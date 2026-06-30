@@ -1,35 +1,26 @@
 # RIVA
 
-RIVA is a web-based AI Agent application.
+[简体中文](README.zh-CN.md) | English
 
-## Project Structure
+RIVA is a web-based AI agent application.
 
-```text
-riva/
-  apps/
-    client/      # Web client, based on React
-    server/      # FastAPI Backend service
-  packages/      # Independent reusable packages, only added when necessary
-  docs/          # Product, architecture, and development documents
-  scripts/       # Development and automation scripts
-  infra/         # Deployment and infrastructure-related configuration
-```
+## Documentation
 
-## Branch Strategy
+- [Project structure](docs/en/project-structure.md)
 
-This project uses separate long-lived branches for client and server development:
+## Development
+
+Use `main` as the stable integration branch. Client, server, and documentation
+work can use dedicated long-lived branches:
 
 ```text
-main      # Stable integration branch
-client    # Frontend development branch
-server    # Backend development branch
+main      stable integration
+client    frontend development
+server    backend development
+docs      documentation
 ```
 
-Avoid developing directly on `main`. Use `main` as the stable integration branch.
+Daily changes should happen on task branches and merge back through the normal
+review path.
 
-## Package Managers
-
-This project uses:
-
-* `pnpm` for JavaScript / TypeScript workspace management
-* `uv` for Python dependency and project management
+Use `pnpm` for JavaScript and TypeScript packages, and `uv` for Python services.

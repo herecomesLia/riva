@@ -1,0 +1,92 @@
+# Project Structure
+
+This document describes the intended structure of the RIVA repository.
+
+## Top-Level Layout
+
+```text
+riva/
+├── apps/
+│   ├── client/      # React web client
+│   └── server/      # FastAPI backend service
+├── packages/        # Shared reusable packages
+│   └── contracts/   # API contracts used by the frontend and backend
+├── docs/            # Product, architecture, and development documents
+├── scripts/         # Development and automation scripts
+└── infra/           # Deployment and infrastructure configuration
+```
+
+## Frontend Architecture
+
+`apps/client/` is the RIVA frontend application. It handles user interaction,
+routing, and UI presentation.
+
+Frontend directory structure:
+
+```text
+apps/client/
+├── public/          # Static assets served by Vite
+├── src/
+│   ├── app/
+│   ├── pages/
+│   ├── widgets/
+│   ├── services/
+│   ├── routes/
+│   ├── stores/
+│   ├── styles/
+│   └── assets/
+├── package.json
+├── vite.config.ts
+└── tsconfig*.json
+```
+
+Layer responsibilities:
+
+- `app/`: application bootstrap, providers, and app-wide configuration.
+- `pages/`: screens mapped to application routes.
+- `widgets/`: reusable UI sections and composed components.
+- `services/`: API clients, Server-Sent Events streams, WebSocket connections,
+  and upload clients.
+- `routes/`: routing definitions.
+- `stores/`: UI, session, and cache state.
+- `styles/`: global styles, themes, and design tokens.
+- `assets/`: static assets imported by the app.
+
+## Backend Architecture
+
+`apps/server/` is the RIVA FastAPI backend service.
+
+Backend directory structure:
+
+```text
+apps/server/
+├── pyproject.toml
+├── uv.lock
+├── src/
+│   └── riva/
+│       ├── api/
+│       ├── core/
+│       ├── db/
+│       ├── models/
+│       ├── schemas/
+│       ├── services/
+│       ├── agents/
+│       ├── prompts/
+│       └── integrations/
+├── tests/
+└── migrations/
+```
+
+Layer responsibilities:
+
+- `api/`: FastAPI routes, request validation, and response handling.
+- `core/`: configuration, logging, exceptions, auth dependencies, and lifecycle code.
+- `db/`: database connections, transactions, and migration support.
+- `models/`: database models, such as users, resumes, jobs, questions, interview
+  sessions, reviews, and agent run records.
+- `schemas/`: Pydantic request and response schemas.
+- `services/`: business services for resumes, jobs, matching analysis, questions,
+  interviews, and review scoring.
+- `agents/`: agents and workflows.
+- `prompts/`: prompt templates, scoring rubrics, and output formats.
+- `integrations/`: adapters for LLM providers, object storage, email, and third-party APIs.
