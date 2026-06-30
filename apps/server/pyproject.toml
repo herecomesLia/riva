@@ -1,0 +1,22 @@
+[project]
+name = "riva-server"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+  "fastapi[standard]>=0.138.1",
+  "pydantic>=2.13.4",
+  "typer>=0.17.4",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.1.1"]
+
+[project.scripts]
+riva = "riva.cli:main"
+
+[tool.uv.build-backend]
+module-name = "riva"
+
+[build-system]
+requires = ["uv_build>=0.11.24,<0.12.0"]
+build-backend = "uv_build"
