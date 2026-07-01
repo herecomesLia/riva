@@ -6,21 +6,21 @@ Riva is an AI interview training assistant for job seekers. Based on the user's 
 
 Across the user's journey from building a job search profile and understanding a target role to practicing interviews and reviewing performance, Riva's capabilities can be grouped into five areas:
 
-- **User foundation**: Maintains resumes, education experience, work experience, project experience, skill tags, target roles, and job search direction as the foundation for personalized analysis and training.
+- **Job Search Profile Management**: Maintains resumes, education experience, work experience, project experience, skill tags, target roles, and job search direction as the foundation for personalized analysis and training.
 - **Job understanding and matching**: Parses target JDs, extracts responsibilities, capability requirements, business context, and high-frequency keywords, then generates a resume-to-role matching analysis.
-- **Core interview training capabilities**: Uses question cards as the smallest training unit and supports personalized question generation, single-question practice, dynamic follow-up questions, scoring, and single-question reviews.
-- **Training modes**: Provides targeted practice and mock interviews for two scenarios: quick single-question improvement and continuous multi-question interview rehearsal.
+- **Question Cards and Single-Question Practice**: Uses question cards as the smallest training unit and supports personalized question generation, single-question practice, dynamic follow-up questions, scoring, and single-question reviews.
+- **Targeted Practice and Mock Interviews**: Provides targeted practice and mock interviews for two scenarios: quick single-question improvement and continuous multi-question interview rehearsal.
 - **Training records and recommendations**: Stores user answers, follow-up questions, scores, reviews, weak areas, and recommendation results to support later question generation, training suggestions, and review improvements.
 
 ## Table of Contents
 
-- [User Foundation](#user-foundation)
+- [Job Search Profile Management](#job-search-profile-management)
 - [Job Understanding and Matching](#job-understanding-and-matching)
-- [Core Interview Training Capabilities](#core-interview-training-capabilities)
-- [Training Modes](#training-modes)
+- [Question Cards and Single-Question Practice](#question-cards-and-single-question-practice)
+- [Targeted Practice and Mock Interviews](#targeted-practice-and-mock-interviews)
 - [Training Records and Recommendations](#training-records-and-recommendations)
 
-## User Foundation
+## Job Search Profile Management
 
 ### Resume Information Management
 
@@ -90,7 +90,7 @@ Riva should combine the user's resume and target JD to generate a matching analy
 
 The matching analysis result should be an important input for question card generation, targeted practice recommendations, and mock interview question set generation.
 
-## Core Interview Training Capabilities
+## Question Cards and Single-Question Practice
 
 ### Question Cards
 
@@ -171,7 +171,7 @@ A single-question review should include:
 
 Review suggestions should be specific, actionable, and related to the user's current answer.
 
-## Training Modes
+## Targeted Practice and Mock Interviews
 
 ### Targeted Practice
 
