@@ -1,6 +1,6 @@
 # 项目结构
 
-本文档说明 RIVA 仓库的目标组织方式。
+本文档说明 Riva 仓库的目标组织方式。
 
 ## 顶层结构
 
@@ -18,7 +18,7 @@ riva/
 
 ## 前端架构
 
-`apps/client/` 是 RIVA 的前端应用，负责用户交互、路由和界面展示。
+`apps/client/` 是 Riva 的前端应用，负责用户交互、路由和界面展示。
 
 前端目录结构：
 
@@ -52,7 +52,7 @@ apps/client/
 
 ## 后端架构
 
-`apps/server/` 是 RIVA 的 FastAPI 后端服务。
+`apps/server/` 是 Riva 的 FastAPI 后端服务。
 
 后端目录结构：
 

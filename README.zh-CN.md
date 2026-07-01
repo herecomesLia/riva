@@ -1,8 +1,8 @@
-# RIVA
+# Riva
 
 简体中文 | [English](README.md)
 
-RIVA 是一个基于 Web 的 AI Agent 应用。
+Riva 是一个基于 Web 的 AI Agent 应用。
 
 ## 文档入口
 

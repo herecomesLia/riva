@@ -1,6 +1,6 @@
 # Project Structure
 
-This document describes the intended structure of the RIVA repository.
+This document describes the intended structure of the Riva repository.
 
 ## Top-Level Layout
 
@@ -18,7 +18,7 @@ riva/
 
 ## Frontend Architecture
 
-`apps/client/` is the RIVA frontend application. It handles user interaction,
+`apps/client/` is the Riva frontend application. It handles user interaction,
 routing, and UI presentation.
 
 Frontend directory structure:
@@ -54,7 +54,7 @@ Layer responsibilities:
 
 ## Backend Architecture
 
-`apps/server/` is the RIVA FastAPI backend service.
+`apps/server/` is the Riva FastAPI backend service.
 
 Backend directory structure:
 
