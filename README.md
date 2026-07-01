@@ -2,11 +2,32 @@
 
 [简体中文](README.zh-CN.md) | English
 
-Riva is a web-based AI agent application.
+Riva is a web-based AI interview training assistant for job seekers.
+
+It helps users prepare for target roles by combining resume context, job
+description understanding, personalized interview question cards, targeted
+practice, mock interviews, scoring, reviews, and follow-up training
+recommendations.
+
+## Product Scope
+
+Riva focuses on five product areas:
+
+- **User foundation**: resumes, education, work experience, project experience,
+  skill tags, target roles, and job search direction.
+- **Job understanding and matching**: JD parsing, capability extraction, keyword
+  analysis, and resume-to-role matching reports.
+- **Interview training capabilities**: personalized question cards,
+  single-question practice, dynamic follow-up questions, scoring, and reviews.
+- **Training modes**: targeted practice for rapid single-question improvement
+  and mock interviews for continuous multi-question rehearsal.
+- **Records and recommendations**: answer history, scores, reviews, weak areas,
+  saved questions, and next-step training suggestions.
 
 ## Documentation
 
-- [Project structure](docs/en/project-structure.md)
+- [Product Requirements](docs/en/product-requirements.md)
+- [Project Structure](docs/en/project-structure.md)
 
 ## Development
 
