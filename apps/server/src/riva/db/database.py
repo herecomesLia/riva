@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from riva.db.base import Base
-from riva.errors import DatabaseUnavailableError
+from riva.core.errors import DatabaseUnavailableError
 
 
 class Database:

@@ -70,7 +70,6 @@ apps/server/
 │       ├── cli/
 │       ├── core/
 │       ├── db/
-│       ├── errors/
 │       ├── models/
 │       ├── schemas/
 │       ├── services/
@@ -86,7 +85,6 @@ Layer responsibilities:
 - `api/`: FastAPI routes, request validation, and response handling.
 - `cli/`: Typer command definitions and command-specific orchestration.
 - `core/`: configuration, logging, auth dependencies, and lifecycle code.
-- `errors/`: centralized error types, exception base classes, and reusable application errors.
 - `db/`: database connections, transactions, and migration support.
 - `models/`: database models, such as users, resumes, jobs, questions, interview
   sessions, reviews, and agent run records.

@@ -68,7 +68,6 @@ apps/server/
 │       ├── cli/
 │       ├── core/
 │       ├── db/
-│       ├── errors/
 │       ├── models/
 │       ├── schemas/
 │       ├── services/
@@ -84,7 +83,6 @@ apps/server/
 - `api/`：FastAPI 路由、请求校验和响应处理。
 - `cli/`：Typer 命令定义和命令侧编排逻辑。
 - `core/`：配置、日志、鉴权依赖和应用生命周期。
-- `errors/`：统一错误类型、异常基类和可复用的业务错误定义。
 - `db/`：数据库连接、事务和迁移基础能力。
 - `models/`：数据库模型，例如用户、简历、岗位、题卡、面试会话、复盘和 Agent 运行记录。
 - `schemas/`：Pydantic 请求和响应结构。
