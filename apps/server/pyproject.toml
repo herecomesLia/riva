@@ -3,10 +3,12 @@ name = "riva-server"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+  "asyncpg>=0.31.0",
   "fastapi[standard]>=0.138.1",
   "pydantic>=2.13.4",
   "pydantic-settings>=2.14.2",
   "rich>=15.0.0",
+  "sqlalchemy>=2.0.45",
   "typer>=0.17.4",
 ]
 

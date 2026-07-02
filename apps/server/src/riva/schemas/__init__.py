@@ -1,3 +1,4 @@
 from riva.schemas.health import HealthResponse
+from riva.schemas.health import DependencyHealthStatus, ServiceHealthStatus
 
-__all__ = ["HealthResponse"]
+__all__ = ["DependencyHealthStatus", "HealthResponse", "ServiceHealthStatus"]

@@ -12,3 +12,4 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 7482
     log_level: LogLevel = LogLevel.info
+    database_url: str

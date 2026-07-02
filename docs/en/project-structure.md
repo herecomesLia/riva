@@ -67,6 +67,7 @@ apps/server/
 ├── src/
 │   └── riva/
 │       ├── api/
+│       ├── cli/
 │       ├── core/
 │       ├── db/
 │       ├── errors/
@@ -83,6 +84,7 @@ apps/server/
 Layer responsibilities:
 
 - `api/`: FastAPI routes, request validation, and response handling.
+- `cli/`: Typer command definitions and command-specific orchestration.
 - `core/`: configuration, logging, auth dependencies, and lifecycle code.
 - `errors/`: centralized error types, exception base classes, and reusable application errors.
 - `db/`: database connections, transactions, and migration support.
