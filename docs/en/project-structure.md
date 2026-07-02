@@ -28,6 +28,7 @@ apps/client/
 ├── public/          # Static assets served by Vite
 ├── src/
 │   ├── app/
+│   ├── i18n/
 │   ├── pages/
 │   ├── widgets/
 │   ├── services/
@@ -43,6 +44,7 @@ apps/client/
 Layer responsibilities:
 
 - `app/`: application bootstrap, providers, and app-wide configuration.
+- `i18n/`: multilingual resources, localization configuration, language switching logic, and internationalized formatting for dates, numbers, and similar values.
 - `pages/`: screens mapped to application routes.
 - `widgets/`: reusable UI sections and composed components.
 - `services/`: API clients, Server-Sent Events streams, WebSocket connections,

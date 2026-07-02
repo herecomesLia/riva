@@ -27,6 +27,7 @@ apps/client/
 ├── public/          # 由 Vite 直接服务的静态资源
 ├── src/
 │   ├── app/
+│   ├── i18n/
 │   ├── pages/
 │   ├── widgets/
 │   ├── services/
@@ -42,6 +43,7 @@ apps/client/
 职责分层：
 
 - `app/`：应用初始化、全局 Provider 和全局配置。
+- `i18n/`：多语言资源、本地化配置、语言切换逻辑和日期、数字等国际化格式处理。
 - `pages/`：对应应用路由的页面。
 - `widgets/`：可复用 UI 区块和组合组件。
 - `services/`：API 客户端、Server-Sent Events 流式连接、WebSocket 连接和上传客户端。
