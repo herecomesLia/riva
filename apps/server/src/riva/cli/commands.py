@@ -1,12 +1,11 @@
-import os
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Annotated
 
 import typer
-import uvicorn
 
 from riva.core.config import Settings
-from riva.core.logging import LogLevel
+from riva.core.logging import LogFormat, LogLevel, configure_logging
 
 
 def start(
@@ -26,15 +25,28 @@ def start(
     ] = None,
     port: Annotated[
         int | None,
-        typer.Option("--port", min=1, max=65535, help="Port to listen on. Overrides RIVA_PORT."),
+        typer.Option(
+            "--port", min=1, max=65535, help="Port to listen on. Overrides RIVA_PORT."
+        ),
     ] = None,
     reload: Annotated[
         bool,
-        typer.Option("--reload", help="Restart the server when source files change. CLI-only."),
+        typer.Option(
+            "--reload", help="Restart the server when source files change. CLI-only."
+        ),
     ] = False,
     log_level: Annotated[
         LogLevel | None,
-        typer.Option("--log-level", help="Uvicorn log level. Overrides RIVA_LOG_LEVEL."),
+        typer.Option(
+            "--log-level", help="Application log level. Overrides RIVA_LOG_LEVEL."
+        ),
+    ] = None,
+    log_format: Annotated[
+        LogFormat | None,
+        typer.Option(
+            "--log-format",
+            help="Log renderer: console for development, json for production.",
+        ),
     ] = None,
 ) -> None:
     """Start the FastAPI server."""
@@ -45,21 +57,50 @@ def start(
         overrides["port"] = port
     if log_level is not None:
         overrides["log_level"] = log_level
+    if log_format is not None:
+        overrides["log_format"] = log_format
 
     settings = Settings(_env_file=env_file, **overrides)
+    settings.write_environ()
+    configure_logging(settings.log_level, settings.log_format)
 
-    os.environ["RIVA_HOST"] = settings.host
-    os.environ["RIVA_PORT"] = str(settings.port)
-    os.environ["RIVA_LOG_LEVEL"] = settings.log_level.value
-    os.environ["RIVA_DATABASE_URL"] = settings.database_url
+    import uvicorn
 
-    uvicorn.run(
-        "riva.main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=reload,
-        log_level=settings.log_level.value,
-    )
+    uvicorn_options: dict[str, object] = {
+        "host": settings.host,
+        "port": settings.port,
+        "reload": reload,
+        "log_level": settings.log_level.value,
+        "log_config": None,
+        "access_log": False,
+    }
+    if reload:
+        uvicorn_options["reload_dirs"] = [str(_source_root_dir())]
+
+    uvicorn.run("riva.main:app", **uvicorn_options)
+
+
+def _source_root_dir() -> Path:
+    spec = find_spec("riva")
+    if spec is None:
+        raise RuntimeError("Cannot resolve the riva package location.")
+
+    package_locations = spec.submodule_search_locations
+    if not package_locations:
+        raise RuntimeError("Cannot resolve the riva package directory.")
+
+    locations = list(package_locations)
+    if len(locations) != 1:
+        raise RuntimeError(
+            f"Expected exactly one riva package location, got: {locations}"
+        )
+
+    package_dir = Path(locations[0]).resolve()
+
+    if not package_dir.is_dir():
+        raise RuntimeError(f"Resolved riva path is not a directory: {package_dir}")
+
+    return package_dir.parent
 
 
 def register_commands(app: typer.Typer) -> None:
