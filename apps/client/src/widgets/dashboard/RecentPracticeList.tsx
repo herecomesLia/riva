@@ -1,10 +1,10 @@
-const records = [
-  { title: '项目深挖 · 增长实验复盘', time: '今天 10:30', score: '7.8' },
-  { title: '行为面试 · 跨团队冲突', time: '昨天 21:15', score: '7.2' },
-  { title: '业务理解 · AI 产品落地', time: '周二 19:40', score: '8.1' },
-]
+import type { RecentPractice } from '../../types/dashboard'
 
-export function RecentPracticeList() {
+type RecentPracticeListProps = {
+  records: RecentPractice[]
+}
+
+export function RecentPracticeList({ records }: RecentPracticeListProps) {
   return (
     <section className="panel" id="history" aria-labelledby="recent-practice-title">
       <div className="panel__header">
@@ -16,17 +16,21 @@ export function RecentPracticeList() {
           查看全部
         </button>
       </div>
-      <div className="record-list">
-        {records.map((record) => (
-          <article className="record-item" key={record.title}>
-            <div>
-              <h3>{record.title}</h3>
-              <p>{record.time}</p>
-            </div>
-            <strong>{record.score}</strong>
-          </article>
-        ))}
-      </div>
+      {records.length > 0 ? (
+        <div className="record-list">
+          {records.map((record) => (
+            <article className="record-item" key={record.id}>
+              <div>
+                <h3>{record.title}</h3>
+                <p>{record.displayTime}</p>
+              </div>
+              <strong>{record.score.toFixed(1)}</strong>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="panel__copy">暂无练习记录。</p>
+      )}
     </section>
   )
 }

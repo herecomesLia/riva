@@ -378,6 +378,23 @@ svg {
   background: var(--color-surface-strong);
 }
 
+.button:disabled,
+.icon-button:disabled,
+.language-button:disabled,
+.user-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
+.app-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-weight: 800;
+}
+
 .login-page {
   --color-background: #f0f9ff;
   --color-surface: #ffffff;
@@ -537,6 +554,16 @@ svg {
   color: color-mix(in srgb, var(--color-muted) 75%, transparent);
 }
 
+.form-error {
+  border: 1px solid color-mix(in srgb, var(--color-danger) 34%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-danger) 8%, white);
+  color: var(--color-danger);
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .login-form__row {
   display: flex;
   align-items: center;
@@ -585,6 +612,31 @@ svg {
 .dashboard-page {
   display: grid;
   gap: var(--space-6);
+}
+
+.dashboard-state {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-8);
+}
+
+.dashboard-state h1 {
+  color: var(--color-foreground);
+  font-size: 32px;
+  line-height: 1.15;
+}
+
+.dashboard-state p {
+  max-width: 680px;
+  color: var(--color-muted);
+}
+
+.dashboard-state--error {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
 }
 
 .dashboard-hero {
@@ -684,6 +736,11 @@ svg {
   align-content: start;
   gap: var(--space-5);
   padding: var(--space-5);
+}
+
+.panel--empty {
+  color: var(--color-muted);
+  font-weight: 800;
 }
 
 .panel__header {

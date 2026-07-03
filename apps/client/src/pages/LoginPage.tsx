@@ -1,15 +1,38 @@
 import type { FormEvent } from 'react'
+import { useState } from 'react'
+import { login } from '../services/auth.api'
+import type { AuthSession } from '../types/auth'
 
 type LoginPageProps = {
-  onLogin: () => void
+  onLogin: (session: AuthSession) => void
 }
 
 const heroTags = ['求职档案', '目标岗位', '模拟面试']
 
 export function LoginPage({ onLogin }: LoginPageProps) {
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    onLogin()
+    setError(null)
+    setIsSubmitting(true)
+
+    const formData = new FormData(event.currentTarget)
+
+    try {
+      const session = await login({
+        account: String(formData.get('account') ?? ''),
+        password: String(formData.get('password') ?? ''),
+        remember: formData.get('remember') === 'on',
+      })
+
+      onLogin(session)
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : '登录失败，请稍后重试')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -78,8 +101,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <a href="#forgot-password">忘记密码？</a>
             </div>
 
-            <button className="button button--primary button--full" type="submit">
-              登录并进入工作台
+            {error ? (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            <button className="button button--primary button--full" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? '登录中...' : '登录并进入工作台'}
             </button>
           </form>
 

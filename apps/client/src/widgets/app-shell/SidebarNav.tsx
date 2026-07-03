@@ -6,6 +6,7 @@ import {
   ProfileIcon,
   RoleIcon,
 } from './icons'
+import type { User } from '../../types/auth'
 
 const navItems = [
   { label: '工作台', href: '#dashboard-title', icon: HomeIcon, active: true },
@@ -16,7 +17,11 @@ const navItems = [
   { label: '训练记录', href: '#history', icon: HistoryIcon },
 ]
 
-export function SidebarNav() {
+type SidebarNavProps = {
+  user: User
+}
+
+export function SidebarNav({ user }: SidebarNavProps) {
   return (
     <aside className="sidebar" aria-label="主导航">
       <div className="brand" aria-label="Riva">
@@ -48,11 +53,8 @@ export function SidebarNav() {
       </nav>
 
       <div className="sidebar__footer">
-        <p>本周目标</p>
-        <strong>完成 6 道高价值题卡</strong>
-        <div className="mini-progress" aria-label="本周目标完成 67%">
-          <span style={{ width: '67%' }} />
-        </div>
+        <p>{user.role}</p>
+        <strong>{user.currentTargetRole ?? '暂未设置目标岗位'}</strong>
       </div>
     </aside>
   )

@@ -1,6 +1,12 @@
 import { BellIcon, SearchIcon } from './icons'
+import type { User } from '../../types/auth'
 
-export function TopBar() {
+type TopBarProps = {
+  onLogout: () => void
+  user: User
+}
+
+export function TopBar({ onLogout, user }: TopBarProps) {
   return (
     <header className="topbar">
       <label className="search-field">
@@ -14,11 +20,14 @@ export function TopBar() {
           <BellIcon className="icon-button__icon" />
         </button>
         <button className="language-button" type="button" aria-label="切换语言">
-          zh-CN
+          {user.locale}
         </button>
         <button className="user-button" type="button" aria-label="打开用户菜单">
-          <span aria-hidden="true">L</span>
-          <span>Liang</span>
+          <span aria-hidden="true">{user.avatarInitial}</span>
+          <span>{user.name}</span>
+        </button>
+        <button className="button button--ghost button--small" type="button" onClick={onLogout}>
+          退出
         </button>
       </div>
     </header>
