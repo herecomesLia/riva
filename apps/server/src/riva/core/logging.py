@@ -17,8 +17,8 @@ from typing import Any
 
 import structlog
 from asgi_correlation_id import correlation_id
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from fastapi import Request
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from structlog.typing import EventDict
 
 from riva.utils import seconds_to_ms
@@ -40,34 +40,49 @@ class LogFormat(StrEnum):
     JSON = "json"
 
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(
+class RequestLoggingMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(
         self,
-        request: Request,
-        call_next: RequestResponseEndpoint,
-    ) -> Response:
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         logger = structlog.get_logger("riva.request")
 
+        request = Request(scope)
         started_at = perf_counter()
         request_id = correlation_id.get()
 
-        # Bind correlation id to structlog context.
-        if request_id is not None:
-            context_tokens = structlog.contextvars.bind_contextvars(
-                request_id=request_id
-            )
-        else:
-            context_tokens = {}
+        # Bind request id to structlog context.
+        context_tokens = (
+            structlog.contextvars.bind_contextvars(request_id=request_id)
+            if request_id is not None
+            else {}
+        )
 
         status_code = 500
         error: Exception | None = None
 
+        async def send_wrapper(message: Message) -> None:
+            nonlocal status_code
+
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+
+            await send(message)
+
         try:
-            response = await call_next(request)
-            status_code = response.status_code
-            return response
+            await self.app(scope, receive, send_wrapper)
 
         except Exception as exc:
+            # Keep the original exception flow.
             error = exc
             raise
 
@@ -108,7 +123,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     pass
 
             finally:
-                # Always clear request context.
+                # Clear request context.
                 structlog.contextvars.reset_contextvars(**context_tokens)
 
     def _resolve_route_template(self, request: Request) -> str | None:
@@ -118,17 +133,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             return None
 
         route_name = getattr(route, "name", None)
-
         if route_name is None:
             return None
 
         path_params = {name: f"{{{name}}}" for name in request.path_params}
 
         try:
-            # Resolve full route template, including router prefixes.
+            # Resolve full route template with router prefixes.
             return str(request.app.url_path_for(route_name, **path_params))
         except Exception:
-            # Do not return an unreliable fallback route.
+            # Avoid unreliable fallback values.
             return None
 
 
