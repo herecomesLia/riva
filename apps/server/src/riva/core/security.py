@@ -7,8 +7,9 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,32}$")
-MIN_PASSWORD_LENGTH = 8
-MAX_PASSWORD_LENGTH = 1024
+PASSWORD_PATTERN = re.compile(
+    r"^[A-Za-z0-9!@#$%^&*()_\-+=\[\]{}|\\:;\"'<>?,./~`]{8,128}$"
+)
 
 _password_hasher = PasswordHasher()
 
@@ -20,7 +21,7 @@ def normalize_username(username: str) -> str:
 
 
 def validate_password(password: str) -> None:
-    if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
+    if not PASSWORD_PATTERN.fullmatch(password):
         raise ValueError("invalid_password")
 
 

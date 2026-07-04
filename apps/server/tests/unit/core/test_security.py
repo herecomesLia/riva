@@ -23,11 +23,37 @@ def test_normalize_username_rejects_invalid_values(username: str) -> None:
 
 
 def test_password_hash_does_not_store_plaintext() -> None:
-    password_hash = hash_password("correct horse battery staple")
+    password = "Aa1!Bb2@"
+    password_hash = hash_password(password)
 
-    assert password_hash != "correct horse battery staple"
-    assert verify_password(password_hash, "correct horse battery staple") is True
+    assert password_hash != password
+    assert verify_password(password_hash, password) is True
     assert verify_password(password_hash, "wrong password") is False
+
+
+def test_password_hash_accepts_documented_visible_symbols() -> None:
+    password = 'Aa1!@#%^&*()_-+=[]{}|\\:;"\'<>?,./~`'
+
+    password_hash = hash_password(password)
+
+    assert verify_password(password_hash, password) is True
+
+
+@pytest.mark.parametrize(
+    "password",
+    [
+        "Aa1!Bb2",  # too short
+        "Aa1!Bb2@" + "c" * 121,  # 129 chars
+        "Aa1!Bb2 ",
+        "Aa1!Bb2\n",
+        "Aa1!Bb2😊",
+    ],
+)
+def test_validate_password_rejects_invalid_values(password: str) -> None:
+    from riva.core.security import validate_password
+
+    with pytest.raises(ValueError, match="invalid_password"):
+        validate_password(password)
 
 
 def test_session_token_digest_is_stable_and_not_plaintext() -> None:

@@ -79,7 +79,7 @@ class AuthService:
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
             raise _invalid_credentials()
-        if len(password) > 1024 or not verify_password(user.password_hash, password):
+        if not verify_password(user.password_hash, password):
             raise _invalid_credentials()
 
         now = _utc_now()
