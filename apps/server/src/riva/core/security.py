@@ -6,7 +6,7 @@ import secrets
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
-USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,32}$")
+USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{4,32}$")
 PASSWORD_PATTERN = re.compile(
     r"^[A-Za-z0-9!@#$%^&*()_\-+=\[\]{}|\\:;\"'<>?,./~`]{8,128}$"
 )

@@ -15,7 +15,26 @@ def test_normalize_username_accepts_uppercase_and_lowercases_for_lookup() -> Non
 
 @pytest.mark.parametrize(
     "username",
-    ["ab", " bad", "bad ", "bad name", "bad.name", "name!", "a" * 33],
+    ["Abc1", "User_Name-1", "A" * 32],
+)
+def test_normalize_username_accepts_valid_usernames(username: str) -> None:
+    normalized = normalize_username(username)
+
+    assert normalized == username.lower()
+
+
+@pytest.mark.parametrize(
+    "username",
+    [
+        "abc",
+        "ab c",
+        " abc",
+        "abc ",
+        "a\tbc",
+        "bad.name",
+        "name!",
+        "a" * 33,
+    ],
 )
 def test_normalize_username_rejects_invalid_values(username: str) -> None:
     with pytest.raises(ValueError, match="invalid_username"):

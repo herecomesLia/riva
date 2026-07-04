@@ -23,7 +23,10 @@ class FakeAuthService:
     counter: int = 0
 
     async def register(self, username: str, password: str) -> AuthResult:
-        normalized_username = normalize_username(username)
+        try:
+            normalized_username = normalize_username(username)
+        except ValueError as exc:
+            raise APIError(422, "invalid_username") from exc
         if normalized_username in self.users:
             raise APIError(409, "username_taken")
 
@@ -45,7 +48,10 @@ class FakeAuthService:
         *,
         current_token: str | None = None,
     ) -> AuthResult:
-        normalized_username = normalize_username(username)
+        try:
+            normalized_username = normalize_username(username)
+        except ValueError as exc:
+            raise APIError(401, "invalid_credentials") from exc
         if normalized_username not in self.users or password != "correct-password":
             raise APIError(401, "invalid_credentials")
         if current_token in self.tokens:
@@ -124,6 +130,20 @@ def test_register_rejects_duplicate_username(app) -> None:
     assert first_response.status_code == 201
     assert second_response.status_code == 409
     assert second_response.json() == {"error": "username_taken"}
+
+
+def test_register_rejects_usernames_shorter_than_four_chars(app) -> None:
+    client, _auth_service = create_auth_client(app)
+
+    with client:
+        response = client.post(
+            "/api/auth/register",
+            json={"username": "abc", "password": "correct-password"},
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "invalid_username"}
 
 
 def test_login_sets_cookie_and_revokes_current_browser_session(app) -> None:
