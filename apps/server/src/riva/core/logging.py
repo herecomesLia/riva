@@ -110,20 +110,7 @@ class RequestLoggingMiddleware:
 
                 logger.info("http.request", **log_fields)
 
-            except Exception:
-                # Logging must not break the request.
-                try:
-                    logger.exception(
-                        "http.request_log_failed",
-                        request_id=request_id,
-                        path=request.url.path,
-                        method=request.method,
-                    )
-                except Exception:
-                    pass
-
             finally:
-                # Clear request context.
                 structlog.contextvars.reset_contextvars(**context_tokens)
 
     def _resolve_route_template(self, request: Request) -> str | None:
