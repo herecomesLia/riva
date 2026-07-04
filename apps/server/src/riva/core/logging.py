@@ -13,6 +13,7 @@ import logging
 import sys
 from enum import StrEnum
 from time import perf_counter
+from types import TracebackType
 from typing import Any
 
 import structlog
@@ -22,6 +23,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from structlog.typing import EventDict
 
 from riva.utils import seconds_to_ms
+
+ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
 
 
 class LogLevel(StrEnum):
@@ -68,7 +71,7 @@ class RequestLoggingMiddleware:
         )
 
         status_code = 500
-        error: Exception | None = None
+        exc_info: ExcInfo | None = None
 
         async def send_wrapper(message: Message) -> None:
             nonlocal status_code
@@ -83,7 +86,7 @@ class RequestLoggingMiddleware:
 
         except Exception as exc:
             # Keep the original exception flow.
-            error = exc
+            exc_info = (type(exc), exc, exc.__traceback__)
             raise
 
         finally:
@@ -104,11 +107,14 @@ class RequestLoggingMiddleware:
                 if route is not None:
                     log_fields["route"] = route
 
-                if error is not None:
-                    log_fields["error_type"] = type(error).__name__
-                    log_fields["error_message"] = str(error)
-
-                logger.info("http.request", **log_fields)
+                if exc_info is None:
+                    logger.info("http.request", **log_fields)
+                else:
+                    exc_type, exc, _ = exc_info
+                    log_fields["error_type"] = exc_type.__name__
+                    log_fields["error_message"] = str(exc)
+                    log_fields["exc_info"] = exc_info
+                    logger.error("http.request", **log_fields)
 
             finally:
                 structlog.contextvars.reset_contextvars(**context_tokens)
@@ -136,11 +142,19 @@ class RequestLoggingMiddleware:
 def configure_logging(log_level: LogLevel, log_format: LogFormat) -> None:
     level = log_level.to_stdlib_level()
     shared_processors = _shared_processors(log_format)
+    exception_processors = _exception_processors(log_format)
+
     structlog_processors = [
         structlog.stdlib.filter_by_level,
         *shared_processors,
+        *exception_processors,
     ]
-    foreign_processors = [*shared_processors, _normalize_foreign_event]
+
+    foreign_processors = [
+        *shared_processors,
+        *exception_processors,
+        _normalize_foreign_event,
+    ]
 
     formatter_processors = _formatter_processors(log_format)
 
@@ -191,9 +205,15 @@ def _shared_processors(log_format: LogFormat) -> list[Any]:
         structlog.stdlib.PositionalArgumentsFormatter(),
         timestamp,
         structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
     ]
+
+
+def _exception_processors(log_format: LogFormat) -> list[Any]:
+    if log_format == LogFormat.JSON:
+        return [structlog.processors.dict_tracebacks]
+
+    return []
 
 
 def _formatter_processors(log_format: LogFormat) -> list[Any]:
