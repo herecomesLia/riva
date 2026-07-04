@@ -6,6 +6,7 @@ from uuid import uuid4
 import structlog
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from riva.api import router
 from riva.core.config import Settings
@@ -78,13 +79,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
 
 
-def register_middlewares(app: FastAPI) -> None:
+def register_middlewares(app: FastAPI, settings: Settings) -> None:
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(
         CorrelationIdMiddleware,
         header_name="X-Request-ID",
         update_request_header=True,
         generator=lambda: str(uuid4()),
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
 
@@ -95,6 +103,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Riva API", lifespan=lifespan)
     app.state.settings = settings
     app.state.database = database
-    register_middlewares(app)
+    register_middlewares(app, settings)
     app.include_router(router, prefix="/api")
     return app

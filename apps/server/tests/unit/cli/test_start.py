@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 
 import riva.cli.commands as commands_module
 from riva.cli.main import app
+from riva.core.config import Settings
 from riva.core.logging import LogFormat, LogLevel
 
 
@@ -81,3 +82,42 @@ def test_start_passes_reload_source_directory(monkeypatch) -> None:
     assert options["reload"] is True
     assert Path(options["reload_dirs"][0]).name == "src"
     assert Path(options["reload_dirs"][0], "riva").is_dir()
+
+
+def test_start_writes_env_file_cors_settings_for_uvicorn_import(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    runner = CliRunner()
+    imported_settings: list[Settings] = []
+    env_file = tmp_path / "riva.env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "RIVA_DATABASE_URL=postgresql+asyncpg://env_user:env_pass@localhost/db",
+                (
+                    "RIVA_CORS_ALLOWED_ORIGINS="
+                    "http://localhost:5173,http://127.0.0.1:5173"
+                ),
+                "RIVA_CORS_ALLOW_CREDENTIALS=true",
+            ]
+        )
+    )
+    monkeypatch.delenv("RIVA_DATABASE_URL", raising=False)
+    monkeypatch.delenv("RIVA_CORS_ALLOWED_ORIGINS", raising=False)
+    monkeypatch.delenv("RIVA_CORS_ALLOW_CREDENTIALS", raising=False)
+
+    def fake_run(_target, **_options) -> None:
+        imported_settings.append(Settings())
+
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+    monkeypatch.setattr(commands_module, "configure_logging", lambda *_args: None)
+
+    result = runner.invoke(app, ["start", "--env-file", str(env_file)])
+
+    assert result.exit_code == 0, result.output
+    assert imported_settings[0].cors_allowed_origins == [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    assert imported_settings[0].cors_allow_credentials is True
