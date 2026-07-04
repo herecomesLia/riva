@@ -15,7 +15,13 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=9.1.1"]
+dev = ["pytest>=9.1.1", "pytest-cov>=7.1.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "integration: tests that require explicitly configured external resources.",
+]
 
 [project.scripts]
 riva = "riva.cli:main"
