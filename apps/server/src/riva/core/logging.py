@@ -105,10 +105,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
             finally:
                 # Always clear request context.
-                try:
-                    structlog.contextvars.reset_contextvars(**context_tokens)
-                except Exception:
-                    pass
+                structlog.contextvars.reset_contextvars(**context_tokens)
 
     def _resolve_request_id(self, request: Request) -> str:
         request_id = request.headers.get("x-request-id")
