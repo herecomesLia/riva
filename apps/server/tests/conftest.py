@@ -18,6 +18,9 @@ def test_settings() -> Settings:
         log_level=LogLevel.INFO,
         log_format=LogFormat.CONSOLE,
         database_url=TEST_DATABASE_URL,
+        cors_allowed_origins=["http://localhost:5173"],
+        session_digest_key="test-session-digest-key",
+        session_cookie_secure=False,
     )
 
 

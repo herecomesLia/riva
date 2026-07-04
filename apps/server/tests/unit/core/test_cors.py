@@ -20,6 +20,8 @@ def create_cors_client(
         log_format=LogFormat.CONSOLE,
         database_url=TEST_DATABASE_URL,
         cors_allowed_origins=allowed_origins,
+        session_digest_key="test-session-digest-key",
+        session_cookie_secure=False,
     )
     app = create_test_app(monkeypatch, settings, FakeDatabase())
     return TestClient(app)

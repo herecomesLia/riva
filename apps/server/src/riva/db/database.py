@@ -6,8 +6,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from riva.db.base import Base
 from riva.core.errors import DatabaseUnavailableError
+from riva.db.base import Base
+
+
+def load_models() -> None:
+    import riva.models  # noqa: F401
 
 
 class Database:
@@ -38,10 +42,12 @@ class Database:
             raise DatabaseUnavailableError("Database ping failed.") from exc
 
     async def create_tables(self) -> None:
+        load_models()
         async with self.engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
 
     async def drop_tables(self) -> None:
+        load_models()
         async with self.engine.begin() as connection:
             await connection.run_sync(Base.metadata.drop_all)
 

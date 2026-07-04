@@ -10,6 +10,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from riva.api import router
 from riva.core.config import Settings
+from riva.core.errors import register_exception_handlers
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
 from riva.utils import seconds_to_ms
@@ -103,6 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Riva API", lifespan=lifespan)
     app.state.settings = settings
     app.state.database = database
+    register_exception_handlers(app)
     register_middlewares(app, settings)
     app.include_router(router, prefix="/api")
     return app

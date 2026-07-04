@@ -17,6 +17,7 @@ def test_start_passes_cli_options_to_uvicorn(monkeypatch) -> None:
         "RIVA_DATABASE_URL",
         "postgresql+asyncpg://cli_user:cli_pass@localhost/cli_db",
     )
+    monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "cli-session-digest-key")
     monkeypatch.setattr(
         uvicorn,
         "run",
@@ -67,6 +68,7 @@ def test_start_passes_reload_source_directory(monkeypatch) -> None:
         "RIVA_DATABASE_URL",
         "postgresql+asyncpg://cli_user:cli_pass@localhost/cli_db",
     )
+    monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "cli-session-digest-key")
     monkeypatch.setattr(
         uvicorn,
         "run",
@@ -100,12 +102,26 @@ def test_start_writes_env_file_cors_settings_for_uvicorn_import(
                     "http://localhost:5173,http://127.0.0.1:5173"
                 ),
                 "RIVA_CORS_ALLOW_CREDENTIALS=true",
+                "RIVA_SESSION_DIGEST_KEY=env-file-session-digest-key",
+                "RIVA_SESSION_COOKIE_NAME=riva_session",
+                "RIVA_SESSION_COOKIE_SECURE=false",
+                "RIVA_SESSION_COOKIE_SAMESITE=lax",
+                "RIVA_SESSION_COOKIE_PATH=/",
+                "RIVA_SESSION_IDLE_TIMEOUT_SECONDS=7200",
+                "RIVA_SESSION_REFRESH_INTERVAL_SECONDS=120",
             ]
         )
     )
     monkeypatch.delenv("RIVA_DATABASE_URL", raising=False)
     monkeypatch.delenv("RIVA_CORS_ALLOWED_ORIGINS", raising=False)
     monkeypatch.delenv("RIVA_CORS_ALLOW_CREDENTIALS", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_DIGEST_KEY", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_COOKIE_NAME", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_COOKIE_SECURE", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_COOKIE_SAMESITE", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_COOKIE_PATH", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_IDLE_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_REFRESH_INTERVAL_SECONDS", raising=False)
 
     def fake_run(_target, **_options) -> None:
         imported_settings.append(Settings())
@@ -121,3 +137,10 @@ def test_start_writes_env_file_cors_settings_for_uvicorn_import(
         "http://127.0.0.1:5173",
     ]
     assert imported_settings[0].cors_allow_credentials is True
+    assert imported_settings[0].session_digest_key == "env-file-session-digest-key"
+    assert imported_settings[0].session_cookie_name == "riva_session"
+    assert imported_settings[0].session_cookie_secure is False
+    assert imported_settings[0].session_cookie_samesite == "lax"
+    assert imported_settings[0].session_cookie_path == "/"
+    assert imported_settings[0].session_idle_timeout_seconds == 7200
+    assert imported_settings[0].session_refresh_interval_seconds == 120

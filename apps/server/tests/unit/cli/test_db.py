@@ -25,6 +25,7 @@ def test_db_setup_creates_tables_without_real_database(monkeypatch) -> None:
         "RIVA_DATABASE_URL",
         "postgresql+asyncpg://cli_user:cli_pass@localhost/cli_db",
     )
+    monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "cli-session-digest-key")
 
     result = runner.invoke(app, ["db", "setup", "-y"])
 
@@ -47,6 +48,7 @@ def test_db_reset_resets_tables_without_real_database(monkeypatch) -> None:
         "RIVA_DATABASE_URL",
         "postgresql+asyncpg://cli_user:cli_pass@localhost/cli_db",
     )
+    monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "cli-session-digest-key")
 
     result = runner.invoke(app, ["db", "reset", "-y"])
 
