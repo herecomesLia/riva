@@ -14,9 +14,9 @@ import sys
 from enum import StrEnum
 from time import perf_counter
 from typing import Any
-from uuid import UUID, uuid4
 
 import structlog
+from asgi_correlation_id import correlation_id
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from structlog.typing import EventDict
@@ -49,10 +49,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         logger = structlog.get_logger("riva.request")
 
         started_at = perf_counter()
-        request_id = self._resolve_request_id(request)
+        request_id = correlation_id.get()
 
-        # Bind request id to structlog context.
-        context_tokens = structlog.contextvars.bind_contextvars(request_id=request_id)
+        # Bind correlation id to structlog context.
+        if request_id is not None:
+            context_tokens = structlog.contextvars.bind_contextvars(
+                request_id=request_id
+            )
+        else:
+            context_tokens = {}
 
         status_code = 500
         error: Exception | None = None
@@ -60,7 +65,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status_code = response.status_code
-            response.headers["X-Request-ID"] = request_id
             return response
 
         except Exception as exc:
@@ -69,17 +73,17 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         finally:
             try:
-                duration_ms = seconds_to_ms(perf_counter() - started_at)
-
                 log_fields: dict[str, Any] = {
                     "status_code": status_code,
                     "method": request.method,
                     "path": request.url.path,
-                    "duration_ms": duration_ms,
+                    "duration_ms": seconds_to_ms(perf_counter() - started_at),
                     "client_ip": request.client.host if request.client else None,
                     "user_agent": request.headers.get("user-agent"),
-                    "request_id": request_id,
                 }
+
+                if request_id is not None:
+                    log_fields["request_id"] = request_id
 
                 route = self._resolve_route_template(request)
                 if route is not None:
@@ -106,19 +110,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             finally:
                 # Always clear request context.
                 structlog.contextvars.reset_contextvars(**context_tokens)
-
-    def _resolve_request_id(self, request: Request) -> str:
-        request_id = request.headers.get("x-request-id")
-
-        if request_id is not None:
-            try:
-                UUID(request_id)
-            except ValueError:
-                pass
-            else:
-                return request_id
-
-        return str(uuid4())
 
     def _resolve_route_template(self, request: Request) -> str | None:
         route = request.scope.get("route")

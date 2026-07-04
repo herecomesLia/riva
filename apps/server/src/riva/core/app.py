@@ -1,8 +1,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from time import perf_counter
+from uuid import uuid4
 
 import structlog
+from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 
 from riva.api import router
@@ -78,6 +80,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def register_middlewares(app: FastAPI) -> None:
     app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(
+        CorrelationIdMiddleware,
+        header_name="X-Request-ID",
+        update_request_header=True,
+        generator=lambda: str(uuid4()),
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
