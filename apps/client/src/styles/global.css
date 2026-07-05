@@ -72,6 +72,7 @@ button {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 main:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-ring) 45%, transparent);
   outline-offset: 3px;
@@ -1326,7 +1327,8 @@ svg {
   padding-right: var(--space-1);
 }
 
-.education-focus-card__period {
+.education-focus-card__period,
+.resume-project-list .resume-project-card__period {
   width: fit-content;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-primary) 10%, var(--color-background));
@@ -1536,36 +1538,6 @@ svg {
   flex: 0 0 auto;
 }
 
-.resume-project-card__edit {
-  display: grid;
-  place-items: center;
-  align-self: stretch;
-  min-width: 32px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-primary);
-  padding: 0;
-  font: inherit;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 180ms ease,
-    color 180ms ease,
-    transform 180ms ease;
-}
-
-.resume-project-card__edit:hover,
-.resume-project-card__edit:focus-visible {
-  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
-  color: var(--color-ring);
-}
-
-.resume-project-card__edit:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
-  outline-offset: 2px;
-}
-
 .resume-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1709,7 +1681,8 @@ svg {
   gap: var(--space-3);
 }
 
-.resume-education-editor__form input {
+.resume-education-editor__form input,
+.resume-education-editor__form textarea {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1719,6 +1692,8 @@ svg {
   font: inherit;
   font-size: 14px;
   font-weight: 500;
+  outline: none;
+  transition: border-color 180ms ease;
 }
 
 .resume-education-editor__form input::placeholder,
@@ -1738,18 +1713,25 @@ svg {
   font: inherit;
   font-size: 14px;
   font-weight: 500;
+  outline: none;
   text-align: left;
   cursor: pointer;
 }
 
-.resume-education-editor__field-button:hover,
-.resume-education-editor__field-button:focus-visible {
+.resume-education-editor__form input:hover,
+.resume-education-editor__form textarea:hover,
+.resume-education-editor__field-button:hover {
   border-color: var(--color-primary);
 }
 
+.resume-education-editor__form input:focus,
+.resume-education-editor__form textarea:focus,
+.resume-education-editor__field-button:focus,
+.resume-education-editor__form input:focus-visible,
+.resume-education-editor__form textarea:focus-visible,
 .resume-education-editor__field-button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
-  outline-offset: 2px;
+  border-color: var(--color-primary);
+  outline: none;
 }
 
 .resume-education-editor__field-button--empty {

@@ -32,6 +32,7 @@ export type ResumeExperience = {
 export type ResumeProject = {
   id: string
   name: string
+  period: string
   role: string
   summary: string
   highlights: string[]

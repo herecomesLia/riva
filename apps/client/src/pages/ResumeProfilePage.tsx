@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent, type WheelEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type FormEvent,
+  type PointerEvent,
+  type WheelEvent,
+} from 'react'
 import editIconUrl from '../assets/edit.svg'
 import { getResumeProfile } from '../services/resume.service'
 import type { AsyncState } from '../types/api'
@@ -10,6 +19,7 @@ type ResumeProfilePageProps = {
 
 type EditableListType = 'skills' | 'certificates'
 type EducationPickerType = 'degree' | 'endPeriod' | 'startPeriod'
+type ProjectPickerType = 'endPeriod' | 'startPeriod'
 
 type EducationDraft = {
   degree: string
@@ -19,6 +29,15 @@ type EducationDraft = {
   organization: string
   startPeriod: string
   title: string
+}
+
+type ProjectDraft = {
+  endPeriod: string
+  id: string
+  name: string
+  role: string
+  sourceText: string
+  startPeriod: string
 }
 
 type WheelPickerProps = {
@@ -34,7 +53,8 @@ function isEmptyProfile(data: { profile: ResumeProfile | null }) {
 
 const EDUCATION_DEGREES = ['大专', '本科', '硕士', '博士']
 const WHEEL_ITEM_HEIGHT = 36
-const PERIOD_YEARS = Array.from({ length: 16 }, (_, index) => String(2015 + index))
+const CURRENT_YEAR = new Date().getFullYear()
+const PERIOD_YEARS = Array.from({ length: 16 }, (_, index) => String(CURRENT_YEAR - 10 + index))
 const PERIOD_MONTHS = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
 
 function parseEditableList(value: string) {
@@ -131,6 +151,83 @@ function educationDraftToExperience(draft: EducationDraft): ResumeExperience {
     organization: draft.organization.trim(),
     period: `${draft.startPeriod} - ${draft.endPeriod}`,
     title: draft.title.trim(),
+  }
+}
+
+function getProjectDraftLabel(draft: ProjectDraft, index: number) {
+  return draft.name || `项目经历 ${index + 1}`
+}
+
+function getProjectHighlights(sourceText: string, fallback: string[]) {
+  const normalizedText = sourceText.trim()
+  const metricMatch = normalizedText.match(/(?:提升|降低|增长|沉淀|完成率|留存|转化率)[^，。；\n]*/)
+  const highlightPool = [
+    metricMatch?.[0],
+    normalizedText.includes('策略') ? '更新项目策略' : '',
+    normalizedText.includes('复盘') ? '完善复盘链路' : '',
+    normalizedText.includes('推荐') ? '优化推荐逻辑' : '',
+    normalizedText.includes('用户') ? '围绕用户体验优化' : '',
+    normalizedText.includes('数据') || normalizedText.includes('埋点') ? '补充数据验证' : '',
+  ].filter((highlight): highlight is string => Boolean(highlight))
+
+  return Array.from(new Set(highlightPool)).slice(0, 3).length
+    ? Array.from(new Set(highlightPool)).slice(0, 3)
+    : fallback
+}
+
+function getProjectSummary(sourceText: string, fallback: string) {
+  const normalizedText = sourceText.trim()
+  const lines = normalizedText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const body = lines
+    .filter((line) => !/^(项目|项目名称|角色|职责|担任|时间|项目时间)[:：]/.test(line))
+    .join(' ')
+  const summarySource = body || normalizedText
+
+  if (!summarySource) {
+    return fallback
+  }
+
+  return summarySource.length > 58 ? `${summarySource.slice(0, 58)}...` : summarySource
+}
+
+function createProjectDraft(project: ResumeProject): ProjectDraft {
+  const { startPeriod, endPeriod } = parseEducationPeriod(project.period)
+
+  return {
+    endPeriod,
+    id: project.id,
+    name: project.name,
+    role: project.role,
+    sourceText: project.sourceText,
+    startPeriod,
+  }
+}
+
+function createEmptyProjectDraft(): ProjectDraft {
+  return {
+    endPeriod: '',
+    id: `project_${Date.now()}`,
+    name: '',
+    role: '',
+    sourceText: '',
+    startPeriod: '',
+  }
+}
+
+function projectDraftToProject(draft: ProjectDraft, originalProject?: ResumeProject): ResumeProject {
+  const sourceText = draft.sourceText.trim()
+
+  return {
+    highlights: getProjectHighlights(sourceText, originalProject?.highlights || []),
+    id: draft.id,
+    name: draft.name.trim(),
+    period: `${draft.startPeriod} - ${draft.endPeriod}`,
+    role: draft.role.trim(),
+    sourceText,
+    summary: getProjectSummary(sourceText, originalProject?.summary || ''),
   }
 }
 
@@ -452,42 +549,7 @@ function EducationFocusBrowser({
   )
 }
 
-function summarizeProjectSource(project: ResumeProject, sourceText: string): ResumeProject {
-  const normalizedText = sourceText.trim()
-  const lines = normalizedText
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  const nameMatch = normalizedText.match(/(?:项目|项目名称)[:：]\s*([^\n]+)/)
-  const roleMatch = normalizedText.match(/(?:角色|职责|担任)[:：]\s*([^\n]+)/)
-  const body = lines
-    .filter((line) => !/^(项目|项目名称|角色|职责|担任)[:：]/.test(line))
-    .join(' ')
-  const summarySource = body || normalizedText
-  const summary = summarySource.length > 58 ? `${summarySource.slice(0, 58)}...` : summarySource
-  const metricMatch = normalizedText.match(/(?:提升|降低|增长|沉淀|完成率|留存|转化率)[^，。；\n]*/)
-  const highlightPool = [
-    metricMatch?.[0],
-    normalizedText.includes('策略') ? '更新项目策略' : '',
-    normalizedText.includes('复盘') ? '完善复盘链路' : '',
-    normalizedText.includes('推荐') ? '优化推荐逻辑' : '',
-    normalizedText.includes('用户') ? '围绕用户体验优化' : '',
-    normalizedText.includes('数据') || normalizedText.includes('埋点') ? '补充数据验证' : '',
-  ].filter((highlight): highlight is string => Boolean(highlight))
-  const highlights = Array.from(new Set(highlightPool)).slice(0, 3)
-
-  return {
-    ...project,
-    name: nameMatch?.[1].trim() || project.name,
-    role: roleMatch?.[1].trim() || project.role,
-    summary: summary || project.summary,
-    highlights: highlights.length ? highlights : project.highlights,
-    sourceText: normalizedText,
-  }
-}
-
-function ProjectList({ items, onEdit }: { items: ResumeProject[]; onEdit: (project: ResumeProject) => void }) {
+function ProjectList({ items }: { items: ResumeProject[] }) {
   if (items.length === 0) {
     return <p className="panel--empty">暂无项目经历</p>
   }
@@ -501,15 +563,7 @@ function ProjectList({ items, onEdit }: { items: ResumeProject[]; onEdit: (proje
               <h3>{project.name}</h3>
               <span>{project.role}</span>
             </div>
-            <button
-              aria-label={`编辑${project.name}项目经历`}
-              className="resume-project-card__edit"
-              title="编辑"
-              type="button"
-              onClick={() => onEdit(project)}
-            >
-              <EditIcon />
-            </button>
+            <span className="resume-project-card__period">{project.period}</span>
           </div>
           <p>{project.summary}</p>
           <div className="keyword-list">
@@ -528,8 +582,12 @@ function ProjectList({ items, onEdit }: { items: ResumeProject[]; onEdit: (proje
 export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
   const [state, setState] = useState<AsyncState<{ profile: ResumeProfile | null }>>({ status: 'loading' })
   const [projects, setProjects] = useState<ResumeProject[]>([])
-  const [editingProjectId, setEditingProjectId] = useState('')
-  const [projectDraft, setProjectDraft] = useState('')
+  const [isEditingProjects, setIsEditingProjects] = useState(false)
+  const [projectDrafts, setProjectDrafts] = useState<ProjectDraft[]>([])
+  const [activeProjectDraftId, setActiveProjectDraftId] = useState('')
+  const [projectPickerType, setProjectPickerType] = useState<ProjectPickerType | ''>('')
+  const [projectPickerYear, setProjectPickerYear] = useState('')
+  const [projectPickerMonth, setProjectPickerMonth] = useState('')
   const [workExperiences, setWorkExperiences] = useState<ResumeExperience[]>([])
   const [editingWorkId, setEditingWorkId] = useState('')
   const [workDraft, setWorkDraft] = useState('')
@@ -573,25 +631,97 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
     }
   }, [state])
 
-  function openProjectEditor(project: ResumeProject) {
-    setEditingProjectId(project.id)
-    setProjectDraft(project.sourceText)
+  function openProjectEditor() {
+    const drafts = projects.length ? projects.map(createProjectDraft) : [createEmptyProjectDraft()]
+
+    setProjectDrafts(drafts)
+    setActiveProjectDraftId(drafts[0]?.id || '')
+    setIsEditingProjects(true)
   }
 
   function closeProjectEditor() {
-    setEditingProjectId('')
-    setProjectDraft('')
+    setIsEditingProjects(false)
+    setProjectDrafts([])
+    setActiveProjectDraftId('')
+    setProjectPickerType('')
   }
 
   function handleProjectSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     setProjects((currentProjects) =>
-      currentProjects.map((project) =>
-        project.id === editingProjectId ? summarizeProjectSource(project, projectDraft) : project,
+      projectDrafts.map((draft) =>
+        projectDraftToProject(
+          draft,
+          currentProjects.find((project) => project.id === draft.id),
+        ),
       ),
     )
     closeProjectEditor()
+  }
+
+  function updateProjectDraft(id: string, patch: Partial<ProjectDraft>) {
+    setProjectDrafts((currentDrafts) =>
+      currentDrafts.map((draft) => (draft.id === id ? { ...draft, ...patch } : draft)),
+    )
+  }
+
+  function addProjectDraft() {
+    const draft = createEmptyProjectDraft()
+
+    setProjectDrafts((currentDrafts) => [...currentDrafts, draft])
+    setActiveProjectDraftId(draft.id)
+  }
+
+  function deleteProjectDraft(id: string) {
+    setProjectDrafts((currentDrafts) => {
+      const nextDrafts =
+        currentDrafts.length > 1 ? currentDrafts.filter((draft) => draft.id !== id) : [createEmptyProjectDraft()]
+
+      if (!nextDrafts.some((draft) => draft.id === activeProjectDraftId)) {
+        setActiveProjectDraftId(nextDrafts[0]?.id || '')
+      }
+
+      return nextDrafts
+    })
+  }
+
+  function openProjectPicker(type: ProjectPickerType) {
+    const activeDraft = projectDrafts.find((draft) => draft.id === activeProjectDraftId)
+
+    if (!activeDraft) {
+      return
+    }
+
+    const { month, year } = splitPeriodValue(type === 'startPeriod' ? activeDraft.startPeriod : activeDraft.endPeriod)
+
+    setProjectPickerType(type)
+    setProjectPickerYear(year || String(CURRENT_YEAR))
+    setProjectPickerMonth(month || '01')
+  }
+
+  function closeProjectPicker() {
+    setProjectPickerType('')
+  }
+
+  function handleStructuredEditorTextFocus(event: FocusEvent<HTMLDivElement>) {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      closeProjectPicker()
+      closeEducationPicker()
+    }
+  }
+
+  function confirmProjectPicker() {
+    const activeDraft = projectDrafts.find((draft) => draft.id === activeProjectDraftId)
+
+    if (!activeDraft || !projectPickerType) {
+      return
+    }
+
+    updateProjectDraft(activeDraft.id, {
+      [projectPickerType]: mergePeriodValue(projectPickerYear, projectPickerMonth),
+    })
+    closeProjectPicker()
   }
 
   function openWorkEditor(item: ResumeExperience) {
@@ -761,10 +891,11 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
   const { profile } = state.data
   const { basicInfo } = profile
   const completion = Math.min(100, Math.max(0, profile.completion))
-  const editingProject = projects.find((project) => project.id === editingProjectId)
   const editingWork = workExperiences.find((item) => item.id === editingWorkId)
   const editingListTitle =
     editingListType === 'skills' ? '技能标签' : editingListType === 'certificates' ? '证书或奖项' : ''
+  const activeProjectDraft = projectDrafts.find((draft) => draft.id === activeProjectDraftId)
+  const projectPickerTitle = projectPickerType === 'startPeriod' ? '项目开始时间' : '项目结束时间'
   const activeEducationDraft = educationDrafts.find((draft) => draft.id === activeEducationDraftId)
   const viewingEducation = education.find((item) => item.id === viewingEducationId)
   const educationPickerTitle =
@@ -904,8 +1035,17 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
               <h2>项目经历</h2>
               <p className="panel__copy">项目亮点会用于项目深挖题和 STAR 结构复盘。</p>
             </div>
+            <button
+              aria-label="编辑项目经历"
+              className="resume-panel-edit"
+              title="编辑"
+              type="button"
+              onClick={openProjectEditor}
+            >
+              <EditIcon />
+            </button>
           </div>
-          <ProjectList items={projects} onEdit={openProjectEditor} />
+          <ProjectList items={projects} />
         </section>
 
         <section className="panel resume-balanced-scroll-panel">
@@ -919,38 +1059,153 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
         </section>
       </div>
 
-      {editingProject ? (
+      {isEditingProjects && activeProjectDraft ? (
         <div className="resume-modal-backdrop">
           <form
             aria-labelledby="project-editor-title"
             aria-modal="true"
-            className="resume-project-editor"
+            className="resume-project-editor resume-education-editor"
             role="dialog"
             onSubmit={handleProjectSave}
           >
             <div className="resume-project-editor__header">
               <div>
-                <p id="project-editor-title">编辑 {editingProject.name}</p>
-                <span>项目经历原文</span>
+                <p id="project-editor-title">编辑项目经历</p>
+                <span>维护结构化信息，项目概述和标签由 Riva 根据原文生成</span>
               </div>
             </div>
-            <label className="resume-project-editor__field">
-              <textarea
-                aria-label="项目经历原文"
-                className="resume-project-editor__textarea"
-                value={projectDraft}
-                onChange={(event) => setProjectDraft(event.target.value)}
-              />
-            </label>
+
+            <div className="resume-education-editor__body">
+              <div className="resume-education-editor__nav" aria-label="选择项目经历">
+                {projectDrafts.map((draft, index) => (
+                  <button
+                    aria-pressed={draft.id === activeProjectDraft.id}
+                    className={`resume-education-editor__nav-item${
+                      draft.id === activeProjectDraft.id ? ' resume-education-editor__nav-item--active' : ''
+                    }`}
+                    key={draft.id}
+                    type="button"
+                    onClick={() => setActiveProjectDraftId(draft.id)}
+                  >
+                    {getProjectDraftLabel(draft, index)}
+                  </button>
+                ))}
+                <button
+                  aria-label="新增项目经历"
+                  className="resume-education-editor__add"
+                  type="button"
+                  onClick={addProjectDraft}
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="resume-education-editor__form" onFocusCapture={handleStructuredEditorTextFocus}>
+                <label className="form-field">
+                  项目名称
+                  <input
+                    placeholder="请填写项目名称"
+                    value={activeProjectDraft.name}
+                    onChange={(event) => updateProjectDraft(activeProjectDraft.id, { name: event.target.value })}
+                  />
+                </label>
+
+                <label className="form-field">
+                  担任角色
+                  <input
+                    placeholder="请填写担任角色"
+                    value={activeProjectDraft.role}
+                    onChange={(event) => updateProjectDraft(activeProjectDraft.id, { role: event.target.value })}
+                  />
+                </label>
+
+                <div className="resume-education-editor__periods">
+                  <div className="form-field">
+                    开始时间
+                    <button
+                      className={`resume-education-editor__field-button${
+                        activeProjectDraft.startPeriod ? '' : ' resume-education-editor__field-button--empty'
+                      }`}
+                      type="button"
+                      onClick={() => openProjectPicker('startPeriod')}
+                    >
+                      {activeProjectDraft.startPeriod || '请选择'}
+                    </button>
+                  </div>
+
+                  <div className="form-field">
+                    结束时间
+                    <button
+                      className={`resume-education-editor__field-button${
+                        activeProjectDraft.endPeriod ? '' : ' resume-education-editor__field-button--empty'
+                      }`}
+                      type="button"
+                      onClick={() => openProjectPicker('endPeriod')}
+                    >
+                      {activeProjectDraft.endPeriod || '请选择'}
+                    </button>
+                  </div>
+                </div>
+
+                <label className="form-field">
+                  项目描述
+                  <textarea
+                    className="resume-project-editor__textarea resume-project-editor__textarea--compact"
+                    placeholder="请填写项目描述"
+                    value={activeProjectDraft.sourceText}
+                    onChange={(event) =>
+                      updateProjectDraft(activeProjectDraft.id, { sourceText: event.target.value })
+                    }
+                  />
+                </label>
+
+                <button
+                  className="resume-education-editor__delete"
+                  type="button"
+                  onClick={() => deleteProjectDraft(activeProjectDraft.id)}
+                >
+                  删除这段项目经历
+                </button>
+              </div>
+            </div>
+
             <div className="resume-project-editor__actions">
               <button className="button button--secondary" type="button" onClick={closeProjectEditor}>
                 取消
               </button>
-              <button className="button button--primary" type="submit" disabled={projectDraft.trim().length === 0}>
+              <button className="button button--primary" type="submit">
                 确认
               </button>
             </div>
           </form>
+
+          {projectPickerType ? (
+            <div className="education-picker-sheet" role="dialog" aria-label={`选择${projectPickerTitle}`}>
+              <div className="education-picker-sheet__header">
+                <button type="button" onClick={closeProjectPicker}>
+                  取消
+                </button>
+                <strong>{projectPickerTitle}</strong>
+                <button type="button" onClick={confirmProjectPicker}>
+                  确定
+                </button>
+              </div>
+              <div className="wheel-picker-group">
+                <WheelPicker
+                  label={`选择${projectPickerTitle}年份`}
+                  options={PERIOD_YEARS}
+                  value={projectPickerYear}
+                  onChange={setProjectPickerYear}
+                />
+                <WheelPicker
+                  label={`选择${projectPickerTitle}月份`}
+                  options={PERIOD_MONTHS}
+                  value={projectPickerMonth}
+                  onChange={setProjectPickerMonth}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1065,7 +1320,7 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
                 </button>
               </div>
 
-              <div className="resume-education-editor__form">
+              <div className="resume-education-editor__form" onFocusCapture={handleStructuredEditorTextFocus}>
                 <label className="form-field">
                   学校
                   <input
