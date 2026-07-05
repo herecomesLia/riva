@@ -2,7 +2,7 @@ import { getAccessToken } from '../stores/session.store'
 import type { ApiErrorData, ApiResponse } from '../types/api'
 
 type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
 }
 
