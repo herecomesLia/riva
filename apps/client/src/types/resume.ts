@@ -25,6 +25,7 @@ export type ResumeExperience = {
   organization: string
   period: string
   description: string
+  degree?: string
   sourceText?: string
 }
 

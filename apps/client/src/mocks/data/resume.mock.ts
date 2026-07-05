@@ -17,14 +17,16 @@ export const mockResumeProfile: ResumeProfile = {
   education: [
     {
       id: 'edu_001',
-      title: '软件工程 本科',
+      title: '软件工程',
+      degree: '本科',
       organization: '华东理工大学',
       period: '2018.09 - 2022.06',
       description: '主修产品设计、数据结构、数据库系统和人机交互，参与校园创新项目。',
     },
     {
       id: 'edu_002',
-      title: '智能产品设计 硕士',
+      title: '智能产品设计',
+      degree: '硕士',
       organization: '上海交通大学',
       period: '2024.09 - 2026.06',
       description:

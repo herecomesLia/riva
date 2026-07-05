@@ -1320,10 +1320,10 @@ svg {
 }
 
 .education-focus-card__body {
+  position: relative;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding-right: var(--space-1);
-  scrollbar-gutter: stable;
 }
 
 .education-focus-card__period {
@@ -1356,6 +1356,38 @@ svg {
   color: var(--color-muted);
   font-size: 15px;
   line-height: 1.55;
+}
+
+.education-focus-card__copy--clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+
+.education-focus-card__read {
+  margin-top: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.education-focus-card__read:hover,
+.education-focus-card__read:focus-visible {
+  color: var(--color-ring);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.education-focus-card__read:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
+  outline-offset: 4px;
+  border-radius: 999px;
 }
 
 @keyframes education-focus-enter {
@@ -1396,29 +1428,47 @@ svg {
 }
 
 .resume-panel-edit {
+  display: grid;
+  place-items: center;
   align-self: start;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: var(--color-primary);
   padding: 0;
   font: inherit;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.4;
+  line-height: 1;
   cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.resume-panel-edit--title {
+  margin-top: -2px;
 }
 
 .resume-panel-edit:hover,
 .resume-panel-edit:focus-visible {
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
   color: var(--color-ring);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .resume-panel-edit:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
-  outline-offset: 4px;
-  border-radius: 999px;
+  outline-offset: 2px;
+}
+
+.resume-edit-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: block;
+  object-fit: contain;
 }
 
 .resume-experience-card__topbar {
@@ -1434,31 +1484,33 @@ svg {
 }
 
 .resume-experience-card__edit {
-  display: flex;
-  align-items: center;
+  display: grid;
+  place-items: center;
   align-self: stretch;
+  min-width: 32px;
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: var(--color-primary);
   padding: 0;
   font: inherit;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.3;
+  line-height: 1;
   cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .resume-experience-card__edit:hover,
 .resume-experience-card__edit:focus-visible {
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
   color: var(--color-ring);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .resume-experience-card__edit:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
-  outline-offset: 4px;
-  border-radius: 999px;
+  outline-offset: 2px;
 }
 
 .resume-project-card__topbar {
@@ -1485,31 +1537,33 @@ svg {
 }
 
 .resume-project-card__edit {
-  display: flex;
-  align-items: center;
+  display: grid;
+  place-items: center;
   align-self: stretch;
+  min-width: 32px;
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: var(--color-primary);
   padding: 0;
   font: inherit;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.3;
+  line-height: 1;
   cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .resume-project-card__edit:hover,
 .resume-project-card__edit:focus-visible {
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
   color: var(--color-ring);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .resume-project-card__edit:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
-  outline-offset: 4px;
-  border-radius: 999px;
+  outline-offset: 2px;
 }
 
 .resume-modal-backdrop {
@@ -1585,6 +1639,292 @@ svg {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+.resume-education-editor {
+  width: min(100%, 760px);
+}
+
+.resume-education-editor__body {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.34fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.resume-education-editor__nav {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+.resume-education-editor__nav-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-muted);
+  padding: var(--space-3);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.resume-education-editor__nav-item--active {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.resume-education-editor__add {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-background) 68%, white);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 24px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.resume-education-editor__add:hover,
+.resume-education-editor__add:focus-visible {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.resume-education-editor__form {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.resume-education-editor__periods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.resume-education-editor__form input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  padding: var(--space-3);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.resume-education-editor__form input::placeholder,
+.resume-education-editor__form textarea::placeholder {
+  color: color-mix(in srgb, var(--color-muted) 66%, white);
+  font-weight: 400;
+}
+
+.resume-education-editor__field-button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  padding: var(--space-3);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.resume-education-editor__field-button:hover,
+.resume-education-editor__field-button:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.resume-education-editor__field-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
+  outline-offset: 2px;
+}
+
+.resume-education-editor__field-button--empty {
+  color: color-mix(in srgb, var(--color-muted) 66%, white);
+  font-weight: 400;
+}
+
+.wheel-picker-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.wheel-picker {
+  position: relative;
+  height: 180px;
+  min-height: 180px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(to bottom, var(--color-surface), transparent 26%, transparent 74%, var(--color-surface)),
+    var(--color-background);
+  padding: 0 var(--space-2);
+  overscroll-behavior: contain;
+  perspective: 560px;
+  touch-action: none;
+  user-select: none;
+}
+
+.wheel-picker--dragging {
+  cursor: grabbing;
+}
+
+.wheel-picker::before {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  z-index: 0;
+  left: var(--space-2);
+  content: '';
+  height: 42px;
+  transform: translateY(-50%);
+  border-block: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  pointer-events: none;
+}
+
+.wheel-picker__track {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.wheel-picker__option {
+  position: absolute;
+  right: var(--space-2);
+  left: var(--space-2);
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-muted) 64%, transparent);
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transform-origin: center center;
+  will-change: top, opacity, transform;
+}
+
+.wheel-picker__option--active {
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-foreground);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.wheel-picker--snapping .wheel-picker__option {
+  transition:
+    color 190ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    font-size 190ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 190ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 190ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 190ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-picker--snapping .wheel-picker__option {
+    transition: none;
+  }
+}
+
+.education-picker-sheet {
+  position: fixed;
+  right: max(var(--space-5), env(safe-area-inset-right));
+  bottom: max(var(--space-5), env(safe-area-inset-bottom));
+  left: max(var(--space-5), env(safe-area-inset-left));
+  z-index: 45;
+  display: grid;
+  gap: var(--space-3);
+  width: min(560px, calc(100vw - var(--space-10)));
+  margin-inline: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4);
+}
+
+.education-picker-sheet__header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.education-picker-sheet__header strong {
+  color: var(--color-foreground);
+  font-size: 17px;
+}
+
+.education-picker-sheet__header button {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.education-picker-sheet__header button:first-child {
+  justify-self: start;
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.education-picker-sheet__header button:last-child {
+  justify-self: end;
+}
+
+.resume-education-editor__delete {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--color-danger);
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.resume-education-editor__delete:hover,
+.resume-education-editor__delete:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.resume-education-viewer {
+  width: min(100%, 620px);
+}
+
+.resume-education-viewer__copy {
+  max-height: min(44vh, 360px);
+  overflow: auto;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.7;
 }
 
 @media (min-width: 1121px) {
@@ -1942,6 +2282,15 @@ svg {
   .role-readiness,
   .resume-detail-list {
     grid-template-columns: 1fr;
+  }
+
+  .resume-education-editor__body,
+  .resume-education-editor__periods {
+    grid-template-columns: 1fr;
+  }
+
+  .resume-education-editor__nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .recommendation-item {
