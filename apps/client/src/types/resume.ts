@@ -60,16 +60,16 @@ export type ResumeSetupGuide = {
   profile: ResumeProfile | null
 }
 
-export type ResumeParseRequest = {
+export type ResumeParseInput = {
   source: 'paste' | 'upload'
   text?: string
   fileName?: string
 }
 
-export type ResumeProfileResponse = {
+export type ResumeProfileResult = {
   profile: ResumeProfile | null
 }
 
-export type SaveResumeProfileRequest = {
+export type SaveResumeProfileInput = {
   profile: ResumeProfile
 }

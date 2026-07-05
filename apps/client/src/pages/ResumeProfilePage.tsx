@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { getResumeProfile } from '../services/resume.api'
+import { getResumeProfile } from '../services/resume.service'
 import type { AsyncState } from '../types/api'
 import type { ResumeExperience, ResumeProfile, ResumeProject } from '../types/resume'
 

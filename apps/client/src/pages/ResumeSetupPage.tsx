@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getResumeSetup, parseResume } from '../services/resume.api'
+import { getResumeSetup, parseResume } from '../services/resume.service'
 import type { AsyncState } from '../types/api'
 import type { ResumeSetupGuide } from '../types/resume'
 
@@ -53,7 +53,7 @@ export function ResumeSetupPage({ onOpenProfile }: ResumeSetupPageProps) {
             ? state.data
             : {
                 status: 'parsed' as const,
-                acceptedFormats: ['PDF', 'DOCX', 'TXT', '直接粘贴文本'],
+                acceptedFormats: [],
                 sampleText: resumeText,
                 steps: [],
                 profile: null,
@@ -91,7 +91,7 @@ export function ResumeSetupPage({ onOpenProfile }: ResumeSetupPageProps) {
   }
 
   const data = state.status === 'success' ? state.data : null
-  const acceptedFormats = data?.acceptedFormats ?? ['PDF', 'DOCX', 'TXT', '直接粘贴文本']
+  const acceptedFormats = data?.acceptedFormats ?? []
   const steps = data?.steps ?? []
 
   return (
@@ -116,13 +116,13 @@ export function ResumeSetupPage({ onOpenProfile }: ResumeSetupPageProps) {
           <div className="panel__header">
             <div>
               <h2>简历来源</h2>
-              <p className="panel__copy">上传文件或粘贴文本，开发模式下会走 MSW 解析接口。</p>
+              <p className="panel__copy">上传文件或粘贴文本，Riva 会识别结构化档案内容。</p>
             </div>
           </div>
 
           <label className="resume-dropzone">
             <span>{fileName || '选择简历文件'}</span>
-            <small>支持 {acceptedFormats.join(' / ')}</small>
+            <small>{acceptedFormats.length > 0 ? `支持 ${acceptedFormats.join(' / ')}` : '支持常见简历文档和文本'}</small>
             <input
               aria-label="选择简历文件"
               type="file"
@@ -136,7 +136,7 @@ export function ResumeSetupPage({ onOpenProfile }: ResumeSetupPageProps) {
             <textarea
               className="resume-textarea"
               value={resumeText}
-              placeholder="粘贴你的简历内容，或保留 mock 示例文本直接测试解析。"
+              placeholder="粘贴你的简历内容，或使用示例文本测试解析流程。"
               onChange={(event) => setResumeText(event.target.value)}
             />
           </label>

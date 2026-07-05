@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { login } from '../services/auth.api'
+import { login } from '../services/auth.service'
 import type { AuthSession } from '../types/auth'
 
 type LoginPageProps = {

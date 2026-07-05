@@ -3,7 +3,7 @@ import { ProgressOverview } from '../widgets/dashboard/ProgressOverview'
 import { CurrentRoleCard } from '../widgets/dashboard/CurrentRoleCard'
 import { RecommendationPanel } from '../widgets/dashboard/RecommendationPanel'
 import { RecentPracticeList } from '../widgets/dashboard/RecentPracticeList'
-import { getDashboardSummary } from '../services/dashboard.api'
+import { getDashboardSummary } from '../services/dashboard.service'
 import type { AsyncState } from '../types/api'
 import type { DashboardSummary } from '../types/dashboard'
 

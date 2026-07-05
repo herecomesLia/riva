@@ -8,7 +8,7 @@ export type User = {
   currentTargetRole?: string
 }
 
-export type LoginRequest = {
+export type LoginCredentials = {
   account: string
   password: string
   remember: boolean
