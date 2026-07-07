@@ -1,17 +1,18 @@
-import { mockDashboardSummary, mockEmptyDashboardSummary } from '../mocks/data/dashboard.mock'
-import { getMockPageState, MockStateError, waitForMockState } from '../mocks/runtime'
+import { mockDashboardSummary } from '../mocks/data/dashboard.mock'
+import { getDashboardPageState } from '../mocks/page-state'
+import { MockStateError, waitForMockState } from '../mocks/runtime'
 import type { CurrentRole, DashboardSummary, RecentPractice, Recommendation } from '../types/dashboard'
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   await waitForMockState()
 
-  const state = getMockPageState('dashboard')
+  const pageState = getDashboardPageState()
 
-  if (state === 'error') {
-    throw new MockStateError('Dashboard 数据暂时不可用')
+  if (pageState.errorMessage) {
+    throw new MockStateError(pageState.errorMessage)
   }
 
-  return state === 'empty' ? mockEmptyDashboardSummary : mockDashboardSummary
+  return pageState.data ?? mockDashboardSummary
 }
 
 export async function getRecentPractice(): Promise<{ items: RecentPractice[] }> {

@@ -1,5 +1,6 @@
-import { mockEmptyResumeSetupGuide, mockResumeProfile, mockResumeSetupGuide } from '../mocks/data/resume.mock'
-import { getMockPageState, MockStateError, waitForMockState } from '../mocks/runtime'
+import { mockResumeProfile, mockResumeSetupGuide } from '../mocks/data/resume.mock'
+import { getResumeProfilePageState, getResumeSetupPageState, getResumeSubmitScenario } from '../mocks/page-state'
+import { MockStateError, waitForMockState } from '../mocks/runtime'
 import type {
   ResumeParseInput,
   ResumeProfile,
@@ -11,17 +12,21 @@ import type {
 export async function getResumeSetup(): Promise<ResumeSetupGuide> {
   await waitForMockState()
 
-  const state = getMockPageState('resumeSetup')
+  const pageState = getResumeSetupPageState()
 
-  if (state === 'error') {
-    throw new MockStateError('简历录入流程暂时不可用')
+  if (pageState.errorMessage) {
+    throw new MockStateError(pageState.errorMessage)
   }
 
-  return state === 'empty' ? mockEmptyResumeSetupGuide : mockResumeSetupGuide
+  return pageState.data ?? mockResumeSetupGuide
 }
 
 export async function parseResume(input: ResumeParseInput): Promise<ResumeProfileResult> {
   await waitForMockState(720)
+
+  if (getResumeSubmitScenario() === 'submitError') {
+    throw new MockStateError('简历提交暂时失败，请检查内容后重试')
+  }
 
   if (!input.text && !input.fileName) {
     throw new MockStateError('请先上传简历文件或粘贴简历文本')
@@ -37,17 +42,21 @@ export async function parseResume(input: ResumeParseInput): Promise<ResumeProfil
 export async function getResumeProfile(): Promise<ResumeProfileResult> {
   await waitForMockState()
 
-  const state = getMockPageState('resumeProfile')
+  const pageState = getResumeProfilePageState()
 
-  if (state === 'error') {
-    throw new MockStateError('求职档案暂时不可用')
+  if (pageState.errorMessage) {
+    throw new MockStateError(pageState.errorMessage)
   }
 
-  return { profile: state === 'empty' ? null : mockResumeProfile }
+  return pageState.data ?? { profile: mockResumeProfile }
 }
 
 export async function saveResumeProfile(input: SaveResumeProfileInput): Promise<{ profile: ResumeProfile }> {
   await waitForMockState()
+
+  if (getResumeSubmitScenario() === 'submitError') {
+    throw new MockStateError('档案保存暂时失败，请稍后重试')
+  }
 
   return { profile: input.profile }
 }
