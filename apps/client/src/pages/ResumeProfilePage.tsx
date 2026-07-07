@@ -5,9 +5,11 @@ import {
   type CSSProperties,
   type FocusEvent,
   type FormEvent,
+  type KeyboardEvent,
   type PointerEvent,
   type WheelEvent,
 } from 'react'
+import deleteIconUrl from '../assets/delete.svg'
 import editIconUrl from '../assets/edit.svg'
 import { getResumeProfile } from '../services/resume.service'
 import type { AsyncState } from '../types/api'
@@ -77,6 +79,14 @@ function parseEditableList(value: string) {
         .filter(Boolean),
     ),
   )
+}
+
+function normalizeSkillTag(value: string) {
+  return value.trim().replace(/^#+/, '').trim()
+}
+
+function getSkillTagInputValue(value: string) {
+  return value.replace(/#/g, '').trimStart()
 }
 
 function parseEducationPeriod(period: string) {
@@ -620,6 +630,7 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
   const [certificates, setCertificates] = useState<string[]>([])
   const [editingListType, setEditingListType] = useState<EditableListType | ''>('')
   const [listDraft, setListDraft] = useState('')
+  const [skillTagInput, setSkillTagInput] = useState('')
   const [education, setEducation] = useState<ResumeExperience[]>([])
   const [isEditingEducation, setIsEditingEducation] = useState(false)
   const [educationDrafts, setEducationDrafts] = useState<EducationDraft[]>([])
@@ -843,11 +854,39 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
   function openListEditor(type: EditableListType) {
     setEditingListType(type)
     setListDraft((type === 'skills' ? skills : certificates).join('\n'))
+    setSkillTagInput('')
   }
 
   function closeListEditor() {
     setEditingListType('')
     setListDraft('')
+    setSkillTagInput('')
+  }
+
+  function addSkillTag() {
+    const nextTag = normalizeSkillTag(skillTagInput)
+
+    if (!nextTag) {
+      return
+    }
+
+    const nextTags = Array.from(new Set([...parseEditableList(listDraft), nextTag]))
+
+    setListDraft(nextTags.join('\n'))
+    setSkillTagInput('')
+  }
+
+  function removeSkillTag(tag: string) {
+    setListDraft(parseEditableList(listDraft).filter((item) => item !== tag).join('\n'))
+  }
+
+  function handleSkillTagKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') {
+      return
+    }
+
+    event.preventDefault()
+    addSkillTag()
   }
 
   function handleListSave(event: FormEvent<HTMLFormElement>) {
@@ -1478,18 +1517,56 @@ export function ResumeProfilePage({ onSetupResume }: ResumeProfilePageProps) {
             <div className="resume-project-editor__header">
               <div>
                 <p id="list-editor-title">编辑{editingListTitle}</p>
-                <span>每行填写一项</span>
+                <span>{editingListType === 'skills' ? '输入技能标签后按回车生成标签' : '每行填写一项'}</span>
               </div>
             </div>
-            <label className="resume-project-editor__field">
-              <textarea
-                aria-label={`${editingListTitle}列表`}
-                className="resume-project-editor__textarea resume-project-editor__textarea--compact"
-                value={listDraft}
-                onChange={(event) => setListDraft(event.target.value)}
-              />
-            </label>
+            {editingListType === 'skills' ? (
+              <div className="skill-tag-editor">
+                <label className="skill-tag-editor__field">
+                  <span className="skill-tag-editor__input-shell">
+                    <span className="skill-tag-editor__prefix">#</span>
+                    <input
+                      aria-label="输入技能标签"
+                      className="skill-tag-editor__input"
+                      placeholder="输入技能标签后按回车"
+                      value={skillTagInput}
+                      onChange={(event) => setSkillTagInput(getSkillTagInputValue(event.target.value))}
+                      onKeyDown={handleSkillTagKeyDown}
+                    />
+                  </span>
+                </label>
+                <div className="skill-tag-editor__tags" aria-label="已生成技能标签">
+                  {parseEditableList(listDraft).map((skill) => (
+                    <span className="skill-tag-editor__tag" key={skill}>
+                      {skill}
+                      <button
+                        aria-label={`删除${skill}标签`}
+                        className="skill-tag-editor__remove"
+                        type="button"
+                        onClick={() => removeSkillTag(skill)}
+                      >
+                        <img aria-hidden="true" src={deleteIconUrl} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <label className="resume-project-editor__field">
+                <textarea
+                  aria-label={`${editingListTitle}列表`}
+                  className="resume-project-editor__textarea resume-project-editor__textarea--compact"
+                  value={listDraft}
+                  onChange={(event) => setListDraft(event.target.value)}
+                />
+              </label>
+            )}
             <div className="resume-project-editor__actions">
+              {editingListType === 'skills' ? (
+                <button className="button button--secondary" type="button" onClick={addSkillTag}>
+                  添加标签
+                </button>
+              ) : null}
               <button className="button button--secondary" type="button" onClick={closeListEditor}>
                 取消
               </button>

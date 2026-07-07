@@ -1583,6 +1583,100 @@ svg {
   gap: var(--space-3);
 }
 
+.skill-tag-editor {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.skill-tag-editor__field {
+  display: block;
+}
+
+.skill-tag-editor__input-shell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  padding: var(--space-4);
+}
+
+.skill-tag-editor__prefix {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  margin-right: 2px;
+}
+
+.skill-tag-editor__input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+}
+
+.skill-tag-editor__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-start;
+  min-height: 42px;
+}
+
+.skill-tag-editor__tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 72px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 7%, white);
+  color: var(--color-primary);
+  padding: 0 18px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.skill-tag-editor__remove {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.skill-tag-editor__remove img {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.skill-tag-editor__remove:hover,
+.skill-tag-editor__remove:focus-visible {
+  opacity: 0.76;
+  outline: none;
+}
+
 .resume-education-editor {
   width: min(100%, 760px);
 }
