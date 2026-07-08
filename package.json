@@ -1,7 +1,19 @@
 {
   "name": "riva",
   "private": true,
-  "scripts": {},
+  "scripts": {
+    "client:dev": "pnpm --dir apps/client dev",
+    "client:build": "pnpm --dir apps/client build",
+    "client:lint": "pnpm --dir apps/client lint",
+    "client:preview": "pnpm --dir apps/client preview",
+    "client:test": "pnpm --dir apps/client test",
+    "client:test:e2e": "pnpm --dir apps/client test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.4"
+  },
   "devEngines": {
     "packageManager": {
       "name": "pnpm",

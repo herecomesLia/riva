@@ -1,28 +1,20 @@
-import { Outlet } from 'react-router'
-import { useSession } from '@/app/session-context'
-import { MobileNav } from '@/components/navigation/MobileNav'
-import { Sidebar } from '@/components/navigation/Sidebar'
-import { TopBar } from '@/components/navigation/TopBar'
+import { Outlet } from "@tanstack/react-router"
+
+import { SidebarNav } from "@/components/navigation/SidebarNav"
+import { TopBar } from "@/components/navigation/TopBar"
+import { Separator } from "@/components/ui/separator"
 
 export function AppShell() {
-  const { logout, user } = useSession()
-
-  if (!user) {
-    return null
-  }
-
   return (
-    <div className="app-shell">
-      <a className="skip-link" href="#main-content">
-        跳转到主要内容
-      </a>
-      <Sidebar user={user} />
-      <div className="app-shell__workspace">
-        <TopBar user={user} onLogout={logout} />
-        <main id="main-content" className="app-shell__main" tabIndex={-1}>
+    <div className="min-h-dvh bg-background text-foreground">
+      <TopBar />
+
+      <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 md:grid-cols-[12rem_1fr]">
+        <SidebarNav />
+        <main className="min-w-0">
+          <Separator className="mb-6 md:hidden" />
           <Outlet />
         </main>
-        <MobileNav />
       </div>
     </div>
   )

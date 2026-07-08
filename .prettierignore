@@ -1,0 +1,13 @@
+node_modules
+dist
+build
+coverage
+playwright-report
+test-results
+.pytest_cache
+.venv
+.git
+.codex
+.agents
+pnpm-lock.yaml
+uv.lock

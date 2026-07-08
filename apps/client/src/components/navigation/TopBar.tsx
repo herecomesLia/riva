@@ -1,34 +1,32 @@
-import { BellIcon, SearchIcon } from './icons'
-import type { User } from '@/types/auth'
+import { BriefcaseBusinessIcon, LogOutIcon, PanelLeftIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
+import { Link } from "@tanstack/react-router"
 
-type TopBarProps = {
-  onLogout: () => void
-  user: User
-}
+import { LanguageSwitcher } from "@/components/navigation/LanguageSwitcher"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
-export function TopBar({ onLogout, user }: TopBarProps) {
+export function TopBar() {
+  const { t } = useTranslation()
+
   return (
-    <header className="topbar">
-      <label className="search-field">
-        <SearchIcon className="search-field__icon" />
-        <span className="sr-only">搜索题卡、岗位或训练记录</span>
-        <input type="search" placeholder="搜索题卡、岗位或训练记录" />
-      </label>
-
-      <div className="topbar__actions">
-        <button className="icon-button" type="button" aria-label="查看通知">
-          <BellIcon className="icon-button__icon" />
-        </button>
-        <button className="language-button" type="button" aria-label="切换语言">
-          {user.locale}
-        </button>
-        <button className="user-button" type="button" aria-label="打开用户菜单">
-          <span aria-hidden="true">{user.avatarInitial}</span>
-          <span>{user.name}</span>
-        </button>
-        <button className="button button--ghost button--small" type="button" onClick={onLogout}>
-          退出
-        </button>
+    <header className="sticky top-0 border-b bg-background/95 backdrop-blur">
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
+        <Link className="flex items-center gap-2 font-heading text-sm font-medium" to="/dashboard">
+          <BriefcaseBusinessIcon data-icon="inline-start" />
+          {t("app.name")}
+        </Link>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{t("appShell.preview")}</Badge>
+          <LanguageSwitcher />
+          <Button variant="ghost" size="icon-sm" aria-label={t("appShell.openNavigation")}>
+            <PanelLeftIcon />
+          </Button>
+          <Button nativeButton={false} variant="outline" size="sm" render={<Link to="/login" />}>
+            <LogOutIcon data-icon="inline-start" />
+            {t("appShell.signOut")}
+          </Button>
+        </div>
       </div>
     </header>
   )

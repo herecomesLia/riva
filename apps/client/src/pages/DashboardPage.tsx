@@ -1,113 +1,76 @@
-import { useEffect, useState } from 'react'
-import { ProgressOverview } from '../widgets/dashboard/ProgressOverview'
-import { CurrentRoleCard } from '../widgets/dashboard/CurrentRoleCard'
-import { RecommendationPanel } from '../widgets/dashboard/RecommendationPanel'
-import { RecentPracticeList } from '../widgets/dashboard/RecentPracticeList'
-import { getDashboardSummary } from '../services/dashboard.service'
-import type { AsyncState } from '../types/api'
-import type { DashboardSummary } from '../types/dashboard'
+import { CalendarDaysIcon, ClipboardCheckIcon, SparklesIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
-function isEmptyDashboard(data: DashboardSummary) {
-  return (
-    data.progress.length === 0 &&
-    data.currentRole === null &&
-    data.recommendations.length === 0 &&
-    data.recentPractice.length === 0
-  )
-}
+import { Badge } from "@/components/ui/badge"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const summaryCards = [
+  {
+    badgeKey: "dashboard.cards.currentRole.badge",
+    descriptionKey: "dashboard.cards.currentRole.description",
+    icon: ClipboardCheckIcon,
+    titleKey: "dashboard.cards.currentRole.title",
+  },
+  {
+    badgeKey: "dashboard.cards.nextSession.badge",
+    descriptionKey: "dashboard.cards.nextSession.description",
+    icon: CalendarDaysIcon,
+    titleKey: "dashboard.cards.nextSession.title",
+  },
+  {
+    badgeKey: "dashboard.cards.recommendation.badge",
+    descriptionKey: "dashboard.cards.recommendation.description",
+    icon: SparklesIcon,
+    titleKey: "dashboard.cards.recommendation.title",
+  },
+]
 
 export function DashboardPage() {
-  const [state, setState] = useState<AsyncState<DashboardSummary>>({ status: 'loading' })
-
-  function loadDashboard() {
-    setState({ status: 'loading' })
-
-    getDashboardSummary()
-      .then((data) => {
-        setState(isEmptyDashboard(data) ? { status: 'empty' } : { status: 'success', data })
-      })
-      .catch((error) => {
-        setState({ status: 'error', error: error instanceof Error ? error.message : '工作台数据加载失败' })
-      })
-  }
-
-  useEffect(() => {
-    loadDashboard()
-  }, [])
-
-  if (state.status === 'loading' || state.status === 'idle') {
-    return (
-      <div className="dashboard-state" role="status">
-        正在加载工作台数据...
-      </div>
-    )
-  }
-
-  if (state.status === 'error') {
-    return (
-      <div className="dashboard-state dashboard-state--error" role="alert">
-        <h1>工作台加载失败</h1>
-        <p>{state.error}</p>
-        <button className="button button--primary" type="button" onClick={loadDashboard}>
-          重试
-        </button>
-      </div>
-    )
-  }
-
-  if (state.status === 'empty') {
-    return (
-      <div className="dashboard-state">
-        <h1>还没有可展示的训练数据</h1>
-        <p>先上传简历并添加目标岗位，Riva 会为你生成匹配分析、题卡和下一步训练建议。</p>
-        <button className="button button--primary" type="button">
-          创建求职档案
-        </button>
-      </div>
-    )
-  }
-
-  if (state.status !== 'success') {
-    return null
-  }
-
-  const { data } = state
+  const { t } = useTranslation()
 
   return (
-    <div className="dashboard-page" aria-labelledby="dashboard-title">
-      <section className="dashboard-hero">
-        <div>
-          <p className="eyebrow">{data.hero.eyebrow}</p>
-          <h1 id="dashboard-title">{data.hero.title}</h1>
-          <p className="dashboard-hero__copy">{data.hero.description}</p>
-        </div>
-        <div className="dashboard-hero__actions" aria-label="主要操作">
-          <button className="button button--primary" type="button">
-            开始专项练习
-          </button>
-          <button className="button button--secondary" type="button">
-            进入模拟面试
-          </button>
-        </div>
-      </section>
-
-      {data.progress.length > 0 ? (
-        <ProgressOverview metrics={data.progress} />
-      ) : (
-        <section className="panel panel--empty">暂无进度指标</section>
-      )}
-
-      <div className="dashboard-grid dashboard-grid--trio">
-        <RecommendationPanel recommendations={data.recommendations} />
-        {data.currentRole ? (
-          <CurrentRoleCard role={data.currentRole} />
-        ) : (
-          <section className="panel panel--empty" id="roles">
-            暂无目标岗位
-          </section>
-        )}
-        <RecentPracticeList records={data.recentPractice} />
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Badge className="w-fit" variant="outline">
+          {t("dashboard.badge")}
+        </Badge>
+        <h1 className="font-heading text-2xl font-medium">{t("dashboard.title")}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          {t("dashboard.description")}
+        </p>
       </div>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        {summaryCards.map((card) => {
+          const Icon = card.icon
+
+          return (
+            <Card key={card.titleKey}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Icon data-icon="inline-start" />
+                  {t(card.titleKey)}
+                </CardTitle>
+                <CardDescription>{t(card.descriptionKey)}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+              <CardFooter>
+                <Badge variant="secondary">{t(card.badgeKey)}</Badge>
+              </CardFooter>
+            </Card>
+          )
+        })}
+      </section>
     </div>
   )
 }
