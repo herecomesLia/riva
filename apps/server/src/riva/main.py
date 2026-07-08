@@ -1,3 +1,7 @@
-from riva.core import create_app
+from riva.core.app import create_app
+from riva.core.config import Settings
+from riva.core.logging import configure_logging
 
-app = create_app()
+settings = Settings()
+configure_logging(settings.log_level, settings.log_format)
+app = create_app(settings)

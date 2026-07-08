@@ -67,6 +67,7 @@ apps/server/
 ├── src/
 │   └── riva/
 │       ├── api/
+│       ├── cli/
 │       ├── core/
 │       ├── db/
 │       ├── models/
@@ -82,7 +83,8 @@ apps/server/
 Layer responsibilities:
 
 - `api/`: FastAPI routes, request validation, and response handling.
-- `core/`: configuration, logging, exceptions, auth dependencies, and lifecycle code.
+- `cli/`: Typer command definitions and command-specific orchestration.
+- `core/`: configuration, logging, auth dependencies, and lifecycle code.
 - `db/`: database connections, transactions, and migration support.
 - `models/`: database models, such as users, resumes, jobs, questions, interview
   sessions, reviews, and agent run records.
