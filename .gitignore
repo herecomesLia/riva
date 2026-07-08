@@ -46,6 +46,8 @@ gemini-debug.log
 #
 # These files are often intentionally committed. Uncomment only if they are
 # local-only in this repo.
+.agents/
+skills-lock.json
 
 # OpenAI Codex
 AGENTS.md
