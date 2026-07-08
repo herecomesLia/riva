@@ -1,0 +1,95 @@
+# Python bytecode and extensions
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+*.sage.py
+
+# Python packaging and build outputs
+.Python
+build/
+downloads/
+develop-eggs/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+share/python-wheels/
+var/
+wheels/
+*.egg
+*.egg-info/
+.installed.cfg
+MANIFEST
+target/
+
+# Python environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pypackages__/
+
+# Python tooling caches and reports
+.coverage
+.coverage.*
+.hypothesis/
+.ipynb_checkpoints/
+.mypy_cache/
+.nox/
+.pybuilder/
+.pyre/
+.pytest_cache/
+.pytype/
+.ruff_cache/
+.tox/
+cover/
+coverage.xml
+cython_debug/
+dmypy.json
+htmlcov/
+nosetests.xml
+.dmypy.json
+*.cover
+*.py.cover
+
+# Python local app data
+instance/
+.webassets-cache
+.scrapy
+db.sqlite3
+db.sqlite3-journal
+local_settings.py
+profile_default/
+ipython_config.py
+
+# Python packaging helpers
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Python Sphinx docs
+docs/_build/
+/site
+
+# Data stores (Python backend)
+*.aof
+*.rdb
+activemq-data/
+celerybeat-schedule*
+mnesia/
+rabbitmq/
+rabbitmq-data/
+
+# Python PDM
+.pdm-python
+.pdm-build/
+
+# Python Pixi
+.pixi/*
+!.pixi/config.toml
