@@ -1,104 +1,135 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/inter';
 @import './global.css';
 
-@theme {
-  --font-sans:
-    'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+@custom-variant dark (&:is(.dark *));
 
-  --color-riva-background: #f6f8fb;
-  --color-riva-foreground: #152033;
-  --color-riva-primary: #075985;
-  --color-riva-primary-foreground: #ffffff;
-  --color-riva-secondary: #0f766e;
-  --color-riva-accent: #7c3aed;
-  --color-riva-surface: #ffffff;
-  --color-riva-surface-muted: #eef4f8;
-  --color-riva-muted: #64748b;
-  --color-riva-border: #cbd5e1;
-  --color-riva-border-strong: #94a3b8;
-  --color-riva-warning: #b45309;
-  --color-riva-warning-soft: #fef3c7;
-  --color-riva-danger: #dc2626;
-  --color-riva-ring: #0284c7;
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Inter Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
 
-  --radius-riva-sm: 0.375rem;
-  --radius-riva-md: 0.5rem;
-  --radius-riva-lg: 0.75rem;
-  --radius-riva-xl: 1rem;
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
 
-  --shadow-riva-sm: 0 1px 2px rgb(15 23 42 / 0.08);
-  --shadow-riva-md: 0 12px 28px rgb(15 23 42 / 0.1);
-  --shadow-riva-lg: 0 18px 48px rgb(15 23 42 / 0.14);
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
-  :root {
-    --riva-font-sans:
-      'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, -apple-system,
-      BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --riva-color-background: var(--color-riva-background);
-    --riva-color-foreground: var(--color-riva-foreground);
-    --riva-color-primary: var(--color-riva-primary);
-    --riva-color-primary-foreground: var(--color-riva-primary-foreground);
-    --riva-color-secondary: var(--color-riva-secondary);
-    --riva-color-accent: var(--color-riva-accent);
-    --riva-color-surface: var(--color-riva-surface);
-    --riva-color-surface-muted: var(--color-riva-surface-muted);
-    --riva-color-muted: var(--color-riva-muted);
-    --riva-color-border: var(--color-riva-border);
-    --riva-color-border-strong: var(--color-riva-border-strong);
-    --riva-color-warning: var(--color-riva-warning);
-    --riva-color-warning-soft: var(--color-riva-warning-soft);
-    --riva-color-danger: var(--color-riva-danger);
-    --riva-color-ring: var(--color-riva-ring);
-    --riva-radius-sm: var(--radius-riva-sm);
-    --riva-radius-md: var(--radius-riva-md);
-    --riva-radius-lg: var(--radius-riva-lg);
-    --riva-radius-xl: var(--radius-riva-xl);
-    --riva-shadow-sm: var(--shadow-riva-sm);
-    --riva-shadow-md: var(--shadow-riva-md);
-    --riva-shadow-lg: var(--shadow-riva-lg);
-
-    --color-primary: var(--riva-color-primary);
-    --color-on-primary: var(--riva-color-primary-foreground);
-    --color-secondary: var(--riva-color-secondary);
-    --color-accent: var(--riva-color-accent);
-    --color-background: var(--riva-color-background);
-    --color-surface: var(--riva-color-surface);
-    --color-surface-strong: var(--riva-color-surface-muted);
-    --color-foreground: var(--riva-color-foreground);
-    --color-text: var(--riva-color-foreground);
-    --color-muted: var(--riva-color-muted);
-    --color-border: var(--riva-color-border);
-    --color-border-strong: var(--riva-color-border-strong);
-    --color-warning: var(--riva-color-warning);
-    --color-warning-soft: var(--riva-color-warning-soft);
-    --color-danger: var(--riva-color-danger);
-    --color-ring: var(--riva-color-ring);
-    --radius-sm: var(--riva-radius-sm);
-    --radius-md: var(--riva-radius-md);
-    --radius-lg: var(--riva-radius-lg);
-    --font-sans: var(--riva-font-sans);
-
-    color: var(--riva-color-foreground);
-    background: var(--riva-color-background);
-    font-family: var(--riva-font-sans);
+  * {
+    @apply border-border outline-ring/50;
   }
-
-  html {
-    background: var(--riva-color-background);
-  }
-
   body {
-    background:
-      radial-gradient(circle at top left, rgb(2 132 199 / 0.08), transparent 30rem),
-      var(--riva-color-background);
-    color: var(--riva-color-foreground);
+    @apply bg-background text-foreground;
   }
-
-  ::selection {
-    background: color-mix(in srgb, var(--riva-color-primary) 24%, transparent);
-    color: var(--riva-color-foreground);
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
   }
 }
