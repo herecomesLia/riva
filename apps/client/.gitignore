@@ -1,0 +1,44 @@
+# JavaScript and frontend build caches
+.cache
+.parcel-cache
+.vite/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.next
+.nuxt
+.output
+out
+dist/
+coverage/
+*.lcov
+.nyc_output/
+.grunt/
+.docusaurus/
+.vuepress/dist
+.temp
+**/.vitepress/dist
+**/.vitepress/cache
+.serverless/
+.fusebox/
+.dynamodb/
+.firebase/
+.vscode-test/
+.lock-wscript
+lib-cov/
+build/Release/
+
+# Dependencies
+jspm_packages/
+bower_components/
+web_modules/
+
+# Package manager state
+.npm
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.yarn-integrity
+.pnp.*
