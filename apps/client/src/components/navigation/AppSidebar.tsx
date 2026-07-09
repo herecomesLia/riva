@@ -36,7 +36,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { userMock } from "@/mocks/data/user.mock"
+import { userMock } from "@/mocks/data/user"
 import { useAuthStore } from "@/stores/auth.store"
 
 type AppNavigationPath =

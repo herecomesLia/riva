@@ -1,5 +1,5 @@
 import { env } from "@/app/env"
-import { userMock, type UserMock } from "@/mocks/data/user.mock"
+import { userMock, type UserMock } from "@/mocks/data/user"
 import { defaultScenario, getPageStateScenario, type PageStateScenario } from "@/mocks/page-state"
 
 export type PageViewState = "loading" | "empty" | "error" | "success"
