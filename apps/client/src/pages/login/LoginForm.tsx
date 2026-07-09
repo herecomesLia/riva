@@ -113,7 +113,7 @@ export function LoginForm({
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>{t("login.password")}</FieldLabel>
-                <InputGroup className="h-12">
+                <InputGroup>
                   <InputGroupInput
                     aria-invalid={isInvalid}
                     autoComplete="current-password"
