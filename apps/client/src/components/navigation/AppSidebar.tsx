@@ -2,7 +2,7 @@ import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router"
 import {
   BriefcaseBusinessIcon,
   ChevronsUpDownIcon,
-  DumbbellIcon,
+  ClipboardListIcon,
   HistoryIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -65,7 +65,7 @@ const appNavigationItems: AppNavigationItem[] = [
     to: "/roles",
   },
   {
-    icon: DumbbellIcon,
+    icon: ClipboardListIcon,
     labelKey: "appShell.nav.practice",
     to: "/practice",
   },
