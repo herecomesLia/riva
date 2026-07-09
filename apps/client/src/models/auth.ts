@@ -1,4 +1,4 @@
-export type AuthUser = {
+export type User = {
   id: string
   username: string
   displayName: string
@@ -6,7 +6,7 @@ export type AuthUser = {
   avatarFallback: string
 }
 
-export type AuthSession = {
-  id: string
-  signedInAt: string
+export type LoginCredentials = {
+  username: string
+  password: string
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
 
-import { authSessionMock, authUserMock } from "@/mocks/data/auth"
+import { userMock } from "@/mocks/data/auth"
 import { useAuthStore } from "@/stores/auth"
 import { resetStores } from "@/test/stores"
 
@@ -9,25 +9,23 @@ describe("auth store", () => {
     resetStores()
   })
 
-  it("sets the provided auth session state", () => {
-    useAuthStore.getState().setAuthSession(authUserMock, authSessionMock)
+  it("sets the provided current user state", () => {
+    useAuthStore.getState().setCurrentUser(userMock)
 
     const state = useAuthStore.getState()
 
-    expect(state.isAuthenticated).toBe(true)
-    expect(state.currentUser).toEqual(authUserMock)
-    expect(state.session).toEqual(authSessionMock)
+    expect(state.currentUser).toEqual(userMock)
+    expect("isAuthenticated" in state).toBe(false)
   })
 
-  it("clears auth session state", () => {
-    useAuthStore.getState().setAuthSession(authUserMock, authSessionMock)
+  it("clears current user state", () => {
+    useAuthStore.getState().setCurrentUser(userMock)
 
-    useAuthStore.getState().clearAuthSession()
+    useAuthStore.getState().clearCurrentUser()
 
     expect(useAuthStore.getState()).toMatchObject({
       currentUser: null,
-      isAuthenticated: false,
-      session: null,
     })
+    expect("isAuthenticated" in useAuthStore.getState()).toBe(false)
   })
 })

@@ -1,50 +1,35 @@
 import { env } from "@/app/env"
-import { authSessionMock, authUserMock } from "@/mocks/data/auth"
+import { userMock } from "@/mocks/data/auth"
 import { waitForMockDelay } from "@/mocks/utils"
-import type { AuthSession, AuthUser } from "@/models/auth"
+import type { LoginCredentials, User } from "@/models/auth"
 
-export type SignInInput = {
-  username: string
-}
-
-export type AuthSessionResult = {
-  session: AuthSession
-  user: AuthUser
-}
+export type { LoginCredentials } from "@/models/auth"
 
 const authDelayMs = 160
 
-export async function login(_input: SignInInput): Promise<AuthSessionResult> {
-  void _input
-
+export async function login(_credentials: LoginCredentials): Promise<User> {
   if (env.mock) {
     await waitForMockDelay(authDelayMs)
-    return {
-      session: authSessionMock,
-      user: authUserMock,
-    }
+    return userMock
   }
 
-  throw new Error("Real login is not implemented.")
+  throw new Error("Real auth API is not implemented.")
 }
 
-export async function logout() {
+export async function logout(): Promise<void> {
   if (env.mock) {
     await waitForMockDelay(authDelayMs)
     return
   }
 
-  throw new Error("Real logout is not implemented.")
+  throw new Error("Real auth API is not implemented.")
 }
 
-export async function restoreSession(): Promise<AuthSessionResult | null> {
+export async function restoreCurrentUser(): Promise<User | null> {
   if (env.mock) {
     await waitForMockDelay(authDelayMs)
-    return {
-      session: authSessionMock,
-      user: authUserMock,
-    }
+    return null
   }
 
-  throw new Error("Real session restore is not implemented.")
+  throw new Error("Real auth API is not implemented.")
 }

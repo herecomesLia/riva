@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router"
 
 import { AppShell } from "@/components/layout/AppShell"
+import { useAuth } from "@/hooks/use-auth"
 import { DashboardPage } from "@/pages/DashboardPage"
 import { HistoryPage } from "@/pages/HistoryPage"
 import { InterviewPage } from "@/pages/InterviewPage"
@@ -17,6 +18,32 @@ import { PracticePage } from "@/pages/PracticePage"
 import { ProfilePage } from "@/pages/ProfilePage"
 import { RolesPage } from "@/pages/RolesPage"
 
+function IndexRoute() {
+  const { isAuthenticated } = useAuth()
+
+  return <Navigate replace to={isAuthenticated ? "/dashboard" : "/login"} />
+}
+
+function LoginRoute() {
+  const { isAuthenticated } = useAuth()
+
+  if (isAuthenticated) {
+    return <Navigate replace to="/dashboard" />
+  }
+
+  return <LoginPage />
+}
+
+function AppRoute() {
+  const { isAuthenticated } = useAuth()
+
+  if (!isAuthenticated) {
+    return <Navigate replace to="/login" />
+  }
+
+  return <AppShell />
+}
+
 const rootRoute = createRootRoute({
   component: Outlet,
 })
@@ -24,19 +51,19 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: () => <Navigate to="/dashboard" replace />,
+  component: IndexRoute,
 })
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  component: LoginPage,
+  component: LoginRoute,
 })
 
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "app",
-  component: AppShell,
+  component: AppRoute,
 })
 
 const dashboardRoute = createRoute({
@@ -88,10 +115,14 @@ const routeTree = rootRoute.addChildren([
   ]),
 ])
 
-const router = createRouter({
-  routeTree,
-  defaultNotFoundComponent: NotFoundPage,
-})
+function createAppRouter() {
+  return createRouter({
+    routeTree,
+    defaultNotFoundComponent: NotFoundPage,
+  })
+}
+
+const router = createAppRouter()
 
 declare module "@tanstack/react-router" {
   interface Register {

@@ -3,32 +3,31 @@ import { useAuthStore } from "@/stores/auth"
 
 export function useAuth() {
   const currentUser = useAuthStore((state) => state.currentUser)
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  const session = useAuthStore((state) => state.session)
-  const clearAuthSession = useAuthStore((state) => state.clearAuthSession)
-  const setAuthSession = useAuthStore((state) => state.setAuthSession)
+  const clearCurrentUser = useAuthStore((state) => state.clearCurrentUser)
+  const setCurrentUser = useAuthStore((state) => state.setCurrentUser)
+  const isAuthenticated = currentUser !== null
 
-  async function login(input: authService.SignInInput) {
-    const result = await authService.login(input)
+  async function login(input: authService.LoginCredentials) {
+    const user = await authService.login(input)
 
-    setAuthSession(result.user, result.session)
-    return result
+    setCurrentUser(user)
+    return user
   }
 
   async function logout() {
     await authService.logout()
-    clearAuthSession()
+    clearCurrentUser()
   }
 
-  async function restoreSession() {
-    const result = await authService.restoreSession()
+  async function restoreCurrentUser() {
+    const user = await authService.restoreCurrentUser()
 
-    if (result) {
-      setAuthSession(result.user, result.session)
-      return result
+    if (user) {
+      setCurrentUser(user)
+      return user
     }
 
-    clearAuthSession()
+    clearCurrentUser()
     return null
   }
 
@@ -37,7 +36,6 @@ export function useAuth() {
     isAuthenticated,
     login,
     logout,
-    restoreSession,
-    session,
+    restoreCurrentUser,
   }
 }

@@ -1,31 +1,23 @@
 import { create } from "zustand"
 
-import type { AuthSession, AuthUser } from "@/models/auth"
+import type { User } from "@/models/auth"
 
 type AuthState = {
-  currentUser: AuthUser | null
-  isAuthenticated: boolean
-  session: AuthSession | null
-  clearAuthSession: () => void
-  setAuthSession: (user: AuthUser, session: AuthSession) => void
+  currentUser: User | null
+  clearCurrentUser: () => void
+  setCurrentUser: (user: User) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  clearAuthSession: () => {
+  clearCurrentUser: () => {
     set({
       currentUser: null,
-      isAuthenticated: false,
-      session: null,
     })
   },
   currentUser: null,
-  isAuthenticated: false,
-  session: null,
-  setAuthSession: (user, session) => {
+  setCurrentUser: (user) => {
     set({
       currentUser: user,
-      isAuthenticated: true,
-      session,
     })
   },
 }))

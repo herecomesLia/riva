@@ -39,7 +39,10 @@ export function LoginPage() {
       onSubmit: formSchema,
     },
     onSubmit: async ({ value }) => {
-      await login({ username: value.username })
+      await login({
+        password: value.password,
+        username: value.username,
+      })
       void navigate({ to: "/dashboard" })
     },
   })

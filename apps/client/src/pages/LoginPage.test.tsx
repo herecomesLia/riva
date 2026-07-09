@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { authSessionMock, authUserMock } from "@/mocks/data/auth"
+import { userMock } from "@/mocks/data/auth"
 import { LoginPage } from "@/pages/LoginPage"
 import { useAuthStore } from "@/stores/auth"
 import { renderWithProviders } from "@/test/render"
@@ -49,8 +49,7 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: t("login.continue") }))
 
     await waitFor(() => {
-      expect(useAuthStore.getState().currentUser).toEqual(authUserMock)
-      expect(useAuthStore.getState().session).toEqual(authSessionMock)
+      expect(useAuthStore.getState().currentUser).toEqual(userMock)
     })
   })
 
