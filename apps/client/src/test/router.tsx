@@ -1,4 +1,9 @@
-import { createMemoryHistory, createRootRoute, createRouter } from "@tanstack/react-router"
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router"
 import { type ReactNode } from "react"
 
 export type TestRouterOptions = {
@@ -6,7 +11,10 @@ export type TestRouterOptions = {
 }
 
 export function createTestRouter(children: ReactNode, options: TestRouterOptions = {}) {
-  const rootRoute = createRootRoute({
+  const rootRoute = createRootRoute()
+  const testRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "$",
     component: () => <>{children}</>,
   })
 
@@ -14,6 +22,6 @@ export function createTestRouter(children: ReactNode, options: TestRouterOptions
     history: createMemoryHistory({
       initialEntries: options.initialEntries ?? ["/"],
     }),
-    routeTree: rootRoute,
+    routeTree: rootRoute.addChildren([testRoute]),
   })
 }
