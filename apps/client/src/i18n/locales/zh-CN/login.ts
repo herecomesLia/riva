@@ -3,7 +3,7 @@ export const login = {
   title: "欢迎回来！",
   description: "请输入你的用户名和密码，继续进入面试训练工作台。",
   username: "用户名",
-  usernamePlaceholder: "请输入账号",
+  usernamePlaceholder: "请输入用户名",
   usernameRequired: "请输入用户名。",
   usernameNoOuterSpaces: "用户名不能以空格开头或结尾。",
   password: "密码",

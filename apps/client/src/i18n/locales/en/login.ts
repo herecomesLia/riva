@@ -3,7 +3,7 @@ export const login = {
   title: "Welcome back!",
   description: "Enter your details to continue to your interview workspace.",
   username: "Username",
-  usernamePlaceholder: "Enter your account",
+  usernamePlaceholder: "Enter your username",
   usernameRequired: "Enter your username.",
   usernameNoOuterSpaces: "Username must not start or end with spaces.",
   password: "Password",
