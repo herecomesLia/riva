@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
-import { LoginCharacters } from "@/components/login/LoginCharacters"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -19,6 +18,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/hooks/use-auth"
+import { LoginCharacters } from "@/pages/login/LoginCharacters"
 
 export function LoginPage() {
   const navigate = useNavigate()

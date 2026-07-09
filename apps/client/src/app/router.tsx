@@ -9,14 +9,14 @@ import {
 
 import { AppShell } from "@/components/layout/AppShell"
 import { useAuth } from "@/hooks/use-auth"
-import { DashboardPage } from "@/pages/DashboardPage"
-import { HistoryPage } from "@/pages/HistoryPage"
-import { InterviewPage } from "@/pages/InterviewPage"
-import { LoginPage } from "@/pages/LoginPage"
-import { NotFoundPage } from "@/pages/NotFoundPage"
-import { PracticePage } from "@/pages/PracticePage"
-import { ProfilePage } from "@/pages/ProfilePage"
-import { RolesPage } from "@/pages/RolesPage"
+import { DashboardPage } from "@/pages/dashboard"
+import { HistoryPage } from "@/pages/history"
+import { InterviewPage } from "@/pages/interview"
+import { LoginPage } from "@/pages/login"
+import { NotFoundPage } from "@/pages/not-found"
+import { PracticePage } from "@/pages/practice"
+import { ProfilePage } from "@/pages/profile"
+import { RolesPage } from "@/pages/roles"
 
 function IndexRoute() {
   const { isAuthenticated } = useAuth()
