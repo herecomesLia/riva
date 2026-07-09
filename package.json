@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "client:dev": "pnpm --dir apps/client dev",
+    "client:dev:mock": "pnpm --dir apps/client dev:mock",
     "client:build": "pnpm --dir apps/client build",
+    "client:build:mock": "pnpm --dir apps/client build:mock",
     "client:lint": "pnpm --dir apps/client lint",
     "client:preview": "pnpm --dir apps/client preview",
     "client:test": "pnpm --dir apps/client test",

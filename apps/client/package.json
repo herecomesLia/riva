@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "cross-env VITE_USE_MOCK=true vite",
     "build": "tsc -b && vite build",
+    "build:mock": "cross-env VITE_USE_MOCK=true pnpm build",
     "lint": "oxlint .",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
@@ -15,6 +17,7 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@fontsource-variable/inter": "^5.2.8",
+    "@tanstack/react-form": "^1.33.0",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
     "class-variance-authority": "^0.7.1",
@@ -24,7 +27,6 @@
     "lucide-react": "^1.23.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-hook-form": "^7.81.0",
     "react-i18next": "^17.0.8",
     "react-resizable-panels": "^4.12.1",
     "shadcn": "^4.13.0",
@@ -44,6 +46,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "cross-env": "^10.1.0",
     "jsdom": "^29.1.1",
     "oxlint": "^1.73.0",
     "tailwindcss": "^4.3.2",
