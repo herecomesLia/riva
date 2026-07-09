@@ -1,64 +1,31 @@
 import { create } from "zustand"
 
-export type AuthUser = {
-  id: string
-  username: string
-  displayName: string
-  avatarUrl?: string
-  avatarFallback: string
-}
-
-export type AuthSession = {
-  id: string
-  signedInAt: string
-}
+import type { AuthSession, AuthUser } from "@/models/auth"
 
 type AuthState = {
   currentUser: AuthUser | null
   isAuthenticated: boolean
   session: AuthSession | null
-  signIn: (username: string) => void
-  signOut: () => void
-}
-
-function normalizeUsername(username: string) {
-  return username.trim() || "user"
-}
-
-function createAvatarFallback(username: string) {
-  return username.slice(0, 2).toUpperCase() || "U"
-}
-
-function createSessionId(username: string) {
-  return `local:${username}:${Date.now().toString(36)}`
+  clearAuthSession: () => void
+  setAuthSession: (user: AuthUser, session: AuthSession) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  currentUser: null,
-  isAuthenticated: false,
-  session: null,
-  signIn: (username) => {
-    const normalizedUsername = normalizeUsername(username)
-
-    set({
-      currentUser: {
-        avatarFallback: createAvatarFallback(normalizedUsername),
-        displayName: normalizedUsername,
-        id: `local:${normalizedUsername.toLowerCase()}`,
-        username: normalizedUsername,
-      },
-      isAuthenticated: true,
-      session: {
-        id: createSessionId(normalizedUsername),
-        signedInAt: new Date().toISOString(),
-      },
-    })
-  },
-  signOut: () => {
+  clearAuthSession: () => {
     set({
       currentUser: null,
       isAuthenticated: false,
       session: null,
+    })
+  },
+  currentUser: null,
+  isAuthenticated: false,
+  session: null,
+  setAuthSession: (user, session) => {
+    set({
+      currentUser: user,
+      isAuthenticated: true,
+      session,
     })
   },
 }))

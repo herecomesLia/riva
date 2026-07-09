@@ -1,57 +1,48 @@
 import { useQuery } from "@tanstack/react-query"
 import {
-    AlertCircleIcon,
-    CalendarDaysIcon,
-    ClipboardCheckIcon,
-    InboxIcon,
-    SparklesIcon,
+  AlertCircleIcon,
+  CalendarDaysIcon,
+  ClipboardCheckIcon,
+  InboxIcon,
+  SparklesIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getDashboardViewModel, type PageViewState } from "@/services/auth"
+import {
+  getDashboardPageState,
+  type DashboardCardData,
+  type DashboardCardIcon,
+  type PageViewState,
+} from "@/services/dashboard"
 
-const summaryCards = [
-  {
-    badgeKey: "dashboard.cards.currentRole.badge",
-    descriptionKey: "dashboard.cards.currentRole.description",
-    icon: ClipboardCheckIcon,
-    titleKey: "dashboard.cards.currentRole.title",
-  },
-  {
-    badgeKey: "dashboard.cards.nextSession.badge",
-    descriptionKey: "dashboard.cards.nextSession.description",
-    icon: CalendarDaysIcon,
-    titleKey: "dashboard.cards.nextSession.title",
-  },
-  {
-    badgeKey: "dashboard.cards.recommendation.badge",
-    descriptionKey: "dashboard.cards.recommendation.description",
-    icon: SparklesIcon,
-    titleKey: "dashboard.cards.recommendation.title",
-  },
-]
+const dashboardCardIcons: Record<DashboardCardIcon, typeof ClipboardCheckIcon> = {
+  currentRole: ClipboardCheckIcon,
+  nextSession: CalendarDaysIcon,
+  recommendation: SparklesIcon,
+}
 
 export function DashboardPage() {
   const { t } = useTranslation()
   const dashboardQuery = useQuery({
-    queryFn: getDashboardViewModel,
-    queryKey: ["dashboard-view-model"],
+    queryFn: getDashboardPageState,
+    queryKey: ["dashboard-page-state"],
   })
+  const dashboardData = dashboardQuery.data
   const viewState: PageViewState = dashboardQuery.isPending
     ? "loading"
     : dashboardQuery.isError
       ? "error"
-      : dashboardQuery.data.state
+      : (dashboardData?.state ?? "error")
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,7 +54,9 @@ export function DashboardPage() {
         <p className="max-w-2xl text-sm text-muted-foreground">{t("dashboard.description")}</p>
       </div>
 
-      {viewState === "loading" && <DashboardLoadingCards />}
+      {viewState === "loading" && (
+        <DashboardLoadingCards cards={dashboardQuery.data?.cards ?? []} />
+      )}
       {viewState === "empty" && (
         <DashboardStateCard
           description={t("common.pageState.empty.description")}
@@ -78,16 +71,23 @@ export function DashboardPage() {
           title={t("common.pageState.error.title")}
         />
       )}
-      {viewState === "success" && <DashboardSummaryCards />}
+      {viewState === "success" && dashboardData && (
+        <DashboardSummaryCards cards={dashboardData.cards} />
+      )}
     </div>
   )
 }
 
-function DashboardLoadingCards() {
+function DashboardLoadingCards({ cards }: { cards: DashboardCardData[] }) {
+  const skeletonCardKeys =
+    cards.length > 0
+      ? cards.map((card) => card.titleKey)
+      : ["dashboard-loading-0", "dashboard-loading-1", "dashboard-loading-2"]
+
   return (
     <section className="grid gap-4 md:grid-cols-3">
-      {summaryCards.map((card) => (
-        <Card key={card.titleKey}>
+      {skeletonCardKeys.map((cardKey) => (
+        <Card key={cardKey}>
           <CardHeader>
             <Skeleton className="h-6 w-2/3" />
             <Skeleton className="h-4 w-full" />
@@ -126,13 +126,13 @@ function DashboardStateCard({
   )
 }
 
-function DashboardSummaryCards() {
+function DashboardSummaryCards({ cards }: { cards: DashboardCardData[] }) {
   const { t } = useTranslation()
 
   return (
     <section className="grid gap-4 md:grid-cols-3">
-      {summaryCards.map((card) => {
-        const Icon = card.icon
+      {cards.map((card) => {
+        const Icon = dashboardCardIcons[card.icon]
 
         return (
           <Card key={card.titleKey}>

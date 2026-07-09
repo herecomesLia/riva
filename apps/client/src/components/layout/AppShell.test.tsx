@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { AppShell } from "@/components/layout/AppShell"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
+import { authSessionMock, authUserMock } from "@/mocks/data/auth"
 import { useAuthStore } from "@/stores/auth"
 import { renderWithProviders } from "@/test/render"
 import { resetStores } from "@/test/stores"
@@ -76,14 +77,18 @@ describe("AppShell", () => {
 
   it("clears auth store and navigates to login after sign out", async () => {
     const user = userEvent.setup()
-    useAuthStore.getState().signIn("eleno")
+    useAuthStore.getState().setAuthSession(authUserMock, authSessionMock)
     const { router } = renderWithProviders(<AppShell />, {
       router: {
         initialEntries: ["/dashboard"],
       },
     })
 
-    await user.click(await screen.findByRole("button", { name: /eleno/ }))
+    await user.click(
+      await screen.findByRole("button", {
+        name: new RegExp(authUserMock.displayName),
+      }),
+    )
     await user.click(await screen.findByText(t("appShell.signOut")))
 
     await waitFor(() => {

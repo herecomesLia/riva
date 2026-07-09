@@ -33,6 +33,7 @@ apps/client/
 │   ├── mocks/
 │   ├── pages/
 │   ├── components/
+│   ├── hooks/
 │   ├── services/
 │   ├── routes/
 │   ├── stores/
@@ -52,6 +53,7 @@ Layer responsibilities:
 - `mocks/`: page-state mocks and other frontend-only mock data used during early-stage UI development.
 - `pages/`: screens mapped to application routes.
 - `components/`: reusable UI sections and composed components.
+- `hooks/`: React hooks that compose client state, service calls, and UI interaction flows.
 - `services/`: API clients, Server-Sent Events streams, WebSocket connections,
   and upload clients.
 - `routes/`: routing definitions.

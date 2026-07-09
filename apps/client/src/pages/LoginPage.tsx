@@ -17,14 +17,17 @@ import {
 } from "@/components/ui/card"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useAuthStore } from "@/stores/auth"
+import { useAuth } from "@/hooks/use-auth"
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const signIn = useAuthStore((state) => state.signIn)
+  const { login } = useAuth()
   const { t } = useTranslation()
   const formSchema = z.object({
-    username: z.string().trim().min(1, t("login.usernameRequired")),
+    username: z
+      .string()
+      .min(1, t("login.usernameRequired"))
+      .refine((value) => value === value.trim(), t("login.usernameNoOuterSpaces")),
     password: z.string().min(1, t("login.passwordRequired")),
   })
   const form = useForm({
@@ -35,8 +38,8 @@ export function LoginPage() {
     validators: {
       onSubmit: formSchema,
     },
-    onSubmit: ({ value }) => {
-      signIn(value.username)
+    onSubmit: async ({ value }) => {
+      await login({ username: value.username })
       void navigate({ to: "/dashboard" })
     },
   })

@@ -32,6 +32,7 @@ apps/client/
 │   ├── mocks/
 │   ├── pages/
 │   ├── components/
+│   ├── hooks/
 │   ├── services/
 │   ├── routes/
 │   ├── stores/
@@ -51,6 +52,7 @@ apps/client/
 - `mocks/`：页面状态 mock 以及早期前端开发使用的 mock 数据。
 - `pages/`：对应应用路由的页面。
 - `components/`：可复用 UI 区块和组合组件。
+- `hooks/`：组合客户端状态、服务调用和界面交互流程的 React Hooks。
 - `services/`：API 客户端、Server-Sent Events 流式连接、WebSocket 连接和上传客户端。
 - `routes/`：路由定义。
 - `stores/`：UI、会话和缓存状态。

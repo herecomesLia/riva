@@ -1,65 +1,50 @@
 import { env } from "@/app/env"
-import { userMock, type UserMock } from "@/mocks/data/user"
-import { defaultScenario, getPageStateScenario, type PageStateScenario } from "@/mocks/page-state"
+import { authSessionMock, authUserMock } from "@/mocks/data/auth"
+import { waitForMockDelay } from "@/mocks/utils"
+import type { AuthSession, AuthUser } from "@/models/auth"
 
-export type PageViewState = "loading" | "empty" | "error" | "success"
-
-export type DashboardViewModel = {
-  scenario: PageStateScenario
-  state: PageViewState
-  user: UserMock
+export type SignInInput = {
+  username: string
 }
 
-export type ResumeProfileViewModel = {
-  scenario: PageStateScenario
-  state: PageViewState
-  user: UserMock
+export type AuthSessionResult = {
+  session: AuthSession
+  user: AuthUser
 }
 
-const viewModelDelayMs = 240
+const authDelayMs = 160
 
-function resolvePageState(scenario: PageStateScenario): PageViewState {
-  if (scenario === "loading" || scenario === "submitting") {
-    return "loading"
+export async function login(_input: SignInInput): Promise<AuthSessionResult> {
+  void _input
+
+  if (env.mock) {
+    await waitForMockDelay(authDelayMs)
+    return {
+      session: authSessionMock,
+      user: authUserMock,
+    }
   }
 
-  if (scenario === "empty" || scenario === "firstTime" || scenario === "incomplete") {
-    return "empty"
+  throw new Error("Real login is not implemented.")
+}
+
+export async function logout() {
+  if (env.mock) {
+    await waitForMockDelay(authDelayMs)
+    return
   }
 
-  if (scenario === "error" || scenario === "submitError") {
-    return "error"
+  throw new Error("Real logout is not implemented.")
+}
+
+export async function restoreSession(): Promise<AuthSessionResult | null> {
+  if (env.mock) {
+    await waitForMockDelay(authDelayMs)
+    return {
+      session: authSessionMock,
+      user: authUserMock,
+    }
   }
 
-  return "success"
-}
-
-function getScenario(page: string) {
-  return env.mock ? getPageStateScenario(page) : defaultScenario
-}
-
-function waitForViewModel() {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, viewModelDelayMs)
-  })
-}
-
-async function getUserPageViewModel(page: string) {
-  const scenario = getScenario(page)
-
-  await waitForViewModel()
-
-  return {
-    scenario,
-    state: resolvePageState(scenario),
-    user: userMock,
-  }
-}
-
-export async function getDashboardViewModel(): Promise<DashboardViewModel> {
-  return getUserPageViewModel("dashboard")
-}
-
-export async function getResumeProfileViewModel(): Promise<ResumeProfileViewModel> {
-  return getUserPageViewModel("resume")
+  throw new Error("Real session restore is not implemented.")
 }

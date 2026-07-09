@@ -3,6 +3,7 @@ export const login = {
   description: "Continue to your interview workspace.",
   username: "Username",
   usernamePlaceholder: "Enter your username",
+  usernameNoOuterSpaces: "Username must not start or end with spaces.",
   usernameRequired: "Enter your username.",
   password: "Password",
   passwordRequired: "Enter your password.",

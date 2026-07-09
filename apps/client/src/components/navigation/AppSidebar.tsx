@@ -36,8 +36,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { userMock } from "@/mocks/data/user"
-import { useAuthStore } from "@/stores/auth"
+import { useAuth } from "@/hooks/use-auth"
 
 type AppNavigationPath =
   "/dashboard" | "/profile" | "/roles" | "/practice" | "/interview" | "/history"
@@ -157,17 +156,20 @@ function AppSidebarHeader() {
 function AppSidebarUser() {
   const { isMobile } = useSidebar()
   const navigate = useNavigate()
-  const currentUser = useAuthStore((state) => state.currentUser)
-  const signOut = useAuthStore((state) => state.signOut)
+  const { currentUser, logout } = useAuth()
   const { t } = useTranslation()
-  const displayUser = currentUser ?? userMock
-  const userName = displayUser.displayName
-  const userDescription = displayUser.username
-  const avatarUrl = displayUser.avatarUrl
-  const avatarFallback = displayUser.avatarFallback
 
-  function handleSignOut() {
-    signOut()
+  if (!currentUser) {
+    return null
+  }
+
+  const userName = currentUser.displayName
+  const userDescription = currentUser.username
+  const avatarUrl = currentUser.avatarUrl
+  const avatarFallback = currentUser.avatarFallback
+
+  async function handleSignOut() {
+    await logout()
     void navigate({ to: "/login" })
   }
 
