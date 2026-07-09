@@ -1,10 +1,9 @@
 export const login = {
   title: "Sign in to Riva",
   description: "Continue to your interview workspace.",
-  email: "Email",
-  emailPlaceholder: "you@example.com",
-  emailRequired: "Enter your email.",
-  emailInvalid: "Enter a valid email address.",
+  username: "Username",
+  usernamePlaceholder: "Enter your username",
+  usernameRequired: "Enter your username.",
   password: "Password",
   passwordRequired: "Enter your password.",
   demoTitle: "Demo account",

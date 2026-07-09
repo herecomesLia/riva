@@ -4,6 +4,8 @@ import { I18nextProvider } from "react-i18next"
 import { Toaster } from "sonner"
 
 import { i18n } from "@/i18n/i18n"
+import { applyThemePreference, readThemePreference } from "@/app/theme"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 const queryClient = new QueryClient()
 
@@ -12,6 +14,21 @@ type AppProvidersProps = {
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
+  useEffect(() => {
+    function syncThemePreference() {
+      applyThemePreference(readThemePreference())
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+
+    syncThemePreference()
+    mediaQuery.addEventListener("change", syncThemePreference)
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncThemePreference)
+    }
+  }, [])
+
   useEffect(() => {
     document.documentElement.lang = i18n.resolvedLanguage ?? i18n.language
 
@@ -29,8 +46,10 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster position="top-center" richColors />
+        <TooltipProvider>
+          {children}
+          <Toaster position="top-center" richColors />
+        </TooltipProvider>
       </QueryClientProvider>
     </I18nextProvider>
   )

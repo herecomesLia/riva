@@ -4,7 +4,7 @@ import { ArrowRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
-import { LanguageSwitcher } from "@/components/navigation/LanguageSwitcher"
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,12 +22,12 @@ export function LoginPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const formSchema = z.object({
-    email: z.string().trim().min(1, t("login.emailRequired")).email(t("login.emailInvalid")),
+    username: z.string().trim().min(1, t("login.usernameRequired")),
     password: z.string().min(1, t("login.passwordRequired")),
   })
   const form = useForm({
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
     validators: {
@@ -60,21 +60,21 @@ export function LoginPage() {
               }}
             >
               <FieldGroup>
-                <form.Field name="email">
+                <form.Field name="username">
                   {(field) => {
                     const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
 
                     return (
                       <Field data-invalid={isInvalid}>
-                        <FieldLabel htmlFor={field.name}>{t("login.email")}</FieldLabel>
+                        <FieldLabel htmlFor={field.name}>{t("login.username")}</FieldLabel>
                         <Input
                           aria-invalid={isInvalid}
                           id={field.name}
                           name={field.name}
                           onBlur={field.handleBlur}
                           onChange={(event) => field.handleChange(event.target.value)}
-                          placeholder={t("login.emailPlaceholder")}
-                          type="email"
+                          placeholder={t("login.usernamePlaceholder")}
+                          type="text"
                           value={field.state.value}
                         />
                         {isInvalid && <FieldError errors={field.state.meta.errors} />}
