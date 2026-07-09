@@ -19,7 +19,7 @@ export function LoginPage() {
 
   return (
     <main className="grid min-h-dvh bg-background text-foreground lg:grid-cols-2">
-      <section className="relative hidden overflow-hidden bg-primary/10 p-12 text-foreground lg:flex lg:flex-col lg:justify-between">
+      <section className="relative hidden overflow-hidden bg-primary/10 p-12 text-foreground lg:flex lg:flex-col lg:gap-5">
         <div className="relative flex items-center gap-3 text-lg font-semibold">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-foreground">
             <SparklesIcon aria-hidden className="size-4" />
@@ -27,8 +27,8 @@ export function LoginPage() {
           <span>{t("login.brand")}</span>
         </div>
 
-        <div className="relative flex h-[500px] items-end justify-center">
-          <LoginCharacters {...charactersProps} />
+        <div className="relative flex flex-1 items-end justify-center">
+          <LoginCharacters className="w-full max-w-[550px]" {...charactersProps} />
         </div>
 
         <div className="relative flex items-center gap-8 text-sm text-muted-foreground">
