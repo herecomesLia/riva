@@ -20,7 +20,7 @@ describe("LoginPage", () => {
     await i18n.changeLanguage(defaultLanguage)
   })
 
-  it("shows username and password validation errors on empty submit", async () => {
+  it("shows account and password validation errors on empty submit", async () => {
     const user = userEvent.setup()
 
     renderWithProviders(<LoginPage />, {
@@ -35,7 +35,7 @@ describe("LoginPage", () => {
     expect(await screen.findByText(t("login.passwordRequired"))).toBeInTheDocument()
   })
 
-  it("writes auth store after submitting username and password", async () => {
+  it("writes auth store after submitting account and password", async () => {
     const user = userEvent.setup()
 
     renderWithProviders(<LoginPage />, {
