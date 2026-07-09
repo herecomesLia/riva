@@ -3,7 +3,7 @@ import { Outlet } from "@tanstack/react-router"
 import { AppSidebar } from "@/components/navigation/AppSidebar"
 import { AppTopbar } from "@/components/navigation/AppTopbar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { useLayoutStore } from "@/stores/layout.store"
+import { useLayoutStore } from "@/stores/layout"
 
 export function AppShell() {
   const isMobileNavigationOpen = useLayoutStore((state) => state.isMobileNavigationOpen)

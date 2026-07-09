@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/card"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useAuthStore } from "@/stores/auth.store"
+import { useAuthStore } from "@/stores/auth"
 
 export function LoginPage() {
   const navigate = useNavigate()

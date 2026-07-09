@@ -17,7 +17,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { usePreferencesStore } from "@/stores/preferences.store"
+import { usePreferencesStore } from "@/stores/preferences"
 
 const themeOptions: Array<{
   icon: typeof SunIcon

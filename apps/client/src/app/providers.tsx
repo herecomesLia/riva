@@ -3,10 +3,10 @@ import { useEffect, type ReactNode } from "react"
 import { I18nextProvider } from "react-i18next"
 import { Toaster } from "sonner"
 
-import { i18n } from "@/i18n/i18n"
 import { applyThemePreference, readThemePreference } from "@/app/theme"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { normalizeLanguagePreference, usePreferencesStore } from "@/stores/preferences.store"
+import { i18n } from "@/i18n/i18n"
+import { normalizeLanguagePreference, usePreferencesStore } from "@/stores/preferences"
 
 const queryClient = new QueryClient()
 

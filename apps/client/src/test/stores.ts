@@ -1,8 +1,8 @@
 import { act } from "@testing-library/react"
 
-import { useAuthStore } from "@/stores/auth.store"
-import { useLayoutStore } from "@/stores/layout.store"
-import { usePreferencesStore } from "@/stores/preferences.store"
+import { useAuthStore } from "@/stores/auth"
+import { useLayoutStore } from "@/stores/layout"
+import { usePreferencesStore } from "@/stores/preferences"
 
 export function resetAuthStore() {
   useAuthStore.setState(useAuthStore.getInitialState(), true)

@@ -37,7 +37,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { userMock } from "@/mocks/data/user"
-import { useAuthStore } from "@/stores/auth.store"
+import { useAuthStore } from "@/stores/auth"
 
 type AppNavigationPath =
   "/dashboard" | "/profile" | "/roles" | "/practice" | "/interview" | "/history"
