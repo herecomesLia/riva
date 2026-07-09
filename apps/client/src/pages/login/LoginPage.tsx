@@ -44,7 +44,7 @@ export function LoginPage() {
         </div>
       </section>
 
-      <section className="flex items-center justify-center bg-background p-8">
+      <section className="flex items-center justify-center bg-background px-4 py-8 sm:p-8">
         <div className="flex w-full max-w-[420px] flex-col gap-10">
           <div className="flex items-center justify-between lg:justify-end">
             <div className="flex items-center gap-3 text-lg font-semibold lg:hidden">

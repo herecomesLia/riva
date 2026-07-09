@@ -146,8 +146,8 @@ export function LoginForm({
           }}
         </form.Field>
 
-        <div className="flex items-center justify-between gap-4">
-          <Field className="w-44 shrink-0 items-center gap-2" orientation="horizontal">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <Field className="max-w-full items-center gap-2 sm:w-auto" orientation="horizontal">
             <Checkbox
               aria-label={t("login.remember")}
               checked={rememberSession}
@@ -168,7 +168,12 @@ export function LoginForm({
         </div>
       </FieldGroup>
 
-      <Button className="h-12 w-full text-base" disabled={form.state.isSubmitting} size="lg" type="submit">
+      <Button
+        className="h-12 w-full text-base"
+        disabled={form.state.isSubmitting}
+        size="lg"
+        type="submit"
+      >
         {form.state.isSubmitting && <Spinner data-icon="inline-start" />}
         {form.state.isSubmitting ? t("login.signingIn") : t("login.continue")}
       </Button>
