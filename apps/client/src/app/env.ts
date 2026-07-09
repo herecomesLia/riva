@@ -1,3 +1,3 @@
 export const env = {
-  mock: import.meta.env.VITE_USE_MOCK === "true",
+  mock: import.meta.env.MOCK === "true",
 } as const

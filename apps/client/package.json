@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:mock": "cross-env VITE_USE_MOCK=true vite",
+    "dev:mock": "cross-env MOCK=true vite",
     "build": "tsc -b && vite build",
-    "build:mock": "cross-env VITE_USE_MOCK=true pnpm build",
+    "build:mock": "cross-env MOCK=true pnpm build",
     "lint": "oxlint .",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",

@@ -1,5 +1,5 @@
 import { CheckIcon, LaptopIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -17,6 +17,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { usePreferencesStore } from "@/stores/preferences.store"
 
 const themeOptions: Array<{
   icon: typeof SunIcon
@@ -41,7 +42,8 @@ const themeOptions: Array<{
 ]
 
 export function ThemeSwitcher() {
-  const [themePreference, setThemePreference] = useState<ThemePreference>("system")
+  const themePreference = usePreferencesStore((state) => state.themePreference)
+  const setThemePreference = usePreferencesStore((state) => state.setThemePreference)
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export function ThemeSwitcher() {
     return () => {
       window.removeEventListener(themePreferenceChangeEvent, handleThemePreferenceChange)
     }
-  }, [])
+  }, [setThemePreference])
 
   function handleThemeChange(preference: ThemePreference) {
     setThemePreference(preference)
@@ -66,9 +68,7 @@ export function ThemeSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={
-          <Button aria-label={t("appShell.theme.select")} size="icon-sm" variant="ghost" />
-        }
+        render={<Button aria-label={t("appShell.theme.select")} size="icon-sm" variant="ghost" />}
       >
         <PaletteIcon data-icon="inline-start" />
       </DropdownMenuTrigger>
@@ -82,7 +82,9 @@ export function ThemeSwitcher() {
               <DropdownMenuItem key={option.value} onClick={() => handleThemeChange(option.value)}>
                 <Icon data-icon="inline-start" />
                 {t(option.labelKey)}
-                {option.value === themePreference && <CheckIcon data-icon="inline-end" className="ml-auto" />}
+                {option.value === themePreference && (
+                  <CheckIcon data-icon="inline-end" className="ml-auto" />
+                )}
               </DropdownMenuItem>
             )
           })}

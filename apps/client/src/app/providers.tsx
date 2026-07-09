@@ -6,6 +6,7 @@ import { Toaster } from "sonner"
 import { i18n } from "@/i18n/i18n"
 import { applyThemePreference, readThemePreference } from "@/app/theme"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { normalizeLanguagePreference, usePreferencesStore } from "@/stores/preferences.store"
 
 const queryClient = new QueryClient()
 
@@ -14,9 +15,15 @@ type AppProvidersProps = {
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
+  const setLanguage = usePreferencesStore((state) => state.setLanguage)
+  const setThemePreference = usePreferencesStore((state) => state.setThemePreference)
+
   useEffect(() => {
     function syncThemePreference() {
-      applyThemePreference(readThemePreference())
+      const themePreference = readThemePreference()
+
+      setThemePreference(themePreference)
+      applyThemePreference(themePreference)
     }
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
@@ -27,13 +34,19 @@ export function AppProviders({ children }: AppProvidersProps) {
     return () => {
       mediaQuery.removeEventListener("change", syncThemePreference)
     }
-  }, [])
+  }, [setThemePreference])
 
   useEffect(() => {
-    document.documentElement.lang = i18n.resolvedLanguage ?? i18n.language
+    const initialLanguage = normalizeLanguagePreference(i18n.resolvedLanguage ?? i18n.language)
+
+    document.documentElement.lang = initialLanguage
+    setLanguage(initialLanguage)
 
     function syncDocumentLanguage(language: string) {
-      document.documentElement.lang = language
+      const languagePreference = normalizeLanguagePreference(language)
+
+      document.documentElement.lang = languagePreference
+      setLanguage(languagePreference)
     }
 
     i18n.on("languageChanged", syncDocumentLanguage)
@@ -41,7 +54,7 @@ export function AppProviders({ children }: AppProvidersProps) {
     return () => {
       i18n.off("languageChanged", syncDocumentLanguage)
     }
-  }, [])
+  }, [setLanguage])
 
   return (
     <I18nextProvider i18n={i18n}>

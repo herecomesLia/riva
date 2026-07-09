@@ -8,6 +8,9 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    "import.meta.env.MOCK": JSON.stringify(process.env.MOCK ?? ""),
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

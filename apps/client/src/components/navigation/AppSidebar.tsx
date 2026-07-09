@@ -1,4 +1,4 @@
-import { Link, useMatchRoute } from "@tanstack/react-router"
+import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router"
 import {
   BriefcaseBusinessIcon,
   ChevronsUpDownIcon,
@@ -36,14 +36,11 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { userMock } from "@/mocks/data/user.mock"
+import { useAuthStore } from "@/stores/auth.store"
 
 type AppNavigationPath =
-  | "/dashboard"
-  | "/profile"
-  | "/roles"
-  | "/practice"
-  | "/interview"
-  | "/history"
+  "/dashboard" | "/profile" | "/roles" | "/practice" | "/interview" | "/history"
 
 type AppNavigationItem = {
   icon: LucideIcon
@@ -159,7 +156,20 @@ function AppSidebarHeader() {
 
 function AppSidebarUser() {
   const { isMobile } = useSidebar()
+  const navigate = useNavigate()
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const signOut = useAuthStore((state) => state.signOut)
   const { t } = useTranslation()
+  const displayUser = currentUser ?? userMock
+  const userName = displayUser.displayName
+  const userDescription = displayUser.username
+  const avatarUrl = displayUser.avatarUrl
+  const avatarFallback = displayUser.avatarFallback
+
+  function handleSignOut() {
+    signOut()
+    void navigate({ to: "/login" })
+  }
 
   return (
     <SidebarMenu>
@@ -174,12 +184,12 @@ function AppSidebarUser() {
             }
           >
             <Avatar>
-              <AvatarImage alt={t("appShell.user.name")} src={t("appShell.user.avatar")} />
-              <AvatarFallback>{t("appShell.user.fallback")}</AvatarFallback>
+              <AvatarImage alt={userName} src={avatarUrl} />
+              <AvatarFallback>{avatarFallback}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{t("appShell.user.name")}</span>
-              <span className="truncate text-xs">{t("appShell.user.description")}</span>
+              <span className="truncate font-medium">{userName}</span>
+              <span className="truncate text-xs">{userDescription}</span>
             </div>
             <ChevronsUpDownIcon />
           </DropdownMenuTrigger>
@@ -193,19 +203,19 @@ function AppSidebarUser() {
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage alt={t("appShell.user.name")} src={t("appShell.user.avatar")} />
-                    <AvatarFallback>{t("appShell.user.fallback")}</AvatarFallback>
+                    <AvatarImage alt={userName} src={avatarUrl} />
+                    <AvatarFallback>{avatarFallback}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{t("appShell.user.name")}</span>
-                    <span className="truncate text-xs">{t("appShell.user.description")}</span>
+                    <span className="truncate font-medium">{userName}</span>
+                    <span className="truncate text-xs">{userDescription}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem render={<Link to="/login" />} variant="destructive">
+              <DropdownMenuItem onClick={handleSignOut} variant="destructive">
                 <LogOutIcon />
                 <span>{t("appShell.signOut")}</span>
               </DropdownMenuItem>

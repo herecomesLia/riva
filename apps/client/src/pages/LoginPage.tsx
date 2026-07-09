@@ -17,9 +17,11 @@ import {
 } from "@/components/ui/card"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { useAuthStore } from "@/stores/auth.store"
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const signIn = useAuthStore((state) => state.signIn)
   const { t } = useTranslation()
   const formSchema = z.object({
     username: z.string().trim().min(1, t("login.usernameRequired")),
@@ -33,7 +35,8 @@ export function LoginPage() {
     validators: {
       onSubmit: formSchema,
     },
-    onSubmit: () => {
+    onSubmit: ({ value }) => {
+      signIn(value.username)
       void navigate({ to: "/dashboard" })
     },
   })

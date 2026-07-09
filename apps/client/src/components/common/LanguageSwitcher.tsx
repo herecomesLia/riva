@@ -1,4 +1,5 @@
 import { CheckIcon, LanguagesIcon } from "lucide-react"
+import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
@@ -10,24 +11,30 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { defaultLanguage, supportedLanguages, type SupportedLanguage } from "@/i18n/resources"
-
-function normalizeLanguage(language: string | undefined): SupportedLanguage {
-  if (language === "en") {
-    return "en"
-  }
-
-  return defaultLanguage
-}
+import { supportedLanguages, type SupportedLanguage } from "@/i18n/resources"
+import { normalizeLanguagePreference, usePreferencesStore } from "@/stores/preferences.store"
 
 export function LanguageSwitcher() {
   const { i18n, t } = useTranslation()
-  const currentLanguage =
-    supportedLanguages.find((language) => language === i18n.resolvedLanguage) ??
-    supportedLanguages.find((language) => language === i18n.language) ??
-    normalizeLanguage(i18n.resolvedLanguage ?? i18n.language)
+  const currentLanguage = usePreferencesStore((state) => state.language)
+  const setLanguage = usePreferencesStore((state) => state.setLanguage)
+
+  useEffect(() => {
+    setLanguage(normalizeLanguagePreference(i18n.resolvedLanguage ?? i18n.language))
+
+    function handleLanguageChanged(language: string) {
+      setLanguage(normalizeLanguagePreference(language))
+    }
+
+    i18n.on("languageChanged", handleLanguageChanged)
+
+    return () => {
+      i18n.off("languageChanged", handleLanguageChanged)
+    }
+  }, [i18n, setLanguage])
 
   function handleLanguageChange(language: SupportedLanguage) {
+    setLanguage(language)
     void i18n.changeLanguage(language)
   }
 
@@ -41,11 +48,7 @@ export function LanguageSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button
-            aria-label={t("appShell.language.select")}
-            size="icon-sm"
-            variant="ghost"
-          />
+          <Button aria-label={t("appShell.language.select")} size="icon-sm" variant="ghost" />
         }
       >
         <LanguagesIcon data-icon="inline-start" />
@@ -54,12 +57,11 @@ export function LanguageSwitcher() {
         <DropdownMenuGroup>
           <DropdownMenuLabel>{t("appShell.language.label")}</DropdownMenuLabel>
           {supportedLanguages.map((language) => (
-            <DropdownMenuItem
-              key={language}
-              onClick={() => handleLanguageChange(language)}
-            >
+            <DropdownMenuItem key={language} onClick={() => handleLanguageChange(language)}>
               {getLanguageLabel(language)}
-              {language === currentLanguage && <CheckIcon data-icon="inline-end" className="ml-auto" />}
+              {language === currentLanguage && (
+                <CheckIcon data-icon="inline-end" className="ml-auto" />
+              )}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
