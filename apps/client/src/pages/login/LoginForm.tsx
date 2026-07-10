@@ -10,15 +10,11 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
+import { useLoginHerosContext } from "@/pages/login/LoginHerosContext"
 
 type LoginFormProps = {
   onLoginSuccess: () => void
-  onPasswordChange: (password: string) => void
-  onPasswordVisibilityChange: (visible: boolean) => void
-  onUsernameBlur: () => void
-  onUsernameFocus: () => void
 }
-
 function createLoginSchema(t: TFunction) {
   return z.object({
     username: z
@@ -29,16 +25,23 @@ function createLoginSchema(t: TFunction) {
   })
 }
 
-export function LoginForm({
-  onLoginSuccess,
-  onPasswordChange,
-  onPasswordVisibilityChange,
-  onUsernameBlur,
-  onUsernameFocus,
-}: LoginFormProps) {
+export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   const { login } = useAuth()
   const { t } = useTranslation()
+  const [, setHerosState] = useLoginHerosContext()
   const [rememberSession, setRememberSession] = useState(false)
+
+  function handleUsernameFocus() {
+    setHerosState((state) => ({ ...state, isUsernameFocused: true }))
+  }
+
+  function handleUsernameBlur() {
+    setHerosState((state) => ({ ...state, isUsernameFocused: false }))
+  }
+
+  function handlePasswordChange(password: string) {
+    setHerosState((state) => ({ ...state, isPasswordEmpty: password.length === 0 }))
+  }
   const form = useForm({
     defaultValues: {
       username: "",
@@ -80,11 +83,11 @@ export function LoginForm({
                   id={field.name}
                   name={field.name}
                   onBlur={() => {
-                    onUsernameBlur()
+                    handleUsernameBlur()
                     field.handleBlur()
                   }}
                   onChange={(event) => field.handleChange(event.target.value)}
-                  onFocus={onUsernameFocus}
+                  onFocus={handleUsernameFocus}
                   placeholder={t("login.usernamePlaceholder")}
                   type="text"
                   value={field.state.value}
@@ -111,10 +114,12 @@ export function LoginForm({
                   name={field.name}
                   onBlur={field.handleBlur}
                   onChange={(event) => {
-                    onPasswordChange(event.target.value)
+                    handlePasswordChange(event.target.value)
                     field.handleChange(event.target.value)
                   }}
-                  onPasswordVisibilityChange={onPasswordVisibilityChange}
+                  onPasswordVisibilityChange={(isPasswordVisible) => {
+                    setHerosState((state) => ({ ...state, isPasswordVisible }))
+                  }}
                   placeholder={t("login.passwordPlaceholder")}
                   type="password"
                   value={field.state.value}
