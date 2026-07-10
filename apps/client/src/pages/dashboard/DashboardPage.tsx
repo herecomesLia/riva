@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import dashboardRobotDark from "@/assets/dashboard-robot-dark.png"
 import dashboardRobot from "@/assets/dashboard-robot.png"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -76,13 +77,12 @@ export function DashboardPage() {
       : (dashboardData?.state ?? "error")
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <header className="relative flex flex-col gap-2.5 py-2 lg:pr-72">
-        <img
-          alt=""
-          className="pointer-events-none absolute -top-3 right-50 hidden w-64 mix-blend-multiply lg:block"
-          src={dashboardRobot}
-        />
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+      <header className="relative flex flex-col gap-2.5 lg:pr-72">
+        <div className="pointer-events-none absolute -top-6 right-50 hidden w-55 lg:block">
+          <img alt="" className="w-full mix-blend-multiply dark:hidden" src={dashboardRobot} />
+          <img alt="" className="hidden w-full dark:block" src={dashboardRobotDark} />
+        </div>
         <div className="relative z-10 flex flex-col gap-2.5">
           <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
             {t("dashboard.title")}
