@@ -1,9 +1,9 @@
 import { useState } from "react"
 
 export function useLoginCharactersState() {
-  const [showPassword, setShowPassword] = useState(false)
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [isUsernameFocused, setIsUsernameFocused] = useState(false)
-  const [password, setPassword] = useState("")
+  const [isPasswordEmpty, setIsPasswordEmpty] = useState(true)
 
   function handleUsernameFocus() {
     setIsUsernameFocused(true)
@@ -14,18 +14,18 @@ export function useLoginCharactersState() {
   }
 
   function handlePasswordChange(nextPassword: string) {
-    setPassword(nextPassword)
+    setIsPasswordEmpty(nextPassword.length === 0)
   }
 
   return {
     charactersProps: {
-      hasPassword: password.length > 0,
+      isPasswordEmpty,
       isUsernameFocused,
-      showPassword,
+      isPasswordVisible,
     },
     formProps: {
       onPasswordChange: handlePasswordChange,
-      onPasswordVisibilityChange: setShowPassword,
+      onPasswordVisibilityChange: setIsPasswordVisible,
       onUsernameBlur: handleUsernameBlur,
       onUsernameFocus: handleUsernameFocus,
     },
