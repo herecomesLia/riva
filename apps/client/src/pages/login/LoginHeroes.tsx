@@ -68,37 +68,84 @@ function useMousePosition() {
 
 function useRandomBlink() {
   const [isBlinking, setIsBlinking] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
 
   useEffect(() => {
-    let nestedTimeout: ReturnType<typeof window.setTimeout> | undefined
+    let cancelled = false
 
-    function scheduleBlink() {
-      const timeout = window.setTimeout(
+    function scheduleNextBlink() {
+      timeoutRef.current = window.setTimeout(
         () => {
+          if (cancelled) return
+
           setIsBlinking(true)
-          nestedTimeout = window.setTimeout(() => {
+
+          timeoutRef.current = window.setTimeout(() => {
+            if (cancelled) return
+
             setIsBlinking(false)
-            scheduleBlink()
+            scheduleNextBlink()
           }, 150)
         },
         Math.random() * 4000 + 3000,
       )
-
-      return timeout
     }
 
-    const timeout = scheduleBlink()
+    scheduleNextBlink()
 
     return () => {
-      window.clearTimeout(timeout)
+      cancelled = true
 
-      if (nestedTimeout) {
-        window.clearTimeout(nestedTimeout)
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current)
       }
     }
   }, [])
 
   return isBlinking
+}
+
+function usePasswordPeek(enabled: boolean) {
+  const [isPeeking, setIsPeeking] = useState(false)
+
+  useEffect(() => {
+    if (!enabled) {
+      setIsPeeking(false)
+      return
+    }
+
+    let cancelled = false
+    let timeoutId: number | undefined
+
+    function schedulePeek() {
+      const delay = Math.random() * 3000 + 2000
+
+      timeoutId = window.setTimeout(() => {
+        if (cancelled) return
+
+        setIsPeeking(true)
+
+        timeoutId = window.setTimeout(() => {
+          if (cancelled) return
+
+          setIsPeeking(false)
+          schedulePeek()
+        }, 800)
+      }, delay)
+    }
+
+    schedulePeek()
+
+    return () => {
+      cancelled = true
+
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [enabled])
+
+  return isPeeking
 }
 
 function calculatePosition(ref: RefObject<HTMLDivElement | null>, mouseX: number, mouseY: number) {
@@ -149,13 +196,7 @@ function calculatePupilPosition(
   }
 }
 
-function Pupil({
-  maxDistance = 5,
-  mousePosition,
-  size = 12,
-  forceLookX,
-  forceLookY,
-}: PupilProps) {
+function Pupil({ maxDistance = 5, mousePosition, size = 12, forceLookX, forceLookY }: PupilProps) {
   const pupilRef = useRef<HTMLDivElement>(null)
   const pupilPosition = calculatePupilPosition(
     pupilRef,
@@ -236,9 +277,11 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
   const isPurpleBlinking = useRandomBlink()
   const isBlackBlinking = useRandomBlink()
   const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false)
-  const [isPurplePeeking, setIsPurplePeeking] = useState(false)
+
   const isHiddenPassword = !isPasswordEmpty && !isPasswordVisible
   const isVisiblePassword = !isPasswordEmpty && isPasswordVisible
+
+  const isPurplePeeking = usePasswordPeek(isVisiblePassword)
 
   useEffect(() => {
     if (!isUsernameFocused) {
@@ -256,27 +299,6 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
       window.clearTimeout(timeout)
     }
   }, [isUsernameFocused])
-
-  useEffect(() => {
-    if (!isVisiblePassword) {
-      setIsPurplePeeking(false)
-      return undefined
-    }
-
-    const timeout = window.setTimeout(
-      () => {
-        setIsPurplePeeking(true)
-        window.setTimeout(() => {
-          setIsPurplePeeking(false)
-        }, 800)
-      },
-      Math.random() * 3000 + 2000,
-    )
-
-    return () => {
-      window.clearTimeout(timeout)
-    }
-  }, [isPurplePeeking, isVisiblePassword])
 
   const purplePosition = calculatePosition(purpleRef, mousePosition.x, mousePosition.y)
   const blackPosition = calculatePosition(blackRef, mousePosition.x, mousePosition.y)
@@ -319,8 +341,12 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
           }}
         >
           <Eye
-            forceLookX={isVisiblePassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
-            forceLookY={isVisiblePassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
+            forceLookX={
+              isVisiblePassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined
+            }
+            forceLookY={
+              isVisiblePassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined
+            }
             isBlinking={isPurpleBlinking}
             maxDistance={5}
             mousePosition={mousePosition}
@@ -328,8 +354,12 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
             size={18}
           />
           <Eye
-            forceLookX={isVisiblePassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
-            forceLookY={isVisiblePassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
+            forceLookX={
+              isVisiblePassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined
+            }
+            forceLookY={
+              isVisiblePassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined
+            }
             isBlinking={isPurpleBlinking}
             maxDistance={5}
             mousePosition={mousePosition}
