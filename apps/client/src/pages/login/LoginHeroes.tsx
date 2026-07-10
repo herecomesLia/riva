@@ -80,8 +80,8 @@ type PupilProps = {
   size?: number
 }
 
-const HEROES_WIDTH = 550
-const HEROES_HEIGHT = 400
+const STAGE_WIDTH = 550
+const STAGE_HEIGHT = 400
 
 const ZERO_POINT = {
   x: 0,
@@ -102,7 +102,7 @@ const characterColors = {
   yellow: "#E8D754",
 } as const
 
-const heroLayout = {
+const stageLayout = {
   purple: {
     body: {
       height: 400,
@@ -501,7 +501,7 @@ function calculateCharacterPosition(
     return DEFAULT_CHARACTER_POSITION
   }
 
-  const top = HEROES_HEIGHT - height
+  const top = STAGE_HEIGHT - height
   const centerX = left + translateX + width / 2
   const centerY = top + height / 3
 
@@ -559,7 +559,7 @@ function transformCharacterPointToRoot({
 
   return {
     x: bodyLeft + bodyMotion.translateX + stateTransformedPoint.x,
-    y: HEROES_HEIGHT - bodyHeight + stateTransformedPoint.y,
+    y: STAGE_HEIGHT - bodyHeight + stateTransformedPoint.y,
   }
 }
 
@@ -887,17 +887,17 @@ function Eye({ isBlinking = false, pupilOffset, pupilSize = 16, size = 48 }: Eye
 export function LoginHeroes({ className }: LoginHeroesProps) {
   const [{ isPasswordEmpty, isPasswordVisible, isUsernameFocused }] = useLoginHeroesContext()
 
-  const [heroesElement, setHeroesElement] = useState<HTMLDivElement | null>(null)
+  const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null)
 
-  const setHeroesRef = useCallback((element: HTMLDivElement | null) => {
-    setHeroesElement(element)
+  const setStageRef = useCallback((element: HTMLDivElement | null) => {
+    setStageElement(element)
   }, [])
 
-  const measuredWidth = useElementWidth(heroesElement)
+  const measuredWidth = useElementWidth(stageElement)
 
-  const horizontalScale = measuredWidth > 0 ? Math.min(measuredWidth / HEROES_WIDTH, 1) : 1
+  const horizontalScale = measuredWidth > 0 ? Math.min(measuredWidth / STAGE_WIDTH, 1) : 1
 
-  const pointerPosition = useHeroesPointerPosition(heroesElement)
+  const pointerPosition = useHeroesPointerPosition(stageElement)
 
   const heroesAction = resolveHeroesAction({
     isPasswordEmpty,
@@ -914,64 +914,64 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
 
   const isShowingMutualLook = heroesAction === "peek" && isLookingAtEachOther
 
-  const purpleHeight = heroesAction === "peek" ? 440 : heroLayout.purple.body.height
+  const purpleHeight = heroesAction === "peek" ? 440 : stageLayout.purple.body.height
 
-  const purpleLeft = scaleX(heroLayout.purple.body.left, horizontalScale)
+  const purpleLeft = scaleX(stageLayout.purple.body.left, horizontalScale)
 
-  const purpleWidth = scaleX(heroLayout.purple.body.width, horizontalScale)
+  const purpleWidth = scaleX(stageLayout.purple.body.width, horizontalScale)
 
-  const blackLeft = scaleX(heroLayout.black.body.left, horizontalScale)
+  const blackLeft = scaleX(stageLayout.black.body.left, horizontalScale)
 
-  const blackWidth = scaleX(heroLayout.black.body.width, horizontalScale)
+  const blackWidth = scaleX(stageLayout.black.body.width, horizontalScale)
 
-  const orangeLeft = scaleX(heroLayout.orange.body.left, horizontalScale)
+  const orangeLeft = scaleX(stageLayout.orange.body.left, horizontalScale)
 
-  const orangeWidth = scaleX(heroLayout.orange.body.width, horizontalScale)
+  const orangeWidth = scaleX(stageLayout.orange.body.width, horizontalScale)
 
-  const yellowLeft = scaleX(heroLayout.yellow.body.left, horizontalScale)
+  const yellowLeft = scaleX(stageLayout.yellow.body.left, horizontalScale)
 
-  const yellowWidth = scaleX(heroLayout.yellow.body.width, horizontalScale)
+  const yellowWidth = scaleX(stageLayout.yellow.body.width, horizontalScale)
 
   const purpleFaceLayout = calculatePairLayout({
-    baseBodyWidth: heroLayout.purple.body.width,
-    baseCenterX: heroLayout.purple.face.centerX,
-    baseGap: heroLayout.purple.face.gap,
+    baseBodyWidth: stageLayout.purple.body.width,
+    baseCenterX: stageLayout.purple.face.centerX,
+    baseGap: stageLayout.purple.face.gap,
     bodyWidth: purpleWidth,
     horizontalScale,
-    itemSize: heroLayout.purple.eye.size,
+    itemSize: stageLayout.purple.eye.size,
   })
 
   const blackFaceLayout = calculatePairLayout({
-    baseBodyWidth: heroLayout.black.body.width,
-    baseCenterX: heroLayout.black.face.centerX,
-    baseGap: heroLayout.black.face.gap,
+    baseBodyWidth: stageLayout.black.body.width,
+    baseCenterX: stageLayout.black.face.centerX,
+    baseGap: stageLayout.black.face.gap,
     bodyWidth: blackWidth,
     horizontalScale,
-    itemSize: heroLayout.black.eye.size,
+    itemSize: stageLayout.black.eye.size,
   })
 
   const orangeFaceLayout = calculatePairLayout({
-    baseBodyWidth: heroLayout.orange.body.width,
-    baseCenterX: heroLayout.orange.face.centerX,
-    baseGap: heroLayout.orange.face.gap,
+    baseBodyWidth: stageLayout.orange.body.width,
+    baseCenterX: stageLayout.orange.face.centerX,
+    baseGap: stageLayout.orange.face.gap,
     bodyWidth: orangeWidth,
     horizontalScale,
-    itemSize: heroLayout.orange.pupil.size,
+    itemSize: stageLayout.orange.pupil.size,
   })
 
   const yellowFaceLayout = calculatePairLayout({
-    baseBodyWidth: heroLayout.yellow.body.width,
-    baseCenterX: heroLayout.yellow.face.centerX,
-    baseGap: heroLayout.yellow.face.gap,
+    baseBodyWidth: stageLayout.yellow.body.width,
+    baseCenterX: stageLayout.yellow.face.centerX,
+    baseGap: stageLayout.yellow.face.gap,
     bodyWidth: yellowWidth,
     horizontalScale,
-    itemSize: heroLayout.yellow.pupil.size,
+    itemSize: stageLayout.yellow.pupil.size,
   })
 
   const yellowMouthLayout = calculateMouthLayout({
-    baseBodyWidth: heroLayout.yellow.body.width,
-    baseCenterX: heroLayout.yellow.mouth.centerX,
-    baseWidth: heroLayout.yellow.mouth.width,
+    baseBodyWidth: stageLayout.yellow.body.width,
+    baseCenterX: stageLayout.yellow.mouth.centerX,
+    baseWidth: stageLayout.yellow.mouth.width,
     bodyWidth: yellowWidth,
     horizontalScale,
   })
@@ -985,7 +985,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
   })
 
   const blackPosition = calculateCharacterPosition(pointerPosition, {
-    height: heroLayout.black.body.height,
+    height: stageLayout.black.body.height,
     horizontalScale,
     left: blackLeft,
     translateX: isShowingMutualLook ? scaleX(20, horizontalScale) : 0,
@@ -993,14 +993,14 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
   })
 
   const orangePosition = calculateCharacterPosition(pointerPosition, {
-    height: heroLayout.orange.body.height,
+    height: stageLayout.orange.body.height,
     horizontalScale,
     left: orangeLeft,
     width: orangeWidth,
   })
 
   const yellowPosition = calculateCharacterPosition(pointerPosition, {
-    height: heroLayout.yellow.body.height,
+    height: stageLayout.yellow.body.height,
     horizontalScale,
     left: yellowLeft,
     width: yellowWidth,
@@ -1038,80 +1038,80 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
     bodyLeft: purpleLeft,
     bodyMotion: purpleMotion.body,
     bodyWidth: purpleWidth,
-    featureHeight: heroLayout.purple.eye.size,
+    featureHeight: stageLayout.purple.eye.size,
     featureLeft: purpleFaceLayout.left,
     featureMotion: purpleMotion.face,
-    featureTop: heroLayout.purple.face.top,
+    featureTop: stageLayout.purple.face.top,
     featureWidth: purpleFaceLayout.width,
   })
 
   const blackFaceCenter = calculateCharacterFeatureCenter({
-    bodyHeight: heroLayout.black.body.height,
+    bodyHeight: stageLayout.black.body.height,
     bodyLeft: blackLeft,
     bodyMotion: blackMotion.body,
     bodyWidth: blackWidth,
-    featureHeight: heroLayout.black.eye.size,
+    featureHeight: stageLayout.black.eye.size,
     featureLeft: blackFaceLayout.left,
     featureMotion: blackMotion.face,
-    featureTop: heroLayout.black.face.top,
+    featureTop: stageLayout.black.face.top,
     featureWidth: blackFaceLayout.width,
   })
 
   const orangeFaceCenter = calculateCharacterFeatureCenter({
-    bodyHeight: heroLayout.orange.body.height,
+    bodyHeight: stageLayout.orange.body.height,
     bodyLeft: orangeLeft,
     bodyMotion: orangeMotion.body,
     bodyWidth: orangeWidth,
-    featureHeight: heroLayout.orange.pupil.size,
+    featureHeight: stageLayout.orange.pupil.size,
     featureLeft: orangeFaceLayout.left,
     featureMotion: orangeMotion.face,
-    featureTop: heroLayout.orange.face.top,
+    featureTop: stageLayout.orange.face.top,
     featureWidth: orangeFaceLayout.width,
   })
 
   const yellowFaceCenter = calculateCharacterFeatureCenter({
-    bodyHeight: heroLayout.yellow.body.height,
+    bodyHeight: stageLayout.yellow.body.height,
     bodyLeft: yellowLeft,
     bodyMotion: yellowMotion.body,
     bodyWidth: yellowWidth,
-    featureHeight: heroLayout.yellow.pupil.size,
+    featureHeight: stageLayout.yellow.pupil.size,
     featureLeft: yellowFaceLayout.left,
     featureMotion: yellowMotion.face,
-    featureTop: heroLayout.yellow.face.top,
+    featureTop: stageLayout.yellow.face.top,
     featureWidth: yellowFaceLayout.width,
   })
 
   const purpleLookOffset = calculateLookOffset(
     pointerPosition,
     purpleFaceCenter,
-    heroLayout.purple.eye.maxDistance,
+    stageLayout.purple.eye.maxDistance,
     purpleMotion.forcedLook,
   )
 
   const blackLookOffset = calculateLookOffset(
     pointerPosition,
     blackFaceCenter,
-    heroLayout.black.eye.maxDistance,
+    stageLayout.black.eye.maxDistance,
     blackMotion.forcedLook,
   )
 
   const orangeLookOffset = calculateLookOffset(
     pointerPosition,
     orangeFaceCenter,
-    heroLayout.orange.pupil.maxDistance,
+    stageLayout.orange.pupil.maxDistance,
     orangeMotion.forcedLook,
   )
 
   const yellowLookOffset = calculateLookOffset(
     pointerPosition,
     yellowFaceCenter,
-    heroLayout.yellow.pupil.maxDistance,
+    stageLayout.yellow.pupil.maxDistance,
     yellowMotion.forcedLook,
   )
 
   return (
     <div
-      ref={setHeroesRef}
+      ref={setStageRef}
       aria-hidden
       className={cn("relative h-[400px] w-full max-w-[550px]", className)}
     >
@@ -1153,7 +1153,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
               className="absolute transition-transform duration-500 ease-in-out"
               style={{
                 left: purpleFaceLayout.left,
-                top: heroLayout.purple.face.top,
+                top: stageLayout.purple.face.top,
                 transform: `translate3d(${purpleMotion.face.state.x}px, ${purpleMotion.face.state.y}px, 0)`,
               }}
             >
@@ -1168,15 +1168,15 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
                 <Eye
                   isBlinking={isPurpleBlinking}
                   pupilOffset={purpleLookOffset}
-                  pupilSize={heroLayout.purple.eye.pupilSize}
-                  size={heroLayout.purple.eye.size}
+                  pupilSize={stageLayout.purple.eye.pupilSize}
+                  size={stageLayout.purple.eye.size}
                 />
 
                 <Eye
                   isBlinking={isPurpleBlinking}
                   pupilOffset={purpleLookOffset}
-                  pupilSize={heroLayout.purple.eye.pupilSize}
-                  size={heroLayout.purple.eye.size}
+                  pupilSize={stageLayout.purple.eye.pupilSize}
+                  size={stageLayout.purple.eye.size}
                 />
               </div>
             </div>
@@ -1188,7 +1188,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
       <div
         className="absolute bottom-0"
         style={{
-          height: heroLayout.black.body.height,
+          height: stageLayout.black.body.height,
           left: blackLeft,
           width: blackWidth,
           zIndex: 2,
@@ -1221,7 +1221,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
               className="absolute transition-transform duration-500 ease-in-out"
               style={{
                 left: blackFaceLayout.left,
-                top: heroLayout.black.face.top,
+                top: stageLayout.black.face.top,
                 transform: `translate3d(${blackMotion.face.state.x}px, ${blackMotion.face.state.y}px, 0)`,
               }}
             >
@@ -1236,15 +1236,15 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
                 <Eye
                   isBlinking={isBlackBlinking}
                   pupilOffset={blackLookOffset}
-                  pupilSize={heroLayout.black.eye.pupilSize}
-                  size={heroLayout.black.eye.size}
+                  pupilSize={stageLayout.black.eye.pupilSize}
+                  size={stageLayout.black.eye.size}
                 />
 
                 <Eye
                   isBlinking={isBlackBlinking}
                   pupilOffset={blackLookOffset}
-                  pupilSize={heroLayout.black.eye.pupilSize}
-                  size={heroLayout.black.eye.size}
+                  pupilSize={stageLayout.black.eye.pupilSize}
+                  size={stageLayout.black.eye.size}
                 />
               </div>
             </div>
@@ -1256,7 +1256,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
       <div
         className="absolute bottom-0"
         style={{
-          height: heroLayout.orange.body.height,
+          height: stageLayout.orange.body.height,
           left: orangeLeft,
           width: orangeWidth,
           zIndex: 3,
@@ -1289,7 +1289,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
               className="absolute transition-transform duration-200 ease-out"
               style={{
                 left: orangeFaceLayout.left,
-                top: heroLayout.orange.face.top,
+                top: stageLayout.orange.face.top,
                 transform: `translate3d(${orangeMotion.face.state.x}px, ${orangeMotion.face.state.y}px, 0)`,
               }}
             >
@@ -1301,9 +1301,9 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
                   transform: `translate3d(${orangeMotion.face.pointer.x}px, ${orangeMotion.face.pointer.y}px, 0)`,
                 }}
               >
-                <Pupil offset={orangeLookOffset} size={heroLayout.orange.pupil.size} />
+                <Pupil offset={orangeLookOffset} size={stageLayout.orange.pupil.size} />
 
-                <Pupil offset={orangeLookOffset} size={heroLayout.orange.pupil.size} />
+                <Pupil offset={orangeLookOffset} size={stageLayout.orange.pupil.size} />
               </div>
             </div>
           </div>
@@ -1314,7 +1314,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
       <div
         className="absolute bottom-0"
         style={{
-          height: heroLayout.yellow.body.height,
+          height: stageLayout.yellow.body.height,
           left: yellowLeft,
           width: yellowWidth,
           zIndex: 4,
@@ -1361,21 +1361,21 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
                   style={{
                     gap: yellowFaceLayout.gap,
                     left: yellowFaceLayout.left,
-                    top: heroLayout.yellow.face.top,
+                    top: stageLayout.yellow.face.top,
                   }}
                 >
-                  <Pupil offset={yellowLookOffset} size={heroLayout.yellow.pupil.size} />
+                  <Pupil offset={yellowLookOffset} size={stageLayout.yellow.pupil.size} />
 
-                  <Pupil offset={yellowLookOffset} size={heroLayout.yellow.pupil.size} />
+                  <Pupil offset={yellowLookOffset} size={stageLayout.yellow.pupil.size} />
                 </div>
 
                 <div
                   className="absolute rounded-full"
                   style={{
                     backgroundColor: characterColors.black,
-                    height: heroLayout.yellow.mouth.height,
+                    height: stageLayout.yellow.mouth.height,
                     left: yellowMouthLayout.left,
-                    top: heroLayout.yellow.mouth.top,
+                    top: stageLayout.yellow.mouth.top,
                     width: yellowMouthLayout.width,
                   }}
                 />
