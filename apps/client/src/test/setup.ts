@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest"
 
 import { cleanup } from "@testing-library/react"
+import ResizeObserver from "resize-observer-polyfill"
 import { afterEach, beforeEach, vi } from "vitest"
 
 import { defaultLanguage } from "@/i18n/resources"
@@ -38,6 +39,11 @@ Object.defineProperty(window, "localStorage", {
 Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
   value: localStorageMock,
+})
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  configurable: true,
+  value: ResizeObserver,
 })
 
 Object.defineProperty(window, "matchMedia", {
