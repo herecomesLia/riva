@@ -41,7 +41,7 @@ export function AppTopbar() {
   const title = activeItem ? t(activeItem.labelKey) : t("app.name")
 
   return (
-    <header className="sticky top-0 flex h-14 shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-6">
+    <header className="sticky top-0 flex h-14 shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur transition-[width,height] ease-linear md:px-6">
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger aria-label={t("appShell.openNavigation")} className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
