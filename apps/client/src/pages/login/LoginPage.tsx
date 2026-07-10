@@ -11,7 +11,7 @@ import { LoginHeroesProvider } from "@/pages/login/LoginHeroesContext"
 import { useMedia } from "react-use"
 
 export function LoginPage() {
-  const shouldRenderHeroes = useMedia("(min-width: 1024px)", false)
+  const shouldRenderHeroes = useMedia("(min-width: 64rem)")
 
   const navigate = useNavigate()
   const { t } = useTranslation()
