@@ -5,11 +5,14 @@ import { useTranslation } from "react-i18next"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { ThemeSwitcher } from "@/components/common/ThemeSwitcher"
 import { Button } from "@/components/ui/button"
-import { LoginHeroes } from "@/pages/login/LoginHeroes"
 import { LoginForm } from "@/pages/login/LoginForm"
+import { LoginHeroes } from "@/pages/login/LoginHeroes"
 import { LoginHeroesProvider } from "@/pages/login/LoginHeroesContext"
+import { useMedia } from "react-use"
 
 export function LoginPage() {
+  const shouldRenderHeroes = useMedia("(min-width: 1024px)", false)
+
   const navigate = useNavigate()
   const { t } = useTranslation()
   function handleLoginSuccess() {
@@ -28,7 +31,7 @@ export function LoginPage() {
           </div>
 
           <div className="relative flex flex-1 items-end justify-center">
-            <LoginHeroes className="w-full max-w-[550px]" />
+            {shouldRenderHeroes && <LoginHeroes className="w-full max-w-[550px]" />}
           </div>
 
           <div className="relative flex items-center gap-8 text-sm text-muted-foreground">
