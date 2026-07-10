@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react"
-import { useRafState } from "react-use"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { cn } from "@/lib/utils"
 import { useLoginHeroesContext, type LoginHeroesState } from "@/pages/login/LoginHeroesContext"
@@ -23,6 +22,7 @@ type CharacterPosition = {
 
 type CharacterGeometry = {
   height: number
+  horizontalScale: number
   left: number
   translateX?: number
   width: number
@@ -39,6 +39,17 @@ type FaceGeometry = {
   faceWidth: number
 }
 
+type PairLayout = {
+  gap: number
+  left: number
+  width: number
+}
+
+type MouthLayout = {
+  left: number
+  width: number
+}
+
 type EyeProps = {
   isBlinking?: boolean
   pupilOffset: Point
@@ -51,6 +62,7 @@ type PupilProps = {
   size?: number
 }
 
+const HEROES_WIDTH = 550
 const HEROES_HEIGHT = 400
 
 const ZERO_POINT = {
@@ -70,6 +82,81 @@ const characterColors = {
   purple: "#6C3FF5",
   white: "#FFFFFF",
   yellow: "#E8D754",
+} as const
+
+const heroLayout = {
+  purple: {
+    body: {
+      height: 400,
+      left: 70,
+      width: 180,
+    },
+    face: {
+      centerX: 79,
+      gap: 32,
+      top: 40,
+    },
+    eye: {
+      maxDistance: 5,
+      pupilSize: 7,
+      size: 18,
+    },
+  },
+  black: {
+    body: {
+      height: 310,
+      left: 240,
+      width: 120,
+    },
+    face: {
+      centerX: 54,
+      gap: 24,
+      top: 32,
+    },
+    eye: {
+      maxDistance: 4,
+      pupilSize: 6,
+      size: 16,
+    },
+  },
+  orange: {
+    body: {
+      height: 200,
+      left: 0,
+      width: 240,
+    },
+    face: {
+      centerX: 110,
+      gap: 32,
+      top: 90,
+    },
+    pupil: {
+      maxDistance: 5,
+      size: 12,
+    },
+  },
+  yellow: {
+    body: {
+      height: 230,
+      left: 310,
+      width: 140,
+    },
+    face: {
+      centerX: 76,
+      gap: 24,
+      top: 40,
+    },
+    mouth: {
+      centerX: 80,
+      height: 4,
+      top: 88,
+      width: 80,
+    },
+    pupil: {
+      maxDistance: 5,
+      size: 12,
+    },
+  },
 } as const
 
 function resolveHeroesAction({
@@ -92,59 +179,130 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
 }
 
+function scaleX(value: number, horizontalScale: number) {
+  return value * horizontalScale
+}
+
 /**
- * Tracks the pointer in the LoginHeroes root coordinate system.
- *
- * getBoundingClientRect() is intentionally called inside the event handler,
- * rather than during React rendering. useRafState limits React updates to
- * animation frames.
+ * Measures the current rendered width of an element.
  */
-function useHeroesPointerPosition(ref: RefObject<HTMLElement | null>) {
-  const [pointerPosition, setPointerPosition] = useRafState<Point | null>(null)
+function useElementWidth(element: HTMLElement | null) {
+  const [width, setWidth] = useState(0)
 
   useEffect(() => {
-    function handlePointerMove(event: PointerEvent) {
-      const element = ref.current
+    if (!element) {
+      setWidth(0)
+      return
+    }
 
-      if (!element) {
+    function updateWidth(nextWidth: number) {
+      setWidth((currentWidth) => {
+        if (Math.abs(currentWidth - nextWidth) < 0.5) {
+          return currentWidth
+        }
+
+        return nextWidth
+      })
+    }
+
+    updateWidth(element.getBoundingClientRect().width)
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+
+      if (entry) {
+        updateWidth(entry.contentRect.width)
+      }
+    })
+
+    observer.observe(element)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [element])
+
+  return width
+}
+
+/**
+ * Reads pointer and element geometry at most once per animation frame.
+ */
+function useHeroesPointerPosition(element: HTMLElement | null) {
+  const [pointerPosition, setPointerPosition] = useState<Point | null>(null)
+
+  const latestPointerRef = useRef<Point | null>(null)
+  const frameRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    function flushPointerPosition() {
+      frameRef.current = null
+
+      const latestPointer = latestPointerRef.current
+
+      if (!element || !latestPointer) {
         return
       }
 
       const rect = element.getBoundingClientRect()
 
       setPointerPosition({
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
+        x: latestPointer.x - rect.left,
+        y: latestPointer.y - rect.top,
       })
     }
 
-    function handleWindowBlur() {
+    function handlePointerMove(event: PointerEvent) {
+      latestPointerRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+      }
+
+      if (frameRef.current !== null) {
+        return
+      }
+
+      frameRef.current = window.requestAnimationFrame(flushPointerPosition)
+    }
+
+    function resetPointerPosition() {
+      latestPointerRef.current = null
+
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
+      }
+
       setPointerPosition(null)
     }
 
     window.addEventListener("pointermove", handlePointerMove, {
       passive: true,
     })
-    window.addEventListener("blur", handleWindowBlur)
+    window.addEventListener("blur", resetPointerPosition)
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove)
-      window.removeEventListener("blur", handleWindowBlur)
+      window.removeEventListener("blur", resetPointerPosition)
+
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current)
+      }
     }
-  }, [ref, setPointerPosition])
+  }, [element])
 
   return pointerPosition
 }
 
 function useRandomBlink() {
   const [isBlinking, setIsBlinking] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    let timeoutId: ReturnType<typeof window.setTimeout> | undefined
 
     function scheduleNextBlink() {
-      timeoutRef.current = window.setTimeout(
+      timeoutId = window.setTimeout(
         () => {
           if (cancelled) {
             return
@@ -152,7 +310,7 @@ function useRandomBlink() {
 
           setIsBlinking(true)
 
-          timeoutRef.current = window.setTimeout(() => {
+          timeoutId = window.setTimeout(() => {
             if (cancelled) {
               return
             }
@@ -170,8 +328,8 @@ function useRandomBlink() {
     return () => {
       cancelled = true
 
-      if (timeoutRef.current !== null) {
-        window.clearTimeout(timeoutRef.current)
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId)
       }
     }
   }, [])
@@ -212,7 +370,7 @@ function usePasswordPeek(enabled: boolean) {
     }
 
     let cancelled = false
-    let timeoutId: number | undefined
+    let timeoutId: ReturnType<typeof window.setTimeout> | undefined
 
     function schedulePeek() {
       const delay = Math.random() * 3000 + 2000
@@ -250,12 +408,86 @@ function usePasswordPeek(enabled: boolean) {
 }
 
 /**
- * Calculates character movement entirely from the root coordinate system.
- * This function does not read refs or DOM layout.
+ * Calculates a responsive two-item layout.
+ *
+ * Item sizes stay unchanged so eyes and pupils remain circular. The gap and
+ * group position shrink with the character body.
  */
+function calculatePairLayout({
+  baseBodyWidth,
+  baseCenterX,
+  baseGap,
+  bodyWidth,
+  horizontalScale,
+  itemSize,
+}: {
+  baseBodyWidth: number
+  baseCenterX: number
+  baseGap: number
+  bodyWidth: number
+  horizontalScale: number
+  itemSize: number
+}): PairLayout {
+  const maximumPadding = Math.max(0, (bodyWidth - itemSize * 2) / 2)
+
+  const sidePadding = Math.min(clamp(8 * horizontalScale, 4, 8), maximumPadding)
+
+  const availableGap = Math.max(0, bodyWidth - sidePadding * 2 - itemSize * 2)
+
+  const gap = Math.min(baseGap, baseGap * horizontalScale, availableGap)
+
+  const width = itemSize * 2 + gap
+
+  const desiredCenter = bodyWidth * (baseCenterX / baseBodyWidth)
+
+  const minimumLeft = sidePadding
+  const maximumLeft = Math.max(minimumLeft, bodyWidth - sidePadding - width)
+
+  return {
+    gap,
+    left: clamp(desiredCenter - width / 2, minimumLeft, maximumLeft),
+    width,
+  }
+}
+
+/**
+ * Calculates a responsive mouth layout that never exceeds the body width.
+ */
+function calculateMouthLayout({
+  baseBodyWidth,
+  baseCenterX,
+  baseWidth,
+  bodyWidth,
+  horizontalScale,
+}: {
+  baseBodyWidth: number
+  baseCenterX: number
+  baseWidth: number
+  bodyWidth: number
+  horizontalScale: number
+}): MouthLayout {
+  const sidePadding = Math.min(clamp(8 * horizontalScale, 4, 8), bodyWidth / 2)
+
+  const maximumWidth = Math.max(0, bodyWidth - sidePadding * 2)
+
+  const minimumWidth = Math.min(32, maximumWidth)
+
+  const width = clamp(baseWidth * horizontalScale, minimumWidth, maximumWidth)
+
+  const desiredCenter = bodyWidth * (baseCenterX / baseBodyWidth)
+
+  const minimumLeft = sidePadding
+  const maximumLeft = Math.max(minimumLeft, bodyWidth - sidePadding - width)
+
+  return {
+    left: clamp(desiredCenter - width / 2, minimumLeft, maximumLeft),
+    width,
+  }
+}
+
 function calculateCharacterPosition(
   pointerPosition: Point | null,
-  { height, left, translateX = 0, width }: CharacterGeometry,
+  { height, horizontalScale, left, translateX = 0, width }: CharacterGeometry,
 ): CharacterPosition {
   if (!pointerPosition) {
     return DEFAULT_CHARACTER_POSITION
@@ -268,20 +500,15 @@ function calculateCharacterPosition(
   const deltaX = pointerPosition.x - centerX
   const deltaY = pointerPosition.y - centerY
 
+  const maximumFaceX = 15 * horizontalScale
+
   return {
     bodySkew: clamp(-deltaX / 120, -6, 6),
-    faceX: clamp(deltaX / 20, -15, 15),
+    faceX: clamp(deltaX / 20, -maximumFaceX, maximumFaceX),
     faceY: clamp(deltaY / 30, -10, 10),
   }
 }
 
-/**
- * Calculates the approximate center of a face in the root coordinate system.
- *
- * The character body skew is deliberately excluded. Including it would require
- * reading the rendered transform matrix from the DOM and would recreate the
- * render-time measurement problem this refactor removes.
- */
 function calculateFaceCenter({
   characterHeight,
   characterLeft,
@@ -300,9 +527,6 @@ function calculateFaceCenter({
   }
 }
 
-/**
- * Calculates pupil movement without reading the eye or pupil DOM element.
- */
 function calculateLookOffset(
   pointerPosition: Point | null,
   targetPosition: Point,
@@ -325,11 +549,11 @@ function calculateLookOffset(
     return ZERO_POINT
   }
 
-  const scale = Math.min(distance, maxDistance) / distance
+  const offsetScale = Math.min(distance, maxDistance) / distance
 
   return {
-    x: deltaX * scale,
-    y: deltaY * scale,
+    x: deltaX * offsetScale,
+    y: deltaY * offsetScale,
   }
 }
 
@@ -339,9 +563,9 @@ function Pupil({ offset, size = 12 }: PupilProps) {
       className="rounded-full transition-transform duration-100 ease-out"
       style={{
         backgroundColor: characterColors.black,
-        height: `${size}px`,
+        height: size,
         transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
-        width: `${size}px`,
+        width: size,
       }}
     />
   )
@@ -353,8 +577,8 @@ function Eye({ isBlinking = false, pupilOffset, pupilSize = 16, size = 48 }: Eye
       className="flex items-center justify-center overflow-hidden rounded-full transition-[height] duration-150"
       style={{
         backgroundColor: characterColors.white,
-        height: isBlinking ? "2px" : `${size}px`,
-        width: `${size}px`,
+        height: isBlinking ? 2 : size,
+        width: size,
       }}
     >
       {!isBlinking && (
@@ -362,9 +586,9 @@ function Eye({ isBlinking = false, pupilOffset, pupilSize = 16, size = 48 }: Eye
           className="rounded-full transition-transform duration-100 ease-out"
           style={{
             backgroundColor: characterColors.black,
-            height: `${pupilSize}px`,
+            height: pupilSize,
             transform: `translate3d(${pupilOffset.x}px, ${pupilOffset.y}px, 0)`,
-            width: `${pupilSize}px`,
+            width: pupilSize,
           }}
         />
       )}
@@ -375,8 +599,17 @@ function Eye({ isBlinking = false, pupilOffset, pupilSize = 16, size = 48 }: Eye
 export function LoginHeroes({ className }: LoginHeroesProps) {
   const [{ isPasswordEmpty, isPasswordVisible, isUsernameFocused }] = useLoginHeroesContext()
 
-  const heroesRef = useRef<HTMLDivElement>(null)
-  const pointerPosition = useHeroesPointerPosition(heroesRef)
+  const [heroesElement, setHeroesElement] = useState<HTMLDivElement | null>(null)
+
+  const setHeroesRef = useCallback((element: HTMLDivElement | null) => {
+    setHeroesElement(element)
+  }, [])
+
+  const measuredWidth = useElementWidth(heroesElement)
+
+  const horizontalScale = measuredWidth > 0 ? Math.min(measuredWidth / HEROES_WIDTH, 1) : 1
+
+  const pointerPosition = useHeroesPointerPosition(heroesElement)
 
   const heroesAction = resolveHeroesAction({
     isPasswordEmpty,
@@ -388,57 +621,134 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
   const isBlackBlinking = useRandomBlink()
 
   const isLookingAtEachOther = useMutualLook(isUsernameFocused)
+
   const isPurplePeeking = usePasswordPeek(heroesAction === "look-away")
 
   const isShowingMutualLook = heroesAction === "peek" && isLookingAtEachOther
 
   /*
-   * Character geometry
+   * Responsive body geometry
    */
 
-  const purpleHeight = heroesAction === "peek" ? 440 : 400
-  const purpleTranslateX = heroesAction === "peek" ? 40 : 0
+  const purpleHeight = heroesAction === "peek" ? 440 : heroLayout.purple.body.height
 
-  const blackTranslateX = isShowingMutualLook ? 20 : 0
+  const purpleLeft = scaleX(heroLayout.purple.body.left, horizontalScale)
+
+  const purpleWidth = scaleX(heroLayout.purple.body.width, horizontalScale)
+
+  const purpleTranslateX = heroesAction === "peek" ? scaleX(40, horizontalScale) : 0
+
+  const blackLeft = scaleX(heroLayout.black.body.left, horizontalScale)
+
+  const blackWidth = scaleX(heroLayout.black.body.width, horizontalScale)
+
+  const blackTranslateX = isShowingMutualLook ? scaleX(20, horizontalScale) : 0
+
+  const orangeLeft = scaleX(heroLayout.orange.body.left, horizontalScale)
+
+  const orangeWidth = scaleX(heroLayout.orange.body.width, horizontalScale)
+
+  const yellowLeft = scaleX(heroLayout.yellow.body.left, horizontalScale)
+
+  const yellowWidth = scaleX(heroLayout.yellow.body.width, horizontalScale)
+
+  /*
+   * Responsive face layouts
+   */
+
+  const purpleFaceLayout = calculatePairLayout({
+    baseBodyWidth: heroLayout.purple.body.width,
+    baseCenterX: heroLayout.purple.face.centerX,
+    baseGap: heroLayout.purple.face.gap,
+    bodyWidth: purpleWidth,
+    horizontalScale,
+    itemSize: heroLayout.purple.eye.size,
+  })
+
+  const blackFaceLayout = calculatePairLayout({
+    baseBodyWidth: heroLayout.black.body.width,
+    baseCenterX: heroLayout.black.face.centerX,
+    baseGap: heroLayout.black.face.gap,
+    bodyWidth: blackWidth,
+    horizontalScale,
+    itemSize: heroLayout.black.eye.size,
+  })
+
+  const orangeFaceLayout = calculatePairLayout({
+    baseBodyWidth: heroLayout.orange.body.width,
+    baseCenterX: heroLayout.orange.face.centerX,
+    baseGap: heroLayout.orange.face.gap,
+    bodyWidth: orangeWidth,
+    horizontalScale,
+    itemSize: heroLayout.orange.pupil.size,
+  })
+
+  const yellowFaceLayout = calculatePairLayout({
+    baseBodyWidth: heroLayout.yellow.body.width,
+    baseCenterX: heroLayout.yellow.face.centerX,
+    baseGap: heroLayout.yellow.face.gap,
+    bodyWidth: yellowWidth,
+    horizontalScale,
+    itemSize: heroLayout.yellow.pupil.size,
+  })
+
+  const yellowMouthLayout = calculateMouthLayout({
+    baseBodyWidth: heroLayout.yellow.body.width,
+    baseCenterX: heroLayout.yellow.mouth.centerX,
+    baseWidth: heroLayout.yellow.mouth.width,
+    bodyWidth: yellowWidth,
+    horizontalScale,
+  })
+
+  /*
+   * Pointer-driven body positions
+   */
 
   const purplePosition = calculateCharacterPosition(pointerPosition, {
     height: purpleHeight,
-    left: 70,
+    horizontalScale,
+    left: purpleLeft,
     translateX: purpleTranslateX,
-    width: 180,
+    width: purpleWidth,
   })
 
   const blackPosition = calculateCharacterPosition(pointerPosition, {
-    height: 310,
-    left: 240,
+    height: heroLayout.black.body.height,
+    horizontalScale,
+    left: blackLeft,
     translateX: blackTranslateX,
-    width: 120,
+    width: blackWidth,
   })
 
   const orangePosition = calculateCharacterPosition(pointerPosition, {
-    height: 200,
-    left: 0,
-    width: 240,
+    height: heroLayout.orange.body.height,
+    horizontalScale,
+    left: orangeLeft,
+    width: orangeWidth,
   })
 
   const yellowPosition = calculateCharacterPosition(pointerPosition, {
-    height: 230,
-    left: 310,
-    width: 140,
+    height: heroLayout.yellow.body.height,
+    horizontalScale,
+    left: yellowLeft,
+    width: yellowWidth,
   })
 
   /*
    * Face movement
-   *
-   * Each face now has a fixed left/top anchor. Mouse and action movement is
-   * represented only through translate3d().
    */
 
   const purpleFaceOffset: Point =
     heroesAction === "look-away"
-      ? { x: -25, y: -5 }
+      ? {
+          x: scaleX(-25, horizontalScale),
+          y: -5,
+        }
       : isShowingMutualLook
-        ? { x: 10, y: 25 }
+        ? {
+            x: scaleX(10, horizontalScale),
+            y: 25,
+          }
         : {
             x: purplePosition.faceX,
             y: purplePosition.faceY,
@@ -446,9 +756,15 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
 
   const blackFaceOffset: Point =
     heroesAction === "look-away"
-      ? { x: -16, y: -4 }
+      ? {
+          x: scaleX(-16, horizontalScale),
+          y: -4,
+        }
       : isShowingMutualLook
-        ? { x: 6, y: -20 }
+        ? {
+            x: scaleX(6, horizontalScale),
+            y: -20,
+          }
         : {
             x: blackPosition.faceX,
             y: blackPosition.faceY,
@@ -456,7 +772,10 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
 
   const orangeFaceOffset: Point =
     heroesAction === "look-away"
-      ? { x: -32, y: -5 }
+      ? {
+          x: scaleX(-32, horizontalScale),
+          y: -5,
+        }
       : {
           x: orangePosition.faceX,
           y: orangePosition.faceY,
@@ -464,7 +783,10 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
 
   const yellowFaceOffset: Point =
     heroesAction === "look-away"
-      ? { x: -32, y: -5 }
+      ? {
+          x: scaleX(-32, horizontalScale),
+          y: -5,
+        }
       : {
           x: yellowPosition.faceX,
           y: yellowPosition.faceY,
@@ -472,14 +794,17 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
 
   const yellowMouthOffset: Point =
     heroesAction === "look-away"
-      ? { x: -30, y: 0 }
+      ? {
+          x: scaleX(-30, horizontalScale),
+          y: 0,
+        }
       : {
           x: yellowPosition.faceX,
           y: yellowPosition.faceY,
         }
 
   /*
-   * Forced eye directions for special actions
+   * Forced eye directions
    */
 
   const purpleForcedLook: Point | undefined =
@@ -505,212 +830,282 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
     heroesAction === "look-away" ? { x: -5, y: -4 } : undefined
 
   /*
-   * Face centers and pupil movement
+   * Face centers and pupil offsets
    */
 
   const purpleFaceCenter = calculateFaceCenter({
     characterHeight: purpleHeight,
-    characterLeft: 70,
+    characterLeft: purpleLeft,
     characterTranslateX: purpleTranslateX,
-    faceHeight: 18,
-    faceLeft: 45,
+    faceHeight: heroLayout.purple.eye.size,
+    faceLeft: purpleFaceLayout.left,
     faceOffset: purpleFaceOffset,
-    faceTop: 40,
-    faceWidth: 68,
+    faceTop: heroLayout.purple.face.top,
+    faceWidth: purpleFaceLayout.width,
   })
 
   const blackFaceCenter = calculateFaceCenter({
-    characterHeight: 310,
-    characterLeft: 240,
+    characterHeight: heroLayout.black.body.height,
+    characterLeft: blackLeft,
     characterTranslateX: blackTranslateX,
-    faceHeight: 16,
-    faceLeft: 26,
+    faceHeight: heroLayout.black.eye.size,
+    faceLeft: blackFaceLayout.left,
     faceOffset: blackFaceOffset,
-    faceTop: 32,
-    faceWidth: 56,
+    faceTop: heroLayout.black.face.top,
+    faceWidth: blackFaceLayout.width,
   })
 
   const orangeFaceCenter = calculateFaceCenter({
-    characterHeight: 200,
-    characterLeft: 0,
-    faceHeight: 12,
-    faceLeft: 82,
+    characterHeight: heroLayout.orange.body.height,
+    characterLeft: orangeLeft,
+    faceHeight: heroLayout.orange.pupil.size,
+    faceLeft: orangeFaceLayout.left,
     faceOffset: orangeFaceOffset,
-    faceTop: 90,
-    faceWidth: 56,
+    faceTop: heroLayout.orange.face.top,
+    faceWidth: orangeFaceLayout.width,
   })
 
   const yellowFaceCenter = calculateFaceCenter({
-    characterHeight: 230,
-    characterLeft: 310,
-    faceHeight: 12,
-    faceLeft: 52,
+    characterHeight: heroLayout.yellow.body.height,
+    characterLeft: yellowLeft,
+    faceHeight: heroLayout.yellow.pupil.size,
+    faceLeft: yellowFaceLayout.left,
     faceOffset: yellowFaceOffset,
-    faceTop: 40,
-    faceWidth: 48,
+    faceTop: heroLayout.yellow.face.top,
+    faceWidth: yellowFaceLayout.width,
   })
 
   const purpleLookOffset = calculateLookOffset(
     pointerPosition,
     purpleFaceCenter,
-    5,
+    heroLayout.purple.eye.maxDistance,
     purpleForcedLook,
   )
 
-  const blackLookOffset = calculateLookOffset(pointerPosition, blackFaceCenter, 4, blackForcedLook)
+  const blackLookOffset = calculateLookOffset(
+    pointerPosition,
+    blackFaceCenter,
+    heroLayout.black.eye.maxDistance,
+    blackForcedLook,
+  )
 
   const orangeLookOffset = calculateLookOffset(
     pointerPosition,
     orangeFaceCenter,
-    5,
+    heroLayout.orange.pupil.maxDistance,
     orangeForcedLook,
   )
 
   const yellowLookOffset = calculateLookOffset(
     pointerPosition,
     yellowFaceCenter,
-    5,
+    heroLayout.yellow.pupil.maxDistance,
     yellowForcedLook,
   )
 
   return (
     <div
-      ref={heroesRef}
+      ref={setHeroesRef}
       aria-hidden
-      className={cn("relative h-[400px] w-[550px] max-w-full", className)}
+      className={cn("relative h-[400px] w-full max-w-[550px]", className)}
     >
-      {/* Purple character */}
+      {/* Purple character layout wrapper */}
       <div
-        className="absolute bottom-0 transition-[height,transform] duration-700 ease-in-out"
+        className="absolute bottom-0"
         style={{
-          backgroundColor: characterColors.purple,
-          borderRadius: "10px 10px 0 0",
-          height: `${purpleHeight}px`,
-          left: "70px",
-          transform:
-            heroesAction === "look-away"
-              ? "skewX(0deg)"
-              : heroesAction === "peek"
-                ? `skewX(${purplePosition.bodySkew - 12}deg) translateX(40px)`
-                : `skewX(${purplePosition.bodySkew}deg)`,
-          transformOrigin: "bottom center",
-          width: "180px",
+          height: 440,
+          left: purpleLeft,
+          width: purpleWidth,
           zIndex: 1,
         }}
       >
         <div
-          className="absolute left-[45px] top-[40px] flex gap-8 transition-transform duration-700 ease-in-out"
+          className="absolute bottom-0 left-0 w-full overflow-hidden transition-[height,transform] duration-700 ease-in-out"
           style={{
-            transform: `translate3d(${purpleFaceOffset.x}px, ${purpleFaceOffset.y}px, 0)`,
+            backfaceVisibility: "hidden",
+            backgroundColor: characterColors.purple,
+            borderRadius: "10px 10px 0 0",
+            height: purpleHeight,
+            transform:
+              heroesAction === "look-away"
+                ? "skewX(0deg) translate3d(0, 0, 0)"
+                : heroesAction === "peek"
+                  ? `skewX(${purplePosition.bodySkew - 12}deg) translate3d(${purpleTranslateX}px, 0, 0)`
+                  : `skewX(${purplePosition.bodySkew}deg) translate3d(0, 0, 0)`,
+            transformOrigin: "bottom center",
+            willChange: "height, transform",
           }}
         >
-          <Eye
-            isBlinking={isPurpleBlinking}
-            pupilOffset={purpleLookOffset}
-            pupilSize={7}
-            size={18}
-          />
+          <div
+            className="absolute flex transition-transform duration-700 ease-in-out"
+            style={{
+              gap: purpleFaceLayout.gap,
+              left: purpleFaceLayout.left,
+              top: heroLayout.purple.face.top,
+              transform: `translate3d(${purpleFaceOffset.x}px, ${purpleFaceOffset.y}px, 0)`,
+            }}
+          >
+            <Eye
+              isBlinking={isPurpleBlinking}
+              pupilOffset={purpleLookOffset}
+              pupilSize={heroLayout.purple.eye.pupilSize}
+              size={heroLayout.purple.eye.size}
+            />
 
-          <Eye
-            isBlinking={isPurpleBlinking}
-            pupilOffset={purpleLookOffset}
-            pupilSize={7}
-            size={18}
-          />
+            <Eye
+              isBlinking={isPurpleBlinking}
+              pupilOffset={purpleLookOffset}
+              pupilSize={heroLayout.purple.eye.pupilSize}
+              size={heroLayout.purple.eye.size}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Black character */}
+      {/* Black character layout wrapper */}
       <div
-        className="absolute bottom-0 transition-transform duration-700 ease-in-out"
+        className="absolute bottom-0"
         style={{
-          backgroundColor: characterColors.black,
-          borderRadius: "8px 8px 0 0",
-          height: "310px",
-          left: "240px",
-          transform:
-            heroesAction === "look-away"
-              ? "skewX(0deg)"
-              : isShowingMutualLook
-                ? `skewX(${blackPosition.bodySkew * 1.5 + 10}deg) translateX(20px)`
-                : heroesAction === "peek"
-                  ? `skewX(${blackPosition.bodySkew * 1.5}deg)`
-                  : `skewX(${blackPosition.bodySkew}deg)`,
-          transformOrigin: "bottom center",
-          width: "120px",
+          height: heroLayout.black.body.height,
+          left: blackLeft,
+          width: blackWidth,
           zIndex: 2,
         }}
       >
         <div
-          className="absolute left-[26px] top-[32px] flex gap-6 transition-transform duration-700 ease-in-out"
+          className="absolute inset-0 overflow-hidden transition-transform duration-700 ease-in-out"
           style={{
-            transform: `translate3d(${blackFaceOffset.x}px, ${blackFaceOffset.y}px, 0)`,
+            backfaceVisibility: "hidden",
+            backgroundColor: characterColors.black,
+            borderRadius: "8px 8px 0 0",
+            transform:
+              heroesAction === "look-away"
+                ? "skewX(0deg) translate3d(0, 0, 0)"
+                : isShowingMutualLook
+                  ? `skewX(${blackPosition.bodySkew * 1.5 + 10}deg) translate3d(${blackTranslateX}px, 0, 0)`
+                  : heroesAction === "peek"
+                    ? `skewX(${blackPosition.bodySkew * 1.5}deg) translate3d(0, 0, 0)`
+                    : `skewX(${blackPosition.bodySkew}deg) translate3d(0, 0, 0)`,
+            transformOrigin: "bottom center",
+            willChange: "transform",
           }}
         >
-          <Eye isBlinking={isBlackBlinking} pupilOffset={blackLookOffset} pupilSize={6} size={16} />
+          <div
+            className="absolute flex transition-transform duration-700 ease-in-out"
+            style={{
+              gap: blackFaceLayout.gap,
+              left: blackFaceLayout.left,
+              top: heroLayout.black.face.top,
+              transform: `translate3d(${blackFaceOffset.x}px, ${blackFaceOffset.y}px, 0)`,
+            }}
+          >
+            <Eye
+              isBlinking={isBlackBlinking}
+              pupilOffset={blackLookOffset}
+              pupilSize={heroLayout.black.eye.pupilSize}
+              size={heroLayout.black.eye.size}
+            />
 
-          <Eye isBlinking={isBlackBlinking} pupilOffset={blackLookOffset} pupilSize={6} size={16} />
+            <Eye
+              isBlinking={isBlackBlinking}
+              pupilOffset={blackLookOffset}
+              pupilSize={heroLayout.black.eye.pupilSize}
+              size={heroLayout.black.eye.size}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Orange character */}
+      {/* Orange character layout wrapper */}
       <div
-        className="absolute bottom-0 transition-transform duration-700 ease-in-out"
+        className="absolute bottom-0"
         style={{
-          backgroundColor: characterColors.orange,
-          borderRadius: "120px 120px 0 0",
-          height: "200px",
-          left: "0",
-          transform:
-            heroesAction === "look-away" ? "skewX(0deg)" : `skewX(${orangePosition.bodySkew}deg)`,
-          transformOrigin: "bottom center",
-          width: "240px",
+          height: heroLayout.orange.body.height,
+          left: orangeLeft,
+          width: orangeWidth,
           zIndex: 3,
         }}
       >
         <div
-          className="absolute left-[82px] top-[90px] flex gap-8 transition-transform duration-200 ease-out"
+          className="absolute inset-0 overflow-hidden transition-transform duration-700 ease-in-out"
           style={{
-            transform: `translate3d(${orangeFaceOffset.x}px, ${orangeFaceOffset.y}px, 0)`,
+            backfaceVisibility: "hidden",
+            backgroundColor: characterColors.orange,
+            borderRadius: `${orangeWidth / 2}px ${orangeWidth / 2}px 0 0`,
+            transform:
+              heroesAction === "look-away"
+                ? "skewX(0deg) translate3d(0, 0, 0)"
+                : `skewX(${orangePosition.bodySkew}deg) translate3d(0, 0, 0)`,
+            transformOrigin: "bottom center",
+            willChange: "transform",
           }}
         >
-          <Pupil offset={orangeLookOffset} />
-          <Pupil offset={orangeLookOffset} />
+          <div
+            className="absolute flex transition-transform duration-200 ease-out"
+            style={{
+              gap: orangeFaceLayout.gap,
+              left: orangeFaceLayout.left,
+              top: heroLayout.orange.face.top,
+              transform: `translate3d(${orangeFaceOffset.x}px, ${orangeFaceOffset.y}px, 0)`,
+            }}
+          >
+            <Pupil offset={orangeLookOffset} size={heroLayout.orange.pupil.size} />
+
+            <Pupil offset={orangeLookOffset} size={heroLayout.orange.pupil.size} />
+          </div>
         </div>
       </div>
 
-      {/* Yellow character */}
+      {/* Yellow character layout wrapper */}
       <div
-        className="absolute bottom-0 transition-transform duration-700 ease-in-out"
+        className="absolute bottom-0"
         style={{
-          backgroundColor: characterColors.yellow,
-          borderRadius: "70px 70px 0 0",
-          height: "230px",
-          left: "310px",
-          transform:
-            heroesAction === "look-away" ? "skewX(0deg)" : `skewX(${yellowPosition.bodySkew}deg)`,
-          transformOrigin: "bottom center",
-          width: "140px",
+          height: heroLayout.yellow.body.height,
+          left: yellowLeft,
+          width: yellowWidth,
           zIndex: 4,
         }}
       >
         <div
-          className="absolute left-[52px] top-[40px] flex gap-6 transition-transform duration-200 ease-out"
+          className="absolute inset-0 overflow-hidden transition-transform duration-700 ease-in-out"
           style={{
-            transform: `translate3d(${yellowFaceOffset.x}px, ${yellowFaceOffset.y}px, 0)`,
+            backfaceVisibility: "hidden",
+            backgroundColor: characterColors.yellow,
+            borderRadius: `${yellowWidth / 2}px ${yellowWidth / 2}px 0 0`,
+            transform:
+              heroesAction === "look-away"
+                ? "skewX(0deg) translate3d(0, 0, 0)"
+                : `skewX(${yellowPosition.bodySkew}deg) translate3d(0, 0, 0)`,
+            transformOrigin: "bottom center",
+            willChange: "transform",
           }}
         >
-          <Pupil offset={yellowLookOffset} />
-          <Pupil offset={yellowLookOffset} />
-        </div>
+          <div
+            className="absolute flex transition-transform duration-200 ease-out"
+            style={{
+              gap: yellowFaceLayout.gap,
+              left: yellowFaceLayout.left,
+              top: heroLayout.yellow.face.top,
+              transform: `translate3d(${yellowFaceOffset.x}px, ${yellowFaceOffset.y}px, 0)`,
+            }}
+          >
+            <Pupil offset={yellowLookOffset} size={heroLayout.yellow.pupil.size} />
 
-        <div
-          className="absolute left-[40px] top-[88px] h-1 w-20 rounded-full transition-transform duration-200 ease-out"
-          style={{
-            backgroundColor: characterColors.black,
-            transform: `translate3d(${yellowMouthOffset.x}px, ${yellowMouthOffset.y}px, 0)`,
-          }}
-        />
+            <Pupil offset={yellowLookOffset} size={heroLayout.yellow.pupil.size} />
+          </div>
+
+          <div
+            className="absolute rounded-full transition-transform duration-200 ease-out"
+            style={{
+              backgroundColor: characterColors.black,
+              height: heroLayout.yellow.mouth.height,
+              left: yellowMouthLayout.left,
+              top: heroLayout.yellow.mouth.top,
+              transform: `translate3d(${yellowMouthOffset.x}px, ${yellowMouthOffset.y}px, 0)`,
+              width: yellowMouthLayout.width,
+            }}
+          />
+        </div>
       </div>
     </div>
   )
