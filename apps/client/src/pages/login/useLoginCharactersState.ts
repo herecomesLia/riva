@@ -2,15 +2,15 @@ import { useState } from "react"
 
 export function useLoginCharactersState() {
   const [showPassword, setShowPassword] = useState(false)
-  const [isTyping, setIsTyping] = useState(false)
+  const [isUsernameFocused, setIsUsernameFocused] = useState(false)
   const [password, setPassword] = useState("")
 
   function handleUsernameFocus() {
-    setIsTyping(true)
+    setIsUsernameFocused(true)
   }
 
   function handleUsernameBlur() {
-    setIsTyping(false)
+    setIsUsernameFocused(false)
   }
 
   function handlePasswordChange(nextPassword: string) {
@@ -23,8 +23,8 @@ export function useLoginCharactersState() {
 
   return {
     charactersProps: {
-      isTyping,
-      password,
+      hasPassword: password.length > 0,
+      isUsernameFocused,
       showPassword,
     },
     formProps: {

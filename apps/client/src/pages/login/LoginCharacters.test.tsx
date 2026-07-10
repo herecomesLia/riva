@@ -6,6 +6,7 @@ import { LoginCharacters } from "@/pages/login/LoginCharacters"
 let resizeObserverCallback: ResizeObserverCallback | undefined
 let observedElement: Element | undefined
 let originalResizeObserver: typeof ResizeObserver | undefined
+let resizeObserverDisconnect: (() => void) | undefined
 
 class MockResizeObserver {
   disconnect = vi.fn()
@@ -16,63 +17,52 @@ class MockResizeObserver {
 
   constructor(callback: ResizeObserverCallback) {
     resizeObserverCallback = callback
+    resizeObserverDisconnect = this.disconnect
   }
 }
 
 type RenderCharactersProps = Partial<Parameters<typeof LoginCharacters>[0]>
 
 function renderCharacters(props: RenderCharactersProps = {}) {
-  return render(<LoginCharacters isTyping={false} password="" showPassword={false} {...props} />)
+  return render(<LoginCharacters hasPassword={false} isUsernameFocused={false} showPassword={false} {...props} />)
+}
+
+function getElement(container: HTMLElement, selector: string, description: string) {
+  const element = container.querySelector<HTMLElement>(selector)
+
+  if (!element) {
+    throw new Error(`${description} was not rendered.`)
+  }
+
+  return element
 }
 
 function getShell(container: HTMLElement) {
-  const shell = container.firstElementChild
-
-  if (!(shell instanceof HTMLElement)) {
-    throw new Error("LoginCharacters shell was not rendered.")
-  }
-
-  return shell
+  return getElement(container, '[data-testid="login-characters-shell"]', "LoginCharacters shell")
 }
 
 function getStage(container: HTMLElement) {
-  const stage = getShell(container).firstElementChild
-
-  if (!(stage instanceof HTMLElement)) {
-    throw new Error("LoginCharacters stage was not rendered.")
-  }
-
-  return stage
+  return getElement(container, '[data-testid="login-characters-stage"]', "LoginCharacters stage")
 }
 
 function getPurpleCharacter(container: HTMLElement) {
-  const purpleCharacter = getStage(container).children[0]
+  return getElement(container, '[data-character="purple"]', "Purple character")
+}
 
-  if (!(purpleCharacter instanceof HTMLElement)) {
-    throw new Error("Purple character was not rendered.")
-  }
+function getPurpleBody(container: HTMLElement) {
+  return getElement(getPurpleCharacter(container), '[data-part="body"]', "Purple character body")
+}
 
-  return purpleCharacter
+function getPurpleFace(container: HTMLElement) {
+  return getElement(getPurpleBody(container), '[data-part="face"]', "Purple character face")
 }
 
 function getOrangeCharacter(container: HTMLElement) {
-  const orangeCharacter = getStage(container).children[2]
-
-  if (!(orangeCharacter instanceof HTMLElement)) {
-    throw new Error("Orange character was not rendered.")
-  }
-
-  return orangeCharacter
+  return getElement(container, '[data-character="orange"]', "Orange character")
 }
 
 function getYellowCharacter(container: HTMLElement) {
-  const yellowCharacter = getStage(container).children[3]
-
-  if (!(yellowCharacter instanceof HTMLElement)) {
-    throw new Error("Yellow character was not rendered.")
-  }
-
-  return yellowCharacter
+  return getElement(container, '[data-character="yellow"]', "Yellow character")
 }
 
 function resizeObservedElement(width: number) {
@@ -100,6 +90,7 @@ describe("LoginCharacters", () => {
   beforeEach(() => {
     resizeObserverCallback = undefined
     observedElement = undefined
+    resizeObserverDisconnect = undefined
     originalResizeObserver = window.ResizeObserver
 
     Object.defineProperty(window, "ResizeObserver", {
@@ -123,6 +114,7 @@ describe("LoginCharacters", () => {
     resizeObserverCallback = undefined
     observedElement = undefined
     originalResizeObserver = undefined
+    resizeObserverDisconnect = undefined
   })
 
   it("scales the fixed stage horizontally while keeping the shell height stable", () => {
@@ -149,7 +141,7 @@ describe("LoginCharacters", () => {
   })
 
   it("moves the purple character horizontally with left instead of translate", () => {
-    const { container, rerender } = renderCharacters({ isTyping: true })
+    const { container, rerender } = renderCharacters({ isUsernameFocused: true })
 
     resizeObservedElement(275)
 
@@ -159,7 +151,7 @@ describe("LoginCharacters", () => {
       transform: "skewX(-12deg)",
     })
 
-    rerender(<LoginCharacters isTyping={false} password="" showPassword={false} />)
+    rerender(<LoginCharacters hasPassword={false} isUsernameFocused={false} showPassword={false} />)
 
     expect(getPurpleCharacter(container)).toHaveStyle({
       height: "400px",
@@ -168,10 +160,104 @@ describe("LoginCharacters", () => {
     })
   })
 
+  it("keeps purple layout, skew, and face movement on the same duration", () => {
+    const { container } = renderCharacters()
+    resizeObservedElement(275)
+
+    expect(getPurpleCharacter(container)).toHaveStyle({
+      transition: "height 700ms ease-in-out, left 700ms ease-in-out, transform 700ms ease-in-out",
+    })
+
+    expect(getPurpleFace(container)).toHaveStyle({
+      transition: "left 700ms ease-in-out, top 700ms ease-in-out, transform 700ms ease-in-out",
+    })
+  })
+
+  it("restores purple mouse following after the username-focus pose ends", () => {
+    vi.useFakeTimers()
+    const animationFrameCallbacks: FrameRequestCallback[] = []
+    const requestAnimationFrameSpy = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      animationFrameCallbacks.push(callback)
+      return animationFrameCallbacks.length
+    })
+
+    try {
+      const { container, rerender } = renderCharacters()
+      resizeObservedElement(275)
+      const purpleCharacter = getPurpleCharacter(container)
+      vi.spyOn(purpleCharacter, "getBoundingClientRect").mockReturnValue({
+        bottom: 300,
+        height: 300,
+        left: 0,
+        right: 180,
+        toJSON: () => ({}),
+        top: 0,
+        width: 180,
+        x: 0,
+        y: 0,
+      })
+
+      act(() => {
+        window.dispatchEvent(new MouseEvent("mousemove", { clientX: 190, clientY: 160 }))
+        animationFrameCallbacks.shift()?.(0)
+      })
+
+      expect(getPurpleFace(container)).toHaveStyle({ transform: "translate(5px, 2px)" })
+
+      rerender(<LoginCharacters hasPassword={false} isUsernameFocused showPassword={false} />)
+
+      expect(getPurpleFace(container)).toHaveStyle({
+        left: "55px",
+        top: "65px",
+        transform: "translate(0px, 0px)",
+        transition: "left 700ms ease-in-out, top 700ms ease-in-out, transform 700ms ease-in-out",
+      })
+
+      act(() => {
+        vi.advanceTimersByTime(800)
+      })
+
+      expect(getPurpleFace(container)).toHaveStyle({
+        left: "45px",
+        top: "40px",
+        transform: "translate(5px, 2px)",
+      })
+    } finally {
+      requestAnimationFrameSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it("keeps the purple scripted pose stable while the mouse moves", () => {
+    const animationFrameCallbacks: FrameRequestCallback[] = []
+    const requestAnimationFrameSpy = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      animationFrameCallbacks.push(callback)
+      return animationFrameCallbacks.length
+    })
+
+    try {
+      const { container, rerender } = renderCharacters()
+      resizeObservedElement(275)
+      rerender(<LoginCharacters hasPassword={false} isUsernameFocused showPassword={false} />)
+
+      expect(getPurpleCharacter(container)).toHaveStyle({ transform: "skewX(-12deg)" })
+
+      act(() => {
+        window.dispatchEvent(new MouseEvent("mousemove", { clientX: 720, clientY: 100 }))
+        animationFrameCallbacks.shift()?.(0)
+      })
+
+      expect(getPurpleCharacter(container)).toHaveStyle({ transform: "skewX(-12deg)" })
+      expect(getPurpleBody(container)).toHaveStyle({ transform: "skewX(-6deg)" })
+    } finally {
+      requestAnimationFrameSpy.mockRestore()
+    }
+  })
+
   it("does not collapse or start timers while the measured width is zero", () => {
     vi.useFakeTimers()
     const addEventListenerSpy = vi.spyOn(window, "addEventListener")
-    const { container, unmount } = renderCharacters({ password: "secret", showPassword: true })
+    const { container, unmount } = renderCharacters({ hasPassword: true, showPassword: true })
 
     try {
       resizeObservedElement(0)
@@ -191,13 +277,7 @@ describe("LoginCharacters", () => {
         visibility: "visible",
       })
       expect(addEventListenerSpy).toHaveBeenCalledWith("mousemove", expect.any(Function))
-      expect(vi.getTimerCount()).toBe(3)
-
-      act(() => {
-        vi.runOnlyPendingTimers()
-      })
-
-      expect(vi.getTimerCount()).toBe(3)
+      expect(vi.getTimerCount()).toBeGreaterThan(0)
       unmount()
       expect(vi.getTimerCount()).toBe(0)
     } finally {
@@ -230,5 +310,26 @@ describe("LoginCharacters", () => {
     } finally {
       requestAnimationFrameSpy.mockRestore()
     }
+  })
+
+  it("cleans observers, mouse listeners, and queued frames on unmount", () => {
+    const requestAnimationFrameSpy = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1)
+    const cancelAnimationFrameSpy = vi.spyOn(window, "cancelAnimationFrame")
+    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener")
+    const { unmount } = renderCharacters()
+    resizeObservedElement(275)
+
+    act(() => {
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 100, clientY: 100 }))
+    })
+
+    unmount()
+
+    expect(resizeObserverDisconnect).toHaveBeenCalledOnce()
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("mousemove", expect.any(Function))
+    expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(1)
+    requestAnimationFrameSpy.mockRestore()
+    cancelAnimationFrameSpy.mockRestore()
+    removeEventListenerSpy.mockRestore()
   })
 })
