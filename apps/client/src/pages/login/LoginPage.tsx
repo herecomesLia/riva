@@ -3,6 +3,7 @@ import { SparklesIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
+import { ThemeSwitcher } from "@/components/common/ThemeSwitcher"
 import { Button } from "@/components/ui/button"
 import { LoginCharacters } from "@/pages/login/LoginCharacters"
 import { LoginForm } from "@/pages/login/LoginForm"
@@ -53,6 +54,7 @@ export function LoginPage() {
               </div>
               <span>{t("login.brand")}</span>
             </div>
+            <ThemeSwitcher />
             <LanguageSwitcher />
           </div>
 
