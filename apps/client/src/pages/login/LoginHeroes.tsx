@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react"
 
 import { cn } from "@/lib/utils"
 import { useLoginHeroesContext, type LoginHeroesState } from "@/pages/login/LoginHeroesContext"
@@ -14,10 +14,13 @@ type Point = {
   y: number
 }
 
-type StageViewport = {
+type StageViewportState = {
   horizontalScale: number
   pointerPosition: Point | null
   ready: boolean
+}
+
+type StageViewport = StageViewportState & {
   ref: RefObject<HTMLDivElement | null>
 }
 
@@ -217,7 +220,7 @@ function createOffsetMotion(state: Point = ZERO_POINT, pointer: Point = ZERO_POI
 
 function useStageViewport(): StageViewport {
   const ref = useRef<HTMLDivElement>(null)
-  const [viewport, setViewport] = useState<Omit<StageViewport, "ref">>({
+  const [viewport, setViewport] = useState<StageViewportState>({
     horizontalScale: 1,
     pointerPosition: null,
     ready: false,
@@ -225,7 +228,7 @@ function useStageViewport(): StageViewport {
   const latestPointerRef = useRef<Point | null>(null)
   const frameRef = useRef<number | null>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = ref.current
 
     if (!element) {
@@ -234,12 +237,15 @@ function useStageViewport(): StageViewport {
 
     const stageElement: HTMLDivElement = element
 
-    function flushViewport() {
-      frameRef.current = null
-
+    function measureViewport() {
       const rect = stageElement.getBoundingClientRect()
+
+      if (rect.width <= 0) {
+        return
+      }
+
       const latestPointer = latestPointerRef.current
-      const horizontalScale = rect.width > 0 ? Math.min(rect.width / STAGE_WIDTH, 1) : 1
+      const horizontalScale = Math.min(rect.width / STAGE_WIDTH, 1)
       const pointerPosition = latestPointer
         ? {
             x: latestPointer.x - rect.left,
@@ -270,6 +276,11 @@ function useStageViewport(): StageViewport {
           ready: true,
         }
       })
+    }
+
+    function flushViewport() {
+      frameRef.current = null
+      measureViewport()
     }
 
     function scheduleViewportUpdate() {
@@ -304,12 +315,13 @@ function useStageViewport(): StageViewport {
       passive: true,
     })
     window.addEventListener("blur", resetPointerPosition)
-    scheduleViewportUpdate()
+    measureViewport()
 
     return () => {
       observer.disconnect()
       window.removeEventListener("pointermove", handlePointerMove)
       window.removeEventListener("blur", resetPointerPosition)
+      latestPointerRef.current = null
 
       if (frameRef.current !== null) {
         window.cancelAnimationFrame(frameRef.current)
@@ -895,7 +907,7 @@ function Eye({ isBlinking = false, pupilOffset, pupilSize = 16, size = 48 }: Eye
 export function LoginHeroes({ className }: LoginHeroesProps) {
   const [{ isPasswordEmpty, isPasswordVisible, isUsernameFocused }] = useLoginHeroesContext()
 
-  const { horizontalScale, pointerPosition, ref: stageRef } = useStageViewport()
+  const { horizontalScale, pointerPosition, ready, ref: stageRef } = useStageViewport()
 
   const heroesAction = resolveHeroesAction({
     isPasswordEmpty,
@@ -1115,6 +1127,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
       style={{
         clipPath:
           "polygon(-100vw -100vh, calc(100% + 100vw) -100vh, calc(100% + 100vw) 100%, -100vw 100%)",
+        visibility: ready ? undefined : "hidden",
       }}
     >
       {/* Purple character layout */}
