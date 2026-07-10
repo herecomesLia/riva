@@ -63,16 +63,28 @@ describe("AppShell", () => {
     ).toBeInTheDocument()
   })
 
-  it("shows the current route title in the top bar", async () => {
+  it("shows today's localized date in the practice top bar", async () => {
     renderWithProviders(<AppShell />, {
       router: {
         initialEntries: ["/practice"],
       },
     })
 
-    expect(
-      await screen.findByRole("heading", { name: t("appShell.nav.practice") }),
-    ).toBeInTheDocument()
+    const today = new Intl.DateTimeFormat(i18n.language, { dateStyle: "full" }).format(new Date())
+
+    expect(await screen.findByRole("heading", { name: today })).toBeInTheDocument()
+  })
+
+  it("shows today's localized date in the dashboard top bar", async () => {
+    renderWithProviders(<AppShell />, {
+      router: {
+        initialEntries: ["/dashboard"],
+      },
+    })
+
+    const today = new Intl.DateTimeFormat(i18n.language, { dateStyle: "full" }).format(new Date())
+
+    expect(await screen.findByRole("heading", { name: today })).toBeInTheDocument()
   })
 
   it("clears auth store and navigates to login after sign out", async () => {

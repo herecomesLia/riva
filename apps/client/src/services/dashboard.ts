@@ -4,41 +4,112 @@ import { waitForMockDelay } from "@/mocks/utils"
 
 export type PageViewState = "loading" | "empty" | "error" | "success"
 
-export type DashboardCardIcon = "currentRole" | "nextSession" | "recommendation"
+export type DashboardRoute = "/profile" | "/roles" | "/practice" | "/interview" | "/history"
 
-export type DashboardCardData = {
-  badgeKey: string
+export type DashboardMetricIcon = "roleFit" | "training" | "performance" | "weaknesses"
+
+export type DashboardMetric = {
   descriptionKey: string
-  icon: DashboardCardIcon
+  icon: DashboardMetricIcon
+  titleKey: string
+  valueKey: string
+}
+
+export type DashboardReadinessStage = {
+  labelKey: string
+  status: "complete" | "current" | "upcoming"
+}
+
+export type DashboardWeakness = {
+  descriptionKey: string
+  practiceCountKey: string
+  titleKey: string
+}
+
+export type DashboardActivity = {
+  descriptionKey: string
+  scoreKey: string
   titleKey: string
 }
 
 export type DashboardPageState = {
-  cards: DashboardCardData[]
+  activities: DashboardActivity[]
+  metrics: DashboardMetric[]
+  readinessStages: DashboardReadinessStage[]
   scenario: PageStateScenario
   state: PageViewState
+  weaknesses: DashboardWeakness[]
 }
 
 const dashboardDelayMs = 240
 
-const dashboardCards: DashboardCardData[] = [
+const dashboardMetrics: DashboardMetric[] = [
   {
-    badgeKey: "dashboard.cards.currentRole.badge",
-    descriptionKey: "dashboard.cards.currentRole.description",
-    icon: "currentRole",
-    titleKey: "dashboard.cards.currentRole.title",
+    descriptionKey: "dashboard.metrics.roleFit.description",
+    icon: "roleFit",
+    titleKey: "dashboard.metrics.roleFit.title",
+    valueKey: "dashboard.metrics.roleFit.value",
   },
   {
-    badgeKey: "dashboard.cards.nextSession.badge",
-    descriptionKey: "dashboard.cards.nextSession.description",
-    icon: "nextSession",
-    titleKey: "dashboard.cards.nextSession.title",
+    descriptionKey: "dashboard.metrics.training.description",
+    icon: "training",
+    titleKey: "dashboard.metrics.training.title",
+    valueKey: "dashboard.metrics.training.value",
   },
   {
-    badgeKey: "dashboard.cards.recommendation.badge",
-    descriptionKey: "dashboard.cards.recommendation.description",
-    icon: "recommendation",
-    titleKey: "dashboard.cards.recommendation.title",
+    descriptionKey: "dashboard.metrics.performance.description",
+    icon: "performance",
+    titleKey: "dashboard.metrics.performance.title",
+    valueKey: "dashboard.metrics.performance.value",
+  },
+  {
+    descriptionKey: "dashboard.metrics.weaknesses.description",
+    icon: "weaknesses",
+    titleKey: "dashboard.metrics.weaknesses.title",
+    valueKey: "dashboard.metrics.weaknesses.value",
+  },
+]
+
+const dashboardReadinessStages: DashboardReadinessStage[] = [
+  { labelKey: "dashboard.readiness.stages.profile", status: "complete" },
+  { labelKey: "dashboard.readiness.stages.role", status: "complete" },
+  { labelKey: "dashboard.readiness.stages.practice", status: "current" },
+  { labelKey: "dashboard.readiness.stages.interview", status: "upcoming" },
+]
+
+const dashboardWeaknesses: DashboardWeakness[] = [
+  {
+    descriptionKey: "dashboard.weaknesses.items.projectExpression.description",
+    practiceCountKey: "dashboard.weaknesses.items.projectExpression.count",
+    titleKey: "dashboard.weaknesses.items.projectExpression.title",
+  },
+  {
+    descriptionKey: "dashboard.weaknesses.items.quantifiedResults.description",
+    practiceCountKey: "dashboard.weaknesses.items.quantifiedResults.count",
+    titleKey: "dashboard.weaknesses.items.quantifiedResults.title",
+  },
+  {
+    descriptionKey: "dashboard.weaknesses.items.pressureResponse.description",
+    practiceCountKey: "dashboard.weaknesses.items.pressureResponse.count",
+    titleKey: "dashboard.weaknesses.items.pressureResponse.title",
+  },
+]
+
+const dashboardActivities: DashboardActivity[] = [
+  {
+    descriptionKey: "dashboard.activity.items.project.description",
+    scoreKey: "dashboard.activity.items.project.score",
+    titleKey: "dashboard.activity.items.project.title",
+  },
+  {
+    descriptionKey: "dashboard.activity.items.behavioral.description",
+    scoreKey: "dashboard.activity.items.behavioral.score",
+    titleKey: "dashboard.activity.items.behavioral.title",
+  },
+  {
+    descriptionKey: "dashboard.activity.items.mockInterview.description",
+    scoreKey: "dashboard.activity.items.mockInterview.score",
+    titleKey: "dashboard.activity.items.mockInterview.title",
   },
 ]
 
@@ -64,9 +135,12 @@ async function getDashboardPageStateWithMock(): Promise<DashboardPageState> {
   await waitForMockDelay(dashboardDelayMs)
 
   return {
-    cards: dashboardCards,
+    activities: dashboardActivities,
+    metrics: dashboardMetrics,
+    readinessStages: dashboardReadinessStages,
     scenario,
     state: resolvePageState(scenario),
+    weaknesses: dashboardWeaknesses,
   }
 }
 
