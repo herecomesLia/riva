@@ -1,6 +1,5 @@
 import { useForm } from "@tanstack/react-form"
 import type { TFunction } from "i18next"
-import { EyeIcon, EyeOffIcon } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
@@ -9,22 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
 
 type LoginFormProps = {
   onLoginSuccess: () => void
   onPasswordChange: (password: string) => void
-  onPasswordVisibilityToggle: () => void
+  onPasswordVisibilityChange: (visible: boolean) => void
   onUsernameBlur: () => void
   onUsernameFocus: () => void
-  showPassword: boolean
 }
 
 function createLoginSchema(t: TFunction) {
@@ -40,10 +32,9 @@ function createLoginSchema(t: TFunction) {
 export function LoginForm({
   onLoginSuccess,
   onPasswordChange,
-  onPasswordVisibilityToggle,
+  onPasswordVisibilityChange,
   onUsernameBlur,
   onUsernameFocus,
-  showPassword,
 }: LoginFormProps) {
   const { login } = useAuth()
   const { t } = useTranslation()
@@ -113,31 +104,21 @@ export function LoginForm({
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>{t("login.password")}</FieldLabel>
-                <InputGroup>
-                  <InputGroupInput
-                    aria-invalid={isInvalid}
-                    autoComplete="current-password"
-                    id={field.name}
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => {
-                      onPasswordChange(event.target.value)
-                      field.handleChange(event.target.value)
-                    }}
-                    placeholder={t("login.passwordPlaceholder")}
-                    type={showPassword ? "text" : "password"}
-                    value={field.state.value}
-                  />
-                  <InputGroupAddon align="inline-end">
-                    <InputGroupButton
-                      aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
-                      onClick={onPasswordVisibilityToggle}
-                      size="icon-sm"
-                    >
-                      {showPassword ? <EyeOffIcon aria-hidden /> : <EyeIcon aria-hidden />}
-                    </InputGroupButton>
-                  </InputGroupAddon>
-                </InputGroup>
+                <Input
+                  aria-invalid={isInvalid}
+                  autoComplete="current-password"
+                  id={field.name}
+                  name={field.name}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => {
+                    onPasswordChange(event.target.value)
+                    field.handleChange(event.target.value)
+                  }}
+                  onPasswordVisibilityChange={onPasswordVisibilityChange}
+                  placeholder={t("login.passwordPlaceholder")}
+                  type="password"
+                  value={field.state.value}
+                />
                 {isInvalid && (
                   <FieldError className="text-red-500" errors={field.state.meta.errors} />
                 )}

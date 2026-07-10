@@ -17,10 +17,6 @@ export function useLoginCharactersState() {
     setPassword(nextPassword)
   }
 
-  function togglePasswordVisibility() {
-    setShowPassword((current) => !current)
-  }
-
   return {
     charactersProps: {
       hasPassword: password.length > 0,
@@ -29,10 +25,9 @@ export function useLoginCharactersState() {
     },
     formProps: {
       onPasswordChange: handlePasswordChange,
-      onPasswordVisibilityToggle: togglePasswordVisibility,
+      onPasswordVisibilityChange: setShowPassword,
       onUsernameBlur: handleUsernameBlur,
       onUsernameFocus: handleUsernameFocus,
-      showPassword,
     },
   }
 }
