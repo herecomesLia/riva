@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
 
 import { cn } from "@/lib/utils"
-import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
+import { useLoginHeroesContext, type LoginHeroesState } from "@/pages/login/LoginHeroesContext"
+
+type LoginHeroesProps = {
+  className?: string
+}
+
+type LoginHeroesAction = "idle" | "peek" | "look-away"
 
 type CharacterPosition = {
   bodySkew: number
   faceX: number
   faceY: number
-}
-
-type LoginHeroesProps = {
-  className?: string
 }
 
 type EyeProps = {
@@ -43,6 +45,20 @@ const characterColors = {
   white: "#FFFFFF",
   yellow: "#E8D754",
 } as const
+
+function resolveHeroesAction({
+  isPasswordEmpty,
+  isPasswordVisible,
+  isUsernameFocused,
+}: LoginHeroesState): LoginHeroesAction {
+  if (!isPasswordEmpty && isPasswordVisible) {
+    return "look-away"
+  }
+  if (!isPasswordEmpty || isUsernameFocused) {
+    return "peek"
+  }
+  return "idle"
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
@@ -103,6 +119,29 @@ function useRandomBlink() {
   }, [])
 
   return isBlinking
+}
+
+function useMutualLook(enabled: boolean) {
+  const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false)
+
+  useEffect(() => {
+    if (!enabled) {
+      setIsLookingAtEachOther(false)
+      return
+    }
+
+    setIsLookingAtEachOther(true)
+
+    const timeoutId = window.setTimeout(() => {
+      setIsLookingAtEachOther(false)
+    }, 800)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [enabled])
+
+  return isLookingAtEachOther
 }
 
 function usePasswordPeek(enabled: boolean) {
@@ -269,36 +308,26 @@ function Eye({
 
 export function LoginHeroes({ className }: LoginHeroesProps) {
   const [{ isPasswordEmpty, isPasswordVisible, isUsernameFocused }] = useLoginHeroesContext()
+
   const mousePosition = useMousePosition()
   const purpleRef = useRef<HTMLDivElement>(null)
   const blackRef = useRef<HTMLDivElement>(null)
   const yellowRef = useRef<HTMLDivElement>(null)
   const orangeRef = useRef<HTMLDivElement>(null)
+
+  const heroesAction = resolveHeroesAction({
+    isPasswordEmpty,
+    isPasswordVisible,
+    isUsernameFocused,
+  })
+
   const isPurpleBlinking = useRandomBlink()
   const isBlackBlinking = useRandomBlink()
-  const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false)
 
-  const isHiddenPassword = !isPasswordEmpty && !isPasswordVisible
-  const isVisiblePassword = !isPasswordEmpty && isPasswordVisible
+  const isLookingAtEachOther = useMutualLook(isUsernameFocused)
+  const isPurplePeeking = usePasswordPeek(heroesAction === "look-away")
 
-  const isPurplePeeking = usePasswordPeek(isVisiblePassword)
-
-  useEffect(() => {
-    if (!isUsernameFocused) {
-      setIsLookingAtEachOther(false)
-      return undefined
-    }
-
-    setIsLookingAtEachOther(true)
-
-    const timeout = window.setTimeout(() => {
-      setIsLookingAtEachOther(false)
-    }, 800)
-
-    return () => {
-      window.clearTimeout(timeout)
-    }
-  }, [isUsernameFocused])
+  const isShowingMutualLook = heroesAction === "peek" && isLookingAtEachOther
 
   const purplePosition = calculatePosition(purpleRef, mousePosition.x, mousePosition.y)
   const blackPosition = calculatePosition(blackRef, mousePosition.x, mousePosition.y)
@@ -313,13 +342,14 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         style={{
           backgroundColor: characterColors.purple,
           borderRadius: "10px 10px 0 0",
-          height: isUsernameFocused || isHiddenPassword ? "440px" : "400px",
+          height: heroesAction === "peek" ? "440px" : "400px",
           left: "70px",
-          transform: isVisiblePassword
-            ? "skewX(0deg)"
-            : isUsernameFocused || isHiddenPassword
-              ? `skewX(${purplePosition.bodySkew - 12}deg) translateX(40px)`
-              : `skewX(${purplePosition.bodySkew}deg)`,
+          transform:
+            heroesAction === "look-away"
+              ? "skewX(0deg)"
+              : heroesAction === "peek"
+                ? `skewX(${purplePosition.bodySkew - 12}deg) translateX(40px)`
+                : `skewX(${purplePosition.bodySkew}deg)`,
           transformOrigin: "bottom center",
           width: "180px",
           zIndex: 1,
@@ -328,24 +358,38 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         <div
           className="absolute flex gap-8 transition-all duration-700 ease-in-out"
           style={{
-            left: isVisiblePassword
-              ? "20px"
-              : isLookingAtEachOther
-                ? "55px"
-                : `${45 + purplePosition.faceX}px`,
-            top: isVisiblePassword
-              ? "35px"
-              : isLookingAtEachOther
-                ? "65px"
-                : `${40 + purplePosition.faceY}px`,
+            left:
+              heroesAction === "look-away"
+                ? "20px"
+                : isShowingMutualLook
+                  ? "55px"
+                  : `${45 + purplePosition.faceX}px`,
+            top:
+              heroesAction === "look-away"
+                ? "35px"
+                : isShowingMutualLook
+                  ? "65px"
+                  : `${40 + purplePosition.faceY}px`,
           }}
         >
           <Eye
             forceLookX={
-              isVisiblePassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined
+              heroesAction === "look-away"
+                ? isPurplePeeking
+                  ? 4
+                  : -4
+                : isShowingMutualLook
+                  ? 3
+                  : undefined
             }
             forceLookY={
-              isVisiblePassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined
+              heroesAction === "look-away"
+                ? isPurplePeeking
+                  ? 5
+                  : -4
+                : isShowingMutualLook
+                  ? 4
+                  : undefined
             }
             isBlinking={isPurpleBlinking}
             maxDistance={5}
@@ -353,12 +397,25 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
             pupilSize={7}
             size={18}
           />
+
           <Eye
             forceLookX={
-              isVisiblePassword ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined
+              heroesAction === "look-away"
+                ? isPurplePeeking
+                  ? 4
+                  : -4
+                : isShowingMutualLook
+                  ? 3
+                  : undefined
             }
             forceLookY={
-              isVisiblePassword ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined
+              heroesAction === "look-away"
+                ? isPurplePeeking
+                  ? 5
+                  : -4
+                : isShowingMutualLook
+                  ? 4
+                  : undefined
             }
             isBlinking={isPurpleBlinking}
             maxDistance={5}
@@ -377,13 +434,14 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
           borderRadius: "8px 8px 0 0",
           height: "310px",
           left: "240px",
-          transform: isVisiblePassword
-            ? "skewX(0deg)"
-            : isLookingAtEachOther
-              ? `skewX(${blackPosition.bodySkew * 1.5 + 10}deg) translateX(20px)`
-              : isUsernameFocused || isHiddenPassword
-                ? `skewX(${blackPosition.bodySkew * 1.5}deg)`
-                : `skewX(${blackPosition.bodySkew}deg)`,
+          transform:
+            heroesAction === "look-away"
+              ? "skewX(0deg)"
+              : isShowingMutualLook
+                ? `skewX(${blackPosition.bodySkew * 1.5 + 10}deg) translateX(20px)`
+                : heroesAction === "peek"
+                  ? `skewX(${blackPosition.bodySkew * 1.5}deg)`
+                  : `skewX(${blackPosition.bodySkew}deg)`,
           transformOrigin: "bottom center",
           width: "120px",
           zIndex: 2,
@@ -392,21 +450,24 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         <div
           className="absolute flex gap-6 transition-all duration-700 ease-in-out"
           style={{
-            left: isVisiblePassword
-              ? "10px"
-              : isLookingAtEachOther
-                ? "32px"
-                : `${26 + blackPosition.faceX}px`,
-            top: isVisiblePassword
-              ? "28px"
-              : isLookingAtEachOther
-                ? "12px"
-                : `${32 + blackPosition.faceY}px`,
+            left:
+              heroesAction === "look-away"
+                ? "10px"
+                : isShowingMutualLook
+                  ? "32px"
+                  : `${26 + blackPosition.faceX}px`,
+
+            top:
+              heroesAction === "look-away"
+                ? "28px"
+                : isShowingMutualLook
+                  ? "12px"
+                  : `${32 + blackPosition.faceY}px`,
           }}
         >
           <Eye
-            forceLookX={isVisiblePassword ? -4 : isLookingAtEachOther ? 0 : undefined}
-            forceLookY={isVisiblePassword ? -4 : isLookingAtEachOther ? -4 : undefined}
+            forceLookX={heroesAction === "look-away" ? -4 : isShowingMutualLook ? 0 : undefined}
+            forceLookY={heroesAction === "look-away" ? -4 : isShowingMutualLook ? -4 : undefined}
             isBlinking={isBlackBlinking}
             maxDistance={4}
             mousePosition={mousePosition}
@@ -414,8 +475,8 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
             size={16}
           />
           <Eye
-            forceLookX={isVisiblePassword ? -4 : isLookingAtEachOther ? 0 : undefined}
-            forceLookY={isVisiblePassword ? -4 : isLookingAtEachOther ? -4 : undefined}
+            forceLookX={heroesAction === "look-away" ? -4 : isShowingMutualLook ? 0 : undefined}
+            forceLookY={heroesAction === "look-away" ? -4 : isShowingMutualLook ? -4 : undefined}
             isBlinking={isBlackBlinking}
             maxDistance={4}
             mousePosition={mousePosition}
@@ -433,7 +494,8 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
           borderRadius: "120px 120px 0 0",
           height: "200px",
           left: "0",
-          transform: isVisiblePassword ? "skewX(0deg)" : `skewX(${orangePosition.bodySkew}deg)`,
+          transform:
+            heroesAction === "look-away" ? "skewX(0deg)" : `skewX(${orangePosition.bodySkew}deg)`,
           transformOrigin: "bottom center",
           width: "240px",
           zIndex: 3,
@@ -442,18 +504,19 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         <div
           className="absolute flex gap-8 transition-all duration-200 ease-out"
           style={{
-            left: isVisiblePassword ? "50px" : `${82 + orangePosition.faceX}px`,
-            top: isVisiblePassword ? "85px" : `${90 + orangePosition.faceY}px`,
+            left: heroesAction === "look-away" ? "50px" : `${82 + orangePosition.faceX}px`,
+
+            top: heroesAction === "look-away" ? "85px" : `${90 + orangePosition.faceY}px`,
           }}
         >
           <Pupil
-            forceLookX={isVisiblePassword ? -5 : undefined}
-            forceLookY={isVisiblePassword ? -4 : undefined}
+            forceLookX={heroesAction === "look-away" ? -5 : undefined}
+            forceLookY={heroesAction === "look-away" ? -4 : undefined}
             mousePosition={mousePosition}
           />
           <Pupil
-            forceLookX={isVisiblePassword ? -5 : undefined}
-            forceLookY={isVisiblePassword ? -4 : undefined}
+            forceLookX={heroesAction === "look-away" ? -5 : undefined}
+            forceLookY={heroesAction === "look-away" ? -4 : undefined}
             mousePosition={mousePosition}
           />
         </div>
@@ -467,7 +530,8 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
           borderRadius: "70px 70px 0 0",
           height: "230px",
           left: "310px",
-          transform: isVisiblePassword ? "skewX(0deg)" : `skewX(${yellowPosition.bodySkew}deg)`,
+          transform:
+            heroesAction === "look-away" ? "skewX(0deg)" : `skewX(${yellowPosition.bodySkew}deg)`,
           transformOrigin: "bottom center",
           width: "140px",
           zIndex: 4,
@@ -476,18 +540,19 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         <div
           className="absolute flex gap-6 transition-all duration-200 ease-out"
           style={{
-            left: isVisiblePassword ? "20px" : `${52 + yellowPosition.faceX}px`,
-            top: isVisiblePassword ? "35px" : `${40 + yellowPosition.faceY}px`,
+            left: heroesAction === "look-away" ? "20px" : `${52 + yellowPosition.faceX}px`,
+
+            top: heroesAction === "look-away" ? "35px" : `${40 + yellowPosition.faceY}px`,
           }}
         >
           <Pupil
-            forceLookX={isVisiblePassword ? -5 : undefined}
-            forceLookY={isVisiblePassword ? -4 : undefined}
+            forceLookX={heroesAction === "look-away" ? -5 : undefined}
+            forceLookY={heroesAction === "look-away" ? -4 : undefined}
             mousePosition={mousePosition}
           />
           <Pupil
-            forceLookX={isVisiblePassword ? -5 : undefined}
-            forceLookY={isVisiblePassword ? -4 : undefined}
+            forceLookX={heroesAction === "look-away" ? -5 : undefined}
+            forceLookY={heroesAction === "look-away" ? -4 : undefined}
             mousePosition={mousePosition}
           />
         </div>
@@ -495,8 +560,9 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
           className="absolute h-1 w-20 rounded-full transition-all duration-200 ease-out"
           style={{
             backgroundColor: characterColors.black,
-            left: isVisiblePassword ? "10px" : `${40 + yellowPosition.faceX}px`,
-            top: isVisiblePassword ? "88px" : `${88 + yellowPosition.faceY}px`,
+            left: heroesAction === "look-away" ? "10px" : `${40 + yellowPosition.faceX}px`,
+
+            top: heroesAction === "look-away" ? "88px" : `${88 + yellowPosition.faceY}px`,
           }}
         />
       </div>
