@@ -1114,6 +1114,10 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
       ref={setStageRef}
       aria-hidden
       className={cn("relative h-[400px] w-full max-w-[550px]", className)}
+      style={{
+        clipPath:
+          "polygon(-100vw -100vh, calc(100% + 100vw) -100vh, calc(100% + 100vw) 100%, -100vw 100%)",
+      }}
     >
       {/* Purple character layout */}
       <div
