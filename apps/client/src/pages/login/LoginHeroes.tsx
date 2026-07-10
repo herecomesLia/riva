@@ -1376,12 +1376,6 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
                     height: heroLayout.yellow.mouth.height,
                     left: yellowMouthLayout.left,
                     top: heroLayout.yellow.mouth.top,
-
-                    // Preserve the previous 2px difference between the
-                    // mouth and eye state offsets without adding another
-                    // animation layer.
-                    transform: "translateX(2px)",
-
                     width: yellowMouthLayout.width,
                   }}
                 />
