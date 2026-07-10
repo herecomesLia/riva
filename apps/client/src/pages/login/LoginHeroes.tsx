@@ -1139,7 +1139,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         >
           {/* Body pointer layer */}
           <div
-            className="absolute inset-0 overflow-hidden transition-transform duration-[550ms] ease-out"
+            className="absolute inset-0 overflow-hidden transition-transform duration-[600ms] ease-in-out"
             style={{
               backfaceVisibility: "hidden",
               backgroundColor: characterColors.purple,
@@ -1207,7 +1207,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         >
           {/* Body pointer layer */}
           <div
-            className="absolute inset-0 overflow-hidden transition-transform duration-[550ms] ease-out"
+            className="absolute inset-0 overflow-hidden transition-transform duration-[600ms] ease-in-out"
             style={{
               backfaceVisibility: "hidden",
               backgroundColor: characterColors.black,
@@ -1275,7 +1275,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         >
           {/* Body pointer layer */}
           <div
-            className="absolute inset-0 overflow-hidden transition-transform duration-[550ms] ease-out"
+            className="absolute inset-0 overflow-hidden transition-transform duration-[600ms] ease-in-out"
             style={{
               backfaceVisibility: "hidden",
               backgroundColor: characterColors.orange,
@@ -1333,7 +1333,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
         >
           {/* Body pointer layer */}
           <div
-            className="absolute inset-0 overflow-hidden transition-transform duration-[550ms] ease-out"
+            className="absolute inset-0 overflow-hidden transition-transform duration-[600ms] ease-in-out"
             style={{
               backfaceVisibility: "hidden",
               backgroundColor: characterColors.yellow,
