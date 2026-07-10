@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 
 import { cn } from "@/lib/utils"
 import { useLoginHeroesContext, type LoginHeroesState } from "@/pages/login/LoginHeroesContext"
@@ -12,6 +12,13 @@ type LoginHeroesAction = "idle" | "peek" | "look-away"
 type Point = {
   x: number
   y: number
+}
+
+type StageViewport = {
+  horizontalScale: number
+  pointerPosition: Point | null
+  ready: boolean
+  ref: RefObject<HTMLDivElement | null>
 }
 
 type CharacterPosition = {
@@ -208,67 +215,67 @@ function createOffsetMotion(state: Point = ZERO_POINT, pointer: Point = ZERO_POI
   }
 }
 
-function useElementWidth(element: HTMLElement | null) {
-  const [width, setWidth] = useState(0)
-
-  useEffect(() => {
-    if (!element) {
-      setWidth(0)
-      return
-    }
-
-    function updateWidth(nextWidth: number) {
-      setWidth((currentWidth) => {
-        if (Math.abs(currentWidth - nextWidth) < 0.5) {
-          return currentWidth
-        }
-
-        return nextWidth
-      })
-    }
-
-    updateWidth(element.getBoundingClientRect().width)
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-
-      if (entry) {
-        updateWidth(entry.contentRect.width)
-      }
-    })
-
-    observer.observe(element)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [element])
-
-  return width
-}
-
-function useHeroesPointerPosition(element: HTMLElement | null) {
-  const [pointerPosition, setPointerPosition] = useState<Point | null>(null)
-
+function useStageViewport(): StageViewport {
+  const ref = useRef<HTMLDivElement>(null)
+  const [viewport, setViewport] = useState<Omit<StageViewport, "ref">>({
+    horizontalScale: 1,
+    pointerPosition: null,
+    ready: false,
+  })
   const latestPointerRef = useRef<Point | null>(null)
   const frameRef = useRef<number | null>(null)
 
   useEffect(() => {
-    function flushPointerPosition() {
+    const element = ref.current
+
+    if (!element) {
+      return
+    }
+
+    const stageElement: HTMLDivElement = element
+
+    function flushViewport() {
       frameRef.current = null
 
+      const rect = stageElement.getBoundingClientRect()
       const latestPointer = latestPointerRef.current
+      const horizontalScale = rect.width > 0 ? Math.min(rect.width / STAGE_WIDTH, 1) : 1
+      const pointerPosition = latestPointer
+        ? {
+            x: latestPointer.x - rect.left,
+            y: latestPointer.y - rect.top,
+          }
+        : null
 
-      if (!element || !latestPointer) {
-        return
-      }
+      setViewport((currentViewport) => {
+        const currentPointer = currentViewport.pointerPosition
+        const pointerUnchanged =
+          currentPointer === pointerPosition ||
+          (currentPointer !== null &&
+            pointerPosition !== null &&
+            currentPointer.x === pointerPosition.x &&
+            currentPointer.y === pointerPosition.y)
 
-      const rect = element.getBoundingClientRect()
+        if (
+          currentViewport.ready &&
+          currentViewport.horizontalScale === horizontalScale &&
+          pointerUnchanged
+        ) {
+          return currentViewport
+        }
 
-      setPointerPosition({
-        x: latestPointer.x - rect.left,
-        y: latestPointer.y - rect.top,
+        return {
+          horizontalScale,
+          pointerPosition,
+          ready: true,
+        }
       })
+    }
+
+    function scheduleViewportUpdate() {
+      if (frameRef.current === null) {
+        frameRef.current = window.requestAnimationFrame(flushViewport)
+      }
     }
 
     function handlePointerMove(event: PointerEvent) {
@@ -277,40 +284,41 @@ function useHeroesPointerPosition(element: HTMLElement | null) {
         y: event.clientY,
       }
 
-      if (frameRef.current !== null) {
-        return
-      }
-
-      frameRef.current = window.requestAnimationFrame(flushPointerPosition)
+      scheduleViewportUpdate()
     }
 
     function resetPointerPosition() {
       latestPointerRef.current = null
-
-      if (frameRef.current !== null) {
-        window.cancelAnimationFrame(frameRef.current)
-        frameRef.current = null
-      }
-
-      setPointerPosition(null)
+      setViewport((currentViewport) =>
+        currentViewport.pointerPosition === null
+          ? currentViewport
+          : { ...currentViewport, pointerPosition: null },
+      )
     }
+
+    const observer = new ResizeObserver(scheduleViewportUpdate)
+
+    observer.observe(stageElement)
 
     window.addEventListener("pointermove", handlePointerMove, {
       passive: true,
     })
     window.addEventListener("blur", resetPointerPosition)
+    scheduleViewportUpdate()
 
     return () => {
+      observer.disconnect()
       window.removeEventListener("pointermove", handlePointerMove)
       window.removeEventListener("blur", resetPointerPosition)
 
       if (frameRef.current !== null) {
         window.cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
       }
     }
-  }, [element])
+  }, [])
 
-  return pointerPosition
+  return { ...viewport, ref }
 }
 
 function useRandomBlink() {
@@ -887,17 +895,7 @@ function Eye({ isBlinking = false, pupilOffset, pupilSize = 16, size = 48 }: Eye
 export function LoginHeroes({ className }: LoginHeroesProps) {
   const [{ isPasswordEmpty, isPasswordVisible, isUsernameFocused }] = useLoginHeroesContext()
 
-  const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null)
-
-  const setStageRef = useCallback((element: HTMLDivElement | null) => {
-    setStageElement(element)
-  }, [])
-
-  const measuredWidth = useElementWidth(stageElement)
-
-  const horizontalScale = measuredWidth > 0 ? Math.min(measuredWidth / STAGE_WIDTH, 1) : 1
-
-  const pointerPosition = useHeroesPointerPosition(stageElement)
+  const { horizontalScale, pointerPosition, ref: stageRef } = useStageViewport()
 
   const heroesAction = resolveHeroesAction({
     isPasswordEmpty,
@@ -1111,7 +1109,7 @@ export function LoginHeroes({ className }: LoginHeroesProps) {
 
   return (
     <div
-      ref={setStageRef}
+      ref={stageRef}
       aria-hidden
       className={cn("relative h-[400px] w-full max-w-[550px]", className)}
       style={{
