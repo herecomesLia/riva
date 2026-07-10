@@ -314,13 +314,18 @@ function useStageViewport(): StageViewport {
     window.addEventListener("pointermove", handlePointerMove, {
       passive: true,
     })
+    window.addEventListener("resize", scheduleViewportUpdate)
     window.addEventListener("blur", resetPointerPosition)
+
     measureViewport()
 
     return () => {
       observer.disconnect()
+
       window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("resize", scheduleViewportUpdate)
       window.removeEventListener("blur", resetPointerPosition)
+
       latestPointerRef.current = null
 
       if (frameRef.current !== null) {
