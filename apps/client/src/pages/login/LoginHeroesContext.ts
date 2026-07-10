@@ -1,13 +1,13 @@
 import { createStateContext } from "react-use"
 
-export type LoginHerosState = {
+export type LoginHeroesState = {
   isPasswordEmpty: boolean
   isPasswordVisible: boolean
   isUsernameFocused: boolean
 }
 
-export const [useLoginHerosContext, LoginHerosProvider, LoginHerosContext] =
-  createStateContext<LoginHerosState>({
+export const [useLoginHeroesContext, LoginHeroesProvider, LoginHeroesContext] =
+  createStateContext<LoginHeroesState>({
     isPasswordEmpty: true,
     isPasswordVisible: false,
     isUsernameFocused: false,

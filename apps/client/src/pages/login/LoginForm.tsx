@@ -10,7 +10,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
-import { useLoginHerosContext } from "@/pages/login/LoginHerosContext"
+import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 
 type LoginFormProps = {
   onLoginSuccess: () => void
@@ -28,7 +28,7 @@ function createLoginSchema(t: TFunction) {
 export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   const { login } = useAuth()
   const { t } = useTranslation()
-  const [, setHerosState] = useLoginHerosContext()
+  const [, setHerosState] = useLoginHeroesContext()
   const [rememberSession, setRememberSession] = useState(false)
 
   function handleUsernameFocus() {

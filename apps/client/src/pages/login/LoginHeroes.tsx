@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react"
 
 import { cn } from "@/lib/utils"
-import { useLoginHerosContext } from "@/pages/login/LoginHerosContext"
+import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 
 type CharacterPosition = {
   bodySkew: number
@@ -9,7 +9,7 @@ type CharacterPosition = {
   faceY: number
 }
 
-type LoginHerosProps = {
+type LoginHeroesProps = {
   className?: string
 }
 
@@ -226,8 +226,8 @@ function Eye({
   )
 }
 
-export function LoginHeros({ className }: LoginHerosProps) {
-  const [{ isPasswordEmpty, isPasswordVisible, isUsernameFocused }] = useLoginHerosContext()
+export function LoginHeroes({ className }: LoginHeroesProps) {
+  const [{ isPasswordEmpty, isPasswordVisible, isUsernameFocused }] = useLoginHeroesContext()
   const mousePosition = useMousePosition()
   const purpleRef = useRef<HTMLDivElement>(null)
   const blackRef = useRef<HTMLDivElement>(null)

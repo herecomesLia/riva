@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { ThemeSwitcher } from "@/components/common/ThemeSwitcher"
 import { Button } from "@/components/ui/button"
-import { LoginHeros } from "@/pages/login/LoginHeros"
+import { LoginHeroes } from "@/pages/login/LoginHeroes"
 import { LoginForm } from "@/pages/login/LoginForm"
-import { LoginHerosProvider } from "@/pages/login/LoginHerosContext"
+import { LoginHeroesProvider } from "@/pages/login/LoginHeroesContext"
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -17,7 +17,7 @@ export function LoginPage() {
   }
 
   return (
-    <LoginHerosProvider>
+    <LoginHeroesProvider>
       <main className="grid min-h-dvh bg-background text-foreground lg:grid-cols-2">
         <section className="relative hidden overflow-hidden bg-primary/10 p-12 text-foreground lg:flex lg:flex-col lg:gap-5">
           <div className="relative flex items-center gap-3 text-lg font-semibold">
@@ -28,7 +28,7 @@ export function LoginPage() {
           </div>
 
           <div className="relative flex flex-1 items-end justify-center">
-            <LoginHeros className="w-full max-w-[550px]" />
+            <LoginHeroes className="w-full max-w-[550px]" />
           </div>
 
           <div className="relative flex items-center gap-8 text-sm text-muted-foreground">
@@ -75,6 +75,6 @@ export function LoginPage() {
           </div>
         </section>
       </main>
-    </LoginHerosProvider>
+    </LoginHeroesProvider>
   )
 }
