@@ -89,6 +89,10 @@ const dashboardCurrentRoles: Record<DashboardCurrentRoleState, DashboardCurrentR
   },
 }
 
+export function getDashboardCurrentRoleByState(state: DashboardCurrentRoleState) {
+  return dashboardCurrentRoles[state]
+}
+
 function getDashboardCurrentRole(scenario: PageStateScenario) {
   if (scenario === "success") {
     return dashboardCurrentRoles.missingJobDescription

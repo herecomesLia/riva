@@ -39,6 +39,13 @@ export const dashboard = {
       action: "添加目标岗位",
     },
   },
+  developmentPreview: {
+    title: "开发预览 · 当前目标",
+    complete: "完整状态",
+    missingJobDescription: "缺少 JD",
+    missingProfile: "缺少档案",
+    empty: "空状态",
+  },
   empty: {
     title: "从建立求职档案开始",
     description: "补充简历和目标岗位后，Riva 会为你生成匹配分析与首轮训练建议。",

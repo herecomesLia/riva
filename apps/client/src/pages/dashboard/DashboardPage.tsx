@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next"
 
 import dashboardRobotDark from "@/assets/dashboard-robot-dark.png"
 import dashboardRobot from "@/assets/dashboard-robot.png"
+import { env } from "@/app/env"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -53,6 +54,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
 import {
   calculatePercentageChange,
+  getDashboardCurrentRoleByState,
   getDashboardPageState,
   type DashboardCurrentRole,
   type DashboardCurrentRoleState,
@@ -106,6 +108,8 @@ const currentRoleStatusStyles: Record<"complete" | "incomplete", string> = {
 export function DashboardPage() {
   const { t } = useTranslation()
   const { currentUser } = useAuth()
+  const [currentRolePreviewState, setCurrentRolePreviewState] =
+    useState<DashboardCurrentRoleState | null>(null)
   const dashboardQuery = useQuery({
     queryFn: getDashboardPageState,
     queryKey: ["dashboard-page-state"],
@@ -116,6 +120,7 @@ export function DashboardPage() {
     : dashboardQuery.isError
       ? "error"
       : (dashboardData?.state ?? "error")
+  const currentRolePreviewEnabled = import.meta.env.DEV && env.mock
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -140,17 +145,36 @@ export function DashboardPage() {
       {viewState === "empty" && <DashboardEmptyState />}
       {viewState === "error" && <DashboardErrorState />}
       {viewState === "success" && dashboardData && (
-        <DashboardOverview dashboardData={dashboardData} />
+        <DashboardOverview
+          currentRole={
+            currentRolePreviewState
+              ? getDashboardCurrentRoleByState(currentRolePreviewState)
+              : dashboardData.currentRole
+          }
+          dashboardData={dashboardData}
+        />
+      )}
+      {currentRolePreviewEnabled && viewState === "success" && dashboardData && (
+        <CurrentRolePreviewControl
+          onStateChange={setCurrentRolePreviewState}
+          selectedState={currentRolePreviewState ?? dashboardData.currentRole.state}
+        />
       )}
     </div>
   )
 }
 
-function DashboardOverview({ dashboardData }: { dashboardData: DashboardPageState }) {
+function DashboardOverview({
+  currentRole,
+  dashboardData,
+}: {
+  currentRole: DashboardCurrentRole
+  dashboardData: DashboardPageState
+}) {
   return (
     <div className="flex flex-col gap-6">
       <section className="grid gap-4 lg:grid-cols-12">
-        <CurrentRoleCard currentRole={dashboardData.currentRole} />
+        <CurrentRoleCard currentRole={currentRole} />
         <RecommendationCard />
       </section>
 
@@ -161,6 +185,60 @@ function DashboardOverview({ dashboardData }: { dashboardData: DashboardPageStat
         <WeaknessesCard dashboardData={dashboardData} />
       </section>
     </div>
+  )
+}
+
+const currentRolePreviewOptions: Array<{
+  labelKey:
+    | "dashboard.developmentPreview.complete"
+    | "dashboard.developmentPreview.missingJobDescription"
+    | "dashboard.developmentPreview.missingProfile"
+    | "dashboard.developmentPreview.empty"
+  state: DashboardCurrentRoleState
+}> = [
+  { labelKey: "dashboard.developmentPreview.complete", state: "complete" },
+  { labelKey: "dashboard.developmentPreview.missingJobDescription", state: "missingJobDescription" },
+  { labelKey: "dashboard.developmentPreview.missingProfile", state: "missingProfile" },
+  { labelKey: "dashboard.developmentPreview.empty", state: "empty" },
+]
+
+function CurrentRolePreviewControl({
+  onStateChange,
+  selectedState,
+}: {
+  onStateChange: (state: DashboardCurrentRoleState) => void
+  selectedState: DashboardCurrentRoleState
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <section
+      aria-label={t("dashboard.developmentPreview.title")}
+      className="fixed right-4 bottom-4 z-50 w-56 rounded-xl border bg-card/95 p-2 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/80"
+    >
+      <p className="px-1 pb-1.5 text-xs font-medium text-muted-foreground">
+        {t("dashboard.developmentPreview.title")}
+      </p>
+      <div className="grid gap-1">
+        {currentRolePreviewOptions.map((option) => {
+          const selected = option.state === selectedState
+
+          return (
+            <Button
+              aria-pressed={selected}
+              className="justify-start"
+              key={option.state}
+              onClick={() => onStateChange(option.state)}
+              size="xs"
+              type="button"
+              variant={selected ? "secondary" : "ghost"}
+            >
+              {t(option.labelKey)}
+            </Button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

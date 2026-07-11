@@ -39,6 +39,13 @@ export const dashboard = {
       action: "Add target role",
     },
   },
+  developmentPreview: {
+    title: "Development preview · Current target",
+    complete: "Complete",
+    missingJobDescription: "Missing job description",
+    missingProfile: "Missing profile",
+    empty: "Empty state",
+  },
   empty: {
     title: "Start with your job-search profile",
     description:
