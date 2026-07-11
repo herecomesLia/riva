@@ -78,6 +78,8 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                   <Input
                     id={field.name}
                     name={field.name}
+                    autoComplete="username"
+                    placeholder={t("login.usernamePlaceholder")}
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(event) => field.handleChange(event.target.value)}
@@ -103,9 +105,12 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                 </div>
                 <FieldControl>
                   <Input
-                    autoComplete="current-password"
                     id={field.name}
                     name={field.name}
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder={t("login.passwordPlaceholder")}
+                    value={field.state.value}
                     onFocus={handleUsernameFocus}
                     onBlur={() => {
                       handleUsernameBlur()
@@ -122,9 +127,6 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                         isPasswordVisible,
                       }))
                     }}
-                    placeholder={t("login.passwordPlaceholder")}
-                    type="password"
-                    value={field.state.value}
                   />
                 </FieldControl>
                 <FieldError errors={field.state.meta.errors} />
