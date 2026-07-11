@@ -81,7 +81,11 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                     autoComplete="username"
                     placeholder={t("login.usernamePlaceholder")}
                     value={field.state.value}
-                    onBlur={field.handleBlur}
+                    onFocus={handleUsernameFocus}
+                    onBlur={() => {
+                      handleUsernameBlur()
+                      field.handleBlur()
+                    }}
                     onChange={(event) => field.handleChange(event.target.value)}
                   />
                 </FieldControl>
@@ -111,11 +115,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                     autoComplete="current-password"
                     placeholder={t("login.passwordPlaceholder")}
                     value={field.state.value}
-                    onFocus={handleUsernameFocus}
-                    onBlur={() => {
-                      handleUsernameBlur()
-                      field.handleBlur()
-                    }}
+                    onBlur={field.handleBlur}
                     onChange={(event) => {
                       const password = event.target.value
                       handlePasswordChange(password)
