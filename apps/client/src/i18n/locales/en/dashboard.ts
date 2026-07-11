@@ -73,6 +73,22 @@ export const dashboard = {
       score: "{{value}} / 10",
     },
   },
+  performanceTrend: {
+    title: "Performance trend",
+    description: "Your 10 most recent {{type}} scores.",
+    switchLabel: "Performance type",
+    types: {
+      targetedPractice: "Targeted practice",
+      mockInterview: "Mock interview",
+    },
+    trainingDays: "Training days",
+    daysUnit: "days",
+    highestScore: "Highest score",
+    averageScore: "Average score",
+    score: "{{score}} / 10",
+    session: "{{type}} · Session {{count}}",
+    chartLabel: "10 most recent {{type}} scores",
+  },
   nextSession: {
     eyebrow: "Next session",
     title: "Continue behavioral interview practice",

@@ -27,10 +27,14 @@ export type DashboardMetric = {
   valueFormat: DashboardMetricValueFormat
 }
 
-export type DashboardReadinessStage = {
-  labelKey: string
-  status: "complete" | "current" | "upcoming"
+export type DashboardPerformanceType = "targetedPractice" | "mockInterview"
+
+export type DashboardPerformancePoint = {
+  date: string
+  score: number
 }
+
+export type DashboardPerformanceTrend = Record<DashboardPerformanceType, DashboardPerformancePoint[]>
 
 export type DashboardWeakness = {
   descriptionKey: string
@@ -47,7 +51,7 @@ export type DashboardActivity = {
 export type DashboardPageState = {
   activities: DashboardActivity[]
   metrics: DashboardMetric[]
-  readinessStages: DashboardReadinessStage[]
+  performanceTrend: DashboardPerformanceTrend
   scenario: PageStateScenario
   state: PageViewState
   weaknesses: DashboardWeakness[]
@@ -110,12 +114,32 @@ export function calculatePercentageChange(
   }
 }
 
-const dashboardReadinessStages: DashboardReadinessStage[] = [
-  { labelKey: "dashboard.readiness.stages.profile", status: "complete" },
-  { labelKey: "dashboard.readiness.stages.role", status: "complete" },
-  { labelKey: "dashboard.readiness.stages.practice", status: "current" },
-  { labelKey: "dashboard.readiness.stages.interview", status: "upcoming" },
-]
+const dashboardPerformanceTrend: DashboardPerformanceTrend = {
+  targetedPractice: [
+    { date: "2026-07-02", score: 6.4 },
+    { date: "2026-07-02", score: 6.8 },
+    { date: "2026-07-02", score: 7.1 },
+    { date: "2026-07-04", score: 6.9 },
+    { date: "2026-07-04", score: 7.4 },
+    { date: "2026-07-06", score: 7.6 },
+    { date: "2026-07-07", score: 7.2 },
+    { date: "2026-07-08", score: 7.8 },
+    { date: "2026-07-09", score: 7.5 },
+    { date: "2026-07-11", score: 8.1 },
+  ],
+  mockInterview: [
+    { date: "2026-07-01", score: 6.5 },
+    { date: "2026-07-02", score: 6.7 },
+    { date: "2026-07-02", score: 7.3 },
+    { date: "2026-07-03", score: 7.0 },
+    { date: "2026-07-05", score: 6.9 },
+    { date: "2026-07-05", score: 7.4 },
+    { date: "2026-07-07", score: 7.1 },
+    { date: "2026-07-08", score: 7.7 },
+    { date: "2026-07-10", score: 7.2 },
+    { date: "2026-07-11", score: 7.4 },
+  ],
+}
 
 const dashboardWeaknesses: DashboardWeakness[] = [
   {
@@ -177,7 +201,7 @@ async function getDashboardPageStateWithMock(): Promise<DashboardPageState> {
   return {
     activities: dashboardActivities,
     metrics: dashboardMetrics,
-    readinessStages: dashboardReadinessStages,
+    performanceTrend: dashboardPerformanceTrend,
     scenario,
     state: resolvePageState(scenario),
     weaknesses: dashboardWeaknesses,

@@ -72,6 +72,22 @@ export const dashboard = {
       score: "{{value}} / 10",
     },
   },
+  performanceTrend: {
+    title: "表现趋势",
+    description: "最近 10 次{{type}}的评分表现。",
+    switchLabel: "训练类型",
+    types: {
+      targetedPractice: "专项练习",
+      mockInterview: "模拟面试",
+    },
+    trainingDays: "训练天数",
+    daysUnit: "天",
+    highestScore: "最高分",
+    averageScore: "平均分",
+    score: "{{score}} / 10",
+    session: "{{type}} 第{{count}}次",
+    chartLabel: "最近 10 次{{type}}评分表现",
+  },
   nextSession: {
     eyebrow: "下一次训练",
     title: "继续行为面试练习",
