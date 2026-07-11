@@ -5,7 +5,7 @@ import type { LoginCredentials, User } from "@/models/auth"
 
 export type { LoginCredentials } from "@/models/auth"
 
-const authDelayMs = 160
+const authDelayMs = 500
 
 export async function login(_credentials: LoginCredentials): Promise<User> {
   if (env.mock) {
