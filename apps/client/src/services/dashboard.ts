@@ -53,8 +53,6 @@ export type DashboardPageState = {
   weaknesses: DashboardWeakness[]
 }
 
-const dashboardDelayMs = 240
-
 export function calculatePercentageChange(
   currentValue: number,
   previousValue: number | null,
@@ -186,7 +184,7 @@ function resolvePageState(scenario: PageStateScenario): PageViewState {
 async function getDashboardPageStateWithMock(): Promise<DashboardPageState> {
   const scenario = getPageStateScenario("dashboard")
 
-  await waitForMockDelay(dashboardDelayMs)
+  await waitForMockDelay()
 
   return {
     metrics: dashboardMetrics,
