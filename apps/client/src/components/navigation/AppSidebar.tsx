@@ -11,6 +11,7 @@ import {
   UserRoundIcon,
   type LucideIcon,
 } from "lucide-react"
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -36,6 +37,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
 
 type AppNavigationPath =
@@ -158,6 +160,7 @@ function AppSidebarUser() {
   const navigate = useNavigate()
   const { currentUser, logout } = useAuth()
   const { t } = useTranslation()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   if (!currentUser) {
     return null
@@ -169,8 +172,18 @@ function AppSidebarUser() {
   const avatarFallback = currentUser.avatarFallback
 
   async function handleSignOut() {
-    await logout()
-    void navigate({ to: "/login" })
+    if (isLoggingOut) {
+      return
+    }
+
+    setIsLoggingOut(true)
+
+    try {
+      await logout()
+      await navigate({ to: "/login" })
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   return (
@@ -217,9 +230,15 @@ function AppSidebarUser() {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={handleSignOut} variant="destructive">
+              <DropdownMenuItem
+                closeOnClick={false}
+                disabled={isLoggingOut}
+                onClick={() => void handleSignOut()}
+                variant="destructive"
+              >
                 <LogOutIcon />
                 <span>{t("appShell.signOut")}</span>
+                {isLoggingOut && <Spinner className="ml-auto" />}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
