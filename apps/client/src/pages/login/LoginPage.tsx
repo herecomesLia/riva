@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { ThemeSwitcher } from "@/components/common/ThemeSwitcher"
-import { Button } from "@/components/ui/button"
 import { LoginForm } from "@/pages/login/LoginForm"
 import { LoginHeroes } from "@/pages/login/LoginHeroes"
 import { LoginHeroesProvider } from "@/pages/login/LoginHeroesContext"
@@ -70,9 +69,9 @@ export function LoginPage() {
               <LoginForm onLoginSuccess={handleLoginSuccess} />
               <p className="text-center text-sm text-muted-foreground">
                 {t("login.noAccount")}{" "}
-                <Button className="h-auto p-0" type="button" variant="link">
+                <a className="text-primary underline-offset-4 hover:underline" href="#">
                   {t("login.signUp")}
-                </Button>
+                </a>
               </p>
             </div>
           </div>

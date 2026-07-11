@@ -1,11 +1,9 @@
 import { useForm } from "@tanstack/react-form"
 import type { TFunction } from "i18next"
-import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
@@ -29,7 +27,6 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   const { login } = useAuth()
   const { t } = useTranslation()
   const [, setHerosState] = useLoginHeroesContext()
-  const [rememberSession, setRememberSession] = useState(false)
 
   function handleUsernameFocus() {
     setHerosState((state) => ({ ...state, isUsernameFocused: true }))
@@ -61,7 +58,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
 
   return (
     <form
-      className="flex flex-col gap-5"
+      className="flex flex-col gap-10"
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
@@ -69,7 +66,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
         void form.handleSubmit()
       }}
     >
-      <FieldGroup className="gap-5">
+      <FieldGroup>
         <form.Field name="username">
           {(field) => {
             const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
@@ -104,7 +101,12 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
 
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{t("login.password")}</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel htmlFor={field.name}>{t("login.password")}</FieldLabel>
+                  <a className="text-sm text-primary underline-offset-4 hover:underline" href="#">
+                    {t("login.forgotPassword")}
+                  </a>
+                </div>
                 <Input
                   aria-invalid={isInvalid}
                   autoComplete="current-password"
@@ -127,32 +129,11 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
             )
           }}
         </form.Field>
-
-        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <Field className="max-w-full items-center gap-2 sm:w-auto" orientation="horizontal">
-            <Checkbox
-              aria-label={t("login.remember")}
-              checked={rememberSession}
-              className="shrink-0"
-              id="remember-session"
-              onCheckedChange={(checked) => setRememberSession(checked === true)}
-            />
-            <FieldLabel
-              className="min-w-0 cursor-pointer truncate font-normal"
-              htmlFor="remember-session"
-            >
-              {t("login.remember")}
-            </FieldLabel>
-          </Field>
-          <Button type="button" variant="link">
-            {t("login.forgotPassword")}
-          </Button>
-        </div>
       </FieldGroup>
 
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
-          <Button className="h-12 w-full text-base" disabled={isSubmitting} size="lg" type="submit">
+          <Button className="w-full" disabled={isSubmitting} size="lg" type="submit">
             {isSubmitting && <Spinner data-icon="inline-start" />}
             {isSubmitting ? t("login.signingIn") : t("login.continue")}
           </Button>
