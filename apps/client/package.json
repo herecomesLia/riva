@@ -10,10 +10,11 @@
     "build:mock": "cross-env MOCK=true pnpm build",
     "lint": "oxlint .",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests",
-    "test:mock": "cross-env MOCK=true vitest run --passWithNoTests",
-    "test:watch": "vitest",
-    "test:watch:mock": "cross-env MOCK=true vitest",
+    "test": "vitest run --project default --passWithNoTests",
+    "test:mock": "vitest run --project mock --passWithNoTests",
+    "test:all": "vitest run --passWithNoTests",
+    "test:watch": "vitest --project default",
+    "test:watch:mock": "vitest --project mock",
     "test:e2e": "playwright test --pass-with-no-tests"
   },
   "dependencies": {

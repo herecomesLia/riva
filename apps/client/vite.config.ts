@@ -6,7 +6,6 @@ import { defineConfig } from "vitest/config"
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// https://vite.dev/config/
 export default defineConfig({
   define: {
     "import.meta.env.MOCK": JSON.stringify(process.env.MOCK ?? ""),
@@ -21,5 +20,25 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: true,
+    projects: [
+      {
+        extends: true,
+        define: {
+          "import.meta.env.MOCK": JSON.stringify(""),
+        },
+        test: {
+          name: "default",
+        },
+      },
+      {
+        extends: true,
+        define: {
+          "import.meta.env.MOCK": JSON.stringify("true"),
+        },
+        test: {
+          name: "mock",
+        },
+      },
+    ],
   },
 })
