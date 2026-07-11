@@ -47,27 +47,27 @@ export function LoginPage() {
           </div>
         </section>
 
-        <section className="flex items-center justify-center bg-background px-4 py-8 sm:p-8">
-          <div className="flex w-full max-w-[420px] flex-col gap-10">
-            <div className="flex items-center justify-between lg:justify-end">
-              <div className="flex items-center gap-3 text-lg font-semibold lg:hidden">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
-                  <SparklesIcon aria-hidden className="size-4 text-foreground" />
-                </div>
-                <span>{t("login.brand")}</span>
+        <section className="flex min-h-dvh flex-col bg-background px-4 py-8 sm:p-8 lg:p-12 gap-8">
+          <div className="flex items-center justify-between lg:justify-end">
+            <div className="flex items-center gap-3 text-lg font-semibold lg:hidden">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
+                <SparklesIcon aria-hidden className="size-4 text-foreground" />
               </div>
+              <span>{t("login.brand")}</span>
+            </div>
+            <div className="flex items-center gap-2">
               <ThemeSwitcher />
               <LanguageSwitcher />
             </div>
+          </div>
 
-            <div className="flex flex-col gap-2 text-center">
-              <h1 className="text-3xl font-bold tracking-normal">{t("login.title")}</h1>
-              <p className="text-sm text-muted-foreground">{t("login.description")}</p>
-            </div>
-
-            <LoginForm onLoginSuccess={handleLoginSuccess} />
-
-            <div className="flex flex-col gap-6">
+          <div className="flex flex-1 items-center justify-center">
+            <div className="flex w-full max-w-[420px] flex-col gap-8">
+              <div className="flex flex-col gap-2 text-center">
+                <h1 className="text-3xl font-bold tracking-normal">{t("login.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("login.description")}</p>
+              </div>
+              <LoginForm onLoginSuccess={handleLoginSuccess} />
               <p className="text-center text-sm text-muted-foreground">
                 {t("login.noAccount")}{" "}
                 <Button className="h-auto p-0" type="button" variant="link">
