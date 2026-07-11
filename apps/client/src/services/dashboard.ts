@@ -42,14 +42,7 @@ export type DashboardWeakness = {
   titleKey: string
 }
 
-export type DashboardActivity = {
-  descriptionKey: string
-  scoreKey: string
-  titleKey: string
-}
-
 export type DashboardPageState = {
-  activities: DashboardActivity[]
   metrics: DashboardMetric[]
   performanceTrend: DashboardPerformanceTrend
   scenario: PageStateScenario
@@ -171,24 +164,6 @@ const dashboardWeaknesses: DashboardWeakness[] = [
   },
 ]
 
-const dashboardActivities: DashboardActivity[] = [
-  {
-    descriptionKey: "dashboard.activity.items.project.description",
-    scoreKey: "dashboard.activity.items.project.score",
-    titleKey: "dashboard.activity.items.project.title",
-  },
-  {
-    descriptionKey: "dashboard.activity.items.behavioral.description",
-    scoreKey: "dashboard.activity.items.behavioral.score",
-    titleKey: "dashboard.activity.items.behavioral.title",
-  },
-  {
-    descriptionKey: "dashboard.activity.items.mockInterview.description",
-    scoreKey: "dashboard.activity.items.mockInterview.score",
-    titleKey: "dashboard.activity.items.mockInterview.title",
-  },
-]
-
 function resolvePageState(scenario: PageStateScenario): PageViewState {
   if (scenario === "loading" || scenario === "submitting") {
     return "loading"
@@ -211,7 +186,6 @@ async function getDashboardPageStateWithMock(): Promise<DashboardPageState> {
   await waitForMockDelay(dashboardDelayMs)
 
   return {
-    activities: dashboardActivities,
     metrics: dashboardMetrics,
     performanceTrend: dashboardPerformanceTrend,
     scenario,

@@ -8,32 +8,9 @@ export const dashboard = {
   actions: {
     adjustRole: "调整岗位",
     analyzeRole: "查看匹配分析",
-    continueTraining: "继续训练",
     startMockInterview: "开始模拟面试",
     startPractice: "开始练习",
     viewHistory: "查看训练记录",
-  },
-  activity: {
-    eyebrow: "最近训练",
-    title: "从最近一次练习继续进步",
-    description: "复盘关键反馈，追踪每次训练带来的变化。",
-    items: {
-      project: {
-        title: "项目难点与解决方案",
-        description: "昨天 · 专项练习",
-        score: "7.6 分",
-      },
-      behavioral: {
-        title: "一次有分歧的协作经历",
-        description: "3 天前 · 行为面试",
-        score: "7.1 分",
-      },
-      mockInterview: {
-        title: "技术一面模拟",
-        description: "上周 · 模拟面试",
-        score: "6.8 分",
-      },
-    },
   },
   currentRole: {
     eyebrow: "当前目标",
@@ -87,12 +64,6 @@ export const dashboard = {
     score: "{{score}} / 10",
     session: "{{type}} 第{{count}}次",
     chartLabel: "最近 10 次{{type}}评分表现",
-  },
-  nextSession: {
-    eyebrow: "下一次训练",
-    title: "继续行为面试练习",
-    description: "上次已完成 2 / 5 题，继续完成本轮训练并获得复盘。",
-    meta: "预计 12 分钟",
   },
   readiness: {
     eyebrow: "岗位准备度",

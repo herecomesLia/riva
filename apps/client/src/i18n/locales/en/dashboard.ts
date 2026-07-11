@@ -8,32 +8,9 @@ export const dashboard = {
   actions: {
     adjustRole: "Adjust role",
     analyzeRole: "View match analysis",
-    continueTraining: "Continue training",
     startMockInterview: "Start mock interview",
     startPractice: "Start practice",
     viewHistory: "View training history",
-  },
-  activity: {
-    eyebrow: "Recent training",
-    title: "Keep improving from your latest practice",
-    description: "Review key feedback and track the progress from every session.",
-    items: {
-      project: {
-        title: "A project challenge and solution",
-        description: "Yesterday · Targeted practice",
-        score: "7.6 score",
-      },
-      behavioral: {
-        title: "A collaboration with disagreement",
-        description: "3 days ago · Behavioral interview",
-        score: "7.1 score",
-      },
-      mockInterview: {
-        title: "Technical first-round simulation",
-        description: "Last week · Mock interview",
-        score: "6.8 score",
-      },
-    },
   },
   currentRole: {
     eyebrow: "Current target",
@@ -88,13 +65,6 @@ export const dashboard = {
     score: "{{score}} / 10",
     session: "{{type}} · Session {{count}}",
     chartLabel: "10 most recent {{type}} scores",
-  },
-  nextSession: {
-    eyebrow: "Next session",
-    title: "Continue behavioral interview practice",
-    description:
-      "You completed 2 of 5 questions last time. Finish this session to receive a review.",
-    meta: "About 12 minutes",
   },
   readiness: {
     eyebrow: "Role readiness",

@@ -5,7 +5,6 @@ import {
   ArrowRightIcon,
   Clock3Icon,
   ClipboardCheckIcon,
-  HistoryIcon,
   MessagesSquareIcon,
   MinusIcon,
   PlayIcon,
@@ -146,11 +145,6 @@ function DashboardOverview({ dashboardData }: { dashboardData: DashboardPageStat
       <section className="grid gap-4 lg:grid-cols-12">
         <PerformanceTrendCard performanceTrend={dashboardData.performanceTrend} />
         <WeaknessesCard dashboardData={dashboardData} />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-12">
-        <NextSessionCard />
-        <ActivityCard dashboardData={dashboardData} />
       </section>
     </div>
   )
@@ -654,69 +648,6 @@ function WeaknessesCard({ dashboardData }: { dashboardData: DashboardPageState }
   )
 }
 
-function NextSessionCard() {
-  const { t } = useTranslation()
-
-  return (
-    <Card className="lg:col-span-5">
-      <CardHeader>
-        <CardTitle>{t("dashboard.nextSession.eyebrow")}</CardTitle>
-        <CardDescription>{t("dashboard.nextSession.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <p className="font-heading text-xl font-medium">{t("dashboard.nextSession.title")}</p>
-        <Badge className="w-fit" variant="outline">
-          <Clock3Icon />
-          {t("dashboard.nextSession.meta")}
-        </Badge>
-      </CardContent>
-      <CardFooter>
-        <Button nativeButton={false} render={<Link to="/practice" />}>
-          <PlayIcon data-icon="inline-start" />
-          {t("dashboard.actions.continueTraining")}
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
-function ActivityCard({ dashboardData }: { dashboardData: DashboardPageState }) {
-  const { t } = useTranslation()
-
-  return (
-    <Card className="lg:col-span-7">
-      <CardHeader>
-        <CardTitle>{t("dashboard.activity.eyebrow")}</CardTitle>
-        <CardDescription>{t("dashboard.activity.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="flex flex-col gap-3">
-          {dashboardData.activities.map((activity, index) => (
-            <li className="flex flex-col gap-3" key={activity.titleKey}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <p className="truncate font-medium">{t(activity.titleKey)}</p>
-                  <p className="text-sm text-muted-foreground">{t(activity.descriptionKey)}</p>
-                </div>
-                <Badge className="shrink-0" variant="secondary">
-                  {t(activity.scoreKey)}
-                </Badge>
-              </div>
-              {index < dashboardData.activities.length - 1 && <Separator />}
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-      <CardFooter>
-        <Button nativeButton={false} render={<Link to="/history" />} size="sm" variant="link">
-          <HistoryIcon data-icon="inline-start" />
-          {t("dashboard.actions.viewHistory")}
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
 function DashboardLoadingState() {
   return (
     <div className="flex flex-col gap-6">
@@ -728,10 +659,6 @@ function DashboardLoadingState() {
         {Array.from({ length: 4 }, (_, index) => (
           <DashboardSkeletonCard key={index} />
         ))}
-      </section>
-      <section className="grid gap-4 lg:grid-cols-2">
-        <DashboardSkeletonCard />
-        <DashboardSkeletonCard />
       </section>
     </div>
   )
