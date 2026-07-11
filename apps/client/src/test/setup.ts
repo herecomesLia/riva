@@ -46,9 +46,22 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   value: ResizeObserver,
 })
 
+const matchMediaMock = vi.fn()
+const scrollToMock = vi.fn()
+
 Object.defineProperty(window, "matchMedia", {
   configurable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
+  value: matchMediaMock,
+})
+
+Object.defineProperty(window, "scrollTo", {
+  configurable: true,
+  value: scrollToMock,
+})
+
+function resetBrowserMocks() {
+  matchMediaMock.mockReset()
+  matchMediaMock.mockImplementation((query: string) => ({
     addEventListener: vi.fn(),
     addListener: vi.fn(),
     dispatchEvent: vi.fn(),
@@ -57,17 +70,17 @@ Object.defineProperty(window, "matchMedia", {
     onchange: null,
     removeEventListener: vi.fn(),
     removeListener: vi.fn(),
-  })),
-})
+  }))
+  scrollToMock.mockReset()
+}
 
-Object.defineProperty(window, "scrollTo", {
-  configurable: true,
-  value: vi.fn(),
-})
+beforeEach(async () => {
+  const { i18n } = await import("@/i18n/i18n")
 
-beforeEach(() => {
+  resetBrowserMocks()
   window.localStorage.clear()
   window.localStorage.setItem("i18nextLng", defaultLanguage)
+  await i18n.changeLanguage(defaultLanguage)
   document.documentElement.lang = defaultLanguage
 })
 
