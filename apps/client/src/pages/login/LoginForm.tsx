@@ -92,9 +92,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                   type="text"
                   value={field.state.value}
                 />
-                {isInvalid && (
-                  <FieldError className="text-red-500" errors={field.state.meta.errors} />
-                )}
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
               </Field>
             )
           }}
@@ -124,9 +122,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                   type="password"
                   value={field.state.value}
                 />
-                {isInvalid && (
-                  <FieldError className="text-red-500" errors={field.state.meta.errors} />
-                )}
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
               </Field>
             )
           }}
@@ -156,12 +152,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
 
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
-          <Button
-            className="h-12 w-full text-base"
-            disabled={isSubmitting}
-            size="lg"
-            type="submit"
-          >
+          <Button className="h-12 w-full text-base" disabled={isSubmitting} size="lg" type="submit">
             {isSubmitting && <Spinner data-icon="inline-start" />}
             {isSubmitting ? t("login.signingIn") : t("login.continue")}
           </Button>
