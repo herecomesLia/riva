@@ -247,16 +247,16 @@ function CurrentRoleCard({ currentRole }: { currentRole: DashboardCurrentRole })
 
   if (currentRole.state === "empty") {
     return (
-      <Card className="min-h-68 lg:col-span-5">
+      <Card className="lg:col-span-5">
         <CardHeader>
           <CardTitle>{t("dashboard.currentRole.eyebrow")}</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 py-3 text-center">
+        <CardContent className="flex flex-1 flex-col items-center justify-start gap-1.5 pt-0 pb-3 text-center">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <SearchCheckIcon className="size-6" />
           </div>
-          <div className="flex max-w-md flex-col gap-1.5">
-            <p className="font-heading text-xl font-medium">{t("dashboard.currentRole.empty.title")}</p>
+          <div className="flex max-w-md flex-col gap-1">
+            <p className="font-heading text-base font-medium">{t("dashboard.currentRole.empty.title")}</p>
             <p className="text-sm leading-6 text-muted-foreground">
               {t("dashboard.currentRole.empty.description")}
             </p>
