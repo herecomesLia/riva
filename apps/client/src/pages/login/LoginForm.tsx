@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
@@ -72,24 +72,18 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
             const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
 
             return (
-              <Field data-invalid={isInvalid}>
+              <Field invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>{t("login.username")}</FieldLabel>
-                <Input
-                  aria-invalid={isInvalid}
-                  autoComplete="username"
-                  id={field.name}
-                  name={field.name}
-                  onBlur={() => {
-                    handleUsernameBlur()
-                    field.handleBlur()
-                  }}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  onFocus={handleUsernameFocus}
-                  placeholder={t("login.usernamePlaceholder")}
-                  type="text"
-                  value={field.state.value}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                <FieldControl>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </FieldControl>
+                <FieldError errors={field.state.meta.errors} />
               </Field>
             )
           }}
@@ -100,31 +94,40 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
             const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
 
             return (
-              <Field data-invalid={isInvalid}>
+              <Field invalid={isInvalid}>
                 <div className="flex items-center justify-between">
                   <FieldLabel htmlFor={field.name}>{t("login.password")}</FieldLabel>
                   <a className="text-sm text-primary underline-offset-4 hover:underline" href="#">
                     {t("login.forgotPassword")}
                   </a>
                 </div>
-                <Input
-                  aria-invalid={isInvalid}
-                  autoComplete="current-password"
-                  id={field.name}
-                  name={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => {
-                    handlePasswordChange(event.target.value)
-                    field.handleChange(event.target.value)
-                  }}
-                  onPasswordVisibilityChange={(isPasswordVisible) => {
-                    setHerosState((state) => ({ ...state, isPasswordVisible }))
-                  }}
-                  placeholder={t("login.passwordPlaceholder")}
-                  type="password"
-                  value={field.state.value}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                <FieldControl>
+                  <Input
+                    autoComplete="current-password"
+                    id={field.name}
+                    name={field.name}
+                    onFocus={handleUsernameFocus}
+                    onBlur={() => {
+                      handleUsernameBlur()
+                      field.handleBlur()
+                    }}
+                    onChange={(event) => {
+                      const password = event.target.value
+                      handlePasswordChange(password)
+                      field.handleChange(password)
+                    }}
+                    onPasswordVisibilityChange={(isPasswordVisible) => {
+                      setHerosState((state) => ({
+                        ...state,
+                        isPasswordVisible,
+                      }))
+                    }}
+                    placeholder={t("login.passwordPlaceholder")}
+                    type="password"
+                    value={field.state.value}
+                  />
+                </FieldControl>
+                <FieldError errors={field.state.meta.errors} />
               </Field>
             )
           }}

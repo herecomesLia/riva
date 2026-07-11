@@ -1,11 +1,38 @@
 "use client"
 
-import { useMemo } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import {
+  cloneElement,
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react"
 
-import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
+
+type FieldContextValue = {
+  errorId: string
+  invalid: boolean
+}
+
+const FieldContext = createContext<FieldContextValue | null>(null)
+
+function useFieldContext(componentName: string) {
+  const context = useContext(FieldContext)
+
+  if (!context) {
+    throw new Error(`${componentName} must be used inside <Field>.`)
+  }
+
+  return context
+}
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -24,7 +51,9 @@ function FieldLegend({
   className,
   variant = "legend",
   ...props
-}: React.ComponentProps<"legend"> & { variant?: "legend" | "label" }) {
+}: React.ComponentProps<"legend"> & {
+  variant?: "legend" | "label"
+}) {
   return (
     <legend
       data-slot="field-legend"
@@ -51,35 +80,83 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-const fieldVariants = cva("group/field flex w-full gap-3 data-[invalid=true]:text-destructive", {
-  variants: {
-    orientation: {
-      vertical: "flex-col *:w-full [&>.sr-only]:w-auto",
-      horizontal:
-        "flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
-      responsive:
-        "flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+const fieldVariants = cva(
+  "group/field relative flex w-full gap-3 data-[invalid=true]:text-destructive",
+  {
+    variants: {
+      orientation: {
+        vertical: "flex-col *:w-full [&>.sr-only]:w-auto",
+        horizontal:
+          "flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        responsive:
+          "flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+      },
+    },
+    defaultVariants: {
+      orientation: "vertical",
     },
   },
-  defaultVariants: {
-    orientation: "vertical",
-  },
-})
+)
+
+type FieldProps = React.ComponentProps<"div"> &
+  VariantProps<typeof fieldVariants> & {
+    invalid?: boolean
+  }
 
 function Field({
+  children,
   className,
+  invalid = false,
   orientation = "vertical",
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
-  return (
-    <div
-      role="group"
-      data-slot="field"
-      data-orientation={orientation}
-      className={cn(fieldVariants({ orientation }), className)}
-      {...props}
-    />
+}: FieldProps) {
+  const generatedId = useId()
+  const errorId = `${generatedId}-error`
+
+  const contextValue = useMemo(
+    () => ({
+      errorId,
+      invalid,
+    }),
+    [errorId, invalid],
   )
+
+  return (
+    <FieldContext.Provider value={contextValue}>
+      <div
+        {...props}
+        role="group"
+        data-slot="field"
+        data-invalid={invalid}
+        data-orientation={orientation}
+        className={cn(fieldVariants({ orientation }), className)}
+      >
+        {children}
+      </div>
+    </FieldContext.Provider>
+  )
+}
+
+type FieldControlChildProps = {
+  "aria-describedby"?: string
+  "aria-invalid"?: React.AriaAttributes["aria-invalid"]
+}
+
+type FieldControlProps = {
+  children: ReactElement<FieldControlChildProps>
+}
+
+function FieldControl({ children }: FieldControlProps) {
+  const { errorId, invalid } = useFieldContext("FieldControl")
+
+  const describedBy = [children.props["aria-describedby"], invalid ? errorId : undefined]
+    .filter(Boolean)
+    .join(" ")
+
+  return cloneElement(children, {
+    "aria-describedby": describedBy || undefined,
+    "aria-invalid": invalid ? true : children.props["aria-invalid"],
+  })
 }
 
 function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
@@ -139,12 +216,12 @@ function FieldSeparator({
   className,
   ...props
 }: React.ComponentProps<"div"> & {
-  children?: React.ReactNode
+  children?: ReactNode
 }) {
   return (
     <div
       data-slot="field-separator"
-      data-content={!!children}
+      data-content={Boolean(children)}
       className={cn(
         "relative -my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2",
         className,
@@ -152,10 +229,11 @@ function FieldSeparator({
       {...props}
     >
       <Separator className="absolute inset-0 top-1/2" />
+
       {children && (
         <span
-          className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"
           data-slot="field-separator-content"
+          className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"
         >
           {children}
         </span>
@@ -164,61 +242,116 @@ function FieldSeparator({
   )
 }
 
-function FieldError({
-  className,
-  children,
-  errors,
-  ...props
-}: React.ComponentProps<"div"> & {
+type FieldErrorProps = Omit<React.ComponentProps<"div">, "id"> & {
   errors?: Array<{ message?: string } | undefined>
-}) {
-  const content = useMemo(() => {
-    if (children) {
+  position?: "overlay" | "flow"
+  visible?: boolean
+}
+
+function FieldError({
+  children,
+  className,
+  errors,
+  onTransitionEnd,
+  position = "overlay",
+  visible,
+  ...props
+}: FieldErrorProps) {
+  const { errorId, invalid } = useFieldContext("FieldError")
+
+  const content = useMemo<ReactNode | null>(() => {
+    if (children !== undefined && children !== null && children !== false && children !== "") {
       return children
     }
 
-    if (!errors?.length) {
+    const messages = [
+      ...new Set(
+        errors
+          ?.map((error) => error?.message?.trim())
+          .filter((message): message is string => Boolean(message)) ?? [],
+      ),
+    ]
+
+    if (messages.length === 0) {
       return null
     }
 
-    const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()]
-
-    if (uniqueErrors?.length == 1) {
-      return uniqueErrors[0]?.message
+    if (messages.length === 1) {
+      return messages[0]
     }
 
     return (
       <ul className="ml-4 flex list-disc flex-col gap-1">
-        {uniqueErrors.map((error, index) => error?.message && <li key={index}>{error.message}</li>)}
+        {messages.map((message) => (
+          <li key={message}>{message}</li>
+        ))}
       </ul>
     )
   }, [children, errors])
 
-  if (!content) {
-    return null
+  const hasContent = content !== null
+  const shouldShow = visible ?? invalid
+  const isVisible = shouldShow && hasContent
+
+  const [cachedContent, setCachedContent] = useState<ReactNode>(content)
+
+  useEffect(() => {
+    if (hasContent) {
+      setCachedContent(content)
+    }
+  }, [content, hasContent])
+
+  const displayedContent = hasContent ? content : cachedContent
+
+  function handleTransitionEnd(event: React.TransitionEvent<HTMLDivElement>) {
+    onTransitionEnd?.(event)
+
+    if (
+      event.target === event.currentTarget &&
+      event.propertyName === "opacity" &&
+      !isVisible &&
+      !hasContent
+    ) {
+      setCachedContent(null)
+    }
   }
 
   return (
     <div
-      role="alert"
-      data-slot="field-error"
-      className={cn("text-sm font-normal text-destructive", className)}
       {...props}
+      id={errorId}
+      role={isVisible ? "alert" : undefined}
+      aria-hidden={!isVisible}
+      data-slot="field-error"
+      data-position={position}
+      data-visible={isVisible}
+      className={cn(
+        "text-xs leading-4 font-normal text-destructive",
+        "transition-[opacity]",
+        "motion-reduce:duration-[1ms]",
+        "data-[visible=false]:pointer-events-none",
+        "data-[visible=false]:opacity-0",
+        "data-[visible=true]:opacity-100",
+        position === "overlay" && "absolute top-full left-0 z-10 mt-1 w-full truncate",
+        className,
+      )}
+      onTransitionEnd={handleTransitionEnd}
     >
-      {content}
+      {displayedContent}
     </div>
   )
 }
 
 export {
   Field,
-  FieldLabel,
+  FieldContent,
+  FieldControl,
   FieldDescription,
   FieldError,
   FieldGroup,
+  FieldLabel,
   FieldLegend,
   FieldSeparator,
   FieldSet,
-  FieldContent,
   FieldTitle,
 }
