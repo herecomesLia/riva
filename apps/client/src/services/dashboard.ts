@@ -34,7 +34,10 @@ export type DashboardPerformancePoint = {
   score: number
 }
 
-export type DashboardPerformanceTrend = Record<DashboardPerformanceType, DashboardPerformancePoint[]>
+export type DashboardPerformanceTrend = Record<
+  DashboardPerformanceType,
+  DashboardPerformancePoint[]
+>
 
 export type DashboardWeakness = {
   descriptionKey: string

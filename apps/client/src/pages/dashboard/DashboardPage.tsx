@@ -351,7 +351,8 @@ function PerformanceTrendCard({
 }) {
   const { i18n, t } = useTranslation()
   const chartRef = useRef<SVGSVGElement>(null)
-  const [performanceType, setPerformanceType] = useState<DashboardPerformanceType>("targetedPractice")
+  const [performanceType, setPerformanceType] =
+    useState<DashboardPerformanceType>("targetedPractice")
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<PerformanceTooltipPosition | null>(null)
   const points = performanceTrend[performanceType]
@@ -383,7 +384,8 @@ function PerformanceTrendCard({
     const chartHeight = bounds.height || performanceChart.height
     const pointX = (point.x / performanceChart.width) * chartWidth
     const pointY = (point.y / performanceChart.height) * chartHeight
-    const canPlaceOnRight = pointX + performanceTooltip.offset + performanceTooltip.width <= chartWidth
+    const canPlaceOnRight =
+      pointX + performanceTooltip.offset + performanceTooltip.width <= chartWidth
     const preferredLeft = canPlaceOnRight
       ? pointX + performanceTooltip.offset
       : pointX - performanceTooltip.offset - performanceTooltip.width
@@ -450,7 +452,8 @@ function PerformanceTrendCard({
                 aria-pressed={performanceType === type}
                 className={cn(
                   "h-8 rounded-lg px-2.5 text-xs font-normal transition-colors hover:bg-transparent hover:font-medium hover:text-foreground dark:hover:bg-transparent",
-                  performanceType === type && "bg-muted font-medium shadow-xs hover:bg-muted dark:hover:bg-muted",
+                  performanceType === type &&
+                    "bg-muted font-medium shadow-xs hover:bg-muted dark:hover:bg-muted",
                 )}
                 key={type}
                 onClick={() => selectPerformanceType(type)}
@@ -462,7 +465,9 @@ function PerformanceTrendCard({
             ))}
           </div>
         </CardAction>
-        <CardDescription>{t("dashboard.performanceTrend.description", { type: typeLabel })}</CardDescription>
+        <CardDescription>
+          {t("dashboard.performanceTrend.description", { type: typeLabel })}
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 lg:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)] lg:items-end">
         <dl className="grid grid-cols-2 gap-4 lg:grid-cols-1">
@@ -530,13 +535,26 @@ function PerformanceTrendCard({
           >
             <defs>
               <linearGradient id="performance-trend-area" x1="0" x2="0" y1="0" y2="1">
-                <stop className="text-primary" offset="0%" stopColor="currentColor" stopOpacity="0.22" />
-                <stop className="text-primary" offset="100%" stopColor="currentColor" stopOpacity="0" />
+                <stop
+                  className="text-primary"
+                  offset="0%"
+                  stopColor="currentColor"
+                  stopOpacity="0.22"
+                />
+                <stop
+                  className="text-primary"
+                  offset="100%"
+                  stopColor="currentColor"
+                  stopOpacity="0"
+                />
               </linearGradient>
             </defs>
             {[0, 5, 10].map((score) => {
-              const y = performanceChart.padding.top +
-                (performanceChart.height - performanceChart.padding.top - performanceChart.padding.bottom) *
+              const y =
+                performanceChart.padding.top +
+                (performanceChart.height -
+                  performanceChart.padding.top -
+                  performanceChart.padding.bottom) *
                   (1 - score / 10)
 
               return (
