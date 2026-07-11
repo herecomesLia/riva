@@ -38,7 +38,10 @@ describe("LoginPage", () => {
   })
 
   it.each([
-    { matchesDesktop: false, description: "does not mount LoginHeroes below the desktop breakpoint" },
+    {
+      matchesDesktop: false,
+      description: "does not mount LoginHeroes below the desktop breakpoint",
+    },
     { matchesDesktop: true, description: "mounts LoginHeroes at the desktop breakpoint" },
   ])("$description", ({ matchesDesktop }) => {
     useMediaMock.mockReturnValue(matchesDesktop)

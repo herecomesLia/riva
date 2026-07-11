@@ -172,10 +172,7 @@ export function resolveYellowMotion(input: {
 }
 
 export function createBodyStateTransform(motion: BodyMotion) {
-  return [
-    `translate3d(${motion.translateX}px, 0, 0)`,
-    `skewX(${motion.stateSkewX}deg)`,
-  ].join(" ")
+  return [`translate3d(${motion.translateX}px, 0, 0)`, `skewX(${motion.stateSkewX}deg)`].join(" ")
 }
 
 export function createPointerSkewTransform(motion: BodyMotion) {

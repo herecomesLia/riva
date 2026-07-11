@@ -75,10 +75,7 @@ export function scaleX(value: number, horizontalScale: number) {
   return value * horizontalScale
 }
 
-export function scaleBodyLayout(
-  body: BaseBodyLayout,
-  horizontalScale: number,
-): ScaledBodyLayout {
+export function scaleBodyLayout(body: BaseBodyLayout, horizontalScale: number): ScaledBodyLayout {
   return {
     height: body.height,
     left: scaleX(body.left, horizontalScale),

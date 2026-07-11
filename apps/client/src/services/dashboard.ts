@@ -6,11 +6,7 @@ export type PageViewState = "loading" | "empty" | "error" | "success"
 
 export type DashboardRoute = "/profile" | "/roles" | "/practice" | "/interview" | "/history"
 
-export type DashboardMetricIcon =
-  | "roleFit"
-  | "practiceTime"
-  | "targetedPractice"
-  | "mockInterview"
+export type DashboardMetricIcon = "roleFit" | "practiceTime" | "targetedPractice" | "mockInterview"
 
 export type DashboardMetricChangeDirection = "up" | "down" | "unchanged"
 

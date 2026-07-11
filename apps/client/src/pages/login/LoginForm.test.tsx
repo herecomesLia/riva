@@ -4,10 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { LoginForm } from "@/pages/login/LoginForm"
-import {
-  LoginHeroesProvider,
-  useLoginHeroesContext,
-} from "@/pages/login/LoginHeroesContext"
+import { LoginHeroesProvider, useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 import { renderWithProviders } from "@/test/render"
 
 const { loginMock } = vi.hoisted(() => ({ loginMock: vi.fn() }))

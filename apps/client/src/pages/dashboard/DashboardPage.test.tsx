@@ -26,13 +26,9 @@ describe("DashboardPage", () => {
       },
     })
 
-    expect(
-      await screen.findByText(i18n.t("dashboard.metrics.roleFit.title")),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(i18n.t("dashboard.metrics.roleFit.title"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.metrics.practiceTime.title"))).toBeInTheDocument()
-    expect(
-      screen.getByText(i18n.t("dashboard.metrics.targetedPractice.title")),
-    ).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.targetedPractice.title"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.metrics.mockInterview.title"))).toBeInTheDocument()
   })
 })
