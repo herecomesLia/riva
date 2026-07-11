@@ -59,45 +59,6 @@ export type DashboardPageState = {
 
 const dashboardDelayMs = 240
 
-const dashboardMetrics: DashboardMetric[] = [
-  {
-    comparisonKey: "dashboard.metrics.roleFit.comparison",
-    currentValue: 76,
-    icon: "roleFit",
-    previousValue: 65.8,
-    titleKey: "dashboard.metrics.roleFit.title",
-    valueKey: "dashboard.metrics.values.percentage",
-    valueFormat: "percentage",
-  },
-  {
-    comparisonKey: "dashboard.metrics.practiceTime.comparison",
-    currentValue: 45,
-    icon: "practiceTime",
-    previousValue: 49,
-    titleKey: "dashboard.metrics.practiceTime.title",
-    valueKey: "dashboard.metrics.values.duration",
-    valueFormat: "duration",
-  },
-  {
-    comparisonKey: "dashboard.metrics.targetedPractice.comparison",
-    currentValue: 7.2,
-    icon: "targetedPractice",
-    previousValue: 7.2,
-    titleKey: "dashboard.metrics.targetedPractice.title",
-    valueKey: "dashboard.metrics.values.score",
-    valueFormat: "score",
-  },
-  {
-    comparisonKey: "dashboard.metrics.mockInterview.comparison",
-    currentValue: 7.4,
-    icon: "mockInterview",
-    previousValue: 6.9,
-    titleKey: "dashboard.metrics.mockInterview.title",
-    valueKey: "dashboard.metrics.values.score",
-    valueFormat: "score",
-  },
-]
-
 export function calculatePercentageChange(
   currentValue: number,
   previousValue: number | null,
@@ -140,6 +101,57 @@ const dashboardPerformanceTrend: DashboardPerformanceTrend = {
     { date: "2026-07-11", score: 7.4 },
   ],
 }
+
+function getRecentPerformanceScores(type: DashboardPerformanceType) {
+  const scores = dashboardPerformanceTrend[type]
+  const latestScore = scores[scores.length - 1]
+  const previousScore = scores[scores.length - 2]
+
+  return {
+    currentValue: latestScore.score,
+    previousValue: previousScore.score,
+  }
+}
+
+const targetedPracticeScores = getRecentPerformanceScores("targetedPractice")
+const mockInterviewScores = getRecentPerformanceScores("mockInterview")
+
+const dashboardMetrics: DashboardMetric[] = [
+  {
+    comparisonKey: "dashboard.metrics.roleFit.comparison",
+    currentValue: 76,
+    icon: "roleFit",
+    previousValue: 65.8,
+    titleKey: "dashboard.metrics.roleFit.title",
+    valueKey: "dashboard.metrics.values.percentage",
+    valueFormat: "percentage",
+  },
+  {
+    comparisonKey: "dashboard.metrics.practiceTime.comparison",
+    currentValue: 45,
+    icon: "practiceTime",
+    previousValue: 49,
+    titleKey: "dashboard.metrics.practiceTime.title",
+    valueKey: "dashboard.metrics.values.duration",
+    valueFormat: "duration",
+  },
+  {
+    comparisonKey: "dashboard.metrics.targetedPractice.comparison",
+    icon: "targetedPractice",
+    titleKey: "dashboard.metrics.targetedPractice.title",
+    valueKey: "dashboard.metrics.values.score",
+    valueFormat: "score",
+    ...targetedPracticeScores,
+  },
+  {
+    comparisonKey: "dashboard.metrics.mockInterview.comparison",
+    icon: "mockInterview",
+    titleKey: "dashboard.metrics.mockInterview.title",
+    valueKey: "dashboard.metrics.values.score",
+    valueFormat: "score",
+    ...mockInterviewScores,
+  },
+]
 
 const dashboardWeaknesses: DashboardWeakness[] = [
   {
