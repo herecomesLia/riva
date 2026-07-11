@@ -15,8 +15,29 @@ export const dashboard = {
   currentRole: {
     eyebrow: "当前目标",
     title: "前端工程师",
-    description: "字节跳动 · 社招 · 技术岗位",
-    status: "档案与 JD 已就绪",
+    context: "字节跳动 · 社招 · 技术岗位",
+    metadata: "上海 · 3–5 年经验",
+    actions: {
+      adjust: "调整岗位",
+      analyze: "查看匹配分析",
+      addJobDescription: "添加岗位 JD",
+      completeProfile: "完善求职档案",
+    },
+    status: {
+      profile: {
+        complete: "档案已完善",
+        incomplete: "待完善档案",
+      },
+      jobDescription: {
+        complete: "JD 已添加",
+        incomplete: "待添加 JD",
+      },
+    },
+    empty: {
+      title: "尚未设置目标岗位",
+      description: "添加岗位信息后可获得匹配分析和个性化训练建议。",
+      action: "添加目标岗位",
+    },
   },
   empty: {
     title: "从建立求职档案开始",

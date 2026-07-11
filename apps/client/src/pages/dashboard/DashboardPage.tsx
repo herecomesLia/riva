@@ -3,11 +3,16 @@ import { Link } from "@tanstack/react-router"
 import {
   AlertCircleIcon,
   ArrowRightIcon,
+  BriefcaseBusinessIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
   Clock3Icon,
   ClipboardCheckIcon,
+  MapPinIcon,
   MessagesSquareIcon,
   MinusIcon,
   PlayIcon,
+  SearchCheckIcon,
   SparklesIcon,
   TargetIcon,
   TriangleIcon,
@@ -49,6 +54,8 @@ import { cn } from "@/lib/utils"
 import {
   calculatePercentageChange,
   getDashboardPageState,
+  type DashboardCurrentRole,
+  type DashboardCurrentRoleState,
   type DashboardMetric,
   type DashboardMetricChangeDirection,
   type DashboardMetricIcon,
@@ -87,6 +94,13 @@ const metricChangeIconStrokeWidths: Record<DashboardMetricChangeDirection, numbe
   down: 2,
   unchanged: 5,
   up: 2,
+}
+
+const currentRoleStatusStyles: Record<"complete" | "incomplete", string> = {
+  complete:
+    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-300",
+  incomplete:
+    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-300",
 }
 
 export function DashboardPage() {
@@ -136,7 +150,7 @@ function DashboardOverview({ dashboardData }: { dashboardData: DashboardPageStat
   return (
     <div className="flex flex-col gap-6">
       <section className="grid gap-4 lg:grid-cols-12">
-        <CurrentRoleCard />
+        <CurrentRoleCard currentRole={dashboardData.currentRole} />
         <RecommendationCard />
       </section>
 
@@ -150,8 +164,51 @@ function DashboardOverview({ dashboardData }: { dashboardData: DashboardPageStat
   )
 }
 
-function CurrentRoleCard() {
+function CurrentRoleCard({ currentRole }: { currentRole: DashboardCurrentRole }) {
   const { t } = useTranslation()
+
+  if (currentRole.state === "empty") {
+    return (
+      <Card className="min-h-68 lg:col-span-5">
+        <CardHeader>
+          <CardTitle>{t("dashboard.currentRole.eyebrow")}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 py-3 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <SearchCheckIcon className="size-6" />
+          </div>
+          <div className="flex max-w-md flex-col gap-1.5">
+            <p className="font-heading text-xl font-medium">{t("dashboard.currentRole.empty.title")}</p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {t("dashboard.currentRole.empty.description")}
+            </p>
+          </div>
+          <Button nativeButton={false} render={<Link to="/roles" />} size="sm">
+            {t("dashboard.currentRole.empty.action")}
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const actionByState: Record<Exclude<DashboardCurrentRoleState, "empty">, {
+    labelKey: "dashboard.currentRole.actions.analyze" | "dashboard.currentRole.actions.addJobDescription" | "dashboard.currentRole.actions.completeProfile"
+    to: "/roles" | "/profile"
+  }> = {
+    complete: {
+      labelKey: "dashboard.currentRole.actions.analyze",
+      to: "/roles",
+    },
+    missingJobDescription: {
+      labelKey: "dashboard.currentRole.actions.addJobDescription",
+      to: "/roles",
+    },
+    missingProfile: {
+      labelKey: "dashboard.currentRole.actions.completeProfile",
+      to: "/profile",
+    },
+  }
+  const action = actionByState[currentRole.state]
 
   return (
     <Card className="lg:col-span-5">
@@ -159,27 +216,57 @@ function CurrentRoleCard() {
         <CardTitle>{t("dashboard.currentRole.eyebrow")}</CardTitle>
         <CardAction>
           <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="outline">
-            {t("dashboard.actions.adjustRole")}
+            {t("dashboard.currentRole.actions.adjust")}
           </Button>
         </CardAction>
-        <CardDescription>{t("dashboard.currentRole.description")}</CardDescription>
+        <CardDescription>{t("dashboard.currentRole.context")}</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <TargetIcon className="text-muted-foreground" />
-          <p className="font-heading text-xl font-medium">{t("dashboard.currentRole.title")}</p>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <BriefcaseBusinessIcon className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-heading text-2xl font-medium tracking-tight">
+              {t("dashboard.currentRole.title")}
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPinIcon className="size-3.5 shrink-0" />
+              {t("dashboard.currentRole.metadata")}
+            </p>
+          </div>
         </div>
-        <Badge className="w-fit" variant="secondary">
-          {t("dashboard.currentRole.status")}
-        </Badge>
+        <div className="flex flex-col items-start gap-2">
+          <div className="flex flex-wrap gap-2">
+            <RoleStatusBadge complete={currentRole.profileCompleted} type="profile" />
+            <RoleStatusBadge complete={currentRole.jobDescriptionAdded} type="jobDescription" />
+          </div>
+          <Button nativeButton={false} render={<Link to={action.to} />} size="sm" variant="link">
+            {t(action.labelKey)}
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
+        </div>
       </CardContent>
-      <CardFooter>
-        <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
-          {t("dashboard.actions.analyzeRole")}
-          <ArrowRightIcon data-icon="inline-end" />
-        </Button>
-      </CardFooter>
     </Card>
+  )
+}
+
+function RoleStatusBadge({
+  complete,
+  type,
+}: {
+  complete: boolean
+  type: "profile" | "jobDescription"
+}) {
+  const { t } = useTranslation()
+  const status = complete ? "complete" : "incomplete"
+  const Icon = complete ? CircleCheckIcon : CircleAlertIcon
+
+  return (
+    <Badge className={currentRoleStatusStyles[status]} variant="outline">
+      <Icon className="size-3.5" />
+      {t(`dashboard.currentRole.status.${type}.${status}`)}
+    </Badge>
   )
 }
 

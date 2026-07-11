@@ -15,8 +15,29 @@ export const dashboard = {
   currentRole: {
     eyebrow: "Current target",
     title: "Frontend Engineer",
-    description: "ByteDance · Experienced hire · Technical role",
-    status: "Profile and JD ready",
+    context: "ByteDance · Experienced hire · Technical role",
+    metadata: "Shanghai · 3–5 years experience",
+    actions: {
+      adjust: "Adjust role",
+      analyze: "View match analysis",
+      addJobDescription: "Add job description",
+      completeProfile: "Complete profile",
+    },
+    status: {
+      profile: {
+        complete: "Profile complete",
+        incomplete: "Complete profile",
+      },
+      jobDescription: {
+        complete: "JD added",
+        incomplete: "Add JD",
+      },
+    },
+    empty: {
+      title: "No target role yet",
+      description: "Add a target role to unlock match analysis and personalized training guidance.",
+      action: "Add target role",
+    },
   },
   empty: {
     title: "Start with your job-search profile",

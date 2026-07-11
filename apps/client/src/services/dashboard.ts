@@ -39,6 +39,18 @@ export type DashboardPerformanceTrend = Record<
   DashboardPerformancePoint[]
 >
 
+export type DashboardCurrentRoleState =
+  | "complete"
+  | "missingJobDescription"
+  | "missingProfile"
+  | "empty"
+
+export type DashboardCurrentRole = {
+  jobDescriptionAdded: boolean
+  profileCompleted: boolean
+  state: DashboardCurrentRoleState
+}
+
 export type DashboardWeakness = {
   descriptionKey: string
   practiceCountKey: string
@@ -46,11 +58,51 @@ export type DashboardWeakness = {
 }
 
 export type DashboardPageState = {
+  currentRole: DashboardCurrentRole
   metrics: DashboardMetric[]
   performanceTrend: DashboardPerformanceTrend
   scenario: PageStateScenario
   state: PageViewState
   weaknesses: DashboardWeakness[]
+}
+
+const dashboardCurrentRoles: Record<DashboardCurrentRoleState, DashboardCurrentRole> = {
+  complete: {
+    jobDescriptionAdded: true,
+    profileCompleted: true,
+    state: "complete",
+  },
+  missingJobDescription: {
+    jobDescriptionAdded: false,
+    profileCompleted: true,
+    state: "missingJobDescription",
+  },
+  missingProfile: {
+    jobDescriptionAdded: true,
+    profileCompleted: false,
+    state: "missingProfile",
+  },
+  empty: {
+    jobDescriptionAdded: false,
+    profileCompleted: false,
+    state: "empty",
+  },
+}
+
+function getDashboardCurrentRole(scenario: PageStateScenario) {
+  if (scenario === "success") {
+    return dashboardCurrentRoles.missingJobDescription
+  }
+
+  if (scenario === "firstTime") {
+    return dashboardCurrentRoles.missingProfile
+  }
+
+  if (scenario === "incomplete") {
+    return dashboardCurrentRoles.empty
+  }
+
+  return dashboardCurrentRoles.missingProfile
 }
 
 export function calculatePercentageChange(
@@ -170,7 +222,7 @@ function resolvePageState(scenario: PageStateScenario): PageViewState {
     return "loading"
   }
 
-  if (scenario === "empty" || scenario === "firstTime" || scenario === "incomplete") {
+  if (scenario === "empty") {
     return "empty"
   }
 
@@ -187,6 +239,7 @@ async function getDashboardPageStateWithMock(): Promise<DashboardPageState> {
   await waitForMockDelay()
 
   return {
+    currentRole: getDashboardCurrentRole(scenario),
     metrics: dashboardMetrics,
     performanceTrend: dashboardPerformanceTrend,
     scenario,
