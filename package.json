@@ -9,6 +9,9 @@
     "client:lint": "pnpm --dir apps/client lint",
     "client:preview": "pnpm --dir apps/client preview",
     "client:test": "pnpm --dir apps/client test",
+    "client:test:mock": "pnpm --dir apps/client test:mock",
+    "client:test:watch": "pnpm --dir apps/client test:watch",
+    "client:test:watch:mock": "pnpm --dir apps/client test:watch:mock",
     "client:test:e2e": "pnpm --dir apps/client test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
