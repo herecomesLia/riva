@@ -154,15 +154,19 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
         </div>
       </FieldGroup>
 
-      <Button
-        className="h-12 w-full text-base"
-        disabled={form.state.isSubmitting}
-        size="lg"
-        type="submit"
-      >
-        {form.state.isSubmitting && <Spinner data-icon="inline-start" />}
-        {form.state.isSubmitting ? t("login.signingIn") : t("login.continue")}
-      </Button>
+      <form.Subscribe selector={(state) => state.isSubmitting}>
+        {(isSubmitting) => (
+          <Button
+            className="h-12 w-full text-base"
+            disabled={isSubmitting}
+            size="lg"
+            type="submit"
+          >
+            {isSubmitting && <Spinner data-icon="inline-start" />}
+            {isSubmitting ? t("login.signingIn") : t("login.continue")}
+          </Button>
+        )}
+      </form.Subscribe>
     </form>
   )
 }
