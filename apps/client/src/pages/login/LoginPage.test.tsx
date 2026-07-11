@@ -1,72 +1,54 @@
 import { screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
-import { i18n } from "@/i18n/i18n"
-import { defaultLanguage } from "@/i18n/resources"
-import { userMock } from "@/mocks/data/auth"
-import { LoginPage } from "@/pages/login"
-import { useAuthStore } from "@/stores/auth"
+import { LoginPage } from "@/pages/login/LoginPage"
 import { renderWithProviders } from "@/test/render"
-import { resetStores } from "@/test/stores"
 
-function t(key: string) {
-  return i18n.t(key)
-}
+const { useMediaMock } = vi.hoisted(() => ({ useMediaMock: vi.fn() }))
+
+vi.mock("react-use", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-use")>()),
+  useMedia: useMediaMock,
+}))
+vi.mock("@/pages/login/LoginForm", () => ({
+  LoginForm: ({ onLoginSuccess }: { onLoginSuccess: () => void }) => (
+    <button onClick={onLoginSuccess} type="button">
+      Complete login
+    </button>
+  ),
+}))
+vi.mock("@/pages/login/LoginHeroes", () => ({
+  LoginHeroes: () => <div data-testid="login-heroes" />,
+}))
 
 describe("LoginPage", () => {
-  beforeEach(async () => {
-    resetStores()
-    await i18n.changeLanguage(defaultLanguage)
-  })
-
-  it("shows account and password validation errors on empty submit", async () => {
+  it("navigates to dashboard after the form reports a successful login", async () => {
     const user = userEvent.setup()
-
-    renderWithProviders(<LoginPage />, {
-      router: {
-        initialEntries: ["/login"],
-      },
-    })
-
-    await user.click(await screen.findByRole("button", { name: t("login.continue") }))
-
-    expect(await screen.findByText(t("login.usernameRequired"))).toBeInTheDocument()
-    expect(await screen.findByText(t("login.passwordRequired"))).toBeInTheDocument()
-  })
-
-  it("writes auth store after submitting account and password", async () => {
-    const user = userEvent.setup()
-
-    renderWithProviders(<LoginPage />, {
-      router: {
-        initialEntries: ["/login"],
-      },
-    })
-
-    await user.type(await screen.findByLabelText(t("login.username")), "eleno")
-    await user.type(screen.getByLabelText(t("login.password")), "secret")
-    await user.click(screen.getByRole("button", { name: t("login.continue") }))
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().currentUser).toEqual(userMock)
-    })
-  })
-
-  it("navigates to dashboard after successful submit", async () => {
-    const user = userEvent.setup()
+    useMediaMock.mockReturnValue(false)
     const { router } = renderWithProviders(<LoginPage />, {
-      router: {
-        initialEntries: ["/login"],
-      },
+      router: { initialEntries: ["/login"] },
     })
 
-    await user.type(await screen.findByLabelText(t("login.username")), "eleno")
-    await user.type(screen.getByLabelText(t("login.password")), "secret")
-    await user.click(screen.getByRole("button", { name: t("login.continue") }))
+    await user.click(await screen.findByRole("button", { name: "Complete login" }))
 
     await waitFor(() => {
       expect(router?.state.location.pathname).toBe("/dashboard")
     })
+  })
+
+  it.each([
+    { matchesDesktop: false, description: "does not mount LoginHeroes below the desktop breakpoint" },
+    { matchesDesktop: true, description: "mounts LoginHeroes at the desktop breakpoint" },
+  ])("$description", ({ matchesDesktop }) => {
+    useMediaMock.mockReturnValue(matchesDesktop)
+
+    renderWithProviders(<LoginPage />, { router: false })
+
+    if (matchesDesktop) {
+      expect(screen.getByTestId("login-heroes")).toBeInTheDocument()
+    } else {
+      expect(screen.queryByTestId("login-heroes")).not.toBeInTheDocument()
+    }
   })
 })
