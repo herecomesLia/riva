@@ -18,4 +18,21 @@ describe("DashboardPage", () => {
       await screen.findByRole("heading", { name: i18n.t("dashboard.title") }),
     ).toBeInTheDocument()
   })
+
+  it("renders the four dashboard metrics", async () => {
+    renderWithProviders(<DashboardPage />, {
+      router: {
+        initialEntries: ["/dashboard"],
+      },
+    })
+
+    expect(
+      await screen.findByText(i18n.t("dashboard.metrics.roleFit.title")),
+    ).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.practiceTime.title"))).toBeInTheDocument()
+    expect(
+      screen.getByText(i18n.t("dashboard.metrics.targetedPractice.title")),
+    ).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.mockInterview.title"))).toBeInTheDocument()
+  })
 })

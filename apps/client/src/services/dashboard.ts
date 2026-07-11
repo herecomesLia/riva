@@ -6,13 +6,29 @@ export type PageViewState = "loading" | "empty" | "error" | "success"
 
 export type DashboardRoute = "/profile" | "/roles" | "/practice" | "/interview" | "/history"
 
-export type DashboardMetricIcon = "roleFit" | "training" | "performance" | "weaknesses"
+export type DashboardMetricIcon =
+  | "roleFit"
+  | "practiceTime"
+  | "targetedPractice"
+  | "mockInterview"
+
+export type DashboardMetricChangeDirection = "up" | "down" | "unchanged"
+
+export type DashboardMetricChange = {
+  direction: DashboardMetricChangeDirection
+  percentage: number
+}
+
+export type DashboardMetricValueFormat = "percentage" | "duration" | "score"
 
 export type DashboardMetric = {
-  descriptionKey: string
+  comparisonKey: string
+  currentValue: number
   icon: DashboardMetricIcon
+  previousValue: number | null
   titleKey: string
   valueKey: string
+  valueFormat: DashboardMetricValueFormat
 }
 
 export type DashboardReadinessStage = {
@@ -45,30 +61,58 @@ const dashboardDelayMs = 240
 
 const dashboardMetrics: DashboardMetric[] = [
   {
-    descriptionKey: "dashboard.metrics.roleFit.description",
+    comparisonKey: "dashboard.metrics.roleFit.comparison",
+    currentValue: 76,
     icon: "roleFit",
+    previousValue: 65.8,
     titleKey: "dashboard.metrics.roleFit.title",
-    valueKey: "dashboard.metrics.roleFit.value",
+    valueKey: "dashboard.metrics.values.percentage",
+    valueFormat: "percentage",
   },
   {
-    descriptionKey: "dashboard.metrics.training.description",
-    icon: "training",
-    titleKey: "dashboard.metrics.training.title",
-    valueKey: "dashboard.metrics.training.value",
+    comparisonKey: "dashboard.metrics.practiceTime.comparison",
+    currentValue: 45,
+    icon: "practiceTime",
+    previousValue: 49,
+    titleKey: "dashboard.metrics.practiceTime.title",
+    valueKey: "dashboard.metrics.values.duration",
+    valueFormat: "duration",
   },
   {
-    descriptionKey: "dashboard.metrics.performance.description",
-    icon: "performance",
-    titleKey: "dashboard.metrics.performance.title",
-    valueKey: "dashboard.metrics.performance.value",
+    comparisonKey: "dashboard.metrics.targetedPractice.comparison",
+    currentValue: 7.2,
+    icon: "targetedPractice",
+    previousValue: 7.2,
+    titleKey: "dashboard.metrics.targetedPractice.title",
+    valueKey: "dashboard.metrics.values.score",
+    valueFormat: "score",
   },
   {
-    descriptionKey: "dashboard.metrics.weaknesses.description",
-    icon: "weaknesses",
-    titleKey: "dashboard.metrics.weaknesses.title",
-    valueKey: "dashboard.metrics.weaknesses.value",
+    comparisonKey: "dashboard.metrics.mockInterview.comparison",
+    currentValue: 7.4,
+    icon: "mockInterview",
+    previousValue: 6.9,
+    titleKey: "dashboard.metrics.mockInterview.title",
+    valueKey: "dashboard.metrics.values.score",
+    valueFormat: "score",
   },
 ]
+
+export function calculatePercentageChange(
+  currentValue: number,
+  previousValue: number | null,
+): DashboardMetricChange | null {
+  if (previousValue === null || previousValue === 0) {
+    return null
+  }
+
+  const percentage = ((currentValue - previousValue) / previousValue) * 100
+
+  return {
+    direction: percentage > 0 ? "up" : percentage < 0 ? "down" : "unchanged",
+    percentage: Math.abs(percentage),
+  }
+}
 
 const dashboardReadinessStages: DashboardReadinessStage[] = [
   { labelKey: "dashboard.readiness.stages.profile", status: "complete" },

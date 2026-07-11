@@ -3,15 +3,15 @@ import { Link } from "@tanstack/react-router"
 import {
   AlertCircleIcon,
   ArrowRightIcon,
-  BarChart3Icon,
-  CalendarCheckIcon,
-  CircleAlertIcon,
   Clock3Icon,
   ClipboardCheckIcon,
   HistoryIcon,
+  MessagesSquareIcon,
+  MinusIcon,
   PlayIcon,
   SparklesIcon,
   TargetIcon,
+  TriangleIcon,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -41,8 +41,10 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import {
+  calculatePercentageChange,
   getDashboardPageState,
   type DashboardMetric,
+  type DashboardMetricChangeDirection,
   type DashboardMetricIcon,
   type DashboardPageState,
   type DashboardReadinessStage,
@@ -50,10 +52,34 @@ import {
 } from "@/services/dashboard"
 
 const metricIcons: Record<DashboardMetricIcon, LucideIcon> = {
-  performance: BarChart3Icon,
+  mockInterview: MessagesSquareIcon,
+  practiceTime: Clock3Icon,
   roleFit: TargetIcon,
-  training: CalendarCheckIcon,
-  weaknesses: CircleAlertIcon,
+  targetedPractice: ClipboardCheckIcon,
+}
+
+const metricChangeStyles: Record<DashboardMetricChangeDirection, string> = {
+  down: "bg-red-500/10 text-red-700 dark:bg-red-400/15 dark:text-red-300",
+  unchanged: "bg-orange-500/10 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300",
+  up: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
+}
+
+const metricChangeIcons: Record<DashboardMetricChangeDirection, LucideIcon> = {
+  down: TriangleIcon,
+  unchanged: MinusIcon,
+  up: TriangleIcon,
+}
+
+const metricChangeIconClasses: Record<DashboardMetricChangeDirection, string> = {
+  down: "size-2 rotate-180 fill-current",
+  unchanged: "size-3",
+  up: "size-2 fill-current",
+}
+
+const metricChangeIconStrokeWidths: Record<DashboardMetricChangeDirection, number> = {
+  down: 2,
+  unchanged: 5,
+  up: 2,
 }
 
 const readinessBadgeVariants = {
@@ -79,7 +105,7 @@ export function DashboardPage() {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
       <header className="relative flex flex-col gap-2.5 lg:pr-72">
-        <div className="pointer-events-none absolute -top-6 right-50 hidden w-55 lg:block">
+        <div className="pointer-events-none absolute -top-5 right-50 hidden w-55 lg:block">
           <img alt="" className="w-full mix-blend-multiply dark:hidden" src={dashboardRobot} />
           <img alt="" className="hidden w-full dark:block" src={dashboardRobotDark} />
         </div>
@@ -197,7 +223,11 @@ function RecommendationCard() {
 }
 
 function DashboardMetrics({ metrics }: { metrics: DashboardMetric[] }) {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
+  const formatMetricNumber = (value: number) =>
+    new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(value)
+  const formatMetricValue = (metric: DashboardMetric, value: number) =>
+    t(metric.valueKey, { value: formatMetricNumber(value) })
 
   return (
     <section
@@ -206,18 +236,54 @@ function DashboardMetrics({ metrics }: { metrics: DashboardMetric[] }) {
     >
       {metrics.map((metric) => {
         const Icon = metricIcons[metric.icon]
+        const change = calculatePercentageChange(metric.currentValue, metric.previousValue)
+        const ChangeIcon = change ? metricChangeIcons[change.direction] : null
 
         return (
-          <Card key={metric.titleKey} size="sm">
+          <Card key={metric.titleKey}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Icon className="text-muted-foreground" />
-                {t(metric.titleKey)}
-              </CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-sm font-medium">{t(metric.titleKey)}</CardTitle>
+                <Icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
+              </div>
             </CardHeader>
-            <CardContent className="flex flex-col gap-1">
-              <p className="font-heading text-2xl font-medium">{t(metric.valueKey)}</p>
-              <CardDescription>{t(metric.descriptionKey)}</CardDescription>
+            <CardContent className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-heading text-3xl font-semibold leading-none tracking-tight">
+                  {metric.valueFormat === "duration" ? (
+                    <>
+                      {formatMetricNumber(metric.currentValue)}
+                      <span className="ml-1 text-sm font-normal text-muted-foreground">
+                        {t("dashboard.metrics.values.durationUnit")}
+                      </span>
+                    </>
+                  ) : (
+                    formatMetricValue(metric, metric.currentValue)
+                  )}
+                </p>
+                {change && ChangeIcon && (
+                  <Badge className={metricChangeStyles[change.direction]} variant="secondary">
+                    <span aria-hidden="true" className="flex shrink-0 items-center">
+                      <ChangeIcon
+                        className={metricChangeIconClasses[change.direction]}
+                        strokeWidth={metricChangeIconStrokeWidths[change.direction]}
+                      />
+                    </span>
+                    {new Intl.NumberFormat(i18n.language, {
+                      maximumFractionDigits: 1,
+                      minimumFractionDigits: change.percentage === 0 ? 0 : 1,
+                    }).format(change.percentage)}
+                    %
+                  </Badge>
+                )}
+              </div>
+              <CardDescription className="text-xs leading-5">
+                {metric.previousValue === null
+                  ? t("dashboard.metrics.noComparison")
+                  : t(metric.comparisonKey, {
+                      value: formatMetricValue(metric, metric.previousValue),
+                    })}
+              </CardDescription>
             </CardContent>
           </Card>
         )

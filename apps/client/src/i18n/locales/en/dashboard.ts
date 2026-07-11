@@ -49,25 +49,28 @@ export const dashboard = {
   },
   metrics: {
     eyebrow: "Preparation progress",
+    noComparison: "No comparable data",
     roleFit: {
       title: "Role fit",
-      value: "76%",
-      description: "+4% from the last analysis",
+      comparison: "vs. {{value}} last role analysis",
     },
-    training: {
-      title: "This week's practice",
-      value: "4 / 6 sessions",
-      description: "2 sessions left to meet this week's goal",
+    practiceTime: {
+      title: "Today's practice time",
+      comparison: "vs. {{value}} yesterday",
     },
-    performance: {
-      title: "Average performance",
-      value: "7.2 / 10",
-      description: "+0.6 from last week",
+    targetedPractice: {
+      title: "Targeted practice performance",
+      comparison: "vs. {{value}} previous targeted practice",
     },
-    weaknesses: {
-      title: "Skills to improve",
-      value: "3 areas",
-      description: "Address frequent weak points first",
+    mockInterview: {
+      title: "Mock interview score",
+      comparison: "vs. {{value}} previous mock interview",
+    },
+    values: {
+      percentage: "{{value}}%",
+      duration: "{{value}} min",
+      durationUnit: "min",
+      score: "{{value}} / 10",
     },
   },
   nextSession: {

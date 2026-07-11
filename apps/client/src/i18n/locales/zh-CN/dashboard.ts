@@ -48,25 +48,28 @@ export const dashboard = {
   },
   metrics: {
     eyebrow: "准备进度",
+    noComparison: "暂无可比较数据",
     roleFit: {
       title: "岗位匹配度",
-      value: "76%",
-      description: "较上次分析 +4%",
+      comparison: "较上次岗位分析 {{value}}",
     },
-    training: {
-      title: "本周训练",
-      value: "4 / 6 次",
-      description: "距离本周目标还差 2 次",
+    practiceTime: {
+      title: "今日练习时间",
+      comparison: "较昨日 {{value}}",
     },
-    performance: {
-      title: "平均表现",
-      value: "7.2 / 10",
-      description: "较上周 +0.6",
+    targetedPractice: {
+      title: "专项练习表现",
+      comparison: "较上一次专项练习 {{value}}",
     },
-    weaknesses: {
-      title: "待补强能力",
-      value: "3 项",
-      description: "优先处理高频薄弱项",
+    mockInterview: {
+      title: "模拟面试分数",
+      comparison: "较上一次模拟面试 {{value}}",
+    },
+    values: {
+      percentage: "{{value}}%",
+      duration: "{{value}} 分钟",
+      durationUnit: "分钟",
+      score: "{{value}} / 10",
     },
   },
   nextSession: {
