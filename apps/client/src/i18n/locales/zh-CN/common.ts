@@ -7,7 +7,7 @@ export const common = {
     },
     error: {
       title: "页面状态异常",
-      description: "当前模拟场景返回了错误状态。",
+      description: "页面数据加载失败。",
     },
     loading: {
       title: "正在加载",

@@ -7,7 +7,7 @@ export const common = {
     },
     error: {
       title: "Page state error",
-      description: "The current simulated scenario returned an error state.",
+      description: "The page data could not be loaded.",
     },
     loading: {
       title: "Loading",

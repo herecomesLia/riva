@@ -4,15 +4,14 @@ import {
   AlertCircleIcon,
   ArrowRightIcon,
   BriefcaseBusinessIcon,
-  CircleAlertIcon,
-  CircleCheckIcon,
   Clock3Icon,
   ClipboardCheckIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
   MapPinIcon,
   MessagesSquareIcon,
   MinusIcon,
   PlayIcon,
-  SearchCheckIcon,
   SparklesIcon,
   TargetIcon,
   TriangleIcon,
@@ -28,7 +27,6 @@ import { useTranslation } from "react-i18next"
 
 import dashboardRobotDark from "@/assets/dashboard-robot-dark.png"
 import dashboardRobot from "@/assets/dashboard-robot.png"
-import { env } from "@/app/env"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,31 +38,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
 import {
   calculatePercentageChange,
-  getDashboardCurrentRoleByState,
-  getDashboardPageState,
-  type DashboardCurrentRole,
-  type DashboardCurrentRoleState,
+  getDashboardData,
   type DashboardMetric,
   type DashboardMetricChangeDirection,
   type DashboardMetricIcon,
-  type DashboardPageState,
+  type DashboardData,
   type DashboardPerformancePoint,
   type DashboardPerformanceType,
-  type PageViewState,
 } from "@/services/dashboard"
 
 const metricIcons: Record<DashboardMetricIcon, LucideIcon> = {
@@ -98,29 +84,21 @@ const metricChangeIconStrokeWidths: Record<DashboardMetricChangeDirection, numbe
   up: 2,
 }
 
-const currentRoleStatusStyles: Record<"complete" | "incomplete", string> = {
+const currentRoleStatusStyles = {
   complete:
     "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-300",
   incomplete:
     "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-300",
-}
+} as const
 
 export function DashboardPage() {
   const { t } = useTranslation()
   const { currentUser } = useAuth()
-  const [currentRolePreviewState, setCurrentRolePreviewState] =
-    useState<DashboardCurrentRoleState | null>(null)
   const dashboardQuery = useQuery({
-    queryFn: getDashboardPageState,
-    queryKey: ["dashboard-page-state"],
+    queryFn: getDashboardData,
+    queryKey: ["dashboard"],
   })
   const dashboardData = dashboardQuery.data
-  const viewState: PageViewState = dashboardQuery.isPending
-    ? "loading"
-    : dashboardQuery.isError
-      ? "error"
-      : (dashboardData?.state ?? "error")
-  const currentRolePreviewEnabled = import.meta.env.DEV && env.mock
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -141,40 +119,20 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {viewState === "loading" && <DashboardLoadingState />}
-      {viewState === "empty" && <DashboardEmptyState />}
-      {viewState === "error" && <DashboardErrorState />}
-      {viewState === "success" && dashboardData && (
-        <DashboardOverview
-          currentRole={
-            currentRolePreviewState
-              ? getDashboardCurrentRoleByState(currentRolePreviewState)
-              : dashboardData.currentRole
-          }
-          dashboardData={dashboardData}
-        />
-      )}
-      {currentRolePreviewEnabled && viewState === "success" && dashboardData && (
-        <CurrentRolePreviewControl
-          onStateChange={setCurrentRolePreviewState}
-          selectedState={currentRolePreviewState ?? dashboardData.currentRole.state}
-        />
+      {dashboardQuery.isPending && <DashboardLoadingState />}
+      {dashboardQuery.isError && <DashboardErrorState />}
+      {dashboardQuery.isSuccess && dashboardData && (
+        <DashboardOverview dashboardData={dashboardData} />
       )}
     </div>
   )
 }
 
-function DashboardOverview({
-  currentRole,
-  dashboardData,
-}: {
-  currentRole: DashboardCurrentRole
-  dashboardData: DashboardPageState
-}) {
+function DashboardOverview({ dashboardData }: { dashboardData: DashboardData }) {
   return (
     <div className="flex flex-col gap-6">
       <section className="grid gap-4 lg:grid-cols-12">
-        <CurrentRoleCard currentRole={currentRole} />
+        <CurrentRoleCard />
         <RecommendationCard />
       </section>
 
@@ -188,105 +146,8 @@ function DashboardOverview({
   )
 }
 
-const currentRolePreviewOptions: Array<{
-  labelKey:
-    | "dashboard.developmentPreview.complete"
-    | "dashboard.developmentPreview.missingJobDescription"
-    | "dashboard.developmentPreview.missingProfile"
-    | "dashboard.developmentPreview.empty"
-  state: DashboardCurrentRoleState
-}> = [
-  { labelKey: "dashboard.developmentPreview.complete", state: "complete" },
-  { labelKey: "dashboard.developmentPreview.missingJobDescription", state: "missingJobDescription" },
-  { labelKey: "dashboard.developmentPreview.missingProfile", state: "missingProfile" },
-  { labelKey: "dashboard.developmentPreview.empty", state: "empty" },
-]
-
-function CurrentRolePreviewControl({
-  onStateChange,
-  selectedState,
-}: {
-  onStateChange: (state: DashboardCurrentRoleState) => void
-  selectedState: DashboardCurrentRoleState
-}) {
+function CurrentRoleCard() {
   const { t } = useTranslation()
-
-  return (
-    <section
-      aria-label={t("dashboard.developmentPreview.title")}
-      className="fixed right-4 bottom-4 z-50 w-56 rounded-xl border bg-card/95 p-2 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/80"
-    >
-      <p className="px-1 pb-1.5 text-xs font-medium text-muted-foreground">
-        {t("dashboard.developmentPreview.title")}
-      </p>
-      <div className="grid gap-1">
-        {currentRolePreviewOptions.map((option) => {
-          const selected = option.state === selectedState
-
-          return (
-            <Button
-              aria-pressed={selected}
-              className="justify-start"
-              key={option.state}
-              onClick={() => onStateChange(option.state)}
-              size="xs"
-              type="button"
-              variant={selected ? "secondary" : "ghost"}
-            >
-              {t(option.labelKey)}
-            </Button>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-function CurrentRoleCard({ currentRole }: { currentRole: DashboardCurrentRole }) {
-  const { t } = useTranslation()
-
-  if (currentRole.state === "empty") {
-    return (
-      <Card className="lg:col-span-5">
-        <CardHeader>
-          <CardTitle>{t("dashboard.currentRole.eyebrow")}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-1 flex-col items-center justify-start gap-1.5 pt-0 pb-3 text-center">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <SearchCheckIcon className="size-6" />
-          </div>
-          <div className="flex max-w-md flex-col gap-1">
-            <p className="font-heading text-base font-medium">{t("dashboard.currentRole.empty.title")}</p>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {t("dashboard.currentRole.empty.description")}
-            </p>
-          </div>
-          <Button nativeButton={false} render={<Link to="/roles" />} size="sm">
-            {t("dashboard.currentRole.empty.action")}
-          </Button>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const actionByState: Record<Exclude<DashboardCurrentRoleState, "empty">, {
-    labelKey: "dashboard.currentRole.actions.analyze" | "dashboard.currentRole.actions.addJobDescription" | "dashboard.currentRole.actions.completeProfile"
-    to: "/roles" | "/profile"
-  }> = {
-    complete: {
-      labelKey: "dashboard.currentRole.actions.analyze",
-      to: "/roles",
-    },
-    missingJobDescription: {
-      labelKey: "dashboard.currentRole.actions.addJobDescription",
-      to: "/roles",
-    },
-    missingProfile: {
-      labelKey: "dashboard.currentRole.actions.completeProfile",
-      to: "/profile",
-    },
-  }
-  const action = actionByState[currentRole.state]
 
   return (
     <Card className="lg:col-span-5">
@@ -316,11 +177,11 @@ function CurrentRoleCard({ currentRole }: { currentRole: DashboardCurrentRole })
         </div>
         <div className="flex flex-col items-start gap-2">
           <div className="flex flex-wrap gap-2">
-            <RoleStatusBadge complete={currentRole.profileCompleted} type="profile" />
-            <RoleStatusBadge complete={currentRole.jobDescriptionAdded} type="jobDescription" />
+            <RoleStatusBadge complete type="profile" />
+            <RoleStatusBadge complete={false} type="jobDescription" />
           </div>
-          <Button nativeButton={false} render={<Link to={action.to} />} size="sm" variant="link">
-            {t(action.labelKey)}
+          <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
+            {t("dashboard.currentRole.actions.addJobDescription")}
             <ArrowRightIcon data-icon="inline-end" />
           </Button>
         </div>
@@ -512,7 +373,7 @@ function getAreaPath(points: PerformanceChartPoint[]) {
 function PerformanceTrendCard({
   performanceTrend,
 }: {
-  performanceTrend: DashboardPageState["performanceTrend"]
+  performanceTrend: DashboardData["performanceTrend"]
 }) {
   const { i18n, t } = useTranslation()
   const chartRef = useRef<SVGSVGElement>(null)
@@ -794,7 +655,7 @@ function PerformanceTrendCard({
   )
 }
 
-function WeaknessesCard({ dashboardData }: { dashboardData: DashboardPageState }) {
+function WeaknessesCard({ dashboardData }: { dashboardData: DashboardData }) {
   const { t } = useTranslation()
 
   return (
@@ -857,31 +718,6 @@ function DashboardSkeletonCard({ className }: { className?: string }) {
       <CardContent className="flex flex-col gap-3">
         <Skeleton className="h-7 w-3/5" />
         <Skeleton className="h-5 w-1/3" />
-      </CardContent>
-    </Card>
-  )
-}
-
-function DashboardEmptyState() {
-  const { t } = useTranslation()
-
-  return (
-    <Card>
-      <CardContent>
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ClipboardCheckIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("dashboard.empty.title")}</EmptyTitle>
-            <EmptyDescription>{t("dashboard.empty.description")}</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button nativeButton={false} render={<Link to="/profile" />}>
-              {t("dashboard.empty.action")}
-            </Button>
-          </EmptyContent>
-        </Empty>
       </CardContent>
     </Card>
   )
