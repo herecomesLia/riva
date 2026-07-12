@@ -1,15 +1,13 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from riva.schemas.base import APIModel
 
 
-class AuthCredentials(BaseModel):
+class AuthCredentials(APIModel):
     username: str
     password: str
 
 
-class UserResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class UserResponse(APIModel):
     id: UUID
     username: str

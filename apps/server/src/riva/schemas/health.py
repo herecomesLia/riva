@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel
+from riva.schemas.base import APIModel
 
 
 class ServiceHealthStatus(StrEnum):
@@ -15,6 +15,6 @@ class DependencyHealthStatus(StrEnum):
     unknown = "unknown"
 
 
-class HealthResponse(BaseModel):
+class HealthResponse(APIModel):
     status: ServiceHealthStatus
     database: DependencyHealthStatus
