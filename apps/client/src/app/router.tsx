@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { DashboardPage } from "@/pages/dashboard"
 import { HistoryPage } from "@/pages/history"
 import { InterviewPage } from "@/pages/interview"
-import { LoginPage } from "@/pages/login"
+import { LoginPage, RegisterPage } from "@/pages/login"
 import { NotFoundPage } from "@/pages/not-found"
 import { PracticePage } from "@/pages/practice"
 import { ProfilePage } from "@/pages/profile"
@@ -32,6 +32,16 @@ function LoginRoute() {
   }
 
   return <LoginPage />
+}
+
+function RegisterRoute() {
+  const { isAuthenticated } = useAuth()
+
+  if (isAuthenticated) {
+    return <Navigate replace to="/dashboard" />
+  }
+
+  return <RegisterPage />
 }
 
 function AppRoute() {
@@ -58,6 +68,12 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   component: LoginRoute,
+})
+
+const registerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/register",
+  component: RegisterRoute,
 })
 
 const appRoute = createRoute({
@@ -105,6 +121,7 @@ const historyRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  registerRoute,
   appRoute.addChildren([
     dashboardRoute,
     profileRoute,
