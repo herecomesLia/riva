@@ -42,7 +42,13 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
-import type { DashboardPerformanceRecord, DashboardResponse } from "@/models/dashboard"
+import type {
+  DashboardPerformanceRecord,
+  DashboardQuestionType,
+  DashboardRecruitmentType,
+  DashboardResponse,
+  DashboardWeaknessCategory,
+} from "@/models/dashboard"
 import { getDashboardData } from "@/services/dashboard"
 
 import { calculatePercentageChange, type DashboardMetricChangeDirection } from "./dashboard-utils"
@@ -128,6 +134,15 @@ const currentRoleStatusStyles = {
   incomplete:
     "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-300",
 } as const
+
+const recommendationQuestionTypeKeys: Record<DashboardQuestionType, string> = {
+  projectExperience: "dashboard.recommendation.questionTypes.projectExperience",
+}
+
+const recruitmentTypeKeys: Record<DashboardRecruitmentType, string> = {
+  campus: "dashboard.currentRole.recruitmentTypes.campus",
+  experienced: "dashboard.currentRole.recruitmentTypes.experienced",
+}
 
 export function DashboardPage() {
   const { t } = useTranslation()
@@ -218,8 +233,7 @@ function CurrentRoleCard({ currentRole }: { currentRole: DashboardResponse["curr
 
   const context = [
     currentRole.company,
-    currentRole.recruitmentType &&
-      t(`dashboard.currentRole.recruitmentTypes.${currentRole.recruitmentType}`),
+    currentRole.recruitmentType && t(recruitmentTypeKeys[currentRole.recruitmentType]),
   ].filter(Boolean)
   const metadata = [
     currentRole.location,
@@ -332,7 +346,9 @@ function RecommendationCard({
       <CardContent className="flex flex-col gap-4">
         <p className="font-heading text-xl font-medium">{recommendation.title}</p>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{recommendation.questionType}</Badge>
+          <Badge variant="outline">
+            {t(recommendationQuestionTypeKeys[recommendation.questionType])}
+          </Badge>
           <Badge variant="outline">
             <Clock3Icon />
             {t("dashboard.recommendation.duration", {
@@ -798,7 +814,7 @@ function PerformanceTrendCard({
   )
 }
 
-const weaknessTitleKeys: Record<string, string> = {
+const weaknessTitleKeys: Record<DashboardWeaknessCategory, string> = {
   pressureResponse: "dashboard.weaknesses.categories.pressureResponse",
   projectExpression: "dashboard.weaknesses.categories.projectExpression",
   quantifiedResults: "dashboard.weaknesses.categories.quantifiedResults",

@@ -31,7 +31,7 @@ const dashboardData: DashboardResponse = {
     id: "recommendation-1",
     title: "重练：项目难点与解决方案",
     description: "最近回答已经说清背景，但解决过程的取舍和成果量化仍可更具体。",
-    questionType: "项目经历题",
+    questionType: "projectExperience",
     estimatedMinutes: 8,
   },
   metrics: {
@@ -91,6 +91,9 @@ describe("DashboardPage", () => {
     })
     expect(screen.getByText(dashboardData.currentRole!.title)).toBeInTheDocument()
     expect(screen.getByText(dashboardData.recommendation!.title)).toBeInTheDocument()
+    expect(
+      screen.getByText(i18n.t("dashboard.recommendation.questionTypes.projectExperience")),
+    ).toBeInTheDocument()
     expect(screen.getByText(dashboardData.weaknesses[0].description)).toBeInTheDocument()
     expect(
       screen.getByLabelText(

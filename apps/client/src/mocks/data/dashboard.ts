@@ -19,7 +19,7 @@ export const dashboardResponse: DashboardResponse = {
     title: "Retry: A project challenge and solution",
     description:
       "Your recent answer explained the context clearly, but the trade-offs and measurable results can be more specific.",
-    questionType: "Project experience",
+    questionType: "projectExperience",
     estimatedMinutes: 8,
   },
   metrics: {

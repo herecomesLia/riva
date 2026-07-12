@@ -41,13 +41,6 @@ export const dashboard = {
       action: "添加目标岗位",
     },
   },
-  developmentPreview: {
-    title: "开发预览 · 当前目标",
-    complete: "完整状态",
-    missingJobDescription: "缺少 JD",
-    missingProfile: "缺少档案",
-    empty: "空状态",
-  },
   empty: {
     title: "从建立求职档案开始",
     description: "补充简历和目标岗位后，Riva 会为你生成匹配分析与首轮训练建议。",
@@ -97,23 +90,12 @@ export const dashboard = {
     chartLabel: "最近 10 次{{type}}评分表现",
     empty: "暂无{{type}}记录。",
   },
-  readiness: {
-    eyebrow: "岗位准备度",
-    title: "你正处于专项训练阶段",
-    description: "完成薄弱项练习后，进入模拟面试检验整体表现。",
-    completed: "已完成",
-    current: "进行中",
-    upcoming: "下一步",
-    stages: {
-      profile: "建立档案",
-      role: "分析岗位",
-      practice: "专项训练",
-      interview: "模拟面试",
-    },
-  },
   recommendation: {
     eyebrow: "今日训练建议",
     duration: "预计 {{minutes}} 分钟",
+    questionTypes: {
+      projectExperience: "项目经历题",
+    },
     empty: {
       title: "暂无训练建议",
       description: "完成更多训练后，我们会为你生成下一步建议。",

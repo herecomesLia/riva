@@ -9,12 +9,19 @@ export type DashboardPerformanceRecord = {
   score: number
 }
 
+export type DashboardQuestionType = "projectExperience"
+
+export type DashboardRecruitmentType = "campus" | "experienced"
+
+export type DashboardWeaknessCategory =
+  "projectExpression" | "quantifiedResults" | "pressureResponse"
+
 export type DashboardResponse = {
   currentRole: {
     id: string
     title: string
     company: string | null
-    recruitmentType: "campus" | "experienced" | null
+    recruitmentType: DashboardRecruitmentType | null
     location: string | null
     experienceYears: {
       min: number
@@ -27,7 +34,7 @@ export type DashboardResponse = {
     id: string
     title: string
     description: string
-    questionType: string
+    questionType: DashboardQuestionType
     estimatedMinutes: number
   } | null
   metrics: {
@@ -42,7 +49,7 @@ export type DashboardResponse = {
   }
   weaknesses: Array<{
     id: string
-    category: string
+    category: DashboardWeaknessCategory
     description: string
     recommendedPracticeCount: number
   }>

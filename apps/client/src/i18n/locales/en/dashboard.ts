@@ -41,13 +41,6 @@ export const dashboard = {
       action: "Add target role",
     },
   },
-  developmentPreview: {
-    title: "Development preview · Current target",
-    complete: "Complete",
-    missingJobDescription: "Missing job description",
-    missingProfile: "Missing profile",
-    empty: "Empty state",
-  },
   empty: {
     title: "Start with your job-search profile",
     description:
@@ -98,24 +91,12 @@ export const dashboard = {
     chartLabel: "10 most recent {{type}} scores",
     empty: "No {{type}} records yet.",
   },
-  readiness: {
-    eyebrow: "Role readiness",
-    title: "You are in the targeted practice stage",
-    description:
-      "Complete your weak-area practice before testing your overall performance in a mock interview.",
-    completed: "Completed",
-    current: "In progress",
-    upcoming: "Next step",
-    stages: {
-      profile: "Build profile",
-      role: "Analyze role",
-      practice: "Targeted practice",
-      interview: "Mock interview",
-    },
-  },
   recommendation: {
     eyebrow: "Today's recommendation",
     duration: "About {{minutes}} min",
+    questionTypes: {
+      projectExperience: "Project experience",
+    },
     empty: {
       title: "No recommendation yet",
       description: "Complete more training to receive your next recommendation.",
