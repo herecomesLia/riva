@@ -15,9 +15,15 @@
     "client:test:watch:mock": "pnpm --filter @riva/client --fail-if-no-match test:watch:mock",
     "client:test:e2e": "pnpm --filter @riva/client --fail-if-no-match test:e2e",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
     "prettier": "^3.9.4"
   },
   "devEngines": {
