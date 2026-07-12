@@ -245,7 +245,13 @@ function CurrentRoleCard({ currentRole }: { currentRole: DashboardResponse["curr
               </p>
             </div>
           </div>
-          <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
+          <Button
+            className="self-start"
+            nativeButton={false}
+            render={<Link to="/roles" />}
+            size="sm"
+            variant="link"
+          >
             {t("dashboard.currentRole.empty.action")}
             <ArrowRightIcon data-icon="inline-end" />
           </Button>
