@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
+import { LoginError } from "@/models/auth"
 import { LoginForm } from "@/pages/login/LoginForm"
 import { LoginHeroesProvider, useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 import { renderWithProviders } from "@/test/render"
@@ -34,16 +35,30 @@ function HeroesStateProbe() {
   return <output data-testid="heroes-state">{JSON.stringify(state)}</output>
 }
 
-function renderLoginForm(onLoginSuccess = vi.fn()) {
+function renderLoginForm(onLoginSuccess = vi.fn(), withHeroesStateProbe = false) {
   return {
     onLoginSuccess,
     ...renderWithProviders(
       <LoginHeroesProvider>
         <LoginForm onLoginSuccess={onLoginSuccess} />
+        {withHeroesStateProbe && <HeroesStateProbe />}
       </LoginHeroesProvider>,
       { router: false },
     ),
   }
+}
+
+async function fillLoginForm(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(t("login.username")), "eleno")
+  await user.type(screen.getByLabelText(t("login.password")), "secret")
+}
+
+function getSubmitButton() {
+  return screen.getByRole("button", { name: t("login.continue") })
+}
+
+function getPasswordInput() {
+  return screen.getByLabelText(t("login.password"))
 }
 
 describe("LoginForm", () => {
@@ -55,7 +70,7 @@ describe("LoginForm", () => {
     const user = userEvent.setup()
     const { onLoginSuccess } = renderLoginForm()
 
-    await user.click(screen.getByRole("button", { name: t("login.continue") }))
+    await user.click(getSubmitButton())
 
     expect(await screen.findByText(t("login.usernameRequired"))).toBeInTheDocument()
     expect(screen.getByText(t("login.passwordRequired"))).toBeInTheDocument()
@@ -68,8 +83,8 @@ describe("LoginForm", () => {
     renderLoginForm()
 
     await user.type(screen.getByLabelText(t("login.username")), " eleno")
-    await user.type(screen.getByLabelText(t("login.password")), "secret")
-    await user.click(screen.getByRole("button", { name: t("login.continue") }))
+    await user.type(getPasswordInput(), "secret")
+    await user.click(getSubmitButton())
 
     expect(await screen.findByText(t("login.usernameNoOuterSpaces"))).toBeInTheDocument()
     expect(loginMock).not.toHaveBeenCalled()
@@ -81,9 +96,8 @@ describe("LoginForm", () => {
     loginMock.mockReturnValue(deferred.promise)
     const { onLoginSuccess } = renderLoginForm()
 
-    await user.type(screen.getByLabelText(t("login.username")), "eleno")
-    await user.type(screen.getByLabelText(t("login.password")), "secret")
-    await user.click(screen.getByRole("button", { name: t("login.continue") }))
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
 
     await waitFor(() => {
       expect(loginMock).toHaveBeenCalledWith({ username: "eleno", password: "secret" })
@@ -105,14 +119,7 @@ describe("LoginForm", () => {
 
   it("synchronizes form interactions with the login heroes state", async () => {
     const user = userEvent.setup()
-
-    renderWithProviders(
-      <LoginHeroesProvider>
-        <LoginForm onLoginSuccess={vi.fn()} />
-        <HeroesStateProbe />
-      </LoginHeroesProvider>,
-      { router: false },
-    )
+    renderLoginForm(vi.fn(), true)
 
     const username = screen.getByLabelText(t("login.username"))
     await user.click(username)
@@ -125,7 +132,7 @@ describe("LoginForm", () => {
       isUsernameFocused: false,
     })
 
-    await user.type(screen.getByLabelText(t("login.password")), "secret")
+    await user.type(getPasswordInput(), "secret")
     expect(JSON.parse(screen.getByTestId("heroes-state").textContent ?? "")).toMatchObject({
       isPasswordEmpty: false,
     })
@@ -133,6 +140,127 @@ describe("LoginForm", () => {
     await user.click(screen.getByRole("button", { name: "Show password" }))
     expect(JSON.parse(screen.getByTestId("heroes-state").textContent ?? "")).toMatchObject({
       isPasswordVisible: true,
+    })
+  })
+
+  it("handles invalid credentials without field-level server errors", async () => {
+    const user = userEvent.setup()
+    loginMock.mockRejectedValue(new LoginError("invalidCredentials"))
+    const { onLoginSuccess } = renderLoginForm()
+
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(t("login.errorInvalidCredentials"))
+    expect(onLoginSuccess).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(t("login.username"))).toHaveValue("eleno")
+    expect(getPasswordInput()).toHaveValue("")
+    expect(getPasswordInput()).toHaveFocus()
+    expect(getSubmitButton()).toBeEnabled()
+  })
+
+  it("keeps credentials for a service unavailable error", async () => {
+    const user = userEvent.setup()
+    loginMock.mockRejectedValue(new LoginError("serviceUnavailable"))
+    const { onLoginSuccess } = renderLoginForm()
+
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(t("login.errorServiceUnavailable"))
+    expect(screen.getByLabelText(t("login.username"))).toHaveValue("eleno")
+    expect(getPasswordInput()).toHaveValue("secret")
+    expect(onLoginSuccess).not.toHaveBeenCalled()
+    expect(getSubmitButton()).toBeEnabled()
+  })
+
+  it("shows a safe fallback for unknown errors", async () => {
+    const user = userEvent.setup()
+    loginMock.mockRejectedValue(new Error("database password leaked"))
+    const { onLoginSuccess } = renderLoginForm()
+
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(t("login.errorUnknown"))
+    expect(alert).not.toHaveTextContent("database password leaked")
+    expect(screen.getByLabelText(t("login.username"))).toHaveValue("eleno")
+    expect(getPasswordInput()).toHaveValue("secret")
+    expect(onLoginSuccess).not.toHaveBeenCalled()
+    expect(getSubmitButton()).toBeEnabled()
+  })
+
+  it("clears the form-level error when the username changes", async () => {
+    const user = userEvent.setup()
+    loginMock.mockRejectedValue(new LoginError("serviceUnavailable"))
+    renderLoginForm()
+
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
+    expect(await screen.findByRole("alert")).toHaveTextContent(t("login.errorServiceUnavailable"))
+
+    await user.type(screen.getByLabelText(t("login.username")), "x")
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  it("clears the form-level error when the password changes", async () => {
+    const user = userEvent.setup()
+    loginMock.mockRejectedValue(new LoginError("serviceUnavailable"))
+    renderLoginForm()
+
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
+    expect(await screen.findByRole("alert")).toHaveTextContent(t("login.errorServiceUnavailable"))
+
+    await user.type(getPasswordInput(), "x")
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  it("can submit again after a failed login and only reports success once", async () => {
+    const user = userEvent.setup()
+    loginMock
+      .mockRejectedValueOnce(new LoginError("invalidCredentials"))
+      .mockResolvedValueOnce(undefined)
+    const { onLoginSuccess } = renderLoginForm()
+
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
+    expect(await screen.findByRole("alert")).toHaveTextContent(t("login.errorInvalidCredentials"))
+
+    await user.type(getPasswordInput(), "secret")
+    await user.click(getSubmitButton())
+
+    await waitFor(() => {
+      expect(loginMock).toHaveBeenCalledTimes(2)
+    })
+    expect(loginMock).toHaveBeenLastCalledWith({ username: "eleno", password: "secret" })
+
+    await waitFor(() => {
+      expect(onLoginSuccess).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it("resets the login heroes password state after invalid credentials clear the password", async () => {
+    const user = userEvent.setup()
+    loginMock.mockRejectedValue(new LoginError("invalidCredentials"))
+    renderLoginForm(vi.fn(), true)
+
+    await fillLoginForm(user)
+    expect(JSON.parse(screen.getByTestId("heroes-state").textContent ?? "")).toMatchObject({
+      isPasswordEmpty: false,
+    })
+
+    await user.click(getSubmitButton())
+
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId("heroes-state").textContent ?? "")).toMatchObject({
+        isPasswordEmpty: true,
+      })
     })
   })
 })

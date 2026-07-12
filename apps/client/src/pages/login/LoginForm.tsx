@@ -1,13 +1,17 @@
 import { useForm } from "@tanstack/react-form"
 import type { TFunction } from "i18next"
+import { AlertCircleIcon } from "lucide-react"
+import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
+import { isLoginError, type LoginErrorCode } from "@/models/auth"
 import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 
 type LoginFormProps = {
@@ -27,6 +31,21 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   const { login } = useAuth()
   const { t } = useTranslation()
   const [, setHerosState] = useLoginHeroesContext()
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+  const [loginErrorCode, setLoginErrorCode] = useState<LoginErrorCode | null>(null)
+
+  const loginErrorMessageKey =
+    loginErrorCode === "invalidCredentials"
+      ? "login.errorInvalidCredentials"
+      : loginErrorCode === "serviceUnavailable"
+        ? "login.errorServiceUnavailable"
+        : loginErrorCode === "unknown"
+          ? "login.errorUnknown"
+          : null
+
+  function clearLoginError() {
+    setLoginErrorCode(null)
+  }
 
   function handleUsernameFocus() {
     setHerosState((state) => ({ ...state, isUsernameFocused: true }))
@@ -39,6 +58,11 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   function handlePasswordChange(password: string) {
     setHerosState((state) => ({ ...state, isPasswordEmpty: password.length === 0 }))
   }
+
+  function resolveLoginErrorCode(error: unknown): LoginErrorCode {
+    return isLoginError(error) ? error.code : "unknown"
+  }
+
   const form = useForm({
     defaultValues: {
       username: "",
@@ -48,11 +72,25 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
       onSubmit: createLoginSchema(t),
     },
     onSubmit: async ({ value }) => {
-      await login({
-        password: value.password,
-        username: value.username,
-      })
-      onLoginSuccess()
+      clearLoginError()
+
+      try {
+        await login({
+          password: value.password,
+          username: value.username,
+        })
+        onLoginSuccess()
+      } catch (error) {
+        const errorCode = resolveLoginErrorCode(error)
+
+        setLoginErrorCode(errorCode)
+
+        if (errorCode === "invalidCredentials") {
+          form.setFieldValue("password", "")
+          handlePasswordChange("")
+          passwordInputRef.current?.focus()
+        }
+      }
     },
   })
 
@@ -86,7 +124,10 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                       handleUsernameBlur()
                       field.handleBlur()
                     }}
-                    onChange={(event) => field.handleChange(event.target.value)}
+                    onChange={(event) => {
+                      clearLoginError()
+                      field.handleChange(event.target.value)
+                    }}
                   />
                 </FieldControl>
                 <FieldError errors={field.state.meta.errors} />
@@ -109,6 +150,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                 </div>
                 <FieldControl>
                   <Input
+                    ref={passwordInputRef}
                     id={field.name}
                     name={field.name}
                     type="password"
@@ -118,6 +160,8 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                     onBlur={field.handleBlur}
                     onChange={(event) => {
                       const password = event.target.value
+
+                      clearLoginError()
                       handlePasswordChange(password)
                       field.handleChange(password)
                     }}
@@ -135,6 +179,15 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
           }}
         </form.Field>
       </FieldGroup>
+
+      <div className="min-h-14">
+        {loginErrorMessageKey && (
+          <Alert variant="destructive">
+            <AlertCircleIcon aria-hidden />
+            <AlertDescription>{t(loginErrorMessageKey)}</AlertDescription>
+          </Alert>
+        )}
+      </div>
 
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
