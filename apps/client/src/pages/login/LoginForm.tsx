@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import type { TFunction } from "i18next"
 import { AlertCircleIcon } from "lucide-react"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
@@ -15,8 +15,12 @@ import { isLoginError, type LoginErrorCode } from "@/models/auth"
 import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 
 type LoginFormProps = {
+  loginErrorVisibleMs?: number
   onLoginSuccess: () => void
 }
+
+const defaultLoginErrorVisibleMs = 1000
+
 function createLoginSchema(t: TFunction) {
   return z.object({
     username: z
@@ -27,7 +31,10 @@ function createLoginSchema(t: TFunction) {
   })
 }
 
-export function LoginForm({ onLoginSuccess }: LoginFormProps) {
+export function LoginForm({
+  loginErrorVisibleMs = defaultLoginErrorVisibleMs,
+  onLoginSuccess,
+}: LoginFormProps) {
   const { login } = useAuth()
   const { t } = useTranslation()
   const [, setHerosState] = useLoginHeroesContext()
@@ -46,6 +53,20 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   function clearLoginError() {
     setLoginErrorCode(null)
   }
+
+  useEffect(() => {
+    if (!loginErrorCode) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      clearLoginError()
+    }, loginErrorVisibleMs)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [loginErrorCode, loginErrorVisibleMs])
 
   function handleUsernameFocus() {
     setHerosState((state) => ({ ...state, isUsernameFocused: true }))

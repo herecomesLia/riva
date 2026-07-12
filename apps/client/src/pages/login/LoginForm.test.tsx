@@ -1,6 +1,6 @@
-import { act, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { LoginError } from "@/models/auth"
@@ -64,6 +64,10 @@ function getPasswordInput() {
 describe("LoginForm", () => {
   beforeEach(() => {
     loginMock.mockReset()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it("shows required errors and does not submit an empty form", async () => {
@@ -205,6 +209,26 @@ describe("LoginForm", () => {
     await user.type(screen.getByLabelText(t("login.username")), "x")
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  it("automatically hides the login error popup after a short duration", async () => {
+    loginMock.mockRejectedValue(new LoginError("invalidCredentials"))
+    renderWithProviders(
+      <LoginHeroesProvider>
+        <LoginForm loginErrorVisibleMs={1} onLoginSuccess={vi.fn()} />
+      </LoginHeroesProvider>,
+      { router: false },
+    )
+
+    fireEvent.change(screen.getByLabelText(t("login.username")), { target: { value: "eleno" } })
+    fireEvent.change(getPasswordInput(), { target: { value: "secret" } })
+    fireEvent.click(getSubmitButton())
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(t("login.errorInvalidCredentials"))
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    })
   })
 
   it("clears the form-level error when the password changes", async () => {
