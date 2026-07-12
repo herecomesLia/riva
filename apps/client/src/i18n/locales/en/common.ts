@@ -8,6 +8,8 @@ export const common = {
     error: {
       title: "Page state error",
       description: "The page data could not be loaded.",
+      retry: "Reload",
+      retrying: "Reloading...",
     },
     loading: {
       title: "Loading",

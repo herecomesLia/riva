@@ -180,14 +180,14 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
         </form.Field>
       </FieldGroup>
 
-      <div className="min-h-14">
-        {loginErrorMessageKey && (
-          <Alert variant="destructive">
+      {loginErrorMessageKey && (
+        <div className="fixed top-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2">
+          <Alert className="shadow-lg" variant="destructive">
             <AlertCircleIcon aria-hidden />
             <AlertDescription>{t(loginErrorMessageKey)}</AlertDescription>
           </Alert>
-        )}
-      </div>
+        </div>
+      )}
 
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (

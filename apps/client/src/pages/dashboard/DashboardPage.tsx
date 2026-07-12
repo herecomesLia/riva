@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import {
   useRef,
+  useEffect,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
 import type {
@@ -150,8 +152,24 @@ export function DashboardPage() {
   const dashboardQuery = useQuery({
     queryFn: getDashboardData,
     queryKey: ["dashboard"],
+    retry: false,
   })
   const dashboardData = dashboardQuery.data
+  const [hasRecoverableError, setHasRecoverableError] = useState(false)
+  const isRecoveringFromError = dashboardQuery.isFetching && hasRecoverableError && !dashboardData
+  const isErrorState = dashboardQuery.isError || isRecoveringFromError
+
+  useEffect(() => {
+    if (dashboardQuery.isError) {
+      setHasRecoverableError(true)
+    }
+  }, [dashboardQuery.isError])
+
+  useEffect(() => {
+    if (dashboardQuery.isSuccess) {
+      setHasRecoverableError(false)
+    }
+  }, [dashboardQuery.isSuccess])
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -172,8 +190,13 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {dashboardQuery.isPending && <DashboardLoadingState />}
-      {dashboardQuery.isError && <DashboardErrorState />}
+      {isErrorState && (
+        <DashboardErrorState
+          isRetrying={dashboardQuery.isFetching}
+          onRetry={() => void dashboardQuery.refetch()}
+        />
+      )}
+      {!isErrorState && dashboardQuery.isPending && <DashboardLoadingState />}
       {dashboardQuery.isSuccess && dashboardData && (
         <DashboardOverview dashboardData={dashboardData} />
       )}
@@ -865,15 +888,23 @@ function WeaknessesCard({ weaknesses }: { weaknesses: DashboardResponse["weaknes
 
 function DashboardLoadingState() {
   return (
-    <div className="flex flex-col gap-6">
-      <section className="grid gap-4 lg:grid-cols-12">
+    <div className="flex flex-col gap-6" data-testid="dashboard-loading-state">
+      <section className="grid gap-4 lg:grid-cols-12" data-testid="dashboard-loading-top">
         <DashboardSkeletonCard className="lg:col-span-5" />
         <DashboardSkeletonCard className="lg:col-span-7" />
       </section>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Dashboard metrics loading"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        data-testid="dashboard-loading-metrics"
+      >
         {Array.from({ length: 4 }, (_, index) => (
           <DashboardSkeletonCard key={index} />
         ))}
+      </section>
+      <section className="grid gap-4 lg:grid-cols-12" data-testid="dashboard-loading-bottom">
+        <DashboardSkeletonCard className="lg:col-span-7" />
+        <DashboardSkeletonCard className="lg:col-span-5" />
       </section>
     </div>
   )
@@ -894,11 +925,17 @@ function DashboardSkeletonCard({ className }: { className?: string }) {
   )
 }
 
-function DashboardErrorState() {
+function DashboardErrorState({
+  isRetrying,
+  onRetry,
+}: {
+  isRetrying: boolean
+  onRetry: () => void
+}) {
   const { t } = useTranslation()
 
   return (
-    <Card>
+    <Card role="alert">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertCircleIcon />
@@ -906,6 +943,12 @@ function DashboardErrorState() {
         </CardTitle>
         <CardDescription>{t("common.pageState.error.description")}</CardDescription>
       </CardHeader>
+      <CardFooter>
+        <Button disabled={isRetrying} onClick={onRetry}>
+          {isRetrying && <Spinner data-icon="inline-start" />}
+          {isRetrying ? t("common.pageState.error.retrying") : t("common.pageState.error.retry")}
+        </Button>
+      </CardFooter>
     </Card>
   )
 }

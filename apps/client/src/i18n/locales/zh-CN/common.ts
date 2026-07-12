@@ -8,6 +8,8 @@ export const common = {
     error: {
       title: "页面状态异常",
       description: "页面数据加载失败。",
+      retry: "重新加载",
+      retrying: "重新加载中...",
     },
     loading: {
       title: "正在加载",
