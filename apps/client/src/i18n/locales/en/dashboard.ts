@@ -14,9 +14,11 @@ export const dashboard = {
   },
   currentRole: {
     eyebrow: "Current target",
-    title: "Frontend Engineer",
-    context: "ByteDance · Experienced hire · Technical role",
-    metadata: "Shanghai · 3–5 years experience",
+    experienceYears: "{{min}}–{{max}} years experience",
+    recruitmentTypes: {
+      campus: "Campus hire",
+      experienced: "Experienced hire",
+    },
     actions: {
       adjust: "Adjust role",
       analyze: "View match analysis",
@@ -111,32 +113,17 @@ export const dashboard = {
   },
   recommendation: {
     eyebrow: "Today's recommendation",
-    title: "Retry: A project challenge and solution",
-    description:
-      "Your recent answer explained the context clearly, but the trade-offs and measurable results can be more specific.",
-    type: "Project experience",
-    duration: "About 8 minutes",
+    duration: "About {{minutes}} min",
   },
   weaknesses: {
     eyebrow: "Improve first",
     title: "Turn weak areas into your next strengths",
     description: "Prioritized from recent practice feedback.",
-    items: {
-      projectExpression: {
-        title: "Project storytelling",
-        description: "Make the structure and key trade-offs clearer.",
-        count: "Practice 2 questions",
-      },
-      quantifiedResults: {
-        title: "Measurable results",
-        description: "Add verifiable business impact and personal contribution.",
-        count: "Practice 2 questions",
-      },
-      pressureResponse: {
-        title: "Pressure scenarios",
-        description: "Explain your actions, collaboration, and reflection more completely.",
-        count: "Practice 1 question",
-      },
+    categories: {
+      projectExpression: "Project storytelling",
+      quantifiedResults: "Measurable results",
+      pressureResponse: "Pressure scenarios",
     },
+    recommendedPracticeCount: "Practice {{count}} questions",
   },
 } as const

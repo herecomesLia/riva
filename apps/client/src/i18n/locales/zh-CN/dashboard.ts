@@ -14,9 +14,11 @@ export const dashboard = {
   },
   currentRole: {
     eyebrow: "当前目标",
-    title: "前端工程师",
-    context: "字节跳动 · 社招 · 技术岗位",
-    metadata: "上海 · 3–5 年经验",
+    experienceYears: "{{min}}–{{max}} 年经验",
+    recruitmentTypes: {
+      campus: "校招",
+      experienced: "社招",
+    },
     actions: {
       adjust: "调整岗位",
       analyze: "查看匹配分析",
@@ -109,31 +111,17 @@ export const dashboard = {
   },
   recommendation: {
     eyebrow: "今日训练建议",
-    title: "重练：项目难点与解决方案",
-    description: "最近回答已经说清背景，但解决过程的取舍和成果量化仍可更具体。",
-    type: "项目经历题",
-    duration: "预计 8 分钟",
+    duration: "预计 {{minutes}} 分钟",
   },
   weaknesses: {
     eyebrow: "优先补强",
     title: "把薄弱项变成下一次的亮点",
     description: "根据近期训练反馈整理，建议按优先级完成练习。",
-    items: {
-      projectExpression: {
-        title: "项目表达",
-        description: "回答结构与关键取舍可以更清晰。",
-        count: "建议练习 2 题",
-      },
-      quantifiedResults: {
-        title: "量化结果",
-        description: "补充可验证的业务影响与个人贡献。",
-        count: "建议练习 2 题",
-      },
-      pressureResponse: {
-        title: "压力场景应对",
-        description: "更完整地说明行动、协作与复盘。",
-        count: "建议练习 1 题",
-      },
+    categories: {
+      projectExpression: "项目表达",
+      quantifiedResults: "量化结果",
+      pressureResponse: "压力场景应对",
     },
+    recommendedPracticeCount: "建议练习 {{count}} 题",
   },
 } as const

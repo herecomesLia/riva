@@ -42,23 +42,61 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
-import {
-  calculatePercentageChange,
-  getDashboardData,
-  type DashboardMetric,
-  type DashboardMetricChangeDirection,
-  type DashboardMetricIcon,
-  type DashboardData,
-  type DashboardPerformancePoint,
-  type DashboardPerformanceType,
-} from "@/services/dashboard"
+import type { DashboardPerformanceRecord, DashboardResponse } from "@/models/dashboard"
+import { getDashboardData } from "@/services/dashboard"
 
-const metricIcons: Record<DashboardMetricIcon, LucideIcon> = {
-  mockInterview: MessagesSquareIcon,
-  practiceTime: Clock3Icon,
-  roleFit: TargetIcon,
-  targetedPractice: ClipboardCheckIcon,
+import { calculatePercentageChange, type DashboardMetricChangeDirection } from "./dashboard-utils"
+
+type DashboardMetricKey = keyof DashboardResponse["metrics"]
+
+type DashboardMetricDisplayFormat = "percentage" | "duration" | "score"
+
+const metricDefinitions: Record<
+  DashboardMetricKey,
+  {
+    comparisonKey: string
+    icon: LucideIcon
+    titleKey: string
+    valueFormat: DashboardMetricDisplayFormat
+    valueKey: string
+  }
+> = {
+  mockInterviewScore: {
+    comparisonKey: "dashboard.metrics.mockInterview.comparison",
+    icon: MessagesSquareIcon,
+    titleKey: "dashboard.metrics.mockInterview.title",
+    valueFormat: "score",
+    valueKey: "dashboard.metrics.values.score",
+  },
+  practiceTimeMinutes: {
+    comparisonKey: "dashboard.metrics.practiceTime.comparison",
+    icon: Clock3Icon,
+    titleKey: "dashboard.metrics.practiceTime.title",
+    valueFormat: "duration",
+    valueKey: "dashboard.metrics.values.duration",
+  },
+  roleFit: {
+    comparisonKey: "dashboard.metrics.roleFit.comparison",
+    icon: TargetIcon,
+    titleKey: "dashboard.metrics.roleFit.title",
+    valueFormat: "percentage",
+    valueKey: "dashboard.metrics.values.percentage",
+  },
+  targetedPracticeScore: {
+    comparisonKey: "dashboard.metrics.targetedPractice.comparison",
+    icon: ClipboardCheckIcon,
+    titleKey: "dashboard.metrics.targetedPractice.title",
+    valueFormat: "score",
+    valueKey: "dashboard.metrics.values.score",
+  },
 }
+
+const metricOrder: DashboardMetricKey[] = [
+  "roleFit",
+  "practiceTimeMinutes",
+  "targetedPracticeScore",
+  "mockInterviewScore",
+]
 
 const metricChangeStyles: Record<DashboardMetricChangeDirection, string> = {
   down: "bg-red-500/10 text-red-700 dark:bg-red-400/15 dark:text-red-300",
@@ -128,26 +166,42 @@ export function DashboardPage() {
   )
 }
 
-function DashboardOverview({ dashboardData }: { dashboardData: DashboardData }) {
+function DashboardOverview({ dashboardData }: { dashboardData: DashboardResponse }) {
   return (
     <div className="flex flex-col gap-6">
       <section className="grid gap-4 lg:grid-cols-12">
-        <CurrentRoleCard />
-        <RecommendationCard />
+        {dashboardData.currentRole && <CurrentRoleCard currentRole={dashboardData.currentRole} />}
+        {dashboardData.recommendation && (
+          <RecommendationCard recommendation={dashboardData.recommendation} />
+        )}
       </section>
 
       <DashboardMetrics metrics={dashboardData.metrics} />
 
       <section className="grid gap-4 lg:grid-cols-12">
         <PerformanceTrendCard performanceTrend={dashboardData.performanceTrend} />
-        <WeaknessesCard dashboardData={dashboardData} />
+        <WeaknessesCard weaknesses={dashboardData.weaknesses} />
       </section>
     </div>
   )
 }
 
-function CurrentRoleCard() {
+function CurrentRoleCard({
+  currentRole,
+}: {
+  currentRole: NonNullable<DashboardResponse["currentRole"]>
+}) {
   const { t } = useTranslation()
+  const context = [
+    currentRole.company,
+    currentRole.recruitmentType &&
+      t(`dashboard.currentRole.recruitmentTypes.${currentRole.recruitmentType}`),
+  ].filter(Boolean)
+  const metadata = [
+    currentRole.location,
+    currentRole.experienceYears &&
+      t("dashboard.currentRole.experienceYears", currentRole.experienceYears),
+  ].filter(Boolean)
 
   return (
     <Card className="lg:col-span-5">
@@ -158,7 +212,7 @@ function CurrentRoleCard() {
             {t("dashboard.currentRole.actions.adjust")}
           </Button>
         </CardAction>
-        <CardDescription>{t("dashboard.currentRole.context")}</CardDescription>
+        {context.length > 0 && <CardDescription>{context.join(" · ")}</CardDescription>}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
@@ -167,18 +221,20 @@ function CurrentRoleCard() {
           </div>
           <div className="min-w-0">
             <p className="truncate font-heading text-2xl font-medium tracking-tight">
-              {t("dashboard.currentRole.title")}
+              {currentRole.title}
             </p>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPinIcon className="size-3.5 shrink-0" />
-              {t("dashboard.currentRole.metadata")}
-            </p>
+            {metadata.length > 0 && (
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <MapPinIcon className="size-3.5 shrink-0" />
+                {metadata.join(" · ")}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-col items-start gap-2">
           <div className="flex flex-wrap gap-2">
-            <RoleStatusBadge complete type="profile" />
-            <RoleStatusBadge complete={false} type="jobDescription" />
+            <RoleStatusBadge complete={currentRole.profileCompleted} type="profile" />
+            <RoleStatusBadge complete={currentRole.jobDescriptionAdded} type="jobDescription" />
           </div>
           <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
             {t("dashboard.currentRole.actions.addJobDescription")}
@@ -209,7 +265,11 @@ function RoleStatusBadge({
   )
 }
 
-function RecommendationCard() {
+function RecommendationCard({
+  recommendation,
+}: {
+  recommendation: NonNullable<DashboardResponse["recommendation"]>
+}) {
   const { t } = useTranslation()
 
   return (
@@ -219,15 +279,17 @@ function RecommendationCard() {
           <SparklesIcon />
           {t("dashboard.recommendation.eyebrow")}
         </CardTitle>
-        <CardDescription>{t("dashboard.recommendation.description")}</CardDescription>
+        <CardDescription>{recommendation.description}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <p className="font-heading text-xl font-medium">{t("dashboard.recommendation.title")}</p>
+        <p className="font-heading text-xl font-medium">{recommendation.title}</p>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{t("dashboard.recommendation.type")}</Badge>
+          <Badge variant="outline">{recommendation.questionType}</Badge>
           <Badge variant="outline">
             <Clock3Icon />
-            {t("dashboard.recommendation.duration")}
+            {t("dashboard.recommendation.duration", {
+              minutes: recommendation.estimatedMinutes,
+            })}
           </Badge>
         </div>
       </CardContent>
@@ -244,43 +306,45 @@ function RecommendationCard() {
   )
 }
 
-function DashboardMetrics({ metrics }: { metrics: DashboardMetric[] }) {
+function DashboardMetrics({ metrics }: { metrics: DashboardResponse["metrics"] }) {
   const { i18n, t } = useTranslation()
   const formatMetricNumber = (value: number) =>
     new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(value)
-  const formatMetricValue = (metric: DashboardMetric, value: number) =>
-    t(metric.valueKey, { value: formatMetricNumber(value) })
+  const formatMetricValue = (valueKey: string, value: number) =>
+    t(valueKey, { value: formatMetricNumber(value) })
 
   return (
     <section
       aria-label={t("dashboard.metrics.eyebrow")}
       className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
     >
-      {metrics.map((metric) => {
-        const Icon = metricIcons[metric.icon]
+      {metricOrder.map((key) => {
+        const metric = metrics[key]
+        const definition = metricDefinitions[key]
+        const Icon = definition.icon
         const change = calculatePercentageChange(metric.currentValue, metric.previousValue)
         const ChangeIcon = change ? metricChangeIcons[change.direction] : null
 
         return (
-          <Card key={metric.titleKey}>
+          <Card key={key}>
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
-                <CardTitle className="text-sm font-medium">{t(metric.titleKey)}</CardTitle>
+                <CardTitle className="text-sm font-medium">{t(definition.titleKey)}</CardTitle>
                 <Icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-heading text-3xl font-semibold leading-none tracking-tight">
-                  {metric.valueFormat === "duration" ? (
+                  {metric.currentValue !== null && definition.valueFormat === "duration" ? (
                     <>
                       {formatMetricNumber(metric.currentValue)}
                       <span className="ml-1 text-sm font-normal text-muted-foreground">
                         {t("dashboard.metrics.values.durationUnit")}
                       </span>
                     </>
-                  ) : (
-                    formatMetricValue(metric, metric.currentValue)
+                  ) : metric.currentValue === null ? null : (
+                    formatMetricValue(definition.valueKey, metric.currentValue)
                   )}
                 </p>
                 {change && ChangeIcon && (
@@ -300,10 +364,10 @@ function DashboardMetrics({ metrics }: { metrics: DashboardMetric[] }) {
                 )}
               </div>
               <CardDescription className="text-xs leading-5">
-                {metric.previousValue === null
+                {metric.currentValue === null || metric.previousValue === null
                   ? t("dashboard.metrics.noComparison")
-                  : t(metric.comparisonKey, {
-                      value: formatMetricValue(metric, metric.previousValue),
+                  : t(definition.comparisonKey, {
+                      value: formatMetricValue(definition.valueKey, metric.previousValue),
                     })}
               </CardDescription>
             </CardContent>
@@ -328,7 +392,7 @@ const performanceTooltip = {
   width: 144,
 }
 
-type PerformanceChartPoint = DashboardPerformancePoint & {
+type PerformanceChartPoint = DashboardPerformanceRecord & {
   x: number
   y: number
 }
@@ -342,7 +406,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum)
 }
 
-function getPerformanceChartPoints(points: DashboardPerformancePoint[]): PerformanceChartPoint[] {
+function getPerformanceChartPoints(points: DashboardPerformanceRecord[]): PerformanceChartPoint[] {
   const { height, padding, width } = performanceChart
   const chartHeight = height - padding.top - padding.bottom
   const chartWidth = width - padding.left - padding.right
@@ -373,12 +437,12 @@ function getAreaPath(points: PerformanceChartPoint[]) {
 function PerformanceTrendCard({
   performanceTrend,
 }: {
-  performanceTrend: DashboardData["performanceTrend"]
+  performanceTrend: DashboardResponse["performanceTrend"]
 }) {
   const { i18n, t } = useTranslation()
   const chartRef = useRef<SVGSVGElement>(null)
   const [performanceType, setPerformanceType] =
-    useState<DashboardPerformanceType>("targetedPractice")
+    useState<keyof DashboardResponse["performanceTrend"]>("targetedPractice")
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<PerformanceTooltipPosition | null>(null)
   const points = performanceTrend[performanceType]
@@ -386,14 +450,14 @@ function PerformanceTrendCard({
   const linePath = getLinePath(chartPoints)
   const areaPath = getAreaPath(chartPoints)
   const activePoint = activeIndex === null ? null : chartPoints[activeIndex]
-  const practicedDays = new Set(points.map((point) => point.date)).size
+  const practicedDays = new Set(points.map((point) => point.occurredAt.slice(0, 10))).size
   const highestScore = Math.max(...points.map((point) => point.score))
   const averageScore = points.reduce((total, point) => total + point.score, 0) / points.length
   const formatScore = (score: number) =>
     new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(score)
-  const formatDate = (date: string) =>
+  const formatDate = (occurredAt: string) =>
     new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short" }).format(
-      new Date(`${date}T12:00:00`),
+      new Date(occurredAt),
     )
   const typeLabel = t(`dashboard.performanceTrend.types.${performanceType}`)
 
@@ -452,7 +516,7 @@ function PerformanceTrendCard({
     showTooltip(nextIndex)
   }
 
-  function selectPerformanceType(type: DashboardPerformanceType) {
+  function selectPerformanceType(type: keyof DashboardResponse["performanceTrend"]) {
     setPerformanceType(type)
     setActiveIndex(null)
     setTooltipPosition(null)
@@ -541,7 +605,7 @@ function PerformanceTrendCard({
                   type: typeLabel,
                 })}
               </p>
-              <p className="text-xs text-muted-foreground">{formatDate(activePoint.date)}</p>
+              <p className="text-xs text-muted-foreground">{formatDate(activePoint.occurredAt)}</p>
               <p className="mt-1 text-sm font-semibold">
                 {t("dashboard.performanceTrend.score", { score: formatScore(activePoint.score) })}
               </p>
@@ -639,12 +703,12 @@ function PerformanceTrendCard({
               visiblePerformanceDateIndexes.has(index) ? (
                 <text
                   className="fill-muted-foreground text-[10px]"
-                  key={`${point.date}-${index}`}
+                  key={point.id}
                   textAnchor="middle"
                   x={point.x}
                   y={performanceChart.height - 7}
                 >
-                  {formatDate(point.date)}
+                  {formatDate(point.occurredAt)}
                 </text>
               ) : null,
             )}
@@ -655,7 +719,13 @@ function PerformanceTrendCard({
   )
 }
 
-function WeaknessesCard({ dashboardData }: { dashboardData: DashboardData }) {
+const weaknessTitleKeys: Record<string, string> = {
+  pressureResponse: "dashboard.weaknesses.categories.pressureResponse",
+  projectExpression: "dashboard.weaknesses.categories.projectExpression",
+  quantifiedResults: "dashboard.weaknesses.categories.quantifiedResults",
+}
+
+function WeaknessesCard({ weaknesses }: { weaknesses: DashboardResponse["weaknesses"] }) {
   const { t } = useTranslation()
 
   return (
@@ -666,18 +736,20 @@ function WeaknessesCard({ dashboardData }: { dashboardData: DashboardData }) {
       </CardHeader>
       <CardContent>
         <ul className="flex flex-col gap-3">
-          {dashboardData.weaknesses.map((weakness, index) => (
-            <li className="flex flex-col gap-3" key={weakness.titleKey}>
+          {weaknesses.map((weakness, index) => (
+            <li className="flex flex-col gap-3" key={weakness.id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <p className="font-medium">{t(weakness.titleKey)}</p>
-                  <p className="text-sm text-muted-foreground">{t(weakness.descriptionKey)}</p>
+                  <p className="font-medium">{t(weaknessTitleKeys[weakness.category])}</p>
+                  <p className="text-sm text-muted-foreground">{weakness.description}</p>
                 </div>
                 <Badge className="shrink-0" variant="outline">
-                  {t(weakness.practiceCountKey)}
+                  {t("dashboard.weaknesses.recommendedPracticeCount", {
+                    count: weakness.recommendedPracticeCount,
+                  })}
                 </Badge>
               </div>
-              {index < dashboardData.weaknesses.length - 1 && <Separator />}
+              {index < weaknesses.length - 1 && <Separator />}
             </li>
           ))}
         </ul>

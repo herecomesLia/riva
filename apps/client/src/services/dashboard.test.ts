@@ -1,22 +1,29 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { calculatePercentageChange } from "@/services/dashboard"
+import { getDashboardData } from "@/services/dashboard"
 
-describe("calculatePercentageChange", () => {
-  it("calculates an increase from the previous value", () => {
-    const change = calculatePercentageChange(76, 65.8)
+vi.mock("@/app/env", () => ({
+  env: { mock: true },
+}))
 
-    expect(change?.direction).toBe("up")
-    expect(change?.percentage).toBeCloseTo(15.5, 1)
+describe("getDashboardData", () => {
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
-  it("calculates a decrease and a steady result", () => {
-    expect(calculatePercentageChange(45, 49)).toMatchObject({ direction: "down" })
-    expect(calculatePercentageChange(7.2, 7.2)).toEqual({ direction: "unchanged", percentage: 0 })
-  })
+  it("returns an independent copy of the mock response", async () => {
+    vi.useFakeTimers()
 
-  it("does not calculate a comparison without a usable previous value", () => {
-    expect(calculatePercentageChange(7.4, null)).toBeNull()
-    expect(calculatePercentageChange(7.4, 0)).toBeNull()
+    const firstResponsePromise = getDashboardData()
+    await vi.advanceTimersByTimeAsync(1000)
+    const firstResponse = await firstResponsePromise
+
+    firstResponse.currentRole!.title = "Changed title"
+
+    const secondResponsePromise = getDashboardData()
+    await vi.advanceTimersByTimeAsync(1000)
+    const secondResponse = await secondResponsePromise
+
+    expect(secondResponse.currentRole!.title).toBe("Frontend Engineer")
   })
 })
