@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { DashboardPage } from "@/pages/dashboard"
 import { HistoryPage } from "@/pages/history"
 import { InterviewPage } from "@/pages/interview"
-import { LoginPage, RegisterPage } from "@/pages/login"
+import { LoginPage } from "@/pages/login"
 import { NotFoundPage } from "@/pages/not-found"
 import { PracticePage } from "@/pages/practice"
 import { ProfilePage } from "@/pages/profile"
@@ -41,7 +41,7 @@ function RegisterRoute() {
     return <Navigate replace to="/dashboard" />
   }
 
-  return <RegisterPage />
+  return <LoginPage mode="register" />
 }
 
 function AppRoute() {

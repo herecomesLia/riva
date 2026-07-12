@@ -18,6 +18,9 @@ vi.mock("@/pages/login/LoginForm", () => ({
     </button>
   ),
 }))
+vi.mock("@/pages/login/RegisterForm", () => ({
+  RegisterForm: () => <form aria-label="Register form" />,
+}))
 vi.mock("@/pages/login/LoginHeroes", () => ({
   LoginHeroes: () => <div data-testid="login-heroes" />,
 }))
@@ -43,15 +46,29 @@ describe("LoginPage", () => {
       description: "does not mount LoginHeroes below the desktop breakpoint",
     },
     { matchesDesktop: true, description: "mounts LoginHeroes at the desktop breakpoint" },
-  ])("$description", ({ matchesDesktop }) => {
+  ])("$description", async ({ matchesDesktop }) => {
     useMediaMock.mockReturnValue(matchesDesktop)
 
-    renderWithProviders(<LoginPage />, { router: false })
+    renderWithProviders(<LoginPage />, { router: { initialEntries: ["/login"] } })
 
     if (matchesDesktop) {
-      expect(screen.getByTestId("login-heroes")).toBeInTheDocument()
+      expect(await screen.findByTestId("login-heroes")).toBeInTheDocument()
     } else {
+      expect(await screen.findByRole("heading", { name: "欢迎回来！" })).toBeInTheDocument()
       expect(screen.queryByTestId("login-heroes")).not.toBeInTheDocument()
     }
+  })
+
+  it("renders the register form inside the shared login page layout", async () => {
+    useMediaMock.mockReturnValue(false)
+
+    renderWithProviders(<LoginPage mode="register" />, {
+      router: { initialEntries: ["/register"] },
+    })
+
+    expect(await screen.findByRole("heading", { name: "创建 Riva 账号" })).toBeInTheDocument()
+    expect(screen.getByRole("form", { name: "Register form" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Complete login" })).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "登录" })).toHaveAttribute("href", "/login")
   })
 })
