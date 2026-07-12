@@ -56,6 +56,7 @@ export const dashboard = {
   },
   metrics: {
     eyebrow: "Preparation progress",
+    noData: "No data",
     noComparison: "No comparable data",
     roleFit: {
       title: "Role fit",
@@ -95,6 +96,7 @@ export const dashboard = {
     score: "{{score}} / 10",
     session: "{{type}} · Session {{count}}",
     chartLabel: "10 most recent {{type}} scores",
+    empty: "No {{type}} records yet.",
   },
   readiness: {
     eyebrow: "Role readiness",
@@ -114,6 +116,10 @@ export const dashboard = {
   recommendation: {
     eyebrow: "Today's recommendation",
     duration: "About {{minutes}} min",
+    empty: {
+      title: "No recommendation yet",
+      description: "Complete more training to receive your next recommendation.",
+    },
   },
   weaknesses: {
     eyebrow: "Improve first",
@@ -124,6 +130,7 @@ export const dashboard = {
       quantifiedResults: "Measurable results",
       pressureResponse: "Pressure scenarios",
     },
+    empty: "No priority weak areas found yet.",
     recommendedPracticeCount: "Practice {{count}} questions",
   },
 } as const

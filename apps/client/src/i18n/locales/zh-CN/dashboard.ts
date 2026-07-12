@@ -55,6 +55,7 @@ export const dashboard = {
   },
   metrics: {
     eyebrow: "准备进度",
+    noData: "暂无数据",
     noComparison: "暂无可比较数据",
     roleFit: {
       title: "岗位匹配度",
@@ -94,6 +95,7 @@ export const dashboard = {
     score: "{{score}} / 10",
     session: "{{type}} 第{{count}}次",
     chartLabel: "最近 10 次{{type}}评分表现",
+    empty: "暂无{{type}}记录。",
   },
   readiness: {
     eyebrow: "岗位准备度",
@@ -112,6 +114,10 @@ export const dashboard = {
   recommendation: {
     eyebrow: "今日训练建议",
     duration: "预计 {{minutes}} 分钟",
+    empty: {
+      title: "暂无训练建议",
+      description: "完成更多训练后，我们会为你生成下一步建议。",
+    },
   },
   weaknesses: {
     eyebrow: "优先补强",
@@ -122,6 +128,7 @@ export const dashboard = {
       quantifiedResults: "量化结果",
       pressureResponse: "压力场景应对",
     },
+    empty: "暂未发现需要优先补强的薄弱项。",
     recommendedPracticeCount: "建议练习 {{count}} 题",
   },
 } as const

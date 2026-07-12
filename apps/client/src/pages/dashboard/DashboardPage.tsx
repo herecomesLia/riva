@@ -170,10 +170,8 @@ function DashboardOverview({ dashboardData }: { dashboardData: DashboardResponse
   return (
     <div className="flex flex-col gap-6">
       <section className="grid gap-4 lg:grid-cols-12">
-        {dashboardData.currentRole && <CurrentRoleCard currentRole={dashboardData.currentRole} />}
-        {dashboardData.recommendation && (
-          <RecommendationCard recommendation={dashboardData.recommendation} />
-        )}
+        <CurrentRoleCard currentRole={dashboardData.currentRole} />
+        <RecommendationCard recommendation={dashboardData.recommendation} />
       </section>
 
       <DashboardMetrics metrics={dashboardData.metrics} />
@@ -186,12 +184,38 @@ function DashboardOverview({ dashboardData }: { dashboardData: DashboardResponse
   )
 }
 
-function CurrentRoleCard({
-  currentRole,
-}: {
-  currentRole: NonNullable<DashboardResponse["currentRole"]>
-}) {
+function CurrentRoleCard({ currentRole }: { currentRole: DashboardResponse["currentRole"] }) {
   const { t } = useTranslation()
+
+  if (!currentRole) {
+    return (
+      <Card className="lg:col-span-5">
+        <CardHeader>
+          <CardTitle>{t("dashboard.currentRole.eyebrow")}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <BriefcaseBusinessIcon className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-heading text-2xl font-medium tracking-tight">
+                {t("dashboard.currentRole.empty.title")}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("dashboard.currentRole.empty.description")}
+              </p>
+            </div>
+          </div>
+          <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
+            {t("dashboard.currentRole.empty.action")}
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
   const context = [
     currentRole.company,
     currentRole.recruitmentType &&
@@ -268,9 +292,33 @@ function RoleStatusBadge({
 function RecommendationCard({
   recommendation,
 }: {
-  recommendation: NonNullable<DashboardResponse["recommendation"]>
+  recommendation: DashboardResponse["recommendation"]
 }) {
   const { t } = useTranslation()
+
+  if (!recommendation) {
+    return (
+      <Card className="lg:col-span-7">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <SparklesIcon />
+            {t("dashboard.recommendation.eyebrow")}
+          </CardTitle>
+          <CardDescription>{t("dashboard.recommendation.empty.description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="font-heading text-xl font-medium">
+            {t("dashboard.recommendation.empty.title")}
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Button nativeButton={false} render={<Link to="/history" />} variant="outline">
+            {t("dashboard.actions.viewHistory")}
+          </Button>
+        </CardFooter>
+      </Card>
+    )
+  }
 
   return (
     <Card className="lg:col-span-7">
@@ -324,6 +372,10 @@ function DashboardMetrics({ metrics }: { metrics: DashboardResponse["metrics"] }
         const Icon = definition.icon
         const change = calculatePercentageChange(metric.currentValue, metric.previousValue)
         const ChangeIcon = change ? metricChangeIcons[change.direction] : null
+        const hasComparison =
+          metric.currentValue !== null &&
+          metric.previousValue !== null &&
+          metric.previousValue !== 0
 
         return (
           <Card key={key}>
@@ -336,14 +388,16 @@ function DashboardMetrics({ metrics }: { metrics: DashboardResponse["metrics"] }
             <CardContent className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-heading text-3xl font-semibold leading-none tracking-tight">
-                  {metric.currentValue !== null && definition.valueFormat === "duration" ? (
+                  {metric.currentValue === null ? (
+                    "--"
+                  ) : definition.valueFormat === "duration" ? (
                     <>
                       {formatMetricNumber(metric.currentValue)}
                       <span className="ml-1 text-sm font-normal text-muted-foreground">
                         {t("dashboard.metrics.values.durationUnit")}
                       </span>
                     </>
-                  ) : metric.currentValue === null ? null : (
+                  ) : (
                     formatMetricValue(definition.valueKey, metric.currentValue)
                   )}
                 </p>
@@ -364,11 +418,13 @@ function DashboardMetrics({ metrics }: { metrics: DashboardResponse["metrics"] }
                 )}
               </div>
               <CardDescription className="text-xs leading-5">
-                {metric.currentValue === null || metric.previousValue === null
-                  ? t("dashboard.metrics.noComparison")
-                  : t(definition.comparisonKey, {
-                      value: formatMetricValue(definition.valueKey, metric.previousValue),
-                    })}
+                {metric.currentValue === null
+                  ? t("dashboard.metrics.noData")
+                  : !hasComparison
+                    ? t("dashboard.metrics.noComparison")
+                    : t(definition.comparisonKey, {
+                        value: formatMetricValue(definition.valueKey, metric.previousValue!),
+                      })}
               </CardDescription>
             </CardContent>
           </Card>
@@ -449,10 +505,15 @@ function PerformanceTrendCard({
   const chartPoints = getPerformanceChartPoints(points)
   const linePath = getLinePath(chartPoints)
   const areaPath = getAreaPath(chartPoints)
-  const activePoint = activeIndex === null ? null : chartPoints[activeIndex]
-  const practicedDays = new Set(points.map((point) => point.occurredAt.slice(0, 10))).size
-  const highestScore = Math.max(...points.map((point) => point.score))
-  const averageScore = points.reduce((total, point) => total + point.score, 0) / points.length
+  const hasPoints = points.length > 0
+  const activePoint = activeIndex === null ? null : (chartPoints[activeIndex] ?? null)
+  const practicedDays = hasPoints
+    ? new Set(points.map((point) => point.occurredAt.slice(0, 10))).size
+    : null
+  const highestScore = hasPoints ? Math.max(...points.map((point) => point.score)) : null
+  const averageScore = hasPoints
+    ? points.reduce((total, point) => total + point.score, 0) / points.length
+    : null
   const formatScore = (score: number) =>
     new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(score)
   const formatDate = (occurredAt: string) =>
@@ -464,7 +525,7 @@ function PerformanceTrendCard({
   function showTooltip(index: number) {
     const chart = chartRef.current
 
-    if (!chart) {
+    if (!chart || chartPoints.length === 0) {
       return
     }
 
@@ -491,7 +552,7 @@ function PerformanceTrendCard({
   function setActivePointFromPointer(event: ReactPointerEvent<SVGSVGElement>) {
     const chart = chartRef.current
 
-    if (!chart) {
+    if (!chart || chartPoints.length === 0) {
       return
     }
 
@@ -503,7 +564,7 @@ function PerformanceTrendCard({
   }
 
   function handleChartKeyDown(event: ReactKeyboardEvent<SVGSVGElement>) {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+    if (chartPoints.length === 0 || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) {
       return
     }
 
@@ -559,161 +620,179 @@ function PerformanceTrendCard({
           {t("dashboard.performanceTrend.description", { type: typeLabel })}
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)] lg:items-end">
-        <dl className="grid grid-cols-2 gap-4 lg:grid-cols-1">
-          <div className="flex flex-col gap-1">
-            <dt className="text-xs font-medium text-muted-foreground">
-              {t("dashboard.performanceTrend.trainingDays")}
-            </dt>
-            <dd className="font-heading text-3xl font-semibold tracking-tight">
-              {practicedDays}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">
-                {t("dashboard.performanceTrend.daysUnit")}
-              </span>
-            </dd>
-          </div>
-          <div className="flex flex-col gap-1">
-            <dt className="text-xs font-medium text-muted-foreground">
-              {t("dashboard.performanceTrend.highestScore")}
-            </dt>
-            <dd className="font-heading text-2xl font-semibold tracking-tight">
-              {t("dashboard.performanceTrend.score", { score: formatScore(highestScore) })}
-            </dd>
-          </div>
-          <div className="flex flex-col gap-1">
-            <dt className="text-xs font-medium text-muted-foreground">
-              {t("dashboard.performanceTrend.averageScore")}
-            </dt>
-            <dd className="font-heading text-2xl font-semibold tracking-tight">
-              {t("dashboard.performanceTrend.score", { score: formatScore(averageScore) })}
-            </dd>
-          </div>
-        </dl>
+      <CardContent
+        className={
+          hasPoints
+            ? "grid gap-6 lg:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)] lg:items-end"
+            : "flex min-h-46 items-center"
+        }
+      >
+        {hasPoints ? (
+          <>
+            <dl className="grid grid-cols-2 gap-4 lg:grid-cols-1">
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs font-medium text-muted-foreground">
+                  {t("dashboard.performanceTrend.trainingDays")}
+                </dt>
+                <dd className="font-heading text-3xl font-semibold tracking-tight">
+                  {practicedDays}
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">
+                    {t("dashboard.performanceTrend.daysUnit")}
+                  </span>
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs font-medium text-muted-foreground">
+                  {t("dashboard.performanceTrend.highestScore")}
+                </dt>
+                <dd className="font-heading text-2xl font-semibold tracking-tight">
+                  {t("dashboard.performanceTrend.score", { score: formatScore(highestScore!) })}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="text-xs font-medium text-muted-foreground">
+                  {t("dashboard.performanceTrend.averageScore")}
+                </dt>
+                <dd className="font-heading text-2xl font-semibold tracking-tight">
+                  {t("dashboard.performanceTrend.score", { score: formatScore(averageScore!) })}
+                </dd>
+              </div>
+            </dl>
 
-        <div className="relative min-w-0" onMouseLeave={hideTooltip}>
-          {activePoint && tooltipPosition && (
-            <div
-              className="pointer-events-none absolute z-10 flex min-h-20 w-36 flex-col rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-lg"
-              style={{
-                left: tooltipPosition.left,
-                top: tooltipPosition.top,
-              }}
-            >
-              <p className="text-xs font-medium text-foreground">
-                {t("dashboard.performanceTrend.session", {
-                  count: (activeIndex ?? 0) + 1,
-                  type: typeLabel,
-                })}
-              </p>
-              <p className="text-xs text-muted-foreground">{formatDate(activePoint.occurredAt)}</p>
-              <p className="mt-1 text-sm font-semibold">
-                {t("dashboard.performanceTrend.score", { score: formatScore(activePoint.score) })}
-              </p>
-            </div>
-          )}
-          <svg
-            aria-label={t("dashboard.performanceTrend.chartLabel", { type: typeLabel })}
-            className="h-46 w-full overflow-visible"
-            onBlur={hideTooltip}
-            onFocus={() => showTooltip(chartPoints.length - 1)}
-            onKeyDown={handleChartKeyDown}
-            onPointerMove={setActivePointFromPointer}
-            ref={chartRef}
-            role="img"
-            tabIndex={0}
-            viewBox={`0 0 ${performanceChart.width} ${performanceChart.height}`}
-          >
-            <defs>
-              <linearGradient id="performance-trend-area" x1="0" x2="0" y1="0" y2="1">
-                <stop
-                  className="text-primary"
-                  offset="0%"
-                  stopColor="currentColor"
-                  stopOpacity="0.22"
-                />
-                <stop
-                  className="text-primary"
-                  offset="100%"
-                  stopColor="currentColor"
-                  stopOpacity="0"
-                />
-              </linearGradient>
-            </defs>
-            {[0, 5, 10].map((score) => {
-              const y =
-                performanceChart.padding.top +
-                (performanceChart.height -
-                  performanceChart.padding.top -
-                  performanceChart.padding.bottom) *
-                  (1 - score / 10)
-
-              return (
-                <g key={score}>
-                  <line
-                    stroke="currentColor"
-                    strokeDasharray="4 4"
-                    strokeWidth="1"
-                    x1={performanceChart.padding.left}
-                    x2={performanceChart.width - performanceChart.padding.right}
-                    y1={y}
-                    y2={y}
-                    className="text-border"
-                  />
-                  <text
-                    className="fill-muted-foreground text-[10px]"
-                    textAnchor="end"
-                    x={performanceChart.padding.left - 6}
-                    y={y + 3}
-                  >
-                    {score}
-                  </text>
-                </g>
-              )
-            })}
-            <path d={areaPath} fill="url(#performance-trend-area)" />
-            <path
-              className="fill-none stroke-primary"
-              d={linePath}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2.5"
-            />
-            {activePoint && (
-              <>
-                <line
-                  className="text-primary/50"
-                  stroke="currentColor"
-                  strokeDasharray="3 3"
-                  strokeWidth="1"
-                  x1={activePoint.x}
-                  x2={activePoint.x}
-                  y1={performanceChart.padding.top}
-                  y2={performanceChart.height - performanceChart.padding.bottom}
-                />
-                <circle
-                  className="fill-card stroke-primary"
-                  cx={activePoint.x}
-                  cy={activePoint.y}
-                  r="4"
-                  strokeWidth="2"
-                />
-              </>
-            )}
-            {chartPoints.map((point, index) =>
-              visiblePerformanceDateIndexes.has(index) ? (
-                <text
-                  className="fill-muted-foreground text-[10px]"
-                  key={point.id}
-                  textAnchor="middle"
-                  x={point.x}
-                  y={performanceChart.height - 7}
+            <div className="relative min-w-0" onMouseLeave={hideTooltip}>
+              {activePoint && tooltipPosition && (
+                <div
+                  className="pointer-events-none absolute z-10 flex min-h-20 w-36 flex-col rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-lg"
+                  style={{
+                    left: tooltipPosition.left,
+                    top: tooltipPosition.top,
+                  }}
                 >
-                  {formatDate(point.occurredAt)}
-                </text>
-              ) : null,
-            )}
-          </svg>
-        </div>
+                  <p className="text-xs font-medium text-foreground">
+                    {t("dashboard.performanceTrend.session", {
+                      count: (activeIndex ?? 0) + 1,
+                      type: typeLabel,
+                    })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDate(activePoint.occurredAt)}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {t("dashboard.performanceTrend.score", {
+                      score: formatScore(activePoint.score),
+                    })}
+                  </p>
+                </div>
+              )}
+              <svg
+                aria-label={t("dashboard.performanceTrend.chartLabel", { type: typeLabel })}
+                className="h-46 w-full overflow-visible"
+                onBlur={hideTooltip}
+                onFocus={() => showTooltip(chartPoints.length - 1)}
+                onKeyDown={handleChartKeyDown}
+                onPointerMove={setActivePointFromPointer}
+                ref={chartRef}
+                role="img"
+                tabIndex={0}
+                viewBox={`0 0 ${performanceChart.width} ${performanceChart.height}`}
+              >
+                <defs>
+                  <linearGradient id="performance-trend-area" x1="0" x2="0" y1="0" y2="1">
+                    <stop
+                      className="text-primary"
+                      offset="0%"
+                      stopColor="currentColor"
+                      stopOpacity="0.22"
+                    />
+                    <stop
+                      className="text-primary"
+                      offset="100%"
+                      stopColor="currentColor"
+                      stopOpacity="0"
+                    />
+                  </linearGradient>
+                </defs>
+                {[0, 5, 10].map((score) => {
+                  const y =
+                    performanceChart.padding.top +
+                    (performanceChart.height -
+                      performanceChart.padding.top -
+                      performanceChart.padding.bottom) *
+                      (1 - score / 10)
+
+                  return (
+                    <g key={score}>
+                      <line
+                        stroke="currentColor"
+                        strokeDasharray="4 4"
+                        strokeWidth="1"
+                        x1={performanceChart.padding.left}
+                        x2={performanceChart.width - performanceChart.padding.right}
+                        y1={y}
+                        y2={y}
+                        className="text-border"
+                      />
+                      <text
+                        className="fill-muted-foreground text-[10px]"
+                        textAnchor="end"
+                        x={performanceChart.padding.left - 6}
+                        y={y + 3}
+                      >
+                        {score}
+                      </text>
+                    </g>
+                  )
+                })}
+                <path d={areaPath} fill="url(#performance-trend-area)" />
+                <path
+                  className="fill-none stroke-primary"
+                  d={linePath}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2.5"
+                />
+                {activePoint && (
+                  <>
+                    <line
+                      className="text-primary/50"
+                      stroke="currentColor"
+                      strokeDasharray="3 3"
+                      strokeWidth="1"
+                      x1={activePoint.x}
+                      x2={activePoint.x}
+                      y1={performanceChart.padding.top}
+                      y2={performanceChart.height - performanceChart.padding.bottom}
+                    />
+                    <circle
+                      className="fill-card stroke-primary"
+                      cx={activePoint.x}
+                      cy={activePoint.y}
+                      r="4"
+                      strokeWidth="2"
+                    />
+                  </>
+                )}
+                {chartPoints.map((point, index) =>
+                  visiblePerformanceDateIndexes.has(index) ? (
+                    <text
+                      className="fill-muted-foreground text-[10px]"
+                      key={point.id}
+                      textAnchor="middle"
+                      x={point.x}
+                      y={performanceChart.height - 7}
+                    >
+                      {formatDate(point.occurredAt)}
+                    </text>
+                  ) : null,
+                )}
+              </svg>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.performanceTrend.empty", { type: typeLabel })}
+          </p>
+        )}
       </CardContent>
     </Card>
   )
@@ -735,24 +814,28 @@ function WeaknessesCard({ weaknesses }: { weaknesses: DashboardResponse["weaknes
         <CardDescription>{t("dashboard.weaknesses.description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ul className="flex flex-col gap-3">
-          {weaknesses.map((weakness, index) => (
-            <li className="flex flex-col gap-3" key={weakness.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <p className="font-medium">{t(weaknessTitleKeys[weakness.category])}</p>
-                  <p className="text-sm text-muted-foreground">{weakness.description}</p>
+        {weaknesses.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("dashboard.weaknesses.empty")}</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {weaknesses.map((weakness, index) => (
+              <li className="flex flex-col gap-3" key={weakness.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <p className="font-medium">{t(weaknessTitleKeys[weakness.category])}</p>
+                    <p className="text-sm text-muted-foreground">{weakness.description}</p>
+                  </div>
+                  <Badge className="shrink-0" variant="outline">
+                    {t("dashboard.weaknesses.recommendedPracticeCount", {
+                      count: weakness.recommendedPracticeCount,
+                    })}
+                  </Badge>
                 </div>
-                <Badge className="shrink-0" variant="outline">
-                  {t("dashboard.weaknesses.recommendedPracticeCount", {
-                    count: weakness.recommendedPracticeCount,
-                  })}
-                </Badge>
-              </div>
-              {index < weaknesses.length - 1 && <Separator />}
-            </li>
-          ))}
-        </ul>
+                {index < weaknesses.length - 1 && <Separator />}
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
       <CardFooter>
         <Button nativeButton={false} render={<Link to="/practice" />} size="sm" variant="link">

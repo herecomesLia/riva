@@ -78,6 +78,7 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText(i18n.t("common.pageState.error.title"))).toBeInTheDocument()
     expect(screen.queryByText(i18n.t("dashboard.metrics.roleFit.title"))).not.toBeInTheDocument()
+    expect(screen.queryByText(dashboardData.currentRole!.title)).not.toBeInTheDocument()
   })
 
   it("renders dashboard content after data loads successfully", async () => {
@@ -91,6 +92,49 @@ describe("DashboardPage", () => {
     expect(screen.getByText(dashboardData.currentRole!.title)).toBeInTheDocument()
     expect(screen.getByText(dashboardData.recommendation!.title)).toBeInTheDocument()
     expect(screen.getByText(dashboardData.weaknesses[0].description)).toBeInTheDocument()
+    expect(
+      screen.getByLabelText(
+        i18n.t("dashboard.performanceTrend.chartLabel", {
+          type: i18n.t("dashboard.performanceTrend.types.targetedPractice"),
+        }),
+      ),
+    ).toBeInTheDocument()
     expect(screen.queryByText(i18n.t("common.pageState.error.title"))).not.toBeInTheDocument()
+  })
+
+  it("renders safe empty states for missing dashboard data", async () => {
+    const emptyDashboardData = structuredClone(dashboardData)
+
+    emptyDashboardData.currentRole = null
+    emptyDashboardData.recommendation = null
+    emptyDashboardData.metrics.roleFit = { currentValue: null, previousValue: null }
+    emptyDashboardData.metrics.practiceTimeMinutes = { currentValue: 45, previousValue: 0 }
+    emptyDashboardData.performanceTrend.targetedPractice = []
+    emptyDashboardData.performanceTrend.mockInterview = []
+    emptyDashboardData.weaknesses = []
+    vi.mocked(getDashboardData).mockResolvedValue(emptyDashboardData)
+
+    renderWithProviders(<DashboardPage />, { router: { initialEntries: ["/dashboard"] } })
+
+    expect(await screen.findByText(i18n.t("dashboard.currentRole.empty.title"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.recommendation.empty.title"))).toBeInTheDocument()
+    expect(screen.getByText("--")).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.noData"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.noComparison"))).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        i18n.t("dashboard.performanceTrend.empty", {
+          type: i18n.t("dashboard.performanceTrend.types.targetedPractice"),
+        }),
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByLabelText(
+        i18n.t("dashboard.performanceTrend.chartLabel", {
+          type: i18n.t("dashboard.performanceTrend.types.targetedPractice"),
+        }),
+      ),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.weaknesses.empty"))).toBeInTheDocument()
   })
 })
