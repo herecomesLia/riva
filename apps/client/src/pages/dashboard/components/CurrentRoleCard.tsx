@@ -40,17 +40,23 @@ type CurrentRoleCardProps = {
 
 export function CurrentRoleCard({ state }: CurrentRoleCardProps) {
   const { t } = useTranslation()
+  const isLoading = state.status === "loading"
   const currentRole = state.status === "ready" ? state.data : null
 
   return (
     <Card className="lg:col-span-5">
       <CardHeader>
         <CardTitle>{t("dashboard.currentRole.eyebrow")}</CardTitle>
-        {state.status === "loading" && <Skeleton className="h-8 w-20" />}
-        {currentRole && <CurrentRoleHeader currentRole={currentRole} />}
+
+        {isLoading ? (
+          <CurrentRoleLoadingHeader />
+        ) : currentRole ? (
+          <CurrentRoleHeader currentRole={currentRole} />
+        ) : null}
       </CardHeader>
+
       <CardContent className="flex flex-col gap-4">
-        {state.status === "loading" ? (
+        {isLoading ? (
           <CurrentRoleLoadingContent />
         ) : currentRole ? (
           <CurrentRoleDataContent currentRole={currentRole} />
@@ -59,6 +65,17 @@ export function CurrentRoleCard({ state }: CurrentRoleCardProps) {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function CurrentRoleLoadingHeader() {
+  return (
+    <>
+      <CardAction>
+        <Skeleton className="h-8 w-20" />
+      </CardAction>
+      <Skeleton className="h-4 w-4/5" data-slot="card-description" />
+    </>
   )
 }
 

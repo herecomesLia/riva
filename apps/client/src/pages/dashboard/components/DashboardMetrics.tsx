@@ -108,7 +108,6 @@ export function DashboardMetrics({ state }: DashboardMetricsProps) {
     <section
       aria-label={t("dashboard.metrics.eyebrow")}
       className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-      data-testid="dashboard-loading-metrics"
     >
       {metricOrder.map((key) => (
         <MetricCard

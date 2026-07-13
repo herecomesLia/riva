@@ -25,9 +25,13 @@ describe("DashboardView", () => {
     renderDashboardView({ status: "loading" })
 
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument()
-    expect(screen.getByTestId("dashboard-loading-top")).toBeInTheDocument()
-    expect(screen.getByTestId("dashboard-loading-metrics")).toBeInTheDocument()
-    expect(screen.getByTestId("dashboard-loading-bottom")).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.currentRole.eyebrow"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.recommendation.eyebrow"))).toBeInTheDocument()
+    expect(
+      screen.getByRole("region", { name: i18n.t("dashboard.metrics.eyebrow") }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.performanceTrend.title"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.weaknesses.eyebrow"))).toBeInTheDocument()
     expect(screen.getAllByText("测试用户")).toHaveLength(1)
     expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(18)
   })

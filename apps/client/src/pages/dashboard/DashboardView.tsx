@@ -65,14 +65,14 @@ function DashboardDefaultView({
         className="flex flex-col gap-6"
         data-testid={content.status === "loading" ? "dashboard-loading-state" : undefined}
       >
-        <section className="grid gap-4 lg:grid-cols-12" data-testid="dashboard-loading-top">
+        <section className="grid gap-4 lg:grid-cols-12">
           <CurrentRoleCard state={contentState.currentRole} />
           <RecommendationCard state={contentState.recommendation} />
         </section>
 
         <DashboardMetrics state={contentState.metrics} />
 
-        <section className="grid gap-4 lg:grid-cols-12" data-testid="dashboard-loading-bottom">
+        <section className="grid gap-4 lg:grid-cols-12">
           <PerformanceTrendCard state={contentState.performanceTrend} />
           <WeaknessesCard state={contentState.weaknesses} />
         </section>
