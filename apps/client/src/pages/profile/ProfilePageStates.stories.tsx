@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react"
 
-import { ProfileProcessingState, ProfileRecognitionFailureState } from "./ProfilePageStates"
+import {
+  ProfileProcessingState,
+  ProfileRecognitionFailureState,
+} from "./components/ProfilePageStates"
 
 const meta = {
   title: "Pages/Profile/Import states",

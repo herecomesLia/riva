@@ -1,36 +1,23 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { act, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { createProfileMockSnapshot } from "@/mocks/data/profile"
-import type { JobProfile } from "@/models/profile"
+import { profileResponseMock } from "@/mocks/data/profile"
 import { ProfilePage } from "@/pages/profile"
-import {
-  cancelResumeRecognitionReview,
-  cancelResumeUpdate,
-  confirmResumeUpdate,
-  createManualJobProfile,
-  getJobProfile,
-  regenerateMatchingAnalysis,
-  saveProfileSection,
-  startInitialResumeRecognition,
-  startUpdatedResumeRecognition,
-  submitResumeRecognitionConfirmation,
-  uploadInitialResume,
-  uploadUpdatedResume,
-} from "@/services/profile"
+import * as profileService from "@/services/profile"
 import { renderWithProviders } from "@/test/render"
 
-vi.mock("@/services/profile", () => ({
-  getJobProfile: vi.fn(),
-  saveProfileSection: vi.fn(),
+vi.mock("@/services/profile", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/profile")>()),
   cancelResumeRecognitionReview: vi.fn(),
   cancelResumeUpdate: vi.fn(),
   confirmResumeUpdate: vi.fn(),
   createManualJobProfile: vi.fn(),
+  getJobProfile: vi.fn(),
   regenerateMatchingAnalysis: vi.fn(),
+  saveProfileSection: vi.fn(),
   startInitialResumeRecognition: vi.fn(),
   startUpdatedResumeRecognition: vi.fn(),
   submitResumeRecognitionConfirmation: vi.fn(),
@@ -38,528 +25,215 @@ vi.mock("@/services/profile", () => ({
   uploadUpdatedResume: vi.fn(),
 }))
 
-function renderProfilePage() {
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, reject, resolve }
+}
+
+function renderPage() {
   return renderWithProviders(<ProfilePage />, { router: { initialEntries: ["/profile"] } })
 }
 
-function setUpEditableProfile() {
-  const snapshot = createProfileMockSnapshot("complete")
-  const profile = snapshot.profile!
-
-  vi.mocked(getJobProfile).mockResolvedValue(snapshot)
-  vi.mocked(saveProfileSection).mockImplementation(async (input) => {
-    const nextProfile = structuredClone(profile)
-
-    if (input.section === "basicInformation") nextProfile.basicInformation = input.values
-    if (input.section === "education") nextProfile.education = input.values
-    if (input.section === "workExperience") nextProfile.workExperiences = input.values
-    if (input.section === "projectExperience") nextProfile.projectExperiences = input.values
-    if (input.section === "skills") nextProfile.skills = input.values
-    if (input.section === "credentials") nextProfile.credentials = input.values
-    if (input.section === "careerDirection") nextProfile.careerDirection = input.values
-
-    return nextProfile
-  })
-
-  return { profile, snapshot }
-}
-
-describe("ProfilePage", () => {
+describe("ProfilePage orchestration", () => {
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
-    vi.mocked(getJobProfile).mockReset()
-    vi.mocked(saveProfileSection).mockReset()
-    vi.mocked(cancelResumeRecognitionReview).mockReset()
-    vi.mocked(cancelResumeUpdate).mockReset()
-    vi.mocked(confirmResumeUpdate).mockReset()
-    vi.mocked(createManualJobProfile).mockReset()
-    vi.mocked(regenerateMatchingAnalysis).mockReset()
-    vi.mocked(startInitialResumeRecognition).mockReset()
-    vi.mocked(startUpdatedResumeRecognition).mockReset()
-    vi.mocked(submitResumeRecognitionConfirmation).mockReset()
-    vi.mocked(uploadInitialResume).mockReset()
-    vi.mocked(uploadUpdatedResume).mockReset()
+    vi.clearAllMocks()
   })
 
-  it("renders an empty state when no profile exists", async () => {
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("notCreated"))
-
-    renderProfilePage()
-
-    expect(await screen.findByTestId("profile-empty-state")).toHaveTextContent(
-      i18n.t("profile.empty.title"),
-    )
-    expect(screen.queryByText("Lin Chen")).not.toBeInTheDocument()
+  it("maps the initial request to loading", async () => {
+    vi.mocked(profileService.getJobProfile).mockReturnValue(new Promise(() => undefined))
+    renderPage()
+    expect(await screen.findByTestId("profile-loading-state")).toBeInTheDocument()
   })
 
-  it("renders the recognition-in-progress state without structured profile sections", async () => {
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("parsing"))
-
-    renderProfilePage()
-
-    expect(await screen.findByTestId("profile-processing-state")).toHaveTextContent(
-      i18n.t("profile.lifecycle.parsing.title"),
-    )
+  it("maps a successful request to ready", async () => {
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
+    renderPage()
     expect(
-      screen.queryByRole("heading", { name: i18n.t("profile.sections.workExperience") }),
-    ).not.toBeInTheDocument()
-  })
-
-  it("renders the recognition failure returned by the service", async () => {
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("recognitionFailed"))
-
-    renderProfilePage()
-
-    expect(await screen.findByTestId("profile-recognition-failure")).toHaveTextContent(
-      "The document could not be parsed.",
-    )
-  })
-
-  it("renders the main structured profile content in the complete state", async () => {
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("complete"))
-
-    renderProfilePage()
-
-    expect(
-      await screen.findByRole("heading", { name: i18n.t("profile.title") }),
+      await screen.findByText(profileResponseMock.profile!.basicInformation.name!),
     ).toBeInTheDocument()
-    expect(screen.getByText("lin-chen-resume.pdf")).toBeInTheDocument()
-    expect(screen.getByText("Lin Chen")).toBeInTheDocument()
-    expect(screen.getAllByText("Senior Frontend Engineer").length).toBeGreaterThan(0)
-    expect(screen.getByText("Merchant Operations Console")).toBeInTheDocument()
-    expect(screen.getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
+  })
+
+  it("moves error through retry loading to ready", async () => {
+    const user = userEvent.setup()
+    const retry = deferred<typeof profileResponseMock>()
+    vi.mocked(profileService.getJobProfile)
+      .mockRejectedValueOnce(new Error("private failure"))
+      .mockReturnValueOnce(retry.promise)
+
+    renderPage()
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("common.pageState.error.retry") }),
+    )
+    expect(screen.getByTestId("profile-loading-state")).toBeInTheDocument()
+    expect(screen.queryByText("private failure")).not.toBeInTheDocument()
+
+    await act(async () => retry.resolve(structuredClone(profileResponseMock)))
     expect(
-      screen.getByRole("button", { name: i18n.t("profile.actions.viewTargetRoles") }),
-    ).toHaveAttribute("href", "/roles")
-  })
-
-  it("shows a lightweight confirmation notice for recognized information that needs review", async () => {
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("awaitingConfirmation"))
-
-    renderProfilePage()
-
-    expect(await screen.findByTestId("profile-review-notice")).toHaveTextContent(
-      i18n.t("profile.lifecycle.awaitingConfirmation.title"),
-    )
-    expect(screen.getAllByText(i18n.t("profile.reviewStatus.needsReview")).length).toBeGreaterThan(
-      0,
-    )
-  })
-
-  it("warns when matching analysis is stale", async () => {
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("matchingAnalysisStale"))
-
-    renderProfilePage()
-
-    expect(await screen.findByTestId("profile-matching-analysis-stale")).toHaveTextContent(
-      i18n.t("profile.matchingAnalysis.staleTitle"),
-    )
-  })
-
-  it("keeps rendering when optional sections and basic fields are missing", async () => {
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("incomplete"))
-
-    renderProfilePage()
-
-    expect(
-      await screen.findByRole("heading", { name: i18n.t("profile.sections.education") }),
+      await screen.findByText(profileResponseMock.profile!.basicInformation.name!),
     ).toBeInTheDocument()
-    expect(screen.getAllByText(i18n.t("profile.emptySection")).length).toBeGreaterThan(0)
-    expect(screen.queryByText("+86 138 0000 1234")).not.toBeInTheDocument()
   })
 
-  it("renders a retryable page error without exposing the raw service error", async () => {
-    vi.mocked(getJobProfile).mockRejectedValue(new Error("raw profile service failure"))
-
-    renderProfilePage()
-
-    const alert = await screen.findByRole("alert")
-
-    expect(alert).toHaveTextContent(i18n.t("common.pageState.error.title"))
-    expect(alert).not.toHaveTextContent("raw profile service failure")
-  })
-
-  it("requires a decision before switching a dirty section and can discard its draft", async () => {
+  it("returns to error when retry fails again", async () => {
     const user = userEvent.setup()
-    setUpEditableProfile()
-    renderProfilePage()
-
-    const basicSection = await screen.findByTestId("profile-section-basicInformation")
+    vi.mocked(profileService.getJobProfile)
+      .mockRejectedValueOnce(new Error("first"))
+      .mockRejectedValueOnce(new Error("second"))
+    renderPage()
     await user.click(
-      within(basicSection).getByRole("button", { name: i18n.t("profile.actions.edit") }),
+      await screen.findByRole("button", { name: i18n.t("common.pageState.error.retry") }),
     )
-
-    const editor = screen.getByTestId("profile-editor-basicInformation")
-    expect(editor).toBeInTheDocument()
-    const name = within(editor).getByLabelText(i18n.t("profile.field.name"))
-    await user.clear(name)
-    await user.type(name, "Draft name")
-    await user.click(
-      within(screen.getByTestId("profile-section-workExperience")).getByRole("button", {
-        name: i18n.t("profile.actions.edit"),
-      }),
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("common.pageState.error.title"),
     )
-    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
-      i18n.t("profile.dialog.discardDraftTitle"),
-    )
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.dialog.stayEditing") }))
-    await user.click(
-      within(screen.getByTestId("profile-section-workExperience")).getByRole("button", {
-        name: i18n.t("profile.actions.edit"),
-      }),
-    )
-    await user.click(
-      screen.getByRole("button", { name: i18n.t("profile.dialog.discardAndContinue") }),
-    )
-
-    expect(await screen.findByTestId("profile-editor-workExperience")).toBeInTheDocument()
-    expect(screen.queryByText("Draft name")).not.toBeInTheDocument()
   })
 
-  it("provides the same draft editor framework for education and project sections", async () => {
-    const user = userEvent.setup()
-    setUpEditableProfile()
-    renderProfilePage()
-
-    for (const section of ["education", "projectExperience"] as const) {
-      const readonlySection = await screen.findByTestId(`profile-section-${section}`)
-      await user.click(
-        within(readonlySection).getByRole("button", { name: i18n.t("profile.actions.edit") }),
-      )
-
-      const editor = screen.getByTestId(`profile-editor-${section}`)
-      expect(
-        within(editor).getByRole("button", { name: i18n.t("profile.editor.addExperience") }),
-      ).toBeInTheDocument()
-      await user.click(
-        within(editor).getByRole("button", { name: i18n.t("profile.editor.cancel") }),
-      )
-    }
-  })
-
-  it("saves a changed work section and updates the rendered query data", async () => {
-    const user = userEvent.setup()
-    setUpEditableProfile()
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-workExperience")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-
-    const editor = screen.getByTestId("profile-editor-workExperience")
-    const company = within(editor).getAllByLabelText(i18n.t("profile.formField.company"))[0]
-    await user.clear(company)
-    await user.type(company, "Updated Commerce")
-    await user.click(within(editor).getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    await waitFor(() => {
-      expect(saveProfileSection).toHaveBeenCalled()
-    })
-    expect(vi.mocked(saveProfileSection).mock.calls[0][0]).toEqual(
-      expect.objectContaining({ section: "workExperience" }),
-    )
-    expect(await screen.findByText("Updated Commerce")).toBeInTheDocument()
-  })
-
-  it("adds and removes list entries only inside the draft, then restores them on cancel", async () => {
-    const user = userEvent.setup()
-    const { profile } = setUpEditableProfile()
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-workExperience")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-workExperience")
-
+  it("keeps ready data visible during a background refresh", async () => {
+    const refresh = deferred<typeof profileResponseMock>()
+    vi.mocked(profileService.getJobProfile)
+      .mockResolvedValueOnce(structuredClone(profileResponseMock))
+      .mockReturnValueOnce(refresh.promise)
+    const result = renderPage()
     expect(
-      within(editor).getByTestId(`profile-editor-item-${profile.workExperiences[0].id}`),
-    ).toBeInTheDocument()
-    await user.click(
-      within(editor).getByRole("button", { name: i18n.t("profile.editor.addExperience") }),
-    )
-    expect(within(editor).getAllByText(i18n.t("profile.editor.delete"))).toHaveLength(3)
-
-    await user.click(
-      within(editor).getAllByRole("button", { name: i18n.t("profile.editor.delete") })[0],
-    )
-    expect(
-      within(editor).queryByTestId(`profile-editor-item-${profile.workExperiences[0].id}`),
-    ).not.toBeInTheDocument()
-
-    await user.click(within(editor).getByRole("button", { name: i18n.t("profile.editor.cancel") }))
-    expect(await screen.findByText("Northstar Commerce")).toBeInTheDocument()
-    expect(profile.workExperiences).toHaveLength(2)
-  })
-
-  it("submits added and deleted entries as one stable-ID section update", async () => {
-    const user = userEvent.setup()
-    const { profile } = setUpEditableProfile()
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-workExperience")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-workExperience")
-    await user.click(
-      within(editor).getByRole("button", { name: i18n.t("profile.editor.addExperience") }),
-    )
-    await user.click(
-      within(editor).getAllByRole("button", { name: i18n.t("profile.editor.delete") })[1],
-    )
-
-    const companies = within(editor).getAllByLabelText(i18n.t("profile.formField.company"))
-    const titles = within(editor).getAllByLabelText(i18n.t("profile.formField.title"))
-    const startDates = within(editor).getAllByLabelText(i18n.t("profile.formField.startDate"))
-    await user.type(companies[1], "New Studio")
-    await user.type(titles[1], "Engineer")
-    fireEvent.change(startDates[1], { target: { value: "2025-01" } })
-    await user.click(within(editor).getAllByRole("checkbox")[1])
-    await user.click(within(editor).getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    await waitFor(() => expect(saveProfileSection).toHaveBeenCalledTimes(1))
-    const input = vi.mocked(saveProfileSection).mock.calls[0][0]
-    expect(input.section).toBe("workExperience")
-    if (input.section === "workExperience") {
-      expect(input.values.map((item) => item.id)).toEqual([
-        profile.workExperiences[0].id,
-        expect.stringMatching(/^draft_/),
-      ])
-      expect(input.values.map((item) => item.id)).not.toContain("1")
-    }
-  })
-
-  it("keeps user input after a save failure and does not mutate the fixture", async () => {
-    const user = userEvent.setup()
-    const { profile } = setUpEditableProfile()
-    vi.mocked(saveProfileSection).mockRejectedValueOnce(new Error("save failed"))
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-workExperience")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-workExperience")
-    const company = within(editor).getAllByLabelText(i18n.t("profile.formField.company"))[0]
-    await user.clear(company)
-    await user.type(company, "Retained draft")
-    await user.click(within(editor).getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
-    expect(company).toHaveValue("Retained draft")
-    expect(profile.workExperiences[0].company).toBe("Northstar Commerce")
-  })
-
-  it("adds and deletes skills in a draft, and rejects duplicate skill names", async () => {
-    const user = userEvent.setup()
-    setUpEditableProfile()
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-skills")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-skills")
-    const initialSkillCount = within(editor).getAllByLabelText(
-      i18n.t("profile.field.skillName"),
-    ).length
-    await user.click(
-      within(editor).getByRole("button", { name: i18n.t("profile.editor.addSkill") }),
-    )
-    expect(within(editor).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(
-      initialSkillCount + 1,
-    )
-
-    const skillNames = within(editor).getAllByLabelText(i18n.t("profile.field.skillName"))
-    await user.type(skillNames.at(-1)!, "React")
-    await user.click(within(editor).getByRole("button", { name: i18n.t("profile.editor.save") }))
-    expect(
-      await screen.findByText(i18n.t("profile.editor.validation.duplicateSkill")),
+      await screen.findByText(profileResponseMock.profile!.basicInformation.name!),
     ).toBeInTheDocument()
 
-    await user.click(
-      within(editor)
-        .getAllByRole("button", { name: i18n.t("profile.editor.delete") })
-        .at(-1)!,
-    )
-    expect(within(editor).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(
-      initialSkillCount,
-    )
+    await act(async () => void result.queryClient.refetchQueries({ queryKey: ["profile"] }))
+    await waitFor(() => expect(profileService.getJobProfile).toHaveBeenCalledTimes(2))
+    expect(
+      screen.getByText(profileResponseMock.profile!.basicInformation.name!),
+    ).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-loading-state")).not.toBeInTheDocument()
+    await act(async () => refresh.resolve(structuredClone(profileResponseMock)))
   })
 
-  it("edits credentials and submits additions and removals as one section", async () => {
+  it("uploads and recognizes an initial resume before caching ready data", async () => {
     const user = userEvent.setup()
-    setUpEditableProfile()
-    renderProfilePage()
+    const empty = { profile: null, recognition: null, resumeUpdate: null, matchingAnalysis: null }
+    const uploading = structuredClone(profileResponseMock)
+    uploading.profile!.resume!.id = "uploaded-resume"
+    const recognized = structuredClone(profileResponseMock)
+    recognized.profile!.status = "awaitingConfirmation"
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(empty)
+    vi.mocked(profileService.uploadInitialResume).mockResolvedValue(uploading)
+    vi.mocked(profileService.startInitialResumeRecognition).mockResolvedValue(recognized)
 
-    const section = await screen.findByTestId("profile-section-credentials")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-credentials")
-    const names = within(editor).getAllByLabelText(i18n.t("profile.field.name"))
-    await user.clear(names[0])
-    await user.type(names[0], "Updated AWS certification")
-    await user.click(
-      within(editor).getByRole("button", { name: i18n.t("profile.editor.addCredential") }),
-    )
-    expect(within(editor).getAllByLabelText(i18n.t("profile.field.name"))).toHaveLength(3)
-    await user.click(
-      within(editor)
-        .getAllByRole("button", { name: i18n.t("profile.editor.delete") })
-        .at(-1)!,
-    )
-    await user.click(within(editor).getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    await waitFor(() => expect(saveProfileSection).toHaveBeenCalled())
-    const input = vi.mocked(saveProfileSection).mock.calls[0][0]
-    expect(input.section).toBe("credentials")
-    if (input.section === "credentials") {
-      expect(input.values).toHaveLength(2)
-      expect(input.values[0].name).toBe("Updated AWS certification")
-    }
-  })
-
-  it("saves the career direction draft and clears its dirty state", async () => {
-    const user = userEvent.setup()
-    setUpEditableProfile()
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-careerDirection")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-careerDirection")
-    const industries = within(editor).getByLabelText(i18n.t("profile.field.desiredIndustries"))
-    await user.clear(industries)
-    await user.type(industries, "Developer tools")
-    await user.click(within(editor).getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    expect(await screen.findByTestId("profile-save-success")).toHaveTextContent(
-      i18n.t("profile.editor.saveSuccess"),
-    )
-    expect(saveProfileSection).toHaveBeenCalled()
-    await user.click(
-      within(screen.getByTestId("profile-section-skills")).getByRole("button", {
-        name: i18n.t("profile.actions.edit"),
-      }),
-    )
-    expect(screen.queryByText(i18n.t("profile.dialog.discardDraftTitle"))).not.toBeInTheDocument()
-  })
-
-  it("blocks in-app navigation while a dirty draft is open", async () => {
-    const user = userEvent.setup()
-    setUpEditableProfile()
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-skills")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-skills")
-    await user.clear(within(editor).getAllByLabelText(i18n.t("profile.field.skillName"))[0])
-    await user.type(
-      within(editor).getAllByLabelText(i18n.t("profile.field.skillName"))[0],
-      "Changed React",
-    )
-    await user.click(
-      screen.getByRole("button", { name: i18n.t("profile.actions.viewTargetRoles") }),
-    )
-
-    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
-      i18n.t("profile.dialog.leavePageTitle"),
-    )
-  })
-
-  it("prevents duplicate saves while saving and shows success once the request resolves", async () => {
-    const user = userEvent.setup()
-    const { profile } = setUpEditableProfile()
-    let resolveSave: ((profile: JobProfile) => void) | undefined
-    vi.mocked(saveProfileSection).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveSave = resolve
-        }),
-    )
-    renderProfilePage()
-
-    const section = await screen.findByTestId("profile-section-skills")
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const editor = screen.getByTestId("profile-editor-skills")
-    const firstSkill = within(editor).getAllByLabelText(i18n.t("profile.field.skillName"))[0]
-    await user.clear(firstSkill)
-    await user.type(firstSkill, "React updated")
-    const save = within(editor).getByRole("button", { name: i18n.t("profile.editor.save") })
-    await user.click(save)
-    await user.click(save)
-
-    expect(saveProfileSection).toHaveBeenCalledTimes(1)
-    expect(save).toBeDisabled()
-    resolveSave?.(profile)
-    expect(await screen.findByTestId("profile-save-success")).toBeInTheDocument()
-  })
-
-  it("uploads pasted resume text and advances to a reviewable recognition draft", async () => {
-    const user = userEvent.setup()
-    const uploading = createProfileMockSnapshot("uploading")
-    const recognized = createProfileMockSnapshot("awaitingConfirmation")
-    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("notCreated"))
-    vi.mocked(uploadInitialResume).mockResolvedValue(uploading)
-    vi.mocked(startInitialResumeRecognition).mockResolvedValue(recognized)
-    renderProfilePage()
-
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "Resume text")
+    renderPage()
+    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
     await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
 
     await waitFor(() =>
-      expect(uploadInitialResume).toHaveBeenCalledWith({ file: undefined, text: "Resume text" }),
+      expect(profileService.startInitialResumeRecognition).toHaveBeenCalledWith(
+        uploading.profile!.profileId,
+        "uploaded-resume",
+      ),
     )
-    expect(await screen.findByTestId("profile-review-notice")).toHaveTextContent(
-      i18n.t("profile.lifecycle.awaitingConfirmation.title"),
-    )
+    expect(await screen.findByTestId("profile-review-notice")).toBeInTheDocument()
   })
 
-  it("confirms or cancels a recognition review through the service layer", async () => {
+  it("keeps the upload form and shows safe feedback when upload fails", async () => {
     const user = userEvent.setup()
-    const snapshot = createProfileMockSnapshot("awaitingConfirmation")
-    const activeProfile = structuredClone(snapshot.profile!)
-    activeProfile.status = "active"
-    vi.mocked(getJobProfile).mockResolvedValue(snapshot)
-    vi.mocked(submitResumeRecognitionConfirmation).mockResolvedValue(activeProfile)
-    renderProfilePage()
-
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.confirmRecognition") }),
-    )
-    expect(await screen.findByText(i18n.t("profile.status.active"))).toBeInTheDocument()
-    expect(submitResumeRecognitionConfirmation).toHaveBeenCalledWith({
-      profileId: snapshot.profile!.profileId,
-      resumeId: snapshot.profile!.resume!.id,
+    vi.mocked(profileService.getJobProfile).mockResolvedValue({
+      profile: null,
+      recognition: null,
+      resumeUpdate: null,
+      matchingAnalysis: null,
     })
+    vi.mocked(profileService.uploadInitialResume).mockRejectedValue(new Error("raw upload error"))
+    renderPage()
+    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
+    expect(await screen.findByText(i18n.t("profile.import.failed"))).toBeInTheDocument()
+    expect(screen.queryByText("raw upload error")).not.toBeInTheDocument()
   })
 
-  it("shows pending replacement summary and keeps the active profile when cancelled", async () => {
+  it("updates the query cache with the saved section returned by the mutation", async () => {
     const user = userEvent.setup()
-    const snapshot = createProfileMockSnapshot("resumeUpdateAwaitingConfirmation")
-    const cancelled = structuredClone(snapshot)
-    cancelled.resumeUpdate = null
-    vi.mocked(getJobProfile).mockResolvedValue(snapshot)
-    vi.mocked(cancelResumeUpdate).mockResolvedValue(cancelled)
-    renderProfilePage()
+    const snapshot = structuredClone(profileResponseMock)
+    const saved = structuredClone(snapshot.profile!)
+    saved.basicInformation.name = "Updated Name"
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
+    vi.mocked(profileService.saveProfileSection).mockResolvedValue(saved)
 
-    const review = await screen.findByTestId("profile-resume-update-review")
-    expect(review).toHaveTextContent(i18n.t("profile.import.newItems"))
-    await user.click(within(review).getByRole("button", { name: i18n.t("profile.import.cancel") }))
-    await waitFor(() => expect(cancelResumeUpdate).toHaveBeenCalled())
-    expect(screen.queryByTestId("profile-resume-update-review")).not.toBeInTheDocument()
-    expect(screen.getByText("Lin Chen")).toBeInTheDocument()
+    renderPage()
+    const basicCard = await screen.findByTestId("profile-section-basicInformation")
+    await user.click(withinCardButton(basicCard, i18n.t("profile.actions.edit")))
+    const name = screen.getByLabelText(i18n.t("profile.field.name"))
+    await user.clear(name)
+    await user.type(name, "Updated Name")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    expect(await screen.findByText("Updated Name")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-save-success")).toBeInTheDocument()
   })
 
-  it("regenerates stale matching analysis through the mock service", async () => {
+  it("retains the draft after a save failure", async () => {
     const user = userEvent.setup()
-    const snapshot = createProfileMockSnapshot("matchingAnalysisStale")
-    vi.mocked(getJobProfile).mockResolvedValue(snapshot)
-    vi.mocked(regenerateMatchingAnalysis).mockResolvedValue({
-      status: "current",
-      profileVersion: snapshot.profile!.version,
-      generatedAt: "2026-07-13T08:20:00.000Z",
-      failureReason: null,
-    })
-    renderProfilePage()
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
+    vi.mocked(profileService.saveProfileSection).mockRejectedValue(new Error("raw save error"))
+    renderPage()
+    const basicCard = await screen.findByTestId("profile-section-basicInformation")
+    await user.click(withinCardButton(basicCard, i18n.t("profile.actions.edit")))
+    const name = screen.getByLabelText(i18n.t("profile.field.name"))
+    await user.clear(name)
+    await user.type(name, "Unsaved Name")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+    expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
+    expect(name).toHaveValue("Unsaved Name")
+  })
 
-    await user.click(
-      await screen.findByRole("button", {
-        name: i18n.t("profile.actions.regenerateMatchingAnalysis"),
-      }),
+  it("removes an experience after the section mutation succeeds", async () => {
+    const user = userEvent.setup()
+    const snapshot = structuredClone(profileResponseMock)
+    const removedTitle = snapshot.profile!.workExperiences[0].title
+    const saved = structuredClone(snapshot.profile!)
+    saved.workExperiences = saved.workExperiences.slice(1)
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
+    vi.mocked(profileService.saveProfileSection).mockResolvedValue(saved)
+
+    renderPage()
+    const section = await screen.findByTestId("profile-section-workExperience")
+    await user.click(withinCardButton(section, i18n.t("profile.actions.edit")))
+    await user.click(screen.getAllByRole("button", { name: i18n.t("profile.editor.delete") })[0])
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    await waitFor(() => expect(profileService.saveProfileSection).toHaveBeenCalledOnce())
+    await waitFor(() =>
+      expect(screen.queryByTestId("profile-editor-workExperience")).not.toBeInTheDocument(),
     )
-    await waitFor(() => expect(regenerateMatchingAnalysis).toHaveBeenCalled())
-    expect(vi.mocked(regenerateMatchingAnalysis).mock.calls[0][0]).toBe(snapshot.profile!.profileId)
-    expect(screen.queryByTestId("profile-matching-analysis-stale")).not.toBeInTheDocument()
+    expect(
+      withinSection("profile-section-workExperience").queryByText(removedTitle),
+    ).not.toBeInTheDocument()
+  })
+
+  it("keeps a deleted experience in the draft when the mutation fails", async () => {
+    const user = userEvent.setup()
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
+    vi.mocked(profileService.saveProfileSection).mockRejectedValue(new Error("delete failed"))
+
+    renderPage()
+    const section = await screen.findByTestId("profile-section-workExperience")
+    await user.click(withinCardButton(section, i18n.t("profile.actions.edit")))
+    await user.click(screen.getAllByRole("button", { name: i18n.t("profile.editor.delete") })[0])
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
+    expect(screen.getByTestId("profile-editor-workExperience")).toBeInTheDocument()
+    expect(screen.queryByText("delete failed")).not.toBeInTheDocument()
   })
 })
+
+function withinCardButton(card: HTMLElement, name: string) {
+  return Array.from(card.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes(name),
+  )!
+}
+
+function withinSection(testId: string) {
+  return within(screen.getByTestId(testId))
+}

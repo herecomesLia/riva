@@ -1,5 +1,5 @@
 import { env } from "@/app/env"
-import { createProfileMockSnapshot, type ProfileMockScenario } from "@/mocks/data/profile"
+import { profileResponseMock } from "@/mocks/data/profile"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   JobProfile,
@@ -13,62 +13,41 @@ import type {
   SaveProfileSectionInput,
 } from "@/models/profile"
 
-const profileMockDelayMs = 500
-
-let activeScenario: ProfileMockScenario | null = null
-let mockSnapshot: JobProfileSnapshot | null = null
-
 function copy<T>(value: T): T {
   return structuredClone(value)
 }
 
-function createProfileMockError(message: string): Error {
-  return new Error(message)
+async function waitForProfileMock() {
+  await waitForMockDelay()
 }
 
-function getMockSnapshot() {
-  if (activeScenario !== env.profileMockScenario || !mockSnapshot) {
-    activeScenario = env.profileMockScenario
-    mockSnapshot = createProfileMockSnapshot(activeScenario)
-  }
-
-  return mockSnapshot
-}
-
-function requireProfile(snapshot: JobProfileSnapshot): JobProfile {
-  if (!snapshot.profile) {
-    throw createProfileMockError("Job profile does not exist.")
-  }
-
-  return snapshot.profile
-}
-
-function requireCurrentResume(profile: JobProfile): ResumeFile {
-  if (!profile.resume) {
-    throw createProfileMockError("Current resume does not exist.")
-  }
-
-  return profile.resume
-}
-
-function requireMatchingProfile(profile: JobProfile, profileId: string) {
-  if (profile.profileId !== profileId) {
-    throw createProfileMockError("Job profile was not found.")
+function requireMock() {
+  if (!env.mock) {
+    throw new Error("Real job profile API is not implemented.")
   }
 }
 
-function createUploadedResume(input: ResumeUploadInput): ResumeFile {
+function standardProfile(): JobProfile {
+  const profile = copy(profileResponseMock.profile)
+  if (!profile) throw new Error("The standard profile fixture is invalid.")
+  return profile
+}
+
+function requireMatchingProfile(profileId: string) {
+  if (profileId !== profileResponseMock.profile?.profileId) {
+    throw new Error("Job profile was not found.")
+  }
+}
+
+function createUploadedResume(input: ResumeUploadInput, id: string): ResumeFile {
   const file = input.file
   const text = input.text?.trim()
-
-  if (!file && !text) {
-    throw createProfileMockError("A resume file or pasted resume text is required.")
-  }
+  if (!file && !text) throw new Error("A resume file or pasted resume text is required.")
 
   return {
-    id: "resume_uploaded_initial",
+    id,
     fileName: file?.name ?? "pasted-resume.txt",
-    mimeType: file?.type || (text ? "text/plain" : "application/octet-stream"),
+    mimeType: file?.type || "text/plain",
     fileSize: file?.size ?? new Blob([text ?? ""]).size,
     uploadedAt: "2026-07-13T08:00:00.000Z",
     parsedAt: null,
@@ -81,268 +60,173 @@ function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) 
   switch (input.section) {
     case "basicInformation":
       profile.basicInformation = copy(input.values)
-      return
+      break
     case "education":
       profile.education = copy(input.values)
-      return
+      break
     case "workExperience":
       profile.workExperiences = copy(input.values)
-      return
+      break
     case "projectExperience":
       profile.projectExperiences = copy(input.values)
-      return
+      break
     case "skills":
       profile.skills = copy(input.values)
-      return
+      break
     case "credentials":
       profile.credentials = copy(input.values)
-      return
+      break
     case "careerDirection":
       profile.careerDirection = copy(input.values)
-      return
+      break
     case "targetRoles":
       profile.targetRoles = copy(input.values)
-      return
   }
-}
-
-function confirmAllReviews(profile: JobProfile) {
-  profile.basicInformation.reviewStatus = "confirmed"
-  profile.education.forEach((item) => {
-    item.reviewStatus = "confirmed"
-  })
-  profile.workExperiences.forEach((item) => {
-    item.reviewStatus = "confirmed"
-  })
-  profile.projectExperiences.forEach((item) => {
-    item.reviewStatus = "confirmed"
-  })
-  profile.skills.forEach((item) => {
-    item.reviewStatus = "confirmed"
-  })
-  profile.credentials.forEach((item) => {
-    item.reviewStatus = "confirmed"
-  })
-  profile.careerDirection.reviewStatus = "confirmed"
-  profile.targetRoles.forEach((item) => {
-    item.reviewStatus = "confirmed"
-  })
-}
-
-async function waitForProfileMock() {
-  await waitForMockDelay(profileMockDelayMs)
 }
 
 export async function getJobProfile(): Promise<JobProfileSnapshot> {
-  if (!env.mock) {
-    throw new Error("Real job profile API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-  return copy(getMockSnapshot())
+  return copy(profileResponseMock)
 }
 
 export async function saveProfileSection(input: SaveProfileSectionInput): Promise<JobProfile> {
-  if (!env.mock) {
-    throw new Error("Real job profile API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-
-  if (env.profileMockScenario === "saveFailure") {
-    throw createProfileMockError("Mock profile save failed.")
-  }
-
-  const profile = requireProfile(getMockSnapshot())
-
-  requireMatchingProfile(profile, input.profileId)
-
-  if (profile.version !== input.version) {
-    throw createProfileMockError("Job profile version is out of date.")
-  }
+  const profile = standardProfile()
+  requireMatchingProfile(input.profileId)
+  if (profile.version !== input.version) throw new Error("Job profile version is out of date.")
 
   applySavedSection(profile, input)
   profile.updatedAt = "2026-07-13T08:05:00.000Z"
   profile.version += 1
   profile.matchingAnalysisStale = true
-
-  return copy(profile)
+  return profile
 }
 
 export async function uploadInitialResume(input: ResumeUploadInput): Promise<JobProfileSnapshot> {
-  if (!env.mock) {
-    throw new Error("Real resume upload API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-
-  const snapshot = getMockSnapshot()
-
-  if (snapshot.profile) {
-    throw createProfileMockError("A job profile already exists.")
-  }
-
-  const nextSnapshot = createProfileMockSnapshot("uploading")
-  const profile = requireProfile(nextSnapshot)
-  const resume = createUploadedResume(input)
-
+  const profile = standardProfile()
+  const resume = createUploadedResume(input, "resume_uploaded_initial")
+  profile.status = "uploadingResume"
   profile.resume = resume
   profile.updatedAt = resume.uploadedAt
-  nextSnapshot.recognition = {
-    resumeId: resume.id,
-    processingStatus: resume.processingStatus,
-    completedAt: null,
-    failureReason: null,
-    pendingReviewCount: 0,
-  }
-  mockSnapshot = nextSnapshot
 
-  return copy(nextSnapshot)
+  return {
+    profile,
+    recognition: {
+      resumeId: resume.id,
+      processingStatus: "uploaded",
+      completedAt: null,
+      failureReason: null,
+      pendingReviewCount: 0,
+    },
+    resumeUpdate: null,
+    matchingAnalysis: null,
+  }
 }
 
 export async function startInitialResumeRecognition(
   profileId: string,
   resumeId: string,
 ): Promise<JobProfileSnapshot> {
-  if (!env.mock) throw new Error("Real resume recognition API is not implemented.")
-
+  requireMock()
   await waitForProfileMock()
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  const resume = requireCurrentResume(profile)
-  requireMatchingProfile(profile, profileId)
-
-  if (resume.id !== resumeId) throw createProfileMockError("Resume recognition was not found.")
-
-  const recognized = createProfileMockSnapshot("awaitingConfirmation")
-  const recognizedProfile = requireProfile(recognized)
-  recognizedProfile.profileId = profile.profileId
-  recognizedProfile.resume = {
-    ...resume,
+  requireMatchingProfile(profileId)
+  const profile = standardProfile()
+  profile.status = "awaitingConfirmation"
+  profile.pendingReviewCount = 4
+  profile.completeness.needsReviewSections = [
+    "basicInformation",
+    "workExperience",
+    "projectExperience",
+  ]
+  profile.resume = {
+    ...profile.resume!,
+    id: resumeId,
     parsedAt: "2026-07-13T08:02:00.000Z",
     processingStatus: "succeeded",
   }
-  recognized.recognition = {
-    resumeId,
-    processingStatus: "succeeded",
-    completedAt: recognizedProfile.resume.parsedAt,
-    failureReason: null,
-    pendingReviewCount: recognizedProfile.pendingReviewCount,
+
+  return {
+    profile,
+    recognition: {
+      resumeId,
+      processingStatus: "succeeded",
+      completedAt: profile.resume.parsedAt,
+      failureReason: null,
+      pendingReviewCount: profile.pendingReviewCount,
+    },
+    resumeUpdate: null,
+    matchingAnalysis: null,
   }
-  mockSnapshot = recognized
-  return copy(recognized)
 }
 
 export async function cancelResumeRecognitionReview(
   profileId: string,
-  resumeId: string,
+  _resumeId: string,
 ): Promise<JobProfileSnapshot> {
-  if (!env.mock) throw new Error("Real resume recognition API is not implemented.")
-
+  requireMock()
   await waitForProfileMock()
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  requireMatchingProfile(profile, profileId)
-
-  if (profile.resume?.id !== resumeId)
-    throw createProfileMockError("Resume recognition was not found.")
-
-  mockSnapshot = createProfileMockSnapshot("notCreated")
-  return copy(mockSnapshot)
+  requireMatchingProfile(profileId)
+  return { profile: null, recognition: null, resumeUpdate: null, matchingAnalysis: null }
 }
 
 export async function createManualJobProfile(): Promise<JobProfileSnapshot> {
-  if (!env.mock) throw new Error("Real job profile API is not implemented.")
-
+  requireMock()
   await waitForProfileMock()
-  const snapshot = createProfileMockSnapshot("incomplete")
-  const profile = requireProfile(snapshot)
-  profile.status = "active"
+  const profile = standardProfile()
   profile.resume = null
-  mockSnapshot = snapshot
-  return copy(snapshot)
+  profile.status = "active"
+  profile.education = []
+  profile.workExperiences = []
+  profile.projectExperiences = []
+  profile.skills = []
+  profile.credentials = []
+  return { profile, recognition: null, resumeUpdate: null, matchingAnalysis: null }
 }
 
 export async function getResumeRecognitionStatus(
   profileId: string,
   resumeId: string,
 ): Promise<ResumeRecognition> {
-  if (!env.mock) {
-    throw new Error("Real resume recognition API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  const resume = requireCurrentResume(profile)
-
-  requireMatchingProfile(profile, profileId)
-
-  if (
-    resume.id !== resumeId ||
-    !snapshot.recognition ||
-    snapshot.recognition.resumeId !== resumeId
-  ) {
-    throw createProfileMockError("Resume recognition was not found.")
+  requireMatchingProfile(profileId)
+  return {
+    resumeId,
+    processingStatus: "succeeded",
+    completedAt: "2026-07-13T08:02:00.000Z",
+    failureReason: null,
+    pendingReviewCount: 4,
   }
-
-  return copy(snapshot.recognition)
 }
 
 export async function submitResumeRecognitionConfirmation(
   input: ResumeRecognitionConfirmationInput,
 ): Promise<JobProfile> {
-  if (!env.mock) {
-    throw new Error("Real resume recognition API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  const resume = requireCurrentResume(profile)
-
-  requireMatchingProfile(profile, input.profileId)
-
-  if (resume.id !== input.resumeId || !snapshot.recognition) {
-    throw createProfileMockError("Resume recognition was not found.")
-  }
-
+  requireMatchingProfile(input.profileId)
+  const profile = standardProfile()
+  profile.resume = { ...profile.resume!, id: input.resumeId }
   profile.status = "active"
-  profile.pendingReviewCount = 0
-  profile.completeness.needsReviewSections = []
   profile.matchingAnalysisStale = true
   profile.updatedAt = "2026-07-13T08:10:00.000Z"
   profile.version += 1
-  snapshot.recognition.pendingReviewCount = 0
-  confirmAllReviews(profile)
-
-  return copy(profile)
+  return profile
 }
 
 export async function uploadUpdatedResume(input: ResumeUploadInput): Promise<JobProfileSnapshot> {
-  if (!env.mock) {
-    throw new Error("Real resume upload API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-
-  if (profile.status !== "active") {
-    throw createProfileMockError(
-      "A confirmed job profile is required before uploading a new resume.",
-    )
-  }
-
-  const resume = createUploadedResume(input)
-  resume.id = "resume_uploaded_update"
+  const snapshot: JobProfileSnapshot = copy(profileResponseMock)
+  const resume = createUploadedResume(input, "resume_uploaded_update")
   snapshot.resumeUpdate = {
     id: "resume_update_uploaded",
     createdAt: resume.uploadedAt,
-    status: "awaitingConfirmation",
+    status: "uploading",
     pendingReviewCount: 0,
     resume,
     changeSummary: null,
@@ -350,109 +234,75 @@ export async function uploadUpdatedResume(input: ResumeUploadInput): Promise<Job
     proposedProfile: null,
     preservesManualChanges: true,
   }
-
-  return copy(snapshot)
+  return snapshot
 }
 
 export async function startUpdatedResumeRecognition(
   input: ResumeUpdateDecisionInput,
 ): Promise<JobProfileSnapshot> {
-  if (!env.mock) throw new Error("Real resume recognition API is not implemented.")
-
+  requireMock()
   await waitForProfileMock()
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  const resumeUpdate = snapshot.resumeUpdate
-  requireMatchingProfile(profile, input.profileId)
-
-  if (!resumeUpdate || resumeUpdate.id !== input.resumeUpdateId) {
-    throw createProfileMockError("Resume update was not found.")
+  requireMatchingProfile(input.profileId)
+  if (input.resumeUpdateId !== "resume_update_uploaded") {
+    throw new Error("Resume update was not found.")
   }
 
-  const candidate = createProfileMockSnapshot("complete").profile!
-  candidate.profileId = profile.profileId
-  candidate.resume = {
-    ...resumeUpdate.resume,
+  const snapshot: JobProfileSnapshot = copy(profileResponseMock)
+  const resume = {
+    ...snapshot.profile!.resume!,
+    id: "resume_uploaded_update",
     parsedAt: "2026-07-13T08:04:00.000Z",
-    processingStatus: "succeeded",
+    processingStatus: "succeeded" as const,
   }
-  resumeUpdate.status = "awaitingConfirmation"
-  resumeUpdate.resume = candidate.resume
-  resumeUpdate.pendingReviewCount = 3
-  resumeUpdate.changeSummary = { newItems: 1, changedItems: 2, missingItems: 1 }
-  resumeUpdate.proposedProfile = candidate
-  mockSnapshot = snapshot
-  return copy(snapshot)
+  snapshot.resumeUpdate = {
+    id: input.resumeUpdateId,
+    createdAt: "2026-07-13T08:00:00.000Z",
+    status: "awaitingConfirmation",
+    pendingReviewCount: 3,
+    resume,
+    changeSummary: { newItems: 1, changedItems: 2, missingItems: 1 },
+    failureReason: null,
+    proposedProfile: { ...standardProfile(), resume },
+    preservesManualChanges: true,
+  }
+  return snapshot
 }
 
 export async function confirmResumeUpdate(input: ResumeUpdateDecisionInput): Promise<JobProfile> {
-  if (!env.mock) {
-    throw new Error("Real resume update API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  const resumeUpdate = snapshot.resumeUpdate
-
-  requireMatchingProfile(profile, input.profileId)
-
-  if (!resumeUpdate || resumeUpdate.id !== input.resumeUpdateId) {
-    throw createProfileMockError("Resume update was not found.")
+  requireMatchingProfile(input.profileId)
+  if (input.resumeUpdateId !== "resume_update_uploaded") {
+    throw new Error("Resume update was not found.")
   }
 
-  profile.resume = copy(resumeUpdate.resume)
+  const profile = standardProfile()
   profile.updatedAt = "2026-07-13T08:15:00.000Z"
   profile.version += 1
   profile.matchingAnalysisStale = true
-  snapshot.resumeUpdate = null
-
-  return copy(profile)
+  return profile
 }
 
 export async function regenerateMatchingAnalysis(profileId: string): Promise<MatchingAnalysis> {
-  if (!env.mock) throw new Error("Real matching analysis API is not implemented.")
-
+  requireMock()
   await waitForProfileMock()
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  requireMatchingProfile(profile, profileId)
-
-  if (env.profileMockScenario === "saveFailure") {
-    throw createProfileMockError("Mock matching analysis regeneration failed.")
-  }
-
-  const matchingAnalysis: MatchingAnalysis = {
+  requireMatchingProfile(profileId)
+  return {
     status: "current",
-    profileVersion: profile.version,
+    profileVersion: profileResponseMock.profile!.version,
     generatedAt: "2026-07-13T08:20:00.000Z",
     failureReason: null,
   }
-  snapshot.matchingAnalysis = matchingAnalysis
-  profile.matchingAnalysisStale = false
-  return copy(matchingAnalysis)
 }
 
 export async function cancelResumeUpdate(
   input: ResumeUpdateDecisionInput,
 ): Promise<JobProfileSnapshot> {
-  if (!env.mock) {
-    throw new Error("Real resume upload API is not implemented.")
-  }
-
+  requireMock()
   await waitForProfileMock()
-
-  const snapshot = getMockSnapshot()
-  const profile = requireProfile(snapshot)
-  const resumeUpdate = snapshot.resumeUpdate
-
-  requireMatchingProfile(profile, input.profileId)
-
-  if (!resumeUpdate || resumeUpdate.id !== input.resumeUpdateId) {
-    throw createProfileMockError("Resume update was not found.")
+  requireMatchingProfile(input.profileId)
+  if (input.resumeUpdateId !== "resume_update_uploaded") {
+    throw new Error("Resume update was not found.")
   }
-
-  snapshot.resumeUpdate = null
-  return copy(snapshot)
+  return copy(profileResponseMock)
 }

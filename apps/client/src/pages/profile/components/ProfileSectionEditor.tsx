@@ -18,6 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  educationItemSchema,
+  profileEmploymentTypes as employmentTypes,
+  profileOptionalTextSchema as optionalText,
+  projectItemSchema,
+  workItemSchema,
+} from "@/schemas/profile"
 import type { EmploymentType, JobProfile, SaveProfileSectionInput } from "@/models/profile"
 
 type EditableSection = "basicInformation" | "education" | "workExperience" | "projectExperience"
@@ -36,64 +43,6 @@ type EditorItem = Record<string, unknown> & {
   isCurrent: boolean
   startDate: string
 }
-
-const requiredText = z.string().trim().min(1, "required")
-const optionalText = z.string()
-const employmentTypes = ["fullTime", "partTime", "internship", "contract", "freelance"] as const
-
-const dateRangeSchema = z
-  .object({
-    endDate: optionalText,
-    isCurrent: z.boolean(),
-    startDate: requiredText,
-  })
-  .superRefine((value, context) => {
-    if (!value.isCurrent && !value.endDate) {
-      context.addIssue({ code: "custom", message: "required", path: ["endDate"] })
-    }
-
-    if (value.endDate && value.endDate < value.startDate) {
-      context.addIssue({ code: "custom", message: "dateRange", path: ["endDate"] })
-    }
-  })
-
-const educationItemSchema = dateRangeSchema.extend({
-  degree: optionalText,
-  description: optionalText,
-  id: requiredText,
-  major: optionalText,
-  school: requiredText,
-  reviewStatus: z.any(),
-  source: z.any(),
-})
-
-const workItemSchema = dateRangeSchema.extend({
-  achievements: optionalText,
-  company: requiredText,
-  employmentType: z.enum(employmentTypes, "employmentType"),
-  id: requiredText,
-  location: optionalText,
-  responsibilities: optionalText,
-  reviewStatus: z.any(),
-  skillIds: optionalText,
-  source: z.any(),
-  title: requiredText,
-})
-
-const projectItemSchema = dateRangeSchema.extend({
-  achievements: optionalText,
-  background: optionalText,
-  contributions: optionalText,
-  id: requiredText,
-  name: requiredText,
-  projectUrl: optionalText.refine((value) => !value || URL.canParse(value), "url"),
-  relatedWorkExperienceId: optionalText,
-  responsibilities: optionalText,
-  reviewStatus: z.any(),
-  role: optionalText,
-  source: z.any(),
-  technologies: optionalText,
-})
 
 function createTemporaryId() {
   return `draft_${crypto.randomUUID()}`

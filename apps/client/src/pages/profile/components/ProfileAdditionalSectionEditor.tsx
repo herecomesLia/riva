@@ -18,6 +18,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  careerDirectionSchema,
+  credentialsSchema,
+  profileCareerLevels as careerLevels,
+  profileEmploymentTypes as employmentTypes,
+  profileJobSearchStages as jobSearchStages,
+  profileJobSearchTypes as jobSearchTypes,
+  skillSchema,
+} from "@/schemas/profile"
 import type { JobProfile, SaveProfileSectionInput } from "@/models/profile"
 
 type EditableSection = "skills" | "credentials" | "careerDirection"
@@ -29,61 +38,6 @@ type ProfileAdditionalSectionEditorProps = {
   profile: JobProfile
   section: EditableSection
 }
-
-const requiredText = z.string().trim().min(1, "required")
-const optionalText = z.string()
-const employmentTypes = ["fullTime", "partTime", "internship", "contract", "freelance"] as const
-const careerLevels = ["entry", "mid", "senior", "lead", "manager", "director"] as const
-const jobSearchTypes = ["active", "passive", "exploring"] as const
-const jobSearchStages = ["preparing", "applying", "interviewing", "offerReview"] as const
-
-const skillSchema = z.object({
-  category: optionalText,
-  id: requiredText,
-  name: requiredText,
-  reviewStatus: z.any(),
-  source: z.any(),
-})
-
-const credentialsSchema = z.object({
-  items: z
-    .array(
-      z
-        .object({
-          awardedAt: optionalText,
-          credentialId: optionalText,
-          credentialUrl: optionalText.refine((value) => !value || URL.canParse(value), "url"),
-          description: optionalText,
-          expiresAt: optionalText,
-          id: requiredText,
-          issuer: optionalText,
-          name: requiredText,
-          reviewStatus: z.any(),
-          source: z.any(),
-          type: z.enum(["certificate", "award"]),
-        })
-        .superRefine((value, context) => {
-          if (value.awardedAt && value.expiresAt && value.expiresAt < value.awardedAt) {
-            context.addIssue({ code: "custom", message: "dateRange", path: ["expiresAt"] })
-          }
-        }),
-    )
-    .default([]),
-})
-
-const careerDirectionSchema = z.object({
-  desiredIndustries: optionalText,
-  desiredLevels: z.array(z.enum(careerLevels)),
-  desiredLocations: optionalText,
-  desiredTitles: optionalText,
-  employmentTypes: z.array(z.enum(employmentTypes)),
-  focusAreas: optionalText,
-  jobSearchStage: z.enum(jobSearchStages),
-  jobSearchType: z.enum(jobSearchTypes),
-  reviewStatus: z.any(),
-  source: z.any(),
-  summary: optionalText,
-})
 
 function createTemporaryId() {
   return `draft_${crypto.randomUUID()}`
