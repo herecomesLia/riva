@@ -15,10 +15,8 @@
     "client:test:watch": "pnpm --filter @riva/client --fail-if-no-match test:watch",
     "client:test:watch:api": "pnpm --filter @riva/client --fail-if-no-match test:watch:api",
     "client:test:watch:mock": "pnpm --filter @riva/client --fail-if-no-match test:watch:mock",
-    "client:test:e2e": "pnpm --filter @riva/client --fail-if-no-match test:e2e",
     "client:storybook": "pnpm --filter @riva/client --fail-if-no-match storybook",
     "client:storybook:build": "pnpm --filter @riva/client --fail-if-no-match build-storybook",
-    "client:test:storybook": "pnpm --filter @riva/client --fail-if-no-match test:storybook",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"

@@ -12,7 +12,6 @@ export default defineMain({
 
   addons: [
     getAbsolutePath("@chromatic-com/storybook"),
-    getAbsolutePath("@storybook/addon-vitest"),
     getAbsolutePath("@storybook/addon-a11y"),
     getAbsolutePath("@storybook/addon-docs"),
     getAbsolutePath("@storybook/addon-mcp"),
