@@ -17,9 +17,7 @@ export default defineConfig({
   },
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: {
-      "@": path.resolve(dirname, "./src"),
-    },
+    tsconfigPaths: true,
   },
   test: {
     environment: "jsdom",

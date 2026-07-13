@@ -6,7 +6,9 @@
     "module": "esnext",
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "#storybook/main": ["./.storybook/__forbidden__/main"],
+      "#storybook/*": ["./.storybook/*"]
     },
     "skipLibCheck": true,
 
