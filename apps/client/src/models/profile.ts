@@ -115,15 +115,29 @@ export type Credential = {
   name: string
   issuer: string | null
   awardedAt: string | null
+  expiresAt: string | null
+  credentialId: string | null
+  credentialUrl: string | null
   description: string | null
   source: ProfileSource
   reviewStatus: ProfileReviewStatus
 }
 
+export type CareerLevel = "entry" | "mid" | "senior" | "lead" | "manager" | "director"
+
+export type JobSearchType = "active" | "passive" | "exploring"
+
+export type JobSearchStage = "preparing" | "applying" | "interviewing" | "offerReview"
+
 export type CareerDirection = {
   desiredTitles: string[]
+  desiredIndustries: string[]
   desiredLocations: string[]
+  desiredLevels: CareerLevel[]
   employmentTypes: EmploymentType[]
+  jobSearchType: JobSearchType
+  jobSearchStage: JobSearchStage
+  focusAreas: string[]
   summary: string | null
   source: ProfileSource
   reviewStatus: ProfileReviewStatus

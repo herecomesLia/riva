@@ -16,37 +16,48 @@ import {
 } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
-import type { JobProfile, ProfileSection } from "@/models/profile"
+import type { JobProfile, ProfileSection, SaveProfileSectionInput } from "@/models/profile"
 
+import { ProfileAdditionalSectionEditor } from "./ProfileAdditionalSectionEditor"
 import { ReviewStatusBadge } from "./ProfileStatusBadge"
+import { ProfileSectionEditor } from "./ProfileSectionEditor"
 import { employmentTypeLabel, formatMonth } from "./profile-formatters"
 
 type ProfileSectionsProps = {
+  editingSection: EditableSection | null
+  onCancelEditing: () => void
+  onDirtyChange: (isDirty: boolean) => void
+  onSave: (input: SaveProfileSectionInput) => Promise<void>
+  onStartEditing: (section: EditableSection) => void
   profile: JobProfile
 }
+
+type EditableSection = Exclude<ProfileSection, "targetRoles">
 
 function ReadonlySectionCard({
   children,
   description,
   footer,
+  onEdit,
   section,
 }: {
   children: ReactNode
   description?: string
   footer?: ReactNode
+  onEdit?: () => void
   section: ProfileSection
 }) {
   const { t } = useTranslation()
 
   return (
-    <Card>
+    <Card data-testid={`profile-section-${section}`}>
       <CardHeader>
         <CardTitle>
           <h2>{t(`profile.sections.${section}`)}</h2>
         </CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
         <CardAction>
-          <Button disabled size="sm" variant="outline">
+          <Button disabled={!onEdit} onClick={onEdit} size="sm" variant="outline">
             <PencilIcon data-icon="inline-start" />
             {t("profile.actions.edit")}
           </Button>
@@ -111,29 +122,70 @@ function DetailList({ items, title }: { items: string[]; title: string }) {
   )
 }
 
-export function ProfileSections({ profile }: ProfileSectionsProps) {
+export function ProfileSections({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
   return (
     <div className="flex flex-col gap-6">
       <section className="grid gap-6 xl:grid-cols-2">
-        <BasicInformationSection profile={profile} />
-        <EducationSection profile={profile} />
+        <BasicInformationSection
+          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+        />
+        <EducationSection
+          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+        />
       </section>
-      <WorkExperienceSection profile={profile} />
-      <ProjectExperienceSection profile={profile} />
+      <WorkExperienceSection
+        {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+      />
+      <ProjectExperienceSection
+        {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+      />
       <section className="grid gap-6 xl:grid-cols-2">
-        <SkillsSection profile={profile} />
-        <CredentialsSection profile={profile} />
+        <SkillsSection
+          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+        />
+        <CredentialsSection
+          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+        />
       </section>
       <section className="grid gap-6 xl:grid-cols-2">
-        <CareerDirectionSection profile={profile} />
+        <CareerDirectionSection
+          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+        />
         <TargetRolesSection profile={profile} />
       </section>
     </div>
   )
 }
 
-function BasicInformationSection({ profile }: ProfileSectionsProps) {
+function BasicInformationSection({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
   const { t } = useTranslation()
+
+  if (editingSection === "basicInformation") {
+    return (
+      <ProfileSectionEditor
+        onCancel={onCancelEditing}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        profile={profile}
+        section="basicInformation"
+      />
+    )
+  }
+
   const information = profile.basicInformation
   const details = [
     ["name", information.name],
@@ -149,7 +201,10 @@ function BasicInformationSection({ profile }: ProfileSectionsProps) {
   ] as const
 
   return (
-    <ReadonlySectionCard section="basicInformation">
+    <ReadonlySectionCard
+      onEdit={() => onStartEditing("basicInformation")}
+      section="basicInformation"
+    >
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center gap-2">
           <ReviewStatusBadge status={information.reviewStatus} />
@@ -192,11 +247,30 @@ function BasicInformationSection({ profile }: ProfileSectionsProps) {
   )
 }
 
-function EducationSection({ profile }: ProfileSectionsProps) {
+function EducationSection({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
   const { t } = useTranslation()
 
+  if (editingSection === "education") {
+    return (
+      <ProfileSectionEditor
+        onCancel={onCancelEditing}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        profile={profile}
+        section="education"
+      />
+    )
+  }
+
   return (
-    <ReadonlySectionCard section="education">
+    <ReadonlySectionCard onEdit={() => onStartEditing("education")} section="education">
       {profile.education.length === 0 ? (
         <EmptySection />
       ) : (
@@ -234,12 +308,32 @@ function EducationSection({ profile }: ProfileSectionsProps) {
   )
 }
 
-function WorkExperienceSection({ profile }: ProfileSectionsProps) {
+function WorkExperienceSection({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
   const { t } = useTranslation()
+
+  if (editingSection === "workExperience") {
+    return (
+      <ProfileSectionEditor
+        onCancel={onCancelEditing}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        profile={profile}
+        section="workExperience"
+      />
+    )
+  }
+
   const skillsById = new Map(profile.skills.map((skill) => [skill.id, skill.name]))
 
   return (
-    <ReadonlySectionCard section="workExperience">
+    <ReadonlySectionCard onEdit={() => onStartEditing("workExperience")} section="workExperience">
       {profile.workExperiences.length === 0 ? (
         <EmptySection />
       ) : (
@@ -297,14 +391,37 @@ function WorkExperienceSection({ profile }: ProfileSectionsProps) {
   )
 }
 
-function ProjectExperienceSection({ profile }: ProfileSectionsProps) {
+function ProjectExperienceSection({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
   const { t } = useTranslation()
+
+  if (editingSection === "projectExperience") {
+    return (
+      <ProfileSectionEditor
+        onCancel={onCancelEditing}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        profile={profile}
+        section="projectExperience"
+      />
+    )
+  }
+
   const workExperienceById = new Map(
     profile.workExperiences.map((experience) => [experience.id, experience.company]),
   )
 
   return (
-    <ReadonlySectionCard section="projectExperience">
+    <ReadonlySectionCard
+      onEdit={() => onStartEditing("projectExperience")}
+      section="projectExperience"
+    >
       {profile.projectExperiences.length === 0 ? (
         <EmptySection />
       ) : (
@@ -361,9 +478,28 @@ function ProjectExperienceSection({ profile }: ProfileSectionsProps) {
   )
 }
 
-function SkillsSection({ profile }: ProfileSectionsProps) {
+function SkillsSection({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
+  if (editingSection === "skills") {
+    return (
+      <ProfileAdditionalSectionEditor
+        onCancel={onCancelEditing}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        profile={profile}
+        section="skills"
+      />
+    )
+  }
+
   return (
-    <ReadonlySectionCard section="skills">
+    <ReadonlySectionCard onEdit={() => onStartEditing("skills")} section="skills">
       {profile.skills.length === 0 ? (
         <EmptySection />
       ) : (
@@ -379,11 +515,30 @@ function SkillsSection({ profile }: ProfileSectionsProps) {
   )
 }
 
-function CredentialsSection({ profile }: ProfileSectionsProps) {
+function CredentialsSection({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
   const { i18n, t } = useTranslation()
 
+  if (editingSection === "credentials") {
+    return (
+      <ProfileAdditionalSectionEditor
+        onCancel={onCancelEditing}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        profile={profile}
+        section="credentials"
+      />
+    )
+  }
+
   return (
-    <ReadonlySectionCard section="credentials">
+    <ReadonlySectionCard onEdit={() => onStartEditing("credentials")} section="credentials">
       {profile.credentials.length === 0 ? (
         <EmptySection />
       ) : (
@@ -412,11 +567,27 @@ function CredentialsSection({ profile }: ProfileSectionsProps) {
                         .join(" · ")}
                     </p>
                   )}
+                  {credential.expiresAt && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("profile.formField.expiresAt")} ·{" "}
+                      {formatMonth(credential.expiresAt, i18n.language, "")}
+                    </p>
+                  )}
                 </div>
                 <ReviewStatusBadge status={credential.reviewStatus} />
               </div>
               {credential.description && (
                 <p className="text-sm leading-6 text-muted-foreground">{credential.description}</p>
+              )}
+              {credential.credentialUrl && (
+                <a
+                  className="text-sm text-primary underline-offset-4 hover:underline"
+                  href={credential.credentialUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {credential.credentialId ?? credential.credentialUrl}
+                </a>
               )}
             </div>
           ))}
@@ -426,15 +597,38 @@ function CredentialsSection({ profile }: ProfileSectionsProps) {
   )
 }
 
-function CareerDirectionSection({ profile }: ProfileSectionsProps) {
+function CareerDirectionSection({
+  editingSection,
+  onCancelEditing,
+  onDirtyChange,
+  onSave,
+  onStartEditing,
+  profile,
+}: ProfileSectionsProps) {
   const { t } = useTranslation()
   const direction = profile.careerDirection
 
+  if (editingSection === "careerDirection") {
+    return (
+      <ProfileAdditionalSectionEditor
+        onCancel={onCancelEditing}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        profile={profile}
+        section="careerDirection"
+      />
+    )
+  }
+
   return (
-    <ReadonlySectionCard section="careerDirection">
+    <ReadonlySectionCard onEdit={() => onStartEditing("careerDirection")} section="careerDirection">
       <div className="flex flex-col gap-5">
         <ReviewStatusBadge status={direction.reviewStatus} />
         <DetailList items={direction.desiredTitles} title={t("profile.field.desiredTitles")} />
+        <DetailList
+          items={direction.desiredIndustries}
+          title={t("profile.field.desiredIndustries")}
+        />
         <DetailList
           items={direction.desiredLocations}
           title={t("profile.field.desiredLocations")}
@@ -451,6 +645,23 @@ function CareerDirectionSection({ profile }: ProfileSectionsProps) {
             </div>
           </div>
         )}
+        {direction.desiredLevels.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">{t("profile.field.desiredLevels")}</h3>
+            <div className="flex flex-wrap gap-2">
+              {direction.desiredLevels.map((level) => (
+                <Badge key={level} variant="outline">
+                  {t(`profile.careerLevel.${level}`)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">{t(`profile.jobSearchType.${direction.jobSearchType}`)}</Badge>
+          <Badge variant="outline">{t(`profile.jobSearchStage.${direction.jobSearchStage}`)}</Badge>
+        </div>
+        <DetailList items={direction.focusAreas} title={t("profile.field.focusAreas")} />
         {direction.summary && (
           <p className="text-sm leading-6 text-muted-foreground">{direction.summary}</p>
         )}
@@ -459,7 +670,7 @@ function CareerDirectionSection({ profile }: ProfileSectionsProps) {
   )
 }
 
-function TargetRolesSection({ profile }: ProfileSectionsProps) {
+function TargetRolesSection({ profile }: { profile: JobProfile }) {
   const { t } = useTranslation()
 
   return (

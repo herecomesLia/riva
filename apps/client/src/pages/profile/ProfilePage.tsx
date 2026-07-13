@@ -1,9 +1,22 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useBlocker } from "@tanstack/react-router"
 import { CircleAlertIcon } from "lucide-react"
+import { useCallback, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { getJobProfile } from "@/services/profile"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import type { ProfileSection } from "@/models/profile"
+import { getJobProfile, saveProfileSection } from "@/services/profile"
 
 import { ProfileHeader } from "./ProfileHeader"
 import {
@@ -17,13 +30,63 @@ import { ProfileResumeCard } from "./ProfileResumeCard"
 import { ProfileSections } from "./ProfileSections"
 import { ProfileSupportingInfo } from "./ProfileSupportingInfo"
 
+type EditableSection = Exclude<ProfileSection, "targetRoles">
+
 export function ProfilePage() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [editingSection, setEditingSection] = useState<EditableSection | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [pendingSection, setPendingSection] = useState<EditableSection | null>(null)
+  const [saveFeedbackVisible, setSaveFeedbackVisible] = useState(false)
+  const blocker = useBlocker({
+    disabled: !isDirty,
+    enableBeforeUnload: isDirty,
+    shouldBlockFn: () => isDirty,
+    withResolver: true,
+  })
   const profileQuery = useQuery({
     queryFn: getJobProfile,
     queryKey: ["profile"],
     retry: false,
   })
+  const saveMutation = useMutation({
+    mutationFn: saveProfileSection,
+    onSuccess: (profile) => {
+      queryClient.setQueryData(["profile"], (snapshot: typeof profileQuery.data) =>
+        snapshot ? { ...snapshot, profile } : snapshot,
+      )
+    },
+  })
+
+  const handleDirtyChange = useCallback((nextIsDirty: boolean) => {
+    setIsDirty(nextIsDirty)
+  }, [])
+
+  function closeEditor() {
+    setEditingSection(null)
+    setIsDirty(false)
+  }
+
+  function startEditing(section: EditableSection) {
+    setSaveFeedbackVisible(false)
+
+    if (editingSection && editingSection !== section && isDirty) {
+      setPendingSection(section)
+      return
+    }
+
+    setEditingSection(section)
+  }
+
+  function discardDraftAndContinue() {
+    if (pendingSection) {
+      setEditingSection(pendingSection)
+    }
+
+    setPendingSection(null)
+    setIsDirty(false)
+  }
 
   if (profileQuery.isPending) {
     return <ProfileLoadingState />
@@ -57,6 +120,12 @@ export function ProfilePage() {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <ProfileHeader profile={profile} />
+
+      {saveFeedbackVisible && (
+        <Alert data-testid="profile-save-success">
+          <AlertDescription>{t("profile.editor.saveSuccess")}</AlertDescription>
+        </Alert>
+      )}
 
       {profile.matchingAnalysisStale && (
         <Alert data-testid="profile-matching-analysis-stale">
@@ -96,10 +165,59 @@ export function ProfilePage() {
 
       {!isProcessing && !isRecognitionFailure && (
         <>
-          <ProfileSections profile={profile} />
+          <ProfileSections
+            editingSection={editingSection}
+            onCancelEditing={closeEditor}
+            onDirtyChange={handleDirtyChange}
+            onSave={async (input) => {
+              await saveMutation.mutateAsync(input)
+              closeEditor()
+              setSaveFeedbackVisible(true)
+            }}
+            onStartEditing={startEditing}
+            profile={profile}
+          />
           <ProfileSupportingInfo profile={profile} />
         </>
       )}
+
+      <AlertDialog open={pendingSection !== null}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("profile.dialog.discardDraftTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("profile.dialog.discardDraftDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingSection(null)}>
+              {t("profile.dialog.stayEditing")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={discardDraftAndContinue} variant="destructive">
+              {t("profile.dialog.discardAndContinue")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={blocker.status === "blocked"}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("profile.dialog.leavePageTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("profile.dialog.leavePageDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>
+              {t("profile.dialog.stayEditing")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => blocker.proceed?.()} variant="destructive">
+              {t("profile.dialog.leavePage")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
