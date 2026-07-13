@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { dashboardResponse } from "@/mocks/data/dashboard"
+import { dashboardResponseMock } from "@/mocks/data/dashboard"
 import { DashboardPage } from "@/pages/dashboard"
 import { getDashboardData } from "@/services/dashboard"
 import { renderWithProviders } from "@/test/render"
@@ -51,12 +51,12 @@ describe("DashboardPage", () => {
   })
 
   it("maps a successful request to the ready default view", async () => {
-    vi.mocked(getDashboardData).mockResolvedValue(structuredClone(dashboardResponse))
+    vi.mocked(getDashboardData).mockResolvedValue(structuredClone(dashboardResponseMock))
 
     renderDashboardPage()
 
-    expect(await screen.findByText(dashboardResponse.currentRole!.title)).toBeInTheDocument()
-    expect(screen.getByText(dashboardResponse.recommendation!.title)).toBeInTheDocument()
+    expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
+    expect(screen.getByText(dashboardResponseMock.recommendation!.title)).toBeInTheDocument()
     expect(screen.queryByTestId("dashboard-loading-state")).not.toBeInTheDocument()
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })
@@ -75,8 +75,8 @@ describe("DashboardPage", () => {
 
   it("switches from error to default loading immediately after retry", async () => {
     const user = userEvent.setup()
-    const firstRequest = createDeferred<typeof dashboardResponse>()
-    const secondRequest = createDeferred<typeof dashboardResponse>()
+    const firstRequest = createDeferred<typeof dashboardResponseMock>()
+    const secondRequest = createDeferred<typeof dashboardResponseMock>()
 
     vi.mocked(getDashboardData)
       .mockReturnValueOnce(firstRequest.promise)
@@ -96,9 +96,9 @@ describe("DashboardPage", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
 
     await act(async () => {
-      secondRequest.resolve(structuredClone(dashboardResponse))
+      secondRequest.resolve(structuredClone(dashboardResponseMock))
     })
-    expect(await screen.findByText(dashboardResponse.currentRole!.title)).toBeInTheDocument()
+    expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
   })
 
   it("shows the ready view after a successful retry", async () => {
@@ -106,14 +106,14 @@ describe("DashboardPage", () => {
 
     vi.mocked(getDashboardData)
       .mockRejectedValueOnce(new Error("first failure"))
-      .mockResolvedValueOnce(structuredClone(dashboardResponse))
+      .mockResolvedValueOnce(structuredClone(dashboardResponseMock))
 
     renderDashboardPage()
 
     expect(await screen.findByRole("alert")).toBeInTheDocument()
     await user.click(getRetryButton())
 
-    expect(await screen.findByText(dashboardResponse.currentRole!.title)).toBeInTheDocument()
+    expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })
 
@@ -134,8 +134,8 @@ describe("DashboardPage", () => {
   })
 
   it("keeps ready data visible during a background fetch", async () => {
-    const firstResponse = structuredClone(dashboardResponse)
-    const secondRequest = createDeferred<typeof dashboardResponse>()
+    const firstResponse = structuredClone(dashboardResponseMock)
+    const secondRequest = createDeferred<typeof dashboardResponseMock>()
     vi.mocked(getDashboardData)
       .mockResolvedValueOnce(firstResponse)
       .mockReturnValueOnce(secondRequest.promise)
@@ -152,7 +152,7 @@ describe("DashboardPage", () => {
     expect(screen.queryByTestId("dashboard-loading-state")).not.toBeInTheDocument()
 
     await act(async () => {
-      secondRequest.resolve(structuredClone(dashboardResponse))
+      secondRequest.resolve(structuredClone(dashboardResponseMock))
     })
   })
 })

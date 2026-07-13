@@ -1,25 +1,6 @@
 import type { DashboardResponse } from "@/models/dashboard"
 
-export type DashboardMockScenario = "full" | "empty" | "partial" | "error" | "errorOnce"
-
-const dashboardMockScenarios = new Set<DashboardMockScenario>([
-  "empty",
-  "error",
-  "errorOnce",
-  "full",
-  "partial",
-])
-
-export function isDashboardMockScenario(value: string | undefined): value is DashboardMockScenario {
-  return value !== undefined && dashboardMockScenarios.has(value as DashboardMockScenario)
-}
-
-const emptyMetric = {
-  currentValue: null,
-  previousValue: null,
-} as const
-
-export const dashboardFullResponse: DashboardResponse = {
+export const dashboardResponseMock: DashboardResponse = {
   currentRole: {
     id: "role_frontend_engineer_bytedance",
     title: "Frontend Engineer",
@@ -106,61 +87,3 @@ export const dashboardFullResponse: DashboardResponse = {
     },
   ],
 }
-
-export const dashboardEmptyResponse: DashboardResponse = {
-  currentRole: null,
-  recommendation: null,
-  metrics: {
-    mockInterviewScore: emptyMetric,
-    practiceTimeMinutes: emptyMetric,
-    roleFit: emptyMetric,
-    targetedPracticeScore: emptyMetric,
-  },
-  performanceTrend: {
-    mockInterview: [],
-    targetedPractice: [],
-  },
-  weaknesses: [],
-}
-
-export const dashboardPartialResponse: DashboardResponse = {
-  currentRole: {
-    id: "role_product_manager_partial",
-    title: "Product Manager",
-    company: null,
-    recruitmentType: "experienced",
-    location: null,
-    experienceYears: null,
-    profileCompleted: false,
-    jobDescriptionAdded: true,
-  },
-  recommendation: null,
-  metrics: {
-    mockInterviewScore: emptyMetric,
-    practiceTimeMinutes: {
-      currentValue: 18,
-      previousValue: null,
-    },
-    roleFit: {
-      currentValue: 68,
-      previousValue: null,
-    },
-    targetedPracticeScore: emptyMetric,
-  },
-  performanceTrend: {
-    mockInterview: [],
-    targetedPractice: [
-      { id: "partial-targeted-practice-001", occurredAt: "2026-07-09T10:00:00.000Z", score: 7.1 },
-    ],
-  },
-  weaknesses: [
-    {
-      id: "partial-weakness-project-expression",
-      category: "projectExpression",
-      description: "Clarify the problem, action, and outcome in a tighter story.",
-      recommendedPracticeCount: 1,
-    },
-  ],
-}
-
-export const dashboardResponse = dashboardFullResponse

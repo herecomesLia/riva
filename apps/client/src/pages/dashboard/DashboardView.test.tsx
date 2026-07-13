@@ -1,17 +1,67 @@
 import { fireEvent, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
-import {
-  dashboardEmptyResponse,
-  dashboardPartialResponse,
-  dashboardResponse,
-} from "@/mocks/data/dashboard"
 import { i18n } from "@/i18n/i18n"
+import { dashboardResponseMock } from "@/mocks/data/dashboard"
 import type { DashboardResponse } from "@/models/dashboard"
 import type { Loadable } from "@/types"
 
-import { DashboardView } from "./DashboardView"
 import { renderWithProviders } from "@/test/render"
+import { DashboardView } from "./DashboardView"
+
+const emptyMetric = { currentValue: null, previousValue: null } as const
+
+const emptyDashboardResponse = {
+  ...structuredClone(dashboardResponseMock),
+  currentRole: null,
+  recommendation: null,
+  metrics: {
+    mockInterviewScore: emptyMetric,
+    practiceTimeMinutes: emptyMetric,
+    roleFit: emptyMetric,
+    targetedPracticeScore: emptyMetric,
+  },
+  performanceTrend: {
+    mockInterview: [],
+    targetedPractice: [],
+  },
+  weaknesses: [],
+} satisfies DashboardResponse
+
+const partialDashboardResponse = {
+  ...structuredClone(dashboardResponseMock),
+  currentRole: {
+    id: "role_product_manager_partial",
+    title: "Product Manager",
+    company: null,
+    recruitmentType: "experienced",
+    location: null,
+    experienceYears: null,
+    profileCompleted: false,
+    jobDescriptionAdded: true,
+  },
+  recommendation: null,
+  metrics: {
+    mockInterviewScore: emptyMetric,
+    practiceTimeMinutes: { currentValue: 18, previousValue: null },
+    roleFit: { currentValue: 68, previousValue: null },
+    targetedPracticeScore: emptyMetric,
+  },
+  performanceTrend: {
+    mockInterview: [],
+    targetedPractice: [
+      { id: "partial-targeted-practice-001", occurredAt: "2026-07-09T10:00:00.000Z", score: 7.1 },
+    ],
+  },
+  weaknesses: [
+    {
+      id: "partial-weakness-project-expression",
+      category: "projectExpression",
+      description: "Clarify the problem, action, and outcome in a tighter story.",
+      recommendedPracticeCount: 1,
+    },
+  ],
+} satisfies DashboardResponse
 
 function renderDashboardView(content: Loadable<DashboardResponse>) {
   return renderWithProviders(
@@ -37,12 +87,12 @@ describe("DashboardView", () => {
   })
 
   it("renders complete business data in the ready layout", async () => {
-    renderDashboardView({ status: "ready", data: structuredClone(dashboardResponse) })
+    renderDashboardView({ status: "ready", data: structuredClone(dashboardResponseMock) })
 
-    expect(await screen.findByText(dashboardResponse.currentRole!.title)).toBeInTheDocument()
-    expect(screen.getByText(dashboardResponse.recommendation!.title)).toBeInTheDocument()
+    expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
+    expect(screen.getByText(dashboardResponseMock.recommendation!.title)).toBeInTheDocument()
     expect(screen.getByText("76%")).toBeInTheDocument()
-    expect(screen.getByText(dashboardResponse.weaknesses[0].description)).toBeInTheDocument()
+    expect(screen.getByText(dashboardResponseMock.weaknesses[0].description)).toBeInTheDocument()
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
     fireEvent.focus(chart)
@@ -51,7 +101,7 @@ describe("DashboardView", () => {
   })
 
   it("renders local empty states for null, empty arrays, and empty metrics", async () => {
-    renderDashboardView({ status: "ready", data: structuredClone(dashboardEmptyResponse) })
+    renderDashboardView({ status: "ready", data: structuredClone(emptyDashboardResponse) })
 
     expect(await screen.findByText("尚未设置目标岗位")).toBeInTheDocument()
     expect(screen.getByText("暂无训练建议")).toBeInTheDocument()
@@ -62,7 +112,7 @@ describe("DashboardView", () => {
   })
 
   it("renders an unchanged metric comparison", async () => {
-    const data = structuredClone(dashboardResponse)
+    const data = structuredClone(dashboardResponseMock)
     data.metrics.roleFit = { currentValue: 76, previousValue: 76 }
 
     renderDashboardView({ status: "ready", data })
@@ -71,12 +121,12 @@ describe("DashboardView", () => {
   })
 
   it("renders partial data without failing unrelated cards", async () => {
-    renderDashboardView({ status: "ready", data: structuredClone(dashboardPartialResponse) })
+    renderDashboardView({ status: "ready", data: structuredClone(partialDashboardResponse) })
 
-    expect(await screen.findByText(dashboardPartialResponse.currentRole!.title)).toBeInTheDocument()
+    expect(await screen.findByText(partialDashboardResponse.currentRole!.title)).toBeInTheDocument()
     expect(screen.getByText("暂无训练建议")).toBeInTheDocument()
     expect(screen.getByText("68%")).toBeInTheDocument()
-    expect(screen.getByText(dashboardPartialResponse.weaknesses[0].description)).toBeInTheDocument()
+    expect(screen.getByText(partialDashboardResponse.weaknesses[0].description)).toBeInTheDocument()
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
     fireEvent.focus(chart)

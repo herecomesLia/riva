@@ -10,9 +10,6 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   define: {
-    "import.meta.env.DASHBOARD_MOCK_SCENARIO": JSON.stringify(
-      process.env.DASHBOARD_MOCK_SCENARIO ?? "",
-    ),
     "import.meta.env.MOCK": JSON.stringify(process.env.MOCK ?? ""),
   },
   plugins: [react(), tailwindcss()],
@@ -27,7 +24,6 @@ export default defineConfig({
       {
         extends: true,
         define: {
-          "import.meta.env.DASHBOARD_MOCK_SCENARIO": JSON.stringify(""),
           "import.meta.env.MOCK": JSON.stringify(""),
         },
         test: {
@@ -37,7 +33,6 @@ export default defineConfig({
       {
         extends: true,
         define: {
-          "import.meta.env.DASHBOARD_MOCK_SCENARIO": JSON.stringify(""),
           "import.meta.env.MOCK": JSON.stringify("true"),
         },
         test: {
