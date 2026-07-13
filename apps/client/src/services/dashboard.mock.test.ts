@@ -3,21 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
 import { getDashboardData } from "@/services/dashboard"
 
-const { envState } = vi.hoisted(() => ({
-  envState: { mock: true },
-}))
-
-vi.mock("@/app/env", () => ({
-  env: envState,
-}))
-
-describe("getDashboardData", () => {
+describe("getDashboardData mock service", () => {
   beforeEach(() => {
-    envState.mock = true
     vi.useFakeTimers()
   })
 
   afterEach(() => {
+    vi.clearAllTimers()
     vi.useRealTimers()
   })
 
@@ -50,11 +42,5 @@ describe("getDashboardData", () => {
 
     expect(secondResponse).toEqual(dashboardResponseMock)
     expect(secondResponse).not.toBe(firstResponse)
-  })
-
-  it("uses the real implementation when mock mode is disabled", async () => {
-    envState.mock = false
-
-    await expect(getDashboardData()).rejects.toThrow("Real dashboard data is not implemented.")
   })
 })

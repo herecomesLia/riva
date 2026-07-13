@@ -1,15 +1,14 @@
 import { screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
+import { useMedia } from "react-use"
 
 import { LoginPage } from "@/pages/login/LoginPage"
 import { renderWithProviders } from "@/test/render"
 
-const { useMediaMock } = vi.hoisted(() => ({ useMediaMock: vi.fn() }))
-
 vi.mock("react-use", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-use")>()),
-  useMedia: useMediaMock,
+  useMedia: vi.fn(),
 }))
 vi.mock("@/pages/login/LoginForm", () => ({
   LoginForm: ({ onLoginSuccess }: { onLoginSuccess: () => void }) => (
@@ -24,6 +23,8 @@ vi.mock("@/pages/login/RegisterForm", () => ({
 vi.mock("@/pages/login/LoginHeroes", () => ({
   LoginHeroes: () => <div data-testid="login-heroes" />,
 }))
+
+const useMediaMock = vi.mocked(useMedia)
 
 describe("LoginPage", () => {
   it("navigates to dashboard after the form reports a successful login", async () => {

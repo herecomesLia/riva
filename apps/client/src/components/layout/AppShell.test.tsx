@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { AppShell } from "@/components/layout/AppShell"
 import { i18n } from "@/i18n/i18n"
@@ -9,6 +9,11 @@ import { userMock } from "@/mocks/data/auth"
 import { useAuthStore } from "@/stores/auth"
 import { renderWithProviders } from "@/test/render"
 import { resetStores } from "@/test/stores"
+
+vi.mock("@/services/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/auth")>()),
+  logout: vi.fn(),
+}))
 
 function t(key: string) {
   return i18n.t(key)
@@ -89,6 +94,8 @@ describe("AppShell", () => {
 
   it("clears auth store and navigates to login after sign out", async () => {
     const user = userEvent.setup()
+    const { logout } = await import("@/services/auth")
+    vi.mocked(logout).mockResolvedValue()
     useAuthStore.getState().setCurrentUser(userMock)
     const { router } = renderWithProviders(<AppShell />, {
       router: {

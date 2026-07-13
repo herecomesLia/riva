@@ -3,10 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { mockLoginCredentials, userMock } from "@/mocks/data/auth"
 import { login } from "@/services/auth"
 
-vi.mock("@/app/env", () => ({
-  env: { mock: true },
-}))
-
 async function resolveMockLogin(
   username: string = mockLoginCredentials.username,
   password: string = mockLoginCredentials.password,
@@ -24,6 +20,7 @@ describe("auth service mock login", () => {
   })
 
   afterEach(() => {
+    vi.clearAllTimers()
     vi.useRealTimers()
   })
 

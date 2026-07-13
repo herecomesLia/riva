@@ -2,17 +2,18 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { useAuth } from "@/hooks/use-auth"
 import { i18n } from "@/i18n/i18n"
 import { LoginError } from "@/models/auth"
 import { LoginForm } from "@/pages/login/LoginForm"
 import { LoginHeroesProvider, useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 import { renderWithProviders } from "@/test/render"
 
-const { loginMock } = vi.hoisted(() => ({ loginMock: vi.fn() }))
-
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ login: loginMock }),
+  useAuth: vi.fn(),
 }))
+
+const loginMock = vi.fn()
 
 function t(key: string) {
   return i18n.t(key)
@@ -64,6 +65,13 @@ function getPasswordInput() {
 describe("LoginForm", () => {
   beforeEach(() => {
     loginMock.mockReset()
+    vi.mocked(useAuth).mockReturnValue({
+      currentUser: null,
+      isAuthenticated: false,
+      login: loginMock,
+      logout: vi.fn(),
+      restoreCurrentUser: vi.fn(),
+    })
   })
 
   afterEach(() => {

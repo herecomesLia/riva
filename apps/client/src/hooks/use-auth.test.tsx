@@ -1,16 +1,23 @@
 import { act, renderHook } from "@testing-library/react"
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { useAuth } from "@/hooks/use-auth"
 import { useAuthStore } from "@/stores/auth"
 import { resetStores } from "@/test/stores"
+
+vi.mock("@/services/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/auth")>()),
+  restoreCurrentUser: vi.fn(),
+}))
 
 describe("useAuth", () => {
   beforeEach(() => {
     resetStores()
   })
 
-  it("does not automatically sign in when restoring the current user in mock mode", async () => {
+  it("does not automatically sign in when restoring no current user", async () => {
+    const { restoreCurrentUser } = await import("@/services/auth")
+    vi.mocked(restoreCurrentUser).mockResolvedValue(null)
     const { result } = renderHook(() => useAuth())
 
     await act(async () => {
