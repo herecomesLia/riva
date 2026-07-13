@@ -29,6 +29,7 @@ import { ResumeProcessingBadge } from "./ProfileStatusBadge"
 import { formatDate, formatFileSize } from "./profile-formatters"
 
 type ProfileResumeCardProps = {
+  onReplaceResume: () => void
   profile: JobProfile
   recognition: ResumeRecognition | null
   resumeUpdate: ResumeUpdate | null
@@ -50,7 +51,12 @@ function attachmentState(status: ResumeProcessingStatus) {
   return "done" as const
 }
 
-export function ProfileResumeCard({ profile, recognition, resumeUpdate }: ProfileResumeCardProps) {
+export function ProfileResumeCard({
+  onReplaceResume,
+  profile,
+  recognition,
+  resumeUpdate,
+}: ProfileResumeCardProps) {
   const { i18n, t } = useTranslation()
   const resume = profile.resume
   const pendingReviewCount = recognition?.pendingReviewCount ?? profile.pendingReviewCount
@@ -120,7 +126,7 @@ export function ProfileResumeCard({ profile, recognition, resumeUpdate }: Profil
         )}
       </CardContent>
       <CardFooter className="flex flex-wrap gap-2">
-        <Button disabled size="sm" variant="outline">
+        <Button onClick={onReplaceResume} size="sm" variant="outline">
           <UploadIcon data-icon="inline-start" />
           {t("profile.actions.replaceResume")}
         </Button>

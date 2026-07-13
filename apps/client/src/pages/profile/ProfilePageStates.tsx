@@ -93,8 +93,14 @@ export function ProfileProcessingState({
 
 export function ProfileRecognitionFailureState({
   failureReason,
+  onManualEntry,
+  onReupload,
+  onRetry,
 }: {
   failureReason: string | null
+  onManualEntry: () => void
+  onReupload: () => void
+  onRetry: () => void
 }) {
   const { t } = useTranslation()
 
@@ -105,6 +111,17 @@ export function ProfileRecognitionFailureState({
       <AlertDescription>
         {failureReason ?? t("profile.lifecycle.failed.description")}
       </AlertDescription>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button onClick={onRetry} size="sm">
+          {t("profile.actions.retryRecognition")}
+        </Button>
+        <Button onClick={onReupload} size="sm" variant="outline">
+          {t("profile.actions.replaceResume")}
+        </Button>
+        <Button onClick={onManualEntry} size="sm" variant="outline">
+          {t("profile.actions.manualEntry")}
+        </Button>
+      </div>
     </Alert>
   )
 }

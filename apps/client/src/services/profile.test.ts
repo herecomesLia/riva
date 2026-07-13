@@ -3,13 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ProfileMockScenario } from "@/mocks/data/profile"
 import {
   cancelResumeUpdate,
+  cancelResumeRecognitionReview,
   confirmResumeUpdate,
+  createManualJobProfile,
   getJobProfile,
   getResumeRecognitionStatus,
   saveProfileSection,
+  startInitialResumeRecognition,
+  startUpdatedResumeRecognition,
   submitResumeRecognitionConfirmation,
   uploadInitialResume,
   uploadUpdatedResume,
+  regenerateMatchingAnalysis,
 } from "@/services/profile"
 
 const { envState } = vi.hoisted(() => ({
@@ -150,6 +155,29 @@ describe("job profile mock service", () => {
     expect(recognition.processingStatus).toBe("uploaded")
   })
 
+  it("recognizes pasted text into a review draft and can cancel the review", async () => {
+    envState.profileMockScenario = "complete"
+    await settleMockRequest(getJobProfile())
+    envState.profileMockScenario = "notCreated"
+    await settleMockRequest(getJobProfile())
+    const upload = await settleMockRequest(uploadInitialResume({ text: "Pasted candidate resume" }))
+    const uploadingProfile = upload.profile!
+    const recognized = await settleMockRequest(
+      startInitialResumeRecognition(uploadingProfile.profileId, uploadingProfile.resume!.id),
+    )
+
+    expect(recognized.profile).toMatchObject({ status: "awaitingConfirmation" })
+    expect(recognized.profile?.resume?.fileName).toBe("pasted-resume.txt")
+
+    const cancelled = await settleMockRequest(
+      cancelResumeRecognitionReview(recognized.profile!.profileId, recognized.profile!.resume!.id),
+    )
+    expect(cancelled.profile).toBeNull()
+
+    const manual = await settleMockRequest(createManualJobProfile())
+    expect(manual.profile).toMatchObject({ status: "active", resume: null })
+  })
+
   it("exposes a confirmed profile after the recognition result is accepted", async () => {
     await setMockScenario("awaitingConfirmation")
     const snapshot = await settleMockRequest(getJobProfile())
@@ -207,11 +235,29 @@ describe("job profile mock service", () => {
         processingStatus: "uploaded",
       },
     })
+
+    const recognized = await settleMockRequest(
+      startUpdatedResumeRecognition({
+        profileId: snapshot.profile!.profileId,
+        resumeUpdateId: snapshot.resumeUpdate!.id,
+      }),
+    )
+    expect(recognized.resumeUpdate).toMatchObject({
+      status: "awaitingConfirmation",
+      changeSummary: { newItems: 1, changedItems: 2, missingItems: 1 },
+      preservesManualChanges: true,
+    })
   })
 
   it("reports stale matching analysis as backend business data", async () => {
-    const profile = await getProfileForScenario("matchingAnalysisStale")
+    await setMockScenario("matchingAnalysisStale")
+    const snapshot = await settleMockRequest(getJobProfile())
+    const profile = snapshot.profile
 
     expect(profile?.matchingAnalysisStale).toBe(true)
+    expect(snapshot.matchingAnalysis?.profileVersion).toBeLessThan(profile!.version)
+
+    const regenerated = await settleMockRequest(regenerateMatchingAnalysis(profile!.profileId))
+    expect(regenerated).toMatchObject({ status: "current", profileVersion: profile!.version })
   })
 })

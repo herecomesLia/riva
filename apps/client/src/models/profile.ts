@@ -179,18 +179,36 @@ export type ResumeRecognition = {
   pendingReviewCount: number
 }
 
+export type ResumeImportChangeSummary = {
+  changedItems: number
+  missingItems: number
+  newItems: number
+}
+
+export type MatchingAnalysis = {
+  failureReason: string | null
+  generatedAt: string | null
+  profileVersion: number
+  status: "current" | "stale" | "regenerating" | "failed"
+}
+
 export type ResumeUpdate = {
   id: string
   resume: ResumeFile
   createdAt: string
-  status: "awaitingConfirmation"
+  status: "uploading" | "parsing" | "awaitingConfirmation" | "failed"
   pendingReviewCount: number
+  changeSummary: ResumeImportChangeSummary | null
+  failureReason: string | null
+  proposedProfile: JobProfile | null
+  preservesManualChanges: boolean
 }
 
 export type JobProfileSnapshot = {
   profile: JobProfile | null
   recognition: ResumeRecognition | null
   resumeUpdate: ResumeUpdate | null
+  matchingAnalysis: MatchingAnalysis | null
 }
 
 export type ProfileSectionValueMap = {
@@ -214,7 +232,8 @@ export type SaveProfileSectionInput = {
 }[ProfileSection]
 
 export type ResumeUploadInput = {
-  file: File
+  file?: File
+  text?: string
 }
 
 export type ResumeRecognitionConfirmationInput = {

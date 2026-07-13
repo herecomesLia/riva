@@ -7,12 +7,35 @@ import { defaultLanguage } from "@/i18n/resources"
 import { createProfileMockSnapshot } from "@/mocks/data/profile"
 import type { JobProfile } from "@/models/profile"
 import { ProfilePage } from "@/pages/profile"
-import { getJobProfile, saveProfileSection } from "@/services/profile"
+import {
+  cancelResumeRecognitionReview,
+  cancelResumeUpdate,
+  confirmResumeUpdate,
+  createManualJobProfile,
+  getJobProfile,
+  regenerateMatchingAnalysis,
+  saveProfileSection,
+  startInitialResumeRecognition,
+  startUpdatedResumeRecognition,
+  submitResumeRecognitionConfirmation,
+  uploadInitialResume,
+  uploadUpdatedResume,
+} from "@/services/profile"
 import { renderWithProviders } from "@/test/render"
 
 vi.mock("@/services/profile", () => ({
   getJobProfile: vi.fn(),
   saveProfileSection: vi.fn(),
+  cancelResumeRecognitionReview: vi.fn(),
+  cancelResumeUpdate: vi.fn(),
+  confirmResumeUpdate: vi.fn(),
+  createManualJobProfile: vi.fn(),
+  regenerateMatchingAnalysis: vi.fn(),
+  startInitialResumeRecognition: vi.fn(),
+  startUpdatedResumeRecognition: vi.fn(),
+  submitResumeRecognitionConfirmation: vi.fn(),
+  uploadInitialResume: vi.fn(),
+  uploadUpdatedResume: vi.fn(),
 }))
 
 function renderProfilePage() {
@@ -46,6 +69,16 @@ describe("ProfilePage", () => {
     await i18n.changeLanguage(defaultLanguage)
     vi.mocked(getJobProfile).mockReset()
     vi.mocked(saveProfileSection).mockReset()
+    vi.mocked(cancelResumeRecognitionReview).mockReset()
+    vi.mocked(cancelResumeUpdate).mockReset()
+    vi.mocked(confirmResumeUpdate).mockReset()
+    vi.mocked(createManualJobProfile).mockReset()
+    vi.mocked(regenerateMatchingAnalysis).mockReset()
+    vi.mocked(startInitialResumeRecognition).mockReset()
+    vi.mocked(startUpdatedResumeRecognition).mockReset()
+    vi.mocked(submitResumeRecognitionConfirmation).mockReset()
+    vi.mocked(uploadInitialResume).mockReset()
+    vi.mocked(uploadUpdatedResume).mockReset()
   })
 
   it("renders an empty state when no profile exists", async () => {
@@ -450,5 +483,83 @@ describe("ProfilePage", () => {
     expect(save).toBeDisabled()
     resolveSave?.(profile)
     expect(await screen.findByTestId("profile-save-success")).toBeInTheDocument()
+  })
+
+  it("uploads pasted resume text and advances to a reviewable recognition draft", async () => {
+    const user = userEvent.setup()
+    const uploading = createProfileMockSnapshot("uploading")
+    const recognized = createProfileMockSnapshot("awaitingConfirmation")
+    vi.mocked(getJobProfile).mockResolvedValue(createProfileMockSnapshot("notCreated"))
+    vi.mocked(uploadInitialResume).mockResolvedValue(uploading)
+    vi.mocked(startInitialResumeRecognition).mockResolvedValue(recognized)
+    renderProfilePage()
+
+    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "Resume text")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
+
+    await waitFor(() =>
+      expect(uploadInitialResume).toHaveBeenCalledWith({ file: undefined, text: "Resume text" }),
+    )
+    expect(await screen.findByTestId("profile-review-notice")).toHaveTextContent(
+      i18n.t("profile.lifecycle.awaitingConfirmation.title"),
+    )
+  })
+
+  it("confirms or cancels a recognition review through the service layer", async () => {
+    const user = userEvent.setup()
+    const snapshot = createProfileMockSnapshot("awaitingConfirmation")
+    const activeProfile = structuredClone(snapshot.profile!)
+    activeProfile.status = "active"
+    vi.mocked(getJobProfile).mockResolvedValue(snapshot)
+    vi.mocked(submitResumeRecognitionConfirmation).mockResolvedValue(activeProfile)
+    renderProfilePage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.confirmRecognition") }),
+    )
+    expect(await screen.findByText(i18n.t("profile.status.active"))).toBeInTheDocument()
+    expect(submitResumeRecognitionConfirmation).toHaveBeenCalledWith({
+      profileId: snapshot.profile!.profileId,
+      resumeId: snapshot.profile!.resume!.id,
+    })
+  })
+
+  it("shows pending replacement summary and keeps the active profile when cancelled", async () => {
+    const user = userEvent.setup()
+    const snapshot = createProfileMockSnapshot("resumeUpdateAwaitingConfirmation")
+    const cancelled = structuredClone(snapshot)
+    cancelled.resumeUpdate = null
+    vi.mocked(getJobProfile).mockResolvedValue(snapshot)
+    vi.mocked(cancelResumeUpdate).mockResolvedValue(cancelled)
+    renderProfilePage()
+
+    const review = await screen.findByTestId("profile-resume-update-review")
+    expect(review).toHaveTextContent(i18n.t("profile.import.newItems"))
+    await user.click(within(review).getByRole("button", { name: i18n.t("profile.import.cancel") }))
+    await waitFor(() => expect(cancelResumeUpdate).toHaveBeenCalled())
+    expect(screen.queryByTestId("profile-resume-update-review")).not.toBeInTheDocument()
+    expect(screen.getByText("Lin Chen")).toBeInTheDocument()
+  })
+
+  it("regenerates stale matching analysis through the mock service", async () => {
+    const user = userEvent.setup()
+    const snapshot = createProfileMockSnapshot("matchingAnalysisStale")
+    vi.mocked(getJobProfile).mockResolvedValue(snapshot)
+    vi.mocked(regenerateMatchingAnalysis).mockResolvedValue({
+      status: "current",
+      profileVersion: snapshot.profile!.version,
+      generatedAt: "2026-07-13T08:20:00.000Z",
+      failureReason: null,
+    })
+    renderProfilePage()
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("profile.actions.regenerateMatchingAnalysis"),
+      }),
+    )
+    await waitFor(() => expect(regenerateMatchingAnalysis).toHaveBeenCalled())
+    expect(vi.mocked(regenerateMatchingAnalysis).mock.calls[0][0]).toBe(snapshot.profile!.profileId)
+    expect(screen.queryByTestId("profile-matching-analysis-stale")).not.toBeInTheDocument()
   })
 })

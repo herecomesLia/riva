@@ -11,6 +11,11 @@ export const profile = {
     staleTitle: "Update your role matching analysis",
     staleDescription:
       "Your profile has changed, so the current analysis may no longer reflect your latest experience and direction.",
+    oldVersion: "The current matching analysis is based on an older profile version.",
+    regenerating: "Regenerating matching analysis…",
+    regenerationFailed: "Matching analysis regeneration failed. Try again.",
+    historyPreserved:
+      "New role matching and training use the latest profile. Historical cards, training, and reports stay unchanged.",
   },
   status: {
     draft: "Draft",
@@ -31,6 +36,11 @@ export const profile = {
     replaceResume: "Replace resume",
     recognizeAgain: "Recognize again",
     viewTargetRoles: "View target roles",
+    confirmRecognition: "Confirm and create profile",
+    cancelRecognition: "Cancel review",
+    retryRecognition: "Recognize again",
+    manualEntry: "Enter manually",
+    regenerateMatchingAnalysis: "Regenerate matching analysis",
   },
   resume: {
     title: "Current resume",
@@ -44,6 +54,31 @@ export const profile = {
     updatePendingTitle: "New resume is waiting for confirmation",
     updatePendingDescription:
       "The new resume has been recognized. Your active profile will not be replaced until it is confirmed.",
+  },
+  import: {
+    title: "Upload a resume to create your profile",
+    updateTitle: "New resume recognition result",
+    description:
+      "Upload a file or paste resume text. Recognition is only written to the profile after you confirm it.",
+    updateDescription:
+      "A new resume creates a separate pending result and never overwrites the current profile directly.",
+    file: "Resume file",
+    text: "Or paste resume text",
+    textPlaceholder: "Paste your resume content here",
+    required: "Select a resume file or paste resume text.",
+    submit: "Upload and recognize",
+    submitting: "Uploading...",
+    processing: "Recognizing the new resume…",
+    failed: "New resume recognition failed.",
+    newItems: "New items recognized",
+    changedItems: "Items that may change",
+    missingItems: "Existing items that may be missing",
+    manualChangesProtected:
+      "Manual edits and additions in the current profile are preserved; anything that cannot be merged safely needs your confirmation.",
+    apply: "Confirm and apply result",
+    applying: "Applying...",
+    cancel: "Cancel new resume update",
+    cancelling: "Cancelling...",
   },
   lifecycle: {
     uploading: {

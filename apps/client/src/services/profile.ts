@@ -4,6 +4,7 @@ import { waitForMockDelay } from "@/mocks/utils"
 import type {
   JobProfile,
   JobProfileSnapshot,
+  MatchingAnalysis,
   ResumeFile,
   ResumeRecognition,
   ResumeRecognitionConfirmationInput,
@@ -56,12 +57,19 @@ function requireMatchingProfile(profile: JobProfile, profileId: string) {
   }
 }
 
-function createUploadedResume(file: File): ResumeFile {
+function createUploadedResume(input: ResumeUploadInput): ResumeFile {
+  const file = input.file
+  const text = input.text?.trim()
+
+  if (!file && !text) {
+    throw createProfileMockError("A resume file or pasted resume text is required.")
+  }
+
   return {
     id: "resume_uploaded_initial",
-    fileName: file.name,
-    mimeType: file.type || "application/octet-stream",
-    fileSize: file.size,
+    fileName: file?.name ?? "pasted-resume.txt",
+    mimeType: file?.type || (text ? "text/plain" : "application/octet-stream"),
+    fileSize: file?.size ?? new Blob([text ?? ""]).size,
     uploadedAt: "2026-07-13T08:00:00.000Z",
     parsedAt: null,
     processingStatus: "uploaded",
@@ -176,7 +184,7 @@ export async function uploadInitialResume(input: ResumeUploadInput): Promise<Job
 
   const nextSnapshot = createProfileMockSnapshot("uploading")
   const profile = requireProfile(nextSnapshot)
-  const resume = createUploadedResume(input.file)
+  const resume = createUploadedResume(input)
 
   profile.resume = resume
   profile.updatedAt = resume.uploadedAt
@@ -190,6 +198,69 @@ export async function uploadInitialResume(input: ResumeUploadInput): Promise<Job
   mockSnapshot = nextSnapshot
 
   return copy(nextSnapshot)
+}
+
+export async function startInitialResumeRecognition(
+  profileId: string,
+  resumeId: string,
+): Promise<JobProfileSnapshot> {
+  if (!env.mock) throw new Error("Real resume recognition API is not implemented.")
+
+  await waitForProfileMock()
+  const snapshot = getMockSnapshot()
+  const profile = requireProfile(snapshot)
+  const resume = requireCurrentResume(profile)
+  requireMatchingProfile(profile, profileId)
+
+  if (resume.id !== resumeId) throw createProfileMockError("Resume recognition was not found.")
+
+  const recognized = createProfileMockSnapshot("awaitingConfirmation")
+  const recognizedProfile = requireProfile(recognized)
+  recognizedProfile.profileId = profile.profileId
+  recognizedProfile.resume = {
+    ...resume,
+    parsedAt: "2026-07-13T08:02:00.000Z",
+    processingStatus: "succeeded",
+  }
+  recognized.recognition = {
+    resumeId,
+    processingStatus: "succeeded",
+    completedAt: recognizedProfile.resume.parsedAt,
+    failureReason: null,
+    pendingReviewCount: recognizedProfile.pendingReviewCount,
+  }
+  mockSnapshot = recognized
+  return copy(recognized)
+}
+
+export async function cancelResumeRecognitionReview(
+  profileId: string,
+  resumeId: string,
+): Promise<JobProfileSnapshot> {
+  if (!env.mock) throw new Error("Real resume recognition API is not implemented.")
+
+  await waitForProfileMock()
+  const snapshot = getMockSnapshot()
+  const profile = requireProfile(snapshot)
+  requireMatchingProfile(profile, profileId)
+
+  if (profile.resume?.id !== resumeId)
+    throw createProfileMockError("Resume recognition was not found.")
+
+  mockSnapshot = createProfileMockSnapshot("notCreated")
+  return copy(mockSnapshot)
+}
+
+export async function createManualJobProfile(): Promise<JobProfileSnapshot> {
+  if (!env.mock) throw new Error("Real job profile API is not implemented.")
+
+  await waitForProfileMock()
+  const snapshot = createProfileMockSnapshot("incomplete")
+  const profile = requireProfile(snapshot)
+  profile.status = "active"
+  profile.resume = null
+  mockSnapshot = snapshot
+  return copy(snapshot)
 }
 
 export async function getResumeRecognitionStatus(
@@ -266,7 +337,7 @@ export async function uploadUpdatedResume(input: ResumeUploadInput): Promise<Job
     )
   }
 
-  const resume = createUploadedResume(input.file)
+  const resume = createUploadedResume(input)
   resume.id = "resume_uploaded_update"
   snapshot.resumeUpdate = {
     id: "resume_update_uploaded",
@@ -274,8 +345,43 @@ export async function uploadUpdatedResume(input: ResumeUploadInput): Promise<Job
     status: "awaitingConfirmation",
     pendingReviewCount: 0,
     resume,
+    changeSummary: null,
+    failureReason: null,
+    proposedProfile: null,
+    preservesManualChanges: true,
   }
 
+  return copy(snapshot)
+}
+
+export async function startUpdatedResumeRecognition(
+  input: ResumeUpdateDecisionInput,
+): Promise<JobProfileSnapshot> {
+  if (!env.mock) throw new Error("Real resume recognition API is not implemented.")
+
+  await waitForProfileMock()
+  const snapshot = getMockSnapshot()
+  const profile = requireProfile(snapshot)
+  const resumeUpdate = snapshot.resumeUpdate
+  requireMatchingProfile(profile, input.profileId)
+
+  if (!resumeUpdate || resumeUpdate.id !== input.resumeUpdateId) {
+    throw createProfileMockError("Resume update was not found.")
+  }
+
+  const candidate = createProfileMockSnapshot("complete").profile!
+  candidate.profileId = profile.profileId
+  candidate.resume = {
+    ...resumeUpdate.resume,
+    parsedAt: "2026-07-13T08:04:00.000Z",
+    processingStatus: "succeeded",
+  }
+  resumeUpdate.status = "awaitingConfirmation"
+  resumeUpdate.resume = candidate.resume
+  resumeUpdate.pendingReviewCount = 3
+  resumeUpdate.changeSummary = { newItems: 1, changedItems: 2, missingItems: 1 }
+  resumeUpdate.proposedProfile = candidate
+  mockSnapshot = snapshot
   return copy(snapshot)
 }
 
@@ -303,6 +409,29 @@ export async function confirmResumeUpdate(input: ResumeUpdateDecisionInput): Pro
   snapshot.resumeUpdate = null
 
   return copy(profile)
+}
+
+export async function regenerateMatchingAnalysis(profileId: string): Promise<MatchingAnalysis> {
+  if (!env.mock) throw new Error("Real matching analysis API is not implemented.")
+
+  await waitForProfileMock()
+  const snapshot = getMockSnapshot()
+  const profile = requireProfile(snapshot)
+  requireMatchingProfile(profile, profileId)
+
+  if (env.profileMockScenario === "saveFailure") {
+    throw createProfileMockError("Mock matching analysis regeneration failed.")
+  }
+
+  const matchingAnalysis: MatchingAnalysis = {
+    status: "current",
+    profileVersion: profile.version,
+    generatedAt: "2026-07-13T08:20:00.000Z",
+    failureReason: null,
+  }
+  snapshot.matchingAnalysis = matchingAnalysis
+  profile.matchingAnalysisStale = false
+  return copy(matchingAnalysis)
 }
 
 export async function cancelResumeUpdate(

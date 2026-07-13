@@ -342,6 +342,10 @@ function createResumeUpdate(): ResumeUpdate {
     createdAt: "2026-07-12T12:15:00.000Z",
     status: "awaitingConfirmation",
     pendingReviewCount: 3,
+    changeSummary: { newItems: 1, changedItems: 2, missingItems: 1 },
+    failureReason: null,
+    proposedProfile: createCompleteProfile(),
+    preservesManualChanges: true,
     resume: createResume({
       id: "resume_2026_07",
       fileName: "lin-chen-resume-july.pdf",
@@ -361,6 +365,18 @@ function createSnapshot(
     profile,
     recognition,
     resumeUpdate: null,
+    matchingAnalysis: profile
+      ? {
+          status: profile.matchingAnalysisStale ? "stale" : "current",
+          profileVersion: profile.matchingAnalysisStale
+            ? Math.max(1, profile.version - 1)
+            : profile.version,
+          generatedAt: profile.matchingAnalysisStale
+            ? "2026-07-10T08:00:00.000Z"
+            : "2026-07-10T09:00:00.000Z",
+          failureReason: null,
+        }
+      : null,
   }
 }
 
