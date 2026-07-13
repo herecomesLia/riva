@@ -5,6 +5,7 @@ import { dashboard as enDashboard } from "./locales/en/dashboard"
 import { login as enLogin } from "./locales/en/login"
 import { notFound as enNotFound } from "./locales/en/not-found"
 import { placeholderPages as enPlaceholderPages } from "./locales/en/placeholder-pages"
+import { profile as enProfile } from "./locales/en/profile"
 import { app as zhCNApp } from "./locales/zh-CN/app"
 import { appShell as zhCNAppShell } from "./locales/zh-CN/app-shell"
 import { common as zhCNCommon } from "./locales/zh-CN/common"
@@ -12,6 +13,7 @@ import { dashboard as zhCNDashboard } from "./locales/zh-CN/dashboard"
 import { login as zhCNLogin } from "./locales/zh-CN/login"
 import { notFound as zhCNNotFound } from "./locales/zh-CN/not-found"
 import { placeholderPages as zhCNPlaceholderPages } from "./locales/zh-CN/placeholder-pages"
+import { profile as zhCNProfile } from "./locales/zh-CN/profile"
 
 export const defaultLanguage = "zh-CN"
 
@@ -31,6 +33,7 @@ export const resources = {
       login: zhCNLogin,
       notFound: zhCNNotFound,
       placeholderPages: zhCNPlaceholderPages,
+      profile: zhCNProfile,
     },
   },
   zh: {
@@ -42,6 +45,7 @@ export const resources = {
       login: zhCNLogin,
       notFound: zhCNNotFound,
       placeholderPages: zhCNPlaceholderPages,
+      profile: zhCNProfile,
     },
   },
   en: {
@@ -53,6 +57,7 @@ export const resources = {
       login: enLogin,
       notFound: enNotFound,
       placeholderPages: enPlaceholderPages,
+      profile: enProfile,
     },
   },
 } as const
