@@ -1,22 +1,59 @@
-import type { Decorator, Preview } from "@storybook/tanstack-react"
-import { QueryClientProvider } from "@tanstack/react-query"
-import { useState } from "react"
+import addonA11y from "@storybook/addon-a11y"
+import addonDocs from "@storybook/addon-docs"
+import { definePreview } from "@storybook/tanstack-react"
 
 import "../src/styles/globals.css"
-import { createTestQueryClient } from "../src/test/query-client"
+import { withAppProviders } from "./decorators/with-app-providers"
 
-const withQueryClient: Decorator = (Story) => {
-  const [queryClient] = useState(createTestQueryClient)
+const preview = definePreview({
+  addons: [addonA11y(), addonDocs()],
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Story />
-    </QueryClientProvider>
-  )
-}
+  decorators: [withAppProviders],
 
-const preview: Preview = {
-  decorators: [withQueryClient],
+  globalTypes: {
+    locale: {
+      description: "Story language",
+      toolbar: {
+        title: "Language",
+        icon: "globe",
+        dynamicTitle: true,
+        items: [
+          {
+            value: "zh-CN",
+            title: "简体中文",
+          },
+          {
+            value: "en",
+            title: "English",
+          },
+        ],
+      },
+    },
+
+    theme: {
+      description: "Story theme",
+      toolbar: {
+        title: "Theme",
+        icon: "circlehollow",
+        dynamicTitle: true,
+        items: [
+          {
+            value: "light",
+            title: "Light",
+          },
+          {
+            value: "dark",
+            title: "Dark",
+          },
+        ],
+      },
+    },
+  },
+
+  initialGlobals: {
+    locale: "zh-CN",
+    theme: "light",
+  },
 
   parameters: {
     controls: {
@@ -26,6 +63,6 @@ const preview: Preview = {
       },
     },
   },
-}
+})
 
 export default preview

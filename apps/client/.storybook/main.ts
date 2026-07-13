@@ -1,13 +1,13 @@
 import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import type { StorybookConfig } from "@storybook/tanstack-react"
+import { defineMain } from "@storybook/tanstack-react/node"
 
 function getAbsolutePath(value: string) {
   return dirname(fileURLToPath(import.meta.resolve(`${value}/package.json`)))
 }
 
-const config: StorybookConfig = {
+export default defineMain({
   stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
 
   addons: [
@@ -22,6 +22,4 @@ const config: StorybookConfig = {
     name: "@storybook/tanstack-react",
     options: {},
   },
-}
-
-export default config
+})
