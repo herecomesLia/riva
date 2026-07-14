@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router"
 import { PencilIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
@@ -10,7 +9,6 @@ import {
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -37,13 +35,11 @@ type EditableSection = Exclude<ProfileSection, "targetRoles">
 function ReadonlySectionCard({
   children,
   description,
-  footer,
   onEdit,
   section,
 }: {
   children: ReactNode
   description?: string
-  footer?: ReactNode
   onEdit?: () => void
   section: ProfileSection
 }) {
@@ -64,7 +60,6 @@ function ReadonlySectionCard({
         </CardAction>
       </CardHeader>
       <CardContent>{children}</CardContent>
-      {footer && <CardFooter>{footer}</CardFooter>}
     </Card>
   )
 }
@@ -153,12 +148,6 @@ export function ProfileSections({
         <CredentialsSection
           {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
         />
-      </section>
-      <section className="grid gap-6 xl:grid-cols-2">
-        <CareerDirectionSection
-          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-        />
-        <TargetRolesSection profile={profile} />
       </section>
     </div>
   )
@@ -589,115 +578,6 @@ function CredentialsSection({
                   {credential.credentialId ?? credential.credentialUrl}
                 </a>
               )}
-            </div>
-          ))}
-        </div>
-      )}
-    </ReadonlySectionCard>
-  )
-}
-
-function CareerDirectionSection({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
-  const { t } = useTranslation()
-  const direction = profile.careerDirection
-
-  if (editingSection === "careerDirection") {
-    return (
-      <ProfileAdditionalSectionEditor
-        onCancel={onCancelEditing}
-        onDirtyChange={onDirtyChange}
-        onSave={onSave}
-        profile={profile}
-        section="careerDirection"
-      />
-    )
-  }
-
-  return (
-    <ReadonlySectionCard onEdit={() => onStartEditing("careerDirection")} section="careerDirection">
-      <div className="flex flex-col gap-5">
-        <ReviewStatusBadge status={direction.reviewStatus} />
-        <DetailList items={direction.desiredTitles} title={t("profile.field.desiredTitles")} />
-        <DetailList
-          items={direction.desiredIndustries}
-          title={t("profile.field.desiredIndustries")}
-        />
-        <DetailList
-          items={direction.desiredLocations}
-          title={t("profile.field.desiredLocations")}
-        />
-        {direction.employmentTypes.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">{t("profile.field.employmentTypes")}</h3>
-            <div className="flex flex-wrap gap-2">
-              {direction.employmentTypes.map((type) => (
-                <Badge key={type} variant="outline">
-                  {employmentTypeLabel(type, t)}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-        {direction.desiredLevels.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">{t("profile.field.desiredLevels")}</h3>
-            <div className="flex flex-wrap gap-2">
-              {direction.desiredLevels.map((level) => (
-                <Badge key={level} variant="outline">
-                  {t(`profile.careerLevel.${level}`)}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{t(`profile.jobSearchType.${direction.jobSearchType}`)}</Badge>
-          <Badge variant="outline">{t(`profile.jobSearchStage.${direction.jobSearchStage}`)}</Badge>
-        </div>
-        <DetailList items={direction.focusAreas} title={t("profile.field.focusAreas")} />
-        {direction.summary && (
-          <p className="text-sm leading-6 text-muted-foreground">{direction.summary}</p>
-        )}
-      </div>
-    </ReadonlySectionCard>
-  )
-}
-
-function TargetRolesSection({ profile }: { profile: JobProfile }) {
-  const { t } = useTranslation()
-
-  return (
-    <ReadonlySectionCard
-      footer={
-        <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
-          {t("profile.actions.viewTargetRoles")}
-        </Button>
-      }
-      section="targetRoles"
-    >
-      {profile.targetRoles.length === 0 ? (
-        <EmptySection />
-      ) : (
-        <div className="flex flex-col gap-4">
-          {profile.targetRoles.map((role, index) => (
-            <div key={role.id} className="flex flex-wrap items-start justify-between gap-3">
-              {index > 0 && <Separator />}
-              <div>
-                <h3 className="font-medium">{role.title}</h3>
-                {[role.company, role.location].filter(Boolean).length > 0 && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {[role.company, role.location].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-              </div>
-              <ReviewStatusBadge status={role.reviewStatus} />
             </div>
           ))}
         </div>

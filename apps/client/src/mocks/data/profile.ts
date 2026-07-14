@@ -201,19 +201,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         reviewStatus: "confirmed",
       },
     ],
-    careerDirection: {
-      desiredTitles: ["Senior Frontend Engineer", "Frontend Technical Lead"],
-      desiredIndustries: ["SaaS", "E-commerce"],
-      desiredLocations: ["Shanghai", "Remote"],
-      desiredLevels: ["senior", "lead"],
-      employmentTypes: ["fullTime"],
-      jobSearchType: "active",
-      jobSearchStage: "applying",
-      focusAreas: ["System design", "Frontend architecture", "Leadership"],
-      summary: "Product-focused frontend roles with ownership of complex workflows.",
-      source: "userEdited",
-      reviewStatus: "confirmed",
-    },
     targetRoles: [
       {
         id: "target_role_frontend_lead",

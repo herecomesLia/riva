@@ -7,22 +7,6 @@ export const profileEmploymentTypes = [
   "contract",
   "freelance",
 ] as const
-export const profileCareerLevels = [
-  "entry",
-  "mid",
-  "senior",
-  "lead",
-  "manager",
-  "director",
-] as const
-export const profileJobSearchTypes = ["active", "passive", "exploring"] as const
-export const profileJobSearchStages = [
-  "preparing",
-  "applying",
-  "interviewing",
-  "offerReview",
-] as const
-
 const requiredText = z.string().trim().min(1, "required")
 export const profileOptionalTextSchema = z.string()
 const optionalText = profileOptionalTextSchema
@@ -112,18 +96,4 @@ export const credentialsSchema = z.object({
         }),
     )
     .default([]),
-})
-
-export const careerDirectionSchema = z.object({
-  desiredIndustries: optionalText,
-  desiredLevels: z.array(z.enum(profileCareerLevels)),
-  desiredLocations: optionalText,
-  desiredTitles: optionalText,
-  employmentTypes: z.array(z.enum(profileEmploymentTypes)),
-  focusAreas: optionalText,
-  jobSearchStage: z.enum(profileJobSearchStages),
-  jobSearchType: z.enum(profileJobSearchTypes),
-  reviewStatus: z.any(),
-  source: z.any(),
-  summary: optionalText,
 })

@@ -76,9 +76,6 @@ function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) 
     case "credentials":
       profile.credentials = copy(input.values)
       break
-    case "careerDirection":
-      profile.careerDirection = copy(input.values)
-      break
     case "targetRoles":
       profile.targetRoles = copy(input.values)
   }

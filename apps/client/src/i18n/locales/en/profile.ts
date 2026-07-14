@@ -10,7 +10,7 @@ export const profile = {
     stale: "Matching analysis is out of date",
     staleTitle: "Update your role matching analysis",
     staleDescription:
-      "Your profile has changed, so the current analysis may no longer reflect your latest experience and direction.",
+      "Your profile has changed, so the current analysis may no longer reflect your latest experience and skills.",
     oldVersion: "The current matching analysis is based on an older profile version.",
     regenerating: "Regenerating matching analysis…",
     regenerationFailed: "Matching analysis regeneration failed. Try again.",
@@ -35,7 +35,6 @@ export const profile = {
     edit: "Edit",
     replaceResume: "Replace resume",
     recognizeAgain: "Recognize again",
-    viewTargetRoles: "View target roles",
     confirmRecognition: "Confirm and create profile",
     cancelRecognition: "Cancel review",
     retryRecognition: "Recognize again",
@@ -88,8 +87,7 @@ export const profile = {
     },
     parsing: {
       title: "Recognizing your resume",
-      description:
-        "Riva is extracting experience, skills, and job-search information from your resume.",
+      description: "Riva is extracting experience and skills from your resume.",
     },
     failed: {
       title: "Resume recognition failed",
@@ -117,7 +115,6 @@ export const profile = {
     projectExperience: "Project experience",
     skills: "Skills",
     credentials: "Certificates and awards",
-    careerDirection: "Career direction",
     targetRoles: "Current target roles",
   },
   field: {
@@ -138,19 +135,11 @@ export const profile = {
     achievements: "Achievements",
     technologies: "Technologies",
     skills: "Related skills",
-    desiredTitles: "Desired roles",
-    desiredLocations: "Desired locations",
     employmentTypes: "Employment types",
-    summary: "Direction summary",
     issuer: "Issuer",
     awardedAt: "Awarded {{value}}",
     skillName: "Skill name",
     skillCategory: "Skill category",
-    desiredIndustries: "Desired industries",
-    desiredLevels: "Role level",
-    jobSearchType: "Job-search type",
-    jobSearchStage: "Current job-search stage",
-    focusAreas: "Capability focus areas",
   },
   reviewStatus: { confirmed: "Confirmed", needsReview: "Needs review", incomplete: "Incomplete" },
   employmentType: {
@@ -160,30 +149,11 @@ export const profile = {
     contract: "Contract",
     freelance: "Freelance",
   },
-  careerLevel: {
-    entry: "Entry",
-    mid: "Mid",
-    senior: "Senior",
-    lead: "Lead",
-    manager: "Manager",
-    director: "Director",
-  },
-  jobSearchType: {
-    active: "Actively searching",
-    passive: "Open to opportunities",
-    exploring: "Exploring",
-  },
-  jobSearchStage: {
-    preparing: "Preparing",
-    applying: "Applying",
-    interviewing: "Interviewing",
-    offerReview: "Reviewing offers",
-  },
   credentialType: { certificate: "Certificate", award: "Award" },
   helper: {
     title: "How Riva uses this information",
     description:
-      "Confirmed experience, skills, and career direction are used for role matching, training question generation, and feedback focus. Unconfirmed or missing information is not treated as complete evidence.",
+      "Confirmed experience and skills are used for role matching, training question generation, and feedback focus. Unconfirmed or missing information is not treated as complete evidence.",
     pendingTitle: "Items to address",
     pendingDescription:
       "Confirm these items to make analysis and training recommendations more relevant.",

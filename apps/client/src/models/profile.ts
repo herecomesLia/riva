@@ -19,7 +19,6 @@ export type ProfileSection =
   | "projectExperience"
   | "skills"
   | "credentials"
-  | "careerDirection"
   | "targetRoles"
 
 export type ProfileCompleteness = {
@@ -123,26 +122,6 @@ export type Credential = {
   reviewStatus: ProfileReviewStatus
 }
 
-export type CareerLevel = "entry" | "mid" | "senior" | "lead" | "manager" | "director"
-
-export type JobSearchType = "active" | "passive" | "exploring"
-
-export type JobSearchStage = "preparing" | "applying" | "interviewing" | "offerReview"
-
-export type CareerDirection = {
-  desiredTitles: string[]
-  desiredIndustries: string[]
-  desiredLocations: string[]
-  desiredLevels: CareerLevel[]
-  employmentTypes: EmploymentType[]
-  jobSearchType: JobSearchType
-  jobSearchStage: JobSearchStage
-  focusAreas: string[]
-  summary: string | null
-  source: ProfileSource
-  reviewStatus: ProfileReviewStatus
-}
-
 export type TargetRoleSummary = {
   id: string
   title: string
@@ -167,7 +146,6 @@ export type JobProfile = {
   projectExperiences: ProjectExperience[]
   skills: ProfileSkill[]
   credentials: Credential[]
-  careerDirection: CareerDirection
   targetRoles: TargetRoleSummary[]
 }
 
@@ -218,7 +196,6 @@ export type ProfileSectionValueMap = {
   projectExperience: ProjectExperience[]
   skills: ProfileSkill[]
   credentials: Credential[]
-  careerDirection: CareerDirection
   targetRoles: TargetRoleSummary[]
 }
 

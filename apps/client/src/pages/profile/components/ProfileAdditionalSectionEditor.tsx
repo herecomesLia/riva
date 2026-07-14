@@ -7,7 +7,6 @@ import { z } from "zod"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -18,18 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  careerDirectionSchema,
-  credentialsSchema,
-  profileCareerLevels as careerLevels,
-  profileEmploymentTypes as employmentTypes,
-  profileJobSearchStages as jobSearchStages,
-  profileJobSearchTypes as jobSearchTypes,
-  skillSchema,
-} from "@/schemas/profile"
+import { credentialsSchema, skillSchema } from "@/schemas/profile"
 import type { JobProfile, SaveProfileSectionInput } from "@/models/profile"
 
-type EditableSection = "skills" | "credentials" | "careerDirection"
+type EditableSection = "skills" | "credentials"
 
 type ProfileAdditionalSectionEditorProps = {
   onCancel: () => void
@@ -41,13 +32,6 @@ type ProfileAdditionalSectionEditorProps = {
 
 function createTemporaryId() {
   return `draft_${crypto.randomUUID()}`
-}
-
-function toLines(value: string) {
-  return value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean)
 }
 
 function toNullable(value: string) {
@@ -180,87 +164,6 @@ function CredentialTypeField({ form, index }: { form: any; index: number }) {
   )
 }
 
-function CheckboxListField({
-  form,
-  label,
-  name,
-  options,
-}: {
-  form: any
-  label: string
-  name: "employmentTypes" | "desiredLevels"
-  options: readonly { label: string; value: string }[]
-}) {
-  return (
-    <form.Field name={name}>
-      {(field: any) => (
-        <Field>
-          <FieldLabel>{label}</FieldLabel>
-          <div className="flex flex-wrap gap-x-4 gap-y-3">
-            {options.map((option) => {
-              const id = `${field.name}-${option.value}`
-              const selected = field.state.value.includes(option.value)
-
-              return (
-                <Field key={option.value} orientation="horizontal">
-                  <Checkbox
-                    checked={selected}
-                    id={id}
-                    onCheckedChange={(checked) => {
-                      field.handleChange(
-                        checked
-                          ? [...field.state.value, option.value]
-                          : field.state.value.filter((value: string) => value !== option.value),
-                      )
-                    }}
-                  />
-                  <FieldLabel htmlFor={id}>{option.label}</FieldLabel>
-                </Field>
-              )
-            })}
-          </div>
-        </Field>
-      )}
-    </form.Field>
-  )
-}
-
-function SelectField({
-  form,
-  label,
-  name,
-  options,
-}: {
-  form: any
-  label: string
-  name: "jobSearchType" | "jobSearchStage"
-  options: readonly { label: string; value: string }[]
-}) {
-  return (
-    <form.Field name={name}>
-      {(field: any) => (
-        <Field>
-          <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
-          <Select onValueChange={field.handleChange} value={field.state.value}>
-            <FieldControl>
-              <SelectTrigger id={field.name} onBlur={field.handleBlur}>
-                <SelectValue />
-              </SelectTrigger>
-            </FieldControl>
-            <SelectContent>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
-    </form.Field>
-  )
-}
-
 export function ProfileAdditionalSectionEditor({
   onCancel,
   onDirtyChange,
@@ -297,10 +200,6 @@ export function ProfileAdditionalSectionEditor({
   })
 
   function addItem() {
-    if (section === "careerDirection") {
-      return
-    }
-
     const items = form.state.values.items ?? []
     form.setFieldValue("items" as never, [...items, createNewItem(section)] as never)
   }
@@ -332,10 +231,8 @@ export function ProfileAdditionalSectionEditor({
           <FieldGroup>
             {section === "skills" ? (
               <SkillFields form={form} onAdd={addItem} profile={profile} />
-            ) : section === "credentials" ? (
-              <CredentialFields form={form} onAdd={addItem} />
             ) : (
-              <CareerDirectionFields form={form} />
+              <CredentialFields form={form} onAdd={addItem} />
             )}
           </FieldGroup>
 
@@ -529,71 +426,6 @@ function CredentialFields({ form, onAdd }: { form: any; onAdd: () => void }) {
   )
 }
 
-function CareerDirectionFields({ form }: { form: any }) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="grid gap-5 md:grid-cols-2">
-      <TextField
-        form={form}
-        label={t("profile.field.desiredTitles")}
-        name="desiredTitles"
-        textarea
-      />
-      <TextField
-        form={form}
-        label={t("profile.field.desiredIndustries")}
-        name="desiredIndustries"
-        textarea
-      />
-      <TextField
-        form={form}
-        label={t("profile.field.desiredLocations")}
-        name="desiredLocations"
-        textarea
-      />
-      <CheckboxListField
-        form={form}
-        label={t("profile.field.desiredLevels")}
-        name="desiredLevels"
-        options={careerLevels.map((value) => ({
-          label: t(`profile.careerLevel.${value}`),
-          value,
-        }))}
-      />
-      <CheckboxListField
-        form={form}
-        label={t("profile.field.employmentTypes")}
-        name="employmentTypes"
-        options={employmentTypes.map((value) => ({
-          label: t(`profile.employmentType.${value}`),
-          value,
-        }))}
-      />
-      <SelectField
-        form={form}
-        label={t("profile.field.jobSearchType")}
-        name="jobSearchType"
-        options={jobSearchTypes.map((value) => ({
-          label: t(`profile.jobSearchType.${value}`),
-          value,
-        }))}
-      />
-      <SelectField
-        form={form}
-        label={t("profile.field.jobSearchStage")}
-        name="jobSearchStage"
-        options={jobSearchStages.map((value) => ({
-          label: t(`profile.jobSearchStage.${value}`),
-          value,
-        }))}
-      />
-      <TextField form={form} label={t("profile.field.focusAreas")} name="focusAreas" textarea />
-      <TextField form={form} label={t("profile.field.summary")} name="summary" textarea />
-    </div>
-  )
-}
-
 function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
   const { t } = useTranslation()
 
@@ -623,27 +455,16 @@ function createDraft(profile: JobProfile, section: EditableSection) {
     }
   }
 
-  if (section === "credentials") {
-    return {
-      items: structuredClone(profile.credentials).map((item) => ({
-        ...item,
-        awardedAt: item.awardedAt ?? "",
-        credentialId: item.credentialId ?? "",
-        credentialUrl: item.credentialUrl ?? "",
-        description: item.description ?? "",
-        expiresAt: item.expiresAt ?? "",
-        issuer: item.issuer ?? "",
-      })),
-    }
-  }
-
   return {
-    ...structuredClone(profile.careerDirection),
-    desiredIndustries: profile.careerDirection.desiredIndustries.join("\n"),
-    desiredLocations: profile.careerDirection.desiredLocations.join("\n"),
-    desiredTitles: profile.careerDirection.desiredTitles.join("\n"),
-    focusAreas: profile.careerDirection.focusAreas.join("\n"),
-    summary: profile.careerDirection.summary ?? "",
+    items: structuredClone(profile.credentials).map((item) => ({
+      ...item,
+      awardedAt: item.awardedAt ?? "",
+      credentialId: item.credentialId ?? "",
+      credentialUrl: item.credentialUrl ?? "",
+      description: item.description ?? "",
+      expiresAt: item.expiresAt ?? "",
+      issuer: item.issuer ?? "",
+    })),
   }
 }
 
@@ -652,7 +473,7 @@ function createSectionSchema(section: EditableSection) {
     return z.object({ items: z.array(skillSchema) })
   }
 
-  return section === "credentials" ? credentialsSchema : careerDirectionSchema
+  return credentialsSchema
 }
 
 function hasDuplicateSkillName(items: { name: string }[]) {
@@ -679,27 +500,16 @@ function normalizeSectionValues(section: EditableSection, value: any) {
     }))
   }
 
-  if (section === "credentials") {
-    return value.items.map((item: any) => ({
-      ...item,
-      awardedAt: toNullable(item.awardedAt),
-      credentialId: toNullable(item.credentialId),
-      credentialUrl: toNullable(item.credentialUrl),
-      description: toNullable(item.description),
-      expiresAt: toNullable(item.expiresAt),
-      issuer: toNullable(item.issuer),
-      name: item.name.trim(),
-    }))
-  }
-
-  return {
-    ...value,
-    desiredIndustries: toLines(value.desiredIndustries),
-    desiredLocations: toLines(value.desiredLocations),
-    desiredTitles: toLines(value.desiredTitles),
-    focusAreas: toLines(value.focusAreas),
-    summary: toNullable(value.summary),
-  }
+  return value.items.map((item: any) => ({
+    ...item,
+    awardedAt: toNullable(item.awardedAt),
+    credentialId: toNullable(item.credentialId),
+    credentialUrl: toNullable(item.credentialUrl),
+    description: toNullable(item.description),
+    expiresAt: toNullable(item.expiresAt),
+    issuer: toNullable(item.issuer),
+    name: item.name.trim(),
+  }))
 }
 
 function createNewItem(section: "skills" | "credentials") {

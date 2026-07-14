@@ -59,6 +59,8 @@ describe("ProfileView", () => {
     expect(await screen.findByText("Lin Chen")).toBeInTheDocument()
     expect(screen.getByText("Merchant Operations Console")).toBeInTheDocument()
     expect(screen.getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-section-targetRoles")).not.toBeInTheDocument()
+    expect(screen.queryByText("Frontend Technical Lead")).not.toBeInTheDocument()
   })
 
   it("renders a local no-resume state while preserving other sections", async () => {
@@ -86,7 +88,7 @@ describe("ProfileView", () => {
     const snapshot = structuredClone(profileResponseMock)
     snapshot.profile!.basicInformation.phone = null
     snapshot.profile!.credentials = []
-    snapshot.profile!.careerDirection.desiredLocations = []
+    snapshot.profile!.projectExperiences = []
     renderReady(snapshot)
     expect(
       await screen.findByRole("heading", { name: i18n.t("profile.title") }),
