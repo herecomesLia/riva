@@ -32,7 +32,7 @@ const meta = preview.meta({
   component: ProfileView,
   decorators: [withRouter],
   parameters: { router: { initialEntries: ["/profile"] } },
-  title: "Pages/Profile/ProfileView",
+  title: "Pages/Profile",
 })
 
 export const Ready = meta.story({ args: readyArgs })
