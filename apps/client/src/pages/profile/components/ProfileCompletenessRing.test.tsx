@@ -13,7 +13,9 @@ describe("ProfileCompletenessRing", () => {
 
   it.each([
     { expected: 0, value: -20 },
+    { expected: 0, value: 0 },
     { expected: 75, value: 75 },
+    { expected: 100, value: 100 },
     { expected: 100, value: 120 },
   ])("clamps $value to $expected", async ({ expected, value }) => {
     renderWithProviders(<ProfileCompletenessRing value={value} />, { router: false })

@@ -66,6 +66,13 @@ describe("ProfileView", () => {
     expect(progressbar).toHaveAttribute("aria-valuenow", "100")
     expect(screen.getByText("100%")).toBeInTheDocument()
     expect(screen.getByText(i18n.t("profile.pendingReviewCount", { count: 0 }))).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        i18n.t("profile.updatedAt", {
+          value: formatDate(profileResponseMock.profile!.updatedAt, i18n.language),
+        }),
+      ),
+    ).toBeInTheDocument()
     expect(screen.getAllByText(i18n.t("profile.reviewStatus.confirmed")).length).toBeGreaterThan(0)
     expect(
       screen.getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
