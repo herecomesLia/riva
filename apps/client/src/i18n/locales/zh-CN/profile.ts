@@ -137,16 +137,6 @@ export const profile = {
     freelance: "自由职业",
   },
   credentialType: { certificate: "证书", award: "奖项" },
-  helper: {
-    title: "Riva 如何使用档案信息",
-    description:
-      "已确认的经历和技能会用于岗位匹配、训练题目生成与反馈重点判断。未确认或缺失的信息不会被当作完整依据。",
-    pendingTitle: "待处理事项",
-    pendingDescription: "确认以下信息，能让分析和训练建议更贴合你的实际情况。",
-    missing: "待补充：{{sections}}",
-    needsReview: "待确认：{{sections}}",
-    allClear: "当前没有待处理事项。",
-  },
   emptySection: "暂未填写此部分内容。",
   editor: {
     addExperience: "新增一段经历",

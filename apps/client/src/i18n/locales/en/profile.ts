@@ -150,17 +150,6 @@ export const profile = {
     freelance: "Freelance",
   },
   credentialType: { certificate: "Certificate", award: "Award" },
-  helper: {
-    title: "How Riva uses this information",
-    description:
-      "Confirmed experience and skills are used for role matching, training question generation, and feedback focus. Unconfirmed or missing information is not treated as complete evidence.",
-    pendingTitle: "Items to address",
-    pendingDescription:
-      "Confirm these items to make analysis and training recommendations more relevant.",
-    missing: "To complete: {{sections}}",
-    needsReview: "To review: {{sections}}",
-    allClear: "There are no items to address right now.",
-  },
   emptySection: "This section has not been filled in yet.",
   editor: {
     addExperience: "Add experience",

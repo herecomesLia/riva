@@ -36,7 +36,6 @@ import {
 } from "./components/ProfilePageStates"
 import { ProfileResumeCard } from "./components/ProfileResumeCard"
 import { ProfileSections } from "./components/ProfileSections"
-import { ProfileSupportingInfo } from "./components/ProfileSupportingInfo"
 
 type EditableSection = Exclude<ProfileSection, "targetRoles">
 
@@ -320,7 +319,6 @@ function ProfileReadyView({
             onStartEditing={startEditing}
             profile={profile}
           />
-          <ProfileSupportingInfo profile={profile} />
         </>
       )}
 
