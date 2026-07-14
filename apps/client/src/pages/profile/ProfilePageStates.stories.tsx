@@ -6,7 +6,7 @@ import {
 } from "./components/ProfilePageStates"
 
 const meta = {
-  title: "Profile/Import states",
+  title: "Profile/Import States",
 } satisfies Meta
 
 export default meta
