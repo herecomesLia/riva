@@ -13,7 +13,7 @@ const meta = preview.meta({
       initialEntries: ["/dashboard"],
     },
   },
-  title: "Dashboard/RecommendationCard",
+  title: "Pages/Dashboard/RecommendationCard",
 })
 
 export const Default = meta.story({

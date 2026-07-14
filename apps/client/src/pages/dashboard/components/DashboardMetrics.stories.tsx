@@ -22,7 +22,7 @@ const mixedMetrics = {
 
 const meta = preview.meta({
   component: DashboardMetrics,
-  title: "Dashboard/DashboardMetrics",
+  title: "Pages/Dashboard/DashboardMetrics",
 })
 
 export const Default = meta.story({

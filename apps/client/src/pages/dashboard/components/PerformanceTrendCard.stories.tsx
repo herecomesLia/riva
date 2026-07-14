@@ -17,7 +17,7 @@ const singleRecordTrend = {
 
 const meta = preview.meta({
   component: PerformanceTrendCard,
-  title: "Dashboard/PerformanceTrendCard",
+  title: "Pages/Dashboard/PerformanceTrendCard",
 })
 
 export const Default = meta.story({
