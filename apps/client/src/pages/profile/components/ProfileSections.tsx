@@ -54,7 +54,7 @@ function ReadonlySectionCard({
         {description && <CardDescription>{description}</CardDescription>}
         <CardAction>
           <Button disabled={!onEdit} onClick={onEdit} size="sm" variant="outline">
-            <PencilIcon data-icon="inline-start" />
+            <PencilIcon className="size-4" data-icon="inline-start" />
             {t("profile.actions.edit")}
           </Button>
         </CardAction>
