@@ -80,6 +80,10 @@ describe("DashboardView", () => {
     expect(
       screen.getByRole("region", { name: i18n.t("dashboard.metrics.eyebrow") }),
     ).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.roleFit.title"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.practiceTime.title"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.targetedPractice.title"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.metrics.mockInterview.title"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.performanceTrend.title"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.weaknesses.eyebrow"))).toBeInTheDocument()
     expect(screen.getAllByText("测试用户")).toHaveLength(1)

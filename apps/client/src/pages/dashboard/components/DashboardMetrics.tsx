@@ -157,16 +157,8 @@ function MetricCard({
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
-          {state.status === "loading" ? (
-            <Skeleton className="h-5 w-3/5" />
-          ) : (
-            <CardTitle className="text-sm font-medium">{t(definition.titleKey)}</CardTitle>
-          )}
-          {state.status === "loading" ? (
-            <Skeleton className="size-5 shrink-0" />
-          ) : (
-            <Icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
-          )}
+          <CardTitle className="text-sm font-medium">{t(definition.titleKey)}</CardTitle>
+          <Icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
