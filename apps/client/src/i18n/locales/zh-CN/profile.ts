@@ -30,7 +30,8 @@ export const profile = {
   },
   actions: {
     edit: "编辑",
-    replaceResume: "替换简历",
+    uploadResume: "上传简历",
+    updateResume: "更新简历",
     recognizeAgain: "重新识别",
     confirmRecognition: "确认并创建档案",
     cancelRecognition: "取消审核",
@@ -43,9 +44,7 @@ export const profile = {
     description: "简历用于初始化档案；后续你可以独立维护档案内容。",
     typeAndSize: "{{type}} · {{size}}",
     uploadedAt: "上传于 {{value}}",
-    parsedAt: "识别于 {{value}}",
     pendingReview: "待确认 {{count}} 项",
-    noResume: "尚未上传简历",
     updatePendingTitle: "新版简历等待确认",
     updatePendingDescription: "已识别新版简历；确认前，当前生效档案不会被替换。",
   },
@@ -56,6 +55,7 @@ export const profile = {
     updateDescription: "新版简历会先生成独立的待确认结果，不会直接覆盖当前档案。",
     file: "简历文件",
     text: "或粘贴简历文本",
+    noFileSelected: "未选择文件",
     textPlaceholder: "在此粘贴简历内容",
     required: "请选择简历文件或粘贴简历文本。",
     submit: "上传并识别",
@@ -80,7 +80,7 @@ export const profile = {
     parsing: { title: "正在识别简历", description: "Riva 正在提取简历中的经历与技能信息。" },
     failed: {
       title: "简历识别失败",
-      description: "我们无法完成这份简历的识别。请稍后替换简历或重新识别。",
+      description: "我们无法完成这份简历的识别。请稍后更新简历或重新识别。",
     },
     awaitingConfirmation: {
       title: "请确认识别结果",

@@ -116,7 +116,7 @@ export function ProfileRecognitionFailureState({
           {t("profile.actions.retryRecognition")}
         </Button>
         <Button onClick={onReupload} size="sm" variant="outline">
-          {t("profile.actions.replaceResume")}
+          {t("profile.actions.updateResume")}
         </Button>
         <Button onClick={onManualEntry} size="sm" variant="outline">
           {t("profile.actions.manualEntry")}

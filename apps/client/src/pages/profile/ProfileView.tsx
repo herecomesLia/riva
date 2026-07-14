@@ -26,7 +26,7 @@ import type {
   SaveProfileSectionInput,
 } from "@/models/profile"
 import { ProfileHeader } from "./components/ProfileHeader"
-import { ResumeImportForm, ResumeUpdateReview } from "./components/ProfileImportPanels"
+import { ResumeImportForm } from "./components/ProfileImportPanels"
 import {
   ProfileEmptyState,
   ProfileErrorState,
@@ -34,7 +34,7 @@ import {
   ProfileProcessingState,
   ProfileRecognitionFailureState,
 } from "./components/ProfilePageStates"
-import { ProfileResumeCard } from "./components/ProfileResumeCard"
+import { ProfileResumeDialog, type ResumeDialogMode } from "./components/ProfileResumeDialog"
 import { ProfileSections } from "./components/ProfileSections"
 
 type EditableSection = Exclude<ProfileSection, "targetRoles">
@@ -98,9 +98,13 @@ function ProfileReadyView({
   const [isDirty, setIsDirty] = useState(false)
   const [pendingSection, setPendingSection] = useState<EditableSection | null>(null)
   const [saveFeedbackVisible, setSaveFeedbackVisible] = useState(false)
-  const [isReplacingResume, setIsReplacingResume] = useState(false)
   const [importPhase, setImportPhase] = useState<"uploading" | "parsing" | null>(null)
-  const [importError, setImportError] = useState<string | null>(null)
+  const [initialImportError, setInitialImportError] = useState<string | null>(null)
+  const [pageActionError, setPageActionError] = useState<string | null>(null)
+  const [resumeDialogMode, setResumeDialogMode] = useState<ResumeDialogMode>("details")
+  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false)
+  const [resumeImportError, setResumeImportError] = useState<string | null>(null)
+  const [resumeUpdateError, setResumeUpdateError] = useState<string | null>(null)
   const blocker = useBlocker({
     disabled: !isDirty,
     enableBeforeUnload: isDirty,
@@ -135,15 +139,17 @@ function ProfileReadyView({
   async function runImport(
     input: ResumeUploadInput,
     upload: (value: ResumeUploadInput) => Promise<JobProfileSnapshot>,
+    setError: (message: string | null) => void,
+    onSuccess?: () => void,
   ) {
     setImportPhase("uploading")
-    setImportError(null)
+    setError(null)
     try {
       await upload(input)
       setImportPhase("parsing")
-      setIsReplacingResume(false)
+      onSuccess?.()
     } catch {
-      setImportError(t("profile.import.failed"))
+      setError(t("profile.import.failed"))
     } finally {
       setImportPhase(null)
     }
@@ -155,10 +161,10 @@ function ProfileReadyView({
         <ProfileEmptyState />
         <ResumeImportForm
           isSubmitting={importPhase !== null}
-          onSubmit={(input) => runImport(input, actions.uploadInitialResume)}
+          onSubmit={(input) => runImport(input, actions.uploadInitialResume, setInitialImportError)}
           title={t("profile.import.title")}
         />
-        {importError && <ImportError message={importError} />}
+        {initialImportError && <ImportError message={initialImportError} />}
       </div>
     )
   }
@@ -175,16 +181,84 @@ function ProfileReadyView({
   const isAwaitingConfirmation = profile.status === "awaitingConfirmation"
   const hasPendingReview = profile.pendingReviewCount > 0
 
+  function closeResumeDialog() {
+    setIsResumeDialogOpen(false)
+    setResumeDialogMode("details")
+    setResumeImportError(null)
+    setResumeUpdateError(null)
+  }
+
+  function handleResumeDialogOpenChange(open: boolean) {
+    if (!open && importPhase !== null) {
+      return
+    }
+
+    if (open) {
+      setResumeDialogMode(profile.resume ? "details" : "import")
+      setResumeImportError(null)
+      setResumeUpdateError(null)
+      setIsResumeDialogOpen(true)
+      return
+    }
+
+    closeResumeDialog()
+  }
+
+  function openResumeDialog() {
+    handleResumeDialogOpenChange(true)
+  }
+
+  async function submitResumeImport(input: ResumeUploadInput) {
+    const upload = profile.resume ? actions.uploadUpdatedResume : actions.uploadInitialResume
+    await runImport(input, upload, setResumeImportError, closeResumeDialog)
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <ProfileHeader profile={profile} />
+      <ProfileHeader onOpenResume={openResumeDialog} profile={profile} />
+      <ProfileResumeDialog
+        importError={resumeImportError}
+        isApplying={pending.confirmUpdate}
+        isCancelling={pending.cancelUpdate}
+        isSubmitting={importPhase !== null}
+        mode={resumeDialogMode}
+        onApplyUpdate={() => {
+          setResumeUpdateError(null)
+          void actions
+            .confirmResumeUpdate({
+              profileId: profile.profileId,
+              resumeUpdateId: snapshot.resumeUpdate!.id,
+            })
+            .catch(() => setResumeUpdateError(t("profile.import.failed")))
+        }}
+        onCancelUpdate={() => {
+          setResumeUpdateError(null)
+          void actions
+            .cancelResumeUpdate({
+              profileId: profile.profileId,
+              resumeUpdateId: snapshot.resumeUpdate!.id,
+            })
+            .catch(() => setResumeUpdateError(t("profile.import.failed")))
+        }}
+        onModeChange={(mode) => {
+          setResumeDialogMode(mode)
+          setResumeImportError(null)
+        }}
+        onOpenChange={handleResumeDialogOpenChange}
+        onSubmit={submitResumeImport}
+        open={isResumeDialogOpen}
+        profile={profile}
+        recognition={snapshot.recognition}
+        resumeUpdate={snapshot.resumeUpdate}
+        updateError={resumeUpdateError}
+      />
 
       {saveFeedbackVisible && (
         <Alert data-testid="profile-save-success">
           <AlertDescription>{t("profile.editor.saveSuccess")}</AlertDescription>
         </Alert>
       )}
-      {importError && <ImportError message={importError} />}
+      {pageActionError && <ImportError message={pageActionError} />}
 
       {profile.matchingAnalysisStale && (
         <Alert data-testid="profile-matching-analysis-stale">
@@ -196,10 +270,10 @@ function ProfileReadyView({
           <Button
             disabled={pending.analysis}
             onClick={() => {
-              setImportError(null)
+              setPageActionError(null)
               void actions
                 .regenerateMatchingAnalysis(profile.profileId)
-                .catch(() => setImportError(t("profile.matchingAnalysis.regenerationFailed")))
+                .catch(() => setPageActionError(t("profile.matchingAnalysis.regenerationFailed")))
             }}
             size="sm"
           >
@@ -208,47 +282,6 @@ function ProfileReadyView({
               : t("profile.actions.regenerateMatchingAnalysis")}
           </Button>
         </Alert>
-      )}
-
-      <ProfileResumeCard
-        profile={profile}
-        recognition={snapshot.recognition}
-        resumeUpdate={snapshot.resumeUpdate}
-        onReplaceResume={() => setIsReplacingResume(true)}
-      />
-
-      {isReplacingResume && (
-        <ResumeImportForm
-          isSubmitting={importPhase !== null}
-          onSubmit={(input) => runImport(input, actions.uploadUpdatedResume)}
-          title={t("profile.actions.replaceResume")}
-        />
-      )}
-
-      {snapshot.resumeUpdate && (
-        <ResumeUpdateReview
-          isApplying={pending.confirmUpdate}
-          isCancelling={pending.cancelUpdate}
-          onApply={() => {
-            setImportError(null)
-            void actions
-              .confirmResumeUpdate({
-                profileId: profile.profileId,
-                resumeUpdateId: snapshot.resumeUpdate!.id,
-              })
-              .catch(() => setImportError(t("profile.import.failed")))
-          }}
-          onCancel={() => {
-            setImportError(null)
-            void actions
-              .cancelResumeUpdate({
-                profileId: profile.profileId,
-                resumeUpdateId: snapshot.resumeUpdate!.id,
-              })
-              .catch(() => setImportError(t("profile.import.failed")))
-          }}
-          resumeUpdate={snapshot.resumeUpdate}
-        />
       )}
 
       {processingStatus && <ProfileProcessingState status={processingStatus} />}

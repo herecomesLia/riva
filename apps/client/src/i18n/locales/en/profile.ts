@@ -33,7 +33,8 @@ export const profile = {
   },
   actions: {
     edit: "Edit",
-    replaceResume: "Replace resume",
+    uploadResume: "Upload resume",
+    updateResume: "Update resume",
     recognizeAgain: "Recognize again",
     confirmRecognition: "Confirm and create profile",
     cancelRecognition: "Cancel review",
@@ -47,9 +48,7 @@ export const profile = {
       "Your resume initializes the profile; you can maintain the profile independently afterwards.",
     typeAndSize: "{{type}} · {{size}}",
     uploadedAt: "Uploaded {{value}}",
-    parsedAt: "Recognized {{value}}",
     pendingReview: "{{count}} items to review",
-    noResume: "No resume uploaded yet",
     updatePendingTitle: "New resume is waiting for confirmation",
     updatePendingDescription:
       "The new resume has been recognized. Your active profile will not be replaced until it is confirmed.",
@@ -63,6 +62,7 @@ export const profile = {
       "A new resume creates a separate pending result and never overwrites the current profile directly.",
     file: "Resume file",
     text: "Or paste resume text",
+    noFileSelected: "No file selected",
     textPlaceholder: "Paste your resume content here",
     required: "Select a resume file or paste resume text.",
     submit: "Upload and recognize",
@@ -91,7 +91,7 @@ export const profile = {
     },
     failed: {
       title: "Resume recognition failed",
-      description: "We could not recognize this resume. Replace it or try recognition again later.",
+      description: "We could not recognize this resume. Update it or try recognition again later.",
     },
     awaitingConfirmation: {
       title: "Confirm the recognized information",

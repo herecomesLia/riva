@@ -1,14 +1,21 @@
-import { CalendarClockIcon, CircleCheckIcon, ListChecksIcon } from "lucide-react"
+import { CalendarClockIcon, CircleCheckIcon, ListChecksIcon, UploadIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { JobProfile } from "@/models/profile"
 
 import { ProfileStatusBadge } from "./ProfileStatusBadge"
 import { formatDate } from "./profile-formatters"
 
-export function ProfileHeader({ profile }: { profile: JobProfile }) {
+export function ProfileHeader({
+  onOpenResume,
+  profile,
+}: {
+  onOpenResume: () => void
+  profile: JobProfile
+}) {
   const { i18n, t } = useTranslation()
 
   return (
@@ -30,10 +37,16 @@ export function ProfileHeader({ profile }: { profile: JobProfile }) {
             {t("profile.description")}
           </p>
         </div>
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarClockIcon className="size-4" />
-          {t("profile.updatedAt", { value: formatDate(profile.updatedAt, i18n.language) })}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CalendarClockIcon className="size-4" />
+            {t("profile.updatedAt", { value: formatDate(profile.updatedAt, i18n.language) })}
+          </p>
+          <Button onClick={onOpenResume} size="sm">
+            <UploadIcon data-icon="inline-start" />
+            {profile.resume ? t("profile.actions.updateResume") : t("profile.actions.uploadResume")}
+          </Button>
+        </div>
       </div>
 
       <Card size="sm">
