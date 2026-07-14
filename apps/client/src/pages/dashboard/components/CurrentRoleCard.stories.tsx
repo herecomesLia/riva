@@ -1,21 +1,39 @@
 import preview from "#storybook/preview"
 
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import type { DashboardResponse } from "@/models/dashboard"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { CurrentRoleCard } from "./CurrentRoleCard"
 
-const defaultRole = dashboardResponseMock.currentRole!
+type CurrentRole = NonNullable<DashboardResponse["currentRole"]>
 
-const profileIncompleteRole = {
-  ...defaultRole,
+function createRole(overrides: Partial<CurrentRole>): CurrentRole {
+  return {
+    ...dashboardResponseMock.currentRole!,
+    ...overrides,
+  }
+}
+
+const defaultRole = createRole({
+  jobDescriptionAdded: true,
+  profileCompleted: true,
+})
+
+const profileIncompleteRole = createRole({
+  jobDescriptionAdded: true,
   profileCompleted: false,
-} satisfies NonNullable<typeof dashboardResponseMock.currentRole>
+})
 
-const jobDescriptionMissingRole = {
-  ...defaultRole,
+const jobDescriptionMissingRole = createRole({
   jobDescriptionAdded: false,
-} satisfies NonNullable<typeof dashboardResponseMock.currentRole>
+  profileCompleted: true,
+})
+
+const bothIncompleteRole = createRole({
+  jobDescriptionAdded: false,
+  profileCompleted: false,
+})
 
 const meta = preview.meta({
   component: CurrentRoleCard,
@@ -55,5 +73,11 @@ export const ProfileIncomplete = meta.story({
 export const JobDescriptionMissing = meta.story({
   args: {
     state: { data: jobDescriptionMissingRole, status: "ready" },
+  },
+})
+
+export const BothIncomplete = meta.story({
+  args: {
+    state: { data: bothIncompleteRole, status: "ready" },
   },
 })

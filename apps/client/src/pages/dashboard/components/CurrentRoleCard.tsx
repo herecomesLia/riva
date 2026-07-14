@@ -190,10 +190,17 @@ function CurrentRoleDataContent({
           <RoleStatusBadge complete={currentRole.profileCompleted} type="profile" />
           <RoleStatusBadge complete={currentRole.jobDescriptionAdded} type="jobDescription" />
         </div>
-        <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
-          {t("dashboard.currentRole.actions.addJobDescription")}
-          <ArrowRightIcon data-icon="inline-end" />
-        </Button>
+        {!currentRole.profileCompleted ? (
+          <Button nativeButton={false} render={<Link to="/profile" />} size="sm" variant="link">
+            {t("dashboard.currentRole.actions.completeProfile")}
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
+        ) : !currentRole.jobDescriptionAdded ? (
+          <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
+            {t("dashboard.currentRole.actions.addJobDescription")}
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
+        ) : null}
       </div>
     </>
   )
