@@ -60,7 +60,10 @@ describe("ProfileView", () => {
     expect(await screen.findByText("Lin Chen")).toBeInTheDocument()
     expect(screen.getByText("Merchant Operations Console")).toBeInTheDocument()
     expect(screen.getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("profile.completeness"))).toBeInTheDocument()
+    const progressbar = screen.getByRole("progressbar", {
+      name: i18n.t("profile.completeness"),
+    })
+    expect(progressbar).toHaveAttribute("aria-valuenow", "100")
     expect(screen.getByText("100%")).toBeInTheDocument()
     expect(screen.getByText(i18n.t("profile.pendingReviewCount", { count: 0 }))).toBeInTheDocument()
     expect(screen.getAllByText(i18n.t("profile.reviewStatus.confirmed")).length).toBeGreaterThan(0)
@@ -197,10 +200,17 @@ describe("ProfileView", () => {
     snapshot.profile!.basicInformation.phone = null
     snapshot.profile!.credentials = []
     snapshot.profile!.projectExperiences = []
+    snapshot.profile!.completeness.percentage = 75
+    snapshot.profile!.pendingReviewCount = 3
     renderReady(snapshot)
     expect(
       await screen.findByRole("heading", { name: i18n.t("profile.title") }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole("progressbar", { name: i18n.t("profile.completeness") }),
+    ).toHaveAttribute("aria-valuenow", "75")
+    expect(screen.getByText("75%")).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("profile.pendingReviewCount", { count: 3 }))).toBeInTheDocument()
     expect(screen.queryByText("+86 138 0000 1234")).not.toBeInTheDocument()
   })
 

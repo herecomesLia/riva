@@ -4,6 +4,7 @@ export const profile = {
     "This is your confirmed structured profile. Riva uses it for role matching and training recommendations.",
   updatedAt: "Last updated {{value}}",
   completeness: "Profile completeness",
+  completenessShort: "Completeness",
   pendingReviewCount: "{{count}} items to review",
   matchingAnalysis: {
     staleTitle: "Update your role matching analysis",

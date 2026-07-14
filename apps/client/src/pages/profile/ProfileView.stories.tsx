@@ -67,6 +67,10 @@ const partial = structuredClone(profileResponseMock)
 partial.profile!.basicInformation.phone = null
 partial.profile!.projectExperiences = []
 partial.profile!.credentials = []
+partial.profile!.completeness.percentage = 75
+partial.profile!.pendingReviewCount = 3
+partial.profile!.completeness.missingSections = ["projectExperience", "credentials"]
+partial.profile!.completeness.needsReviewSections = ["basicInformation"]
 
 export const Partial = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: partial } },

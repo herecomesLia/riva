@@ -3,6 +3,7 @@ export const profile = {
   description: "这是你确认后的结构化档案，Riva 会用它来生成岗位匹配分析与训练建议。",
   updatedAt: "最后更新 {{value}}",
   completeness: "档案完整度",
+  completenessShort: "档案完整度",
   pendingReviewCount: "{{count}} 项待确认",
   matchingAnalysis: {
     staleTitle: "建议更新岗位匹配分析",
