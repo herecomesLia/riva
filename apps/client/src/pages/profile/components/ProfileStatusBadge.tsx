@@ -1,21 +1,7 @@
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
-import type { ProfileReviewStatus, ProfileStatus, ResumeProcessingStatus } from "@/models/profile"
-
-type ProfileStatusBadgeProps = {
-  status: ProfileStatus
-}
-
-export function ProfileStatusBadge({ status }: ProfileStatusBadgeProps) {
-  const { t } = useTranslation()
-
-  return (
-    <Badge variant={status === "recognitionFailed" ? "destructive" : "secondary"}>
-      {t(`profile.status.${status}`)}
-    </Badge>
-  )
-}
+import type { ProfileReviewStatus, ResumeProcessingStatus } from "@/models/profile"
 
 export function ResumeProcessingBadge({ status }: { status: ResumeProcessingStatus }) {
   const { t } = useTranslation()

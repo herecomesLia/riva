@@ -17,10 +17,24 @@ import { Skeleton } from "@/components/ui/skeleton"
 export function ProfileLoadingState() {
   return (
     <div className="flex flex-col gap-6" data-testid="profile-loading-state">
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-5 w-28" />
-        <Skeleton className="h-9 w-44" />
-        <Skeleton className="h-5 w-full max-w-2xl" />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-9 w-44" />
+            <Skeleton className="h-5 w-full max-w-2xl" />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-9 w-28" />
+          </div>
+        </div>
+        <Card size="sm">
+          <CardContent className="flex flex-col gap-3">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-10 w-20" />
+            <Skeleton className="h-5 w-32" />
+          </CardContent>
+        </Card>
       </div>
       <div className="grid gap-4 lg:grid-cols-12">
         <ProfileSkeletonCard className="lg:col-span-7" />

@@ -67,6 +67,8 @@ describe("ProfileView", () => {
     expect(
       screen.getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
     ).toBeVisible()
+    expect(screen.queryByText("档案已生效")).not.toBeInTheDocument()
+    expect(screen.queryByText("匹配分析已同步")).not.toBeInTheDocument()
     expect(screen.queryByText("lin-chen-resume.pdf")).not.toBeInTheDocument()
     expect(screen.queryByTestId("profile-section-targetRoles")).not.toBeInTheDocument()
     expect(screen.queryByText("Frontend Technical Lead")).not.toBeInTheDocument()
@@ -200,6 +202,16 @@ describe("ProfileView", () => {
       await screen.findByRole("heading", { name: i18n.t("profile.title") }),
     ).toBeInTheDocument()
     expect(screen.queryByText("+86 138 0000 1234")).not.toBeInTheDocument()
+  })
+
+  it("keeps the stale matching-analysis alert without repeating its status in the header", async () => {
+    const snapshot = structuredClone(profileResponseMock)
+    snapshot.profile!.matchingAnalysisStale = true
+    renderReady(snapshot)
+
+    expect(await screen.findByTestId("profile-matching-analysis-stale")).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("profile.matchingAnalysis.staleTitle"))).toBeInTheDocument()
+    expect(screen.queryByText("匹配分析已过期")).not.toBeInTheDocument()
   })
 
   it("renders long user content verbatim", async () => {

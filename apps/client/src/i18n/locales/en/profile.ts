@@ -6,8 +6,6 @@ export const profile = {
   completeness: "Profile completeness",
   pendingReviewCount: "{{count}} items to review",
   matchingAnalysis: {
-    current: "Matching analysis is current",
-    stale: "Matching analysis is out of date",
     staleTitle: "Update your role matching analysis",
     staleDescription:
       "Your profile has changed, so the current analysis may no longer reflect your latest experience and skills.",
@@ -16,14 +14,6 @@ export const profile = {
     regenerationFailed: "Matching analysis regeneration failed. Try again.",
     historyPreserved:
       "New role matching and training use the latest profile. Historical cards, training, and reports stay unchanged.",
-  },
-  status: {
-    draft: "Draft",
-    uploadingResume: "Uploading resume",
-    parsingResume: "Recognizing resume",
-    recognitionFailed: "Recognition failed",
-    awaitingConfirmation: "Waiting for confirmation",
-    active: "Profile active",
   },
   processingStatus: {
     uploaded: "Uploaded, waiting to be recognized",

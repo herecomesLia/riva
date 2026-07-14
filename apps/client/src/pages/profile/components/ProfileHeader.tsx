@@ -1,12 +1,10 @@
 import { CalendarClockIcon, CircleCheckIcon, ListChecksIcon, UploadIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { JobProfile } from "@/models/profile"
 
-import { ProfileStatusBadge } from "./ProfileStatusBadge"
 import { formatDate } from "./profile-formatters"
 
 export function ProfileHeader({
@@ -21,14 +19,6 @@ export function ProfileHeader({
   return (
     <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <ProfileStatusBadge status={profile.status} />
-          <Badge variant={profile.matchingAnalysisStale ? "secondary" : "outline"}>
-            {profile.matchingAnalysisStale
-              ? t("profile.matchingAnalysis.stale")
-              : t("profile.matchingAnalysis.current")}
-          </Badge>
-        </div>
         <div className="flex flex-col gap-2">
           <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight">
             {t("profile.title")}

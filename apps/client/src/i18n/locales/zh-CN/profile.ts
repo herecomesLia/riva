@@ -5,22 +5,12 @@ export const profile = {
   completeness: "档案完整度",
   pendingReviewCount: "{{count}} 项待确认",
   matchingAnalysis: {
-    current: "匹配分析已同步",
-    stale: "匹配分析已过期",
     staleTitle: "建议更新岗位匹配分析",
     staleDescription: "你的求职档案已更新，现有匹配分析可能不再反映最新经历与技能。",
     oldVersion: "当前匹配分析基于旧版档案。",
     regenerating: "正在重新生成匹配分析…",
     regenerationFailed: "重新生成匹配分析失败，请重试。",
     historyPreserved: "新岗位匹配和训练将使用最新档案；历史题卡、训练和报告保持原样。",
-  },
-  status: {
-    draft: "草稿",
-    uploadingResume: "正在上传简历",
-    parsingResume: "正在识别简历",
-    recognitionFailed: "识别失败",
-    awaitingConfirmation: "等待确认",
-    active: "档案已生效",
   },
   processingStatus: {
     uploaded: "已上传，等待识别",
