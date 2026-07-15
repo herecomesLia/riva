@@ -137,7 +137,6 @@ export const profile = {
     saving: "正在保存...",
     saveError: "保存失败。你的修改仍保留，可以重试或取消。",
     saveSuccess: "修改已保存。",
-    unsavedChanges: "你有尚未保存的修改。",
     validation: {
       required: "请填写此字段。",
       dateRange: "结束时间不能早于开始时间。",

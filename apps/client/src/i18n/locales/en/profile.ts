@@ -151,7 +151,6 @@ export const profile = {
     saving: "Saving...",
     saveError: "Saving failed. Your changes are still here; retry or cancel.",
     saveSuccess: "Changes saved.",
-    unsavedChanges: "You have unsaved changes.",
     validation: {
       required: "This field is required.",
       dateRange: "The end date cannot be before the start date.",

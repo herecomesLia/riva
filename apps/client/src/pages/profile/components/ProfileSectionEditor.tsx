@@ -342,16 +342,6 @@ export function ProfileSectionEditor({
             <AlertDescription>{t("profile.editor.saveError")}</AlertDescription>
           </Alert>
         )}
-
-        <form.Subscribe selector={(state: any) => state.isDirty}>
-          {(isDirty: boolean) =>
-            isDirty ? (
-              <Alert className="mt-6">
-                <AlertDescription>{t("profile.editor.unsavedChanges")}</AlertDescription>
-              </Alert>
-            ) : null
-          }
-        </form.Subscribe>
       </div>
       <EditorFooter form={form} onCancel={onCancel} />
     </form>
