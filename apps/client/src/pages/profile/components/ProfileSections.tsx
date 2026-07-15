@@ -14,23 +14,16 @@ import {
 } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
-import type { JobProfile, ProfileSection, SaveProfileSectionInput } from "@/models/profile"
+import type { JobProfile, ProfileSection } from "@/models/profile"
 
-import { ProfileAdditionalSectionEditor } from "./ProfileAdditionalSectionEditor"
+import type { EditableProfileSection } from "./ProfileSectionEditDialog"
 import { ReviewStatusBadge } from "./ProfileStatusBadge"
-import { ProfileSectionEditor } from "./ProfileSectionEditor"
 import { employmentTypeLabel, formatMonth } from "./profile-formatters"
 
 type ProfileSectionsProps = {
-  editingSection: EditableSection | null
-  onCancelEditing: () => void
-  onDirtyChange: (isDirty: boolean) => void
-  onSave: (input: SaveProfileSectionInput) => Promise<void>
-  onStartEditing: (section: EditableSection) => void
+  onStartEditing: (section: EditableProfileSection) => void
   profile: JobProfile
 }
-
-type EditableSection = Exclude<ProfileSection, "targetRoles">
 
 function ReadonlySectionCard({
   children,
@@ -117,58 +110,22 @@ function DetailList({ items, title }: { items: string[]; title: string }) {
   )
 }
 
-export function ProfileSections({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
+export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProps) {
   return (
     <div className="flex flex-col gap-6">
-      <EducationSection
-        {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-      />
-      <WorkExperienceSection
-        {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-      />
-      <ProjectExperienceSection
-        {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-      />
+      <EducationSection onStartEditing={onStartEditing} profile={profile} />
+      <WorkExperienceSection onStartEditing={onStartEditing} profile={profile} />
+      <ProjectExperienceSection onStartEditing={onStartEditing} profile={profile} />
       <section className="grid gap-6 xl:grid-cols-2">
-        <SkillsSection
-          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-        />
-        <CredentialsSection
-          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-        />
+        <SkillsSection onStartEditing={onStartEditing} profile={profile} />
+        <CredentialsSection onStartEditing={onStartEditing} profile={profile} />
       </section>
     </div>
   )
 }
 
-function EducationSection({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
+function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
   const { t } = useTranslation()
-
-  if (editingSection === "education") {
-    return (
-      <ProfileSectionEditor
-        onCancel={onCancelEditing}
-        onDirtyChange={onDirtyChange}
-        onSave={onSave}
-        profile={profile}
-        section="education"
-      />
-    )
-  }
 
   return (
     <ReadonlySectionCard onEdit={() => onStartEditing("education")} section="education">
@@ -209,27 +166,8 @@ function EducationSection({
   )
 }
 
-function WorkExperienceSection({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
+function WorkExperienceSection({ onStartEditing, profile }: ProfileSectionsProps) {
   const { t } = useTranslation()
-
-  if (editingSection === "workExperience") {
-    return (
-      <ProfileSectionEditor
-        onCancel={onCancelEditing}
-        onDirtyChange={onDirtyChange}
-        onSave={onSave}
-        profile={profile}
-        section="workExperience"
-      />
-    )
-  }
 
   const skillsById = new Map(profile.skills.map((skill) => [skill.id, skill.name]))
 
@@ -292,27 +230,8 @@ function WorkExperienceSection({
   )
 }
 
-function ProjectExperienceSection({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
+function ProjectExperienceSection({ onStartEditing, profile }: ProfileSectionsProps) {
   const { t } = useTranslation()
-
-  if (editingSection === "projectExperience") {
-    return (
-      <ProfileSectionEditor
-        onCancel={onCancelEditing}
-        onDirtyChange={onDirtyChange}
-        onSave={onSave}
-        profile={profile}
-        section="projectExperience"
-      />
-    )
-  }
 
   const workExperienceById = new Map(
     profile.workExperiences.map((experience) => [experience.id, experience.company]),
@@ -379,26 +298,7 @@ function ProjectExperienceSection({
   )
 }
 
-function SkillsSection({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
-  if (editingSection === "skills") {
-    return (
-      <ProfileAdditionalSectionEditor
-        onCancel={onCancelEditing}
-        onDirtyChange={onDirtyChange}
-        onSave={onSave}
-        profile={profile}
-        section="skills"
-      />
-    )
-  }
-
+function SkillsSection({ onStartEditing, profile }: ProfileSectionsProps) {
   return (
     <ReadonlySectionCard onEdit={() => onStartEditing("skills")} section="skills">
       {profile.skills.length === 0 ? (
@@ -416,27 +316,8 @@ function SkillsSection({
   )
 }
 
-function CredentialsSection({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
+function CredentialsSection({ onStartEditing, profile }: ProfileSectionsProps) {
   const { i18n, t } = useTranslation()
-
-  if (editingSection === "credentials") {
-    return (
-      <ProfileAdditionalSectionEditor
-        onCancel={onCancelEditing}
-        onDirtyChange={onDirtyChange}
-        onSave={onSave}
-        profile={profile}
-        section="credentials"
-      />
-    )
-  }
 
   return (
     <ReadonlySectionCard onEdit={() => onStartEditing("credentials")} section="credentials">

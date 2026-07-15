@@ -19,7 +19,6 @@ import type {
   JobProfile,
   JobProfileSnapshot,
   MatchingAnalysis,
-  ProfileSection,
   ResumeRecognitionConfirmationInput,
   ResumeUpdateDecisionInput,
   ResumeUploadInput,
@@ -35,9 +34,11 @@ import {
   ProfileRecognitionFailureState,
 } from "./components/ProfilePageStates"
 import { ProfileResumeDialog, type ResumeDialogMode } from "./components/ProfileResumeDialog"
+import {
+  ProfileSectionEditDialog,
+  type EditableProfileSection,
+} from "./components/ProfileSectionEditDialog"
 import { ProfileSections } from "./components/ProfileSections"
-
-type EditableSection = Exclude<ProfileSection, "targetRoles">
 
 export type ProfileViewActions = {
   cancelRecognition: (profileId: string, resumeId: string) => Promise<JobProfileSnapshot>
@@ -94,9 +95,9 @@ function ProfileReadyView({
   snapshot: JobProfileSnapshot
 }) {
   const { t } = useTranslation()
-  const [editingSection, setEditingSection] = useState<EditableSection | null>(null)
+  const [editingSection, setEditingSection] = useState<EditableProfileSection | null>(null)
   const [isDirty, setIsDirty] = useState(false)
-  const [pendingSection, setPendingSection] = useState<EditableSection | null>(null)
+  const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
   const [saveFeedbackVisible, setSaveFeedbackVisible] = useState(false)
   const [importPhase, setImportPhase] = useState<"uploading" | "parsing" | null>(null)
   const [initialImportError, setInitialImportError] = useState<string | null>(null)
@@ -121,19 +122,28 @@ function ProfileReadyView({
     setIsDirty(false)
   }
 
-  function startEditing(section: EditableSection) {
+  function startEditing(section: EditableProfileSection) {
     setSaveFeedbackVisible(false)
-    if (editingSection && editingSection !== section && isDirty) {
-      setPendingSection(section)
-      return
-    }
+    setIsDirty(false)
     setEditingSection(section)
   }
 
-  function discardDraftAndContinue() {
-    if (pendingSection) setEditingSection(pendingSection)
-    setPendingSection(null)
-    setIsDirty(false)
+  function requestCloseEditor() {
+    if (isDirty) {
+      setIsDiscardDialogOpen(true)
+      return
+    }
+
+    closeEditor()
+  }
+
+  function handleEditorOpenChange(open: boolean) {
+    if (!open) requestCloseEditor()
+  }
+
+  function discardDraftAndClose() {
+    setIsDiscardDialogOpen(false)
+    closeEditor()
   }
 
   async function runImport(
@@ -340,22 +350,23 @@ function ProfileReadyView({
 
       {!isProcessing && !isRecognitionFailure && (
         <>
-          <ProfileSections
-            editingSection={editingSection}
-            onCancelEditing={closeEditor}
+          <ProfileSections onStartEditing={startEditing} profile={profile} />
+          <ProfileSectionEditDialog
             onDirtyChange={handleDirtyChange}
+            onOpenChange={handleEditorOpenChange}
             onSave={async (input) => {
               await actions.saveSection(input)
               closeEditor()
               setSaveFeedbackVisible(true)
             }}
-            onStartEditing={startEditing}
+            open={editingSection !== null}
             profile={profile}
+            section={editingSection}
           />
         </>
       )}
 
-      <AlertDialog open={pendingSection !== null}>
+      <AlertDialog open={isDiscardDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("profile.dialog.discardDraftTitle")}</AlertDialogTitle>
@@ -364,11 +375,11 @@ function ProfileReadyView({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingSection(null)}>
+            <AlertDialogCancel onClick={() => setIsDiscardDialogOpen(false)}>
               {t("profile.dialog.stayEditing")}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={discardDraftAndContinue} variant="destructive">
-              {t("profile.dialog.discardAndContinue")}
+            <AlertDialogAction onClick={discardDraftAndClose} variant="destructive">
+              {t("profile.dialog.discardChanges")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

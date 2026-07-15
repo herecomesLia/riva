@@ -6,7 +6,7 @@ import { z } from "zod"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DialogFooter } from "@/components/ui/dialog"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -19,15 +19,14 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { credentialsSchema, skillSchema } from "@/schemas/profile"
 import type { JobProfile, SaveProfileSectionInput } from "@/models/profile"
-
-type EditableSection = "skills" | "credentials"
+import type { EditableAdditionalSection } from "./ProfileSectionEditDialog"
 
 type ProfileAdditionalSectionEditorProps = {
   onCancel: () => void
   onDirtyChange: (isDirty: boolean) => void
   onSave: (input: SaveProfileSectionInput) => Promise<void>
   profile: JobProfile
-  section: EditableSection
+  section: EditableAdditionalSection
 }
 
 function createTemporaryId() {
@@ -204,61 +203,51 @@ export function ProfileAdditionalSectionEditor({
     form.setFieldValue("items" as never, [...items, createNewItem(section)] as never)
   }
 
-  function cancelEditing() {
-    onDirtyChange(false)
-    onCancel()
-  }
-
   return (
-    <Card data-testid={`profile-editor-${section}`}>
-      <CardHeader>
-        <CardTitle>{t(`profile.sections.${section}`)}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault()
-            void form.handleSubmit()
-          }}
-        >
-          <form.Subscribe selector={(state: any) => state.isDirty}>
-            {(isDirty: boolean) => (
-              <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />
-            )}
-          </form.Subscribe>
+    <form
+      className="grid max-h-[calc(100dvh-8.25rem)] min-h-0 grid-rows-[minmax(0,1fr)_auto]"
+      data-testid={`profile-editor-${section}`}
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault()
+        void form.handleSubmit()
+      }}
+    >
+      <div className="min-h-0 overflow-y-auto px-6 py-5">
+        <form.Subscribe selector={(state: any) => state.isDirty}>
+          {(isDirty: boolean) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
+        </form.Subscribe>
 
-          <FieldGroup>
-            {section === "skills" ? (
-              <SkillFields form={form} onAdd={addItem} profile={profile} />
-            ) : (
-              <CredentialFields form={form} onAdd={addItem} />
-            )}
-          </FieldGroup>
+        <FieldGroup>
+          {section === "skills" ? (
+            <SkillFields form={form} onAdd={addItem} profile={profile} />
+          ) : (
+            <CredentialFields form={form} onAdd={addItem} />
+          )}
+        </FieldGroup>
 
-          {validationError && (
-            <Alert className="mt-6" variant="destructive">
-              <AlertDescription>{translateValidationError(t, validationError)}</AlertDescription>
-            </Alert>
-          )}
-          <form.Subscribe selector={(state: any) => state.isDirty}>
-            {(isDirty: boolean) =>
-              isDirty ? (
-                <Alert className="mt-6">
-                  <AlertDescription>{t("profile.editor.unsavedChanges")}</AlertDescription>
-                </Alert>
-              ) : null
-            }
-          </form.Subscribe>
-          {saveError && (
-            <Alert className="mt-6" variant="destructive">
-              <AlertDescription>{t("profile.editor.saveError")}</AlertDescription>
-            </Alert>
-          )}
-          <EditorFooter form={form} onCancel={cancelEditing} />
-        </form>
-      </CardContent>
-    </Card>
+        {validationError && (
+          <Alert className="mt-6" variant="destructive">
+            <AlertDescription>{translateValidationError(t, validationError)}</AlertDescription>
+          </Alert>
+        )}
+        <form.Subscribe selector={(state: any) => state.isDirty}>
+          {(isDirty: boolean) =>
+            isDirty ? (
+              <Alert className="mt-6">
+                <AlertDescription>{t("profile.editor.unsavedChanges")}</AlertDescription>
+              </Alert>
+            ) : null
+          }
+        </form.Subscribe>
+        {saveError && (
+          <Alert className="mt-6" variant="destructive">
+            <AlertDescription>{t("profile.editor.saveError")}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+      <EditorFooter form={form} onCancel={onCancel} />
+    </form>
   )
 }
 
@@ -430,7 +419,7 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
   const { t } = useTranslation()
 
   return (
-    <div className="mt-6 flex flex-wrap justify-end gap-2">
+    <DialogFooter className="border-t bg-popover px-6 py-4">
       <Button onClick={onCancel} type="button" variant="outline">
         {t("profile.editor.cancel")}
       </Button>
@@ -441,11 +430,11 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
           </Button>
         )}
       </form.Subscribe>
-    </div>
+    </DialogFooter>
   )
 }
 
-function createDraft(profile: JobProfile, section: EditableSection) {
+function createDraft(profile: JobProfile, section: EditableAdditionalSection) {
   if (section === "skills") {
     return {
       items: structuredClone(profile.skills).map((item) => ({
@@ -468,7 +457,7 @@ function createDraft(profile: JobProfile, section: EditableSection) {
   }
 }
 
-function createSectionSchema(section: EditableSection) {
+function createSectionSchema(section: EditableAdditionalSection) {
   if (section === "skills") {
     return z.object({ items: z.array(skillSchema) })
   }
@@ -491,7 +480,7 @@ function hasDuplicateSkillName(items: { name: string }[]) {
   })
 }
 
-function normalizeSectionValues(section: EditableSection, value: any) {
+function normalizeSectionValues(section: EditableAdditionalSection, value: any) {
   if (section === "skills") {
     return value.items.map((item: any) => ({
       ...item,

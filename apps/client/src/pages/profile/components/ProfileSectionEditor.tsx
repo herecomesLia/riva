@@ -6,8 +6,8 @@ import { z } from "zod"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { DialogFooter } from "@/components/ui/dialog"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -25,15 +25,14 @@ import {
   workItemSchema,
 } from "@/schemas/profile"
 import type { EmploymentType, JobProfile, SaveProfileSectionInput } from "@/models/profile"
-
-type EditableSection = "education" | "workExperience" | "projectExperience"
+import type { EditableExperienceSection } from "./ProfileSectionEditDialog"
 
 type ProfileSectionEditorProps = {
   onCancel: () => void
   onDirtyChange: (isDirty: boolean) => void
   onSave: (input: SaveProfileSectionInput) => Promise<void>
   profile: JobProfile
-  section: EditableSection
+  section: EditableExperienceSection
 }
 
 type EditorItem = Record<string, unknown> & {
@@ -292,81 +291,70 @@ export function ProfileSectionEditor({
     form.setFieldValue("items" as never, [...items, createNewItem(section)] as never)
   }
 
-  function cancelEditing() {
-    onDirtyChange(false)
-    onCancel()
-  }
-
   return (
-    <Card data-testid={`profile-editor-${section}`}>
-      <CardHeader>
-        <CardTitle>{t(`profile.sections.${section}`)}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault()
-            void form.handleSubmit()
-          }}
-        >
-          <form.Subscribe selector={(state: any) => state.isDirty}>
-            {(isDirty: boolean) => (
-              <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />
+    <form
+      className="grid max-h-[calc(100dvh-8.25rem)] min-h-0 grid-rows-[minmax(0,1fr)_auto]"
+      data-testid={`profile-editor-${section}`}
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault()
+        void form.handleSubmit()
+      }}
+    >
+      <div className="min-h-0 overflow-y-auto px-6 py-5">
+        <form.Subscribe selector={(state: any) => state.isDirty}>
+          {(isDirty: boolean) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
+        </form.Subscribe>
+        <FieldGroup>
+          <form.Subscribe selector={(state: any) => state.values.items}>
+            {(items: EditorItem[]) => (
+              <div className="flex flex-col gap-6">
+                {items.map((item, index) => (
+                  <ExperienceFields
+                    form={form}
+                    index={index}
+                    itemId={item.id}
+                    key={item.id}
+                    onDelete={() => {
+                      form.setFieldValue(
+                        "items" as never,
+                        items.filter((candidate) => candidate.id !== item.id) as never,
+                      )
+                    }}
+                    profile={profile}
+                    section={section}
+                  />
+                ))}
+              </div>
             )}
           </form.Subscribe>
-          <FieldGroup>
-            <form.Subscribe selector={(state: any) => state.values.items}>
-              {(items: EditorItem[]) => (
-                <div className="flex flex-col gap-6">
-                  {items.map((item, index) => (
-                    <ExperienceFields
-                      form={form}
-                      index={index}
-                      itemId={item.id}
-                      key={item.id}
-                      onDelete={() => {
-                        form.setFieldValue(
-                          "items" as never,
-                          items.filter((candidate) => candidate.id !== item.id) as never,
-                        )
-                      }}
-                      profile={profile}
-                      section={section}
-                    />
-                  ))}
-                </div>
-              )}
-            </form.Subscribe>
-            <Button onClick={addExperience} type="button" variant="outline">
-              <PlusIcon data-icon="inline-start" />
-              {t("profile.editor.addExperience")}
-            </Button>
-            <Alert>
-              <AlertDescription>{t("profile.editor.deleteDescription")}</AlertDescription>
-            </Alert>
-          </FieldGroup>
+          <Button onClick={addExperience} type="button" variant="outline">
+            <PlusIcon data-icon="inline-start" />
+            {t("profile.editor.addExperience")}
+          </Button>
+          <Alert>
+            <AlertDescription>{t("profile.editor.deleteDescription")}</AlertDescription>
+          </Alert>
+        </FieldGroup>
 
-          {saveError && (
-            <Alert className="mt-6" variant="destructive">
-              <AlertDescription>{t("profile.editor.saveError")}</AlertDescription>
-            </Alert>
-          )}
+        {saveError && (
+          <Alert className="mt-6" variant="destructive">
+            <AlertDescription>{t("profile.editor.saveError")}</AlertDescription>
+          </Alert>
+        )}
 
-          <form.Subscribe selector={(state: any) => state.isDirty}>
-            {(isDirty: boolean) =>
-              isDirty ? (
-                <Alert className="mt-6">
-                  <AlertDescription>{t("profile.editor.unsavedChanges")}</AlertDescription>
-                </Alert>
-              ) : null
-            }
-          </form.Subscribe>
-
-          <EditorFooter form={form} onCancel={cancelEditing} />
-        </form>
-      </CardContent>
-    </Card>
+        <form.Subscribe selector={(state: any) => state.isDirty}>
+          {(isDirty: boolean) =>
+            isDirty ? (
+              <Alert className="mt-6">
+                <AlertDescription>{t("profile.editor.unsavedChanges")}</AlertDescription>
+              </Alert>
+            ) : null
+          }
+        </form.Subscribe>
+      </div>
+      <EditorFooter form={form} onCancel={onCancel} />
+    </form>
   )
 }
 
@@ -383,7 +371,7 @@ function ExperienceFields({
   itemId: string
   onDelete: () => void
   profile: JobProfile
-  section: EditableSection
+  section: EditableExperienceSection
 }) {
   const { t } = useTranslation()
   const fieldLabel = (name: string) => t(`profile.formField.${name}`)
@@ -525,7 +513,7 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
   const { t } = useTranslation()
 
   return (
-    <div className="mt-6 flex flex-wrap justify-end gap-2">
+    <DialogFooter className="border-t bg-popover px-6 py-4">
       <Button onClick={onCancel} type="button" variant="outline">
         {t("profile.editor.cancel")}
       </Button>
@@ -536,11 +524,11 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
           </Button>
         )}
       </form.Subscribe>
-    </div>
+    </DialogFooter>
   )
 }
 
-function createDraft(profile: JobProfile, section: EditableSection) {
+function createDraft(profile: JobProfile, section: EditableExperienceSection) {
   switch (section) {
     case "education":
       return {
@@ -584,7 +572,7 @@ function createDraft(profile: JobProfile, section: EditableSection) {
   }
 }
 
-function createSectionSchema(section: EditableSection) {
+function createSectionSchema(section: EditableExperienceSection) {
   const itemSchema =
     section === "education"
       ? educationItemSchema
@@ -595,7 +583,7 @@ function createSectionSchema(section: EditableSection) {
   return z.object({ items: z.array(itemSchema) })
 }
 
-function normalizeSectionValues(section: EditableSection, value: any) {
+function normalizeSectionValues(section: EditableExperienceSection, value: any) {
   if (section === "education") {
     return value.items.map((item: any) => ({
       ...item,
@@ -634,7 +622,7 @@ function normalizeSectionValues(section: EditableSection, value: any) {
   }))
 }
 
-function createNewItem(section: EditableSection) {
+function createNewItem(section: EditableExperienceSection) {
   const base = {
     endDate: "",
     id: createTemporaryId(),

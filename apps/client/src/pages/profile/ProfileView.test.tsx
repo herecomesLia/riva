@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -255,24 +255,159 @@ describe("ProfileView", () => {
     expect(onRetry).toHaveBeenCalledOnce()
   })
 
-  it("opens a business section editor without changing server data", async () => {
+  it("opens the education editor in a dialog without replacing the read-only card", async () => {
     const user = userEvent.setup()
     const snapshot = structuredClone(profileResponseMock)
     renderReady(snapshot)
     const section = await screen.findByTestId("profile-section-education")
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    expect(screen.getByTestId("profile-editor-education")).toBeInTheDocument()
+    const dialog = await screen.findByRole("dialog")
+
+    expect(within(section).getByText("Fudan University")).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(
+        i18n.t("profile.editor.dialogTitle", {
+          section: i18n.t("profile.sections.education"),
+        }),
+      ),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByTestId("profile-editor-education")).toBeInTheDocument()
     expect(snapshot).toEqual(profileResponseMock)
   })
 
-  it("adds and removes an experience only in the draft until save", async () => {
+  it.each(["education", "workExperience", "projectExperience", "skills", "credentials"] as const)(
+    "opens the %s editor in the shared dialog",
+    async (sectionName) => {
+      const user = userEvent.setup()
+      renderReady()
+      const section = await screen.findByTestId(`profile-section-${sectionName}`)
+      await user.click(
+        within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }),
+      )
+
+      const dialog = await screen.findByRole("dialog")
+      expect(
+        within(dialog).getByText(
+          i18n.t("profile.editor.dialogTitle", {
+            section: i18n.t(`profile.sections.${sectionName}`),
+          }),
+        ),
+      ).toBeInTheDocument()
+      expect(within(dialog).getByTestId(`profile-editor-${sectionName}`)).toBeInTheDocument()
+    },
+  )
+
+  it("keeps experience additions and deletions in the draft until save", async () => {
     const user = userEvent.setup()
-    const { actions } = renderReady()
+    const snapshot = structuredClone(profileResponseMock)
+    const { actions } = renderReady(snapshot)
     const section = await screen.findByTestId("profile-section-workExperience")
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.addExperience") }))
-    const deletes = screen.getAllByRole("button", { name: i18n.t("profile.editor.delete") })
+    const dialog = await screen.findByRole("dialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("profile.editor.addExperience") }),
+    )
+    const deletes = within(dialog).getAllByRole("button", { name: i18n.t("profile.editor.delete") })
     await user.click(deletes.at(-1)!)
     expect(actions.saveSection).not.toHaveBeenCalled()
+    expect(snapshot).toEqual(profileResponseMock)
+  })
+
+  it("saves from the dialog, closes it, and keeps the read-only card visible", async () => {
+    const user = userEvent.setup()
+    const snapshot = structuredClone(profileResponseMock)
+    const { actions } = renderReady(snapshot)
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const school = within(dialog).getByLabelText(i18n.t("profile.formField.school"))
+
+    await user.clear(school)
+    await user.type(school, "Updated University")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    await waitFor(() => expect(actions.saveSection).toHaveBeenCalledOnce())
+    expect(actions.saveSection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: snapshot.profile!.profileId,
+        section: "education",
+        version: snapshot.profile!.version,
+        values: expect.arrayContaining([expect.objectContaining({ school: "Updated University" })]),
+      }),
+    )
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    expect(screen.getByTestId("profile-section-education")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-save-success")).toBeInTheDocument()
+  })
+
+  it("keeps the dialog and draft open when saving fails", async () => {
+    const user = userEvent.setup()
+    const actions = createActions()
+    actions.saveSection = vi.fn(async () => {
+      throw new Error("save failed")
+    })
+    renderReady(structuredClone(profileResponseMock), actions)
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const school = within(dialog).getByLabelText(i18n.t("profile.formField.school"))
+
+    await user.clear(school)
+    await user.type(school, "Retry University")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    expect(await within(dialog).findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue("Retry University")).toBeInTheDocument()
+  })
+
+  it("closes an unchanged dialog without a discard confirmation", async () => {
+    const user = userEvent.setup()
+    renderReady()
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.cancel") }))
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+  })
+
+  it("confirms before discarding a dirty dialog and resets the next editor session", async () => {
+    const user = userEvent.setup()
+    renderReady()
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const school = within(dialog).getByLabelText(i18n.t("profile.formField.school"))
+
+    await user.clear(school)
+    await user.type(school, "Discarded University")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.cancel") }))
+
+    const discardDialog = await screen.findByRole("alertdialog")
+    expect(
+      within(discardDialog).getByText(i18n.t("profile.dialog.discardDraftTitle")),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue("Discarded University")).toBeInTheDocument()
+
+    await user.click(
+      within(discardDialog).getByRole("button", { name: i18n.t("profile.dialog.stayEditing") }),
+    )
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue("Discarded University")).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.cancel") }))
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: i18n.t("profile.dialog.discardChanges"),
+      }),
+    )
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    expect(
+      within(await screen.findByRole("dialog")).getByLabelText(i18n.t("profile.formField.school")),
+    ).toHaveValue("Fudan University")
   })
 })

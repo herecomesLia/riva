@@ -139,6 +139,8 @@ export const profile = {
     addSkill: "Add skill",
     addCredential: "Add certificate or award",
     cancel: "Cancel",
+    dialogTitle: "Edit {{section}}",
+    dialogDescription: "Update this profile section and save your changes.",
     current: "Currently ongoing",
     delete: "Delete this entry",
     deleteDescription:
@@ -160,10 +162,9 @@ export const profile = {
   },
   dialog: {
     discardDraftTitle: "Discard unsaved changes?",
-    discardDraftDescription:
-      "This section has a draft that has not been saved. Continuing will discard it.",
+    discardDraftDescription: "Closing will discard the changes you have not saved.",
     stayEditing: "Keep editing",
-    discardAndContinue: "Discard and continue",
+    discardChanges: "Discard changes",
     leavePageTitle: "Leave this page?",
     leavePageDescription: "You have unsaved changes. They will be lost if you leave.",
     leavePage: "Leave page",
