@@ -28,10 +28,10 @@ export function ProfileLoadingState() {
         </div>
         <Skeleton className="h-8 w-28 max-w-full justify-self-start lg:justify-self-end" />
       </div>
-      <div className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        <ProfileSkeletonCard />
-        <ProfileSkeletonCard />
-        <ProfileSkeletonCard />
+      <div className="grid items-stretch gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <ProfileSkeletonCard className="h-full" />
+        <ProfileSkeletonCard className="h-full" />
+        <ProfileSkeletonCard className="h-full" />
       </div>
       <ProfileSkeletonCard />
       <ProfileSkeletonCard />
@@ -39,9 +39,9 @@ export function ProfileLoadingState() {
   )
 }
 
-function ProfileSkeletonCard() {
+function ProfileSkeletonCard({ className }: { className?: string }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <Skeleton className="h-5 w-2/5" />
         <Skeleton className="h-4 w-4/5" />

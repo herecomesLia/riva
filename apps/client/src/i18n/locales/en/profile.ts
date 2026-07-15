@@ -79,6 +79,10 @@ export const profile = {
     credentials: "Certificates and awards",
     targetRoles: "Current target roles",
   },
+  carousel: {
+    next: "Next {{section}}",
+    previous: "Previous {{section}}",
+  },
   field: {
     name: "Name",
     location: "Location",

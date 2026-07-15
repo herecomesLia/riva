@@ -160,7 +160,7 @@ describe("ProfilePage orchestration", () => {
     renderPage()
     const educationCard = await screen.findByTestId("profile-section-education")
     await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
-    const school = screen.getByLabelText(i18n.t("profile.formField.school"))
+    const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
     await user.clear(school)
     await user.type(school, "Updated University")
     await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
@@ -176,7 +176,7 @@ describe("ProfilePage orchestration", () => {
     renderPage()
     const educationCard = await screen.findByTestId("profile-section-education")
     await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
-    const school = screen.getByLabelText(i18n.t("profile.formField.school"))
+    const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
     await user.clear(school)
     await user.type(school, "Unsaved University")
     await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))

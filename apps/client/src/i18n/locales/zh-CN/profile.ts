@@ -70,6 +70,10 @@ export const profile = {
     credentials: "证书与奖项",
     targetRoles: "当前目标岗位",
   },
+  carousel: {
+    next: "下一项{{section}}",
+    previous: "上一项{{section}}",
+  },
   field: {
     name: "姓名",
     location: "所在地",

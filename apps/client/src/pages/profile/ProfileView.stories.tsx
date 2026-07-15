@@ -64,6 +64,29 @@ export const EmptySections = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: empty } },
 })
 
+const multipleEducation = structuredClone(profileResponseMock)
+multipleEducation.profile!.education.push({
+  degree: "Master of Science",
+  endDate: "2021-06",
+  id: "education_riva_2021",
+  isCurrent: false,
+  major: "Human-Computer Interaction",
+  school: "Riva University",
+  source: "userAdded",
+  startDate: "2018-09",
+})
+
+export const MultipleEducation = meta.story({
+  args: { ...readyArgs, content: { status: "ready", data: multipleEducation } },
+})
+
+const singleCredential = structuredClone(profileResponseMock)
+singleCredential.profile!.credentials = singleCredential.profile!.credentials.slice(0, 1)
+
+export const SingleCredential = meta.story({
+  args: { ...readyArgs, content: { status: "ready", data: singleCredential } },
+})
+
 const partial = structuredClone(profileResponseMock)
 partial.profile!.projectExperiences = []
 partial.profile!.credentials = []
@@ -90,6 +113,12 @@ export const AfterResumeUpdate = meta.story({
 })
 
 const longContent = structuredClone(profileResponseMock)
+longContent.profile!.education[0]!.school =
+  "Fudan University School of Computer Science and Technology International Program"
+longContent.profile!.education[0]!.major =
+  "Computer Science and Technology with Human-Centered Product Design"
+longContent.profile!.credentials[0]!.credentialUrl =
+  "https://credentials.example.com/verification/this-is-a-deliberately-long-unbroken-credential-verification-token-for-layout-checking"
 longContent.profile!.projectExperiences[0]!.background =
   "A product-focused engineer who works across accessibility, design systems, performance, architecture, and cross-functional delivery. ".repeat(
     5,

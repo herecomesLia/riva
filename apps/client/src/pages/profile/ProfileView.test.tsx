@@ -91,6 +91,195 @@ describe("ProfileView", () => {
     expect(screen.getByTestId("profile-section-projectExperience")).toBeInTheDocument()
   })
 
+  it("navigates shared education records without replacing the full-section editor", async () => {
+    const user = userEvent.setup()
+    renderReady()
+
+    const section = await screen.findByTestId("profile-section-education")
+    const previousName = i18n.t("profile.carousel.previous", {
+      section: i18n.t("profile.sections.education"),
+    })
+    const nextName = i18n.t("profile.carousel.next", {
+      section: i18n.t("profile.sections.education"),
+    })
+
+    expect(within(section).getByText("Fudan University")).toBeInTheDocument()
+    expect(within(section).queryByText("Tongji University")).not.toBeInTheDocument()
+    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
+
+    await user.click(within(section).getByRole("button", { name: nextName }))
+    expect(within(section).getByText("Tongji University")).toBeInTheDocument()
+    expect(within(section).queryByText("Fudan University")).not.toBeInTheDocument()
+    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
+    expect(within(section).queryByRole("button", { name: nextName })).not.toBeInTheDocument()
+
+    await user.click(within(section).getByRole("button", { name: previousName }))
+    expect(within(section).getByText("Fudan University")).toBeInTheDocument()
+    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
+    expect(within(section).getByRole("button", { name: nextName })).toBeInTheDocument()
+
+    await user.click(within(section).getByRole("button", { name: nextName }))
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByTestId("profile-editor-education")).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue("Fudan University")).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue("Tongji University")).toBeInTheDocument()
+  })
+
+  it("shows linear navigation controls for three education records", async () => {
+    const user = userEvent.setup()
+    const snapshot = structuredClone(profileResponseMock)
+    snapshot.profile!.education.push({
+      degree: "Master of Science",
+      endDate: "2024-06",
+      id: "education_riva_2024",
+      isCurrent: false,
+      major: "Human-Computer Interaction",
+      school: "Riva University",
+      source: "userAdded",
+      startDate: "2021-09",
+    })
+    renderReady(snapshot)
+
+    const section = await screen.findByTestId("profile-section-education")
+    const previousName = i18n.t("profile.carousel.previous", {
+      section: i18n.t("profile.sections.education"),
+    })
+    const nextName = i18n.t("profile.carousel.next", {
+      section: i18n.t("profile.sections.education"),
+    })
+
+    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
+    await user.click(within(section).getByRole("button", { name: nextName }))
+    expect(within(section).getByText("Tongji University")).toBeInTheDocument()
+    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
+    expect(within(section).getByRole("button", { name: nextName })).toBeInTheDocument()
+
+    await user.click(within(section).getByRole("button", { name: nextName }))
+    expect(within(section).getByText("Riva University")).toBeInTheDocument()
+    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
+    expect(within(section).queryByRole("button", { name: nextName })).not.toBeInTheDocument()
+  })
+
+  it("does not render education carousel controls for one record", async () => {
+    const snapshot = structuredClone(profileResponseMock)
+    snapshot.profile!.education = snapshot.profile!.education.slice(0, 1)
+    renderReady(snapshot)
+
+    const section = await screen.findByTestId("profile-section-education")
+
+    expect(
+      within(section).queryByRole("button", {
+        name: i18n.t("profile.carousel.previous", {
+          section: i18n.t("profile.sections.education"),
+        }),
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(section).queryByRole("button", {
+        name: i18n.t("profile.carousel.next", {
+          section: i18n.t("profile.sections.education"),
+        }),
+      }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("navigates credentials linearly while retaining their type badge and accessible link", async () => {
+    const user = userEvent.setup()
+    renderReady()
+
+    const section = await screen.findByTestId("profile-section-credentials")
+    const previousName = i18n.t("profile.carousel.previous", {
+      section: i18n.t("profile.sections.credentials"),
+    })
+    const nextName = i18n.t("profile.carousel.next", {
+      section: i18n.t("profile.sections.credentials"),
+    })
+
+    expect(within(section).getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
+    expect(
+      within(section).getByText(i18n.t("profile.credentialType.certificate")),
+    ).toBeInTheDocument()
+    expect(within(section).getByRole("link", { name: "AWS-CCP-2023-0174" })).toBeInTheDocument()
+    expect(within(section).queryByText("Product Excellence Award")).not.toBeInTheDocument()
+    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
+
+    await user.click(within(section).getByRole("button", { name: nextName }))
+    expect(within(section).getByText("Product Excellence Award")).toBeInTheDocument()
+    expect(within(section).getByText(i18n.t("profile.credentialType.award"))).toBeInTheDocument()
+    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
+    expect(within(section).queryByRole("button", { name: nextName })).not.toBeInTheDocument()
+
+    await user.click(within(section).getByRole("button", { name: previousName }))
+    expect(within(section).getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
+  })
+
+  it("does not render credential carousel controls for one record", async () => {
+    const snapshot = structuredClone(profileResponseMock)
+    snapshot.profile!.credentials = snapshot.profile!.credentials.slice(0, 1)
+    renderReady(snapshot)
+
+    const section = await screen.findByTestId("profile-section-credentials")
+
+    expect(
+      within(section).queryByRole("button", {
+        name: i18n.t("profile.carousel.previous", {
+          section: i18n.t("profile.sections.credentials"),
+        }),
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(section).queryByRole("button", {
+        name: i18n.t("profile.carousel.next", {
+          section: i18n.t("profile.sections.credentials"),
+        }),
+      }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("keeps carousel indexes valid when the profile data removes the active record", async () => {
+    const user = userEvent.setup()
+    const snapshot = structuredClone(profileResponseMock)
+    const { actions, rerender } = renderReady(snapshot)
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(
+      within(section).getByRole("button", {
+        name: i18n.t("profile.carousel.next", {
+          section: i18n.t("profile.sections.education"),
+        }),
+      }),
+    )
+    expect(within(section).getByText("Tongji University")).toBeInTheDocument()
+
+    const updatedSnapshot = structuredClone(snapshot)
+    updatedSnapshot.profile!.education = updatedSnapshot.profile!.education.slice(0, 1)
+    rerender(
+      <ProfileView
+        actions={actions}
+        content={{ status: "ready", data: updatedSnapshot }}
+        variant="default"
+      />,
+    )
+
+    expect(await within(section).findByText("Fudan University")).toBeInTheDocument()
+    expect(within(section).queryByText("Tongji University")).not.toBeInTheDocument()
+  })
+
+  it("does not render carousel controls for empty summary sections", async () => {
+    const snapshot = structuredClone(profileResponseMock)
+    snapshot.profile!.education = []
+    snapshot.profile!.credentials = []
+    renderReady(snapshot)
+
+    const education = await screen.findByTestId("profile-section-education")
+    const credentials = screen.getByTestId("profile-section-credentials")
+
+    expect(within(education).queryByRole("button", { name: /教育经历/ })).not.toBeInTheDocument()
+    expect(
+      within(credentials).queryByRole("button", { name: /证书与奖项/ }),
+    ).not.toBeInTheDocument()
+  })
+
   it("opens the current resume details from the header and resets the dialog when closed", async () => {
     const user = userEvent.setup()
     const snapshot: JobProfileSnapshot = structuredClone(profileResponseMock)
@@ -305,9 +494,7 @@ describe("ProfileView", () => {
     const dialog = await screen.findByRole("dialog")
 
     for (const field of ["school", "degree", "major", "startDate", "endDate"] as const) {
-      expect(
-        within(dialog).getByLabelText(i18n.t(`profile.formField.${field}`)),
-      ).toBeInTheDocument()
+      expect(within(dialog).getAllByLabelText(i18n.t(`profile.formField.${field}`))).toHaveLength(2)
     }
     expect(within(dialog).queryByLabelText(i18n.t("profile.formField.description"))).toBeNull()
   })
@@ -318,8 +505,10 @@ describe("ProfileView", () => {
     const section = await screen.findByTestId("profile-section-education")
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
     const dialog = await screen.findByRole("dialog")
-    const present = within(dialog).getByRole("checkbox", { name: i18n.t("profile.field.present") })
-    const endDate = within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))
+    const present = within(dialog).getAllByRole("checkbox", {
+      name: i18n.t("profile.field.present"),
+    })[0]!
+    const endDate = within(dialog).getAllByLabelText(i18n.t("profile.formField.endDate"))[0]!
 
     expect(present).not.toBeChecked()
     expect(endDate).toHaveAttribute("type", "month")
@@ -327,17 +516,18 @@ describe("ProfileView", () => {
 
     await user.click(present)
     expect(present).toBeChecked()
-    expect(within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))).toHaveAttribute(
-      "type",
-      "text",
-    )
-    expect(within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))).toBeDisabled()
-    expect(within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))).toHaveValue(
+    expect(
+      within(dialog).getAllByLabelText(i18n.t("profile.formField.endDate"))[0],
+    ).toHaveAttribute("type", "text")
+    expect(within(dialog).getAllByLabelText(i18n.t("profile.formField.endDate"))[0]).toBeDisabled()
+    expect(within(dialog).getAllByLabelText(i18n.t("profile.formField.endDate"))[0]).toHaveValue(
       i18n.t("profile.field.present"),
     )
 
     await user.click(present)
-    const restoredEndDate = within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))
+    const restoredEndDate = within(dialog).getAllByLabelText(
+      i18n.t("profile.formField.endDate"),
+    )[0]!
     expect(restoredEndDate).toHaveAttribute("type", "month")
     expect(restoredEndDate).toHaveValue("")
 
@@ -433,7 +623,7 @@ describe("ProfileView", () => {
     const section = await screen.findByTestId("profile-section-education")
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
     const dialog = await screen.findByRole("dialog")
-    const school = within(dialog).getByLabelText(i18n.t("profile.formField.school"))
+    const school = within(dialog).getAllByLabelText(i18n.t("profile.formField.school"))[0]!
 
     await user.clear(school)
     await user.type(school, "Updated University")
@@ -445,12 +635,14 @@ describe("ProfileView", () => {
         profileId: snapshot.profile!.profileId,
         section: "education",
         version: snapshot.profile!.version,
-        values: [expect.objectContaining({ school: "Updated University" })],
+        values: expect.arrayContaining([expect.objectContaining({ school: "Updated University" })]),
       }),
     )
     expect(actions.saveSection).toHaveBeenCalledWith(
       expect.objectContaining({
-        values: [expect.not.objectContaining({ description: expect.anything() })],
+        values: expect.not.arrayContaining([
+          expect.objectContaining({ description: expect.anything() }),
+        ]),
       }),
     )
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
@@ -468,7 +660,7 @@ describe("ProfileView", () => {
     const section = await screen.findByTestId("profile-section-education")
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
     const dialog = await screen.findByRole("dialog")
-    const school = within(dialog).getByLabelText(i18n.t("profile.formField.school"))
+    const school = within(dialog).getAllByLabelText(i18n.t("profile.formField.school"))[0]!
 
     await user.clear(school)
     await user.type(school, "Retry University")
@@ -497,7 +689,7 @@ describe("ProfileView", () => {
     const section = await screen.findByTestId("profile-section-education")
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
     const dialog = await screen.findByRole("dialog")
-    const school = within(dialog).getByLabelText(i18n.t("profile.formField.school"))
+    const school = within(dialog).getAllByLabelText(i18n.t("profile.formField.school"))[0]!
 
     await user.clear(school)
     await user.type(school, "Discarded University")
@@ -525,7 +717,9 @@ describe("ProfileView", () => {
 
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
     expect(
-      within(await screen.findByRole("dialog")).getByLabelText(i18n.t("profile.formField.school")),
+      within(await screen.findByRole("dialog")).getAllByLabelText(
+        i18n.t("profile.formField.school"),
+      )[0],
     ).toHaveValue("Fudan University")
   })
 })

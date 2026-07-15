@@ -52,6 +52,16 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         isCurrent: false,
         source: "resumeExtracted",
       },
+      {
+        id: "education_tongji_2021",
+        school: "Tongji University",
+        degree: "Master of Engineering",
+        major: "Software Engineering",
+        startDate: "2018-09",
+        endDate: "2021-06",
+        isCurrent: false,
+        source: "resumeExtracted",
+      },
     ],
     workExperiences: [
       {

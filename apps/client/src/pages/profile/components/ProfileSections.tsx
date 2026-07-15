@@ -1,5 +1,5 @@
-import { PencilIcon } from "lucide-react"
-import type { ReactNode } from "react"
+import { ChevronLeftIcon, ChevronRightIcon, PencilIcon } from "lucide-react"
+import { useEffect, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 import type { JobProfile, ProfileSection } from "@/models/profile"
 
 import type { EditableProfileSection } from "./ProfileSectionEditDialog"
@@ -26,11 +27,15 @@ type ProfileSectionsProps = {
 
 function ReadonlySectionCard({
   children,
+  className,
+  contentClassName,
   description,
   onEdit,
   section,
 }: {
   children: ReactNode
+  className?: string
+  contentClassName?: string
   description?: string
   onEdit?: () => void
   section: ProfileSection
@@ -38,7 +43,7 @@ function ReadonlySectionCard({
   const { t } = useTranslation()
 
   return (
-    <Card data-testid={`profile-section-${section}`}>
+    <Card className={cn(className)} data-testid={`profile-section-${section}`}>
       <CardHeader>
         <CardTitle>
           <h2>{t(`profile.sections.${section}`)}</h2>
@@ -51,7 +56,7 @@ function ReadonlySectionCard({
           </Button>
         </CardAction>
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className={cn(contentClassName)}>{children}</CardContent>
     </Card>
   )
 }
@@ -109,11 +114,94 @@ function DetailList({ items, title }: { items: string[]; title: string }) {
   )
 }
 
+type ProfileItemCarouselProps<T> = {
+  getItemKey: (item: T) => string
+  items: T[]
+  renderItem: (item: T) => ReactNode
+  sectionLabel: string
+}
+
+const carouselArrowClassName =
+  "pointer-events-auto bg-transparent opacity-40 transition-opacity hover:bg-transparent hover:opacity-100 focus-visible:bg-transparent focus-visible:opacity-100 active:!translate-y-0 active:bg-transparent dark:hover:bg-transparent dark:focus-visible:bg-transparent"
+
+function ProfileItemCarousel<T>({
+  getItemKey,
+  items,
+  renderItem,
+  sectionLabel,
+}: ProfileItemCarouselProps<T>) {
+  const { t } = useTranslation()
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  useEffect(() => {
+    setCurrentIndex((index) => Math.min(index, Math.max(items.length - 1, 0)))
+  }, [items.length])
+
+  if (items.length === 0) {
+    return null
+  }
+
+  const safeIndex = Math.min(currentIndex, items.length - 1)
+  const currentItem = items[safeIndex]
+  const hasMultipleItems = items.length > 1
+  const canGoPrevious = safeIndex > 0
+  const canGoNext = safeIndex < items.length - 1
+
+  function showPrevious() {
+    setCurrentIndex((index) => Math.max(0, index - 1))
+  }
+
+  function showNext() {
+    setCurrentIndex((index) => Math.min(items.length - 1, index + 1))
+  }
+
+  return (
+    <div
+      className={cn(
+        "relative flex flex-1 rounded-xl border bg-background/60 py-4",
+        hasMultipleItems ? "px-11" : "px-4",
+      )}
+    >
+      <div aria-live="polite" className="min-w-0 flex-1" key={getItemKey(currentItem)}>
+        {renderItem(currentItem)}
+      </div>
+      {canGoPrevious && (
+        <div className="pointer-events-none absolute inset-y-0 left-2 flex items-center">
+          <Button
+            aria-label={t("profile.carousel.previous", { section: sectionLabel })}
+            className={carouselArrowClassName}
+            onClick={showPrevious}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <ChevronLeftIcon />
+          </Button>
+        </div>
+      )}
+      {canGoNext && (
+        <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+          <Button
+            aria-label={t("profile.carousel.next", { section: sectionLabel })}
+            className={carouselArrowClassName}
+            onClick={showNext}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <ChevronRightIcon />
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProps) {
   return (
     <div className="flex flex-col gap-6">
       <section
-        className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3"
+        className="grid items-stretch gap-6 lg:grid-cols-2 xl:grid-cols-3"
         data-testid="profile-summary-sections"
       >
         <EducationSection onStartEditing={onStartEditing} profile={profile} />
@@ -127,24 +215,30 @@ export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProp
 }
 
 function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
+  const { t } = useTranslation()
+
   return (
-    <ReadonlySectionCard onEdit={() => onStartEditing("education")} section="education">
+    <ReadonlySectionCard
+      className="h-full"
+      contentClassName="flex flex-1 flex-col"
+      onEdit={() => onStartEditing("education")}
+      section="education"
+    >
       {profile.education.length === 0 ? (
         <EmptySection />
       ) : (
-        <div className="flex flex-col gap-5">
-          {profile.education.map((education, index) => {
+        <ProfileItemCarousel
+          getItemKey={(education) => education.id}
+          items={profile.education}
+          renderItem={(education) => {
             const degreeMajor = [education.degree, education.major].filter(Boolean).join(" · ")
 
             return (
-              <div key={education.id} className="flex flex-col gap-2">
-                {index > 0 && <Separator className="mb-3" />}
-                <div>
-                  <h3 className="font-medium">{education.school}</h3>
-                  {degreeMajor && (
-                    <p className="mt-1 text-sm text-muted-foreground">{degreeMajor}</p>
-                  )}
-                </div>
+              <div className="flex min-w-0 flex-col gap-2">
+                <h3 className="break-words font-medium">{education.school}</h3>
+                {degreeMajor && (
+                  <p className="break-words text-sm text-muted-foreground">{degreeMajor}</p>
+                )}
                 <DateRange
                   endDate={education.endDate}
                   isCurrent={education.isCurrent}
@@ -152,8 +246,9 @@ function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
                 />
               </div>
             )
-          })}
-        </div>
+          }}
+          sectionLabel={t("profile.sections.education")}
+        />
       )}
     </ReadonlySectionCard>
   )
@@ -287,7 +382,12 @@ function ProjectExperienceSection({ onStartEditing, profile }: ProfileSectionsPr
 
 function SkillsSection({ onStartEditing, profile }: ProfileSectionsProps) {
   return (
-    <ReadonlySectionCard onEdit={() => onStartEditing("skills")} section="skills">
+    <ReadonlySectionCard
+      className="h-full"
+      contentClassName="flex flex-1 flex-col"
+      onEdit={() => onStartEditing("skills")}
+      section="skills"
+    >
       {profile.skills.length === 0 ? (
         <EmptySection />
       ) : (
@@ -307,17 +407,23 @@ function CredentialsSection({ onStartEditing, profile }: ProfileSectionsProps) {
   const { i18n, t } = useTranslation()
 
   return (
-    <ReadonlySectionCard onEdit={() => onStartEditing("credentials")} section="credentials">
+    <ReadonlySectionCard
+      className="h-full"
+      contentClassName="flex flex-1 flex-col"
+      onEdit={() => onStartEditing("credentials")}
+      section="credentials"
+    >
       {profile.credentials.length === 0 ? (
         <EmptySection />
       ) : (
-        <div className="flex flex-col gap-5">
-          {profile.credentials.map((credential, index) => (
-            <div key={credential.id} className="flex flex-col gap-2">
-              {index > 0 && <Separator className="mb-3" />}
+        <ProfileItemCarousel
+          getItemKey={(credential) => credential.id}
+          items={profile.credentials}
+          renderItem={(credential) => (
+            <div className="flex min-w-0 flex-col gap-2">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-medium">{credential.name}</h3>
+                  <h3 className="min-w-0 break-words font-medium">{credential.name}</h3>
                   <Badge variant="outline">{t(`profile.credentialType.${credential.type}`)}</Badge>
                 </div>
                 {(credential.issuer || credential.awardedAt) && (
@@ -354,8 +460,9 @@ function CredentialsSection({ onStartEditing, profile }: ProfileSectionsProps) {
                 </a>
               )}
             </div>
-          ))}
-        </div>
+          )}
+          sectionLabel={t("profile.sections.credentials")}
+        />
       )}
     </ReadonlySectionCard>
   )
