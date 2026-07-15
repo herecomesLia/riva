@@ -1,4 +1,10 @@
-import { ChevronLeftIcon, ChevronRightIcon, PencilIcon } from "lucide-react"
+import {
+  CalendarDaysIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  GraduationCapIcon,
+  PencilIcon,
+} from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -97,6 +103,32 @@ function DateRange({
   )
 }
 
+function EducationDateRange({
+  endDate,
+  isCurrent,
+  startDate,
+}: {
+  endDate: string | null
+  isCurrent: boolean
+  startDate: string | null
+}) {
+  const { i18n, t } = useTranslation()
+  const start = formatMonth(startDate, i18n.language, "—")
+  const end = isCurrent ? t("profile.field.present") : formatMonth(endDate, i18n.language, "—")
+
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+      <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+      <span className="min-w-0 break-words">
+        {t("profile.field.dateRange", {
+          end,
+          start,
+        })}
+      </span>
+    </div>
+  )
+}
+
 function DetailList({ items, title }: { items: string[]; title: string }) {
   if (items.length === 0) {
     return null
@@ -116,6 +148,7 @@ function DetailList({ items, title }: { items: string[]; title: string }) {
 
 type ProfileItemCarouselProps<T> = {
   getItemKey: (item: T) => string
+  itemCardClassName?: string
   items: T[]
   renderItem: (item: T) => ReactNode
   sectionLabel: string
@@ -126,6 +159,7 @@ const carouselArrowClassName =
 
 function ProfileItemCarousel<T>({
   getItemKey,
+  itemCardClassName,
   items,
   renderItem,
   sectionLabel,
@@ -160,6 +194,7 @@ function ProfileItemCarousel<T>({
       className={cn(
         "relative flex flex-1 rounded-xl border bg-background/60 py-4",
         hasMultipleItems ? "px-11" : "px-4",
+        itemCardClassName,
       )}
     >
       <div aria-live="polite" className="min-w-0 flex-1" key={getItemKey(currentItem)}>
@@ -229,21 +264,33 @@ function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
       ) : (
         <ProfileItemCarousel
           getItemKey={(education) => education.id}
+          itemCardClassName="before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-primary before:opacity-80 before:shadow-[4px_0_12px_var(--primary)] border-border bg-card py-5"
           items={profile.education}
           renderItem={(education) => {
             const degreeMajor = [education.degree, education.major].filter(Boolean).join(" · ")
 
             return (
-              <div className="flex min-w-0 flex-col gap-2">
-                <h3 className="break-words font-medium">{education.school}</h3>
-                {degreeMajor && (
-                  <p className="break-words text-sm text-muted-foreground">{degreeMajor}</p>
-                )}
-                <DateRange
-                  endDate={education.endDate}
-                  isCurrent={education.isCurrent}
-                  startDate={education.startDate}
-                />
+              <div className="flex min-w-0 items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:size-14">
+                  <GraduationCapIcon aria-hidden="true" className="size-6 sm:size-7" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="break-words font-heading text-base leading-6 font-semibold text-foreground">
+                    {education.school}
+                  </h3>
+                  {degreeMajor && (
+                    <p className="mt-1 break-words text-sm leading-6 text-muted-foreground">
+                      {degreeMajor}
+                    </p>
+                  )}
+                  <div className="mt-3">
+                    <EducationDateRange
+                      endDate={education.endDate}
+                      isCurrent={education.isCurrent}
+                      startDate={education.startDate}
+                    />
+                  </div>
+                </div>
               </div>
             )
           }}

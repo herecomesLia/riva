@@ -7,7 +7,7 @@ import { defaultLanguage } from "@/i18n/resources"
 import { profileResponseMock } from "@/mocks/data/profile"
 import type { JobProfileSnapshot } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
-import { formatDate } from "@/pages/profile/components/profile-formatters"
+import { formatDate, formatMonth } from "@/pages/profile/components/profile-formatters"
 import { renderWithProviders } from "@/test/render"
 
 function createActions(): ProfileViewActions {
@@ -104,11 +104,27 @@ describe("ProfileView", () => {
     })
 
     expect(within(section).getByText("Fudan University")).toBeInTheDocument()
+    expect(
+      within(section).getByText(
+        i18n.t("profile.field.dateRange", {
+          end: formatMonth("2018-06", i18n.language, "—"),
+          start: formatMonth("2014-09", i18n.language, "—"),
+        }),
+      ),
+    ).toBeInTheDocument()
     expect(within(section).queryByText("Tongji University")).not.toBeInTheDocument()
     expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
 
     await user.click(within(section).getByRole("button", { name: nextName }))
     expect(within(section).getByText("Tongji University")).toBeInTheDocument()
+    expect(
+      within(section).getByText(
+        i18n.t("profile.field.dateRange", {
+          end: formatMonth("2021-06", i18n.language, "—"),
+          start: formatMonth("2018-09", i18n.language, "—"),
+        }),
+      ),
+    ).toBeInTheDocument()
     expect(within(section).queryByText("Fudan University")).not.toBeInTheDocument()
     expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
     expect(within(section).queryByRole("button", { name: nextName })).not.toBeInTheDocument()
