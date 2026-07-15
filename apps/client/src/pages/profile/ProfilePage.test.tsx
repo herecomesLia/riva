@@ -11,16 +11,12 @@ import { renderWithProviders } from "@/test/render"
 
 vi.mock("@/services/profile", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/profile")>()),
-  cancelResumeRecognitionReview: vi.fn(),
-  cancelResumeUpdate: vi.fn(),
-  confirmResumeUpdate: vi.fn(),
   createManualJobProfile: vi.fn(),
   getJobProfile: vi.fn(),
-  regenerateMatchingAnalysis: vi.fn(),
+  resetInitialResumeImport: vi.fn(),
   saveProfileSection: vi.fn(),
   startInitialResumeRecognition: vi.fn(),
   startUpdatedResumeRecognition: vi.fn(),
-  submitResumeRecognitionConfirmation: vi.fn(),
   uploadInitialResume: vi.fn(),
   uploadUpdatedResume: vi.fn(),
 }))
@@ -118,7 +114,7 @@ describe("ProfilePage orchestration", () => {
     const uploading = structuredClone(profileResponseMock)
     uploading.profile!.resume!.id = "uploaded-resume"
     const recognized = structuredClone(profileResponseMock)
-    recognized.profile!.status = "awaitingConfirmation"
+    recognized.profile!.status = "active"
     vi.mocked(profileService.getJobProfile).mockResolvedValue(empty)
     vi.mocked(profileService.uploadInitialResume).mockResolvedValue(uploading)
     vi.mocked(profileService.startInitialResumeRecognition).mockResolvedValue(recognized)
@@ -133,7 +129,8 @@ describe("ProfilePage orchestration", () => {
         "uploaded-resume",
       ),
     )
-    expect(await screen.findByTestId("profile-review-notice")).toBeInTheDocument()
+    expect(await screen.findByTestId("profile-import-success")).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-review-notice")).not.toBeInTheDocument()
   })
 
   it("keeps the upload form and shows safe feedback when upload fails", async () => {

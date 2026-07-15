@@ -2,19 +2,14 @@ import preview from "#storybook/preview"
 import { fn } from "storybook/test"
 
 import { profileResponseMock } from "@/mocks/data/profile"
+import type { JobProfileSnapshot } from "@/models/profile"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { ProfileView, type ProfileViewActions } from "./ProfileView"
 
 const actions: ProfileViewActions = {
-  cancelRecognition: fn(async () => structuredClone(profileResponseMock)),
-  cancelResumeUpdate: fn(async () => structuredClone(profileResponseMock)),
-  confirmRecognition: fn(async () => structuredClone(profileResponseMock.profile!)),
-  confirmResumeUpdate: fn(async () => structuredClone(profileResponseMock.profile!)),
   createManualProfile: fn(async () => structuredClone(profileResponseMock)),
-  regenerateMatchingAnalysis: fn(async () =>
-    structuredClone(profileResponseMock.matchingAnalysis!),
-  ),
+  resetInitialResumeImport: fn(async () => structuredClone(profileResponseMock)),
   retryRecognition: fn(async () => structuredClone(profileResponseMock)),
   saveSection: fn(async () => structuredClone(profileResponseMock.profile!)),
   uploadInitialResume: fn(async () => structuredClone(profileResponseMock)),
@@ -24,7 +19,6 @@ const actions: ProfileViewActions = {
 const readyArgs = {
   actions,
   content: { status: "ready" as const, data: structuredClone(profileResponseMock) },
-  pending: { analysis: false, cancelUpdate: false, confirmUpdate: false },
   variant: "default" as const,
 }
 
@@ -52,6 +46,13 @@ export const NoResume = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: noResume } },
 })
 
+const afterInitialImport: JobProfileSnapshot = structuredClone(profileResponseMock)
+afterInitialImport.matchingAnalysis = null
+
+export const AfterInitialImport = meta.story({
+  args: { ...readyArgs, content: { status: "ready", data: afterInitialImport } },
+})
+
 const empty = structuredClone(profileResponseMock)
 empty.profile!.education = []
 empty.profile!.workExperiences = []
@@ -66,14 +67,26 @@ export const EmptySections = meta.story({
 const partial = structuredClone(profileResponseMock)
 partial.profile!.projectExperiences = []
 partial.profile!.credentials = []
-partial.profile!.education[0]!.reviewStatus = "needsReview"
 partial.profile!.completeness.percentage = 75
-partial.profile!.pendingReviewCount = 1
 partial.profile!.completeness.missingSections = ["projectExperience", "credentials"]
-partial.profile!.completeness.needsReviewSections = ["education"]
 
 export const Partial = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: partial } },
+})
+
+const afterResumeUpdate: JobProfileSnapshot = structuredClone(profileResponseMock)
+afterResumeUpdate.resumeUpdate = {
+  changeSummary: { changedItems: 2, missingItems: 1, newItems: 1 },
+  createdAt: "2026-07-13T08:00:00.000Z",
+  failureReason: null,
+  id: "resume_update_uploaded",
+  preservesManualChanges: true,
+  resume: structuredClone(afterResumeUpdate.profile!.resume!),
+  status: "succeeded",
+}
+
+export const AfterResumeUpdate = meta.story({
+  args: { ...readyArgs, content: { status: "ready", data: afterResumeUpdate } },
 })
 
 const longContent = structuredClone(profileResponseMock)

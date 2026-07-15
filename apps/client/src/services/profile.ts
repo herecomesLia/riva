@@ -5,16 +5,22 @@ import type {
   JobProfile,
   JobProfileSnapshot,
   MatchingAnalysis,
+  ProfileSource,
   ResumeFile,
   ResumeRecognition,
-  ResumeRecognitionConfirmationInput,
-  ResumeUpdateDecisionInput,
+  ResumeUpdate,
   ResumeUploadInput,
   SaveProfileSectionInput,
 } from "@/models/profile"
 
 function copy<T>(value: T): T {
   return structuredClone(value)
+}
+
+let mockSnapshot: JobProfileSnapshot = copy(profileResponseMock)
+
+export function resetProfileMockState() {
+  mockSnapshot = copy(profileResponseMock)
 }
 
 async function waitForProfileMock() {
@@ -33,10 +39,22 @@ function standardProfile(): JobProfile {
   return profile
 }
 
-function requireMatchingProfile(profileId: string) {
-  if (profileId !== profileResponseMock.profile?.profileId) {
+function requireProfile(profileId: string) {
+  const profile = mockSnapshot.profile
+  if (!profile || profile.profileId !== profileId) {
     throw new Error("Job profile was not found.")
   }
+
+  return profile
+}
+
+function setMockSnapshot(snapshot: JobProfileSnapshot) {
+  mockSnapshot = copy(snapshot)
+  return copy(mockSnapshot)
+}
+
+function setProfile(profile: JobProfile) {
+  return setMockSnapshot({ ...mockSnapshot, profile })
 }
 
 function createUploadedResume(input: ResumeUploadInput, id: string): ResumeFile {
@@ -56,69 +74,161 @@ function createUploadedResume(input: ResumeUploadInput, id: string): ResumeFile 
   }
 }
 
+function removeSource<T extends { source?: ProfileSource }>(item: T) {
+  const { source: _source, ...businessFields } = item
+  return businessFields
+}
+
+function applySources<T extends { id: string; source?: ProfileSource }>(
+  currentItems: Array<T & { source: ProfileSource }>,
+  submittedItems: T[],
+) {
+  const currentById = new Map(currentItems.map((item) => [item.id, item]))
+
+  return submittedItems.map((submittedItem) => {
+    const currentItem = currentById.get(submittedItem.id)
+    const businessFields = removeSource(submittedItem)
+
+    if (!currentItem || submittedItem.id.startsWith("draft_")) {
+      return { ...businessFields, source: "userAdded" as const }
+    }
+
+    const source: ProfileSource =
+      JSON.stringify(removeSource(currentItem)) === JSON.stringify(businessFields)
+        ? currentItem.source
+        : "userEdited"
+
+    return { ...businessFields, source }
+  })
+}
+
 function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) {
   switch (input.section) {
     case "education":
-      profile.education = copy(input.values)
+      profile.education = applySources(profile.education, input.values)
       break
     case "workExperience":
-      profile.workExperiences = copy(input.values)
+      profile.workExperiences = applySources(profile.workExperiences, input.values)
       break
     case "projectExperience":
-      profile.projectExperiences = copy(input.values)
+      profile.projectExperiences = applySources(profile.projectExperiences, input.values)
       break
     case "skills":
-      profile.skills = copy(input.values)
+      profile.skills = applySources(profile.skills, input.values)
       break
     case "credentials":
-      profile.credentials = copy(input.values)
+      profile.credentials = applySources(profile.credentials, input.values)
       break
     case "targetRoles":
-      profile.targetRoles = copy(input.values)
+      profile.targetRoles = applySources(profile.targetRoles, input.values)
+  }
+}
+
+function withResumeExtractedSource(profile: JobProfile): JobProfile {
+  return {
+    ...profile,
+    credentials: profile.credentials.map((item) => ({ ...item, source: "resumeExtracted" })),
+    education: profile.education.map((item) => ({ ...item, source: "resumeExtracted" })),
+    projectExperiences: profile.projectExperiences.map((item) => ({
+      ...item,
+      source: "resumeExtracted",
+    })),
+    skills: profile.skills.map((item) => ({ ...item, source: "resumeExtracted" })),
+    workExperiences: profile.workExperiences.map((item) => ({
+      ...item,
+      source: "resumeExtracted",
+    })),
+  }
+}
+
+function mergeRecognizedItems<T extends { id: string; source: ProfileSource }>(
+  currentItems: T[],
+  recognizedItems: T[],
+) {
+  const recognizedById = new Map(recognizedItems.map((item) => [item.id, item]))
+  const merged = currentItems.map((item) => {
+    const recognized = recognizedById.get(item.id)
+
+    if (!recognized || item.source !== "resumeExtracted") {
+      return item
+    }
+
+    return { ...recognized, source: "resumeExtracted" as const }
+  })
+
+  for (const recognized of recognizedItems) {
+    if (!currentItems.some((item) => item.id === recognized.id)) {
+      merged.push({ ...recognized, source: "resumeExtracted" })
+    }
+  }
+
+  return merged
+}
+
+function mergeRecognizedProfile(profile: JobProfile): JobProfile {
+  const recognized = withResumeExtractedSource(standardProfile())
+  const additionalSkill = {
+    category: "Frontend",
+    id: "skill_accessibility",
+    name: "Accessibility",
+    source: "resumeExtracted" as const,
+  }
+
+  return {
+    ...profile,
+    credentials: mergeRecognizedItems(profile.credentials, recognized.credentials),
+    education: mergeRecognizedItems(profile.education, recognized.education),
+    projectExperiences: mergeRecognizedItems(
+      profile.projectExperiences,
+      recognized.projectExperiences,
+    ),
+    skills: mergeRecognizedItems(profile.skills, [...recognized.skills, additionalSkill]),
+    workExperiences: mergeRecognizedItems(profile.workExperiences, recognized.workExperiences),
   }
 }
 
 export async function getJobProfile(): Promise<JobProfileSnapshot> {
   requireMock()
   await waitForProfileMock()
-  return copy(profileResponseMock)
+  return copy(mockSnapshot)
 }
 
 export async function saveProfileSection(input: SaveProfileSectionInput): Promise<JobProfile> {
   requireMock()
   await waitForProfileMock()
-  const profile = standardProfile()
-  requireMatchingProfile(input.profileId)
+  const profile = copy(requireProfile(input.profileId))
   if (profile.version !== input.version) throw new Error("Job profile version is out of date.")
 
   applySavedSection(profile, input)
   profile.updatedAt = "2026-07-13T08:05:00.000Z"
   profile.version += 1
   profile.matchingAnalysisStale = true
-  return profile
+  setProfile(profile)
+  return copy(profile)
 }
 
 export async function uploadInitialResume(input: ResumeUploadInput): Promise<JobProfileSnapshot> {
   requireMock()
   await waitForProfileMock()
-  const profile = standardProfile()
   const resume = createUploadedResume(input, "resume_uploaded_initial")
+  const existingProfile = mockSnapshot.profile
+  const profile = copy(existingProfile ?? withResumeExtractedSource(standardProfile()))
+
   profile.status = "uploadingResume"
   profile.resume = resume
   profile.updatedAt = resume.uploadedAt
 
-  return {
+  return setMockSnapshot({
+    matchingAnalysis: null,
     profile,
     recognition: {
       resumeId: resume.id,
       processingStatus: "uploaded",
       completedAt: null,
       failureReason: null,
-      pendingReviewCount: 0,
     },
     resumeUpdate: null,
-    matchingAnalysis: null,
-  }
+  })
 }
 
 export async function startInitialResumeRecognition(
@@ -127,40 +237,47 @@ export async function startInitialResumeRecognition(
 ): Promise<JobProfileSnapshot> {
   requireMock()
   await waitForProfileMock()
-  requireMatchingProfile(profileId)
-  const profile = standardProfile()
-  profile.status = "awaitingConfirmation"
-  profile.pendingReviewCount = 3
-  profile.completeness.needsReviewSections = ["education", "workExperience", "projectExperience"]
+  const uploadingProfile = copy(requireProfile(profileId))
+  if (uploadingProfile.resume?.id !== resumeId) throw new Error("Resume was not found.")
+
+  const parsedAt = "2026-07-13T08:02:00.000Z"
+  const profile = mergeRecognizedProfile(uploadingProfile)
+  profile.status = "active"
   profile.resume = {
-    ...profile.resume!,
-    id: resumeId,
-    parsedAt: "2026-07-13T08:02:00.000Z",
+    ...uploadingProfile.resume,
+    parsedAt,
     processingStatus: "succeeded",
   }
+  profile.updatedAt = parsedAt
+  profile.version += 1
+  profile.matchingAnalysisStale = false
 
-  return {
+  return setMockSnapshot({
+    matchingAnalysis: null,
     profile,
     recognition: {
       resumeId,
       processingStatus: "succeeded",
-      completedAt: profile.resume.parsedAt,
+      completedAt: parsedAt,
       failureReason: null,
-      pendingReviewCount: profile.pendingReviewCount,
     },
     resumeUpdate: null,
-    matchingAnalysis: null,
-  }
+  })
 }
 
-export async function cancelResumeRecognitionReview(
+export async function resetInitialResumeImport(
   profileId: string,
   _resumeId: string,
 ): Promise<JobProfileSnapshot> {
   requireMock()
   await waitForProfileMock()
-  requireMatchingProfile(profileId)
-  return { profile: null, recognition: null, resumeUpdate: null, matchingAnalysis: null }
+  requireProfile(profileId)
+  return setMockSnapshot({
+    matchingAnalysis: null,
+    profile: null,
+    recognition: null,
+    resumeUpdate: null,
+  })
 }
 
 export async function createManualJobProfile(): Promise<JobProfileSnapshot> {
@@ -174,7 +291,13 @@ export async function createManualJobProfile(): Promise<JobProfileSnapshot> {
   profile.projectExperiences = []
   profile.skills = []
   profile.credentials = []
-  return { profile, recognition: null, resumeUpdate: null, matchingAnalysis: null }
+  profile.targetRoles = []
+  profile.completeness = {
+    percentage: 0,
+    missingSections: ["education", "workExperience", "projectExperience", "skills", "credentials"],
+  }
+  profile.matchingAnalysisStale = false
+  return setMockSnapshot({ profile, recognition: null, resumeUpdate: null, matchingAnalysis: null })
 }
 
 export async function getResumeRecognitionStatus(
@@ -183,116 +306,77 @@ export async function getResumeRecognitionStatus(
 ): Promise<ResumeRecognition> {
   requireMock()
   await waitForProfileMock()
-  requireMatchingProfile(profileId)
-  return {
-    resumeId,
-    processingStatus: "succeeded",
-    completedAt: "2026-07-13T08:02:00.000Z",
-    failureReason: null,
-    pendingReviewCount: 3,
-  }
-}
-
-export async function submitResumeRecognitionConfirmation(
-  input: ResumeRecognitionConfirmationInput,
-): Promise<JobProfile> {
-  requireMock()
-  await waitForProfileMock()
-  requireMatchingProfile(input.profileId)
-  const profile = standardProfile()
-  profile.resume = { ...profile.resume!, id: input.resumeId }
-  profile.status = "active"
-  profile.matchingAnalysisStale = true
-  profile.updatedAt = "2026-07-13T08:10:00.000Z"
-  profile.version += 1
-  return profile
+  requireProfile(profileId)
+  const recognition = mockSnapshot.recognition
+  if (!recognition || recognition.resumeId !== resumeId)
+    throw new Error("Resume recognition was not found.")
+  return copy(recognition)
 }
 
 export async function uploadUpdatedResume(input: ResumeUploadInput): Promise<JobProfileSnapshot> {
   requireMock()
   await waitForProfileMock()
-  const snapshot: JobProfileSnapshot = copy(profileResponseMock)
+  const profile = copy(mockSnapshot.profile)
+  if (!profile) throw new Error("Job profile was not found.")
+
   const resume = createUploadedResume(input, "resume_uploaded_update")
-  snapshot.resumeUpdate = {
+  const resumeUpdate: ResumeUpdate = {
     id: "resume_update_uploaded",
     createdAt: resume.uploadedAt,
     status: "uploading",
-    pendingReviewCount: 0,
     resume,
     changeSummary: null,
     failureReason: null,
-    proposedProfile: null,
     preservesManualChanges: true,
   }
-  return snapshot
+
+  return setMockSnapshot({ ...mockSnapshot, profile, resumeUpdate })
 }
 
 export async function startUpdatedResumeRecognition(
-  input: ResumeUpdateDecisionInput,
+  profileId: string,
+  resumeUpdateId: string,
 ): Promise<JobProfileSnapshot> {
   requireMock()
   await waitForProfileMock()
-  requireMatchingProfile(input.profileId)
-  if (input.resumeUpdateId !== "resume_update_uploaded") {
+  const currentProfile = copy(requireProfile(profileId))
+  const currentResumeUpdate = mockSnapshot.resumeUpdate
+  if (!currentResumeUpdate || currentResumeUpdate.id !== resumeUpdateId) {
     throw new Error("Resume update was not found.")
   }
 
-  const snapshot: JobProfileSnapshot = copy(profileResponseMock)
-  const resume = {
-    ...snapshot.profile!.resume!,
-    id: "resume_uploaded_update",
-    parsedAt: "2026-07-13T08:04:00.000Z",
-    processingStatus: "succeeded" as const,
+  const parsedAt = "2026-07-13T08:04:00.000Z"
+  const profile = mergeRecognizedProfile(currentProfile)
+  profile.status = "active"
+  profile.resume = {
+    ...currentResumeUpdate.resume,
+    parsedAt,
+    processingStatus: "succeeded",
   }
-  snapshot.resumeUpdate = {
-    id: input.resumeUpdateId,
-    createdAt: "2026-07-13T08:00:00.000Z",
-    status: "awaitingConfirmation",
-    pendingReviewCount: 3,
-    resume,
-    changeSummary: { newItems: 1, changedItems: 2, missingItems: 1 },
-    failureReason: null,
-    proposedProfile: { ...standardProfile(), resume },
-    preservesManualChanges: true,
-  }
-  return snapshot
-}
-
-export async function confirmResumeUpdate(input: ResumeUpdateDecisionInput): Promise<JobProfile> {
-  requireMock()
-  await waitForProfileMock()
-  requireMatchingProfile(input.profileId)
-  if (input.resumeUpdateId !== "resume_update_uploaded") {
-    throw new Error("Resume update was not found.")
-  }
-
-  const profile = standardProfile()
-  profile.updatedAt = "2026-07-13T08:15:00.000Z"
+  profile.updatedAt = parsedAt
   profile.version += 1
   profile.matchingAnalysisStale = true
-  return profile
+
+  return setMockSnapshot({
+    ...mockSnapshot,
+    profile,
+    resumeUpdate: {
+      ...currentResumeUpdate,
+      changeSummary: { newItems: 1, changedItems: 2, missingItems: 1 },
+      resume: profile.resume,
+      status: "succeeded",
+    },
+  })
 }
 
 export async function regenerateMatchingAnalysis(profileId: string): Promise<MatchingAnalysis> {
   requireMock()
   await waitForProfileMock()
-  requireMatchingProfile(profileId)
+  const profile = requireProfile(profileId)
   return {
     status: "current",
-    profileVersion: profileResponseMock.profile!.version,
+    profileVersion: profile.version,
     generatedAt: "2026-07-13T08:20:00.000Z",
     failureReason: null,
   }
-}
-
-export async function cancelResumeUpdate(
-  input: ResumeUpdateDecisionInput,
-): Promise<JobProfileSnapshot> {
-  requireMock()
-  await waitForProfileMock()
-  requireMatchingProfile(input.profileId)
-  if (input.resumeUpdateId !== "resume_update_uploaded") {
-    throw new Error("Resume update was not found.")
-  }
-  return copy(profileResponseMock)
 }

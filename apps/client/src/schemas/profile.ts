@@ -31,8 +31,6 @@ export const educationItemSchema = dateRangeSchema.extend({
   id: requiredText,
   major: optionalText,
   school: requiredText,
-  reviewStatus: z.any(),
-  source: z.any(),
 })
 
 export const workItemSchema = dateRangeSchema.extend({
@@ -42,9 +40,7 @@ export const workItemSchema = dateRangeSchema.extend({
   id: requiredText,
   location: optionalText,
   responsibilities: optionalText,
-  reviewStatus: z.any(),
   skillIds: optionalText,
-  source: z.any(),
   title: requiredText,
 })
 
@@ -57,9 +53,7 @@ export const projectItemSchema = dateRangeSchema.extend({
   projectUrl: optionalText.refine((value) => !value || URL.canParse(value), "url"),
   relatedWorkExperienceId: optionalText,
   responsibilities: optionalText,
-  reviewStatus: z.any(),
   role: optionalText,
-  source: z.any(),
   technologies: optionalText,
 })
 
@@ -67,8 +61,6 @@ export const skillSchema = z.object({
   category: optionalText,
   id: requiredText,
   name: requiredText,
-  reviewStatus: z.any(),
-  source: z.any(),
 })
 
 export const credentialsSchema = z.object({
@@ -84,8 +76,6 @@ export const credentialsSchema = z.object({
           id: requiredText,
           issuer: optionalText,
           name: requiredText,
-          reviewStatus: z.any(),
-          source: z.any(),
           type: z.enum(["certificate", "award"]),
         })
         .superRefine((value, context) => {

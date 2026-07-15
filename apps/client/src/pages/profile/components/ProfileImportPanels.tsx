@@ -123,21 +123,7 @@ export function ResumeImportForm({
   )
 }
 
-export function ResumeUpdateReview({
-  embedded = false,
-  isApplying,
-  isCancelling,
-  onApply,
-  onCancel,
-  resumeUpdate,
-}: {
-  embedded?: boolean
-  isApplying: boolean
-  isCancelling: boolean
-  onApply: () => void
-  onCancel: () => void
-  resumeUpdate: ResumeUpdate
-}) {
+export function ResumeUpdateSummary({ resumeUpdate }: { resumeUpdate: ResumeUpdate }) {
   const { t } = useTranslation()
   const summary = resumeUpdate.changeSummary
 
@@ -154,7 +140,7 @@ export function ResumeUpdateReview({
           {resumeUpdate.failureReason ?? t("profile.import.failed")}
         </AlertDescription>
       </Alert>
-    ) : (
+    ) : resumeUpdate.status === "succeeded" ? (
       <>
         <Alert>
           <FileTextIcon />
@@ -177,43 +163,15 @@ export function ResumeUpdateReview({
           </dl>
         )}
       </>
-    )
-
-  const actions = (
-    <>
-      <Button
-        disabled={isApplying || isCancelling || resumeUpdate.status !== "awaitingConfirmation"}
-        onClick={onApply}
-      >
-        {isApplying ? t("profile.import.applying") : t("profile.import.apply")}
-      </Button>
-      <Button disabled={isApplying || isCancelling} onClick={onCancel} variant="outline">
-        {isCancelling ? t("profile.import.cancelling") : t("profile.import.cancel")}
-      </Button>
-    </>
-  )
-
-  if (embedded) {
-    return (
-      <section className="flex flex-col gap-4" data-testid="profile-resume-update-review">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-medium">{t("profile.import.updateTitle")}</h3>
-          <p className="text-sm text-muted-foreground">{t("profile.import.updateDescription")}</p>
-        </div>
-        {content}
-        <div className="flex flex-wrap gap-2">{actions}</div>
-      </section>
-    )
-  }
+    ) : null
 
   return (
-    <Card data-testid="profile-resume-update-review">
-      <CardHeader>
-        <CardTitle>{t("profile.import.updateTitle")}</CardTitle>
-        <CardDescription>{t("profile.import.updateDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">{content}</CardContent>
-      <CardFooter className="flex flex-wrap gap-2">{actions}</CardFooter>
-    </Card>
+    <section className="flex flex-col gap-4" data-testid="profile-resume-update-summary">
+      <div className="flex flex-col gap-1">
+        <h3 className="font-medium">{t("profile.import.updateTitle")}</h3>
+        <p className="text-sm text-muted-foreground">{t("profile.import.updateDescription")}</p>
+      </div>
+      <div className="flex flex-col gap-4">{content}</div>
+    </section>
   )
 }

@@ -17,7 +17,6 @@ import { Separator } from "@/components/ui/separator"
 import type { JobProfile, ProfileSection } from "@/models/profile"
 
 import type { EditableProfileSection } from "./ProfileSectionEditDialog"
-import { ReviewStatusBadge } from "./ProfileStatusBadge"
 import { employmentTypeLabel, formatMonth } from "./profile-formatters"
 
 type ProfileSectionsProps = {
@@ -140,14 +139,11 @@ function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
             return (
               <div key={education.id} className="flex flex-col gap-2">
                 {index > 0 && <Separator className="mb-3" />}
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-medium">{education.school}</h3>
-                    {degreeMajor && (
-                      <p className="mt-1 text-sm text-muted-foreground">{degreeMajor}</p>
-                    )}
-                  </div>
-                  <ReviewStatusBadge status={education.reviewStatus} />
+                <div>
+                  <h3 className="font-medium">{education.school}</h3>
+                  {degreeMajor && (
+                    <p className="mt-1 text-sm text-muted-foreground">{degreeMajor}</p>
+                  )}
                 </div>
                 <DateRange
                   endDate={education.endDate}
@@ -177,25 +173,22 @@ function WorkExperienceSection({ onStartEditing, profile }: ProfileSectionsProps
           {profile.workExperiences.map((experience, index) => (
             <article key={experience.id} className="flex flex-col gap-4">
               {index > 0 && <Separator />}
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex flex-col gap-1">
-                  <h3 className="font-heading text-lg font-medium">{experience.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {[
-                      experience.company,
-                      employmentTypeLabel(experience.employmentType, t),
-                      experience.location,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  <DateRange
-                    endDate={experience.endDate}
-                    isCurrent={experience.isCurrent}
-                    startDate={experience.startDate}
-                  />
-                </div>
-                <ReviewStatusBadge status={experience.reviewStatus} />
+              <div className="flex flex-col gap-1">
+                <h3 className="font-heading text-lg font-medium">{experience.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {[
+                    experience.company,
+                    employmentTypeLabel(experience.employmentType, t),
+                    experience.location,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                <DateRange
+                  endDate={experience.endDate}
+                  isCurrent={experience.isCurrent}
+                  startDate={experience.startDate}
+                />
               </div>
               <div className="grid gap-5 lg:grid-cols-2">
                 <DetailList
@@ -246,17 +239,14 @@ function ProjectExperienceSection({ onStartEditing, profile }: ProfileSectionsPr
           {profile.projectExperiences.map((project, index) => (
             <article key={project.id} className="flex flex-col gap-4">
               {index > 0 && <Separator />}
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex flex-col gap-1">
-                  <h3 className="font-heading text-lg font-medium">{project.name}</h3>
-                  {project.role && <p className="text-sm text-muted-foreground">{project.role}</p>}
-                  <DateRange
-                    endDate={project.endDate}
-                    isCurrent={project.endDate === null}
-                    startDate={project.startDate}
-                  />
-                </div>
-                <ReviewStatusBadge status={project.reviewStatus} />
+              <div className="flex flex-col gap-1">
+                <h3 className="font-heading text-lg font-medium">{project.name}</h3>
+                {project.role && <p className="text-sm text-muted-foreground">{project.role}</p>}
+                <DateRange
+                  endDate={project.endDate}
+                  isCurrent={project.endDate === null}
+                  startDate={project.startDate}
+                />
               </div>
               {project.background && (
                 <p className="text-sm leading-6 text-muted-foreground">{project.background}</p>
@@ -325,35 +315,30 @@ function CredentialsSection({ onStartEditing, profile }: ProfileSectionsProps) {
           {profile.credentials.map((credential, index) => (
             <div key={credential.id} className="flex flex-col gap-2">
               {index > 0 && <Separator className="mb-3" />}
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-medium">{credential.name}</h3>
-                    <Badge variant="outline">
-                      {t(`profile.credentialType.${credential.type}`)}
-                    </Badge>
-                  </div>
-                  {(credential.issuer || credential.awardedAt) && (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {[
-                        credential.issuer,
-                        credential.awardedAt &&
-                          t("profile.field.awardedAt", {
-                            value: formatMonth(credential.awardedAt, i18n.language, ""),
-                          }),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  )}
-                  {credential.expiresAt && (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {t("profile.formField.expiresAt")} ·{" "}
-                      {formatMonth(credential.expiresAt, i18n.language, "")}
-                    </p>
-                  )}
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-medium">{credential.name}</h3>
+                  <Badge variant="outline">{t(`profile.credentialType.${credential.type}`)}</Badge>
                 </div>
-                <ReviewStatusBadge status={credential.reviewStatus} />
+                {(credential.issuer || credential.awardedAt) && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {[
+                      credential.issuer,
+                      credential.awardedAt &&
+                        t("profile.field.awardedAt", {
+                          value: formatMonth(credential.awardedAt, i18n.language, ""),
+                        }),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+                {credential.expiresAt && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("profile.formField.expiresAt")} ·{" "}
+                    {formatMonth(credential.expiresAt, i18n.language, "")}
+                  </p>
+                )}
               </div>
               {credential.description && (
                 <p className="text-sm leading-6 text-muted-foreground">{credential.description}</p>

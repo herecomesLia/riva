@@ -1,12 +1,5 @@
 export type ProfileStatus =
-  | "draft"
-  | "uploadingResume"
-  | "parsingResume"
-  | "recognitionFailed"
-  | "awaitingConfirmation"
-  | "active"
-
-export type ProfileReviewStatus = "confirmed" | "needsReview" | "incomplete"
+  "draft" | "uploadingResume" | "parsingResume" | "recognitionFailed" | "active"
 
 export type ProfileSource = "resumeExtracted" | "userEdited" | "userAdded"
 
@@ -18,7 +11,6 @@ export type ProfileSection =
 export type ProfileCompleteness = {
   percentage: number
   missingSections: ProfileSection[]
-  needsReviewSections: ProfileSection[]
 }
 
 export type ResumeFile = {
@@ -41,7 +33,6 @@ export type EducationExperience = {
   endDate: string | null
   isCurrent: boolean
   source: ProfileSource
-  reviewStatus: ProfileReviewStatus
 }
 
 export type EmploymentType = "fullTime" | "partTime" | "internship" | "contract" | "freelance"
@@ -59,7 +50,6 @@ export type WorkExperience = {
   achievements: string[]
   skillIds: string[]
   source: ProfileSource
-  reviewStatus: ProfileReviewStatus
 }
 
 export type ProjectExperience = {
@@ -76,7 +66,6 @@ export type ProjectExperience = {
   projectUrl: string | null
   relatedWorkExperienceId: string | null
   source: ProfileSource
-  reviewStatus: ProfileReviewStatus
 }
 
 export type ProfileSkill = {
@@ -84,7 +73,6 @@ export type ProfileSkill = {
   name: string
   category: string | null
   source: ProfileSource
-  reviewStatus: ProfileReviewStatus
 }
 
 export type Credential = {
@@ -98,7 +86,6 @@ export type Credential = {
   credentialUrl: string | null
   description: string | null
   source: ProfileSource
-  reviewStatus: ProfileReviewStatus
 }
 
 export type TargetRoleSummary = {
@@ -107,7 +94,6 @@ export type TargetRoleSummary = {
   company: string | null
   location: string | null
   source: ProfileSource
-  reviewStatus: ProfileReviewStatus
 }
 
 export type JobProfile = {
@@ -116,7 +102,6 @@ export type JobProfile = {
   completeness: ProfileCompleteness
   updatedAt: string
   version: number
-  pendingReviewCount: number
   matchingAnalysisStale: boolean
   resume: ResumeFile | null
   education: EducationExperience[]
@@ -132,7 +117,6 @@ export type ResumeRecognition = {
   processingStatus: ResumeProcessingStatus
   completedAt: string | null
   failureReason: string | null
-  pendingReviewCount: number
 }
 
 export type ResumeImportChangeSummary = {
@@ -152,11 +136,9 @@ export type ResumeUpdate = {
   id: string
   resume: ResumeFile
   createdAt: string
-  status: "uploading" | "parsing" | "awaitingConfirmation" | "failed"
-  pendingReviewCount: number
+  status: "uploading" | "parsing" | "succeeded" | "failed"
   changeSummary: ResumeImportChangeSummary | null
   failureReason: string | null
-  proposedProfile: JobProfile | null
   preservesManualChanges: boolean
 }
 
@@ -188,14 +170,4 @@ export type SaveProfileSectionInput = {
 export type ResumeUploadInput = {
   file?: File
   text?: string
-}
-
-export type ResumeRecognitionConfirmationInput = {
-  profileId: string
-  resumeId: string
-}
-
-export type ResumeUpdateDecisionInput = {
-  profileId: string
-  resumeUpdateId: string
 }

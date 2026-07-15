@@ -1,21 +1,9 @@
 export const profile = {
   title: "Job profile",
-  description:
-    "This is your confirmed structured profile. Riva uses it for role matching and training recommendations.",
+  description: "This is Riva's current structured profile for future role matching and training.",
   updatedAt: "Last updated {{value}}",
   completeness: "Profile completeness",
   completenessShort: "Completeness",
-  pendingReviewCount: "{{count}} items to review",
-  matchingAnalysis: {
-    staleTitle: "Update your role matching analysis",
-    staleDescription:
-      "Your profile has changed, so the current analysis may no longer reflect your latest experience and skills.",
-    oldVersion: "The current matching analysis is based on an older profile version.",
-    regenerating: "Regenerating matching analysis…",
-    regenerationFailed: "Matching analysis regeneration failed. Try again.",
-    historyPreserved:
-      "New role matching and training use the latest profile. Historical cards, training, and reports stay unchanged.",
-  },
   processingStatus: {
     uploaded: "Uploaded, waiting to be recognized",
     parsing: "Recognizing",
@@ -26,12 +14,8 @@ export const profile = {
     edit: "Edit",
     uploadResume: "Upload resume",
     updateResume: "Update resume",
-    recognizeAgain: "Recognize again",
-    confirmRecognition: "Confirm and create profile",
-    cancelRecognition: "Cancel review",
     retryRecognition: "Recognize again",
     manualEntry: "Enter manually",
-    regenerateMatchingAnalysis: "Regenerate matching analysis",
   },
   resume: {
     title: "Current resume",
@@ -39,18 +23,14 @@ export const profile = {
       "Your resume initializes the profile; you can maintain the profile independently afterwards.",
     typeAndSize: "{{type}} · {{size}}",
     uploadedAt: "Uploaded {{value}}",
-    pendingReview: "{{count}} items to review",
-    updatePendingTitle: "New resume is waiting for confirmation",
-    updatePendingDescription:
-      "The new resume has been recognized. Your active profile will not be replaced until it is confirmed.",
   },
   import: {
     title: "Upload a resume to create your profile",
     updateTitle: "New resume recognition result",
     description:
-      "Upload a file or paste resume text. Recognition is only written to the profile after you confirm it.",
+      "Upload a file or paste resume text. Recognition updates your current profile directly.",
     updateDescription:
-      "A new resume creates a separate pending result and never overwrites the current profile directly.",
+      "A new resume is recognized and automatically merged into your current profile.",
     file: "Resume file",
     text: "Or paste resume text",
     noFileSelected: "No file selected",
@@ -59,22 +39,23 @@ export const profile = {
     submit: "Upload and recognize",
     submitting: "Uploading...",
     processing: "Recognizing the new resume…",
-    failed: "New resume recognition failed.",
+    failed: "Resume recognition failed. Try again.",
     newItems: "New items recognized",
     changedItems: "Items that may change",
     missingItems: "Existing items that may be missing",
-    manualChangesProtected:
-      "Manual edits and additions in the current profile are preserved; anything that cannot be merged safely needs your confirmation.",
-    apply: "Confirm and apply result",
-    applying: "Applying...",
-    cancel: "Cancel new resume update",
-    cancelling: "Cancelling...",
+    manualChangesProtected: "Manual edits and additions in your current profile were preserved.",
+    success: "Resume recognition complete",
+    successDescription:
+      "Your profile has been updated. Review the extracted information for accuracy.",
+    updateSuccess: "Your job profile was updated from the new resume",
+    updateSummary:
+      "{{newItems}} added, {{changedItems}} updated, and {{missingItems}} existing items retained.",
   },
   lifecycle: {
     uploading: {
       title: "Your resume is uploading",
       description:
-        "Once it finishes uploading, we will recognize it and create a structured profile for review.",
+        "Once it finishes uploading, we will recognize it and update your structured profile.",
     },
     parsing: {
       title: "Recognizing your resume",
@@ -84,20 +65,11 @@ export const profile = {
       title: "Resume recognition failed",
       description: "We could not recognize this resume. Update it or try recognition again later.",
     },
-    awaitingConfirmation: {
-      title: "Confirm the recognized information",
-      description:
-        "Some information needs your confirmation before it is used for role matching and training.",
-    },
-    needsReview: {
-      title: "Your profile still has information to review",
-      description: "Check the items marked for review in a later editing phase.",
-    },
   },
   empty: {
     title: "You do not have a job profile yet",
     description:
-      "After you upload a resume, Riva extracts initial information for review and creates a structured profile you can maintain over time.",
+      "After you upload a resume, Riva extracts initial information and creates a structured profile you can maintain over time.",
   },
   sections: {
     education: "Education",
@@ -123,7 +95,6 @@ export const profile = {
     skillName: "Skill name",
     skillCategory: "Skill category",
   },
-  reviewStatus: { confirmed: "Confirmed", needsReview: "Needs review", incomplete: "Incomplete" },
   employmentType: {
     fullTime: "Full time",
     partTime: "Part time",

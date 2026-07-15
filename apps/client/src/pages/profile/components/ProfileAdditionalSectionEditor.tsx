@@ -428,7 +428,7 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
 function createDraft(profile: JobProfile, section: EditableAdditionalSection) {
   if (section === "skills") {
     return {
-      items: structuredClone(profile.skills).map((item) => ({
+      items: structuredClone(profile.skills).map(({ source: _source, ...item }) => ({
         ...item,
         category: item.category ?? "",
       })),
@@ -436,7 +436,7 @@ function createDraft(profile: JobProfile, section: EditableAdditionalSection) {
   }
 
   return {
-    items: structuredClone(profile.credentials).map((item) => ({
+    items: structuredClone(profile.credentials).map(({ source: _source, ...item }) => ({
       ...item,
       awardedAt: item.awardedAt ?? "",
       credentialId: item.credentialId ?? "",
@@ -473,14 +473,14 @@ function hasDuplicateSkillName(items: { name: string }[]) {
 
 function normalizeSectionValues(section: EditableAdditionalSection, value: any) {
   if (section === "skills") {
-    return value.items.map((item: any) => ({
+    return value.items.map(({ source: _source, ...item }: any) => ({
       ...item,
       category: toNullable(item.category),
       name: item.name.trim(),
     }))
   }
 
-  return value.items.map((item: any) => ({
+  return value.items.map(({ source: _source, ...item }: any) => ({
     ...item,
     awardedAt: toNullable(item.awardedAt),
     credentialId: toNullable(item.credentialId),
@@ -495,8 +495,6 @@ function normalizeSectionValues(section: EditableAdditionalSection, value: any) 
 function createNewItem(section: "skills" | "credentials") {
   const base = {
     id: createTemporaryId(),
-    reviewStatus: "confirmed",
-    source: "userAdded",
   }
 
   if (section === "skills") {

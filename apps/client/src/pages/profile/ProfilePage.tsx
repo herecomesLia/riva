@@ -2,16 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import type { JobProfileSnapshot } from "@/models/profile"
 import {
-  cancelResumeRecognitionReview,
-  cancelResumeUpdate,
-  confirmResumeUpdate,
   createManualJobProfile,
   getJobProfile,
-  regenerateMatchingAnalysis,
+  resetInitialResumeImport,
   saveProfileSection,
   startInitialResumeRecognition,
   startUpdatedResumeRecognition,
-  submitResumeRecognitionConfirmation,
   uploadInitialResume,
   uploadUpdatedResume,
 } from "@/services/profile"
@@ -65,59 +61,24 @@ export function ProfilePage() {
       const uploading = setSnapshot(await uploadUpdatedResume(input))
       const profile = uploading.profile
       const resumeUpdate = uploading.resumeUpdate
-      if (!profile || !resumeUpdate) throw new Error("Resume update returned no review.")
-      return setSnapshot(
-        await startUpdatedResumeRecognition({
-          profileId: profile.profileId,
-          resumeUpdateId: resumeUpdate.id,
-        }),
-      )
+      if (!profile || !resumeUpdate) throw new Error("Resume update returned no result.")
+      return setSnapshot(await startUpdatedResumeRecognition(profile.profileId, resumeUpdate.id))
     },
   })
   const manualProfileMutation = useMutation({
     mutationFn: createManualJobProfile,
     onSuccess: setSnapshot,
   })
-  const cancelRecognitionMutation = useMutation({
+  const resetInitialImportMutation = useMutation({
     mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) =>
-      cancelResumeRecognitionReview(profileId, resumeId),
+      resetInitialResumeImport(profileId, resumeId),
     onSuccess: setSnapshot,
-  })
-  const confirmRecognitionMutation = useMutation({
-    mutationFn: submitResumeRecognitionConfirmation,
-    onSuccess: setProfile,
-  })
-  const confirmUpdateMutation = useMutation({
-    mutationFn: confirmResumeUpdate,
-    onSuccess: setProfile,
-  })
-  const cancelUpdateMutation = useMutation({
-    mutationFn: cancelResumeUpdate,
-    onSuccess: setSnapshot,
-  })
-  const analysisMutation = useMutation({
-    mutationFn: regenerateMatchingAnalysis,
-    onSuccess: (matchingAnalysis) => {
-      queryClient.setQueryData<JobProfileSnapshot>(profileQueryKey, (snapshot) =>
-        snapshot?.profile
-          ? {
-              ...snapshot,
-              matchingAnalysis,
-              profile: { ...snapshot.profile, matchingAnalysisStale: false },
-            }
-          : snapshot,
-      )
-    },
   })
 
   const actions: ProfileViewActions = {
-    cancelRecognition: (profileId, resumeId) =>
-      cancelRecognitionMutation.mutateAsync({ profileId, resumeId }),
-    cancelResumeUpdate: (input) => cancelUpdateMutation.mutateAsync(input),
-    confirmRecognition: (input) => confirmRecognitionMutation.mutateAsync(input),
-    confirmResumeUpdate: (input) => confirmUpdateMutation.mutateAsync(input),
     createManualProfile: () => manualProfileMutation.mutateAsync(),
-    regenerateMatchingAnalysis: (profileId) => analysisMutation.mutateAsync(profileId),
+    resetInitialResumeImport: (profileId, resumeId) =>
+      resetInitialImportMutation.mutateAsync({ profileId, resumeId }),
     retryRecognition: (profileId, resumeId) =>
       recognitionMutation.mutateAsync({ profileId, resumeId }),
     saveSection: (input) => saveMutation.mutateAsync(input),
@@ -130,11 +91,6 @@ export function ProfilePage() {
       <ProfileView
         actions={actions}
         content={{ status: "ready", data: profileQuery.data }}
-        pending={{
-          analysis: analysisMutation.isPending,
-          cancelUpdate: cancelUpdateMutation.isPending,
-          confirmUpdate: confirmUpdateMutation.isPending,
-        }}
         variant="default"
       />
     )

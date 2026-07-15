@@ -25,7 +25,6 @@ function createRecognition(resume: ResumeFile, overrides: Partial<ResumeRecognit
     processingStatus: resume.processingStatus,
     completedAt: resume.parsedAt,
     failureReason: resume.failureReason,
-    pendingReviewCount: 0,
     ...overrides,
   } satisfies ResumeRecognition
 }
@@ -37,11 +36,9 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
     completeness: {
       percentage: 100,
       missingSections: [],
-      needsReviewSections: [],
     },
     updatedAt: "2026-07-10T09:15:00.000Z",
     version: 7,
-    pendingReviewCount: 0,
     matchingAnalysisStale: false,
     resume: createResume(),
     education: [
@@ -54,7 +51,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         endDate: "2018-06",
         isCurrent: false,
         source: "resumeExtracted",
-        reviewStatus: "confirmed",
       },
     ],
     workExperiences: [
@@ -77,7 +73,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         ],
         skillIds: ["skill_react", "skill_typescript", "skill_design_systems"],
         source: "userEdited",
-        reviewStatus: "confirmed",
       },
       {
         id: "work_orbit_2018",
@@ -92,7 +87,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         achievements: ["Introduced a reusable charting foundation used by four teams."],
         skillIds: ["skill_react", "skill_javascript"],
         source: "resumeExtracted",
-        reviewStatus: "confirmed",
       },
     ],
     projectExperiences: [
@@ -110,7 +104,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         projectUrl: null,
         relatedWorkExperienceId: "work_northstar_2022",
         source: "userEdited",
-        reviewStatus: "confirmed",
       },
     ],
     skills: [
@@ -119,28 +112,24 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         name: "React",
         category: "Frontend",
         source: "resumeExtracted",
-        reviewStatus: "confirmed",
       },
       {
         id: "skill_typescript",
         name: "TypeScript",
         category: "Frontend",
         source: "resumeExtracted",
-        reviewStatus: "confirmed",
       },
       {
         id: "skill_design_systems",
         name: "Design systems",
         category: "Frontend",
         source: "userAdded",
-        reviewStatus: "confirmed",
       },
       {
         id: "skill_javascript",
         name: "JavaScript",
         category: "Frontend",
         source: "resumeExtracted",
-        reviewStatus: "confirmed",
       },
     ],
     credentials: [
@@ -155,7 +144,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         credentialUrl: "https://www.credly.com/",
         description: null,
         source: "resumeExtracted",
-        reviewStatus: "confirmed",
       },
       {
         id: "award_design_2024",
@@ -168,7 +156,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         credentialUrl: null,
         description: "Recognized for cross-functional delivery of the merchant operations console.",
         source: "userAdded",
-        reviewStatus: "confirmed",
       },
     ],
     targetRoles: [
@@ -178,7 +165,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         company: null,
         location: "Shanghai",
         source: "userAdded",
-        reviewStatus: "confirmed",
       },
     ],
     ...overrides,

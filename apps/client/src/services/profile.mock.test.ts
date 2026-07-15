@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { profileResponseMock } from "@/mocks/data/profile"
 import {
   getJobProfile,
+  resetProfileMockState,
   saveProfileSection,
+  startInitialResumeRecognition,
+  startUpdatedResumeRecognition,
   uploadInitialResume,
   uploadUpdatedResume,
 } from "@/services/profile"
@@ -11,6 +14,7 @@ import {
 describe("profile mock service", () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    resetProfileMockState()
   })
 
   afterEach(() => {
@@ -22,7 +26,7 @@ describe("profile mock service", () => {
     return promise
   }
 
-  it("returns the one standard fixture after the configured mock delay", async () => {
+  it("returns the current mock snapshot after the configured mock delay", async () => {
     const promise = getJobProfile()
     let settled = false
     void promise.then(() => {
@@ -55,9 +59,36 @@ describe("profile mock service", () => {
       }),
     )
     expect(profile.education[0]!.school).toBe("Updated University")
+    expect(profile.education[0]!.source).toBe("userEdited")
     expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
     expect(profile.matchingAnalysisStale).toBe(true)
     expect(profileResponseMock.profile!.education[0]!.school).toBe("Fudan University")
+
+    const current = await settle(getJobProfile())
+    expect(current.profile!.education[0]!.school).toBe("Updated University")
+  })
+
+  it("derives sources from the current profile instead of accepting form metadata", async () => {
+    const values = structuredClone(profileResponseMock.profile!.skills)
+    values.push({
+      category: "Frontend",
+      id: "draft_new_skill",
+      name: "Testing Library",
+      source: "resumeExtracted",
+    })
+    const profile = await settle(
+      saveProfileSection({
+        profileId: profileResponseMock.profile!.profileId,
+        version: profileResponseMock.profile!.version,
+        section: "skills",
+        values,
+      }),
+    )
+
+    expect(profile.skills.find((skill) => skill.id === "skill_react")!.source).toBe(
+      "resumeExtracted",
+    )
+    expect(profile.skills.find((skill) => skill.id === "draft_new_skill")!.source).toBe("userAdded")
   })
 
   it("retains the target-role section contract for the future Roles module", async () => {
@@ -103,6 +134,40 @@ describe("profile mock service", () => {
     )
     expect(updated.resumeUpdate!.resume.fileName).toBe("updated.pdf")
     expect(updated.resumeUpdate!.resume).not.toBeInstanceOf(File)
+  })
+
+  it("writes initial recognition results directly into the active profile", async () => {
+    const uploading = await settle(uploadInitialResume({ text: "resume body" }))
+    const recognized = await settle(
+      startInitialResumeRecognition(uploading.profile!.profileId, uploading.profile!.resume!.id),
+    )
+
+    expect(recognized.profile).toMatchObject({ status: "active" })
+    expect(recognized.profile!.resume).toMatchObject({ processingStatus: "succeeded" })
+    expect(recognized.profile!.education[0]!.source).toBe("resumeExtracted")
+    expect(recognized.matchingAnalysis).toBeNull()
+  })
+
+  it("merges a new resume without overwriting manual profile content", async () => {
+    const beforeUpdate = await settle(getJobProfile())
+    const manuallyEditedCompany = beforeUpdate.profile!.workExperiences[0]!.company
+    const userAddedSkill = beforeUpdate.profile!.skills.find(
+      (skill) => skill.source === "userAdded",
+    )!
+    const uploading = await settle(uploadUpdatedResume({ text: "updated resume" }))
+    const updated = await settle(
+      startUpdatedResumeRecognition(uploading.profile!.profileId, uploading.resumeUpdate!.id),
+    )
+
+    expect(updated.profile!.workExperiences[0]!.company).toBe(manuallyEditedCompany)
+    expect(updated.profile!.skills).toContainEqual(userAddedSkill)
+    expect(updated.profile!.skills).toContainEqual(
+      expect.objectContaining({ id: "skill_accessibility", source: "resumeExtracted" }),
+    )
+    expect(updated.resumeUpdate).toMatchObject({
+      changeSummary: { changedItems: 2, missingItems: 1, newItems: 1 },
+      status: "succeeded",
+    })
   })
 
   it("rejects an upload without a file or pasted text", async () => {

@@ -17,19 +17,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 export function ProfileLoadingState() {
   return (
     <div className="flex flex-col gap-6" data-testid="profile-loading-state">
-      <div className="grid items-start gap-y-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:grid-rows-[auto_auto] lg:gap-x-6">
-        <div className="order-1 flex min-w-0 flex-col gap-2 lg:col-start-1 lg:row-start-1">
+      <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+        <div className="flex min-w-0 flex-col gap-2">
           <Skeleton className="h-9 w-44 max-w-full" />
           <Skeleton className="h-5 w-full max-w-2xl" />
+          <Skeleton className="h-5 w-40 max-w-full" />
         </div>
-        <div className="order-2 justify-self-center lg:col-start-2 lg:row-start-1 lg:pr-10">
+        <div className="justify-self-center lg:pr-6">
           <Skeleton className="size-24 rounded-full" />
         </div>
-        <Skeleton className="order-4 h-5 w-40 max-w-full lg:col-start-1 lg:row-start-2 lg:self-center" />
-        <div className="order-3 justify-self-center lg:col-start-2 lg:row-start-2 lg:self-center lg:pr-10">
-          <Skeleton className="h-5 w-28" />
-        </div>
-        <Skeleton className="order-5 h-8 w-28 max-w-full lg:col-start-3 lg:row-start-2 lg:self-center lg:justify-self-end" />
+        <Skeleton className="h-8 w-28 max-w-full justify-self-start lg:justify-self-end" />
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
         <ProfileSkeletonCard />

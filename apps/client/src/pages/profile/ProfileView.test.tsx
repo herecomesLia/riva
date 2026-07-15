@@ -12,14 +12,8 @@ import { renderWithProviders } from "@/test/render"
 
 function createActions(): ProfileViewActions {
   return {
-    cancelRecognition: vi.fn(async () => structuredClone(profileResponseMock)),
-    cancelResumeUpdate: vi.fn(async () => structuredClone(profileResponseMock)),
-    confirmRecognition: vi.fn(async () => structuredClone(profileResponseMock.profile!)),
-    confirmResumeUpdate: vi.fn(async () => structuredClone(profileResponseMock.profile!)),
     createManualProfile: vi.fn(async () => structuredClone(profileResponseMock)),
-    regenerateMatchingAnalysis: vi.fn(async () =>
-      structuredClone(profileResponseMock.matchingAnalysis!),
-    ),
+    resetInitialResumeImport: vi.fn(async () => structuredClone(profileResponseMock)),
     retryRecognition: vi.fn(async () => structuredClone(profileResponseMock)),
     saveSection: vi.fn(async () => structuredClone(profileResponseMock.profile!)),
     uploadInitialResume: vi.fn(async () => structuredClone(profileResponseMock)),
@@ -37,7 +31,6 @@ function renderReady(
       <ProfileView
         actions={actions}
         content={{ status: "ready", data: snapshot }}
-        pending={{ analysis: false, cancelUpdate: false, confirmUpdate: false }}
         variant="default"
       />,
       { router: { initialEntries: ["/profile"] } },
@@ -67,7 +60,6 @@ describe("ProfileView", () => {
     })
     expect(progressbar).toHaveAttribute("aria-valuenow", "100")
     expect(screen.getByText("100%")).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("profile.pendingReviewCount", { count: 0 }))).toBeInTheDocument()
     expect(
       screen.getByText(
         i18n.t("profile.updatedAt", {
@@ -75,7 +67,6 @@ describe("ProfileView", () => {
         }),
       ),
     ).toBeInTheDocument()
-    expect(screen.getAllByText(i18n.t("profile.reviewStatus.confirmed")).length).toBeGreaterThan(0)
     expect(
       screen.getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
     ).toBeVisible()
@@ -84,6 +75,8 @@ describe("ProfileView", () => {
     expect(screen.queryByText("lin-chen-resume.pdf")).not.toBeInTheDocument()
     expect(screen.queryByTestId("profile-section-targetRoles")).not.toBeInTheDocument()
     expect(screen.queryByText("Frontend Technical Lead")).not.toBeInTheDocument()
+    expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/已确认/)).not.toBeInTheDocument()
   })
 
   it("groups education, skills, and credentials in the summary sections", async () => {
@@ -178,7 +171,7 @@ describe("ProfileView", () => {
     expect(actions.uploadInitialResume).not.toHaveBeenCalled()
   })
 
-  it("keeps resume update review inside the resume dialog", async () => {
+  it("keeps the completed resume update summary inside the resume dialog", async () => {
     const user = userEvent.setup()
     const snapshot: JobProfileSnapshot = structuredClone(profileResponseMock)
     snapshot.resumeUpdate = {
@@ -186,20 +179,18 @@ describe("ProfileView", () => {
       createdAt: "2026-07-13T08:00:00.000Z",
       failureReason: null,
       id: "resume_update_uploaded",
-      pendingReviewCount: 3,
       preservesManualChanges: true,
-      proposedProfile: null,
       resume: structuredClone(snapshot.profile!.resume!),
-      status: "awaitingConfirmation",
+      status: "succeeded",
     }
     renderReady(snapshot)
 
-    expect(screen.queryByTestId("profile-resume-update-review")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("profile-resume-update-summary")).not.toBeInTheDocument()
     await user.click(
       await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
     )
     const dialog = await screen.findByRole("dialog")
-    expect(within(dialog).getByTestId("profile-resume-update-review")).toBeInTheDocument()
+    expect(within(dialog).getByTestId("profile-resume-update-summary")).toBeInTheDocument()
     expect(within(dialog).getByText(i18n.t("profile.import.updateTitle"))).toBeInTheDocument()
   })
 
@@ -219,14 +210,11 @@ describe("ProfileView", () => {
   it("renders partial nullable data without failing the page", async () => {
     const snapshot = structuredClone(profileResponseMock)
     snapshot.profile!.education[0]!.degree = null
-    snapshot.profile!.education[0]!.reviewStatus = "needsReview"
     snapshot.profile!.workExperiences[0]!.location = null
     snapshot.profile!.credentials = []
     snapshot.profile!.projectExperiences = []
     snapshot.profile!.completeness.percentage = 75
     snapshot.profile!.completeness.missingSections = ["projectExperience", "credentials"]
-    snapshot.profile!.completeness.needsReviewSections = ["education"]
-    snapshot.profile!.pendingReviewCount = 1
     renderReady(snapshot)
     expect(
       await screen.findByRole("heading", { name: i18n.t("profile.title") }),
@@ -235,18 +223,18 @@ describe("ProfileView", () => {
       screen.getByRole("progressbar", { name: i18n.t("profile.completeness") }),
     ).toHaveAttribute("aria-valuenow", "75")
     expect(screen.getByText("75%")).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("profile.pendingReviewCount", { count: 1 }))).toBeInTheDocument()
+    expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
     expect(screen.queryByText("Bachelor of Engineering")).not.toBeInTheDocument()
   })
 
-  it("keeps the stale matching-analysis alert without repeating its status in the header", async () => {
+  it("does not render matching-analysis regeneration controls", async () => {
     const snapshot = structuredClone(profileResponseMock)
     snapshot.profile!.matchingAnalysisStale = true
     renderReady(snapshot)
 
-    expect(await screen.findByTestId("profile-matching-analysis-stale")).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("profile.matchingAnalysis.staleTitle"))).toBeInTheDocument()
-    expect(screen.queryByText("匹配分析已过期")).not.toBeInTheDocument()
+    expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-matching-analysis-stale")).not.toBeInTheDocument()
+    expect(screen.queryByText(/重新生成匹配分析/)).not.toBeInTheDocument()
   })
 
   it("renders long user content verbatim", async () => {
@@ -391,7 +379,11 @@ describe("ProfileView", () => {
         expect.objectContaining({
           section: sectionName,
           values: expect.arrayContaining([
-            expect.objectContaining({ endDate: null, id: itemId, isCurrent: true }),
+            expect.objectContaining({
+              endDate: null,
+              id: itemId,
+              ...(sectionName === "projectExperience" ? {} : { isCurrent: true }),
+            }),
           ]),
         }),
       )

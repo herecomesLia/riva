@@ -582,7 +582,7 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
   switch (section) {
     case "education":
       return {
-        items: structuredClone(profile.education).map((item) => ({
+        items: structuredClone(profile.education).map(({ source: _source, ...item }) => ({
           ...item,
           degree: item.degree ?? "",
           endDate: item.endDate ?? "",
@@ -592,7 +592,7 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
       }
     case "workExperience":
       return {
-        items: structuredClone(profile.workExperiences).map((item) => ({
+        items: structuredClone(profile.workExperiences).map(({ source: _source, ...item }) => ({
           ...item,
           achievements: joinLines(item.achievements),
           endDate: item.endDate ?? "",
@@ -604,7 +604,7 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
       }
     case "projectExperience":
       return {
-        items: structuredClone(profile.projectExperiences).map((item) => ({
+        items: structuredClone(profile.projectExperiences).map(({ source: _source, ...item }) => ({
           ...item,
           achievements: joinLines(item.achievements),
           background: item.background ?? "",
@@ -635,7 +635,7 @@ function createSectionSchema(section: EditableExperienceSection) {
 
 function normalizeSectionValues(section: EditableExperienceSection, value: any) {
   if (section === "education") {
-    return value.items.map((item: any) => ({
+    return value.items.map(({ source: _source, ...item }: any) => ({
       ...item,
       degree: toNullable(item.degree),
       endDate: item.isCurrent ? null : toNullable(item.endDate),
@@ -645,7 +645,7 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
   }
 
   if (section === "workExperience") {
-    return value.items.map((item: any) => ({
+    return value.items.map(({ source: _source, ...item }: any) => ({
       ...item,
       achievements: toLines(item.achievements),
       endDate: item.isCurrent ? null : toNullable(item.endDate),
@@ -656,12 +656,12 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
     }))
   }
 
-  return value.items.map((item: any) => ({
+  return value.items.map(({ isCurrent, source: _source, ...item }: any) => ({
     ...item,
     achievements: toLines(item.achievements),
     background: toNullable(item.background),
     contributions: toLines(item.contributions),
-    endDate: item.isCurrent ? null : toNullable(item.endDate),
+    endDate: isCurrent ? null : toNullable(item.endDate),
     projectUrl: toNullable(item.projectUrl),
     relatedWorkExperienceId: toNullable(item.relatedWorkExperienceId),
     responsibilities: toLines(item.responsibilities),
@@ -676,8 +676,6 @@ function createNewItem(section: EditableExperienceSection) {
     endDate: "",
     id: createTemporaryId(),
     isCurrent: false,
-    reviewStatus: "confirmed",
-    source: "userAdded",
     startDate: "",
   }
 

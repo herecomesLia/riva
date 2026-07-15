@@ -1,7 +1,7 @@
-import { FileTextIcon, RotateCcwIcon, UploadIcon } from "lucide-react"
+import { FileTextIcon, UploadIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Attachment,
   AttachmentContent,
@@ -17,14 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type {
-  JobProfile,
-  ResumeProcessingStatus,
-  ResumeRecognition,
-  ResumeUpdate,
-} from "@/models/profile"
+import type { JobProfile, ResumeProcessingStatus, ResumeUpdate } from "@/models/profile"
 
-import { ResumeImportForm, ResumeUpdateReview } from "./ProfileImportPanels"
+import { ResumeImportForm, ResumeUpdateSummary } from "./ProfileImportPanels"
 import { ResumeProcessingBadge } from "./ProfileStatusBadge"
 import { formatDate, formatFileSize } from "./profile-formatters"
 
@@ -32,20 +27,14 @@ export type ResumeDialogMode = "details" | "import"
 
 type ProfileResumeDialogProps = {
   importError: string | null
-  isApplying: boolean
-  isCancelling: boolean
   isSubmitting: boolean
   mode: ResumeDialogMode
-  onApplyUpdate: () => void
-  onCancelUpdate: () => void
   onModeChange: (mode: ResumeDialogMode) => void
   onOpenChange: (open: boolean) => void
   onSubmit: (input: { file?: File; text?: string }) => Promise<void>
   open: boolean
   profile: JobProfile
-  recognition: ResumeRecognition | null
   resumeUpdate: ResumeUpdate | null
-  updateError: string | null
 }
 
 function attachmentState(status: ResumeProcessingStatus) {
@@ -66,25 +55,18 @@ function attachmentState(status: ResumeProcessingStatus) {
 
 export function ProfileResumeDialog({
   importError,
-  isApplying,
-  isCancelling,
   isSubmitting,
   mode,
-  onApplyUpdate,
-  onCancelUpdate,
   onModeChange,
   onOpenChange,
   onSubmit,
   open,
   profile,
-  recognition,
   resumeUpdate,
-  updateError,
 }: ProfileResumeDialogProps) {
   const { i18n, t } = useTranslation()
   const resume = profile.resume
   const isImportForm = mode === "import" || !resume
-  const pendingReviewCount = recognition?.pendingReviewCount ?? profile.pendingReviewCount
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -145,46 +127,16 @@ export function ProfileResumeDialog({
               </div>
             </dl>
 
-            {pendingReviewCount > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {t("profile.resume.pendingReview", { count: pendingReviewCount })}
-              </p>
-            )}
-
-            {resumeUpdate && (
-              <Alert>
-                <FileTextIcon />
-                <AlertTitle>{t("profile.resume.updatePendingTitle")}</AlertTitle>
-                <AlertDescription>{t("profile.resume.updatePendingDescription")}</AlertDescription>
-              </Alert>
-            )}
-
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => onModeChange("import")} size="sm" variant="outline">
                 <UploadIcon data-icon="inline-start" />
                 {t("profile.actions.updateResume")}
               </Button>
-              <Button disabled size="sm" variant="outline">
-                <RotateCcwIcon data-icon="inline-start" />
-                {t("profile.actions.recognizeAgain")}
-              </Button>
             </div>
 
             {resumeUpdate && (
               <div className="border-t pt-5">
-                <ResumeUpdateReview
-                  embedded
-                  isApplying={isApplying}
-                  isCancelling={isCancelling}
-                  onApply={onApplyUpdate}
-                  onCancel={onCancelUpdate}
-                  resumeUpdate={resumeUpdate}
-                />
-                {updateError && (
-                  <Alert className="mt-4" variant="destructive">
-                    <AlertDescription>{updateError}</AlertDescription>
-                  </Alert>
-                )}
+                <ResumeUpdateSummary resumeUpdate={resumeUpdate} />
               </div>
             )}
           </div>
