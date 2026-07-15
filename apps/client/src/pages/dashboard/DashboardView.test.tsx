@@ -86,6 +86,7 @@ describe("DashboardView", () => {
     expect(screen.getByText(i18n.t("dashboard.metrics.mockInterview.title"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.performanceTrend.title"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.weaknesses.eyebrow"))).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("dashboard.weaknesses.description"))).not.toBeInTheDocument()
     expect(screen.getAllByText("测试用户")).toHaveLength(1)
     expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(18)
   })
@@ -97,6 +98,7 @@ describe("DashboardView", () => {
     expect(screen.getByText(dashboardResponseMock.recommendation!.title)).toBeInTheDocument()
     expect(screen.getByText("76%")).toBeInTheDocument()
     expect(screen.getByText(dashboardResponseMock.weaknesses[0].description)).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.weaknesses.description"))).toBeInTheDocument()
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
     fireEvent.focus(chart)
@@ -113,6 +115,7 @@ describe("DashboardView", () => {
     expect(screen.getAllByText("暂无数据")).toHaveLength(4)
     expect(screen.getByText("暂无专项练习记录。")).toBeInTheDocument()
     expect(screen.getByText("暂未发现需要优先补强的薄弱项。")).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("dashboard.weaknesses.description"))).toBeInTheDocument()
   })
 
   it("renders an unchanged metric comparison", async () => {

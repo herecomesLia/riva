@@ -34,7 +34,11 @@ export function WeaknessesCard({ state }: WeaknessesCardProps) {
     <Card className="lg:col-span-5">
       <CardHeader>
         <CardTitle>{t("dashboard.weaknesses.eyebrow")}</CardTitle>
-        <CardDescription>{t("dashboard.weaknesses.description")}</CardDescription>
+        {state.status === "loading" ? (
+          <Skeleton className="h-4 w-4/5" />
+        ) : (
+          <CardDescription>{t("dashboard.weaknesses.description")}</CardDescription>
+        )}
       </CardHeader>
       <CardContent>
         {state.status === "loading" ? (
