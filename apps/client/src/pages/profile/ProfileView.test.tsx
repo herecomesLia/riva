@@ -57,8 +57,10 @@ describe("ProfileView", () => {
 
   it("renders complete business data", async () => {
     renderReady()
-    expect(await screen.findByText("Lin Chen")).toBeInTheDocument()
+    expect(await screen.findByText("Fudan University")).toBeInTheDocument()
+    expect(screen.getByText("Northstar Commerce")).toBeInTheDocument()
     expect(screen.getByText("Merchant Operations Console")).toBeInTheDocument()
+    expect(screen.getAllByText("React").length).toBeGreaterThan(0)
     expect(screen.getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
     const progressbar = screen.getByRole("progressbar", {
       name: i18n.t("profile.completeness"),
@@ -138,7 +140,7 @@ describe("ProfileView", () => {
 
     expect(actions.uploadInitialResume).toHaveBeenCalledOnce()
     expect(actions.uploadUpdatedResume).not.toHaveBeenCalled()
-    expect(screen.getByText("Lin Chen")).toBeInTheDocument()
+    expect(screen.getByText("Fudan University")).toBeInTheDocument()
   })
 
   it("uses the updated-resume action after choosing update for an existing resume", async () => {
@@ -204,11 +206,15 @@ describe("ProfileView", () => {
 
   it("renders partial nullable data without failing the page", async () => {
     const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.basicInformation.phone = null
+    snapshot.profile!.education[0]!.degree = null
+    snapshot.profile!.education[0]!.reviewStatus = "needsReview"
+    snapshot.profile!.workExperiences[0]!.location = null
     snapshot.profile!.credentials = []
     snapshot.profile!.projectExperiences = []
     snapshot.profile!.completeness.percentage = 75
-    snapshot.profile!.pendingReviewCount = 3
+    snapshot.profile!.completeness.missingSections = ["projectExperience", "credentials"]
+    snapshot.profile!.completeness.needsReviewSections = ["education"]
+    snapshot.profile!.pendingReviewCount = 1
     renderReady(snapshot)
     expect(
       await screen.findByRole("heading", { name: i18n.t("profile.title") }),
@@ -217,8 +223,8 @@ describe("ProfileView", () => {
       screen.getByRole("progressbar", { name: i18n.t("profile.completeness") }),
     ).toHaveAttribute("aria-valuenow", "75")
     expect(screen.getByText("75%")).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("profile.pendingReviewCount", { count: 3 }))).toBeInTheDocument()
-    expect(screen.queryByText("+86 138 0000 1234")).not.toBeInTheDocument()
+    expect(screen.getByText(i18n.t("profile.pendingReviewCount", { count: 1 }))).toBeInTheDocument()
+    expect(screen.queryByText("Bachelor of Engineering")).not.toBeInTheDocument()
   })
 
   it("keeps the stale matching-analysis alert without repeating its status in the header", async () => {
@@ -234,7 +240,7 @@ describe("ProfileView", () => {
   it("renders long user content verbatim", async () => {
     const snapshot = structuredClone(profileResponseMock)
     const longText = "Long profile content ".repeat(30)
-    snapshot.profile!.basicInformation.personalSummary = longText
+    snapshot.profile!.projectExperiences[0]!.background = longText
     renderReady(snapshot)
     expect(await screen.findByText(/Long profile content Long profile content/)).toBeInTheDocument()
   })
@@ -253,9 +259,9 @@ describe("ProfileView", () => {
     const user = userEvent.setup()
     const snapshot = structuredClone(profileResponseMock)
     renderReady(snapshot)
-    const section = await screen.findByTestId("profile-section-basicInformation")
+    const section = await screen.findByTestId("profile-section-education")
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    expect(screen.getByTestId("profile-editor-basicInformation")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-editor-education")).toBeInTheDocument()
     expect(snapshot).toEqual(profileResponseMock)
   })
 

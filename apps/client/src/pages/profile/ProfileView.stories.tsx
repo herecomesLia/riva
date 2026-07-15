@@ -64,20 +64,20 @@ export const EmptySections = meta.story({
 })
 
 const partial = structuredClone(profileResponseMock)
-partial.profile!.basicInformation.phone = null
 partial.profile!.projectExperiences = []
 partial.profile!.credentials = []
+partial.profile!.education[0]!.reviewStatus = "needsReview"
 partial.profile!.completeness.percentage = 75
-partial.profile!.pendingReviewCount = 3
+partial.profile!.pendingReviewCount = 1
 partial.profile!.completeness.missingSections = ["projectExperience", "credentials"]
-partial.profile!.completeness.needsReviewSections = ["basicInformation"]
+partial.profile!.completeness.needsReviewSections = ["education"]
 
 export const Partial = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: partial } },
 })
 
 const longContent = structuredClone(profileResponseMock)
-longContent.profile!.basicInformation.personalSummary =
+longContent.profile!.projectExperiences[0]!.background =
   "A product-focused engineer who works across accessibility, design systems, performance, architecture, and cross-functional delivery. ".repeat(
     5,
   )

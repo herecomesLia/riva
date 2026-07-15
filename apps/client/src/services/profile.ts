@@ -58,9 +58,6 @@ function createUploadedResume(input: ResumeUploadInput, id: string): ResumeFile 
 
 function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) {
   switch (input.section) {
-    case "basicInformation":
-      profile.basicInformation = copy(input.values)
-      break
     case "education":
       profile.education = copy(input.values)
       break
@@ -133,12 +130,8 @@ export async function startInitialResumeRecognition(
   requireMatchingProfile(profileId)
   const profile = standardProfile()
   profile.status = "awaitingConfirmation"
-  profile.pendingReviewCount = 4
-  profile.completeness.needsReviewSections = [
-    "basicInformation",
-    "workExperience",
-    "projectExperience",
-  ]
+  profile.pendingReviewCount = 3
+  profile.completeness.needsReviewSections = ["education", "workExperience", "projectExperience"]
   profile.resume = {
     ...profile.resume!,
     id: resumeId,
@@ -196,7 +189,7 @@ export async function getResumeRecognitionStatus(
     processingStatus: "succeeded",
     completedAt: "2026-07-13T08:02:00.000Z",
     failureReason: null,
-    pendingReviewCount: 4,
+    pendingReviewCount: 3,
   }
 }
 

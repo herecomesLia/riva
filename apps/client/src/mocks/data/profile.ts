@@ -1,37 +1,9 @@
 import type {
-  BasicInformation,
   JobProfile,
   JobProfileSnapshot,
   ResumeFile,
   ResumeRecognition,
 } from "@/models/profile"
-
-function createBasicInformation(): BasicInformation {
-  return {
-    name: "Lin Chen",
-    professionalTitle: "Frontend Engineer",
-    location: "Shanghai",
-    email: "lin.chen@example.com",
-    phone: "+86 138 0000 1234",
-    personalSummary:
-      "Frontend engineer focused on accessible product experiences and scalable design systems.",
-    portfolioUrl: "https://portfolio.example.com/lin-chen",
-    githubUrl: "https://github.com/lin-chen",
-    linkedinUrl: "https://www.linkedin.com/in/lin-chen",
-    fieldSources: {
-      name: "resumeExtracted",
-      professionalTitle: "userEdited",
-      location: "resumeExtracted",
-      email: "resumeExtracted",
-      phone: "resumeExtracted",
-      personalSummary: "userEdited",
-      portfolioUrl: "userAdded",
-      githubUrl: "userAdded",
-      linkedinUrl: "userAdded",
-    },
-    reviewStatus: "confirmed",
-  }
-}
 
 function createResume(overrides: Partial<ResumeFile> = {}): ResumeFile {
   return {
@@ -72,7 +44,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
     pendingReviewCount: 0,
     matchingAnalysisStale: false,
     resume: createResume(),
-    basicInformation: createBasicInformation(),
     education: [
       {
         id: "education_fudan_2018",

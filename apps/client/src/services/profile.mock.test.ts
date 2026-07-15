@@ -37,29 +37,27 @@ describe("profile mock service", () => {
   it("returns an independent snapshot for every request", async () => {
     const first = await settle(getJobProfile())
     const second = await settle(getJobProfile())
-    first.profile!.basicInformation.name = "mutated"
+    first.profile!.education[0]!.school = "mutated"
     expect(second).toEqual(profileResponseMock)
     expect(second).not.toBe(first)
     expect(second.profile).not.toBe(first.profile)
   })
 
   it("saves a typed section without mutating the standard fixture", async () => {
-    const values = {
-      ...structuredClone(profileResponseMock.profile!.basicInformation),
-      name: "Updated Name",
-    }
+    const values = structuredClone(profileResponseMock.profile!.education)
+    values[0]!.school = "Updated University"
     const profile = await settle(
       saveProfileSection({
         profileId: profileResponseMock.profile!.profileId,
         version: profileResponseMock.profile!.version,
-        section: "basicInformation",
+        section: "education",
         values,
       }),
     )
-    expect(profile.basicInformation.name).toBe("Updated Name")
+    expect(profile.education[0]!.school).toBe("Updated University")
     expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
     expect(profile.matchingAnalysisStale).toBe(true)
-    expect(profileResponseMock.profile!.basicInformation.name).toBe("Lin Chen")
+    expect(profileResponseMock.profile!.education[0]!.school).toBe("Fudan University")
   })
 
   it("retains the target-role section contract for the future Roles module", async () => {

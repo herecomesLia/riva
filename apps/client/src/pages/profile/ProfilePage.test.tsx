@@ -55,7 +55,7 @@ describe("ProfilePage orchestration", () => {
     vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
     renderPage()
     expect(
-      await screen.findByText(profileResponseMock.profile!.basicInformation.name!),
+      await screen.findByText(profileResponseMock.profile!.projectExperiences[0]!.name),
     ).toBeInTheDocument()
   })
 
@@ -75,7 +75,7 @@ describe("ProfilePage orchestration", () => {
 
     await act(async () => retry.resolve(structuredClone(profileResponseMock)))
     expect(
-      await screen.findByText(profileResponseMock.profile!.basicInformation.name!),
+      await screen.findByText(profileResponseMock.profile!.projectExperiences[0]!.name),
     ).toBeInTheDocument()
   })
 
@@ -100,13 +100,13 @@ describe("ProfilePage orchestration", () => {
       .mockReturnValueOnce(refresh.promise)
     const result = renderPage()
     expect(
-      await screen.findByText(profileResponseMock.profile!.basicInformation.name!),
+      await screen.findByText(profileResponseMock.profile!.projectExperiences[0]!.name),
     ).toBeInTheDocument()
 
     await act(async () => void result.queryClient.refetchQueries({ queryKey: ["profile"] }))
     await waitFor(() => expect(profileService.getJobProfile).toHaveBeenCalledTimes(2))
     expect(
-      screen.getByText(profileResponseMock.profile!.basicInformation.name!),
+      screen.getByText(profileResponseMock.profile!.projectExperiences[0]!.name),
     ).toBeInTheDocument()
     expect(screen.queryByTestId("profile-loading-state")).not.toBeInTheDocument()
     await act(async () => refresh.resolve(structuredClone(profileResponseMock)))
@@ -156,19 +156,19 @@ describe("ProfilePage orchestration", () => {
     const user = userEvent.setup()
     const snapshot = structuredClone(profileResponseMock)
     const saved = structuredClone(snapshot.profile!)
-    saved.basicInformation.name = "Updated Name"
+    saved.education[0]!.school = "Updated University"
     vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
     vi.mocked(profileService.saveProfileSection).mockResolvedValue(saved)
 
     renderPage()
-    const basicCard = await screen.findByTestId("profile-section-basicInformation")
-    await user.click(withinCardButton(basicCard, i18n.t("profile.actions.edit")))
-    const name = screen.getByLabelText(i18n.t("profile.field.name"))
-    await user.clear(name)
-    await user.type(name, "Updated Name")
+    const educationCard = await screen.findByTestId("profile-section-education")
+    await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
+    const school = screen.getByLabelText(i18n.t("profile.formField.school"))
+    await user.clear(school)
+    await user.type(school, "Updated University")
     await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
 
-    expect(await screen.findByText("Updated Name")).toBeInTheDocument()
+    expect(await screen.findByText("Updated University")).toBeInTheDocument()
     expect(screen.getByTestId("profile-save-success")).toBeInTheDocument()
   })
 
@@ -177,14 +177,14 @@ describe("ProfilePage orchestration", () => {
     vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
     vi.mocked(profileService.saveProfileSection).mockRejectedValue(new Error("raw save error"))
     renderPage()
-    const basicCard = await screen.findByTestId("profile-section-basicInformation")
-    await user.click(withinCardButton(basicCard, i18n.t("profile.actions.edit")))
-    const name = screen.getByLabelText(i18n.t("profile.field.name"))
-    await user.clear(name)
-    await user.type(name, "Unsaved Name")
+    const educationCard = await screen.findByTestId("profile-section-education")
+    await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
+    const school = screen.getByLabelText(i18n.t("profile.formField.school"))
+    await user.clear(school)
+    await user.type(school, "Unsaved University")
     await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
     expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
-    expect(name).toHaveValue("Unsaved Name")
+    expect(school).toHaveValue("Unsaved University")
   })
 
   it("removes an experience after the section mutation succeeds", async () => {

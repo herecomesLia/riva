@@ -87,7 +87,6 @@ export const profile = {
     description: "上传简历后，Riva 会提取初始信息供你确认，并建立可长期维护的结构化档案。",
   },
   sections: {
-    basicInformation: "基本信息",
     education: "教育经历",
     workExperience: "工作经历",
     projectExperience: "项目经历",
@@ -97,14 +96,7 @@ export const profile = {
   },
   field: {
     name: "姓名",
-    professionalTitle: "职业标题",
     location: "所在地",
-    email: "邮箱",
-    phone: "电话",
-    personalSummary: "个人简介",
-    portfolioUrl: "作品集",
-    githubUrl: "GitHub",
-    linkedinUrl: "LinkedIn",
     degreeMajor: "{{degree}} · {{major}}",
     dateRange: "{{start}} – {{end}}",
     present: "至今",

@@ -127,14 +127,9 @@ export function ProfileSections({
 }: ProfileSectionsProps) {
   return (
     <div className="flex flex-col gap-6">
-      <section className="grid gap-6 xl:grid-cols-2">
-        <BasicInformationSection
-          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-        />
-        <EducationSection
-          {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
-        />
-      </section>
+      <EducationSection
+        {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
+      />
       <WorkExperienceSection
         {...{ editingSection, onCancelEditing, onDirtyChange, onSave, onStartEditing, profile }}
       />
@@ -150,89 +145,6 @@ export function ProfileSections({
         />
       </section>
     </div>
-  )
-}
-
-function BasicInformationSection({
-  editingSection,
-  onCancelEditing,
-  onDirtyChange,
-  onSave,
-  onStartEditing,
-  profile,
-}: ProfileSectionsProps) {
-  const { t } = useTranslation()
-
-  if (editingSection === "basicInformation") {
-    return (
-      <ProfileSectionEditor
-        onCancel={onCancelEditing}
-        onDirtyChange={onDirtyChange}
-        onSave={onSave}
-        profile={profile}
-        section="basicInformation"
-      />
-    )
-  }
-
-  const information = profile.basicInformation
-  const details = [
-    ["name", information.name],
-    ["professionalTitle", information.professionalTitle],
-    ["location", information.location],
-    ["email", information.email],
-    ["phone", information.phone],
-  ] as const
-  const links = [
-    ["portfolioUrl", information.portfolioUrl],
-    ["githubUrl", information.githubUrl],
-    ["linkedinUrl", information.linkedinUrl],
-  ] as const
-
-  return (
-    <ReadonlySectionCard
-      onEdit={() => onStartEditing("basicInformation")}
-      section="basicInformation"
-    >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <ReviewStatusBadge status={information.reviewStatus} />
-        </div>
-        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-          {details.map(([key, value]) =>
-            value ? (
-              <div key={key} className="flex flex-col gap-1">
-                <dt className="text-sm text-muted-foreground">{t(`profile.field.${key}`)}</dt>
-                <dd className="text-sm font-medium">{value}</dd>
-              </div>
-            ) : null,
-          )}
-        </dl>
-        {information.personalSummary && (
-          <div className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-medium">{t("profile.field.personalSummary")}</h3>
-            <p className="text-sm leading-6 text-muted-foreground">{information.personalSummary}</p>
-          </div>
-        )}
-        {links.some(([, value]) => value) && (
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            {links.map(([key, value]) =>
-              value ? (
-                <a
-                  key={key}
-                  className="text-primary underline-offset-4 hover:underline"
-                  href={value}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {t(`profile.field.${key}`)}
-                </a>
-              ) : null,
-            )}
-          </div>
-        )}
-      </div>
-    </ReadonlySectionCard>
   )
 }
 

@@ -100,7 +100,6 @@ export const profile = {
       "After you upload a resume, Riva extracts initial information for review and creates a structured profile you can maintain over time.",
   },
   sections: {
-    basicInformation: "Basic information",
     education: "Education",
     workExperience: "Work experience",
     projectExperience: "Project experience",
@@ -110,14 +109,7 @@ export const profile = {
   },
   field: {
     name: "Name",
-    professionalTitle: "Professional title",
     location: "Location",
-    email: "Email",
-    phone: "Phone",
-    personalSummary: "Professional summary",
-    portfolioUrl: "Portfolio",
-    githubUrl: "GitHub",
-    linkedinUrl: "LinkedIn",
     degreeMajor: "{{degree}} · {{major}}",
     dateRange: "{{start}} – {{end}}",
     present: "Present",

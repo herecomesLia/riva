@@ -21,13 +21,12 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   educationItemSchema,
   profileEmploymentTypes as employmentTypes,
-  profileOptionalTextSchema as optionalText,
   projectItemSchema,
   workItemSchema,
 } from "@/schemas/profile"
 import type { EmploymentType, JobProfile, SaveProfileSectionInput } from "@/models/profile"
 
-type EditableSection = "basicInformation" | "education" | "workExperience" | "projectExperience"
+type EditableSection = "education" | "workExperience" | "projectExperience"
 
 type ProfileSectionEditorProps = {
   onCancel: () => void
@@ -290,10 +289,7 @@ export function ProfileSectionEditor({
 
   function addExperience() {
     const items = (form.state.values as { items?: EditorItem[] }).items ?? []
-    form.setFieldValue(
-      "items" as never,
-      [...items, createNewItem(section as Exclude<EditableSection, "basicInformation">)] as never,
-    )
+    form.setFieldValue("items" as never, [...items, createNewItem(section)] as never)
   }
 
   function cancelEditing() {
@@ -320,41 +316,35 @@ export function ProfileSectionEditor({
             )}
           </form.Subscribe>
           <FieldGroup>
-            {section === "basicInformation" ? (
-              <BasicInformationFields form={form} />
-            ) : (
-              <>
-                <form.Subscribe selector={(state: any) => state.values.items}>
-                  {(items: EditorItem[]) => (
-                    <div className="flex flex-col gap-6">
-                      {items.map((item, index) => (
-                        <ExperienceFields
-                          form={form}
-                          index={index}
-                          itemId={item.id}
-                          key={item.id}
-                          onDelete={() => {
-                            form.setFieldValue(
-                              "items" as never,
-                              items.filter((candidate) => candidate.id !== item.id) as never,
-                            )
-                          }}
-                          profile={profile}
-                          section={section}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </form.Subscribe>
-                <Button onClick={addExperience} type="button" variant="outline">
-                  <PlusIcon data-icon="inline-start" />
-                  {t("profile.editor.addExperience")}
-                </Button>
-                <Alert>
-                  <AlertDescription>{t("profile.editor.deleteDescription")}</AlertDescription>
-                </Alert>
-              </>
-            )}
+            <form.Subscribe selector={(state: any) => state.values.items}>
+              {(items: EditorItem[]) => (
+                <div className="flex flex-col gap-6">
+                  {items.map((item, index) => (
+                    <ExperienceFields
+                      form={form}
+                      index={index}
+                      itemId={item.id}
+                      key={item.id}
+                      onDelete={() => {
+                        form.setFieldValue(
+                          "items" as never,
+                          items.filter((candidate) => candidate.id !== item.id) as never,
+                        )
+                      }}
+                      profile={profile}
+                      section={section}
+                    />
+                  ))}
+                </div>
+              )}
+            </form.Subscribe>
+            <Button onClick={addExperience} type="button" variant="outline">
+              <PlusIcon data-icon="inline-start" />
+              {t("profile.editor.addExperience")}
+            </Button>
+            <Alert>
+              <AlertDescription>{t("profile.editor.deleteDescription")}</AlertDescription>
+            </Alert>
           </FieldGroup>
 
           {saveError && (
@@ -380,33 +370,6 @@ export function ProfileSectionEditor({
   )
 }
 
-function BasicInformationFields({ form }: { form: any }) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="grid gap-5 md:grid-cols-2">
-      <TextField form={form} label={t("profile.field.name")} name="name" />
-      <TextField
-        form={form}
-        label={t("profile.field.professionalTitle")}
-        name="professionalTitle"
-      />
-      <TextField form={form} label={t("profile.field.location")} name="location" />
-      <TextField form={form} label={t("profile.field.email")} name="email" type="email" />
-      <TextField form={form} label={t("profile.field.phone")} name="phone" />
-      <TextField
-        form={form}
-        label={t("profile.field.personalSummary")}
-        name="personalSummary"
-        textarea
-      />
-      <TextField form={form} label={t("profile.field.portfolioUrl")} name="portfolioUrl" />
-      <TextField form={form} label={t("profile.field.githubUrl")} name="githubUrl" />
-      <TextField form={form} label={t("profile.field.linkedinUrl")} name="linkedinUrl" />
-    </div>
-  )
-}
-
 function ExperienceFields({
   form,
   index,
@@ -420,7 +383,7 @@ function ExperienceFields({
   itemId: string
   onDelete: () => void
   profile: JobProfile
-  section: Exclude<EditableSection, "basicInformation">
+  section: EditableSection
 }) {
   const { t } = useTranslation()
   const fieldLabel = (name: string) => t(`profile.formField.${name}`)
@@ -579,8 +542,6 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
 
 function createDraft(profile: JobProfile, section: EditableSection) {
   switch (section) {
-    case "basicInformation":
-      return structuredClone(profile.basicInformation)
     case "education":
       return {
         items: structuredClone(profile.education).map((item) => ({
@@ -624,22 +585,6 @@ function createDraft(profile: JobProfile, section: EditableSection) {
 }
 
 function createSectionSchema(section: EditableSection) {
-  if (section === "basicInformation") {
-    return z.object({
-      email: optionalText,
-      fieldSources: z.any(),
-      githubUrl: optionalText,
-      linkedinUrl: optionalText,
-      location: optionalText,
-      name: optionalText,
-      personalSummary: optionalText,
-      phone: optionalText,
-      portfolioUrl: optionalText,
-      professionalTitle: optionalText,
-      reviewStatus: z.any(),
-    })
-  }
-
   const itemSchema =
     section === "education"
       ? educationItemSchema
@@ -651,21 +596,6 @@ function createSectionSchema(section: EditableSection) {
 }
 
 function normalizeSectionValues(section: EditableSection, value: any) {
-  if (section === "basicInformation") {
-    return {
-      ...value,
-      email: toNullable(value.email),
-      githubUrl: toNullable(value.githubUrl),
-      linkedinUrl: toNullable(value.linkedinUrl),
-      location: toNullable(value.location),
-      name: toNullable(value.name),
-      personalSummary: toNullable(value.personalSummary),
-      phone: toNullable(value.phone),
-      portfolioUrl: toNullable(value.portfolioUrl),
-      professionalTitle: toNullable(value.professionalTitle),
-    }
-  }
-
   if (section === "education") {
     return value.items.map((item: any) => ({
       ...item,
@@ -704,7 +634,7 @@ function normalizeSectionValues(section: EditableSection, value: any) {
   }))
 }
 
-function createNewItem(section: Exclude<EditableSection, "basicInformation">) {
+function createNewItem(section: EditableSection) {
   const base = {
     endDate: "",
     id: createTemporaryId(),

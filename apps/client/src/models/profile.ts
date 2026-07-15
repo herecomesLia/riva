@@ -13,13 +13,7 @@ export type ProfileSource = "resumeExtracted" | "userEdited" | "userAdded"
 export type ResumeProcessingStatus = "uploaded" | "parsing" | "succeeded" | "failed"
 
 export type ProfileSection =
-  | "basicInformation"
-  | "education"
-  | "workExperience"
-  | "projectExperience"
-  | "skills"
-  | "credentials"
-  | "targetRoles"
+  "education" | "workExperience" | "projectExperience" | "skills" | "credentials" | "targetRoles"
 
 export type ProfileCompleteness = {
   percentage: number
@@ -36,20 +30,6 @@ export type ResumeFile = {
   parsedAt: string | null
   processingStatus: ResumeProcessingStatus
   failureReason: string | null
-}
-
-export type BasicInformation = {
-  name: string | null
-  professionalTitle: string | null
-  location: string | null
-  email: string | null
-  phone: string | null
-  personalSummary: string | null
-  portfolioUrl: string | null
-  githubUrl: string | null
-  linkedinUrl: string | null
-  fieldSources: Partial<Record<Exclude<keyof BasicInformation, "fieldSources">, ProfileSource>>
-  reviewStatus: ProfileReviewStatus
 }
 
 export type EducationExperience = {
@@ -140,7 +120,6 @@ export type JobProfile = {
   pendingReviewCount: number
   matchingAnalysisStale: boolean
   resume: ResumeFile | null
-  basicInformation: BasicInformation
   education: EducationExperience[]
   workExperiences: WorkExperience[]
   projectExperiences: ProjectExperience[]
@@ -190,7 +169,6 @@ export type JobProfileSnapshot = {
 }
 
 export type ProfileSectionValueMap = {
-  basicInformation: BasicInformation
   education: EducationExperience[]
   workExperience: WorkExperience[]
   projectExperience: ProjectExperience[]
