@@ -31,21 +31,20 @@ export function ProfileLoadingState() {
         </div>
         <Skeleton className="order-5 h-8 w-28 max-w-full lg:col-start-3 lg:row-start-2 lg:self-center lg:justify-self-end" />
       </div>
-      <div className="grid gap-4 lg:grid-cols-12">
-        <ProfileSkeletonCard className="lg:col-span-7" />
-        <ProfileSkeletonCard className="lg:col-span-5" />
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <ProfileSkeletonCard />
         <ProfileSkeletonCard />
         <ProfileSkeletonCard />
       </div>
+      <ProfileSkeletonCard />
+      <ProfileSkeletonCard />
     </div>
   )
 }
 
-function ProfileSkeletonCard({ className }: { className?: string }) {
+function ProfileSkeletonCard() {
   return (
-    <Card className={className}>
+    <Card>
       <CardHeader>
         <Skeleton className="h-5 w-2/5" />
         <Skeleton className="h-4 w-4/5" />

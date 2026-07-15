@@ -113,13 +113,16 @@ function DetailList({ items, title }: { items: string[]; title: string }) {
 export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProps) {
   return (
     <div className="flex flex-col gap-6">
-      <EducationSection onStartEditing={onStartEditing} profile={profile} />
-      <WorkExperienceSection onStartEditing={onStartEditing} profile={profile} />
-      <ProjectExperienceSection onStartEditing={onStartEditing} profile={profile} />
-      <section className="grid gap-6 xl:grid-cols-2">
+      <section
+        className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3"
+        data-testid="profile-summary-sections"
+      >
+        <EducationSection onStartEditing={onStartEditing} profile={profile} />
         <SkillsSection onStartEditing={onStartEditing} profile={profile} />
         <CredentialsSection onStartEditing={onStartEditing} profile={profile} />
       </section>
+      <WorkExperienceSection onStartEditing={onStartEditing} profile={profile} />
+      <ProjectExperienceSection onStartEditing={onStartEditing} profile={profile} />
     </div>
   )
 }
@@ -357,7 +360,7 @@ function CredentialsSection({ onStartEditing, profile }: ProfileSectionsProps) {
               )}
               {credential.credentialUrl && (
                 <a
-                  className="text-sm text-primary underline-offset-4 hover:underline"
+                  className="break-words text-sm text-primary underline-offset-4 hover:underline"
                   href={credential.credentialUrl}
                   rel="noreferrer"
                   target="_blank"

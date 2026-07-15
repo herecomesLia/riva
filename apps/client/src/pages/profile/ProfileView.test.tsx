@@ -86,6 +86,18 @@ describe("ProfileView", () => {
     expect(screen.queryByText("Frontend Technical Lead")).not.toBeInTheDocument()
   })
 
+  it("groups education, skills, and credentials in the summary sections", async () => {
+    renderReady()
+
+    const summarySections = await screen.findByTestId("profile-summary-sections")
+
+    expect(within(summarySections).getByTestId("profile-section-education")).toBeInTheDocument()
+    expect(within(summarySections).getByTestId("profile-section-skills")).toBeInTheDocument()
+    expect(within(summarySections).getByTestId("profile-section-credentials")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-section-workExperience")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-section-projectExperience")).toBeInTheDocument()
+  })
+
   it("opens the current resume details from the header and resets the dialog when closed", async () => {
     const user = userEvent.setup()
     const snapshot: JobProfileSnapshot = structuredClone(profileResponseMock)
