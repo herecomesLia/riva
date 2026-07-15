@@ -158,21 +158,90 @@ function TextField({
   )
 }
 
-function CurrentField({ form, index }: { form: any; index: number }) {
+function EndDateField({
+  form,
+  hasSubmitted,
+  index,
+}: {
+  form: any
+  hasSubmitted: boolean
+  index: number
+}) {
   const { t } = useTranslation()
-  const fieldName = `items.${index}.isCurrent`
+  const endDateName = `items.${index}.endDate`
+  const isCurrentName = `items.${index}.isCurrent`
 
   return (
-    <form.Field name={fieldName}>
-      {(field: any) => (
-        <Field orientation="horizontal">
-          <Checkbox
-            checked={field.state.value}
-            id={field.name}
-            onCheckedChange={field.handleChange}
-          />
-          <FieldLabel htmlFor={field.name}>{t("profile.editor.current")}</FieldLabel>
-        </Field>
+    <form.Field name={endDateName}>
+      {(endDateField: any) => (
+        <form.Field name={isCurrentName}>
+          {(isCurrentField: any) => {
+            const isCurrent = Boolean(isCurrentField.state.value)
+            const endDate = endDateField.state.value ?? ""
+            const startDate = form.state.values.items?.[index]?.startDate ?? ""
+            const validationError =
+              hasSubmitted && !isCurrent
+                ? !endDate
+                  ? "required"
+                  : endDate < startDate
+                    ? "dateRange"
+                    : null
+                : null
+            const errors = validationError
+              ? [{ message: translateValidationError(t, validationError) }]
+              : []
+            const invalid = !isCurrent && errors.length > 0
+
+            return (
+              <Field invalid={invalid}>
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel htmlFor={endDateField.name}>
+                    {t("profile.formField.endDate")}
+                  </FieldLabel>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Checkbox
+                      checked={isCurrent}
+                      id={`${isCurrentField.name}-present`}
+                      onCheckedChange={(checked) => {
+                        const nextIsCurrent = checked === true
+
+                        isCurrentField.handleChange(nextIsCurrent)
+                        if (nextIsCurrent) endDateField.handleChange("")
+                      }}
+                    />
+                    <FieldLabel
+                      className="cursor-pointer font-normal"
+                      htmlFor={`${isCurrentField.name}-present`}
+                    >
+                      {t("profile.field.present")}
+                    </FieldLabel>
+                  </div>
+                </div>
+                <FieldControl>
+                  {isCurrent ? (
+                    <Input
+                      aria-label={t("profile.formField.endDate")}
+                      disabled
+                      id={endDateField.name}
+                      readOnly
+                      type="text"
+                      value={t("profile.field.present")}
+                    />
+                  ) : (
+                    <Input
+                      id={endDateField.name}
+                      onBlur={endDateField.handleBlur}
+                      onChange={(event) => endDateField.handleChange(event.target.value)}
+                      type="month"
+                      value={endDateField.state.value ?? ""}
+                    />
+                  )}
+                </FieldControl>
+                {!isCurrent && <FieldError errors={errors} visible={invalid} />}
+              </Field>
+            )
+          }}
+        </form.Field>
       )}
     </form.Field>
   )
@@ -265,6 +334,7 @@ export function ProfileSectionEditor({
 }: ProfileSectionEditorProps) {
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState(false)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
   const form = useForm({
     defaultValues: createDraft(profile, section) as any,
     validators: {
@@ -284,6 +354,7 @@ export function ProfileSectionEditor({
         setSaveError(true)
       }
     },
+    onSubmitInvalid: () => setHasSubmitted(true),
   })
 
   function addExperience() {
@@ -321,6 +392,7 @@ export function ProfileSectionEditor({
                         items.filter((candidate) => candidate.id !== item.id) as never,
                       )
                     }}
+                    hasSubmitted={hasSubmitted}
                     profile={profile}
                     section={section}
                   />
@@ -350,6 +422,7 @@ export function ProfileSectionEditor({
 
 function ExperienceFields({
   form,
+  hasSubmitted,
   index,
   itemId,
   onDelete,
@@ -357,6 +430,7 @@ function ExperienceFields({
   section,
 }: {
   form: any
+  hasSubmitted: boolean
   index: number
   itemId: string
   onDelete: () => void
@@ -374,14 +448,7 @@ function ExperienceFields({
         name="startDate"
         type="month"
       />
-      <TextField
-        form={form}
-        index={index}
-        label={fieldLabel("endDate")}
-        name="endDate"
-        type="month"
-      />
-      <CurrentField form={form} index={index} />
+      <EndDateField form={form} hasSubmitted={hasSubmitted} index={index} />
     </>
   )
 
@@ -405,13 +472,6 @@ function ExperienceFields({
             <TextField form={form} index={index} label={fieldLabel("degree")} name="degree" />
             <TextField form={form} index={index} label={fieldLabel("major")} name="major" />
             {dateFields}
-            <TextField
-              form={form}
-              index={index}
-              label={fieldLabel("description")}
-              name="description"
-              textarea
-            />
           </>
         ) : section === "workExperience" ? (
           <>
@@ -525,7 +585,6 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
         items: structuredClone(profile.education).map((item) => ({
           ...item,
           degree: item.degree ?? "",
-          description: item.description ?? "",
           endDate: item.endDate ?? "",
           major: item.major ?? "",
           startDate: item.startDate ?? "",
@@ -555,6 +614,7 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
           relatedWorkExperienceId: item.relatedWorkExperienceId ?? "",
           responsibilities: joinLines(item.responsibilities),
           role: item.role ?? "",
+          isCurrent: item.endDate === null,
           startDate: item.startDate ?? "",
           technologies: item.technologies.join(", "),
         })),
@@ -578,8 +638,7 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
     return value.items.map((item: any) => ({
       ...item,
       degree: toNullable(item.degree),
-      description: toNullable(item.description),
-      endDate: toNullable(item.endDate),
+      endDate: item.isCurrent ? null : toNullable(item.endDate),
       major: toNullable(item.major),
       startDate: toNullable(item.startDate),
     }))
@@ -589,7 +648,7 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
     return value.items.map((item: any) => ({
       ...item,
       achievements: toLines(item.achievements),
-      endDate: toNullable(item.endDate),
+      endDate: item.isCurrent ? null : toNullable(item.endDate),
       location: toNullable(item.location),
       responsibilities: toLines(item.responsibilities),
       skillIds: toCommaSeparatedValues(item.skillIds),
@@ -602,7 +661,7 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
     achievements: toLines(item.achievements),
     background: toNullable(item.background),
     contributions: toLines(item.contributions),
-    endDate: toNullable(item.endDate),
+    endDate: item.isCurrent ? null : toNullable(item.endDate),
     projectUrl: toNullable(item.projectUrl),
     relatedWorkExperienceId: toNullable(item.relatedWorkExperienceId),
     responsibilities: toLines(item.responsibilities),
@@ -623,7 +682,7 @@ function createNewItem(section: EditableExperienceSection) {
   }
 
   if (section === "education") {
-    return { ...base, degree: "", description: "", major: "", school: "" }
+    return { ...base, degree: "", major: "", school: "" }
   }
 
   if (section === "workExperience") {

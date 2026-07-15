@@ -110,7 +110,6 @@ export const profile = {
   field: {
     name: "Name",
     location: "Location",
-    degreeMajor: "{{degree}} · {{major}}",
     dateRange: "{{start}} – {{end}}",
     present: "Present",
     responsibilities: "Responsibilities",
@@ -141,7 +140,6 @@ export const profile = {
     cancel: "Cancel",
     dialogTitle: "Edit {{section}}",
     dialogDescription: "Update this profile section and save your changes.",
-    current: "Currently ongoing",
     delete: "Delete this entry",
     deleteDescription:
       "Deletion only changes this draft. It is applied to your profile when you save.",

@@ -21,14 +21,13 @@ const dateRangeSchema = z
     if (!value.isCurrent && !value.endDate) {
       context.addIssue({ code: "custom", message: "required", path: ["endDate"] })
     }
-    if (value.endDate && value.endDate < value.startDate) {
+    if (!value.isCurrent && value.endDate && value.endDate < value.startDate) {
       context.addIssue({ code: "custom", message: "dateRange", path: ["endDate"] })
     }
   })
 
 export const educationItemSchema = dateRangeSchema.extend({
   degree: optionalText,
-  description: optionalText,
   id: requiredText,
   major: optionalText,
   school: requiredText,

@@ -125,41 +125,35 @@ export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProp
 }
 
 function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
-  const { t } = useTranslation()
-
   return (
     <ReadonlySectionCard onEdit={() => onStartEditing("education")} section="education">
       {profile.education.length === 0 ? (
         <EmptySection />
       ) : (
         <div className="flex flex-col gap-5">
-          {profile.education.map((education, index) => (
-            <div key={education.id} className="flex flex-col gap-2">
-              {index > 0 && <Separator className="mb-3" />}
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-medium">{education.school}</h3>
-                  {(education.degree || education.major) && (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {t("profile.field.degreeMajor", {
-                        degree: education.degree ?? "—",
-                        major: education.major ?? "—",
-                      })}
-                    </p>
-                  )}
+          {profile.education.map((education, index) => {
+            const degreeMajor = [education.degree, education.major].filter(Boolean).join(" · ")
+
+            return (
+              <div key={education.id} className="flex flex-col gap-2">
+                {index > 0 && <Separator className="mb-3" />}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-medium">{education.school}</h3>
+                    {degreeMajor && (
+                      <p className="mt-1 text-sm text-muted-foreground">{degreeMajor}</p>
+                    )}
+                  </div>
+                  <ReviewStatusBadge status={education.reviewStatus} />
                 </div>
-                <ReviewStatusBadge status={education.reviewStatus} />
+                <DateRange
+                  endDate={education.endDate}
+                  isCurrent={education.isCurrent}
+                  startDate={education.startDate}
+                />
               </div>
-              <DateRange
-                endDate={education.endDate}
-                isCurrent={education.isCurrent}
-                startDate={education.startDate}
-              />
-              {education.description && (
-                <p className="text-sm leading-6 text-muted-foreground">{education.description}</p>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </ReadonlySectionCard>

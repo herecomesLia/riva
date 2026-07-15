@@ -97,7 +97,6 @@ export const profile = {
   field: {
     name: "姓名",
     location: "所在地",
-    degreeMajor: "{{degree}} · {{major}}",
     dateRange: "{{start}} – {{end}}",
     present: "至今",
     responsibilities: "主要职责",
@@ -128,7 +127,6 @@ export const profile = {
     cancel: "取消",
     dialogTitle: "编辑{{section}}",
     dialogDescription: "修改此档案分区，完成后保存更改。",
-    current: "当前进行中",
     delete: "删除此条目",
     deleteDescription: "删除仅会修改当前草稿；保存修改后才会应用到档案。",
     experience: "经历 {{count}}",

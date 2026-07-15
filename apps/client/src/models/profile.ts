@@ -40,7 +40,6 @@ export type EducationExperience = {
   startDate: string | null
   endDate: string | null
   isCurrent: boolean
-  description: string | null
   source: ProfileSource
   reviewStatus: ProfileReviewStatus
 }

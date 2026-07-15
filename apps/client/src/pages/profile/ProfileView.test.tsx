@@ -297,6 +297,95 @@ describe("ProfileView", () => {
     },
   )
 
+  it("renders only the supported education fields in the editor", async () => {
+    const user = userEvent.setup()
+    renderReady()
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+
+    for (const field of ["school", "degree", "major", "startDate", "endDate"] as const) {
+      expect(
+        within(dialog).getByLabelText(i18n.t(`profile.formField.${field}`)),
+      ).toBeInTheDocument()
+    }
+    expect(within(dialog).queryByLabelText(i18n.t("profile.formField.description"))).toBeNull()
+  })
+
+  it("manages an education end date with the present option", async () => {
+    const user = userEvent.setup()
+    renderReady()
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const present = within(dialog).getByRole("checkbox", { name: i18n.t("profile.field.present") })
+    const endDate = within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))
+
+    expect(present).not.toBeChecked()
+    expect(endDate).toHaveAttribute("type", "month")
+    expect(endDate).toHaveValue("2018-06")
+
+    await user.click(present)
+    expect(present).toBeChecked()
+    expect(within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))).toHaveAttribute(
+      "type",
+      "text",
+    )
+    expect(within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))).toBeDisabled()
+    expect(within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))).toHaveValue(
+      i18n.t("profile.field.present"),
+    )
+
+    await user.click(present)
+    const restoredEndDate = within(dialog).getByLabelText(i18n.t("profile.formField.endDate"))
+    expect(restoredEndDate).toHaveAttribute("type", "month")
+    expect(restoredEndDate).toHaveValue("")
+
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+    expect(
+      await within(dialog).findByText(i18n.t("profile.editor.validation.required")),
+    ).toBeInTheDocument()
+
+    await user.type(restoredEndDate, "2010-01")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+    expect(
+      await within(dialog).findByText(i18n.t("profile.editor.validation.dateRange")),
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    ["education", "education_fudan_2018", 0],
+    ["workExperience", "work_orbit_2018", 1],
+    ["projectExperience", "project_merchant_console", 0],
+  ] as const)(
+    "saves %s with a null end date when marked present",
+    async (sectionName, itemId, itemIndex) => {
+      const user = userEvent.setup()
+      const { actions } = renderReady()
+      const section = await screen.findByTestId(`profile-section-${sectionName}`)
+      await user.click(
+        within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }),
+      )
+      const dialog = await screen.findByRole("dialog")
+      const present = within(dialog).getAllByRole("checkbox", {
+        name: i18n.t("profile.field.present"),
+      })[itemIndex]!
+
+      if (sectionName !== "projectExperience") await user.click(present)
+      await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+      await waitFor(() => expect(actions.saveSection).toHaveBeenCalledOnce())
+      expect(actions.saveSection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          section: sectionName,
+          values: expect.arrayContaining([
+            expect.objectContaining({ endDate: null, id: itemId, isCurrent: true }),
+          ]),
+        }),
+      )
+    },
+  )
+
   it("keeps experience additions and deletions in the draft until save", async () => {
     const user = userEvent.setup()
     const snapshot = structuredClone(profileResponseMock)
@@ -309,6 +398,26 @@ describe("ProfileView", () => {
     )
     const deletes = within(dialog).getAllByRole("button", { name: i18n.t("profile.editor.delete") })
     await user.click(deletes.at(-1)!)
+    expect(actions.saveSection).not.toHaveBeenCalled()
+    expect(snapshot).toEqual(profileResponseMock)
+  })
+
+  it("keeps education additions and deletions in the draft until save", async () => {
+    const user = userEvent.setup()
+    const snapshot = structuredClone(profileResponseMock)
+    const { actions } = renderReady(snapshot)
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("profile.editor.addExperience") }),
+    )
+    await user.click(
+      within(dialog)
+        .getAllByRole("button", { name: i18n.t("profile.editor.delete") })
+        .at(-1)!,
+    )
+
     expect(actions.saveSection).not.toHaveBeenCalled()
     expect(snapshot).toEqual(profileResponseMock)
   })
@@ -332,7 +441,12 @@ describe("ProfileView", () => {
         profileId: snapshot.profile!.profileId,
         section: "education",
         version: snapshot.profile!.version,
-        values: expect.arrayContaining([expect.objectContaining({ school: "Updated University" })]),
+        values: [expect.objectContaining({ school: "Updated University" })],
+      }),
+    )
+    expect(actions.saveSection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        values: [expect.not.objectContaining({ description: expect.anything() })],
       }),
     )
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())

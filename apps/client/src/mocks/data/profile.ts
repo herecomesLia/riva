@@ -53,7 +53,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         startDate: "2014-09",
         endDate: "2018-06",
         isCurrent: false,
-        description: "Coursework included software engineering and human-computer interaction.",
         source: "resumeExtracted",
         reviewStatus: "confirmed",
       },
