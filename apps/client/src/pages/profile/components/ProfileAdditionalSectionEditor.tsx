@@ -239,10 +239,10 @@ function SkillFields({ form, onAdd }: { form: any; onAdd: () => void }) {
     <>
       <form.Subscribe selector={(state: any) => state.values.items}>
         {(items: any[]) => (
-          <div className="flex flex-col gap-4">
+          <div className="grid items-start gap-4 lg:grid-cols-2">
             {items.map((item, index) => (
               <div
-                className="grid gap-4 rounded-xl border p-4 md:grid-cols-[minmax(0,1fr)_auto]"
+                className="grid min-w-0 gap-3 rounded-xl border p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
                 data-testid={`profile-editor-item-${item.id}`}
                 key={item.id}
               >
@@ -253,7 +253,7 @@ function SkillFields({ form, onAdd }: { form: any; onAdd: () => void }) {
                   name="name"
                 />
                 <Button
-                  className="self-end"
+                  className="justify-self-start sm:justify-self-end"
                   onClick={() => {
                     form.setFieldValue(
                       "items" as never,

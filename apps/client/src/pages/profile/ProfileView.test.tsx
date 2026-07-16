@@ -460,6 +460,9 @@ describe("ProfileView", () => {
     const dialog = await screen.findByRole("dialog")
 
     expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(4)
+    expect(
+      within(dialog).getAllByRole("button", { name: i18n.t("profile.editor.delete") }),
+    ).toHaveLength(4)
     expect(within(dialog).queryByLabelText(/技能分类|Skill category/)).not.toBeInTheDocument()
     expect(dialog.querySelector("datalist")).toBeNull()
 
@@ -476,7 +479,10 @@ describe("ProfileView", () => {
     await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
 
     await waitFor(() => expect(actions.saveSection).toHaveBeenCalledOnce())
-    const savedValues = vi.mocked(actions.saveSection).mock.calls[0]![0].values
+    const savedValues = vi.mocked(actions.saveSection).mock.calls[0]![0].values as Array<{
+      id: string
+      name: string
+    }>
     expect(savedValues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "skill_react", name: "React Native" }),
@@ -485,6 +491,13 @@ describe("ProfileView", () => {
     expect(savedValues.every((skill) => Object.keys(skill).sort().join(",") === "id,name")).toBe(
       true,
     )
+    expect(savedValues.map((skill) => skill.name)).toEqual([
+      "React Native",
+      "TypeScript",
+      "Design systems",
+      "JavaScript",
+      "Testing Library",
+    ])
   })
 
   it("validates required and duplicate skill names", async () => {
@@ -517,10 +530,15 @@ describe("ProfileView", () => {
     await user.click(
       within(dialog)
         .getAllByRole("button", { name: i18n.t("profile.editor.delete") })
-        .at(-1)!,
+        .at(1)!,
     )
 
     expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(3)
+    expect(
+      within(dialog)
+        .getAllByLabelText(i18n.t("profile.field.skillName"))
+        .map((input) => input.getAttribute("value")),
+    ).toEqual(["React", "Design systems", "JavaScript"])
     expect(actions.saveSection).not.toHaveBeenCalled()
     expect(snapshot).toEqual(profileResponseMock)
   })

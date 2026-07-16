@@ -31,4 +31,15 @@ export const ProjectExperience = meta.story({ args: createArgs("projectExperienc
 
 export const Skills = meta.story({ args: createArgs("skills") })
 
+const fiveSkills = structuredClone(profileResponseMock.profile!)
+fiveSkills.skills.push({
+  id: "skill_accessibility",
+  name: "Accessibility and inclusive design",
+  source: "userAdded",
+})
+
+export const FiveSkills = meta.story({
+  args: { ...createArgs("skills"), profile: fiveSkills },
+})
+
 export const Credentials = meta.story({ args: createArgs("credentials") })
