@@ -139,22 +139,24 @@ export function ProfileRecognitionFailureState({
   const { t } = useTranslation()
 
   return (
-    <Alert data-testid="profile-recognition-failure" variant="destructive">
-      <AlertCircleIcon />
-      <AlertTitle>{t("profile.lifecycle.failed.title")}</AlertTitle>
-      <AlertDescription>
-        {failureReason ?? t("profile.lifecycle.failed.description")}
-      </AlertDescription>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button onClick={onRetry} size="sm">
-          {t("profile.actions.retryRecognition")}
-        </Button>
-        <Button onClick={onReupload} size="sm" variant="outline">
-          {t("profile.actions.updateResume")}
-        </Button>
-        <Button onClick={onManualEntry} size="sm" variant="outline">
-          {t("profile.actions.manualEntry")}
-        </Button>
+    <Alert className="items-start" data-testid="profile-recognition-failure" variant="destructive">
+      <AlertCircleIcon className="mt-0.5 shrink-0" />
+      <div className="min-w-0">
+        <AlertTitle>{t("profile.lifecycle.failed.title")}</AlertTitle>
+        <AlertDescription className="mt-1">
+          {failureReason ?? t("profile.lifecycle.failed.description")}
+        </AlertDescription>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button onClick={onRetry} size="sm">
+            {t("profile.actions.retryRecognition")}
+          </Button>
+          <Button onClick={onReupload} size="sm" variant="outline">
+            {t("profile.actions.updateResume")}
+          </Button>
+          <Button onClick={onManualEntry} size="sm" variant="outline">
+            {t("profile.actions.manualEntry")}
+          </Button>
+        </div>
       </div>
     </Alert>
   )

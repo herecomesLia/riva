@@ -145,6 +145,53 @@ describe("ProfileView", () => {
     expect(screen.queryByText(/已确认/)).not.toBeInTheDocument()
   })
 
+  it("keeps recognition-failure actions with the supplied failure reason", async () => {
+    const user = userEvent.setup()
+    const snapshot = structuredClone(profileResponseMock)
+    snapshot.profile!.status = "recognitionFailed"
+    snapshot.recognition = {
+      ...snapshot.recognition!,
+      failureReason: "The document could not be parsed.",
+    }
+    const { actions } = renderReady(snapshot)
+    const alert = await screen.findByTestId("profile-recognition-failure")
+
+    expect(alert).toHaveTextContent(i18n.t("profile.lifecycle.failed.title"))
+    expect(alert).toHaveTextContent("The document could not be parsed.")
+
+    await user.click(
+      within(alert).getByRole("button", { name: i18n.t("profile.actions.retryRecognition") }),
+    )
+    await user.click(
+      within(alert).getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    )
+    await user.click(
+      within(alert).getByRole("button", { name: i18n.t("profile.actions.manualEntry") }),
+    )
+
+    expect(actions.retryRecognition).toHaveBeenCalledWith(
+      snapshot.profile!.profileId,
+      snapshot.profile!.resume!.id,
+    )
+    expect(actions.resetInitialResumeImport).toHaveBeenCalledWith(
+      snapshot.profile!.profileId,
+      snapshot.profile!.resume!.id,
+    )
+    expect(actions.createManualProfile).toHaveBeenCalledOnce()
+  })
+
+  it("uses the default recognition-failure description when no reason is available", async () => {
+    const snapshot = structuredClone(profileResponseMock)
+    snapshot.profile!.status = "recognitionFailed"
+    snapshot.profile!.resume!.failureReason = null
+    snapshot.recognition = null
+    renderReady(snapshot)
+
+    expect(await screen.findByTestId("profile-recognition-failure")).toHaveTextContent(
+      i18n.t("profile.lifecycle.failed.description"),
+    )
+  })
+
   it("groups only education and skills in the summary sections", async () => {
     renderReady()
 
