@@ -125,6 +125,83 @@ describe("profile mock service", () => {
     await assertion
   })
 
+  it("atomically creates a new skill and replaces its temporary work-experience id", async () => {
+    const values = [structuredClone(profileResponseMock.profile!.workExperiences[0]!)]
+    values[0]!.skillIds = ["skill_react", "draft_skill_accessibility"]
+
+    const profile = await settle(
+      saveProfileSection({
+        profileId: profileResponseMock.profile!.profileId,
+        section: "workExperience",
+        skillsToCreate: [{ clientId: "draft_skill_accessibility", name: "Accessibility" }],
+        values,
+        version: profileResponseMock.profile!.version,
+      }),
+    )
+
+    const skill = profile.skills.find((candidate) => candidate.name === "Accessibility")!
+    expect(skill).toMatchObject({ source: "userAdded" })
+    expect(profile.workExperiences[0]!.skillIds).toEqual(["skill_react", skill.id])
+    expect(profile.workExperiences[0]!.source).toBe("userEdited")
+    expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
+    expect(profile.matchingAnalysisStale).toBe(true)
+  })
+
+  it("reuses matching skills and creates duplicate draft names only once", async () => {
+    const values = [structuredClone(profileResponseMock.profile!.workExperiences[0]!)]
+    values.push({
+      ...structuredClone(values[0]!),
+      id: "draft_work_second",
+      skillIds: ["draft_skill_react", "draft_skill_accessibility_two"],
+    })
+    values[0]!.skillIds = ["draft_skill_react", "draft_skill_accessibility_one"]
+
+    const profile = await settle(
+      saveProfileSection({
+        profileId: profileResponseMock.profile!.profileId,
+        section: "workExperience",
+        skillsToCreate: [
+          { clientId: "draft_skill_react", name: " react " },
+          { clientId: "draft_skill_accessibility_one", name: "Accessibility" },
+          { clientId: "draft_skill_accessibility_two", name: "accessibility" },
+        ],
+        values,
+        version: profileResponseMock.profile!.version,
+      }),
+    )
+
+    const accessibilitySkills = profile.skills.filter(
+      (skill) => skill.name.toLowerCase() === "accessibility",
+    )
+    expect(accessibilitySkills).toHaveLength(1)
+    expect(profile.workExperiences[0]!.skillIds[0]).toBe("skill_react")
+    expect(profile.workExperiences[0]!.skillIds[1]).toBe(accessibilitySkills[0]!.id)
+    expect(profile.workExperiences[1]!.skillIds).toEqual([
+      "skill_react",
+      accessibilitySkills[0]!.id,
+    ])
+  })
+
+  it("does not partially save a new skill or work experience for a stale version", async () => {
+    const promise = saveProfileSection({
+      profileId: profileResponseMock.profile!.profileId,
+      section: "workExperience",
+      skillsToCreate: [{ clientId: "draft_skill_accessibility", name: "Accessibility" }],
+      values: structuredClone(profileResponseMock.profile!.workExperiences).map((experience) => ({
+        ...experience,
+        skillIds: ["draft_skill_accessibility"],
+      })),
+      version: -1,
+    })
+    const assertion = expect(promise).rejects.toThrow("version is out of date")
+    await vi.runAllTimersAsync()
+    await assertion
+
+    const current = await settle(getJobProfile())
+    expect(current.profile!.skills.some((skill) => skill.name === "Accessibility")).toBe(false)
+    expect(current.profile!.workExperiences).toEqual(profileResponseMock.profile!.workExperiences)
+  })
+
   it("accepts a file or pasted text for upload and never returns File in server data", async () => {
     const initial = await settle(uploadInitialResume({ text: "resume body" }))
     expect(initial.profile!.resume).toMatchObject({

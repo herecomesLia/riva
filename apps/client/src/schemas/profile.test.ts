@@ -22,13 +22,14 @@ const schemas: Array<[string, any, Record<string, unknown>]> = [
     "work experience",
     workItemSchema,
     {
-      achievements: "",
+      achievements: [],
       company: "Riva",
+      endDate: "",
       employmentType: "fullTime",
       id: "work_1",
       location: "",
-      responsibilities: "",
-      skillIds: "",
+      responsibilities: [],
+      skillIds: [],
       title: "Engineer",
     },
   ],
@@ -100,6 +101,58 @@ describe("experience date schemas", () => {
       }
     },
   )
+})
+
+describe("work experience schema", () => {
+  it("keeps structured arrays and trims duplicate items before saving", () => {
+    const result = workItemSchema.safeParse({
+      achievements: ["  Improved performance  ", "Improved performance"],
+      company: "Riva",
+      endDate: "",
+      employmentType: "fullTime",
+      id: "work_1",
+      isCurrent: true,
+      location: "",
+      responsibilities: ["  Built the platform  ", "Built the platform"],
+      skillIds: ["skill_react", "skill_react"],
+      startDate: "2024-01",
+      title: "Engineer",
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          achievements: ["Improved performance"],
+          responsibilities: ["Built the platform"],
+          skillIds: ["skill_react"],
+        }),
+        success: true,
+      }),
+    )
+  })
+
+  it("removes blank bullet items before saving", () => {
+    const result = workItemSchema.safeParse({
+      achievements: [],
+      company: "Riva",
+      endDate: "",
+      employmentType: "fullTime",
+      id: "work_1",
+      isCurrent: true,
+      location: "",
+      responsibilities: ["   "],
+      skillIds: [],
+      startDate: "2024-01",
+      title: "Engineer",
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({ responsibilities: [] }),
+        success: true,
+      }),
+    )
+  })
 })
 
 describe("skill schema", () => {

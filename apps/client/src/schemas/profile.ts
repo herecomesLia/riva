@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { normalizeBulletItems, normalizeSkillIds } from "@/models/profile-text"
+
 export const profileEmploymentTypes = [
   "fullTime",
   "partTime",
@@ -10,6 +12,17 @@ export const profileEmploymentTypes = [
 const requiredText = z.string().trim().min(1, "required")
 export const profileOptionalTextSchema = z.string()
 const optionalText = profileOptionalTextSchema
+const bulletItemSchema = z.string().trim().min(1, "required")
+const bulletItemsSchema = z
+  .array(z.string())
+  .default([])
+  .transform(normalizeBulletItems)
+  .pipe(z.array(bulletItemSchema))
+const skillIdsSchema = z
+  .array(z.string())
+  .default([])
+  .transform(normalizeSkillIds)
+  .pipe(z.array(requiredText))
 
 const dateRangeSchema = z
   .object({
@@ -34,13 +47,13 @@ export const educationItemSchema = dateRangeSchema.extend({
 })
 
 export const workItemSchema = dateRangeSchema.extend({
-  achievements: optionalText,
+  achievements: bulletItemsSchema,
   company: requiredText,
   employmentType: z.enum(profileEmploymentTypes, "employmentType"),
   id: requiredText,
   location: optionalText,
-  responsibilities: optionalText,
-  skillIds: optionalText,
+  responsibilities: bulletItemsSchema,
+  skillIds: skillIdsSchema,
   title: requiredText,
 })
 

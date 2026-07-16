@@ -157,14 +157,30 @@ export type ProfileSectionValueMap = {
   targetRoles: TargetRoleSummary[]
 }
 
-export type SaveProfileSectionInput = {
+type SaveStandardProfileSectionInput = {
   [Section in ProfileSection]: {
     profileId: string
     version: number
     section: Section
     values: ProfileSectionValueMap[Section]
   }
-}[ProfileSection]
+}[Exclude<ProfileSection, "workExperience">]
+
+export type NewProfileSkillInput = {
+  clientId: string
+  name: string
+}
+
+export type SaveWorkExperienceSectionInput = {
+  profileId: string
+  version: number
+  section: "workExperience"
+  values: WorkExperience[]
+  skillsToCreate: NewProfileSkillInput[]
+}
+
+export type SaveProfileSectionInput =
+  SaveStandardProfileSectionInput | SaveWorkExperienceSectionInput
 
 export type ResumeUploadInput = {
   file?: File

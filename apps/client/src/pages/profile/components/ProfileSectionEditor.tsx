@@ -19,14 +19,23 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { normalizeBulletItems, normalizeSkillIds } from "@/models/profile-text"
 import {
   educationItemSchema,
   profileEmploymentTypes as employmentTypes,
   projectItemSchema,
   workItemSchema,
 } from "@/schemas/profile"
-import type { EmploymentType, JobProfile, SaveProfileSectionInput } from "@/models/profile"
+import type {
+  EmploymentType,
+  JobProfile,
+  ProfileSkill,
+  SaveProfileSectionInput,
+  WorkExperience,
+} from "@/models/profile"
+import { BulletListEditor } from "./BulletListEditor"
 import type { EditableExperienceSection } from "./ProfileSectionEditDialog"
+import { SkillTagInput } from "./SkillTagInput"
 
 type ProfileSectionEditorProps = {
   onCancel: () => void
@@ -47,11 +56,11 @@ function createTemporaryId() {
   return `draft_${crypto.randomUUID()}`
 }
 
-function joinLines(value: string[]) {
+function joinProjectLines(value: string[]) {
   return value.join("\n")
 }
 
-function toLines(value: string) {
+function toProjectLines(value: string) {
   return value
     .split("\n")
     .map((item) => item.trim())
@@ -62,7 +71,7 @@ function toNullable(value: string) {
   return value.trim() || null
 }
 
-function toCommaSeparatedValues(value: string) {
+function toProjectCommaSeparatedValues(value: string) {
   return value
     .split(",")
     .map((item) => item.trim())
@@ -343,6 +352,7 @@ export function ProfileSectionEditor({
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState(false)
   const [hasSubmitted, setHasSubmitted] = useState(false)
+  const [draftSkills, setDraftSkills] = useState<ProfileSkill[]>([])
   const form = useForm({
     defaultValues: createDraft(profile, section) as any,
     validators: {
@@ -352,12 +362,33 @@ export function ProfileSectionEditor({
       setSaveError(false)
 
       try {
-        await onSave({
-          profileId: profile.profileId,
-          section,
-          values: normalizeSectionValues(section, value),
-          version: profile.version,
-        } as SaveProfileSectionInput)
+        const values = normalizeSectionValues(section, value)
+        const workExperienceValues = values as WorkExperience[]
+        const skillsToCreate =
+          section === "workExperience"
+            ? draftSkills
+                .filter((skill) =>
+                  workExperienceValues.some((experience) => experience.skillIds.includes(skill.id)),
+                )
+                .map(({ id, name }) => ({ clientId: id, name }))
+            : []
+
+        await onSave(
+          section === "workExperience"
+            ? {
+                profileId: profile.profileId,
+                section,
+                skillsToCreate,
+                values,
+                version: profile.version,
+              }
+            : {
+                profileId: profile.profileId,
+                section,
+                values,
+                version: profile.version,
+              },
+        )
       } catch {
         setSaveError(true)
       }
@@ -402,6 +433,8 @@ export function ProfileSectionEditor({
                     }}
                     hasSubmitted={hasSubmitted}
                     profile={profile}
+                    draftSkills={draftSkills}
+                    onDraftSkillsChange={setDraftSkills}
                     section={section}
                   />
                 ))}
@@ -434,6 +467,8 @@ function ExperienceFields({
   index,
   itemId,
   onDelete,
+  draftSkills,
+  onDraftSkillsChange,
   profile,
   section,
 }: {
@@ -442,6 +477,8 @@ function ExperienceFields({
   index: number
   itemId: string
   onDelete: () => void
+  draftSkills: ProfileSkill[]
+  onDraftSkillsChange: (skills: ProfileSkill[]) => void
   profile: JobProfile
   section: EditableExperienceSection
 }) {
@@ -487,26 +524,37 @@ function ExperienceFields({
               name="location"
             />
             {dateFields}
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.field.responsibilities")}
-              name="responsibilities"
-              textarea
-            />
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.field.achievements")}
-              name="achievements"
-              textarea
-            />
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.field.skills")}
-              name="skillIds"
-            />
+            <form.Field name={`items.${index}.responsibilities`}>
+              {(field: any) => (
+                <BulletListEditor
+                  description={t("profile.editor.bulletListDescription")}
+                  items={field.state.value ?? []}
+                  label={t("profile.field.responsibilities")}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.Field>
+            <form.Field name={`items.${index}.achievements`}>
+              {(field: any) => (
+                <BulletListEditor
+                  description={t("profile.editor.bulletListDescription")}
+                  items={field.state.value ?? []}
+                  label={t("profile.field.achievements")}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.Field>
+            <form.Field name={`items.${index}.skillIds`}>
+              {(field: any) => (
+                <SkillTagInput
+                  availableSkills={profile.skills}
+                  draftSkills={draftSkills}
+                  onDraftSkillsChange={onDraftSkillsChange}
+                  onSelectedSkillIdsChange={field.handleChange}
+                  selectedSkillIds={field.state.value ?? []}
+                />
+              )}
+            </form.Field>
           </>
         ) : (
           <>
@@ -596,11 +644,11 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
       return {
         items: structuredClone(profile.workExperiences).map(({ source: _source, ...item }) => ({
           ...item,
-          achievements: joinLines(item.achievements),
+          achievements: structuredClone(item.achievements),
           endDate: item.endDate ?? "",
           location: item.location ?? "",
-          responsibilities: joinLines(item.responsibilities),
-          skillIds: item.skillIds.join(", "),
+          responsibilities: structuredClone(item.responsibilities),
+          skillIds: structuredClone(item.skillIds),
           startDate: item.startDate ?? "",
         })),
       }
@@ -608,13 +656,13 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
       return {
         items: structuredClone(profile.projectExperiences).map(({ source: _source, ...item }) => ({
           ...item,
-          achievements: joinLines(item.achievements),
+          achievements: joinProjectLines(item.achievements),
           background: item.background ?? "",
-          contributions: joinLines(item.contributions),
+          contributions: joinProjectLines(item.contributions),
           endDate: item.endDate ?? "",
           projectUrl: item.projectUrl ?? "",
           relatedWorkExperienceId: item.relatedWorkExperienceId ?? "",
-          responsibilities: joinLines(item.responsibilities),
+          responsibilities: joinProjectLines(item.responsibilities),
           role: item.role ?? "",
           isCurrent: item.endDate === null,
           startDate: item.startDate ?? "",
@@ -649,27 +697,27 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
   if (section === "workExperience") {
     return value.items.map(({ source: _source, ...item }: any) => ({
       ...item,
-      achievements: toLines(item.achievements),
+      achievements: normalizeBulletItems(item.achievements),
       endDate: item.isCurrent ? null : toNullable(item.endDate),
       location: toNullable(item.location),
-      responsibilities: toLines(item.responsibilities),
-      skillIds: toCommaSeparatedValues(item.skillIds),
+      responsibilities: normalizeBulletItems(item.responsibilities),
+      skillIds: normalizeSkillIds(item.skillIds),
       startDate: toNullable(item.startDate),
     }))
   }
 
   return value.items.map(({ isCurrent, source: _source, ...item }: any) => ({
     ...item,
-    achievements: toLines(item.achievements),
+    achievements: toProjectLines(item.achievements),
     background: toNullable(item.background),
-    contributions: toLines(item.contributions),
+    contributions: toProjectLines(item.contributions),
     endDate: isCurrent ? null : toNullable(item.endDate),
     projectUrl: toNullable(item.projectUrl),
     relatedWorkExperienceId: toNullable(item.relatedWorkExperienceId),
-    responsibilities: toLines(item.responsibilities),
+    responsibilities: toProjectLines(item.responsibilities),
     role: toNullable(item.role),
     startDate: toNullable(item.startDate),
-    technologies: toCommaSeparatedValues(item.technologies),
+    technologies: toProjectCommaSeparatedValues(item.technologies),
   }))
 }
 
@@ -688,12 +736,12 @@ function createNewItem(section: EditableExperienceSection) {
   if (section === "workExperience") {
     return {
       ...base,
-      achievements: "",
+      achievements: [],
       company: "",
       employmentType: "fullTime" satisfies EmploymentType,
       location: "",
-      responsibilities: "",
-      skillIds: "",
+      responsibilities: [],
+      skillIds: [],
       title: "",
     }
   }

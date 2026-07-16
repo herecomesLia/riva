@@ -1,6 +1,7 @@
 import { env } from "@/app/env"
 import { profileResponseMock } from "@/mocks/data/profile"
 import { waitForMockDelay } from "@/mocks/utils"
+import { normalizeSkillIds, normalizeSkillName } from "@/models/profile-text"
 import type {
   JobProfile,
   JobProfileSnapshot,
@@ -11,6 +12,7 @@ import type {
   ResumeUpdate,
   ResumeUploadInput,
   SaveProfileSectionInput,
+  SaveWorkExperienceSectionInput,
 } from "@/models/profile"
 
 function copy<T>(value: T): T {
@@ -124,6 +126,57 @@ function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) 
   }
 }
 
+function createSkillId(profile: JobProfile, name: string) {
+  const base = `skill_${
+    normalizeSkillName(name)
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "custom"
+  }`
+  let id = base
+  let suffix = 2
+
+  while (profile.skills.some((skill) => skill.id === id)) {
+    id = `${base}_${suffix}`
+    suffix += 1
+  }
+
+  return id
+}
+
+function applyWorkExperienceSave(profile: JobProfile, input: SaveWorkExperienceSectionInput) {
+  const skillIdsByName = new Map(
+    profile.skills.map((skill) => [normalizeSkillName(skill.name), skill.id]),
+  )
+  const persistedIdsByClientId = new Map<string, string>()
+
+  for (const draftSkill of input.skillsToCreate) {
+    const name = draftSkill.name.trim().replace(/\s+/g, " ")
+    const normalizedName = normalizeSkillName(name)
+    if (!normalizedName) continue
+
+    let persistedId = skillIdsByName.get(normalizedName)
+    if (!persistedId) {
+      persistedId = createSkillId(profile, name)
+      profile.skills.push({ id: persistedId, name, source: "userAdded" })
+      skillIdsByName.set(normalizedName, persistedId)
+    }
+    persistedIdsByClientId.set(draftSkill.clientId, persistedId)
+  }
+
+  const values = input.values.map((experience) => {
+    const skillIds = experience.skillIds.map((id) => {
+      const persistedId = persistedIdsByClientId.get(id)
+      if (id.startsWith("draft_skill_") && !persistedId) {
+        throw new Error("A selected draft skill is missing from this save request.")
+      }
+      return persistedId ?? id
+    })
+
+    return { ...experience, skillIds: normalizeSkillIds(skillIds) }
+  })
+  profile.workExperiences = applySources(profile.workExperiences, values)
+}
+
 function withResumeExtractedSource(profile: JobProfile): JobProfile {
   return {
     ...profile,
@@ -198,7 +251,11 @@ export async function saveProfileSection(input: SaveProfileSectionInput): Promis
   const profile = copy(requireProfile(input.profileId))
   if (profile.version !== input.version) throw new Error("Job profile version is out of date.")
 
-  applySavedSection(profile, input)
+  if (input.section === "workExperience") {
+    applyWorkExperienceSave(profile, input)
+  } else {
+    applySavedSection(profile, input)
+  }
   profile.updatedAt = "2026-07-13T08:05:00.000Z"
   profile.version += 1
   profile.matchingAnalysisStale = true
