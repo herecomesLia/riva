@@ -28,7 +28,7 @@ const defaultSkills = structuredClone(profileResponseMock.profile!.skills)
 const meta = preview.meta({
   component: WorkExperienceCard,
   parameters: { layout: "padded" },
-  title: "Profile/WorkExperienceCard",
+  title: "Profile/WorkExperience/Card",
 })
 
 const defaultOnEdit = fn()

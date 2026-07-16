@@ -18,7 +18,7 @@ function createSkill(overrides: Partial<Skill> = {}): Skill {
 const meta = preview.meta({
   component: SkillsCard,
   parameters: { layout: "padded" },
-  title: "Profile/SkillsCard",
+  title: "Profile/Skills/Card",
 })
 
 const defaultOnEdit = fn()

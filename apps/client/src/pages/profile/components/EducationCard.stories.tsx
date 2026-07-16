@@ -18,7 +18,7 @@ function createEducation(overrides: Partial<Education> = {}): Education {
 const meta = preview.meta({
   component: EducationCard,
   parameters: { layout: "padded" },
-  title: "Profile/EducationCard",
+  title: "Profile/Education/Card",
 })
 
 const defaultOnEdit = fn()
