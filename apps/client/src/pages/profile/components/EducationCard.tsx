@@ -80,7 +80,7 @@ function EducationDateRange({
 
   return (
     <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-      <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+      <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0" />
       <span className="min-w-0 break-words">
         {t("profile.field.dateRange", {
           end,
