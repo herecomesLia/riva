@@ -1,10 +1,11 @@
-import { AlertCircleIcon, FileUpIcon, LoaderCircleIcon } from "lucide-react"
+import { AlertCircleIcon, CalendarClockIcon, FileUpIcon, LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -14,14 +15,26 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { ProfileHeaderIntro } from "./ProfileHeaderIntro"
+
 export function ProfileLoadingState() {
+  const { t } = useTranslation()
+
   return (
-    <div className="flex flex-col gap-6" data-testid="profile-loading-state">
+    <div aria-busy="true" className="flex flex-col gap-6" data-testid="profile-loading-state">
       <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
         <div className="flex min-w-0 flex-col gap-2">
-          <Skeleton className="h-9 w-44 max-w-full" />
-          <Skeleton className="h-5 w-full max-w-2xl" />
-          <Skeleton className="h-5 w-40 max-w-full" />
+          <ProfileHeaderIntro />
+          <div
+            aria-label={t("common.pageState.loading.title")}
+            className="flex min-w-0 items-center gap-2"
+          >
+            <CalendarClockIcon
+              aria-hidden="true"
+              className="size-4 shrink-0 text-muted-foreground"
+            />
+            <Skeleton className="h-4 w-36 max-w-full" />
+          </div>
         </div>
         <div className="justify-self-center lg:pr-6">
           <Skeleton className="size-24 rounded-full" />
@@ -32,21 +45,35 @@ export function ProfileLoadingState() {
         className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
         data-testid="profile-loading-summary-sections"
       >
-        <ProfileSkeletonCard className="h-full" />
-        <ProfileSkeletonCard className="h-full" />
+        <ProfileSkeletonCard className="h-full" section="education" />
+        <ProfileSkeletonCard className="h-full" section="skills" />
       </div>
-      <ProfileSkeletonCard />
-      <ProfileSkeletonCard />
+      <ProfileSkeletonCard section="workExperience" />
+      <ProfileSkeletonCard section="projectExperience" />
     </div>
   )
 }
 
-function ProfileSkeletonCard({ className }: { className?: string }) {
+type LoadingProfileSection = "education" | "skills" | "workExperience" | "projectExperience"
+
+function ProfileSkeletonCard({
+  className,
+  section,
+}: {
+  className?: string
+  section: LoadingProfileSection
+}) {
+  const { t } = useTranslation()
+
   return (
-    <Card className={className} data-testid="profile-skeleton-card">
+    <Card aria-busy="true" className={className} data-testid="profile-skeleton-card">
       <CardHeader>
-        <Skeleton className="h-5 w-2/5" />
-        <Skeleton className="h-4 w-4/5" />
+        <CardTitle>
+          <h2>{t(`profile.sections.${section}`)}</h2>
+        </CardTitle>
+        <CardAction>
+          <Skeleton className="h-8 w-20 rounded-md" />
+        </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <Skeleton className="h-5 w-full" />

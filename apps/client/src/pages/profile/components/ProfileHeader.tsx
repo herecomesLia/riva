@@ -6,6 +6,7 @@ import type { JobProfile } from "@/models/profile"
 
 import { ProfileCompletenessRing } from "./ProfileCompletenessRing"
 import { formatDate } from "./profile-formatters"
+import { ProfileHeaderIntro } from "./ProfileHeaderIntro"
 
 export function ProfileHeader({
   onOpenResume,
@@ -19,12 +20,7 @@ export function ProfileHeader({
   return (
     <header className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
       <div className="flex min-w-0 flex-col gap-2">
-        <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight">
-          {t("profile.title")}
-        </h1>
-        <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-          {t("profile.description")}
-        </p>
+        <ProfileHeaderIntro />
         <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
           <CalendarClockIcon className="size-4 shrink-0" />
           {t("profile.updatedAt", { value: formatDate(profile.updatedAt, i18n.language) })}

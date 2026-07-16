@@ -86,8 +86,34 @@ describe("ProfileView", () => {
     renderWithProviders(<ProfileView content={{ status: "loading" }} variant="default" />)
     const loadingState = await screen.findByTestId("profile-loading-state")
     const summary = within(loadingState).getByTestId("profile-loading-summary-sections")
+
+    expect(
+      within(loadingState).getByRole("heading", {
+        level: 1,
+        name: i18n.t("profile.title"),
+      }),
+    ).toBeInTheDocument()
+    expect(within(loadingState).getByText(i18n.t("profile.description"))).toBeInTheDocument()
+    for (const section of ["education", "skills", "workExperience", "projectExperience"] as const) {
+      expect(
+        within(loadingState).getByRole("heading", {
+          level: 2,
+          name: i18n.t(`profile.sections.${section}`),
+        }),
+      ).toBeInTheDocument()
+    }
     expect(within(summary).getAllByTestId("profile-skeleton-card")).toHaveLength(2)
     expect(within(loadingState).getAllByTestId("profile-skeleton-card")).toHaveLength(4)
+    expect(
+      within(loadingState).queryByRole("button", {
+        name: i18n.t("profile.actions.edit"),
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(loadingState).queryByRole("button", {
+        name: i18n.t("profile.actions.updateResume"),
+      }),
+    ).not.toBeInTheDocument()
   })
 
   it("renders the complete ready-page lifecycle and header", async () => {
