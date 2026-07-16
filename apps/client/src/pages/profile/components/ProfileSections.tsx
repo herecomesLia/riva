@@ -2,6 +2,7 @@ import {
   CalendarDaysIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CodeXmlIcon,
   GraduationCapIcon,
   PencilIcon,
 } from "lucide-react"
@@ -253,7 +254,7 @@ function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
 
   return (
     <ReadonlySectionCard
-      className="h-full"
+      className="h-full [--card-spacing:--spacing(4)]"
       contentClassName="flex flex-1 flex-col"
       onEdit={() => onStartEditing("education")}
       section="education"
@@ -263,26 +264,26 @@ function EducationSection({ onStartEditing, profile }: ProfileSectionsProps) {
       ) : (
         <ProfileItemCarousel
           getItemKey={(education) => education.id}
-          itemCardClassName="before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-primary before:opacity-80 before:shadow-[4px_0_12px_var(--primary)] border-border bg-card py-5"
+          itemCardClassName="border-border bg-card py-4"
           items={profile.education}
           renderItem={(education) => {
             const degreeMajor = [education.degree, education.major].filter(Boolean).join(" · ")
 
             return (
-              <div className="flex min-w-0 items-start gap-4">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:size-14">
-                  <GraduationCapIcon aria-hidden="true" className="size-6 sm:size-7" />
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:size-12">
+                  <GraduationCapIcon aria-hidden="true" className="size-5 sm:size-6" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="break-words font-heading text-base leading-6 font-semibold text-foreground">
+                  <h3 className="break-words font-heading text-base leading-5 font-semibold text-foreground">
                     {education.school}
                   </h3>
                   {degreeMajor && (
-                    <p className="mt-1 break-words text-sm leading-6 text-muted-foreground">
+                    <p className="mt-0.5 break-words text-sm leading-5 text-muted-foreground">
                       {degreeMajor}
                     </p>
                   )}
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <EducationDateRange
                       endDate={education.endDate}
                       isCurrent={education.isCurrent}
@@ -429,7 +430,7 @@ function ProjectExperienceSection({ onStartEditing, profile }: ProfileSectionsPr
 function SkillsSection({ onStartEditing, profile }: ProfileSectionsProps) {
   return (
     <ReadonlySectionCard
-      className="h-full"
+      className="h-full [--card-spacing:--spacing(4)]"
       contentClassName="flex flex-1 flex-col"
       onEdit={() => onStartEditing("skills")}
       section="skills"
@@ -440,11 +441,12 @@ function SkillsSection({ onStartEditing, profile }: ProfileSectionsProps) {
         <div className="flex flex-wrap gap-2">
           {profile.skills.map((skill) => (
             <Badge
-              className="h-auto min-h-5 max-w-full whitespace-normal break-words"
+              className="h-auto min-h-6 max-w-full gap-1.5 whitespace-normal break-words border-primary/20 bg-primary/10 px-2.5 py-1 text-primary hover:bg-primary/15"
               key={skill.id}
               variant="outline"
             >
-              {skill.name}
+              <CodeXmlIcon aria-hidden="true" data-icon="inline-start" />
+              <span className="min-w-0 break-words">{skill.name}</span>
             </Badge>
           ))}
         </div>
