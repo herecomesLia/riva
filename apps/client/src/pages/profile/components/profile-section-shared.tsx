@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next"
+import type { LucideIcon } from "lucide-react"
 
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { cn } from "@/lib/utils"
 
 import { formatMonth } from "./profile-formatters"
 
@@ -18,10 +20,12 @@ export function EmptySection() {
 }
 
 export function DateRange({
+  className,
   endDate,
   isCurrent,
   startDate,
 }: {
+  className?: string
   endDate: string | null
   isCurrent: boolean
   startDate: string | null
@@ -31,23 +35,34 @@ export function DateRange({
   const end = isCurrent ? t("profile.field.present") : formatMonth(endDate, i18n.language, "—")
 
   return (
-    <p className="text-sm text-muted-foreground">
+    <span className={cn("text-sm text-muted-foreground", className)}>
       {t("profile.field.dateRange", {
         end,
         start,
       })}
-    </p>
+    </span>
   )
 }
 
-export function DetailList({ items, title }: { items: string[]; title: string }) {
+export function DetailList({
+  icon: Icon,
+  items,
+  title,
+}: {
+  icon?: LucideIcon
+  items: string[]
+  title: string
+}) {
   if (items.length === 0) {
     return null
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <h4 className="text-sm font-medium">{title}</h4>
+      <h4 className="flex items-center gap-2 text-sm font-medium">
+        {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-primary" />}
+        {title}
+      </h4>
       <ul className="flex list-disc flex-col gap-1 pl-5 text-sm leading-6 text-muted-foreground">
         {items.map((item) => (
           <li key={item}>{item}</li>

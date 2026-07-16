@@ -71,6 +71,34 @@ export const Multiple = meta.story({
   },
 })
 
+export const ThreeRecords = meta.story({
+  args: {
+    experiences: [
+      createExperience(),
+      createExperience({
+        company: "Orbit Labs",
+        endDate: "2022-03",
+        id: "work_orbit_2018",
+        isCurrent: false,
+        location: "Hangzhou",
+        startDate: "2018-07",
+        title: "Frontend Engineer",
+      }),
+      createExperience({
+        company: "River Studio",
+        endDate: "2018-06",
+        id: "work_river_2016",
+        isCurrent: false,
+        location: "Suzhou",
+        startDate: "2016-04",
+        title: "Web Developer",
+      }),
+    ],
+    onEdit: fn(),
+    skills: structuredClone(defaultSkills),
+  },
+})
+
 export const Current = meta.story({
   args: {
     experiences: [createExperience({ endDate: null, isCurrent: true })],
