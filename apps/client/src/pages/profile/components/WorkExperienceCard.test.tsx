@@ -74,8 +74,8 @@ describe("WorkExperienceCard", () => {
       screen.getByTestId("work-experience-skills").querySelectorAll('[data-slot="badge"]'),
     ).toHaveLength(2)
     expect(
-      screen.getByTestId("work-experience-skills").querySelectorAll('svg[aria-hidden="true"]'),
-    ).toHaveLength(2)
+      screen.getByTestId("work-experience-skills").querySelectorAll('[data-slot="badge"] svg'),
+    ).toHaveLength(0)
   })
 
   it("falls back to an unknown skill id", () => {

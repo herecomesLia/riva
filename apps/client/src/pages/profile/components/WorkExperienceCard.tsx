@@ -58,7 +58,11 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                   </h4>
                   <div className="flex flex-wrap gap-2" data-testid="work-experience-skills">
                     {experience.skillIds.map((skillId) => (
-                      <ProfileSkillBadge key={skillId} name={skillsById.get(skillId) ?? skillId} />
+                      <ProfileSkillBadge
+                        key={skillId}
+                        name={skillsById.get(skillId) ?? skillId}
+                        showIcon={false}
+                      />
                     ))}
                   </div>
                 </div>

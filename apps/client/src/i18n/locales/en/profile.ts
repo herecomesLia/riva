@@ -12,6 +12,7 @@ export const profile = {
   },
   actions: {
     edit: "Edit",
+    openProject: "View project",
     uploadResume: "Upload resume",
     updateResume: "Update resume",
     retryRecognition: "Recognize again",

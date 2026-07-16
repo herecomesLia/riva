@@ -72,7 +72,6 @@ export function SkillTagInput({
       <div className="flex flex-wrap gap-2">
         {selectedSkills.map((skill) => (
           <Badge className="h-7 bg-sky-100 text-primary dark:bg-sky-950" key={skill.id}>
-            <CodeXmlIcon data-icon="inline-start" />
             {skill.name}
             <Button
               aria-label={t("profile.editor.removeSkill", { name: skill.name })}

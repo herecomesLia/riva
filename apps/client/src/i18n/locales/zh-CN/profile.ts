@@ -12,6 +12,7 @@ export const profile = {
   },
   actions: {
     edit: "编辑",
+    openProject: "查看项目",
     uploadResume: "上传简历",
     updateResume: "更新简历",
     retryRecognition: "重新识别",

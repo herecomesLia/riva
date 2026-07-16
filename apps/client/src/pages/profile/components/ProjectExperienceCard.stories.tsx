@@ -59,10 +59,51 @@ export const Multiple = meta.story({
   },
 })
 
+export const ThreeProjects = meta.story({
+  args: {
+    onEdit: fn(),
+    projects: [
+      createProject(),
+      createProject({
+        achievements: ["Reduced support response time after rollout."],
+        endDate: "2023-12",
+        id: "project_support_workspace",
+        name: "Support Operations Workspace",
+        responsibilities: ["Owned frontend architecture and delivery."],
+        role: "Frontend engineer",
+        skillIds: ["skill_react", "skill_javascript"],
+        startDate: "2022-05",
+      }),
+      createProject({
+        achievements: ["Made adoption progress visible to product teams."],
+        endDate: "2022-04",
+        id: "project_foundation",
+        name: "Engineering Foundation",
+        responsibilities: [
+          "Established the initial reusable implementation patterns for the product team.",
+          "Documented the team workflow and component conventions.",
+        ],
+        role: "Frontend engineer",
+        skillIds: ["skill_typescript"],
+        startDate: "2021-09",
+      }),
+    ],
+    skills: structuredClone(defaultSkills),
+  },
+})
+
 export const Ongoing = meta.story({
   args: {
     onEdit: fn(),
     projects: [createProject({ endDate: null })],
+    skills: structuredClone(defaultSkills),
+  },
+})
+
+export const MissingRole = meta.story({
+  args: {
+    onEdit: fn(),
+    projects: [createProject({ role: null })],
     skills: structuredClone(defaultSkills),
   },
 })
@@ -78,6 +119,8 @@ export const LongContent = meta.story({
           "Established measurable adoption and reliability standards for shared components.",
         ],
         name: "International Merchant Operations, Accessibility, and Workflow Intelligence Platform",
+        projectUrl:
+          "https://projects.example.com/international-merchant-operations-accessibility-workflow-intelligence-platform",
         responsibilities: [
           "Defined frontend architecture, delivery milestones, and design-system integration.",
           "Coordinated product, design, quality, data, and platform stakeholders.",
