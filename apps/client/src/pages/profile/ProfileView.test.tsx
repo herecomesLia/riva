@@ -2,6 +2,16 @@ import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+const { toastSuccess } = vi.hoisted(() => ({
+  toastSuccess: vi.fn(),
+}))
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: toastSuccess,
+  },
+}))
+
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { profileResponseMock } from "@/mocks/data/profile"
@@ -41,6 +51,7 @@ function renderReady(
 
 describe("ProfileView", () => {
   beforeEach(async () => {
+    toastSuccess.mockClear()
     await i18n.changeLanguage(defaultLanguage)
   })
 
@@ -722,7 +733,11 @@ describe("ProfileView", () => {
     )
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(screen.getByTestId("profile-section-education")).toBeInTheDocument()
-    expect(screen.getByTestId("profile-save-success")).toBeInTheDocument()
+    expect(toastSuccess).toHaveBeenCalledWith(i18n.t("profile.editor.saveSuccess"), {
+      duration: 2500,
+      id: "profile-save-success",
+    })
+    expect(screen.queryByTestId("profile-save-success")).not.toBeInTheDocument()
   })
 
   it("keeps the dialog and draft open when saving fails", async () => {
@@ -743,6 +758,7 @@ describe("ProfileView", () => {
 
     expect(await within(dialog).findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
     expect(within(dialog).getByDisplayValue("Retry University")).toBeInTheDocument()
+    expect(toastSuccess).not.toHaveBeenCalled()
   })
 
   it("closes an unchanged dialog without a discard confirmation", async () => {

@@ -166,7 +166,7 @@ describe("ProfilePage orchestration", () => {
     await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
 
     expect(await screen.findByText("Updated University")).toBeInTheDocument()
-    expect(screen.getByTestId("profile-save-success")).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-save-success")).not.toBeInTheDocument()
   })
 
   it("retains the draft after a save failure", async () => {

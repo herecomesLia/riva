@@ -2,6 +2,7 @@ import { useBlocker } from "@tanstack/react-router"
 import { CircleAlertIcon } from "lucide-react"
 import { useCallback, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -77,7 +78,6 @@ function ProfileReadyView({
   const [editingSection, setEditingSection] = useState<EditableProfileSection | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
-  const [saveFeedbackVisible, setSaveFeedbackVisible] = useState(false)
   const [importFeedback, setImportFeedback] = useState<"initial" | "update" | null>(null)
   const [importPhase, setImportPhase] = useState<"uploading" | "parsing" | null>(null)
   const [initialImportError, setInitialImportError] = useState<string | null>(null)
@@ -101,7 +101,6 @@ function ProfileReadyView({
   }
 
   function startEditing(section: EditableProfileSection) {
-    setSaveFeedbackVisible(false)
     setIsDirty(false)
     setEditingSection(section)
   }
@@ -249,12 +248,6 @@ function ProfileReadyView({
           )}
         </Alert>
       )}
-      {saveFeedbackVisible && (
-        <Alert data-testid="profile-save-success">
-          <AlertDescription>{t("profile.editor.saveSuccess")}</AlertDescription>
-        </Alert>
-      )}
-
       {processingStatus && <ProfileProcessingState status={processingStatus} />}
       {isRecognitionFailure && (
         <ProfileRecognitionFailureState
@@ -281,7 +274,10 @@ function ProfileReadyView({
             onSave={async (input) => {
               await actions.saveSection(input)
               closeEditor()
-              setSaveFeedbackVisible(true)
+              toast.success(t("profile.editor.saveSuccess"), {
+                duration: 2500,
+                id: "profile-save-success",
+              })
             }}
             open={editingSection !== null}
             profile={profile}
