@@ -25,6 +25,19 @@ function createArgs(
 
 export const Education = meta.story({ args: createArgs("education") })
 
+export const EducationEnglish = meta.story({
+  args: createArgs("education"),
+  globals: { locale: "en" },
+})
+
+const currentEducation = structuredClone(profileResponseMock.profile!)
+currentEducation.education[0]!.endDate = null
+currentEducation.education[0]!.isCurrent = true
+
+export const EducationPresent = meta.story({
+  args: { ...createArgs("education"), profile: currentEducation },
+})
+
 export const WorkExperience = meta.story({ args: createArgs("workExperience") })
 
 export const ProjectExperience = meta.story({ args: createArgs("projectExperience") })
@@ -43,3 +56,8 @@ export const FiveSkills = meta.story({
 })
 
 export const Credentials = meta.story({ args: createArgs("credentials") })
+
+export const CredentialsEnglish = meta.story({
+  args: createArgs("credentials"),
+  globals: { locale: "en" },
+})

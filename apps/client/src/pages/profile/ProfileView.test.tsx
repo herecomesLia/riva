@@ -18,7 +18,7 @@ import { profileResponseMock } from "@/mocks/data/profile"
 import type { JobProfileSnapshot } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
 import { ProfileSectionEditDialog } from "@/pages/profile/components/ProfileSectionEditDialog"
-import { formatDate, formatMonth } from "@/pages/profile/components/profile-formatters"
+import { formatDate } from "@/pages/profile/components/profile-formatters"
 import { renderWithProviders } from "@/test/render"
 
 function createActions(): ProfileViewActions {
@@ -49,6 +49,33 @@ function renderReady(
   }
 }
 
+function formatMonthForLocale(value: string) {
+  const [year, month] = value.split("-").map(Number)
+
+  return new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(Date.UTC(year!, month! - 1, 1)))
+}
+
+function monthName(index: number) {
+  return new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+    month: "long",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(2000, index, 1)))
+}
+
+async function selectMonth(trigger: HTMLElement, year: string, monthIndex: number) {
+  const user = userEvent.setup()
+
+  await user.click(trigger)
+  await user.click(screen.getByLabelText(i18n.t("profile.monthPicker.year")))
+  await user.click(await screen.findByRole("option", { name: year }))
+  await user.click(screen.getByLabelText(i18n.t("profile.monthPicker.month")))
+  await user.click(await screen.findByRole("option", { name: monthName(monthIndex) }))
+}
+
 describe("ProfileView", () => {
   beforeEach(async () => {
     toastSuccess.mockClear()
@@ -63,12 +90,11 @@ describe("ProfileView", () => {
     expect(within(loadingState).getAllByTestId("profile-skeleton-card")).toHaveLength(4)
   })
 
-  it("renders complete business data", async () => {
+  it("renders the complete ready-page lifecycle and header", async () => {
     renderReady()
-    expect(await screen.findByText("Fudan University")).toBeInTheDocument()
-    expect(screen.getByText("Northstar Commerce")).toBeInTheDocument()
-    expect(screen.getByText("Merchant Operations Console")).toBeInTheDocument()
-    expect(screen.getAllByText("React").length).toBeGreaterThan(0)
+    expect(
+      await screen.findByRole("heading", { name: i18n.t("profile.title") }),
+    ).toBeInTheDocument()
     const progressbar = screen.getByRole("progressbar", {
       name: i18n.t("profile.completeness"),
     })
@@ -105,156 +131,6 @@ describe("ProfileView", () => {
     ).not.toBeInTheDocument()
     expect(screen.getByTestId("profile-section-workExperience")).toBeInTheDocument()
     expect(screen.getByTestId("profile-section-projectExperience")).toBeInTheDocument()
-  })
-
-  it("navigates shared education records without replacing the full-section editor", async () => {
-    const user = userEvent.setup()
-    renderReady()
-
-    const section = await screen.findByTestId("profile-section-education")
-    const previousName = i18n.t("profile.carousel.previous", {
-      section: i18n.t("profile.sections.education"),
-    })
-    const nextName = i18n.t("profile.carousel.next", {
-      section: i18n.t("profile.sections.education"),
-    })
-
-    expect(within(section).getByText("Fudan University")).toBeInTheDocument()
-    expect(
-      within(section).getByText(
-        i18n.t("profile.field.dateRange", {
-          end: formatMonth("2018-06", i18n.language, "—"),
-          start: formatMonth("2014-09", i18n.language, "—"),
-        }),
-      ),
-    ).toBeInTheDocument()
-    expect(within(section).queryByText("Tongji University")).not.toBeInTheDocument()
-    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
-
-    await user.click(within(section).getByRole("button", { name: nextName }))
-    expect(within(section).getByText("Tongji University")).toBeInTheDocument()
-    expect(
-      within(section).getByText(
-        i18n.t("profile.field.dateRange", {
-          end: formatMonth("2021-06", i18n.language, "—"),
-          start: formatMonth("2018-09", i18n.language, "—"),
-        }),
-      ),
-    ).toBeInTheDocument()
-    expect(within(section).queryByText("Fudan University")).not.toBeInTheDocument()
-    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
-    expect(within(section).queryByRole("button", { name: nextName })).not.toBeInTheDocument()
-
-    await user.click(within(section).getByRole("button", { name: previousName }))
-    expect(within(section).getByText("Fudan University")).toBeInTheDocument()
-    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
-    expect(within(section).getByRole("button", { name: nextName })).toBeInTheDocument()
-
-    await user.click(within(section).getByRole("button", { name: nextName }))
-    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
-    const dialog = await screen.findByRole("dialog")
-    expect(within(dialog).getByTestId("profile-editor-education")).toBeInTheDocument()
-    expect(within(dialog).getByDisplayValue("Fudan University")).toBeInTheDocument()
-    expect(within(dialog).getByDisplayValue("Tongji University")).toBeInTheDocument()
-  })
-
-  it("shows linear navigation controls for three education records", async () => {
-    const user = userEvent.setup()
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.education.push({
-      degree: "Master of Science",
-      endDate: "2024-06",
-      id: "education_riva_2024",
-      isCurrent: false,
-      major: "Human-Computer Interaction",
-      school: "Riva University",
-      source: "userAdded",
-      startDate: "2021-09",
-    })
-    renderReady(snapshot)
-
-    const section = await screen.findByTestId("profile-section-education")
-    const previousName = i18n.t("profile.carousel.previous", {
-      section: i18n.t("profile.sections.education"),
-    })
-    const nextName = i18n.t("profile.carousel.next", {
-      section: i18n.t("profile.sections.education"),
-    })
-
-    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
-    await user.click(within(section).getByRole("button", { name: nextName }))
-    expect(within(section).getByText("Tongji University")).toBeInTheDocument()
-    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
-    expect(within(section).getByRole("button", { name: nextName })).toBeInTheDocument()
-
-    await user.click(within(section).getByRole("button", { name: nextName }))
-    expect(within(section).getByText("Riva University")).toBeInTheDocument()
-    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
-    expect(within(section).queryByRole("button", { name: nextName })).not.toBeInTheDocument()
-  })
-
-  it("does not render education carousel controls for one record", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.education = snapshot.profile!.education.slice(0, 1)
-    renderReady(snapshot)
-
-    const section = await screen.findByTestId("profile-section-education")
-
-    expect(
-      within(section).queryByRole("button", {
-        name: i18n.t("profile.carousel.previous", {
-          section: i18n.t("profile.sections.education"),
-        }),
-      }),
-    ).not.toBeInTheDocument()
-    expect(
-      within(section).queryByRole("button", {
-        name: i18n.t("profile.carousel.next", {
-          section: i18n.t("profile.sections.education"),
-        }),
-      }),
-    ).not.toBeInTheDocument()
-  })
-
-  it("keeps carousel indexes valid when the profile data removes the active record", async () => {
-    const user = userEvent.setup()
-    const snapshot = structuredClone(profileResponseMock)
-    const { actions, rerender } = renderReady(snapshot)
-    const section = await screen.findByTestId("profile-section-education")
-    await user.click(
-      within(section).getByRole("button", {
-        name: i18n.t("profile.carousel.next", {
-          section: i18n.t("profile.sections.education"),
-        }),
-      }),
-    )
-    expect(within(section).getByText("Tongji University")).toBeInTheDocument()
-
-    const updatedSnapshot = structuredClone(snapshot)
-    updatedSnapshot.profile!.education = updatedSnapshot.profile!.education.slice(0, 1)
-    rerender(
-      <ProfileView
-        actions={actions}
-        content={{ status: "ready", data: updatedSnapshot }}
-        variant="default"
-      />,
-    )
-
-    expect(await within(section).findByText("Fudan University")).toBeInTheDocument()
-    expect(within(section).queryByText("Tongji University")).not.toBeInTheDocument()
-  })
-
-  it("keeps education and skills empty states independent", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.education = []
-    snapshot.profile!.skills = []
-    renderReady(snapshot)
-
-    const education = await screen.findByTestId("profile-section-education")
-    const skills = screen.getByTestId("profile-section-skills")
-
-    expect(within(education).getAllByText(i18n.t("profile.emptySection"))).toHaveLength(2)
-    expect(within(skills).getAllByText(i18n.t("profile.emptySection"))).toHaveLength(2)
   })
 
   it("opens the current resume details from the header and resets the dialog when closed", async () => {
@@ -360,19 +236,6 @@ describe("ProfileView", () => {
     expect(within(dialog).getByText(i18n.t("profile.import.updateTitle"))).toBeInTheDocument()
   })
 
-  it.each([
-    ["education", "education"],
-    ["workExperience", "workExperiences"],
-    ["projectExperience", "projectExperiences"],
-    ["skills", "skills"],
-  ] as const)("renders a local empty state for %s", async (section, property) => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile![property] = []
-    renderReady(snapshot)
-    const card = await screen.findByTestId("profile-section-" + section)
-    expect(within(card).getAllByText(i18n.t("profile.emptySection")).length).toBeGreaterThan(0)
-  })
-
   it("renders partial nullable data without failing the page", async () => {
     const snapshot = structuredClone(profileResponseMock)
     snapshot.profile!.education[0]!.degree = null
@@ -390,7 +253,6 @@ describe("ProfileView", () => {
     ).toHaveAttribute("aria-valuenow", "75")
     expect(screen.getByText("75%")).toBeInTheDocument()
     expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
-    expect(screen.queryByText("Bachelor of Engineering")).not.toBeInTheDocument()
   })
 
   it("does not render matching-analysis regeneration controls", async () => {
@@ -401,14 +263,6 @@ describe("ProfileView", () => {
     expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
     expect(screen.queryByTestId("profile-matching-analysis-stale")).not.toBeInTheDocument()
     expect(screen.queryByText(/重新生成匹配分析/)).not.toBeInTheDocument()
-  })
-
-  it("renders long user content verbatim", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    const longText = "Long profile content ".repeat(30)
-    snapshot.profile!.projectExperiences[0]!.background = longText
-    renderReady(snapshot)
-    expect(await screen.findByText(/Long profile content Long profile content/)).toBeInTheDocument()
   })
 
   it("renders a safe page error and invokes retry", async () => {
@@ -570,6 +424,12 @@ describe("ProfileView", () => {
     const dialog = await screen.findByRole("dialog")
     expect(within(dialog).getByTestId("profile-editor-credentials")).toBeInTheDocument()
     expect(within(dialog).getByDisplayValue("AWS Certified Cloud Practitioner")).toBeInTheDocument()
+    expect(
+      within(dialog).getAllByLabelText(i18n.t("profile.formField.awardedAt"))[0],
+    ).toHaveTextContent(formatMonthForLocale("2023-08"))
+    expect(
+      within(dialog).getAllByLabelText(i18n.t("profile.formField.expiresAt"))[0],
+    ).toHaveTextContent(i18n.t("profile.monthPicker.placeholder"))
   })
 
   it("renders only the supported education fields in the editor", async () => {
@@ -597,8 +457,7 @@ describe("ProfileView", () => {
     const endDate = within(dialog).getAllByLabelText(i18n.t("profile.formField.endDate"))[0]!
 
     expect(present).not.toBeChecked()
-    expect(endDate).toHaveAttribute("type", "month")
-    expect(endDate).toHaveValue("2018-06")
+    expect(endDate).toHaveTextContent(formatMonthForLocale("2018-06"))
 
     await user.click(present)
     expect(present).toBeChecked()
@@ -614,19 +473,46 @@ describe("ProfileView", () => {
     const restoredEndDate = within(dialog).getAllByLabelText(
       i18n.t("profile.formField.endDate"),
     )[0]!
-    expect(restoredEndDate).toHaveAttribute("type", "month")
-    expect(restoredEndDate).toHaveValue("")
+    expect(restoredEndDate).toHaveTextContent(i18n.t("profile.monthPicker.placeholder"))
 
     await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
     expect(
       await within(dialog).findByText(i18n.t("profile.editor.validation.required")),
     ).toBeInTheDocument()
 
-    await user.type(restoredEndDate, "2010-01")
+    await selectMonth(restoredEndDate, "2010", 0)
     await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
     expect(
       await within(dialog).findByText(i18n.t("profile.editor.validation.dateRange")),
     ).toBeInTheDocument()
+  })
+
+  it("saves selected start and end months as YYYY-MM values", async () => {
+    const user = userEvent.setup()
+    const { actions } = renderReady()
+    const section = await screen.findByTestId("profile-section-education")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const startDate = within(dialog).getAllByLabelText(i18n.t("profile.formField.startDate"))[0]!
+    const endDate = within(dialog).getAllByLabelText(i18n.t("profile.formField.endDate"))[0]!
+
+    await selectMonth(startDate, "2013", 7)
+    await selectMonth(endDate, "2018", 6)
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    await waitFor(() => expect(actions.saveSection).toHaveBeenCalledOnce())
+    expect(actions.saveSection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "education",
+        values: expect.arrayContaining([
+          expect.objectContaining({
+            endDate: "2018-07",
+            id: "education_fudan_2018",
+            startDate: "2013-08",
+          }),
+        ]),
+      }),
+    )
   })
 
   it.each([

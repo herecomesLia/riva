@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { LocalizedMonthPicker } from "@/components/ui/month-picker"
 import {
   Select,
   SelectContent,
@@ -75,16 +76,16 @@ function TextField({
   form,
   index,
   label,
+  month = false,
   name,
   textarea = false,
-  type = "text",
 }: {
   form: any
   index?: number
   label: string
+  month?: boolean
   name: string
   textarea?: boolean
-  type?: string
 }) {
   const { t } = useTranslation()
   const fieldName = index === undefined ? name : `items.${index}.${name}`
@@ -98,7 +99,15 @@ function TextField({
           <Field invalid={invalid}>
             <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
             <FieldControl>
-              {textarea ? (
+              {month ? (
+                <LocalizedMonthPicker
+                  id={field.name}
+                  invalid={invalid}
+                  onBlur={field.handleBlur}
+                  onChange={field.handleChange}
+                  value={field.state.value ?? ""}
+                />
+              ) : textarea ? (
                 <Textarea
                   id={field.name}
                   onBlur={field.handleBlur}
@@ -110,7 +119,6 @@ function TextField({
                   id={field.name}
                   onBlur={field.handleBlur}
                   onChange={(event) => field.handleChange(event.target.value)}
-                  type={type}
                   value={field.state.value ?? ""}
                 />
               )}
@@ -332,15 +340,15 @@ function CredentialFields({ form, onAdd }: { form: any; onAdd: () => void }) {
                     form={form}
                     index={index}
                     label={t("profile.formField.awardedAt")}
+                    month
                     name="awardedAt"
-                    type="month"
                   />
                   <TextField
                     form={form}
                     index={index}
                     label={t("profile.formField.expiresAt")}
+                    month
                     name="expiresAt"
-                    type="month"
                   />
                   <TextField
                     form={form}

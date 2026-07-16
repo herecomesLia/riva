@@ -59,24 +59,8 @@ empty.profile!.workExperiences = []
 empty.profile!.projectExperiences = []
 empty.profile!.skills = []
 
-export const EmptySections = meta.story({
+export const EmptyProfile = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: empty } },
-})
-
-const multipleEducation = structuredClone(profileResponseMock)
-multipleEducation.profile!.education.push({
-  degree: "Master of Science",
-  endDate: "2021-06",
-  id: "education_riva_2021",
-  isCurrent: false,
-  major: "Human-Computer Interaction",
-  school: "Riva University",
-  source: "userAdded",
-  startDate: "2018-09",
-})
-
-export const MultipleEducation = meta.story({
-  args: { ...readyArgs, content: { status: "ready", data: multipleEducation } },
 })
 
 const partial = structuredClone(profileResponseMock)
@@ -102,20 +86,4 @@ afterResumeUpdate.resumeUpdate = {
 
 export const AfterResumeUpdate = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: afterResumeUpdate } },
-})
-
-const longContent = structuredClone(profileResponseMock)
-longContent.profile!.education[0]!.school =
-  "Fudan University School of Computer Science and Technology International Program"
-longContent.profile!.education[0]!.major =
-  "Computer Science and Technology with Human-Centered Product Design"
-longContent.profile!.skills[0]!.name =
-  "Cross-functional product engineering and accessibility architecture"
-longContent.profile!.projectExperiences[0]!.background =
-  "A product-focused engineer who works across accessibility, design systems, performance, architecture, and cross-functional delivery. ".repeat(
-    5,
-  )
-
-export const LongContent = meta.story({
-  args: { ...readyArgs, content: { status: "ready", data: longContent } },
 })

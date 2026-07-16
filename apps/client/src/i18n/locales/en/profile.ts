@@ -107,6 +107,12 @@ export const profile = {
   },
   credentialType: { certificate: "Certificate", award: "Award" },
   emptySection: "This section has not been filled in yet.",
+  monthPicker: {
+    placeholder: "Select month",
+    year: "Year",
+    month: "Month",
+    clear: "Clear",
+  },
   editor: {
     addExperience: "Add experience",
     addSkill: "Add skill",

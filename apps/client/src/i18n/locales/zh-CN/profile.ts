@@ -98,6 +98,12 @@ export const profile = {
   },
   credentialType: { certificate: "证书", award: "奖项" },
   emptySection: "暂未填写此部分内容。",
+  monthPicker: {
+    placeholder: "选择月份",
+    year: "年份",
+    month: "月份",
+    clear: "清除",
+  },
   editor: {
     addExperience: "新增一段经历",
     addSkill: "新增技能",
