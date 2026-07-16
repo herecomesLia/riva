@@ -58,7 +58,6 @@ empty.profile!.education = []
 empty.profile!.workExperiences = []
 empty.profile!.projectExperiences = []
 empty.profile!.skills = []
-empty.profile!.credentials = []
 
 export const EmptySections = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: empty } },
@@ -78,13 +77,6 @@ multipleEducation.profile!.education.push({
 
 export const MultipleEducation = meta.story({
   args: { ...readyArgs, content: { status: "ready", data: multipleEducation } },
-})
-
-const singleCredential = structuredClone(profileResponseMock)
-singleCredential.profile!.credentials = singleCredential.profile!.credentials.slice(0, 1)
-
-export const SingleCredential = meta.story({
-  args: { ...readyArgs, content: { status: "ready", data: singleCredential } },
 })
 
 const partial = structuredClone(profileResponseMock)
@@ -117,8 +109,8 @@ longContent.profile!.education[0]!.school =
   "Fudan University School of Computer Science and Technology International Program"
 longContent.profile!.education[0]!.major =
   "Computer Science and Technology with Human-Centered Product Design"
-longContent.profile!.credentials[0]!.credentialUrl =
-  "https://credentials.example.com/verification/this-is-a-deliberately-long-unbroken-credential-verification-token-for-layout-checking"
+longContent.profile!.skills[0]!.name =
+  "Cross-functional product engineering and accessibility architecture"
 longContent.profile!.projectExperiences[0]!.background =
   "A product-focused engineer who works across accessibility, design systems, performance, architecture, and cross-functional delivery. ".repeat(
     5,

@@ -7,6 +7,7 @@ import { defaultLanguage } from "@/i18n/resources"
 import { profileResponseMock } from "@/mocks/data/profile"
 import type { JobProfileSnapshot } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
+import { ProfileSectionEditDialog } from "@/pages/profile/components/ProfileSectionEditDialog"
 import { formatDate, formatMonth } from "@/pages/profile/components/profile-formatters"
 import { renderWithProviders } from "@/test/render"
 
@@ -45,7 +46,10 @@ describe("ProfileView", () => {
 
   it("renders the full loading layout without a service", async () => {
     renderWithProviders(<ProfileView content={{ status: "loading" }} variant="default" />)
-    expect(await screen.findByTestId("profile-loading-state")).toBeInTheDocument()
+    const loadingState = await screen.findByTestId("profile-loading-state")
+    const summary = within(loadingState).getByTestId("profile-loading-summary-sections")
+    expect(within(summary).getAllByTestId("profile-skeleton-card")).toHaveLength(2)
+    expect(within(loadingState).getAllByTestId("profile-skeleton-card")).toHaveLength(4)
   })
 
   it("renders complete business data", async () => {
@@ -54,7 +58,6 @@ describe("ProfileView", () => {
     expect(screen.getByText("Northstar Commerce")).toBeInTheDocument()
     expect(screen.getByText("Merchant Operations Console")).toBeInTheDocument()
     expect(screen.getAllByText("React").length).toBeGreaterThan(0)
-    expect(screen.getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
     const progressbar = screen.getByRole("progressbar", {
       name: i18n.t("profile.completeness"),
     })
@@ -79,14 +82,16 @@ describe("ProfileView", () => {
     expect(screen.queryByText(/已确认/)).not.toBeInTheDocument()
   })
 
-  it("groups education, skills, and credentials in the summary sections", async () => {
+  it("groups only education and skills in the summary sections", async () => {
     renderReady()
 
     const summarySections = await screen.findByTestId("profile-summary-sections")
 
     expect(within(summarySections).getByTestId("profile-section-education")).toBeInTheDocument()
     expect(within(summarySections).getByTestId("profile-section-skills")).toBeInTheDocument()
-    expect(within(summarySections).getByTestId("profile-section-credentials")).toBeInTheDocument()
+    expect(
+      within(summarySections).queryByTestId("profile-section-credentials"),
+    ).not.toBeInTheDocument()
     expect(screen.getByTestId("profile-section-workExperience")).toBeInTheDocument()
     expect(screen.getByTestId("profile-section-projectExperience")).toBeInTheDocument()
   })
@@ -200,59 +205,6 @@ describe("ProfileView", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("navigates credentials linearly while retaining their type badge and accessible link", async () => {
-    const user = userEvent.setup()
-    renderReady()
-
-    const section = await screen.findByTestId("profile-section-credentials")
-    const previousName = i18n.t("profile.carousel.previous", {
-      section: i18n.t("profile.sections.credentials"),
-    })
-    const nextName = i18n.t("profile.carousel.next", {
-      section: i18n.t("profile.sections.credentials"),
-    })
-
-    expect(within(section).getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
-    expect(
-      within(section).getByText(i18n.t("profile.credentialType.certificate")),
-    ).toBeInTheDocument()
-    expect(within(section).getByRole("link", { name: "AWS-CCP-2023-0174" })).toBeInTheDocument()
-    expect(within(section).queryByText("Product Excellence Award")).not.toBeInTheDocument()
-    expect(within(section).queryByRole("button", { name: previousName })).not.toBeInTheDocument()
-
-    await user.click(within(section).getByRole("button", { name: nextName }))
-    expect(within(section).getByText("Product Excellence Award")).toBeInTheDocument()
-    expect(within(section).getByText(i18n.t("profile.credentialType.award"))).toBeInTheDocument()
-    expect(within(section).getByRole("button", { name: previousName })).toBeInTheDocument()
-    expect(within(section).queryByRole("button", { name: nextName })).not.toBeInTheDocument()
-
-    await user.click(within(section).getByRole("button", { name: previousName }))
-    expect(within(section).getByText("AWS Certified Cloud Practitioner")).toBeInTheDocument()
-  })
-
-  it("does not render credential carousel controls for one record", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.credentials = snapshot.profile!.credentials.slice(0, 1)
-    renderReady(snapshot)
-
-    const section = await screen.findByTestId("profile-section-credentials")
-
-    expect(
-      within(section).queryByRole("button", {
-        name: i18n.t("profile.carousel.previous", {
-          section: i18n.t("profile.sections.credentials"),
-        }),
-      }),
-    ).not.toBeInTheDocument()
-    expect(
-      within(section).queryByRole("button", {
-        name: i18n.t("profile.carousel.next", {
-          section: i18n.t("profile.sections.credentials"),
-        }),
-      }),
-    ).not.toBeInTheDocument()
-  })
-
   it("keeps carousel indexes valid when the profile data removes the active record", async () => {
     const user = userEvent.setup()
     const snapshot = structuredClone(profileResponseMock)
@@ -281,19 +233,17 @@ describe("ProfileView", () => {
     expect(within(section).queryByText("Tongji University")).not.toBeInTheDocument()
   })
 
-  it("does not render carousel controls for empty summary sections", async () => {
+  it("keeps education and skills empty states independent", async () => {
     const snapshot = structuredClone(profileResponseMock)
     snapshot.profile!.education = []
-    snapshot.profile!.credentials = []
+    snapshot.profile!.skills = []
     renderReady(snapshot)
 
     const education = await screen.findByTestId("profile-section-education")
-    const credentials = screen.getByTestId("profile-section-credentials")
+    const skills = screen.getByTestId("profile-section-skills")
 
-    expect(within(education).queryByRole("button", { name: /教育经历/ })).not.toBeInTheDocument()
-    expect(
-      within(credentials).queryByRole("button", { name: /证书与奖项/ }),
-    ).not.toBeInTheDocument()
+    expect(within(education).getAllByText(i18n.t("profile.emptySection"))).toHaveLength(2)
+    expect(within(skills).getAllByText(i18n.t("profile.emptySection"))).toHaveLength(2)
   })
 
   it("opens the current resume details from the header and resets the dialog when closed", async () => {
@@ -480,7 +430,7 @@ describe("ProfileView", () => {
     expect(snapshot).toEqual(profileResponseMock)
   })
 
-  it.each(["education", "workExperience", "projectExperience", "skills", "credentials"] as const)(
+  it.each(["education", "workExperience", "projectExperience", "skills"] as const)(
     "opens the %s editor in the shared dialog",
     async (sectionName) => {
       const user = userEvent.setup()
@@ -501,6 +451,24 @@ describe("ProfileView", () => {
       expect(within(dialog).getByTestId(`profile-editor-${sectionName}`)).toBeInTheDocument()
     },
   )
+
+  it("keeps the credentials editor available independently", async () => {
+    renderWithProviders(
+      <ProfileSectionEditDialog
+        onDirtyChange={vi.fn()}
+        onOpenChange={vi.fn()}
+        onSave={vi.fn(async () => undefined)}
+        open
+        profile={structuredClone(profileResponseMock.profile!)}
+        section="credentials"
+      />,
+      { router: false },
+    )
+
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByTestId("profile-editor-credentials")).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue("AWS Certified Cloud Practitioner")).toBeInTheDocument()
+  })
 
   it("renders only the supported education fields in the editor", async () => {
     const user = userEvent.setup()

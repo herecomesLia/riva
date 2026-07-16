@@ -236,12 +236,11 @@ export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProp
   return (
     <div className="flex flex-col gap-6">
       <section
-        className="grid items-stretch gap-6 lg:grid-cols-2 xl:grid-cols-3"
+        className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
         data-testid="profile-summary-sections"
       >
         <EducationSection onStartEditing={onStartEditing} profile={profile} />
         <SkillsSection onStartEditing={onStartEditing} profile={profile} />
-        <CredentialsSection onStartEditing={onStartEditing} profile={profile} />
       </section>
       <WorkExperienceSection onStartEditing={onStartEditing} profile={profile} />
       <ProjectExperienceSection onStartEditing={onStartEditing} profile={profile} />
@@ -440,76 +439,15 @@ function SkillsSection({ onStartEditing, profile }: ProfileSectionsProps) {
       ) : (
         <div className="flex flex-wrap gap-2">
           {profile.skills.map((skill) => (
-            <Badge key={skill.id} variant="outline">
+            <Badge
+              className="h-auto min-h-5 max-w-full whitespace-normal break-words"
+              key={skill.id}
+              variant="outline"
+            >
               {skill.name}
             </Badge>
           ))}
         </div>
-      )}
-    </ReadonlySectionCard>
-  )
-}
-
-function CredentialsSection({ onStartEditing, profile }: ProfileSectionsProps) {
-  const { i18n, t } = useTranslation()
-
-  return (
-    <ReadonlySectionCard
-      className="h-full"
-      contentClassName="flex flex-1 flex-col"
-      onEdit={() => onStartEditing("credentials")}
-      section="credentials"
-    >
-      {profile.credentials.length === 0 ? (
-        <EmptySection />
-      ) : (
-        <ProfileItemCarousel
-          getItemKey={(credential) => credential.id}
-          items={profile.credentials}
-          renderItem={(credential) => (
-            <div className="flex min-w-0 flex-col gap-2">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="min-w-0 break-words font-medium">{credential.name}</h3>
-                  <Badge variant="outline">{t(`profile.credentialType.${credential.type}`)}</Badge>
-                </div>
-                {(credential.issuer || credential.awardedAt) && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {[
-                      credential.issuer,
-                      credential.awardedAt &&
-                        t("profile.field.awardedAt", {
-                          value: formatMonth(credential.awardedAt, i18n.language, ""),
-                        }),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                )}
-                {credential.expiresAt && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t("profile.formField.expiresAt")} ·{" "}
-                    {formatMonth(credential.expiresAt, i18n.language, "")}
-                  </p>
-                )}
-              </div>
-              {credential.description && (
-                <p className="text-sm leading-6 text-muted-foreground">{credential.description}</p>
-              )}
-              {credential.credentialUrl && (
-                <a
-                  className="break-words text-sm text-primary underline-offset-4 hover:underline"
-                  href={credential.credentialUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {credential.credentialId ?? credential.credentialUrl}
-                </a>
-              )}
-            </div>
-          )}
-          sectionLabel={t("profile.sections.credentials")}
-        />
       )}
     </ReadonlySectionCard>
   )

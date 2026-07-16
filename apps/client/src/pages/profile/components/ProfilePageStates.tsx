@@ -28,8 +28,10 @@ export function ProfileLoadingState() {
         </div>
         <Skeleton className="h-8 w-28 max-w-full justify-self-start lg:justify-self-end" />
       </div>
-      <div className="grid items-stretch gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        <ProfileSkeletonCard className="h-full" />
+      <div
+        className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
+        data-testid="profile-loading-summary-sections"
+      >
         <ProfileSkeletonCard className="h-full" />
         <ProfileSkeletonCard className="h-full" />
       </div>
@@ -41,7 +43,7 @@ export function ProfileLoadingState() {
 
 function ProfileSkeletonCard({ className }: { className?: string }) {
   return (
-    <Card className={className}>
+    <Card className={className} data-testid="profile-skeleton-card">
       <CardHeader>
         <Skeleton className="h-5 w-2/5" />
         <Skeleton className="h-4 w-4/5" />
