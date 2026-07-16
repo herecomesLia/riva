@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { normalizeBulletItems, normalizeSkillIds } from "@/models/profile-text"
 import {
   educationItemSchema,
@@ -30,6 +29,7 @@ import type {
   EmploymentType,
   JobProfile,
   ProfileSkill,
+  ProjectExperience,
   SaveProfileSectionInput,
   WorkExperience,
 } from "@/models/profile"
@@ -56,26 +56,8 @@ function createTemporaryId() {
   return `draft_${crypto.randomUUID()}`
 }
 
-function joinProjectLines(value: string[]) {
-  return value.join("\n")
-}
-
-function toProjectLines(value: string) {
-  return value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
 function toNullable(value: string) {
   return value.trim() || null
-}
-
-function toProjectCommaSeparatedValues(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
 }
 
 function translateValidationError(t: ReturnType<typeof useTranslation>["t"], error: unknown) {
@@ -118,14 +100,12 @@ function TextField({
   label,
   month = false,
   name,
-  textarea = false,
 }: {
   form: any
   index?: number
   label: string
   month?: boolean
   name: string
-  textarea?: boolean
 }) {
   const { t } = useTranslation()
   const fieldName = index === undefined ? name : `items.${index}.${name}`
@@ -145,13 +125,6 @@ function TextField({
                   invalid={invalid}
                   onBlur={field.handleBlur}
                   onChange={field.handleChange}
-                  value={field.state.value ?? ""}
-                />
-              ) : textarea ? (
-                <Textarea
-                  id={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
                   value={field.state.value ?? ""}
                 />
               ) : (
@@ -302,46 +275,6 @@ function EmploymentTypeField({ form, index }: { form: any; index: number }) {
   )
 }
 
-function RelatedWorkField({
-  form,
-  index,
-  profile,
-}: {
-  form: any
-  index: number
-  profile: JobProfile
-}) {
-  const { t } = useTranslation()
-  const fieldName = `items.${index}.relatedWorkExperienceId`
-
-  return (
-    <form.Field name={fieldName}>
-      {(field: any) => (
-        <Field>
-          <FieldLabel htmlFor={field.name}>
-            {t("profile.formField.relatedWorkExperienceId")}
-          </FieldLabel>
-          <Select onValueChange={field.handleChange} value={field.state.value || null}>
-            <FieldControl>
-              <SelectTrigger id={field.name} onBlur={field.handleBlur}>
-                <SelectValue />
-              </SelectTrigger>
-            </FieldControl>
-            <SelectContent>
-              <SelectItem value="">—</SelectItem>
-              {profile.workExperiences.map((experience) => (
-                <SelectItem key={experience.id} value={experience.id}>
-                  {experience.company} · {experience.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
-    </form.Field>
-  )
-}
-
 export function ProfileSectionEditor({
   onCancel,
   onDirtyChange,
@@ -363,18 +296,16 @@ export function ProfileSectionEditor({
 
       try {
         const values = normalizeSectionValues(section, value)
-        const workExperienceValues = values as WorkExperience[]
-        const skillsToCreate =
-          section === "workExperience"
-            ? draftSkills
-                .filter((skill) =>
-                  workExperienceValues.some((experience) => experience.skillIds.includes(skill.id)),
-                )
-                .map(({ id, name }) => ({ clientId: id, name }))
-            : []
+        const isSkillLinkedSection = section === "workExperience" || section === "projectExperience"
+        const skillLinkedValues = values as Array<WorkExperience | ProjectExperience>
+        const skillsToCreate = isSkillLinkedSection
+          ? draftSkills
+              .filter((skill) => skillLinkedValues.some((item) => item.skillIds.includes(skill.id)))
+              .map(({ id, name }) => ({ clientId: id, name }))
+          : []
 
         await onSave(
-          section === "workExperience"
+          isSkillLinkedSection
             ? {
                 profileId: profile.profileId,
                 section,
@@ -548,7 +479,9 @@ function ExperienceFields({
               {(field: any) => (
                 <SkillTagInput
                   availableSkills={profile.skills}
+                  description={t("profile.editor.skillInputDescription")}
                   draftSkills={draftSkills}
+                  label={t("profile.field.skills")}
                   onDraftSkillsChange={onDraftSkillsChange}
                   onSelectedSkillIdsChange={field.handleChange}
                   selectedSkillIds={field.state.value ?? []}
@@ -558,50 +491,58 @@ function ExperienceFields({
           </>
         ) : (
           <>
-            <TextField form={form} index={index} label={t("profile.field.name")} name="name" />
-            <TextField form={form} index={index} label={fieldLabel("role")} name="role" />
+            <TextField
+              form={form}
+              index={index}
+              label={t("profile.formField.projectName")}
+              name="name"
+            />
+            <TextField
+              form={form}
+              index={index}
+              label={t("profile.formField.projectRole")}
+              name="role"
+            />
             {dateFields}
-            <TextField
-              form={form}
-              index={index}
-              label={fieldLabel("background")}
-              name="background"
-              textarea
-            />
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.field.responsibilities")}
-              name="responsibilities"
-              textarea
-            />
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.field.contributions")}
-              name="contributions"
-              textarea
-            />
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.field.achievements")}
-              name="achievements"
-              textarea
-            />
-            <TextField
-              form={form}
-              index={index}
-              label={fieldLabel("technologies")}
-              name="technologies"
-            />
+            <form.Field name={`items.${index}.responsibilities`}>
+              {(field: any) => (
+                <BulletListEditor
+                  description={t("profile.editor.projectDescriptionHint")}
+                  items={field.state.value ?? []}
+                  label={t("profile.field.projectDescription")}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.Field>
+            <form.Field name={`items.${index}.achievements`}>
+              {(field: any) => (
+                <BulletListEditor
+                  description={t("profile.editor.projectAchievementsHint")}
+                  items={field.state.value ?? []}
+                  label={t("profile.field.projectAchievements")}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.Field>
+            <form.Field name={`items.${index}.skillIds`}>
+              {(field: any) => (
+                <SkillTagInput
+                  availableSkills={profile.skills}
+                  description={t("profile.editor.technologyStackDescription")}
+                  draftSkills={draftSkills}
+                  label={t("profile.field.technologyStack")}
+                  onDraftSkillsChange={onDraftSkillsChange}
+                  onSelectedSkillIdsChange={field.handleChange}
+                  selectedSkillIds={field.state.value ?? []}
+                />
+              )}
+            </form.Field>
             <TextField
               form={form}
               index={index}
               label={fieldLabel("projectUrl")}
               name="projectUrl"
             />
-            <RelatedWorkField form={form} index={index} profile={profile} />
           </>
         )}
       </div>
@@ -656,17 +597,14 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
       return {
         items: structuredClone(profile.projectExperiences).map(({ source: _source, ...item }) => ({
           ...item,
-          achievements: joinProjectLines(item.achievements),
-          background: item.background ?? "",
-          contributions: joinProjectLines(item.contributions),
+          achievements: structuredClone(item.achievements),
           endDate: item.endDate ?? "",
           projectUrl: item.projectUrl ?? "",
-          relatedWorkExperienceId: item.relatedWorkExperienceId ?? "",
-          responsibilities: joinProjectLines(item.responsibilities),
+          responsibilities: structuredClone(item.responsibilities),
           role: item.role ?? "",
           isCurrent: item.endDate === null,
+          skillIds: structuredClone(item.skillIds),
           startDate: item.startDate ?? "",
-          technologies: item.technologies.join(", "),
         })),
       }
   }
@@ -708,16 +646,13 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
 
   return value.items.map(({ isCurrent, source: _source, ...item }: any) => ({
     ...item,
-    achievements: toProjectLines(item.achievements),
-    background: toNullable(item.background),
-    contributions: toProjectLines(item.contributions),
+    achievements: normalizeBulletItems(item.achievements),
     endDate: isCurrent ? null : toNullable(item.endDate),
     projectUrl: toNullable(item.projectUrl),
-    relatedWorkExperienceId: toNullable(item.relatedWorkExperienceId),
-    responsibilities: toProjectLines(item.responsibilities),
+    responsibilities: normalizeBulletItems(item.responsibilities),
     role: toNullable(item.role),
+    skillIds: normalizeSkillIds(item.skillIds),
     startDate: toNullable(item.startDate),
-    technologies: toProjectCommaSeparatedValues(item.technologies),
   }))
 }
 
@@ -748,14 +683,11 @@ function createNewItem(section: EditableExperienceSection) {
 
   return {
     ...base,
-    achievements: "",
-    background: "",
-    contributions: "",
+    achievements: [],
     name: "",
     projectUrl: "",
-    relatedWorkExperienceId: "",
-    responsibilities: "",
+    responsibilities: [],
     role: "",
-    technologies: "",
+    skillIds: [],
   }
 }

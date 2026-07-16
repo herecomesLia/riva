@@ -6,11 +6,15 @@ import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { profileResponseMock } from "@/mocks/data/profile"
 import type { SaveProfileSectionInput } from "@/models/profile"
+import type { EditableExperienceSection } from "./ProfileSectionEditDialog"
 import { renderWithProviders } from "@/test/render"
 
 import { ProfileSectionEditor } from "./ProfileSectionEditor"
 
-function renderEditor(onSave = vi.fn(async (_input: SaveProfileSectionInput) => {})) {
+function renderEditor(
+  section: EditableExperienceSection = "workExperience",
+  onSave = vi.fn(async (_input: SaveProfileSectionInput) => {}),
+) {
   return {
     onSave,
     ...renderWithProviders(
@@ -19,7 +23,7 @@ function renderEditor(onSave = vi.fn(async (_input: SaveProfileSectionInput) => 
         onDirtyChange={vi.fn()}
         onSave={onSave}
         profile={structuredClone(profileResponseMock.profile!)}
-        section="workExperience"
+        section={section}
       />,
       { router: false },
     ),
@@ -83,11 +87,73 @@ describe("ProfileSectionEditor work experience", () => {
     const onSave = vi.fn(async () => {
       throw new Error("save failed")
     })
-    renderEditor(onSave)
+    renderEditor("workExperience", onSave)
 
     await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
 
     expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
     expect(screen.getByTestId("profile-editor-workExperience")).toBeInTheDocument()
+  })
+})
+
+describe("ProfileSectionEditor project experience", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage(defaultLanguage)
+  })
+
+  it("uses project-specific labels and structured project content fields", async () => {
+    const user = userEvent.setup()
+    const { onSave } = renderEditor("projectExperience")
+
+    expect(screen.getByLabelText(i18n.t("profile.formField.projectName"))).toBeInTheDocument()
+    expect(screen.getByLabelText(i18n.t("profile.formField.projectRole"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("profile.field.projectDescription"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("profile.field.projectAchievements"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("profile.field.technologyStack"))).toBeInTheDocument()
+    expect(screen.queryByText("项目背景")).not.toBeInTheDocument()
+    expect(screen.queryByText("关键贡献")).not.toBeInTheDocument()
+    expect(screen.queryByText("关联工作经历")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    const input = onSave.mock.calls[0]![0]
+    expect(input.section).toBe("projectExperience")
+    if (input.section === "projectExperience") {
+      expect(input.values[0]!.responsibilities).toEqual(
+        profileResponseMock.profile!.projectExperiences[0]!.responsibilities,
+      )
+      expect(input.values[0]!.achievements).toEqual(
+        profileResponseMock.profile!.projectExperiences[0]!.achievements,
+      )
+      expect(input.values[0]!.skillIds).toEqual(
+        profileResponseMock.profile!.projectExperiences[0]!.skillIds,
+      )
+      expect(input.skillsToCreate).toEqual([])
+    }
+  })
+
+  it("includes a new technology in the same project save", async () => {
+    const user = userEvent.setup()
+    const { onSave } = renderEditor("projectExperience")
+    const input = screen.getByRole("combobox", {
+      name: i18n.t("profile.editor.skillInputPlaceholder"),
+    })
+
+    await user.type(input, "Accessibility")
+    await user.keyboard("{Enter}")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    const saveInput = onSave.mock.calls[0]![0]
+    if (saveInput.section === "projectExperience") {
+      expect(saveInput.skillsToCreate).toEqual([
+        expect.objectContaining({
+          clientId: expect.stringMatching(/^draft_skill_/),
+          name: "Accessibility",
+        }),
+      ])
+      expect(saveInput.values[0]!.skillIds).toContain(saveInput.skillsToCreate[0]!.clientId)
+    }
   })
 })

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { profileResponseMock } from "@/mocks/data/profile"
+import type { ProfileSkill } from "@/models/profile"
 import { renderWithProviders } from "@/test/render"
 
 import { SkillTagInput } from "./SkillTagInput"
@@ -17,15 +18,15 @@ function StatefulSkillTagInput({
   onDraftSkillsChange: (skills: unknown[]) => void
   onSelectedSkillIdsChange: (ids: string[]) => void
 }) {
-  const [draftSkills, setDraftSkills] = useState<
-    Array<{ id: string; name: string; source: "userAdded" }>
-  >([])
+  const [draftSkills, setDraftSkills] = useState<ProfileSkill[]>([])
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([])
 
   return (
     <SkillTagInput
       availableSkills={[]}
+      description="Select from existing skills, or enter a new skill."
       draftSkills={draftSkills}
+      label="Related skills"
       onDraftSkillsChange={(skills) => {
         setDraftSkills(skills)
         onDraftSkillsChange(skills)
@@ -50,7 +51,9 @@ describe("SkillTagInput", () => {
     renderWithProviders(
       <SkillTagInput
         availableSkills={profileResponseMock.profile!.skills}
+        description="Select from existing skills, or enter a new skill."
         draftSkills={[]}
+        label="Related skills"
         onDraftSkillsChange={vi.fn()}
         onSelectedSkillIdsChange={onSelectedSkillIdsChange}
         selectedSkillIds={[]}

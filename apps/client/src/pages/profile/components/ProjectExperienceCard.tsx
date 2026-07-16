@@ -1,27 +1,21 @@
 import { useTranslation } from "react-i18next"
 
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import type { JobProfile } from "@/models/profile"
 
 import { ProfileSectionCard } from "./ProfileSectionCard"
+import { ProfileSkillBadge } from "./ProfileSkillBadge"
 import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 
 export type ProjectExperienceCardProps = {
   onEdit: () => void
   projects: JobProfile["projectExperiences"]
-  workExperiences: JobProfile["workExperiences"]
+  skills: JobProfile["skills"]
 }
 
-export function ProjectExperienceCard({
-  onEdit,
-  projects,
-  workExperiences,
-}: ProjectExperienceCardProps) {
+export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExperienceCardProps) {
   const { t } = useTranslation()
-  const workExperienceById = new Map(
-    workExperiences.map((experience) => [experience.id, experience.company]),
-  )
+  const skillsById = new Map(skills.map((skill) => [skill.id, skill.name]))
 
   return (
     <ProfileSectionCard onEdit={onEdit} section="projectExperience">
@@ -41,33 +35,24 @@ export function ProjectExperienceCard({
                   startDate={project.startDate}
                 />
               </div>
-              {project.background && (
-                <p className="text-sm leading-6 text-muted-foreground">{project.background}</p>
-              )}
-              {project.relatedWorkExperienceId &&
-                workExperienceById.get(project.relatedWorkExperienceId) && (
-                  <p className="text-sm text-muted-foreground">
-                    {workExperienceById.get(project.relatedWorkExperienceId)}
-                  </p>
-                )}
-              <div className="grid gap-5 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-2">
                 <DetailList
                   items={project.responsibilities}
-                  title={t("profile.field.responsibilities")}
+                  title={t("profile.field.projectDescription")}
                 />
                 <DetailList
-                  items={project.contributions}
-                  title={t("profile.field.contributions")}
+                  items={project.achievements}
+                  title={t("profile.field.projectAchievements")}
                 />
-                <DetailList items={project.achievements} title={t("profile.field.achievements")} />
               </div>
-              {project.technologies.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {project.technologies.map((technology) => (
-                    <Badge key={technology} variant="outline">
-                      {technology}
-                    </Badge>
-                  ))}
+              {project.skillIds.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-medium">{t("profile.field.technologyStack")}</h4>
+                  <div className="flex flex-wrap gap-2" data-testid="project-experience-skills">
+                    {project.skillIds.map((skillId) => (
+                      <ProfileSkillBadge key={skillId} name={skillsById.get(skillId) ?? skillId} />
+                    ))}
+                  </div>
                 </div>
               )}
             </article>

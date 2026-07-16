@@ -18,7 +18,9 @@ import type { ProfileSkill } from "@/models/profile"
 
 type SkillTagInputProps = {
   availableSkills: ProfileSkill[]
+  description: string
   draftSkills: ProfileSkill[]
+  label: string
   onDraftSkillsChange: (skills: ProfileSkill[]) => void
   onSelectedSkillIdsChange: (ids: string[]) => void
   selectedSkillIds: string[]
@@ -30,7 +32,9 @@ function createDraftSkill(name: string): ProfileSkill {
 
 export function SkillTagInput({
   availableSkills,
+  description,
   draftSkills,
+  label,
   onDraftSkillsChange,
   onSelectedSkillIdsChange,
   selectedSkillIds,
@@ -63,8 +67,8 @@ export function SkillTagInput({
 
   return (
     <Field>
-      <FieldLabel>{t("profile.field.skills")}</FieldLabel>
-      <FieldDescription>{t("profile.editor.skillInputDescription")}</FieldDescription>
+      <FieldLabel>{label}</FieldLabel>
+      <FieldDescription>{description}</FieldDescription>
       <div className="flex flex-wrap gap-2">
         {selectedSkills.map((skill) => (
           <Badge className="h-7 bg-sky-100 text-primary dark:bg-sky-950" key={skill.id}>

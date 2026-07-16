@@ -324,10 +324,12 @@ describe("ProfileView", () => {
     await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
     const dialog = await screen.findByRole("dialog")
 
-    expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(4)
+    expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(
+      profileResponseMock.profile!.skills.length,
+    )
     expect(
       within(dialog).getAllByRole("button", { name: i18n.t("profile.editor.delete") }),
-    ).toHaveLength(4)
+    ).toHaveLength(profileResponseMock.profile!.skills.length)
     expect(within(dialog).queryByLabelText(/技能分类|Skill category/)).not.toBeInTheDocument()
     expect(dialog.querySelector("datalist")).toBeNull()
 
@@ -335,7 +337,7 @@ describe("ProfileView", () => {
       within(dialog).getByRole("button", { name: i18n.t("profile.editor.addSkill") }),
     )
     const skillNames = within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))
-    expect(skillNames).toHaveLength(5)
+    expect(skillNames).toHaveLength(profileResponseMock.profile!.skills.length + 1)
     expect(skillNames.at(-1)).toHaveValue("")
 
     await user.clear(skillNames[0]!)
@@ -361,6 +363,7 @@ describe("ProfileView", () => {
       "TypeScript",
       "Design systems",
       "JavaScript",
+      "TanStack Query",
       "Testing Library",
     ])
   })
@@ -398,12 +401,14 @@ describe("ProfileView", () => {
         .at(1)!,
     )
 
-    expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(3)
+    expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(
+      profileResponseMock.profile!.skills.length - 1,
+    )
     expect(
       within(dialog)
         .getAllByLabelText(i18n.t("profile.field.skillName"))
         .map((input) => input.getAttribute("value")),
-    ).toEqual(["React", "Design systems", "JavaScript"])
+    ).toEqual(["React", "Design systems", "JavaScript", "TanStack Query"])
     expect(actions.saveSection).not.toHaveBeenCalled()
     expect(snapshot).toEqual(profileResponseMock)
   })

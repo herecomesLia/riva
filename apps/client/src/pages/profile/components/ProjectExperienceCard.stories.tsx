@@ -7,37 +7,29 @@ import type { JobProfile } from "@/models/profile"
 import { ProjectExperienceCard } from "./ProjectExperienceCard"
 
 type Project = JobProfile["projectExperiences"][number]
-type WorkExperience = JobProfile["workExperiences"][number]
+type Skill = JobProfile["skills"][number]
 
 function createProject(overrides: Partial<Project> = {}): Project {
-  return {
-    ...structuredClone(profileResponseMock.profile!.projectExperiences[0]!),
-    ...overrides,
-  }
+  return { ...structuredClone(profileResponseMock.profile!.projectExperiences[0]!), ...overrides }
 }
 
-function createWorkExperience(overrides: Partial<WorkExperience> = {}): WorkExperience {
-  return {
-    ...structuredClone(profileResponseMock.profile!.workExperiences[0]!),
-    ...overrides,
-  }
+function createSkill(overrides: Partial<Skill> = {}): Skill {
+  return { ...structuredClone(profileResponseMock.profile!.skills[0]!), ...overrides }
 }
 
-const defaultWorkExperiences = structuredClone(profileResponseMock.profile!.workExperiences)
-
+const defaultSkills = structuredClone(profileResponseMock.profile!.skills)
 const meta = preview.meta({
   component: ProjectExperienceCard,
   parameters: { layout: "padded" },
   title: "Profile/ProjectExperienceCard",
 })
-
 const defaultOnEdit = fn()
 
 export const Default = meta.story({
   args: {
     onEdit: defaultOnEdit,
     projects: [createProject()],
-    workExperiences: structuredClone(defaultWorkExperiences),
+    skills: structuredClone(defaultSkills),
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /编辑|edit/i }))
@@ -45,9 +37,7 @@ export const Default = meta.story({
   },
 })
 
-export const Empty = meta.story({
-  args: { onEdit: fn(), projects: [], workExperiences: structuredClone(defaultWorkExperiences) },
-})
+export const Empty = meta.story({ args: { onEdit: fn(), projects: [], skills: [] } })
 
 export const Multiple = meta.story({
   args: {
@@ -56,19 +46,16 @@ export const Multiple = meta.story({
       createProject(),
       createProject({
         achievements: ["Reduced support response time after rollout."],
-        background: "An internal support workspace for global operations teams.",
-        contributions: ["Built a reusable case routing system."],
         endDate: "2023-12",
         id: "project_support_workspace",
         name: "Support Operations Workspace",
-        relatedWorkExperienceId: "work_orbit_2018",
         responsibilities: ["Owned frontend architecture and delivery."],
         role: "Frontend engineer",
+        skillIds: ["skill_react", "skill_javascript"],
         startDate: "2022-05",
-        technologies: ["React", "JavaScript"],
       }),
     ],
-    workExperiences: structuredClone(defaultWorkExperiences),
+    skills: structuredClone(defaultSkills),
   },
 })
 
@@ -76,7 +63,7 @@ export const Ongoing = meta.story({
   args: {
     onEdit: fn(),
     projects: [createProject({ endDate: null })],
-    workExperiences: structuredClone(defaultWorkExperiences),
+    skills: structuredClone(defaultSkills),
   },
 })
 
@@ -90,30 +77,29 @@ export const LongContent = meta.story({
           "Improved accessibility and performance for the highest-volume workflows.",
           "Established measurable adoption and reliability standards for shared components.",
         ],
-        background:
-          "A unified workspace connecting merchant support, operational workflows, accessibility requirements, internationalization, observability, and cross-functional delivery across multiple markets.",
-        contributions: [
-          "Built a configurable workflow renderer shared by six product flows.",
-          "Created an accessible interaction framework for dense operational tasks.",
-          "Introduced performance monitoring and regression review practices.",
-        ],
         name: "International Merchant Operations, Accessibility, and Workflow Intelligence Platform",
         responsibilities: [
           "Defined frontend architecture, delivery milestones, and design-system integration.",
           "Coordinated product, design, quality, data, and platform stakeholders.",
           "Reviewed implementation quality and mentored engineers across teams.",
         ],
-        technologies: [
-          "React",
-          "TypeScript",
-          "TanStack Query",
-          "Storybook",
-          "Testing Library",
-          "Web Performance APIs",
+        role: "Principal frontend engineer for cross-functional platform delivery",
+        skillIds: [
+          "skill_react",
+          "skill_typescript",
+          "skill_tanstack_query",
+          "skill_storybook",
+          "skill_testing_library",
         ],
       }),
     ],
-    workExperiences: [createWorkExperience()],
+    skills: [
+      createSkill(),
+      createSkill({ id: "skill_typescript", name: "TypeScript" }),
+      createSkill({ id: "skill_tanstack_query", name: "TanStack Query" }),
+      createSkill({ id: "skill_storybook", name: "Storybook" }),
+      createSkill({ id: "skill_testing_library", name: "Testing Library" }),
+    ],
   },
 })
 
@@ -123,14 +109,12 @@ export const MissingOptionalFields = meta.story({
     projects: [
       createProject({
         achievements: [],
-        background: null,
-        contributions: [],
-        relatedWorkExperienceId: null,
+        projectUrl: null,
         responsibilities: [],
         role: null,
-        technologies: [],
+        skillIds: [],
       }),
     ],
-    workExperiences: [],
+    skills: [],
   },
 })

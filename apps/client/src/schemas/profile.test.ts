@@ -37,16 +37,13 @@ const schemas: Array<[string, any, Record<string, unknown>]> = [
     "project experience",
     projectItemSchema,
     {
-      achievements: "",
-      background: "",
-      contributions: "",
+      achievements: [],
       id: "project_1",
       name: "Riva project",
       projectUrl: "",
-      relatedWorkExperienceId: "",
-      responsibilities: "",
+      responsibilities: [],
       role: "",
-      technologies: "",
+      skillIds: [],
     },
   ],
 ]
@@ -149,6 +146,34 @@ describe("work experience schema", () => {
     expect(result).toEqual(
       expect.objectContaining({
         data: expect.objectContaining({ responsibilities: [] }),
+        success: true,
+      }),
+    )
+  })
+})
+
+describe("project experience schema", () => {
+  it("keeps structured project content and technology skill ids", () => {
+    const result = projectItemSchema.safeParse({
+      achievements: ["  Improved project adoption  ", "Improved project adoption"],
+      endDate: "",
+      id: "project_1",
+      isCurrent: true,
+      name: "Riva project",
+      projectUrl: "https://riva.example.com",
+      responsibilities: ["  Built the project workspace  ", "Built the project workspace", "  "],
+      role: "",
+      skillIds: ["skill_react", "skill_react"],
+      startDate: "2024-01",
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          achievements: ["Improved project adoption"],
+          responsibilities: ["Built the project workspace"],
+          skillIds: ["skill_react"],
+        }),
         success: true,
       }),
     )

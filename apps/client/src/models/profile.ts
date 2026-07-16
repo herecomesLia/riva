@@ -58,13 +58,10 @@ export type ProjectExperience = {
   role: string | null
   startDate: string | null
   endDate: string | null
-  background: string | null
   responsibilities: string[]
-  contributions: string[]
   achievements: string[]
-  technologies: string[]
+  skillIds: string[]
   projectUrl: string | null
-  relatedWorkExperienceId: string | null
   source: ProfileSource
 }
 
@@ -164,23 +161,26 @@ type SaveStandardProfileSectionInput = {
     section: Section
     values: ProfileSectionValueMap[Section]
   }
-}[Exclude<ProfileSection, "workExperience">]
+}[Exclude<ProfileSection, "workExperience" | "projectExperience">]
 
 export type NewProfileSkillInput = {
   clientId: string
   name: string
 }
 
-export type SaveWorkExperienceSectionInput = {
-  profileId: string
-  version: number
-  section: "workExperience"
-  values: WorkExperience[]
-  skillsToCreate: NewProfileSkillInput[]
-}
+type SkillLinkedProfileSection = "workExperience" | "projectExperience"
 
-export type SaveProfileSectionInput =
-  SaveStandardProfileSectionInput | SaveWorkExperienceSectionInput
+type SaveSkillLinkedSectionInput = {
+  [Section in SkillLinkedProfileSection]: {
+    profileId: string
+    version: number
+    section: Section
+    values: ProfileSectionValueMap[Section]
+    skillsToCreate: NewProfileSkillInput[]
+  }
+}[SkillLinkedProfileSection]
+
+export type SaveProfileSectionInput = SaveStandardProfileSectionInput | SaveSkillLinkedSectionInput
 
 export type ResumeUploadInput = {
   file?: File

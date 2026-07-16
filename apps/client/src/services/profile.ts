@@ -12,7 +12,7 @@ import type {
   ResumeUpdate,
   ResumeUploadInput,
   SaveProfileSectionInput,
-  SaveWorkExperienceSectionInput,
+  NewProfileSkillInput,
 } from "@/models/profile"
 
 function copy<T>(value: T): T {
@@ -109,12 +109,6 @@ function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) 
     case "education":
       profile.education = applySources(profile.education, input.values)
       break
-    case "workExperience":
-      profile.workExperiences = applySources(profile.workExperiences, input.values)
-      break
-    case "projectExperience":
-      profile.projectExperiences = applySources(profile.projectExperiences, input.values)
-      break
     case "skills":
       profile.skills = applySources(profile.skills, input.values)
       break
@@ -143,13 +137,13 @@ function createSkillId(profile: JobProfile, name: string) {
   return id
 }
 
-function applyWorkExperienceSave(profile: JobProfile, input: SaveWorkExperienceSectionInput) {
+function persistDraftSkills(profile: JobProfile, skillsToCreate: NewProfileSkillInput[]) {
   const skillIdsByName = new Map(
     profile.skills.map((skill) => [normalizeSkillName(skill.name), skill.id]),
   )
   const persistedIdsByClientId = new Map<string, string>()
 
-  for (const draftSkill of input.skillsToCreate) {
+  for (const draftSkill of skillsToCreate) {
     const name = draftSkill.name.trim().replace(/\s+/g, " ")
     const normalizedName = normalizeSkillName(name)
     if (!normalizedName) continue
@@ -163,18 +157,41 @@ function applyWorkExperienceSave(profile: JobProfile, input: SaveWorkExperienceS
     persistedIdsByClientId.set(draftSkill.clientId, persistedId)
   }
 
-  const values = input.values.map((experience) => {
-    const skillIds = experience.skillIds.map((id) => {
+  return persistedIdsByClientId
+}
+
+function replaceDraftSkillIds(skillIds: string[], persistedIdsByClientId: Map<string, string>) {
+  return normalizeSkillIds(
+    skillIds.map((id) => {
       const persistedId = persistedIdsByClientId.get(id)
       if (id.startsWith("draft_skill_") && !persistedId) {
         throw new Error("A selected draft skill is missing from this save request.")
       }
       return persistedId ?? id
-    })
+    }),
+  )
+}
 
-    return { ...experience, skillIds: normalizeSkillIds(skillIds) }
-  })
-  profile.workExperiences = applySources(profile.workExperiences, values)
+function applySkillLinkedSectionSave(
+  profile: JobProfile,
+  input: Extract<SaveProfileSectionInput, { section: "workExperience" | "projectExperience" }>,
+) {
+  const persistedIdsByClientId = persistDraftSkills(profile, input.skillsToCreate)
+
+  if (input.section === "workExperience") {
+    const values = input.values.map((experience) => ({
+      ...experience,
+      skillIds: replaceDraftSkillIds(experience.skillIds, persistedIdsByClientId),
+    }))
+    profile.workExperiences = applySources(profile.workExperiences, values)
+    return
+  }
+
+  const values = input.values.map((project) => ({
+    ...project,
+    skillIds: replaceDraftSkillIds(project.skillIds, persistedIdsByClientId),
+  }))
+  profile.projectExperiences = applySources(profile.projectExperiences, values)
 }
 
 function withResumeExtractedSource(profile: JobProfile): JobProfile {
@@ -251,8 +268,8 @@ export async function saveProfileSection(input: SaveProfileSectionInput): Promis
   const profile = copy(requireProfile(input.profileId))
   if (profile.version !== input.version) throw new Error("Job profile version is out of date.")
 
-  if (input.section === "workExperience") {
-    applyWorkExperienceSave(profile, input)
+  if (input.section === "workExperience" || input.section === "projectExperience") {
+    applySkillLinkedSectionSave(profile, input)
   } else {
     applySavedSection(profile, input)
   }

@@ -58,16 +58,13 @@ export const workItemSchema = dateRangeSchema.extend({
 })
 
 export const projectItemSchema = dateRangeSchema.extend({
-  achievements: optionalText,
-  background: optionalText,
-  contributions: optionalText,
+  achievements: bulletItemsSchema,
   id: requiredText,
   name: requiredText,
   projectUrl: optionalText.refine((value) => !value || URL.canParse(value), "url"),
-  relatedWorkExperienceId: optionalText,
-  responsibilities: optionalText,
+  responsibilities: bulletItemsSchema,
   role: optionalText,
-  technologies: optionalText,
+  skillIds: skillIdsSchema,
 })
 
 export const skillSchema = z.object({

@@ -182,6 +182,50 @@ describe("profile mock service", () => {
     ])
   })
 
+  it("atomically creates a new skill and replaces its temporary project technology id", async () => {
+    const values = [structuredClone(profileResponseMock.profile!.projectExperiences[0]!)]
+    values[0]!.skillIds = ["skill_react", "draft_skill_tanstack_router"]
+
+    const profile = await settle(
+      saveProfileSection({
+        profileId: profileResponseMock.profile!.profileId,
+        section: "projectExperience",
+        skillsToCreate: [{ clientId: "draft_skill_tanstack_router", name: "TanStack Router" }],
+        values,
+        version: profileResponseMock.profile!.version,
+      }),
+    )
+
+    const skill = profile.skills.find((candidate) => candidate.name === "TanStack Router")!
+    expect(skill).toMatchObject({ source: "userAdded" })
+    expect(profile.projectExperiences[0]!.skillIds).toEqual(["skill_react", skill.id])
+    expect(profile.projectExperiences[0]!.source).toBe("userEdited")
+    expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
+    expect(profile.matchingAnalysisStale).toBe(true)
+  })
+
+  it("does not partially save a new skill or project experience for a stale version", async () => {
+    const promise = saveProfileSection({
+      profileId: profileResponseMock.profile!.profileId,
+      section: "projectExperience",
+      skillsToCreate: [{ clientId: "draft_skill_tanstack_router", name: "TanStack Router" }],
+      values: structuredClone(profileResponseMock.profile!.projectExperiences).map((project) => ({
+        ...project,
+        skillIds: ["draft_skill_tanstack_router"],
+      })),
+      version: -1,
+    })
+    const assertion = expect(promise).rejects.toThrow("version is out of date")
+    await vi.runAllTimersAsync()
+    await assertion
+
+    const current = await settle(getJobProfile())
+    expect(current.profile!.skills.some((skill) => skill.name === "TanStack Router")).toBe(false)
+    expect(current.profile!.projectExperiences).toEqual(
+      profileResponseMock.profile!.projectExperiences,
+    )
+  })
+
   it("does not partially save a new skill or work experience for a stale version", async () => {
     const promise = saveProfileSection({
       profileId: profileResponseMock.profile!.profileId,
