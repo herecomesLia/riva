@@ -88,7 +88,6 @@ export const profile = {
     issuer: "颁发方",
     awardedAt: "获得于 {{value}}",
     skillName: "技能名称",
-    skillCategory: "技能分类",
   },
   employmentType: {
     fullTime: "全职",

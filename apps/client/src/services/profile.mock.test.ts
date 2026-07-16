@@ -70,8 +70,8 @@ describe("profile mock service", () => {
 
   it("derives sources from the current profile instead of accepting form metadata", async () => {
     const values = structuredClone(profileResponseMock.profile!.skills)
+    values[1]!.name = "TypeScript Advanced"
     values.push({
-      category: "Frontend",
       id: "draft_new_skill",
       name: "Testing Library",
       source: "resumeExtracted",
@@ -88,7 +88,13 @@ describe("profile mock service", () => {
     expect(profile.skills.find((skill) => skill.id === "skill_react")!.source).toBe(
       "resumeExtracted",
     )
+    expect(profile.skills.find((skill) => skill.id === "skill_typescript")!.source).toBe(
+      "userEdited",
+    )
     expect(profile.skills.find((skill) => skill.id === "draft_new_skill")!.source).toBe("userAdded")
+    expect(
+      profile.skills.every((skill) => Object.keys(skill).sort().join(",") === "id,name,source"),
+    ).toBe(true)
   })
 
   it("retains the target-role section contract for the future Roles module", async () => {

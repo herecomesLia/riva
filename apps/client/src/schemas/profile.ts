@@ -58,7 +58,6 @@ export const projectItemSchema = dateRangeSchema.extend({
 })
 
 export const skillSchema = z.object({
-  category: optionalText,
   id: requiredText,
   name: requiredText,
 })

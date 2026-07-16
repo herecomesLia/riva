@@ -452,6 +452,79 @@ describe("ProfileView", () => {
     },
   )
 
+  it("edits skills with names only and omits category from saved values", async () => {
+    const user = userEvent.setup()
+    const { actions } = renderReady()
+    const section = await screen.findByTestId("profile-section-skills")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+
+    expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(4)
+    expect(within(dialog).queryByLabelText(/技能分类|Skill category/)).not.toBeInTheDocument()
+    expect(dialog.querySelector("datalist")).toBeNull()
+
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("profile.editor.addSkill") }),
+    )
+    const skillNames = within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))
+    expect(skillNames).toHaveLength(5)
+    expect(skillNames.at(-1)).toHaveValue("")
+
+    await user.clear(skillNames[0]!)
+    await user.type(skillNames[0]!, "  React Native  ")
+    await user.type(skillNames.at(-1)!, "Testing Library")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    await waitFor(() => expect(actions.saveSection).toHaveBeenCalledOnce())
+    const savedValues = vi.mocked(actions.saveSection).mock.calls[0]![0].values
+    expect(savedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "skill_react", name: "React Native" }),
+      ]),
+    )
+    expect(savedValues.every((skill) => Object.keys(skill).sort().join(",") === "id,name")).toBe(
+      true,
+    )
+  })
+
+  it("validates required and duplicate skill names", async () => {
+    const user = userEvent.setup()
+    const { actions } = renderReady()
+    const section = await screen.findByTestId("profile-section-skills")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const skillNames = within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))
+
+    await user.clear(skillNames[0]!)
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+    expect(actions.saveSection).not.toHaveBeenCalled()
+
+    await user.type(skillNames[0]!, "React")
+    await user.clear(skillNames[1]!)
+    await user.type(skillNames[1]!, "React")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.editor.save") }))
+    expect(actions.saveSection).not.toHaveBeenCalled()
+  })
+
+  it("keeps skill deletion in the draft until save", async () => {
+    const user = userEvent.setup()
+    const snapshot = structuredClone(profileResponseMock)
+    const { actions } = renderReady(snapshot)
+    const section = await screen.findByTestId("profile-section-skills")
+    await user.click(within(section).getByRole("button", { name: i18n.t("profile.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+
+    await user.click(
+      within(dialog)
+        .getAllByRole("button", { name: i18n.t("profile.editor.delete") })
+        .at(-1)!,
+    )
+
+    expect(within(dialog).getAllByLabelText(i18n.t("profile.field.skillName"))).toHaveLength(3)
+    expect(actions.saveSection).not.toHaveBeenCalled()
+    expect(snapshot).toEqual(profileResponseMock)
+  })
+
   it("keeps the credentials editor available independently", async () => {
     renderWithProviders(
       <ProfileSectionEditDialog

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { educationItemSchema, projectItemSchema, workItemSchema } from "@/schemas/profile"
+import {
+  educationItemSchema,
+  projectItemSchema,
+  skillSchema,
+  workItemSchema,
+} from "@/schemas/profile"
 
 const schemas: Array<[string, any, Record<string, unknown>]> = [
   [
@@ -95,4 +100,19 @@ describe("experience date schemas", () => {
       }
     },
   )
+})
+
+describe("skill schema", () => {
+  it("requires and trims a skill name", () => {
+    const result = skillSchema.safeParse({
+      id: "skill_react",
+      name: "  React  ",
+    })
+
+    expect(result).toEqual({ success: true, data: { id: "skill_react", name: "React" } })
+  })
+
+  it("rejects an empty skill name", () => {
+    expect(skillSchema.safeParse({ id: "skill_react", name: "   " }).success).toBe(false)
+  })
 })

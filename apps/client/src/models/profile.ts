@@ -71,7 +71,6 @@ export type ProjectExperience = {
 export type ProfileSkill = {
   id: string
   name: string
-  category: string | null
   source: ProfileSource
 }
 

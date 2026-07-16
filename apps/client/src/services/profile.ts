@@ -168,7 +168,6 @@ function mergeRecognizedItems<T extends { id: string; source: ProfileSource }>(
 function mergeRecognizedProfile(profile: JobProfile): JobProfile {
   const recognized = withResumeExtractedSource(standardProfile())
   const additionalSkill = {
-    category: "Frontend",
     id: "skill_accessibility",
     name: "Accessibility",
     source: "resumeExtracted" as const,

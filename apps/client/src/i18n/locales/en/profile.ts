@@ -97,7 +97,6 @@ export const profile = {
     issuer: "Issuer",
     awardedAt: "Awarded {{value}}",
     skillName: "Skill name",
-    skillCategory: "Skill category",
   },
   employmentType: {
     fullTime: "Full time",

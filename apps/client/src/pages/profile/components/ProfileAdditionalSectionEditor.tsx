@@ -76,7 +76,6 @@ function TextField({
   index,
   label,
   name,
-  options,
   textarea = false,
   type = "text",
 }: {
@@ -84,7 +83,6 @@ function TextField({
   index?: number
   label: string
   name: string
-  options?: string[]
   textarea?: boolean
   type?: string
 }) {
@@ -110,7 +108,6 @@ function TextField({
               ) : (
                 <Input
                   id={field.name}
-                  list={options?.length ? `${field.name}-options` : undefined}
                   onBlur={field.handleBlur}
                   onChange={(event) => field.handleChange(event.target.value)}
                   type={type}
@@ -118,13 +115,6 @@ function TextField({
                 />
               )}
             </FieldControl>
-            {options?.length ? (
-              <datalist id={`${field.name}-options`}>
-                {options.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-            ) : null}
             <FieldError
               errors={field.state.meta.errors.map((error: unknown) => ({
                 message: translateValidationError(t, error),
@@ -220,7 +210,7 @@ export function ProfileAdditionalSectionEditor({
 
         <FieldGroup>
           {section === "skills" ? (
-            <SkillFields form={form} onAdd={addItem} profile={profile} />
+            <SkillFields form={form} onAdd={addItem} />
           ) : (
             <CredentialFields form={form} onAdd={addItem} />
           )}
@@ -242,19 +232,8 @@ export function ProfileAdditionalSectionEditor({
   )
 }
 
-function SkillFields({
-  form,
-  onAdd,
-  profile,
-}: {
-  form: any
-  onAdd: () => void
-  profile: JobProfile
-}) {
+function SkillFields({ form, onAdd }: { form: any; onAdd: () => void }) {
   const { t } = useTranslation()
-  const categories = [
-    ...new Set(profile.skills.flatMap((skill) => (skill.category ? [skill.category] : []))),
-  ]
 
   return (
     <>
@@ -263,7 +242,7 @@ function SkillFields({
           <div className="flex flex-col gap-4">
             {items.map((item, index) => (
               <div
-                className="grid gap-4 rounded-xl border p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                className="grid gap-4 rounded-xl border p-4 md:grid-cols-[minmax(0,1fr)_auto]"
                 data-testid={`profile-editor-item-${item.id}`}
                 key={item.id}
               >
@@ -272,13 +251,6 @@ function SkillFields({
                   index={index}
                   label={t("profile.field.skillName")}
                   name="name"
-                />
-                <TextField
-                  form={form}
-                  index={index}
-                  label={t("profile.field.skillCategory")}
-                  name="category"
-                  options={categories}
                 />
                 <Button
                   className="self-end"
@@ -428,10 +400,7 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
 function createDraft(profile: JobProfile, section: EditableAdditionalSection) {
   if (section === "skills") {
     return {
-      items: structuredClone(profile.skills).map(({ source: _source, ...item }) => ({
-        ...item,
-        category: item.category ?? "",
-      })),
+      items: structuredClone(profile.skills).map(({ source: _source, ...item }) => item),
     }
   }
 
@@ -475,7 +444,6 @@ function normalizeSectionValues(section: EditableAdditionalSection, value: any) 
   if (section === "skills") {
     return value.items.map(({ source: _source, ...item }: any) => ({
       ...item,
-      category: toNullable(item.category),
       name: item.name.trim(),
     }))
   }
@@ -498,7 +466,7 @@ function createNewItem(section: "skills" | "credentials") {
   }
 
   if (section === "skills") {
-    return { ...base, category: "", name: "" }
+    return { ...base, name: "" }
   }
 
   return {

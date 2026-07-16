@@ -120,25 +120,21 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
       {
         id: "skill_react",
         name: "React",
-        category: "Frontend",
         source: "resumeExtracted",
       },
       {
         id: "skill_typescript",
         name: "TypeScript",
-        category: "Frontend",
         source: "resumeExtracted",
       },
       {
         id: "skill_design_systems",
         name: "Design systems",
-        category: "Frontend",
         source: "userAdded",
       },
       {
         id: "skill_javascript",
         name: "JavaScript",
-        category: "Frontend",
         source: "resumeExtracted",
       },
     ],
