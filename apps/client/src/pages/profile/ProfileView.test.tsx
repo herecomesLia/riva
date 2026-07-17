@@ -117,6 +117,25 @@ describe("ProfileView", () => {
     ).not.toBeInTheDocument()
   })
 
+  it("uses the initial-resume action only when no profile exists", async () => {
+    const actions = createActions()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ProfileView
+        actions={actions}
+        content={{ status: "ready", data: createProfileMockSnapshot("noProfile") }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
+
+    expect(actions.uploadInitialResume).toHaveBeenCalledOnce()
+    expect(actions.uploadUpdatedResume).not.toHaveBeenCalled()
+  })
+
   it("renders the complete ready-page lifecycle and header", async () => {
     renderReady()
     expect(
@@ -309,8 +328,8 @@ describe("ProfileView", () => {
     await user.type(within(dialog).getByLabelText(i18n.t("profile.import.text")), "resume text")
     await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.import.submit") }))
 
-    expect(actions.uploadInitialResume).toHaveBeenCalledOnce()
-    expect(actions.uploadUpdatedResume).not.toHaveBeenCalled()
+    expect(actions.uploadUpdatedResume).toHaveBeenCalledOnce()
+    expect(actions.uploadInitialResume).not.toHaveBeenCalled()
     expect(screen.getByText("Fudan University")).toBeInTheDocument()
   })
 

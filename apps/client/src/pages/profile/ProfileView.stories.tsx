@@ -55,7 +55,26 @@ export const NoProfile = meta.story({
 export const ManualEmptyProfile = pageStory("emptyManualProfile")
 export const Ready = pageStory("complete")
 export const Partial = pageStory("partial")
-export const NoResume = pageStory("profileWithoutResume")
+export const NoResume = meta.story({
+  render: () => (
+    <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="profileWithoutResume" />
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /上传简历|upload resume/i }))
+    const dialog = await screen.findByRole("dialog")
+    await userEvent.type(within(dialog).getByLabelText(/简历文本|resume text/i), "Profile resume")
+    await userEvent.click(within(dialog).getByRole("button", { name: /导入|import/i }))
+
+    await waitFor(() =>
+      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
+        /正在识别简历|recognizing your resume/i,
+      ),
+    )
+    await waitFor(() =>
+      expect(canvas.getByTestId("profile-resume-update-success")).toBeInTheDocument(),
+    )
+  },
+})
 export const UploadingResume = pageStory("initialResumeUploading")
 export const ParsingResume = pageStory("initialResumeRecognizing")
 export const RecognitionFailed = meta.story({

@@ -19,9 +19,11 @@ function copy<T>(value: T): T {
 }
 
 let mockSnapshot: JobProfileSnapshot = copy(profileResponseMock)
+const retryableRecognitionFailures = new Set<string>()
 
 export function resetProfileMockState() {
   mockSnapshot = copy(profileResponseMock)
+  retryableRecognitionFailures.clear()
 }
 
 function standardProfile(): JobProfile {
@@ -269,9 +271,16 @@ function staleMatchingAnalysis(
 }
 
 function recognitionFailureReason(resume: ResumeFile) {
-  return resume.fileName.toLowerCase().includes("unreadable")
-    ? "The resume could not be recognized because its text layer is unavailable."
-    : null
+  const fileName = resume.fileName.toLowerCase()
+  if (fileName.includes("unreadable")) {
+    return "The resume could not be recognized because its text layer is unavailable."
+  }
+  if (fileName.includes("retryable") && !retryableRecognitionFailures.has(resume.id)) {
+    // Mock fixtures can model one transient backend failure before a retry succeeds.
+    retryableRecognitionFailures.add(resume.id)
+    return "The resume could not be recognized because the recognition service timed out."
+  }
+  return null
 }
 
 function completeInitialRecognition(profile: JobProfile, recognition: ResumeRecognition) {
@@ -282,7 +291,12 @@ function completeInitialRecognition(profile: JobProfile, recognition: ResumeReco
     return setMockSnapshot({
       ...mockSnapshot,
       profile: failedProfile,
-      recognition: { ...recognition, processingStatus: "failed", failureReason },
+      recognition: {
+        ...recognition,
+        completedAt: "2026-07-13T08:02:00.000Z",
+        failureReason,
+        processingStatus: "failed",
+      },
     })
   }
 
@@ -398,13 +412,28 @@ export async function startInitialResumeRecognition(
   const recognition = mockSnapshot.recognition
   if (!recognition || recognition.resumeId !== resumeId)
     throw new Error("Resume recognition was not found.")
-  if (recognition.processingStatus !== "uploaded") return copy(mockSnapshot)
+  if (recognition.processingStatus === "parsing" || recognition.processingStatus === "succeeded") {
+    return copy(mockSnapshot)
+  }
+  if (recognition.processingStatus !== "uploaded" && recognition.processingStatus !== "failed") {
+    return copy(mockSnapshot)
+  }
 
-  const resume = { ...profile.resume, processingStatus: "parsing" as const }
+  const resume = {
+    ...profile.resume,
+    failureReason: null,
+    parsedAt: null,
+    processingStatus: "parsing" as const,
+  }
   return setMockSnapshot({
     ...mockSnapshot,
     profile: { ...profile, resume, status: "parsingResume" },
-    recognition: { ...recognition, processingStatus: "parsing" },
+    recognition: {
+      ...recognition,
+      completedAt: null,
+      failureReason: null,
+      processingStatus: "parsing",
+    },
   })
 }
 

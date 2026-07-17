@@ -307,6 +307,11 @@ describe("profile mock service", () => {
     expect(recognized.profile!.resume).toMatchObject({ processingStatus: "succeeded" })
     expect(recognized.profile!.education[0]!.source).toBe("resumeExtracted")
     expect(recognized.matchingAnalysis).toBeNull()
+
+    const repeatedStart = await settle(
+      startInitialResumeRecognition(recognized.profile!.profileId, recognized.profile!.resume!.id),
+    )
+    expect(repeatedStart).toEqual(recognized)
   })
 
   it("keeps a safe failure reason when recognition fails", async () => {
@@ -333,6 +338,94 @@ describe("profile mock service", () => {
     expect(failed.profile).toMatchObject({ status: "recognitionFailed" })
     expect(failed.profile!.resume).toMatchObject({ processingStatus: "failed" })
     expect(failed.recognition!.failureReason).toContain("text layer")
+    expect(failed.recognition!.completedAt).not.toBeNull()
+  })
+
+  it("retries a failed initial recognition through parsing and clears failed job fields", async () => {
+    await settle(
+      resetInitialResumeImport(
+        profileResponseMock.profile!.profileId,
+        profileResponseMock.profile!.resume!.id,
+      ),
+    )
+    const uploading = await settle(
+      uploadInitialResume({
+        file: new File(["retryable"], "retryable-resume.pdf", { type: "application/pdf" }),
+      }),
+    )
+    const parsing = await settle(
+      startInitialResumeRecognition(uploading.profile!.profileId, uploading.profile!.resume!.id),
+    )
+    const duplicateStart = await settle(
+      startInitialResumeRecognition(parsing.profile!.profileId, parsing.profile!.resume!.id),
+    )
+    expect(duplicateStart).toEqual(parsing)
+
+    await settle(
+      getResumeRecognitionStatus(parsing.profile!.profileId, parsing.profile!.resume!.id),
+    )
+    const failed = await settle(getJobProfile())
+    expect(failed).toMatchObject({
+      profile: { status: "recognitionFailed", resume: { processingStatus: "failed" } },
+      recognition: { processingStatus: "failed" },
+    })
+    expect(failed.recognition!.failureReason).not.toBeNull()
+    expect(failed.recognition!.completedAt).not.toBeNull()
+
+    const retried = await settle(
+      startInitialResumeRecognition(failed.profile!.profileId, failed.profile!.resume!.id),
+    )
+    expect(retried).toMatchObject({
+      profile: {
+        status: "parsingResume",
+        resume: { failureReason: null, parsedAt: null, processingStatus: "parsing" },
+      },
+      recognition: { completedAt: null, failureReason: null, processingStatus: "parsing" },
+    })
+
+    await settle(
+      getResumeRecognitionStatus(retried.profile!.profileId, retried.profile!.resume!.id),
+    )
+    const succeeded = await settle(getJobProfile())
+    expect(succeeded).toMatchObject({
+      profile: { status: "active", resume: { processingStatus: "succeeded" } },
+      recognition: { processingStatus: "succeeded" },
+    })
+  })
+
+  it("can fail again after retrying a persistently unreadable initial resume", async () => {
+    await settle(
+      resetInitialResumeImport(
+        profileResponseMock.profile!.profileId,
+        profileResponseMock.profile!.resume!.id,
+      ),
+    )
+    const uploading = await settle(
+      uploadInitialResume({
+        file: new File(["unreadable"], "unreadable-resume.pdf", { type: "application/pdf" }),
+      }),
+    )
+    const parsing = await settle(
+      startInitialResumeRecognition(uploading.profile!.profileId, uploading.profile!.resume!.id),
+    )
+    await settle(
+      getResumeRecognitionStatus(parsing.profile!.profileId, parsing.profile!.resume!.id),
+    )
+    const failed = await settle(getJobProfile())
+
+    const retried = await settle(
+      startInitialResumeRecognition(failed.profile!.profileId, failed.profile!.resume!.id),
+    )
+    expect(retried.profile).toMatchObject({ status: "parsingResume" })
+    await settle(
+      getResumeRecognitionStatus(retried.profile!.profileId, retried.profile!.resume!.id),
+    )
+
+    const failedAgain = await settle(getJobProfile())
+    expect(failedAgain).toMatchObject({
+      profile: { status: "recognitionFailed", resume: { processingStatus: "failed" } },
+      recognition: { processingStatus: "failed" },
+    })
   })
 
   it("keeps the active resume when an update cannot be recognized", async () => {
@@ -352,6 +445,74 @@ describe("profile mock service", () => {
     expect(failed.profile!.resume!.id).toBe(originalResumeId)
     expect(failed.resumeUpdate).toMatchObject({ status: "failed" })
     expect(failed.resumeUpdate!.failureReason).toContain("text layer")
+  })
+
+  it("updates a manual profile without a resume and preserves user content", async () => {
+    const manual = await settle(createManualJobProfile())
+    const firstSave = await settle(
+      saveProfileSection({
+        profileId: manual.profile!.profileId,
+        version: manual.profile!.version,
+        section: "skills",
+        values: [{ id: "skill_custom", name: "Custom workflow", source: "userAdded" }],
+      }),
+    )
+    const secondSave = await settle(
+      saveProfileSection({
+        profileId: firstSave.profile!.profileId,
+        version: firstSave.profile!.version,
+        section: "skills",
+        values: [
+          { id: "skill_custom", name: "Custom workflow edited", source: "userAdded" },
+          { id: "skill_added", name: "Portfolio review", source: "userAdded" },
+        ],
+      }),
+    )
+    const uploading = await settle(uploadUpdatedResume({ text: "manual profile resume" }))
+    expect(uploading).toMatchObject({
+      profile: { profileId: manual.profile!.profileId, resume: null, status: "active" },
+      resumeUpdate: { status: "uploading" },
+    })
+    const parsing = await settle(
+      startUpdatedResumeRecognition(uploading.profile!.profileId, uploading.resumeUpdate!.id),
+    )
+    await settle(getResumeUpdateStatus(parsing.profile!.profileId, parsing.resumeUpdate!.id))
+    const updated = await settle(getJobProfile())
+
+    expect(updated.profile).toMatchObject({
+      resume: { processingStatus: "succeeded" },
+      version: secondSave.profile!.version + 1,
+    })
+    expect(updated.profile!.skills).toContainEqual(
+      expect.objectContaining({ id: "skill_custom", source: "userEdited" }),
+    )
+    expect(updated.profile!.skills).toContainEqual(
+      expect.objectContaining({ id: "skill_added", source: "userAdded" }),
+    )
+    expect(updated.matchingAnalysis).toBeNull()
+    expect(updated.profile!.matchingAnalysisStale).toBe(false)
+  })
+
+  it("keeps a manual profile without a resume after a failed resume update", async () => {
+    const manual = await settle(createManualJobProfile())
+    const uploading = await settle(
+      uploadUpdatedResume({
+        file: new File(["unreadable"], "unreadable-manual-resume.pdf", {
+          type: "application/pdf",
+        }),
+      }),
+    )
+    const parsing = await settle(
+      startUpdatedResumeRecognition(uploading.profile!.profileId, uploading.resumeUpdate!.id),
+    )
+    await settle(getResumeUpdateStatus(parsing.profile!.profileId, parsing.resumeUpdate!.id))
+    const failed = await settle(getJobProfile())
+
+    expect(failed).toMatchObject({
+      profile: { profileId: manual.profile!.profileId, resume: null, status: "active" },
+      resumeUpdate: { status: "failed" },
+    })
+    expect(failed.profile!.status).not.toBe("recognitionFailed")
   })
 
   it("merges a new resume without overwriting manual profile content", async () => {

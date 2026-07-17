@@ -225,13 +225,7 @@ function ProfileReadyView({
   }
 
   async function submitResumeImport(input: ResumeUploadInput) {
-    const isUpdate = Boolean(profile.resume)
-    await runImport(
-      input,
-      isUpdate ? actions.uploadUpdatedResume : actions.uploadInitialResume,
-      setResumeImportError,
-      closeResumeDialog,
-    )
+    await runImport(input, actions.uploadUpdatedResume, setResumeImportError, closeResumeDialog)
   }
 
   const summary = snapshot.resumeUpdate?.changeSummary
