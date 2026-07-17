@@ -12,7 +12,7 @@ export function createProfileEditDialogArgs(
   return {
     onDirtyChange: fn(),
     onOpenChange: fn(),
-    onSave: fn(async () => {}),
+    onSave: fn(async () => undefined),
     open: true,
     profile: structuredClone(profile) as JobProfile,
     section,

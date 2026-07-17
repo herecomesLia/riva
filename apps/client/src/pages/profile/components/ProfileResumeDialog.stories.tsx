@@ -1,7 +1,7 @@
 import preview from "#storybook/preview"
 import { fn } from "storybook/test"
 
-import { profileResponseMock } from "@/mocks/data/profile"
+import { createProfileMockSnapshot } from "@/mocks/data/profile"
 import type { JobProfileSnapshot } from "@/models/profile"
 
 import { ProfileResumeDialog } from "./ProfileResumeDialog"
@@ -26,16 +26,13 @@ const meta = preview.meta({
 })
 
 export const ExistingResume = meta.story({
-  args: createArgs(structuredClone(profileResponseMock), "details"),
+  args: createArgs(createProfileMockSnapshot(), "details"),
 })
 
-const noResume = structuredClone(profileResponseMock)
-noResume.profile!.resume = null
-
 export const NoResume = meta.story({
-  args: createArgs(noResume, "import"),
+  args: createArgs(createProfileMockSnapshot("profileWithoutResume"), "import"),
 })
 
 export const UpdateForm = meta.story({
-  args: createArgs(structuredClone(profileResponseMock), "import"),
+  args: createArgs(createProfileMockSnapshot(), "import"),
 })

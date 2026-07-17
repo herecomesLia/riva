@@ -78,8 +78,7 @@ function ProfileReadyView({
   const [editingSection, setEditingSection] = useState<EditableProfileSection | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
-  const [importFeedback, setImportFeedback] = useState<"initial" | "update" | null>(null)
-  const [importPhase, setImportPhase] = useState<"uploading" | "parsing" | null>(null)
+  const [isImportSubmitting, setIsImportSubmitting] = useState(false)
   const [initialImportError, setInitialImportError] = useState<string | null>(null)
   const [resumeDialogMode, setResumeDialogMode] = useState<ResumeDialogMode>("details")
   const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false)
@@ -126,21 +125,18 @@ function ProfileReadyView({
   async function runImport(
     input: ResumeUploadInput,
     upload: (value: ResumeUploadInput) => Promise<JobProfileSnapshot>,
-    feedback: "initial" | "update",
     setError: (message: string | null) => void,
     onSuccess?: () => void,
   ) {
-    setImportPhase("uploading")
+    setIsImportSubmitting(true)
     setError(null)
     try {
       await upload(input)
-      setImportPhase("parsing")
-      setImportFeedback(feedback)
       onSuccess?.()
     } catch {
       setError(t("profile.import.failed"))
     } finally {
-      setImportPhase(null)
+      setIsImportSubmitting(false)
     }
   }
 
@@ -149,10 +145,8 @@ function ProfileReadyView({
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <ProfileEmptyState />
         <ResumeImportForm
-          isSubmitting={importPhase !== null}
-          onSubmit={(input) =>
-            runImport(input, actions.uploadInitialResume, "initial", setInitialImportError)
-          }
+          isSubmitting={isImportSubmitting}
+          onSubmit={(input) => runImport(input, actions.uploadInitialResume, setInitialImportError)}
           title={t("profile.import.title")}
         />
         {initialImportError && <ImportError message={initialImportError} />}
@@ -162,11 +156,13 @@ function ProfileReadyView({
 
   const { profile } = snapshot
   const processingStatus =
-    importPhase === "parsing"
-      ? "parsingResume"
-      : profile.status === "uploadingResume" || profile.status === "parsingResume"
-        ? profile.status
-        : null
+    profile.status === "uploadingResume" || profile.status === "parsingResume"
+      ? profile.status
+      : snapshot.resumeUpdate?.status === "uploading"
+        ? "uploadingResume"
+        : snapshot.resumeUpdate?.status === "parsing"
+          ? "parsingResume"
+          : null
   const isProcessing = processingStatus !== null
   const isRecognitionFailure = profile.status === "recognitionFailed"
 
@@ -177,7 +173,7 @@ function ProfileReadyView({
   }
 
   function handleResumeDialogOpenChange(open: boolean) {
-    if (!open && importPhase !== null) return
+    if (!open && isImportSubmitting) return
 
     if (open) {
       setResumeDialogMode(profile.resume ? "details" : "import")
@@ -194,7 +190,6 @@ function ProfileReadyView({
     await runImport(
       input,
       isUpdate ? actions.uploadUpdatedResume : actions.uploadInitialResume,
-      isUpdate ? "update" : "initial",
       setResumeImportError,
       closeResumeDialog,
     )
@@ -202,19 +197,17 @@ function ProfileReadyView({
 
   const summary = snapshot.resumeUpdate?.changeSummary
   const showsInitialImportFeedback =
-    importFeedback === "initial" ||
-    (snapshot.recognition?.processingStatus === "succeeded" &&
-      snapshot.matchingAnalysis === null &&
-      snapshot.resumeUpdate === null)
-  const showsResumeUpdateFeedback =
-    importFeedback === "update" || snapshot.resumeUpdate?.status === "succeeded"
+    snapshot.recognition?.processingStatus === "succeeded" &&
+    snapshot.matchingAnalysis === null &&
+    snapshot.resumeUpdate === null
+  const showsResumeUpdateFeedback = snapshot.resumeUpdate?.status === "succeeded"
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <ProfileHeader onOpenResume={() => handleResumeDialogOpenChange(true)} profile={profile} />
       <ProfileResumeDialog
         importError={resumeImportError}
-        isSubmitting={importPhase !== null}
+        isSubmitting={isImportSubmitting}
         mode={resumeDialogMode}
         onModeChange={(mode) => {
           setResumeDialogMode(mode)

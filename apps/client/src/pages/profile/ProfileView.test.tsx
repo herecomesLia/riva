@@ -14,7 +14,7 @@ vi.mock("sonner", () => ({
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { profileResponseMock } from "@/mocks/data/profile"
+import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/profile"
 import type { JobProfileSnapshot } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
 import { ProfileSectionEditDialog } from "@/pages/profile/components/ProfileSectionEditDialog"
@@ -147,17 +147,14 @@ describe("ProfileView", () => {
 
   it("keeps recognition-failure actions with the supplied failure reason", async () => {
     const user = userEvent.setup()
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.status = "recognitionFailed"
-    snapshot.recognition = {
-      ...snapshot.recognition!,
-      failureReason: "The document could not be parsed.",
-    }
+    const snapshot = createProfileMockSnapshot("initialResumeRecognitionFailed")
     const { actions } = renderReady(snapshot)
     const alert = await screen.findByTestId("profile-recognition-failure")
 
     expect(alert).toHaveTextContent(i18n.t("profile.lifecycle.failed.title"))
-    expect(alert).toHaveTextContent("The document could not be parsed.")
+    expect(alert).toHaveTextContent(
+      "The resume could not be recognized because its text layer is unavailable.",
+    )
 
     await user.click(
       within(alert).getByRole("button", { name: i18n.t("profile.actions.retryRecognition") }),
@@ -181,10 +178,7 @@ describe("ProfileView", () => {
   })
 
   it("uses the default recognition-failure description when no reason is available", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.status = "recognitionFailed"
-    snapshot.profile!.resume!.failureReason = null
-    snapshot.recognition = null
+    const snapshot = createProfileMockSnapshot("initialResumeRecognitionFailedWithoutReason")
     renderReady(snapshot)
 
     expect(await screen.findByTestId("profile-recognition-failure")).toHaveTextContent(
@@ -243,8 +237,7 @@ describe("ProfileView", () => {
   })
 
   it("opens the import form from the header when the profile has no resume", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.resume = null
+    const snapshot = createProfileMockSnapshot("profileWithoutResume")
     const { actions } = renderReady(snapshot)
     const user = userEvent.setup()
 
@@ -288,16 +281,7 @@ describe("ProfileView", () => {
 
   it("keeps the completed resume update summary inside the resume dialog", async () => {
     const user = userEvent.setup()
-    const snapshot: JobProfileSnapshot = structuredClone(profileResponseMock)
-    snapshot.resumeUpdate = {
-      changeSummary: { changedItems: 2, missingItems: 1, newItems: 1 },
-      createdAt: "2026-07-13T08:00:00.000Z",
-      failureReason: null,
-      id: "resume_update_uploaded",
-      preservesManualChanges: true,
-      resume: structuredClone(snapshot.profile!.resume!),
-      status: "succeeded",
-    }
+    const snapshot = createProfileMockSnapshot("resumeUpdateSucceeded")
     renderReady(snapshot)
 
     expect(screen.queryByTestId("profile-resume-update-summary")).not.toBeInTheDocument()
@@ -310,13 +294,7 @@ describe("ProfileView", () => {
   })
 
   it("renders partial nullable data without failing the page", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.education[0]!.degree = null
-    snapshot.profile!.workExperiences[0]!.location = null
-    snapshot.profile!.credentials = []
-    snapshot.profile!.projectExperiences = []
-    snapshot.profile!.completeness.percentage = 75
-    snapshot.profile!.completeness.missingSections = ["projectExperience", "credentials"]
+    const snapshot = createProfileMockSnapshot("partial")
     renderReady(snapshot)
     expect(
       await screen.findByRole("heading", { name: i18n.t("profile.title") }),
@@ -329,8 +307,7 @@ describe("ProfileView", () => {
   })
 
   it("does not render matching-analysis regeneration controls", async () => {
-    const snapshot = structuredClone(profileResponseMock)
-    snapshot.profile!.matchingAnalysisStale = true
+    const snapshot = createProfileMockSnapshot("matchingAnalysisStale")
     renderReady(snapshot)
 
     expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()

@@ -4,6 +4,8 @@ import type { JobProfileSnapshot } from "@/models/profile"
 import {
   createManualJobProfile,
   getJobProfile,
+  getResumeRecognitionStatus,
+  getResumeUpdateStatus,
   resetInitialResumeImport,
   saveProfileSection,
   startInitialResumeRecognition,
@@ -36,33 +38,78 @@ export function ProfilePage() {
     return profile
   }
 
+  async function refreshSnapshotBestEffort(fallback: JobProfileSnapshot) {
+    try {
+      return setSnapshot(await getJobProfile())
+    } catch {
+      try {
+        return setSnapshot(await getJobProfile())
+      } catch {
+        return fallback
+      }
+    }
+  }
+
+  async function advanceInitialRecognition(
+    profileId: string,
+    resumeId: string,
+    fallback: JobProfileSnapshot,
+  ) {
+    let latest = fallback
+    try {
+      latest = setSnapshot(await startInitialResumeRecognition(profileId, resumeId))
+      await getResumeRecognitionStatus(profileId, resumeId)
+    } catch {
+      return refreshSnapshotBestEffort(latest)
+    }
+    return refreshSnapshotBestEffort(latest)
+  }
+
+  async function advanceUpdatedResumeRecognition(
+    profileId: string,
+    resumeUpdateId: string,
+    fallback: JobProfileSnapshot,
+  ) {
+    let latest = fallback
+    try {
+      latest = setSnapshot(await startUpdatedResumeRecognition(profileId, resumeUpdateId))
+      await getResumeUpdateStatus(profileId, resumeUpdateId)
+    } catch {
+      return refreshSnapshotBestEffort(latest)
+    }
+    return refreshSnapshotBestEffort(latest)
+  }
+
   const saveMutation = useMutation({
     mutationFn: saveProfileSection,
-    onSuccess: setProfile,
+    onSuccess: async (profile) => {
+      setProfile(profile)
+      const snapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
+      if (snapshot) await refreshSnapshotBestEffort(snapshot)
+    },
   })
   const recognitionMutation = useMutation({
-    mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) =>
-      startInitialResumeRecognition(profileId, resumeId),
-    onSuccess: setSnapshot,
+    mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) => {
+      const fallback = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
+      if (!fallback) throw new Error("Job profile is not available.")
+      return advanceInitialRecognition(profileId, resumeId, fallback)
+    },
   })
   const uploadInitialMutation = useMutation({
-    mutationFn: async (input: Parameters<typeof uploadInitialResume>[0]) => {
-      const uploading = setSnapshot(await uploadInitialResume(input))
-      const profile = uploading.profile
+    mutationFn: async (input) => {
+      const snapshot = setSnapshot(await uploadInitialResume(input))
+      const profile = snapshot.profile
       if (!profile?.resume) throw new Error("Resume upload returned no profile.")
-      return recognitionMutation.mutateAsync({
-        profileId: profile.profileId,
-        resumeId: profile.resume.id,
-      })
+      return advanceInitialRecognition(profile.profileId, profile.resume.id, snapshot)
     },
   })
   const uploadUpdatedMutation = useMutation({
-    mutationFn: async (input: Parameters<typeof uploadUpdatedResume>[0]) => {
-      const uploading = setSnapshot(await uploadUpdatedResume(input))
-      const profile = uploading.profile
-      const resumeUpdate = uploading.resumeUpdate
+    mutationFn: async (input) => {
+      const snapshot = setSnapshot(await uploadUpdatedResume(input))
+      const profile = snapshot.profile
+      const resumeUpdate = snapshot.resumeUpdate
       if (!profile || !resumeUpdate) throw new Error("Resume update returned no result.")
-      return setSnapshot(await startUpdatedResumeRecognition(profile.profileId, resumeUpdate.id))
+      return advanceUpdatedResumeRecognition(profile.profileId, resumeUpdate.id, snapshot)
     },
   })
   const manualProfileMutation = useMutation({

@@ -124,6 +124,7 @@ export type ResumeImportChangeSummary = {
 export type MatchingAnalysis = {
   failureReason: string | null
   generatedAt: string | null
+  /** Profile version used when this analysis was generated; stale analyses intentionally lag behind. */
   profileVersion: number
   status: "current" | "stale" | "regenerating" | "failed"
 }
