@@ -82,6 +82,17 @@ function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
   if (resumeUpdate?.status === "succeeded") {
     expect(resumeUpdate.changeSummary).not.toBeNull()
     expect(resumeUpdate.failureReason).toBeNull()
+    expect(profile.resume).not.toBeNull()
+    expect(profile.resume).toMatchObject({
+      id: resumeUpdate.resume.id,
+      parsedAt: resumeUpdate.resume.parsedAt,
+      processingStatus: "succeeded",
+      uploadedAt: resumeUpdate.resume.uploadedAt,
+    })
+    expect(resumeUpdate.resume.parsedAt).not.toBeNull()
+    expect(new Date(resumeUpdate.resume.parsedAt!).getTime()).toBeGreaterThanOrEqual(
+      new Date(resumeUpdate.resume.uploadedAt).getTime(),
+    )
   }
 
   if (matchingAnalysis) {

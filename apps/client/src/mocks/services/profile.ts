@@ -257,13 +257,15 @@ function mergeRecognizedProfile(profile: JobProfile): JobProfile {
   }
 }
 
-function staleMatchingAnalysis(profile: JobProfile): MatchingAnalysis {
-  return {
-    status: "stale",
-    profileVersion: profile.version - 1,
-    generatedAt: "2026-07-10T09:16:00.000Z",
-    failureReason: null,
+function staleMatchingAnalysis(
+  matchingAnalysis: MatchingAnalysis | null,
+  profile: JobProfile,
+): MatchingAnalysis | null {
+  if (!matchingAnalysis) return null
+  if (matchingAnalysis.profileVersion >= profile.version) {
+    throw new Error("A stale matching analysis must be older than the profile.")
   }
+  return { ...matchingAnalysis, status: "stale" }
 }
 
 function recognitionFailureReason(resume: ResumeFile) {
@@ -319,17 +321,19 @@ function completeUpdatedRecognition(profile: JobProfile, resumeUpdate: ResumeUpd
 
   const parsedAt = "2026-07-13T08:04:00.000Z"
   const resume = { ...resumeUpdate.resume, parsedAt, processingStatus: "succeeded" as const }
-  const completedProfile = mergeRecognizedProfile({
+  const mergedProfile = mergeRecognizedProfile({
     ...profile,
-    matchingAnalysisStale: true,
+    matchingAnalysisStale: false,
     resume,
     status: "active",
     updatedAt: parsedAt,
     version: profile.version + 1,
   })
+  const matchingAnalysis = staleMatchingAnalysis(mockSnapshot.matchingAnalysis, mergedProfile)
+  const completedProfile = { ...mergedProfile, matchingAnalysisStale: matchingAnalysis !== null }
   return setMockSnapshot({
     ...mockSnapshot,
-    matchingAnalysis: staleMatchingAnalysis(completedProfile),
+    matchingAnalysis,
     profile: completedProfile,
     resumeUpdate: {
       ...resumeUpdate,
@@ -346,7 +350,9 @@ export async function getJobProfile(): Promise<JobProfileSnapshot> {
   return copy(mockSnapshot)
 }
 
-export async function saveProfileSection(input: SaveProfileSectionInput): Promise<JobProfile> {
+export async function saveProfileSection(
+  input: SaveProfileSectionInput,
+): Promise<JobProfileSnapshot> {
   await waitForMockDelay()
   const profile = copy(requireProfile(input.profileId))
   if (profile.version !== input.version) throw new Error("Job profile version is out of date.")
@@ -357,9 +363,9 @@ export async function saveProfileSection(input: SaveProfileSectionInput): Promis
   }
   profile.updatedAt = "2026-07-13T08:05:00.000Z"
   profile.version += 1
-  profile.matchingAnalysisStale = true
-  setMockSnapshot({ ...mockSnapshot, matchingAnalysis: staleMatchingAnalysis(profile), profile })
-  return copy(profile)
+  const matchingAnalysis = staleMatchingAnalysis(mockSnapshot.matchingAnalysis, profile)
+  profile.matchingAnalysisStale = matchingAnalysis !== null
+  return setMockSnapshot({ ...mockSnapshot, matchingAnalysis, profile })
 }
 
 export async function uploadInitialResume(input: ResumeUploadInput): Promise<JobProfileSnapshot> {

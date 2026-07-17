@@ -26,6 +26,7 @@ function createActions(): ProfileViewActions {
     createManualProfile: vi.fn(async () => structuredClone(profileResponseMock)),
     resetInitialResumeImport: vi.fn(async () => structuredClone(profileResponseMock)),
     retryRecognition: vi.fn(async () => structuredClone(profileResponseMock)),
+    retrySynchronization: vi.fn(async () => structuredClone(profileResponseMock)),
     saveSection: vi.fn(async () => structuredClone(profileResponseMock.profile!)),
     uploadInitialResume: vi.fn(async () => structuredClone(profileResponseMock)),
     uploadUpdatedResume: vi.fn(async () => structuredClone(profileResponseMock)),
@@ -184,6 +185,63 @@ describe("ProfileView", () => {
     expect(await screen.findByTestId("profile-recognition-failure")).toHaveTextContent(
       i18n.t("profile.lifecycle.failed.description"),
     )
+  })
+
+  it("keeps the recognition failure page and shows safe feedback when manual entry fails", async () => {
+    const user = userEvent.setup()
+    const actions = createActions()
+    actions.createManualProfile = vi.fn(async () => {
+      throw new Error("manual profile request failed")
+    })
+    renderReady(createProfileMockSnapshot("initialResumeRecognitionFailed"), actions)
+
+    await user.click(
+      within(await screen.findByTestId("profile-recognition-failure")).getByRole("button", {
+        name: i18n.t("profile.actions.manualEntry"),
+      }),
+    )
+
+    expect(await screen.findByText(i18n.t("profile.lifecycle.actionFailed"))).toBeInTheDocument()
+    expect(screen.getByTestId("profile-recognition-failure")).toBeInTheDocument()
+    expect(screen.queryByText("manual profile request failed")).not.toBeInTheDocument()
+  })
+
+  it("keeps the recognition failure page and shows safe feedback when reupload reset fails", async () => {
+    const user = userEvent.setup()
+    const actions = createActions()
+    actions.resetInitialResumeImport = vi.fn(async () => {
+      throw new Error("reset request failed")
+    })
+    renderReady(createProfileMockSnapshot("initialResumeRecognitionFailed"), actions)
+
+    await user.click(
+      within(await screen.findByTestId("profile-recognition-failure")).getByRole("button", {
+        name: i18n.t("profile.actions.updateResume"),
+      }),
+    )
+
+    expect(await screen.findByText(i18n.t("profile.lifecycle.actionFailed"))).toBeInTheDocument()
+    expect(screen.getByTestId("profile-recognition-failure")).toBeInTheDocument()
+    expect(screen.queryByText("reset request failed")).not.toBeInTheDocument()
+  })
+
+  it("keeps the recognition failure page and shows safe feedback when recognition retry fails", async () => {
+    const user = userEvent.setup()
+    const actions = createActions()
+    actions.retryRecognition = vi.fn(async () => {
+      throw new Error("recognition retry request failed")
+    })
+    renderReady(createProfileMockSnapshot("initialResumeRecognitionFailed"), actions)
+
+    await user.click(
+      within(await screen.findByTestId("profile-recognition-failure")).getByRole("button", {
+        name: i18n.t("profile.actions.retryRecognition"),
+      }),
+    )
+
+    expect(await screen.findByText(i18n.t("profile.lifecycle.actionFailed"))).toBeInTheDocument()
+    expect(screen.getByTestId("profile-recognition-failure")).toBeInTheDocument()
+    expect(screen.queryByText("recognition retry request failed")).not.toBeInTheDocument()
   })
 
   it("groups only education and skills in the summary sections", async () => {

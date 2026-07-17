@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 
 import type { JobProfileSnapshot } from "@/models/profile"
 import {
@@ -18,8 +19,12 @@ import { ProfileView, type ProfileViewActions } from "./ProfileView"
 
 const profileQueryKey = ["profile"] as const
 
+type ProfileSynchronizationError = "initialRecognition" | "resumeUpdate"
+
 export function ProfilePage() {
   const queryClient = useQueryClient()
+  const [synchronizationError, setSynchronizationError] =
+    useState<ProfileSynchronizationError | null>(null)
   const profileQuery = useQuery({
     queryFn: getJobProfile,
     queryKey: profileQueryKey,
@@ -31,23 +36,25 @@ export function ProfilePage() {
     return snapshot
   }
 
-  function setProfile(profile: NonNullable<JobProfileSnapshot["profile"]>) {
-    queryClient.setQueryData<JobProfileSnapshot>(profileQueryKey, (snapshot) =>
-      snapshot ? { ...snapshot, profile } : snapshot,
-    )
-    return profile
-  }
-
   async function refreshSnapshotBestEffort(fallback: JobProfileSnapshot) {
     try {
-      return setSnapshot(await getJobProfile())
+      return { snapshot: setSnapshot(await getJobProfile()), synchronized: true }
     } catch {
       try {
-        return setSnapshot(await getJobProfile())
+        return { snapshot: setSnapshot(await getJobProfile()), synchronized: true }
       } catch {
-        return fallback
+        return { snapshot: fallback, synchronized: false }
       }
     }
+  }
+
+  async function synchronizeRecognition(
+    fallback: JobProfileSnapshot,
+    task: ProfileSynchronizationError,
+  ) {
+    const result = await refreshSnapshotBestEffort(fallback)
+    setSynchronizationError(result.synchronized ? null : task)
+    return result.snapshot
   }
 
   async function advanceInitialRecognition(
@@ -60,9 +67,9 @@ export function ProfilePage() {
       latest = setSnapshot(await startInitialResumeRecognition(profileId, resumeId))
       await getResumeRecognitionStatus(profileId, resumeId)
     } catch {
-      return refreshSnapshotBestEffort(latest)
+      return synchronizeRecognition(latest, "initialRecognition")
     }
-    return refreshSnapshotBestEffort(latest)
+    return synchronizeRecognition(latest, "initialRecognition")
   }
 
   async function advanceUpdatedResumeRecognition(
@@ -75,28 +82,30 @@ export function ProfilePage() {
       latest = setSnapshot(await startUpdatedResumeRecognition(profileId, resumeUpdateId))
       await getResumeUpdateStatus(profileId, resumeUpdateId)
     } catch {
-      return refreshSnapshotBestEffort(latest)
+      return synchronizeRecognition(latest, "resumeUpdate")
     }
-    return refreshSnapshotBestEffort(latest)
+    return synchronizeRecognition(latest, "resumeUpdate")
   }
 
   const saveMutation = useMutation({
     mutationFn: saveProfileSection,
-    onSuccess: async (profile) => {
-      setProfile(profile)
-      const snapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
-      if (snapshot) await refreshSnapshotBestEffort(snapshot)
+    onSuccess: async (snapshot) => {
+      setSnapshot(snapshot)
+      const cachedSnapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
+      if (cachedSnapshot) await refreshSnapshotBestEffort(cachedSnapshot)
     },
   })
   const recognitionMutation = useMutation({
     mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) => {
       const fallback = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
       if (!fallback) throw new Error("Job profile is not available.")
+      setSynchronizationError(null)
       return advanceInitialRecognition(profileId, resumeId, fallback)
     },
   })
   const uploadInitialMutation = useMutation({
     mutationFn: async (input) => {
+      setSynchronizationError(null)
       const snapshot = setSnapshot(await uploadInitialResume(input))
       const profile = snapshot.profile
       if (!profile?.resume) throw new Error("Resume upload returned no profile.")
@@ -105,6 +114,7 @@ export function ProfilePage() {
   })
   const uploadUpdatedMutation = useMutation({
     mutationFn: async (input) => {
+      setSynchronizationError(null)
       const snapshot = setSnapshot(await uploadUpdatedResume(input))
       const profile = snapshot.profile
       const resumeUpdate = snapshot.resumeUpdate
@@ -114,13 +124,33 @@ export function ProfilePage() {
   })
   const manualProfileMutation = useMutation({
     mutationFn: createManualJobProfile,
+    onMutate: () => setSynchronizationError(null),
     onSuccess: setSnapshot,
   })
   const resetInitialImportMutation = useMutation({
     mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) =>
       resetInitialResumeImport(profileId, resumeId),
+    onMutate: () => setSynchronizationError(null),
     onSuccess: setSnapshot,
   })
+
+  async function retrySynchronization() {
+    const snapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
+    const profile = snapshot?.profile
+    if (!snapshot || !profile) return
+
+    if (
+      snapshot.resumeUpdate?.status === "uploading" ||
+      snapshot.resumeUpdate?.status === "parsing"
+    ) {
+      setSynchronizationError(null)
+      return advanceUpdatedResumeRecognition(profile.profileId, snapshot.resumeUpdate.id, snapshot)
+    }
+    if (profile.resume) {
+      setSynchronizationError(null)
+      return advanceInitialRecognition(profile.profileId, profile.resume.id, snapshot)
+    }
+  }
 
   const actions: ProfileViewActions = {
     createManualProfile: () => manualProfileMutation.mutateAsync(),
@@ -128,6 +158,7 @@ export function ProfilePage() {
       resetInitialImportMutation.mutateAsync({ profileId, resumeId }),
     retryRecognition: (profileId, resumeId) =>
       recognitionMutation.mutateAsync({ profileId, resumeId }),
+    retrySynchronization,
     saveSection: (input) => saveMutation.mutateAsync(input),
     uploadInitialResume: (input) => uploadInitialMutation.mutateAsync(input),
     uploadUpdatedResume: (input) => uploadUpdatedMutation.mutateAsync(input),
@@ -137,7 +168,7 @@ export function ProfilePage() {
     return (
       <ProfileView
         actions={actions}
-        content={{ status: "ready", data: profileQuery.data }}
+        content={{ status: "ready", data: profileQuery.data, synchronizationError }}
         variant="default"
       />
     )

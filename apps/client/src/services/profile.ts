@@ -1,7 +1,6 @@
 import { env } from "@/app/env"
 import * as profileMockService from "@/mocks/services/profile"
 import type {
-  JobProfile,
   JobProfileSnapshot,
   MatchingAnalysis,
   ResumeRecognition,
@@ -22,7 +21,7 @@ export function getJobProfile(): Promise<JobProfileSnapshot> {
   return env.mock ? profileMockService.getJobProfile() : realApiUnavailable()
 }
 
-export function saveProfileSection(input: SaveProfileSectionInput): Promise<JobProfile> {
+export function saveProfileSection(input: SaveProfileSectionInput): Promise<JobProfileSnapshot> {
   return env.mock ? profileMockService.saveProfileSection(input) : realApiUnavailable()
 }
 

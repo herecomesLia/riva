@@ -101,9 +101,15 @@ export function ProfileEmptyState() {
 }
 
 export function ProfileProcessingState({
+  isRetrying = false,
+  onRetry,
   status,
+  synchronizationError = null,
 }: {
+  isRetrying?: boolean
+  onRetry?: () => void
   status: "uploadingResume" | "parsingResume"
+  synchronizationError?: "initialRecognition" | "resumeUpdate" | null
 }) {
   const { t } = useTranslation()
   const stateKey = status === "uploadingResume" ? "uploading" : "parsing"
@@ -118,6 +124,20 @@ export function ProfileProcessingState({
         <CardDescription>{t(`profile.lifecycle.${stateKey}.description`)}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {synchronizationError && (
+          <Alert data-testid="profile-synchronization-error" variant="destructive">
+            <AlertCircleIcon />
+            <AlertTitle>{t("profile.lifecycle.syncFailed.title")}</AlertTitle>
+            <AlertDescription>{t("profile.lifecycle.syncFailed.description")}</AlertDescription>
+            {onRetry && (
+              <Button disabled={isRetrying} onClick={onRetry} size="sm" variant="outline">
+                {isRetrying
+                  ? t("profile.lifecycle.syncFailed.retrying")
+                  : t("profile.lifecycle.syncFailed.retry")}
+              </Button>
+            )}
+          </Alert>
+        )}
         <Skeleton className="h-5 w-full max-w-md" />
         <Skeleton className="h-5 w-4/5 max-w-sm" />
       </CardContent>
@@ -127,11 +147,13 @@ export function ProfileProcessingState({
 
 export function ProfileRecognitionFailureState({
   failureReason,
+  isActionPending = false,
   onManualEntry,
   onReupload,
   onRetry,
 }: {
   failureReason: string | null
+  isActionPending?: boolean
   onManualEntry: () => void
   onReupload: () => void
   onRetry: () => void
@@ -147,13 +169,13 @@ export function ProfileRecognitionFailureState({
           {failureReason ?? t("profile.lifecycle.failed.description")}
         </AlertDescription>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={onRetry} size="sm">
+          <Button disabled={isActionPending} onClick={onRetry} size="sm">
             {t("profile.actions.retryRecognition")}
           </Button>
-          <Button onClick={onReupload} size="sm" variant="outline">
+          <Button disabled={isActionPending} onClick={onReupload} size="sm" variant="outline">
             {t("profile.actions.updateResume")}
           </Button>
-          <Button onClick={onManualEntry} size="sm" variant="outline">
+          <Button disabled={isActionPending} onClick={onManualEntry} size="sm" variant="outline">
             {t("profile.actions.manualEntry")}
           </Button>
         </div>

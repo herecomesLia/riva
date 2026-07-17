@@ -339,8 +339,15 @@ function createPartialProfileSnapshot(): JobProfileSnapshot {
 }
 
 function createResumeUpdateSucceededSnapshot(): JobProfileSnapshot {
+  const resume = createResume({
+    id: "resume_update_2026_07_succeeded",
+    parsedAt: "2026-07-13T08:04:00.000Z",
+    processingStatus: "succeeded",
+    uploadedAt: "2026-07-13T08:00:00.000Z",
+  })
   const profile = createCompleteProfile({
     matchingAnalysisStale: true,
+    resume,
     updatedAt: "2026-07-13T08:04:00.000Z",
     version: 8,
   })
@@ -352,7 +359,7 @@ function createResumeUpdateSucceededSnapshot(): JobProfileSnapshot {
       id: "resume_update_2026_07",
       createdAt: "2026-07-13T08:00:00.000Z",
       status: "succeeded",
-      resume: profile.resume!,
+      resume,
       changeSummary: { changedItems: 2, missingItems: 1, newItems: 1 },
       failureReason: null,
       preservesManualChanges: true,

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { profileResponseMock } from "@/mocks/data/profile"
 import {
+  createManualJobProfile,
   getJobProfile,
   getResumeRecognitionStatus,
   getResumeUpdateStatus,
@@ -30,6 +31,12 @@ describe("profile mock service", () => {
     return promise
   }
 
+  async function saveProfile(input: Parameters<typeof saveProfileSection>[0]) {
+    const snapshot = await settle(saveProfileSection(input))
+    if (!snapshot.profile) throw new Error("Saved profile snapshot is invalid.")
+    return snapshot.profile
+  }
+
   it("returns the current mock snapshot after the configured mock delay", async () => {
     const promise = getJobProfile()
     let settled = false
@@ -54,14 +61,12 @@ describe("profile mock service", () => {
   it("saves a typed section without mutating the standard fixture", async () => {
     const values = structuredClone(profileResponseMock.profile!.education)
     values[0]!.school = "Updated University"
-    const profile = await settle(
-      saveProfileSection({
-        profileId: profileResponseMock.profile!.profileId,
-        version: profileResponseMock.profile!.version,
-        section: "education",
-        values,
-      }),
-    )
+    const profile = await saveProfile({
+      profileId: profileResponseMock.profile!.profileId,
+      version: profileResponseMock.profile!.version,
+      section: "education",
+      values,
+    })
     expect(profile.education[0]!.school).toBe("Updated University")
     expect(profile.education[0]!.source).toBe("userEdited")
     expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
@@ -80,14 +85,12 @@ describe("profile mock service", () => {
       name: "Testing Library",
       source: "resumeExtracted",
     })
-    const profile = await settle(
-      saveProfileSection({
-        profileId: profileResponseMock.profile!.profileId,
-        version: profileResponseMock.profile!.version,
-        section: "skills",
-        values,
-      }),
-    )
+    const profile = await saveProfile({
+      profileId: profileResponseMock.profile!.profileId,
+      version: profileResponseMock.profile!.version,
+      section: "skills",
+      values,
+    })
 
     expect(profile.skills.find((skill) => skill.id === "skill_react")!.source).toBe(
       "resumeExtracted",
@@ -104,14 +107,12 @@ describe("profile mock service", () => {
   it("retains the target-role section contract for the future Roles module", async () => {
     const values = structuredClone(profileResponseMock.profile!.targetRoles)
     values[0]!.title = "Principal Frontend Engineer"
-    const profile = await settle(
-      saveProfileSection({
-        profileId: profileResponseMock.profile!.profileId,
-        version: profileResponseMock.profile!.version,
-        section: "targetRoles",
-        values,
-      }),
-    )
+    const profile = await saveProfile({
+      profileId: profileResponseMock.profile!.profileId,
+      version: profileResponseMock.profile!.version,
+      section: "targetRoles",
+      values,
+    })
 
     expect(profile.targetRoles[0]!.title).toBe("Principal Frontend Engineer")
     expect(profileResponseMock.profile!.targetRoles[0]!.title).toBe("Frontend Technical Lead")
@@ -133,15 +134,13 @@ describe("profile mock service", () => {
     const values = [structuredClone(profileResponseMock.profile!.workExperiences[0]!)]
     values[0]!.skillIds = ["skill_react", "draft_skill_accessibility"]
 
-    const profile = await settle(
-      saveProfileSection({
-        profileId: profileResponseMock.profile!.profileId,
-        section: "workExperience",
-        skillsToCreate: [{ clientId: "draft_skill_accessibility", name: "Accessibility" }],
-        values,
-        version: profileResponseMock.profile!.version,
-      }),
-    )
+    const profile = await saveProfile({
+      profileId: profileResponseMock.profile!.profileId,
+      section: "workExperience",
+      skillsToCreate: [{ clientId: "draft_skill_accessibility", name: "Accessibility" }],
+      values,
+      version: profileResponseMock.profile!.version,
+    })
 
     const skill = profile.skills.find((candidate) => candidate.name === "Accessibility")!
     expect(skill).toMatchObject({ source: "userAdded" })
@@ -160,19 +159,17 @@ describe("profile mock service", () => {
     })
     values[0]!.skillIds = ["draft_skill_react", "draft_skill_accessibility_one"]
 
-    const profile = await settle(
-      saveProfileSection({
-        profileId: profileResponseMock.profile!.profileId,
-        section: "workExperience",
-        skillsToCreate: [
-          { clientId: "draft_skill_react", name: " react " },
-          { clientId: "draft_skill_accessibility_one", name: "Accessibility" },
-          { clientId: "draft_skill_accessibility_two", name: "accessibility" },
-        ],
-        values,
-        version: profileResponseMock.profile!.version,
-      }),
-    )
+    const profile = await saveProfile({
+      profileId: profileResponseMock.profile!.profileId,
+      section: "workExperience",
+      skillsToCreate: [
+        { clientId: "draft_skill_react", name: " react " },
+        { clientId: "draft_skill_accessibility_one", name: "Accessibility" },
+        { clientId: "draft_skill_accessibility_two", name: "accessibility" },
+      ],
+      values,
+      version: profileResponseMock.profile!.version,
+    })
 
     const accessibilitySkills = profile.skills.filter(
       (skill) => skill.name.toLowerCase() === "accessibility",
@@ -190,15 +187,13 @@ describe("profile mock service", () => {
     const values = [structuredClone(profileResponseMock.profile!.projectExperiences[0]!)]
     values[0]!.skillIds = ["skill_react", "draft_skill_tanstack_router"]
 
-    const profile = await settle(
-      saveProfileSection({
-        profileId: profileResponseMock.profile!.profileId,
-        section: "projectExperience",
-        skillsToCreate: [{ clientId: "draft_skill_tanstack_router", name: "TanStack Router" }],
-        values,
-        version: profileResponseMock.profile!.version,
-      }),
-    )
+    const profile = await saveProfile({
+      profileId: profileResponseMock.profile!.profileId,
+      section: "projectExperience",
+      skillsToCreate: [{ clientId: "draft_skill_tanstack_router", name: "TanStack Router" }],
+      values,
+      version: profileResponseMock.profile!.version,
+    })
 
     const skill = profile.skills.find((candidate) => candidate.name === "TanStack Router")!
     expect(skill).toMatchObject({ source: "userAdded" })
@@ -390,8 +385,8 @@ describe("profile mock service", () => {
     })
   })
 
-  it("keeps matching-analysis state synchronized across save, update, and regeneration", async () => {
-    const saved = await settle(
+  it("preserves the generated analysis version across consecutive saves", async () => {
+    const firstSave = await settle(
       saveProfileSection({
         profileId: profileResponseMock.profile!.profileId,
         version: profileResponseMock.profile!.version,
@@ -399,21 +394,49 @@ describe("profile mock service", () => {
         values: structuredClone(profileResponseMock.profile!.skills),
       }),
     )
-    let snapshot = await settle(getJobProfile())
-    expect(saved.matchingAnalysisStale).toBe(true)
-    expect(snapshot.matchingAnalysis).toMatchObject({
+    expect(firstSave.profile).toMatchObject({ matchingAnalysisStale: true, version: 8 })
+    expect(firstSave.matchingAnalysis).toMatchObject({
       status: "stale",
-      profileVersion: saved.version - 1,
+      profileVersion: 7,
     })
 
-    const current = await settle(regenerateMatchingAnalysis(saved.profileId))
-    snapshot = await settle(getJobProfile())
-    expect(current.profileVersion).toBe(saved.version)
+    const secondSave = await settle(
+      saveProfileSection({
+        profileId: firstSave.profile!.profileId,
+        version: firstSave.profile!.version,
+        section: "skills",
+        values: structuredClone(firstSave.profile!.skills),
+      }),
+    )
+    expect(secondSave.profile).toMatchObject({ matchingAnalysisStale: true, version: 9 })
+    expect(secondSave.matchingAnalysis).toMatchObject({
+      status: "stale",
+      profileVersion: 7,
+    })
+
+    const current = await settle(regenerateMatchingAnalysis(secondSave.profile!.profileId))
+    const snapshot = await settle(getJobProfile())
+    expect(current.profileVersion).toBe(secondSave.profile!.version)
     expect(snapshot.profile!.matchingAnalysisStale).toBe(false)
     expect(snapshot.matchingAnalysis).toMatchObject({
       status: "current",
-      profileVersion: saved.version,
+      profileVersion: secondSave.profile!.version,
     })
+  })
+
+  it("does not create an analysis when saving a manual profile without one", async () => {
+    const manual = await settle(createManualJobProfile())
+    const saved = await settle(
+      saveProfileSection({
+        profileId: manual.profile!.profileId,
+        version: manual.profile!.version,
+        section: "skills",
+        values: [],
+      }),
+    )
+
+    expect(saved.profile).toMatchObject({ matchingAnalysisStale: false, version: 2 })
+    expect(saved.matchingAnalysis).toBeNull()
   })
 
   it("rejects an upload without a file or pasted text", async () => {

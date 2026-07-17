@@ -66,6 +66,13 @@ export const profile = {
       title: "Resume recognition failed",
       description: "We could not recognize this resume. Update it or try recognition again later.",
     },
+    syncFailed: {
+      title: "Unable to synchronize recognition status",
+      description: "Your current profile was kept. Synchronize again to continue processing.",
+      retry: "Synchronize again",
+      retrying: "Synchronizing...",
+    },
+    actionFailed: "This action could not be completed. Try again.",
   },
   empty: {
     title: "You do not have a job profile yet",

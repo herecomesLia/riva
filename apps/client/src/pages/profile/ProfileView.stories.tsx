@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, fn, waitFor, within } from "storybook/test"
+import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { createProfileMockSnapshot } from "@/mocks/data/profile"
 import { ProfileView } from "./ProfileView"
@@ -44,7 +44,9 @@ export const NoProfile = meta.story({
     await userEvent.click(canvas.getByRole("button", { name: /导入|import/i }))
 
     await waitFor(() =>
-      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(/识别|parsing/i),
+      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
+        /正在识别简历|recognizing your resume/i,
+      ),
     )
     await waitFor(() => expect(canvas.getByTestId("profile-import-success")).toBeInTheDocument())
     await expect(canvas.getByTestId("profile-section-education")).toBeInTheDocument()
@@ -64,7 +66,9 @@ export const RecognitionFailed = meta.story({
     await userEvent.click(canvas.getByRole("button", { name: /重试识别|retry recognition/i }))
 
     await waitFor(() =>
-      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(/识别|parsing/i),
+      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
+        /正在识别简历|recognizing your resume/i,
+      ),
     )
     await waitFor(() => expect(canvas.getByTestId("profile-import-success")).toBeInTheDocument())
     await expect(canvas.queryByTestId("profile-recognition-failure")).not.toBeInTheDocument()
@@ -78,10 +82,11 @@ export const EditableProfile = meta.story({
   render: () => <ProfileStoryHarness autoAdvance scenario="complete" />,
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getAllByRole("button", { name: /编辑|edit/i })[0]!)
-    const school = canvas.getAllByLabelText(/学校|school/i)[0]!
+    const dialog = await screen.findByRole("dialog")
+    const school = within(dialog).getAllByLabelText(/学校|school/i)[0]!
     await userEvent.clear(school)
     await userEvent.type(school, "Updated University")
-    await userEvent.click(canvas.getByRole("button", { name: /保存|save/i }))
+    await userEvent.click(within(dialog).getByRole("button", { name: /保存|save/i }))
     await waitFor(() => expect(canvas.getByText("Updated University")).toBeInTheDocument())
   },
 })
@@ -90,14 +95,23 @@ export const ResumeUpdateFlow = meta.story({
   render: () => <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="complete" />,
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /更新简历|update resume/i }))
+    const dialog = await screen.findByRole("dialog")
     await userEvent.click(
-      within(await canvas.findByRole("dialog")).getByRole("button", {
+      within(dialog).getByRole("button", {
         name: /更新简历|update resume/i,
       }),
     )
-    await userEvent.type(canvas.getByLabelText(/简历文本|resume text/i), "Updated frontend resume")
-    await userEvent.click(canvas.getByRole("button", { name: /导入|import/i }))
+    await userEvent.type(
+      within(dialog).getByLabelText(/简历文本|resume text/i),
+      "Updated frontend resume",
+    )
+    await userEvent.click(within(dialog).getByRole("button", { name: /导入|import/i }))
 
+    await waitFor(() =>
+      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
+        /正在识别简历|recognizing your resume/i,
+      ),
+    )
     await waitFor(() =>
       expect(canvas.getByTestId("profile-resume-update-success")).toBeInTheDocument(),
     )
@@ -112,8 +126,9 @@ export const DeletedWorkExperience = meta.story({
   play: async ({ canvas, userEvent }) => {
     const section = canvas.getByTestId("profile-section-workExperience")
     await userEvent.click(within(section).getByRole("button", { name: /编辑|edit/i }))
-    await userEvent.click(canvas.getAllByRole("button", { name: /删除|delete/i })[0]!)
-    await userEvent.click(canvas.getByRole("button", { name: /保存|save/i }))
+    const dialog = await screen.findByRole("dialog")
+    await userEvent.click(within(dialog).getAllByRole("button", { name: /删除|delete/i })[0]!)
+    await userEvent.click(within(dialog).getByRole("button", { name: /保存|save/i }))
 
     await waitFor(() =>
       expect(canvas.queryByText(deletedWorkExperienceTitle)).not.toBeInTheDocument(),

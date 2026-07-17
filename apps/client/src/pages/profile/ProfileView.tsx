@@ -41,6 +41,7 @@ export type ProfileViewActions = {
   createManualProfile: () => Promise<JobProfileSnapshot>
   resetInitialResumeImport: (profileId: string, resumeId: string) => Promise<JobProfileSnapshot>
   retryRecognition: (profileId: string, resumeId: string) => Promise<JobProfileSnapshot>
+  retrySynchronization?: () => Promise<JobProfileSnapshot | undefined>
   saveSection: (input: SaveProfileSectionInput) => Promise<unknown>
   uploadInitialResume: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
   uploadUpdatedResume: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
@@ -51,7 +52,11 @@ export type ProfileViewProps =
   | { variant: "default"; content: { status: "loading" } }
   | {
       variant: "default"
-      content: { status: "ready"; data: JobProfileSnapshot }
+      content: {
+        status: "ready"
+        data: JobProfileSnapshot
+        synchronizationError?: "initialRecognition" | "resumeUpdate" | null
+      }
       actions: ProfileViewActions
     }
 
@@ -64,15 +69,23 @@ export function ProfileView(props: ProfileViewProps) {
     return <ProfileLoadingState />
   }
 
-  return <ProfileReadyView actions={props.actions} snapshot={props.content.data} />
+  return (
+    <ProfileReadyView
+      actions={props.actions}
+      snapshot={props.content.data}
+      synchronizationError={props.content.synchronizationError ?? null}
+    />
+  )
 }
 
 function ProfileReadyView({
   actions,
   snapshot,
+  synchronizationError,
 }: {
   actions: ProfileViewActions
   snapshot: JobProfileSnapshot
+  synchronizationError: "initialRecognition" | "resumeUpdate" | null
 }) {
   const { t } = useTranslation()
   const [editingSection, setEditingSection] = useState<EditableProfileSection | null>(null)
@@ -83,6 +96,9 @@ function ProfileReadyView({
   const [resumeDialogMode, setResumeDialogMode] = useState<ResumeDialogMode>("details")
   const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false)
   const [resumeImportError, setResumeImportError] = useState<string | null>(null)
+  const [lifecycleActionError, setLifecycleActionError] = useState<string | null>(null)
+  const [pendingLifecycleAction, setPendingLifecycleAction] = useState(false)
+  const [isSynchronizing, setIsSynchronizing] = useState(false)
   const blocker = useBlocker({
     disabled: !isDirty,
     enableBeforeUnload: isDirty,
@@ -137,6 +153,29 @@ function ProfileReadyView({
       setError(t("profile.import.failed"))
     } finally {
       setIsImportSubmitting(false)
+    }
+  }
+
+  async function runLifecycleAction(action: () => Promise<JobProfileSnapshot>) {
+    if (pendingLifecycleAction) return
+    setPendingLifecycleAction(true)
+    setLifecycleActionError(null)
+    try {
+      await action()
+    } catch {
+      setLifecycleActionError(t("profile.lifecycle.actionFailed"))
+    } finally {
+      setPendingLifecycleAction(false)
+    }
+  }
+
+  async function retrySynchronization() {
+    if (isSynchronizing) return
+    setIsSynchronizing(true)
+    try {
+      await actions.retrySynchronization?.()
+    } finally {
+      setIsSynchronizing(false)
     }
   }
 
@@ -241,21 +280,39 @@ function ProfileReadyView({
           )}
         </Alert>
       )}
-      {processingStatus && <ProfileProcessingState status={processingStatus} />}
+      {processingStatus && (
+        <ProfileProcessingState
+          isRetrying={isSynchronizing}
+          onRetry={retrySynchronization}
+          status={processingStatus}
+          synchronizationError={synchronizationError}
+        />
+      )}
       {isRecognitionFailure && (
         <ProfileRecognitionFailureState
+          isActionPending={pendingLifecycleAction}
           failureReason={
             snapshot.recognition?.failureReason ?? profile.resume?.failureReason ?? null
           }
-          onManualEntry={() => void actions.createManualProfile()}
-          onRetry={() =>
-            profile.resume && void actions.retryRecognition(profile.profileId, profile.resume.id)
-          }
-          onReupload={() =>
-            profile.resume &&
-            void actions.resetInitialResumeImport(profile.profileId, profile.resume.id)
-          }
+          onManualEntry={() => runLifecycleAction(actions.createManualProfile)}
+          onRetry={() => {
+            if (profile.resume) {
+              return runLifecycleAction(() =>
+                actions.retryRecognition(profile.profileId, profile.resume!.id),
+              )
+            }
+          }}
+          onReupload={() => {
+            if (profile.resume) {
+              return runLifecycleAction(() =>
+                actions.resetInitialResumeImport(profile.profileId, profile.resume!.id),
+              )
+            }
+          }}
         />
+      )}
+      {isRecognitionFailure && lifecycleActionError && (
+        <ImportError message={lifecycleActionError} />
       )}
 
       {!isProcessing && !isRecognitionFailure && (

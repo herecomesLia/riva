@@ -58,6 +58,13 @@ export const profile = {
       title: "简历识别失败",
       description: "我们无法完成这份简历的识别。请稍后更新简历或重新识别。",
     },
+    syncFailed: {
+      title: "暂时无法同步识别状态",
+      description: "已保留当前档案。请重新同步以继续处理。",
+      retry: "重新同步",
+      retrying: "正在同步...",
+    },
+    actionFailed: "操作暂时无法完成，请重试。",
   },
   empty: {
     title: "还没有求职档案",
