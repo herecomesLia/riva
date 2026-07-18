@@ -10,10 +10,23 @@ function copy<T>(value: T): T {
 function toDashboardExperienceYears(
   experienceRange: TargetRoleExperienceRange | null,
 ): NonNullable<DashboardResponse["currentRole"]>["experienceYears"] {
-  if (!experienceRange || experienceRange.minYears === null || experienceRange.maxYears === null) {
+  if (
+    !experienceRange ||
+    (experienceRange.minYears === null && experienceRange.maxYears === null)
+  ) {
     return null
   }
   return { min: experienceRange.minYears, max: experienceRange.maxYears }
+}
+
+function toRoleFit(role: TargetRole | null): DashboardResponse["metrics"]["roleFit"] {
+  if (role?.matchingAnalysis?.status !== "current") {
+    return { currentValue: null, previousValue: null }
+  }
+  return {
+    currentValue: role.matchingAnalysis.result.overallMatchScore,
+    previousValue: null,
+  }
 }
 
 function toCurrentRoleSummary(
@@ -40,9 +53,14 @@ export async function getDashboardData(): Promise<DashboardResponse> {
     : null
   const profileCompleted =
     rolesResponse.profileContext.exists && rolesResponse.profileContext.completed
+  const dashboard = copy(dashboardResponseMock)
 
   return {
-    ...copy(dashboardResponseMock),
+    ...dashboard,
     currentRole: toCurrentRoleSummary(currentRole, profileCompleted),
+    metrics: {
+      ...dashboard.metrics,
+      roleFit: toRoleFit(currentRole),
+    },
   }
 }

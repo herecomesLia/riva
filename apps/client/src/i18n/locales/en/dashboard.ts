@@ -14,7 +14,11 @@ export const dashboard = {
   },
   currentRole: {
     eyebrow: "Current target",
-    experienceYears: "{{min}}–{{max}} years experience",
+    experienceYears: {
+      range: "{{min}}–{{max}} years",
+      minimum: "{{min}}+ years",
+      maximum: "Up to {{max}} years",
+    },
     recruitmentTypes: {
       campus: "Campus hire",
       experienced: "Experienced hire",

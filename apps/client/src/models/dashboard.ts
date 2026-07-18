@@ -24,8 +24,8 @@ export type DashboardResponse = {
     recruitmentType: DashboardRecruitmentType | null
     location: string | null
     experienceYears: {
-      min: number
-      max: number
+      min: number | null
+      max: number | null
     } | null
     profileCompleted: boolean
     jobDescriptionAdded: boolean

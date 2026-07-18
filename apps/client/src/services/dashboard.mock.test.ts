@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
 import { getDashboardData } from "@/services/dashboard"
-import { getRolesPage, resetRolesMockState, setCurrentTargetRole } from "@/services/roles"
+import type { TargetRoleExperienceRange } from "@/models/roles"
+import {
+  getRolesPage,
+  resetRolesMockState,
+  setCurrentTargetRole,
+  updateTargetRole,
+} from "@/services/roles"
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -19,10 +25,31 @@ async function settle<T>(promise: Promise<T>) {
   return promise
 }
 
+async function updateCurrentExperienceRange(experienceRange: TargetRoleExperienceRange | null) {
+  const roles = await settle(getRolesPage())
+  const role = roles.roles.find((candidate) => candidate.id === roles.currentRoleId)!
+  await settle(
+    updateTargetRole({
+      roleId: role.id,
+      version: role.version,
+      title: role.title,
+      company: role.company,
+      recruitmentType: role.recruitmentType,
+      location: role.location,
+      experienceRange,
+    }),
+  )
+  return settle(getDashboardData())
+}
+
 describe("getDashboardData mock service", () => {
   it("returns a dashboard summary projected from the current target-role state", async () => {
     const roles = await settle(getRolesPage())
     const currentRole = roles.roles.find((role) => role.id === roles.currentRoleId)!
+    const matchingAnalysis = currentRole.matchingAnalysis
+    if (matchingAnalysis?.status !== "current") {
+      throw new Error("Expected the default current matching-analysis fixture.")
+    }
 
     const responsePromise = getDashboardData()
     await vi.advanceTimersByTimeAsync(999)
@@ -40,7 +67,16 @@ describe("getDashboardData mock service", () => {
         profileCompleted: true,
         jobDescriptionAdded: true,
       },
+      metrics: {
+        roleFit: {
+          currentValue: matchingAnalysis.result.overallMatchScore,
+          previousValue: null,
+        },
+      },
     })
+    expect(matchingAnalysis.result.overallMatchScore).not.toBe(
+      dashboardResponseMock.metrics.roleFit.currentValue,
+    )
   })
 
   it("returns an independent response copy for each mock request", async () => {
@@ -69,6 +105,7 @@ describe("getDashboardData mock service", () => {
       profileCompleted: true,
       jobDescriptionAdded: false,
     })
+    expect(dashboard.metrics.roleFit).toEqual({ currentValue: null, previousValue: null })
   })
 
   it("derives profile and JD completion flags from domain state", async () => {
@@ -97,6 +134,48 @@ describe("getDashboardData mock service", () => {
   it("returns no current-role summary when the roles domain has no current role", async () => {
     resetRolesMockState("noRoles")
 
-    await expect(settle(getDashboardData())).resolves.toMatchObject({ currentRole: null })
+    await expect(settle(getDashboardData())).resolves.toMatchObject({
+      currentRole: null,
+      metrics: { roleFit: { currentValue: null, previousValue: null } },
+    })
   })
+
+  it.each([
+    "matchingAnalysisGenerating",
+    "matchingAnalysisFailed",
+    "matchingAnalysisStale",
+    "roleWithParsedJobDescription",
+  ] as const)("does not expose %s as a current role-fit score", async (scenario) => {
+    resetRolesMockState(scenario)
+
+    const dashboard = await settle(getDashboardData())
+
+    expect(dashboard.metrics.roleFit).toEqual({ currentValue: null, previousValue: null })
+  })
+
+  it.each([
+    [
+      { minYears: 3, maxYears: 5 },
+      { min: 3, max: 5 },
+    ],
+    [
+      { minYears: 5, maxYears: null },
+      { min: 5, max: null },
+    ],
+    [
+      { minYears: null, maxYears: 3 },
+      { min: null, max: 3 },
+    ],
+    [{ minYears: null, maxYears: null }, null],
+    [null, null],
+  ] satisfies Array<
+    [TargetRoleExperienceRange | null, { min: number | null; max: number | null } | null]
+  >)(
+    "projects the %o experience range without losing one-sided bounds",
+    async (range, expected) => {
+      const dashboard = await updateCurrentExperienceRange(range)
+
+      expect(dashboard.currentRole?.experienceYears).toEqual(expected)
+    },
+  )
 })

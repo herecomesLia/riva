@@ -161,11 +161,17 @@ function CurrentRoleDataContent({
   currentRole: NonNullable<DashboardResponse["currentRole"]>
 }) {
   const { t } = useTranslation()
-  const metadata = [
-    currentRole.location,
-    currentRole.experienceYears &&
-      t("dashboard.currentRole.experienceYears", currentRole.experienceYears),
-  ].filter(Boolean)
+  const experienceYears = currentRole.experienceYears
+  const experienceYearsLabel = !experienceYears
+    ? null
+    : experienceYears.min !== null && experienceYears.max !== null
+      ? t("dashboard.currentRole.experienceYears.range", experienceYears)
+      : experienceYears.min !== null
+        ? t("dashboard.currentRole.experienceYears.minimum", { min: experienceYears.min })
+        : experienceYears.max !== null
+          ? t("dashboard.currentRole.experienceYears.maximum", { max: experienceYears.max })
+          : null
+  const metadata = [currentRole.location, experienceYearsLabel].filter(Boolean)
 
   return (
     <>
