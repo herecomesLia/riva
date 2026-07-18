@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -8,18 +8,34 @@ import { createRolesMockResponse } from "@/mocks/data/roles"
 import type { RolesPageResponse } from "@/models/roles"
 import { renderWithProviders } from "@/test/render"
 
-import { RolesView } from "./RolesView"
+import { RolesView, type RolesViewActions } from "./RolesView"
+import { RolesActionError } from "./roles-errors"
+
+function createActions(
+  data: RolesPageResponse,
+  overrides: Partial<RolesViewActions> = {},
+): RolesViewActions {
+  return {
+    archiveTargetRole: vi.fn(async () => data),
+    createTargetRole: vi.fn(async () => data),
+    deleteTargetRole: vi.fn(async () => data),
+    setCurrentTargetRole: vi.fn(async () => data),
+    updateRolePreparationStatus: vi.fn(async () => data),
+    updateTargetRole: vi.fn(async () => data),
+    ...overrides,
+  }
+}
 
 function renderReadyView(
   data: RolesPageResponse,
   options: {
+    actions?: RolesViewActions
     initialSelectedRoleId?: string
-    setCurrentTargetRole?: (roleId: string) => void
   } = {},
 ) {
   return renderWithProviders(
     <RolesView
-      actions={{ setCurrentTargetRole: options.setCurrentTargetRole }}
+      actions={options.actions ?? createActions(data)}
       content={{ status: "ready", data }}
       initialSelectedRoleId={options.initialSelectedRoleId}
       variant="default"
@@ -109,11 +125,11 @@ describe("RolesView", () => {
 
   it("changes only local selection when a role is clicked", async () => {
     const user = userEvent.setup()
-    const setCurrentTargetRole = vi.fn()
+    const setCurrentTargetRole = vi.fn(async () => data)
     const data = createRolesMockResponse("multipleRoles")
     const currentRole = data.roles.find((role) => role.isCurrent)!
     const otherRole = data.roles.find((role) => !role.isCurrent)!
-    renderReadyView(data, { setCurrentTargetRole })
+    renderReadyView(data, { actions: createActions(data, { setCurrentTargetRole }) })
 
     const currentButton = await screen.findByRole("button", {
       name: new RegExp(`^${currentRole.title}`),
@@ -129,6 +145,181 @@ describe("RolesView", () => {
     expect(currentButton).toHaveAttribute("aria-pressed", "false")
     expect(setCurrentTargetRole).not.toHaveBeenCalled()
     expect(within(currentButton).getByText(i18n.t("roles.badges.current"))).toBeInTheDocument()
+  })
+
+  it("validates required title, non-negative experience, and experience order", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("noRoles")
+    const actions = createActions(data)
+    renderReadyView(data, { actions })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const dialog = await screen.findByRole("dialog")
+    const minimumExperience = within(dialog).getByLabelText(i18n.t("roles.editor.fields.minYears"))
+    fireEvent.change(minimumExperience, { target: { value: "-1" } })
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
+    expect(
+      await within(dialog).findByText(i18n.t("roles.editor.validation.required")),
+    ).toBeInTheDocument()
+    expect(
+      await within(dialog).findByText(i18n.t("roles.editor.validation.nonNegative")),
+    ).toBeInTheDocument()
+
+    await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "SRE")
+    await user.clear(minimumExperience)
+    await user.type(minimumExperience, "5")
+    await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.maxYears")), "2")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
+    expect(
+      await within(dialog).findByText(i18n.t("roles.editor.validation.experienceRange")),
+    ).toBeInTheDocument()
+
+    expect(actions.createTargetRole).not.toHaveBeenCalled()
+  })
+
+  it("chooses independent current and preparation actions with the selected role version", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("multipleRoles")
+    const selectedRole = data.roles.find((role) => !role.isCurrent)!
+    const actions = createActions(data)
+    renderReadyView(data, { actions, initialSelectedRoleId: selectedRole.id })
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("roles.actions.setCurrent") }),
+    )
+    expect(actions.setCurrentTargetRole).toHaveBeenCalledWith({
+      roleId: selectedRole.id,
+      version: selectedRole.version,
+    })
+
+    await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.resume") }))
+    expect(actions.updateRolePreparationStatus).toHaveBeenCalledWith({
+      roleId: selectedRole.id,
+      version: selectedRole.version,
+      preparationStatus: "preparing",
+    })
+  })
+
+  it("prevents duplicate form submissions while a save is pending", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("noRoles")
+    let resolveSave!: (value: RolesPageResponse) => void
+    const pendingSave = new Promise<RolesPageResponse>((resolve) => {
+      resolveSave = resolve
+    })
+    const createTargetRole = vi.fn(() => pendingSave)
+    renderReadyView(data, { actions: createActions(data, { createTargetRole }) })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const dialog = await screen.findByRole("dialog")
+    await user.type(
+      within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")),
+      "Data Engineer",
+    )
+    const save = within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") })
+    await user.click(save)
+
+    await waitFor(() => expect(createTargetRole).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(save).toBeDisabled())
+    resolveSave(data)
+  })
+
+  it("closes after a successful edit save", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("singleRoleWithoutJobDescription")
+    const actions = createActions(data)
+    renderReadyView(data, { actions })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const title = within(dialog).getByLabelText(i18n.t("roles.editor.fields.title"))
+    await user.clear(title)
+    await user.type(title, "Staff Frontend Engineer")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    expect(actions.updateTargetRole).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Staff Frontend Engineer",
+        version: data.roles[0]!.version,
+      }),
+    )
+  })
+
+  it("shows a safe version-conflict error and preserves a failed draft", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("singleRoleWithoutJobDescription")
+    const updateTargetRole = vi.fn(async () => {
+      throw new RolesActionError("versionConflict")
+    })
+    renderReadyView(data, { actions: createActions(data, { updateTargetRole }) })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.edit") }))
+    const dialog = await screen.findByRole("dialog")
+    const title = within(dialog).getByLabelText(i18n.t("roles.editor.fields.title"))
+    await user.clear(title)
+    await user.type(title, "Unsaved Staff Engineer")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
+
+    expect(
+      await within(dialog).findByText(i18n.t("roles.errors.versionConflict")),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue("Unsaved Staff Engineer")).toBeInTheDocument()
+    expect(within(dialog).queryByText("versionConflict")).not.toBeInTheDocument()
+  })
+
+  it("requires destructive confirmation before deleting", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("singleRoleWithoutJobDescription")
+    const actions = createActions(data)
+    renderReadyView(data, { actions })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.delete") }))
+    expect(actions.deleteTargetRole).not.toHaveBeenCalled()
+    const confirmation = await screen.findByRole("alertdialog")
+    await user.click(
+      within(confirmation).getByRole("button", { name: i18n.t("roles.actions.delete") }),
+    )
+    expect(actions.deleteTargetRole).toHaveBeenCalledWith({
+      roleId: data.roles[0]!.id,
+      version: data.roles[0]!.version,
+    })
+  })
+
+  it("confirms before closing a dirty editor", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("noRoles")
+    renderReadyView(data)
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const dialog = await screen.findByRole("dialog")
+    await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "Draft")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.cancel") }))
+
+    const discard = await screen.findByRole("alertdialog")
+    expect(within(dialog).getByDisplayValue("Draft")).toBeInTheDocument()
+    await user.click(
+      within(discard).getByRole("button", { name: i18n.t("roles.dialog.stayEditing") }),
+    )
+    expect(within(dialog).getByDisplayValue("Draft")).toBeInTheDocument()
+  })
+
+  it("blocks page navigation while the editor is dirty", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("noRoles")
+    const { router } = renderReadyView(data)
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const dialog = await screen.findByRole("dialog")
+    await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "Draft")
+
+    act(() => {
+      void router!.navigate({ to: "/profile" })
+    })
+
+    const blocker = await screen.findByRole("alertdialog")
+    expect(within(blocker).getByText(i18n.t("roles.dialog.leavePageTitle"))).toBeInTheDocument()
+    expect(router!.state.location.pathname).toBe("/roles")
   })
 
   it("shows an explicit notice when no server current role exists", async () => {

@@ -1,14 +1,42 @@
-import { BriefcaseBusinessIcon, Building2Icon, MapPinIcon, TimerIcon } from "lucide-react"
+import {
+  ArchiveIcon,
+  BriefcaseBusinessIcon,
+  Building2Icon,
+  MapPinIcon,
+  PauseIcon,
+  PencilIcon,
+  PlayIcon,
+  StarIcon,
+  TimerIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import type { TargetRole, TargetRoleExperienceRange } from "@/models/roles"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
 
-export function RoleDetails({ role }: { role: TargetRole }) {
+export type RoleDetailsActions = {
+  archive: () => void
+  delete: () => void
+  edit: () => void
+  setCurrent: () => void
+  togglePreparationStatus: () => void
+}
+
+export function RoleDetails({
+  actions,
+  pending,
+  role,
+}: {
+  actions?: RoleDetailsActions
+  pending?: boolean
+  role: TargetRole
+}) {
   const { t } = useTranslation()
 
   return (
@@ -25,6 +53,52 @@ export function RoleDetails({ role }: { role: TargetRole }) {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
+        {actions && (
+          <div className="flex flex-wrap gap-2" data-testid="role-actions">
+            <Button disabled={pending} onClick={actions.edit} size="sm" variant="outline">
+              <PencilIcon data-icon="inline-start" />
+              {t("roles.actions.edit")}
+            </Button>
+            {!role.isCurrent && role.preparationStatus !== "archived" && (
+              <Button disabled={pending} onClick={actions.setCurrent} size="sm" variant="outline">
+                <StarIcon data-icon="inline-start" />
+                {t("roles.actions.setCurrent")}
+              </Button>
+            )}
+            {role.preparationStatus !== "archived" && (
+              <Button
+                disabled={pending}
+                onClick={actions.togglePreparationStatus}
+                size="sm"
+                variant="outline"
+              >
+                {role.preparationStatus === "preparing" ? (
+                  <PauseIcon data-icon="inline-start" />
+                ) : (
+                  <PlayIcon data-icon="inline-start" />
+                )}
+                {t(
+                  role.preparationStatus === "preparing"
+                    ? "roles.actions.pause"
+                    : "roles.actions.resume",
+                )}
+              </Button>
+            )}
+            {role.preparationStatus !== "archived" && (
+              <Button disabled={pending} onClick={actions.archive} size="sm" variant="outline">
+                <ArchiveIcon data-icon="inline-start" />
+                {t("roles.actions.archive")}
+              </Button>
+            )}
+            <Button disabled={pending} onClick={actions.delete} size="sm" variant="destructive">
+              <Trash2Icon data-icon="inline-start" />
+              {t("roles.actions.delete")}
+            </Button>
+          </div>
+        )}
+
+        <Separator />
+
         <section aria-labelledby="role-basics-title" className="flex flex-col gap-3">
           <h3 className="font-heading font-medium" id="role-basics-title">
             {t("roles.details.sections.basics")}

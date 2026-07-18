@@ -4,7 +4,63 @@ export const roles = {
     "Manage roles you are preparing for or have archived, and review JD and match-analysis status.",
   actions: {
     add: "Add target role",
+    archive: "Archive role",
+    delete: "Delete role",
+    edit: "Edit details",
+    pause: "Pause preparation",
+    resume: "Resume preparation",
     retry: "Reload",
+    setCurrent: "Set as current role",
+  },
+  editor: {
+    create: {
+      title: "Add target role",
+      description: "Save the role basics. Your first role becomes the current role automatically.",
+    },
+    edit: {
+      title: "Edit role details",
+      description: "Update role basics without implicitly changing the current role.",
+    },
+    fields: {
+      title: "Role title",
+      company: "Company name",
+      recruitmentType: "Recruitment type",
+      location: "Location",
+      minYears: "Minimum years of experience",
+      maxYears: "Maximum years of experience",
+      preparationStatus: "Preparation status",
+    },
+    options: { unspecified: "Not specified" },
+    validation: {
+      required: "Enter a role title.",
+      nonNegative: "Experience must be a non-negative integer.",
+      experienceRange: "Minimum experience cannot exceed maximum experience.",
+    },
+    cancel: "Cancel",
+    save: "Save",
+    saving: "Saving",
+  },
+  dialog: {
+    archiveTitle: "Archive this role?",
+    archiveDescription: "The role will remain saved, but an archived role cannot be current.",
+    deleteTitle: "Permanently delete this role?",
+    deleteDescription:
+      "This cannot be undone. The role, JD, and match-analysis data will be deleted.",
+    cancel: "Cancel",
+    discardDraftTitle: "Discard unsaved changes?",
+    discardDraftDescription: "Closing will discard the role details you have not saved.",
+    stayEditing: "Keep editing",
+    discardChanges: "Discard changes",
+    leavePageTitle: "Leave and discard changes?",
+    leavePageDescription: "The role form still contains unsaved changes.",
+    leavePage: "Leave page",
+  },
+  errors: {
+    actionTitle: "Action not completed",
+    requestFailed:
+      "We could not save this change. Try again later; your draft and current role data are preserved.",
+    versionConflict:
+      "This role changed elsewhere. Close the form, review the latest version, and try again.",
   },
   list: {
     title: "Saved roles",

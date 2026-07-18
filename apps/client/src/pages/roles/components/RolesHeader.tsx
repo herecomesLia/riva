@@ -3,7 +3,13 @@ import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 
-export function RolesHeader() {
+export function RolesHeader({
+  disabled = false,
+  onAdd,
+}: {
+  disabled?: boolean
+  onAdd?: () => void
+}) {
   const { t } = useTranslation()
 
   return (
@@ -14,7 +20,7 @@ export function RolesHeader() {
         </h1>
         <p className="text-base leading-7 text-muted-foreground">{t("roles.description")}</p>
       </div>
-      <Button disabled>
+      <Button disabled={disabled || !onAdd} onClick={onAdd}>
         <PlusIcon data-icon="inline-start" />
         {t("roles.actions.add")}
       </Button>
