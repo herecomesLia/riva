@@ -12,14 +12,14 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import type { TargetRole, TargetRoleExperienceRange } from "@/models/roles"
+import type { ProfileContext, TargetRole, TargetRoleExperienceRange } from "@/models/roles"
 
-import { RoleStatusBadges } from "./RoleStatusBadges"
 import { JobDescriptionCard } from "./JobDescriptionCard"
+import { MatchingAnalysisCard } from "./MatchingAnalysisCard"
+import { RoleStatusBadges } from "./RoleStatusBadges"
 
 export type RoleDetailsActions = {
   archive: () => void
@@ -30,17 +30,23 @@ export type RoleDetailsActions = {
   editJobDescription: () => void
   retryJobDescriptionParsing: () => void
   retryJobDescriptionSynchronization: () => void
+  generateMatchingAnalysis: () => void
+  retryMatchingAnalysisSynchronization: () => void
 }
 
 export function RoleDetails({
   actions,
   pending,
+  profileContext,
   role,
   jobDescriptionSynchronizationError = false,
+  matchingAnalysisSynchronizationError = false,
 }: {
   actions?: RoleDetailsActions
   jobDescriptionSynchronizationError?: boolean
+  matchingAnalysisSynchronizationError?: boolean
   pending?: boolean
+  profileContext: ProfileContext
   role: TargetRole
 }) {
   const { t } = useTranslation()
@@ -148,18 +154,14 @@ export function RoleDetails({
           synchronizationError={jobDescriptionSynchronizationError}
         />
 
-        <div className="grid gap-4">
-          <StatusSummary
-            description={t(
-              `roles.matchingAnalysisStatus.${role.matchingAnalysis?.status ?? "none"}.description`,
-            )}
-            label={t(
-              `roles.matchingAnalysisStatus.${role.matchingAnalysis?.status ?? "none"}.label`,
-            )}
-            title={t("roles.details.sections.matchingAnalysis")}
-            variant={role.matchingAnalysis?.status === "failed" ? "destructive" : "outline"}
-          />
-        </div>
+        <MatchingAnalysisCard
+          onGenerate={actions?.generateMatchingAnalysis}
+          onRetrySynchronization={actions?.retryMatchingAnalysisSynchronization}
+          pending={pending}
+          profileContext={profileContext}
+          role={role}
+          synchronizationError={matchingAnalysisSynchronizationError}
+        />
       </CardContent>
     </Card>
   )
@@ -180,34 +182,6 @@ function RoleField({
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0 text-sm font-medium">{value}</dd>
     </div>
-  )
-}
-
-function StatusSummary({
-  description,
-  label,
-  title,
-  variant,
-}: {
-  description: string
-  label: string
-  title: string
-  variant: "destructive" | "outline"
-}) {
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle>
-            <h3>{title}</h3>
-          </CardTitle>
-          <Badge variant={variant}>{label}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
   )
 }
 

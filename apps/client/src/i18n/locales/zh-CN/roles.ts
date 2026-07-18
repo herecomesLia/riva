@@ -94,6 +94,65 @@ export const roles = {
       keywords: "高频关键词",
     },
   },
+  matching: {
+    cardDescription: "结合当前求职档案与岗位 JD，查看能力匹配和面试准备重点。",
+    actions: {
+      generate: "生成匹配分析",
+      regenerate: "重新生成分析",
+      retry: "重试生成",
+      resynchronize: "重新同步状态",
+    },
+    prerequisites: {
+      profile: {
+        missing: {
+          title: "请先创建求职档案",
+          description: "匹配分析需要使用你的经历、技能和求职信息。",
+          action: "前往创建档案",
+        },
+        incomplete: {
+          title: "请补充求职档案",
+          description: "完善关键经历和技能后，才能生成可靠的匹配分析。",
+          action: "前往完善档案",
+        },
+      },
+      jd: {
+        missing: {
+          title: "请先添加岗位 JD",
+          description: "保存并解析 JD 后，才能分析岗位要求与档案的匹配情况。",
+        },
+        parsing: {
+          title: "正在等待 JD 解析",
+          description: "JD 解析完成后即可生成匹配分析。",
+        },
+        failed: {
+          title: "请先重试 JD 解析",
+          description: "当前 JD 尚未得到结构化结果，匹配分析暂不可用。",
+        },
+      },
+    },
+    synchronization: {
+      title: "暂时无法获取匹配分析结果",
+      description: "分析任务仍在生成中。可以重新同步，不会重复创建分析任务。",
+    },
+    stale: {
+      title: "当前结果需要更新",
+      description: "求职档案或 JD 已发生变化；下方保留的是上次生成的分析。",
+    },
+    failed: {
+      title: "匹配分析未完成",
+    },
+    result: {
+      overallMatch: "总体匹配度",
+      coreRequirements: "岗位核心要求",
+      matchedCapabilities: "高匹配能力",
+      missingCapabilities: "缺失能力",
+      underrepresentedCapabilities: "有能力但表达不足",
+      resumeHighlights: "可重点准备的项目或经历",
+      resumeGaps: "简历薄弱点",
+      highRiskQuestions: "高风险追问",
+      preparationRecommendations: "面试准备建议",
+    },
+  },
   list: {
     title: "已保存岗位",
     description: "选择岗位可查看详情，不会改变当前默认岗位。",

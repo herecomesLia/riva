@@ -16,12 +16,14 @@ export function RolesStoryHarness({
   initialData,
   initialSelectedRoleId,
   jobDescriptionSynchronizationErrorRoleIds = [],
+  matchingAnalysisSynchronizationErrorRoleIds = [],
   transitions = {},
 }: {
   actions: Partial<RolesViewActions>
   initialData: RolesPageResponse
   initialSelectedRoleId?: string
   jobDescriptionSynchronizationErrorRoleIds?: string[]
+  matchingAnalysisSynchronizationErrorRoleIds?: string[]
   transitions?: RolesStoryTransitions
 }) {
   const [data, setData] = useState(() => structuredClone(initialData))
@@ -51,8 +53,10 @@ export function RolesStoryHarness({
     archiveTargetRole: wrap("archiveTargetRole"),
     createTargetRole: wrap("createTargetRole"),
     deleteTargetRole: wrap("deleteTargetRole"),
+    generateMatchingAnalysis: wrap("generateMatchingAnalysis"),
     retryJobDescriptionParsing: wrap("retryJobDescriptionParsing"),
     retryJobDescriptionSynchronization: wrap("retryJobDescriptionSynchronization"),
+    retryMatchingAnalysisSynchronization: wrap("retryMatchingAnalysisSynchronization"),
     saveJobDescription: wrap("saveJobDescription"),
     setCurrentTargetRole: wrap("setCurrentTargetRole"),
     updateRolePreparationStatus: wrap("updateRolePreparationStatus"),
@@ -65,6 +69,7 @@ export function RolesStoryHarness({
       content={{ status: "ready", data }}
       initialSelectedRoleId={initialSelectedRoleId}
       jobDescriptionSynchronizationErrorRoleIds={jobDescriptionSynchronizationErrorRoleIds}
+      matchingAnalysisSynchronizationErrorRoleIds={matchingAnalysisSynchronizationErrorRoleIds}
       variant="default"
     />
   )

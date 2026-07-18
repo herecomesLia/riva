@@ -18,7 +18,9 @@ import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
+  GenerateOrRegenerateMatchingAnalysisInput,
   GetJobDescriptionParsingStatusInput,
+  GetMatchingAnalysisStatusInput,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
@@ -45,11 +47,17 @@ export type RolesViewActions = {
   archiveTargetRole: (input: ArchiveTargetRoleInput) => Promise<RolesPageResponse>
   createTargetRole: (input: CreateTargetRoleInput) => Promise<RolesPageResponse>
   deleteTargetRole: (input: DeleteTargetRoleInput) => Promise<RolesPageResponse>
+  generateMatchingAnalysis: (
+    input: GenerateOrRegenerateMatchingAnalysisInput,
+  ) => Promise<RolesPageResponse>
   retryJobDescriptionParsing: (
     input: StartOrRetryJobDescriptionParsingInput,
   ) => Promise<RolesPageResponse>
   retryJobDescriptionSynchronization: (
     input: GetJobDescriptionParsingStatusInput,
+  ) => Promise<RolesPageResponse>
+  retryMatchingAnalysisSynchronization: (
+    input: GetMatchingAnalysisStatusInput,
   ) => Promise<RolesPageResponse>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
@@ -66,6 +74,7 @@ export type RolesViewProps =
       actions?: RolesViewActions
       initialSelectedRoleId?: string
       jobDescriptionSynchronizationErrorRoleIds?: string[]
+      matchingAnalysisSynchronizationErrorRoleIds?: string[]
     }
   | {
       variant: "error"
@@ -93,6 +102,9 @@ export function RolesView(props: RolesViewProps) {
           jobDescriptionSynchronizationErrorRoleIds={
             props.jobDescriptionSynchronizationErrorRoleIds ?? []
           }
+          matchingAnalysisSynchronizationErrorRoleIds={
+            props.matchingAnalysisSynchronizationErrorRoleIds ?? []
+          }
         />
       )}
     </div>
@@ -104,11 +116,13 @@ function RolesReadyView({
   data,
   initialSelectedRoleId,
   jobDescriptionSynchronizationErrorRoleIds,
+  matchingAnalysisSynchronizationErrorRoleIds,
 }: {
   actions?: RolesViewActions
   data: RolesPageResponse
   initialSelectedRoleId?: string
   jobDescriptionSynchronizationErrorRoleIds: string[]
+  matchingAnalysisSynchronizationErrorRoleIds: string[]
 }) {
   const { t } = useTranslation()
   const defaultSelectedRoleId =
@@ -200,6 +214,23 @@ function RolesReadyView({
                         delete: () => setConfirmation("delete"),
                         edit: () => setEditorMode("edit"),
                         editJobDescription: () => setIsJobDescriptionEditorOpen(true),
+                        generateMatchingAnalysis: () => {
+                          if (
+                            !data.profileContext.exists ||
+                            !data.profileContext.completed ||
+                            selectedRole.jobDescription.status !== "ready" ||
+                            selectedRole.matchingAnalysis?.status === "generating" ||
+                            selectedRole.matchingAnalysis?.status === "current"
+                          ) {
+                            return
+                          }
+                          void runAction(() =>
+                            actions.generateMatchingAnalysis({
+                              roleId: selectedRole.id,
+                              version: selectedRole.version,
+                            }),
+                          )
+                        },
                         retryJobDescriptionParsing: () => {
                           if (selectedRole.jobDescription.status !== "failed") return
                           const jobDescriptionVersion = selectedRole.jobDescription.version
@@ -219,6 +250,15 @@ function RolesReadyView({
                               roleId: selectedRole.id,
                               version: selectedRole.version,
                               jobDescriptionVersion,
+                            }),
+                          )
+                        },
+                        retryMatchingAnalysisSynchronization: () => {
+                          if (selectedRole.matchingAnalysis?.status !== "generating") return
+                          void runAction(() =>
+                            actions.retryMatchingAnalysisSynchronization({
+                              roleId: selectedRole.id,
+                              version: selectedRole.version,
                             }),
                           )
                         },
@@ -244,8 +284,12 @@ function RolesReadyView({
                     : undefined
                 }
                 pending={pendingAction}
+                profileContext={data.profileContext}
                 role={selectedRole}
                 jobDescriptionSynchronizationError={jobDescriptionSynchronizationErrorRoleIds.includes(
+                  selectedRole.id,
+                )}
+                matchingAnalysisSynchronizationError={matchingAnalysisSynchronizationErrorRoleIds.includes(
                   selectedRole.id,
                 )}
               />

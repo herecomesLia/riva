@@ -477,3 +477,172 @@ export const JobDescriptionSynchronizationError = meta.story({
     />
   ),
 })
+
+export const ProfileMissing = meta.story({
+  args: {
+    content: { status: "ready", data: createRolesMockResponse("profileMissing") },
+    variant: "default",
+  },
+})
+
+export const ProfileIncomplete = meta.story({
+  args: {
+    content: { status: "ready", data: createRolesMockResponse("profileIncomplete") },
+    variant: "default",
+  },
+})
+
+export const AnalysisUnavailableWithoutJD = meta.story({
+  args: {
+    content: {
+      status: "ready",
+      data: createRolesMockResponse("singleRoleWithoutJobDescription"),
+    },
+    variant: "default",
+  },
+})
+
+export const MatchingAnalysisGenerating = meta.story({
+  args: {
+    content: {
+      status: "ready",
+      data: createRolesMockResponse("matchingAnalysisGenerating"),
+    },
+    variant: "default",
+  },
+})
+
+export const MatchingAnalysisFailed = meta.story({
+  args: {
+    content: { status: "ready", data: createRolesMockResponse("matchingAnalysisFailed") },
+    variant: "default",
+  },
+})
+
+export const MatchingAnalysisStale = meta.story({
+  args: {
+    content: { status: "ready", data: createRolesMockResponse("matchingAnalysisStale") },
+    variant: "default",
+  },
+})
+
+export const MatchingAnalysisCurrent = meta.story({
+  args: {
+    content: { status: "ready", data: createRolesMockResponse("matchingAnalysisCurrent") },
+    variant: "default",
+  },
+})
+
+function createGeneratingAnalysisResponse(initial: RolesPageResponse) {
+  const response = structuredClone(initial)
+  const role = response.roles[0]!
+  if (
+    !response.profileContext.exists ||
+    !response.profileContext.completed ||
+    role.jobDescription.status !== "ready"
+  ) {
+    throw new globalThis.Error("Expected complete analysis prerequisites.")
+  }
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    matchingAnalysis: {
+      status: "generating",
+      profileVersion: response.profileContext.version,
+      jobDescriptionVersion: role.jobDescription.version,
+      generatedAt: null,
+      failureReason: null,
+      result: null,
+    },
+  }
+  return response
+}
+
+function createCurrentAnalysisResponse(generating: RolesPageResponse) {
+  const response = structuredClone(generating)
+  const role = response.roles[0]!
+  const result = createRolesMockResponse("matchingAnalysisCurrent").roles[0]!.matchingAnalysis
+  if (role.matchingAnalysis?.status !== "generating" || result?.status !== "current") {
+    throw new globalThis.Error("Expected generating and current analysis fixtures.")
+  }
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    matchingAnalysis: {
+      ...role.matchingAnalysis,
+      status: "current",
+      generatedAt: "2026-07-18T09:00:00.000Z",
+      result: structuredClone(result.result),
+    },
+  }
+  return response
+}
+
+const generateAnalysisInitial = createRolesMockResponse("roleWithParsedJobDescription")
+const generateAnalysisGenerating = createGeneratingAnalysisResponse(generateAnalysisInitial)
+const generateAnalysisCurrent = createCurrentAnalysisResponse(generateAnalysisGenerating)
+const generateAnalysisGate = createTransitionGate()
+
+export const GenerateMatchingAnalysis = meta.story({
+  render: () => (
+    <RolesStoryHarness
+      actions={{ generateMatchingAnalysis: fn(async () => generateAnalysisGenerating) }}
+      initialData={generateAnalysisInitial}
+      transitions={{
+        generateMatchingAnalysis: async () => {
+          await generateAnalysisGate.wait()
+          return generateAnalysisCurrent
+        },
+      }}
+    />
+  ),
+  play: async ({ userEvent }) => {
+    generateAnalysisGate.reset()
+    await userEvent.click(
+      screen.getByRole("button", { name: /生成匹配分析|generate match analysis/i }),
+    )
+    await waitFor(() => expect(screen.getAllByText(/生成中|generating/i).length).toBeGreaterThan(0))
+    generateAnalysisGate.release()
+    const result = await screen.findByTestId("matching-analysis-result")
+    await expect(within(result).getByText("78%")).toBeVisible()
+    await expect(
+      within(result).getByText(
+        generateAnalysisCurrent.roles[0]!.matchingAnalysis!.result!.matchedCapabilities[0]!,
+      ),
+    ).toBeVisible()
+  },
+})
+
+const regenerateAnalysisInitial = createRolesMockResponse("matchingAnalysisStale")
+const regenerateAnalysisGenerating = createGeneratingAnalysisResponse(regenerateAnalysisInitial)
+const regenerateAnalysisCurrent = createCurrentAnalysisResponse(regenerateAnalysisGenerating)
+const regenerateAnalysisGate = createTransitionGate()
+
+export const RegenerateStaleAnalysis = meta.story({
+  render: () => (
+    <RolesStoryHarness
+      actions={{ generateMatchingAnalysis: fn(async () => regenerateAnalysisGenerating) }}
+      initialData={regenerateAnalysisInitial}
+      transitions={{
+        generateMatchingAnalysis: async () => {
+          await regenerateAnalysisGate.wait()
+          return regenerateAnalysisCurrent
+        },
+      }}
+    />
+  ),
+  play: async ({ userEvent }) => {
+    regenerateAnalysisGate.reset()
+    await userEvent.click(screen.getByRole("button", { name: /重新生成分析|regenerate analysis/i }))
+    await waitFor(() => expect(screen.getAllByText(/生成中|generating/i).length).toBeGreaterThan(0))
+    regenerateAnalysisGate.release()
+    const result = await screen.findByTestId("matching-analysis-result")
+    await expect(within(result).getByText("78%")).toBeVisible()
+    await expect(
+      within(result).getByText(
+        regenerateAnalysisCurrent.roles[0]!.matchingAnalysis!.result!
+          .preparationRecommendations[0]!,
+      ),
+    ).toBeVisible()
+  },
+})

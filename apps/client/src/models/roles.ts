@@ -63,12 +63,15 @@ export type JobDescriptionAnalysis = {
 export type MatchingAnalysisStatus = "generating" | "current" | "stale" | "failed"
 
 export type MatchingAnalysisResult = {
+  /** Whole-number percentage from 0 to 100. */
+  overallMatchScore: number
   coreRequirementsSummary: string
   matchedCapabilities: string[]
   missingCapabilities: string[]
   underrepresentedCapabilities: string[]
   resumeHighlights: string[]
   resumeGaps: string[]
+  highRiskQuestions: string[]
   preparationRecommendations: string[]
 }
 

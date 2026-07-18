@@ -7,11 +7,14 @@ import { defaultLanguage } from "@/i18n/resources"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 import { RolesPage } from "@/pages/roles"
 import { JOB_DESCRIPTION_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useJobDescriptionSynchronization"
+import { MATCHING_ANALYSIS_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useMatchingAnalysisSynchronization"
 import {
   archiveTargetRole,
   createTargetRole,
   deleteTargetRole,
+  generateMatchingAnalysis,
   getJobDescriptionParsingStatus,
+  getMatchingAnalysisStatus,
   getRolesPage,
   saveJobDescription,
   setCurrentTargetRole,
@@ -27,7 +30,9 @@ vi.mock("@/services/roles", async (importOriginal) => ({
   archiveTargetRole: vi.fn(),
   createTargetRole: vi.fn(),
   deleteTargetRole: vi.fn(),
+  generateMatchingAnalysis: vi.fn(),
   getJobDescriptionParsingStatus: vi.fn(),
+  getMatchingAnalysisStatus: vi.fn(),
   saveJobDescription: vi.fn(),
   setCurrentTargetRole: vi.fn(),
   startJobDescriptionParsing: vi.fn(),
@@ -53,6 +58,7 @@ const mutationMocks = [
   archiveTargetRole,
   createTargetRole,
   deleteTargetRole,
+  generateMatchingAnalysis,
   saveJobDescription,
   setCurrentTargetRole,
   startJobDescriptionParsing,
@@ -65,6 +71,7 @@ describe("RolesPage", () => {
     await i18n.changeLanguage(defaultLanguage)
     vi.mocked(getRolesPage).mockReset()
     vi.mocked(getJobDescriptionParsingStatus).mockReset()
+    vi.mocked(getMatchingAnalysisStatus).mockReset()
     mutationMocks.forEach((mutation) => vi.mocked(mutation).mockReset())
   })
 
@@ -510,6 +517,177 @@ describe("RolesPage", () => {
       await screen.findByText(i18n.t("roles.matchingAnalysisStatus.stale.label")),
     ).toBeInTheDocument()
   })
+
+  it.each([
+    "profileMissing",
+    "profileIncomplete",
+    "singleRoleWithoutJobDescription",
+    "roleWithJobDescriptionParsing",
+    "roleWithJobDescriptionFailed",
+  ] as const)("does not expose generation when %s blocks its prerequisites", async (scenario) => {
+    vi.mocked(getRolesPage).mockResolvedValue(createRolesMockResponse(scenario))
+    if (scenario === "roleWithJobDescriptionParsing") {
+      vi.mocked(getJobDescriptionParsingStatus).mockReturnValue(new Promise(() => undefined))
+    }
+
+    renderRolesPage()
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(
+      within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
+    ).not.toBeInTheDocument()
+    expect(generateMatchingAnalysis).not.toHaveBeenCalled()
+  })
+
+  it("writes the generating mutation response into cache and starts status polling", async () => {
+    const user = userEvent.setup()
+    const { generating, initial } = createMatchingAnalysisFlowResponses()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(generateMatchingAnalysis).mockResolvedValue(generating)
+    vi.mocked(getMatchingAnalysisStatus).mockReturnValue(new Promise(() => undefined))
+    const { queryClient } = renderRolesPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
+    )
+
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(generating))
+    expect(vi.mocked(generateMatchingAnalysis).mock.calls[0]?.[0]).toEqual({
+      roleId: initial.roles[0]!.id,
+      version: initial.roles[0]!.version,
+    })
+    await waitFor(() =>
+      expect(getMatchingAnalysisStatus).toHaveBeenCalledWith(matchingPollingInput(generating)),
+    )
+  })
+
+  it("automatically polls an initial generating analysis into current", async () => {
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    const current = createCurrentMatchingAnalysisResponse(initial)
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus).mockResolvedValue(current.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(current))
+    expect(await screen.findByTestId("matching-analysis-result")).toBeInTheDocument()
+  })
+
+  it("stores a matching-analysis business failure and stops polling", async () => {
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    const failed = createFailedMatchingAnalysisResponse(initial)
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus).mockResolvedValue(failed.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(failed))
+    expect(
+      await screen.findByText(failed.roles[0]!.matchingAnalysis!.failureReason!),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(i18n.t("roles.matching.synchronization.title")),
+    ).not.toBeInTheDocument()
+    expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1)
+  })
+
+  it("restores the complete matching polling loop after synchronization retry", async () => {
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    const generatingTwo = createNextGeneratingAnalysisResponse(initial)
+    const current = createCurrentMatchingAnalysisResponse(generatingTwo)
+    const resumedStatus = createDeferred<(typeof generatingTwo.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus)
+      .mockRejectedValueOnce(new Error("analysis transport details"))
+      .mockReturnValueOnce(resumedStatus.promise)
+      .mockResolvedValueOnce(current.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    const retry = await screen.findByRole("button", {
+      name: i18n.t("roles.matching.actions.resynchronize"),
+    })
+    vi.useFakeTimers()
+    fireEvent.click(retry)
+    await act(async () => Promise.resolve())
+    expect(screen.getByText(i18n.t("roles.matching.synchronization.title"))).toBeInTheDocument()
+
+    await act(async () => resumedStatus.resolve(generatingTwo.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(generatingTwo)
+    expect(
+      screen.queryByText(i18n.t("roles.matching.synchronization.title")),
+    ).not.toBeInTheDocument()
+    await act(async () => vi.advanceTimersByTimeAsync(MATCHING_ANALYSIS_POLL_INTERVAL_MS))
+    expect(queryClient.getQueryData(["roles"])).toEqual(current)
+    expect(getMatchingAnalysisStatus).toHaveBeenNthCalledWith(
+      3,
+      matchingPollingInput(generatingTwo),
+    )
+  })
+
+  it("regenerates stale analysis with current dependency versions", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("matchingAnalysisStale")
+    if (!initial.profileContext.exists || initial.roles[0]!.jobDescription.status !== "ready") {
+      throw new Error("Expected complete stale-analysis prerequisites.")
+    }
+    const generating = createGeneratingMatchingAnalysisResponse(initial)
+    const current = createCurrentMatchingAnalysisResponse(generating)
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(generateMatchingAnalysis).mockResolvedValue(generating)
+    vi.mocked(getMatchingAnalysisStatus).mockResolvedValue(current.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
+    )
+
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(current))
+    expect(current.roles[0]!.matchingAnalysis).toMatchObject({
+      status: "current",
+      profileVersion: initial.profileContext.version,
+      jobDescriptionVersion: initial.roles[0]!.jobDescription.version,
+    })
+  })
+
+  it("preserves stale cache data and restores the button after generation request failure", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("matchingAnalysisStale")
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(generateMatchingAnalysis).mockRejectedValue(new Error("raw analysis service failure"))
+    const { queryClient } = renderRolesPage()
+
+    const regenerate = await screen.findByRole("button", {
+      name: i18n.t("roles.matching.actions.regenerate"),
+    })
+    await user.click(regenerate)
+
+    expect(await screen.findByText(i18n.t("roles.errors.requestFailed"))).toBeInTheDocument()
+    expect(queryClient.getQueryData(["roles"])).toEqual(initial)
+    expect(screen.getByTestId("matching-analysis-result")).toBeInTheDocument()
+    expect(regenerate).toBeEnabled()
+    expect(screen.queryByText("raw analysis service failure")).not.toBeInTheDocument()
+  })
+
+  it("merges a completed analysis without changing other roles or page context", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("multipleRoles")
+    initial.roles[0]!.matchingAnalysis = null
+    const untouchedRole = structuredClone(initial.roles[1]!)
+    const generating = createGeneratingMatchingAnalysisResponse(initial)
+    const current = createCurrentMatchingAnalysisResponse(generating)
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(generateMatchingAnalysis).mockResolvedValue(generating)
+    vi.mocked(getMatchingAnalysisStatus).mockResolvedValue(current.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
+    )
+
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(current))
+    const cached = queryClient.getQueryData<ReturnType<typeof createRolesMockResponse>>(["roles"])!
+    expect(cached.roles[1]).toEqual(untouchedRole)
+    expect(cached.currentRoleId).toBe(initial.currentRoleId)
+    expect(cached.profileContext).toEqual(initial.profileContext)
+  })
 })
 
 async function submitJobDescription(user: ReturnType<typeof userEvent.setup>, rawText: string) {
@@ -725,4 +903,105 @@ function createReadyResponseFromParsing(
     },
   }
   return response
+}
+
+function createMatchingAnalysisFlowResponses() {
+  const initial = createRolesMockResponse("roleWithParsedJobDescription")
+  const generating = createGeneratingMatchingAnalysisResponse(initial)
+  const current = createCurrentMatchingAnalysisResponse(generating)
+  const failed = createFailedMatchingAnalysisResponse(generating)
+  return { current, failed, generating, initial }
+}
+
+function createGeneratingMatchingAnalysisResponse(
+  initial: ReturnType<typeof createRolesMockResponse>,
+) {
+  const response = structuredClone(initial)
+  const role = response.roles[0]!
+  if (
+    !response.profileContext.exists ||
+    !response.profileContext.completed ||
+    role.jobDescription.status !== "ready"
+  ) {
+    throw new Error("Expected complete matching-analysis prerequisites.")
+  }
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    matchingAnalysis: {
+      status: "generating",
+      profileVersion: response.profileContext.version,
+      jobDescriptionVersion: role.jobDescription.version,
+      generatedAt: null,
+      failureReason: null,
+      result: null,
+    },
+  }
+  return response
+}
+
+function createNextGeneratingAnalysisResponse(
+  generating: ReturnType<typeof createRolesMockResponse>,
+) {
+  const response = structuredClone(generating)
+  const role = response.roles[0]!
+  if (role.matchingAnalysis?.status !== "generating") {
+    throw new Error("Expected a generating matching analysis.")
+  }
+  response.roles[0] = { ...role, version: role.version + 1 }
+  return response
+}
+
+function createCurrentMatchingAnalysisResponse(
+  generating: ReturnType<typeof createRolesMockResponse>,
+) {
+  const response = structuredClone(generating)
+  const role = response.roles[0]!
+  if (role.matchingAnalysis?.status !== "generating") {
+    throw new Error("Expected a generating matching analysis.")
+  }
+  const currentFixture = createRolesMockResponse("matchingAnalysisCurrent").roles[0]!
+  if (currentFixture.matchingAnalysis?.status !== "current") {
+    throw new Error("Expected the current matching-analysis fixture.")
+  }
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    matchingAnalysis: {
+      ...role.matchingAnalysis,
+      status: "current",
+      generatedAt: "2026-07-18T09:00:00.000Z",
+      result: structuredClone(currentFixture.matchingAnalysis.result),
+    },
+  }
+  return response
+}
+
+function createFailedMatchingAnalysisResponse(
+  generating: ReturnType<typeof createRolesMockResponse>,
+) {
+  const response = structuredClone(generating)
+  const role = response.roles[0]!
+  if (role.matchingAnalysis?.status !== "generating") {
+    throw new Error("Expected a generating matching analysis.")
+  }
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    matchingAnalysis: {
+      ...role.matchingAnalysis,
+      status: "failed",
+      failureReason:
+        "The matching analysis could not be generated right now. Your profile and JD are preserved; please try again.",
+    },
+  }
+  return response
+}
+
+function matchingPollingInput(response: ReturnType<typeof createRolesMockResponse>) {
+  const role = response.roles[0]!
+  if (role.matchingAnalysis?.status !== "generating") {
+    throw new Error("Expected a generating matching analysis.")
+  }
+  return { roleId: role.id, version: role.version }
 }

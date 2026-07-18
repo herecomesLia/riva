@@ -99,6 +99,68 @@ export const roles = {
       keywords: "Frequent keywords",
     },
   },
+  matching: {
+    cardDescription:
+      "Compare the current job profile with this JD and focus your interview preparation.",
+    actions: {
+      generate: "Generate match analysis",
+      regenerate: "Regenerate analysis",
+      retry: "Retry generation",
+      resynchronize: "Synchronize status",
+    },
+    prerequisites: {
+      profile: {
+        missing: {
+          title: "Create your job profile first",
+          description: "Match analysis uses your experience, skills, and job-search context.",
+          action: "Create profile",
+        },
+        incomplete: {
+          title: "Complete your job profile",
+          description: "Add the key experience and skills needed for a reliable match analysis.",
+          action: "Complete profile",
+        },
+      },
+      jd: {
+        missing: {
+          title: "Add the job description first",
+          description: "Save and parse the JD before comparing it with your profile.",
+        },
+        parsing: {
+          title: "Waiting for JD parsing",
+          description: "Match analysis will be available after JD parsing completes.",
+        },
+        failed: {
+          title: "Retry JD parsing first",
+          description: "A structured JD result is required before match analysis can start.",
+        },
+      },
+    },
+    synchronization: {
+      title: "Unable to retrieve the match-analysis result",
+      description:
+        "The analysis task is still generating. Synchronizing again will not create another task.",
+    },
+    stale: {
+      title: "This result needs an update",
+      description:
+        "Your profile or JD changed. The previous generated analysis remains visible below.",
+    },
+    failed: {
+      title: "Match analysis did not complete",
+    },
+    result: {
+      overallMatch: "Overall match",
+      coreRequirements: "Core role requirements",
+      matchedCapabilities: "Strong matches",
+      missingCapabilities: "Missing capabilities",
+      underrepresentedCapabilities: "Capabilities underrepresented in your profile",
+      resumeHighlights: "Projects and experience to emphasize",
+      resumeGaps: "Resume weaknesses",
+      highRiskQuestions: "High-risk follow-up questions",
+      preparationRecommendations: "Interview preparation recommendations",
+    },
+  },
   list: {
     title: "Saved roles",
     description: "Selecting a role shows its details without changing the current default role.",

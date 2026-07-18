@@ -18,6 +18,7 @@ const completeProfileContext = {
 
 function createMatchingAnalysisResult(): MatchingAnalysisResult {
   return {
+    overallMatchScore: 78,
     coreRequirementsSummary:
       "Lead complex React product delivery with strong engineering judgment and measurable impact.",
     matchedCapabilities: ["React architecture", "TypeScript", "Design systems"],
@@ -29,6 +30,10 @@ function createMatchingAnalysisResult(): MatchingAnalysisResult {
     ],
     resumeGaps: [
       "Describe experimentation design and decision-making with more concrete examples.",
+    ],
+    highRiskQuestions: [
+      "How did you align partner teams when frontend architecture decisions affected delivery scope?",
+      "Which experiment metrics did you use to decide whether a product change should ship?",
     ],
     preparationRecommendations: [
       "Prepare a STAR narrative about balancing delivery speed and frontend quality.",

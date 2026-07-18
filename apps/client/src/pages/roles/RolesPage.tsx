@@ -5,6 +5,7 @@ import {
   archiveTargetRole,
   createTargetRole,
   deleteTargetRole,
+  generateMatchingAnalysis,
   getRolesPage,
   saveJobDescription,
   setCurrentTargetRole,
@@ -18,6 +19,7 @@ import {
   ROLES_QUERY_KEY,
   useJobDescriptionSynchronization,
 } from "./hooks/useJobDescriptionSynchronization"
+import { useMatchingAnalysisSynchronization } from "./hooks/useMatchingAnalysisSynchronization"
 import { RolesActionError } from "./roles-errors"
 
 export function RolesPage() {
@@ -29,6 +31,11 @@ export function RolesPage() {
   })
   const { clearSynchronizationError, restartSynchronization, synchronizationErrorRoleIds } =
     useJobDescriptionSynchronization(rolesQuery.data)
+  const {
+    clearSynchronizationError: clearMatchingAnalysisSynchronizationError,
+    restartSynchronization: restartMatchingAnalysisSynchronization,
+    synchronizationErrorRoleIds: matchingAnalysisSynchronizationErrorRoleIds,
+  } = useMatchingAnalysisSynchronization(rolesQuery.data)
 
   function setRolesResponse(response: RolesPageResponse) {
     queryClient.setQueryData(ROLES_QUERY_KEY, response)
@@ -50,6 +57,7 @@ export function RolesPage() {
     onSuccess: setRolesResponse,
   })
   const deleteMutation = useMutation({ mutationFn: deleteTargetRole, onSuccess: setRolesResponse })
+  const generateMatchingAnalysisMutation = useMutation({ mutationFn: generateMatchingAnalysis })
   const saveJobDescriptionMutation = useMutation({ mutationFn: saveJobDescription })
   const retryJobDescriptionParsingMutation = useMutation({
     mutationFn: startJobDescriptionParsing,
@@ -73,6 +81,12 @@ export function RolesPage() {
     archiveTargetRole: (input) => runMutation(archiveMutation.mutateAsync, input),
     createTargetRole: (input) => runMutation(createMutation.mutateAsync, input),
     deleteTargetRole: (input) => runMutation(deleteMutation.mutateAsync, input),
+    generateMatchingAnalysis: async (input) => {
+      const response = await runMutation(generateMatchingAnalysisMutation.mutateAsync, input)
+      setRolesResponse(response)
+      clearMatchingAnalysisSynchronizationError(input.roleId)
+      return response
+    },
     retryJobDescriptionParsing: async (input) => {
       const response = await runMutation(retryJobDescriptionParsingMutation.mutateAsync, input)
       setRolesResponse(response)
@@ -81,6 +95,11 @@ export function RolesPage() {
     },
     retryJobDescriptionSynchronization: async (input) => {
       const response = restartSynchronization(input)
+      if (!response) throw new RolesActionError("requestFailed")
+      return response
+    },
+    retryMatchingAnalysisSynchronization: async (input) => {
+      const response = restartMatchingAnalysisSynchronization(input)
       if (!response) throw new RolesActionError("requestFailed")
       return response
     },
@@ -101,6 +120,7 @@ export function RolesPage() {
         actions={actions}
         content={{ status: "ready", data: rolesQuery.data }}
         jobDescriptionSynchronizationErrorRoleIds={synchronizationErrorRoleIds}
+        matchingAnalysisSynchronizationErrorRoleIds={matchingAnalysisSynchronizationErrorRoleIds}
         variant="default"
       />
     )

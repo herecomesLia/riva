@@ -83,6 +83,9 @@ function expectConsistentMatchingAnalysis(response: RolesPageResponse, role: Tar
       expect(matchingAnalysis.jobDescriptionVersion).toBe(role.jobDescription.version)
       expect(matchingAnalysis.generatedAt).toMatch(/^2026-07-\d{2}T/)
       expect(matchingAnalysis.result).not.toBeNull()
+      expect(matchingAnalysis.result.overallMatchScore).toBeGreaterThanOrEqual(0)
+      expect(matchingAnalysis.result.overallMatchScore).toBeLessThanOrEqual(100)
+      expect(matchingAnalysis.result.highRiskQuestions).not.toHaveLength(0)
       return
     case "stale":
       expect(
@@ -91,6 +94,9 @@ function expectConsistentMatchingAnalysis(response: RolesPageResponse, role: Tar
       ).toBe(true)
       expect(matchingAnalysis.generatedAt).toMatch(/^2026-07-\d{2}T/)
       expect(matchingAnalysis.result).not.toBeNull()
+      expect(matchingAnalysis.result.overallMatchScore).toBeGreaterThanOrEqual(0)
+      expect(matchingAnalysis.result.overallMatchScore).toBeLessThanOrEqual(100)
+      expect(matchingAnalysis.result.highRiskQuestions).not.toHaveLength(0)
   }
 }
 

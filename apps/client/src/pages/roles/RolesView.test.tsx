@@ -19,8 +19,10 @@ function createActions(
     archiveTargetRole: vi.fn(async () => data),
     createTargetRole: vi.fn(async () => data),
     deleteTargetRole: vi.fn(async () => data),
+    generateMatchingAnalysis: vi.fn(async () => data),
     retryJobDescriptionParsing: vi.fn(async () => data),
     retryJobDescriptionSynchronization: vi.fn(async () => data),
+    retryMatchingAnalysisSynchronization: vi.fn(async () => data),
     saveJobDescription: vi.fn(async () => data),
     setCurrentTargetRole: vi.fn(async () => data),
     updateRolePreparationStatus: vi.fn(async () => data),
@@ -34,6 +36,7 @@ function renderReadyView(
   options: {
     actions?: RolesViewActions
     initialSelectedRoleId?: string
+    matchingAnalysisSynchronizationErrorRoleIds?: string[]
   } = {},
 ) {
   return renderWithProviders(
@@ -41,6 +44,9 @@ function renderReadyView(
       actions={options.actions ?? createActions(data)}
       content={{ status: "ready", data }}
       initialSelectedRoleId={options.initialSelectedRoleId}
+      matchingAnalysisSynchronizationErrorRoleIds={
+        options.matchingAnalysisSynchronizationErrorRoleIds
+      }
       variant="default"
     />,
     { router: { initialEntries: ["/roles"] } },
@@ -425,6 +431,133 @@ describe("RolesView", () => {
     ).toBeInTheDocument()
     expect(textarea).toHaveValue("Lead React architecture and TypeScript delivery.")
     expect(within(dialog).queryByText("unsafe transport failure")).not.toBeInTheDocument()
+  })
+
+  it("links to profile creation when no job profile exists", async () => {
+    const data = createRolesMockResponse("profileMissing")
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.missing.title"))
+    expect(
+      within(card).getByRole("button", {
+        name: i18n.t("roles.matching.prerequisites.profile.missing.action"),
+      }),
+    ).toHaveAttribute("href", "/profile")
+  })
+
+  it("links to profile completion when the job profile is incomplete", async () => {
+    const data = createRolesMockResponse("profileIncomplete")
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.incomplete.title"))
+    expect(
+      within(card).getByRole("button", {
+        name: i18n.t("roles.matching.prerequisites.profile.incomplete.action"),
+      }),
+    ).toHaveAttribute("href", "/profile")
+  })
+
+  it.each([
+    ["singleRoleWithoutJobDescription", "missing"],
+    ["roleWithJobDescriptionParsing", "parsing"],
+    ["roleWithJobDescriptionFailed", "failed"],
+  ] as const)("blocks analysis for %s with the %s JD guidance", async (scenario, status) => {
+    const data = createRolesMockResponse(scenario)
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(i18n.t(`roles.matching.prerequisites.jd.${status}.title`))
+    expect(
+      within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("renders the complete current matching-analysis result as read-only", async () => {
+    const data = createRolesMockResponse("matchingAnalysisCurrent")
+    const analysis = data.roles[0]!.matchingAnalysis
+    if (analysis?.status !== "current") throw new Error("Expected a current analysis fixture.")
+    renderReadyView(data)
+
+    const result = await screen.findByTestId("matching-analysis-result")
+    expect(result).toHaveTextContent(`${analysis.result.overallMatchScore}%`)
+    expect(result).toHaveTextContent(analysis.result.coreRequirementsSummary)
+    expect(result).toHaveTextContent(analysis.result.highRiskQuestions[0]!)
+    expect(
+      within(screen.getByTestId("matching-analysis-card")).queryByRole("button"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("keeps stale results visible and offers regeneration", async () => {
+    const data = createRolesMockResponse("matchingAnalysisStale")
+    const analysis = data.roles[0]!.matchingAnalysis
+    if (analysis?.status !== "stale") throw new Error("Expected a stale analysis fixture.")
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
+    expect(card).toHaveTextContent(analysis.result.matchedCapabilities[0]!)
+    expect(
+      within(card).getByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
+    ).toBeEnabled()
+  })
+
+  it("shows a safe matching-analysis business failure and retry action", async () => {
+    const data = createRolesMockResponse("matchingAnalysisFailed")
+    const analysis = data.roles[0]!.matchingAnalysis
+    if (analysis?.status !== "failed") throw new Error("Expected a failed analysis fixture.")
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(analysis.failureReason)
+    expect(
+      within(card).getByRole("button", { name: i18n.t("roles.matching.actions.retry") }),
+    ).toBeEnabled()
+  })
+
+  it("prevents duplicate matching-analysis generation while pending", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    let resolveGeneration!: (response: RolesPageResponse) => void
+    const generateMatchingAnalysis = vi.fn(
+      () =>
+        new Promise<RolesPageResponse>((resolve) => {
+          resolveGeneration = resolve
+        }),
+    )
+    renderReadyView(data, {
+      actions: createActions(data, { generateMatchingAnalysis }),
+    })
+
+    const generate = await screen.findByRole("button", {
+      name: i18n.t("roles.matching.actions.generate"),
+    })
+    await user.click(generate)
+    expect(generate).toBeDisabled()
+    await user.click(generate)
+    expect(generateMatchingAnalysis).toHaveBeenCalledTimes(1)
+    expect(generateMatchingAnalysis).toHaveBeenCalledWith({
+      roleId: data.roles[0]!.id,
+      version: data.roles[0]!.version,
+    })
+    resolveGeneration(data)
+  })
+
+  it("shows matching synchronization recovery without exposing transport errors", async () => {
+    const data = createRolesMockResponse("matchingAnalysisGenerating")
+    const role = data.roles[0]!
+    renderReadyView(data, {
+      matchingAnalysisSynchronizationErrorRoleIds: [role.id],
+    })
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(i18n.t("roles.matching.synchronization.title"))
+    expect(
+      within(card).getByRole("button", {
+        name: i18n.t("roles.matching.actions.resynchronize"),
+      }),
+    ).toBeEnabled()
   })
 
   it("shows an explicit notice when no server current role exists", async () => {
