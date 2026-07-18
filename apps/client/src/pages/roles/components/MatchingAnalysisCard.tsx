@@ -25,7 +25,10 @@ export function MatchingAnalysisCard({
   synchronizationError: boolean
 }) {
   const { t } = useTranslation()
-  const status = role.matchingAnalysis?.status ?? "none"
+  const analysis = role.matchingAnalysis
+  const status = analysis?.status ?? "none"
+  const canGenerate =
+    profileContext.exists && profileContext.completed && role.jobDescription.status === "ready"
 
   return (
     <Card data-testid="matching-analysis-card" size="sm">
@@ -43,35 +46,20 @@ export function MatchingAnalysisCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {!profileContext.exists ? (
-          <ProfilePrerequisite exists={false} />
-        ) : !profileContext.completed ? (
-          <ProfilePrerequisite exists />
-        ) : role.jobDescription.status !== "ready" ? (
-          <JobDescriptionPrerequisite status={role.jobDescription.status} />
-        ) : role.matchingAnalysis === null ? (
-          <AnalysisEmpty onGenerate={onGenerate} pending={pending} />
-        ) : role.matchingAnalysis.status === "generating" ? (
-          <AnalysisGenerating
-            onRetrySynchronization={onRetrySynchronization}
-            pending={pending}
-            synchronizationError={synchronizationError}
-          />
-        ) : role.matchingAnalysis.status === "failed" ? (
-          <AnalysisFailed
-            failureReason={role.matchingAnalysis.failureReason}
-            onRetry={onGenerate}
-            pending={pending}
-          />
-        ) : (
+        {analysis?.status === "stale" ? (
           <>
-            {role.matchingAnalysis.status === "stale" && (
-              <Alert>
-                <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
-                <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
-              </Alert>
-            )}
-            {role.matchingAnalysis.status === "stale" && onGenerate && (
+            <Alert>
+              <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
+              <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
+            </Alert>
+            {!profileContext.exists ? (
+              <ProfilePrerequisite exists={false} />
+            ) : !profileContext.completed ? (
+              <ProfilePrerequisite exists />
+            ) : role.jobDescription.status !== "ready" ? (
+              <JobDescriptionPrerequisite status={role.jobDescription.status} />
+            ) : null}
+            {canGenerate && onGenerate && (
               <div className="flex justify-end">
                 <Button disabled={pending} onClick={onGenerate} size="sm">
                   {pending ? (
@@ -83,8 +71,30 @@ export function MatchingAnalysisCard({
                 </Button>
               </div>
             )}
-            <MatchingAnalysisResultView result={role.matchingAnalysis.result} />
+            <MatchingAnalysisResultView result={analysis.result} />
           </>
+        ) : !profileContext.exists ? (
+          <ProfilePrerequisite exists={false} />
+        ) : !profileContext.completed ? (
+          <ProfilePrerequisite exists />
+        ) : role.jobDescription.status !== "ready" ? (
+          <JobDescriptionPrerequisite status={role.jobDescription.status} />
+        ) : analysis === null ? (
+          <AnalysisEmpty onGenerate={onGenerate} pending={pending} />
+        ) : analysis.status === "generating" ? (
+          <AnalysisGenerating
+            onRetrySynchronization={onRetrySynchronization}
+            pending={pending}
+            synchronizationError={synchronizationError}
+          />
+        ) : analysis.status === "failed" ? (
+          <AnalysisFailed
+            failureReason={analysis.failureReason}
+            onRetry={onGenerate}
+            pending={pending}
+          />
+        ) : (
+          <MatchingAnalysisResultView result={analysis.result} />
         )}
       </CardContent>
     </Card>

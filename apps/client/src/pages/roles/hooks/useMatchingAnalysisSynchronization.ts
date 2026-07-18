@@ -8,18 +8,29 @@ import { ROLES_QUERY_KEY } from "./useJobDescriptionSynchronization"
 
 export const MATCHING_ANALYSIS_POLL_INTERVAL_MS = 1000
 
-type PollingController = {
+type MatchingAnalysisOperation = {
   input: GetMatchingAnalysisStatusInput
+  profileVersion: number
+  jobDescriptionVersion: number
+}
+
+type PollingController = {
+  operation: MatchingAnalysisOperation
   timer: ReturnType<typeof setTimeout> | null
 }
 
-function createOperationKey(input: GetMatchingAnalysisStatusInput) {
-  return `${input.roleId}:${input.version}`
+function createOperationKey(operation: MatchingAnalysisOperation) {
+  const { input, profileVersion, jobDescriptionVersion } = operation
+  return `${input.roleId}:${input.version}:${profileVersion}:${jobDescriptionVersion}`
 }
 
-function getGeneratingInput(role: TargetRole): GetMatchingAnalysisStatusInput | null {
+function getGeneratingOperation(role: TargetRole): MatchingAnalysisOperation | null {
   if (role.matchingAnalysis?.status !== "generating") return null
-  return { roleId: role.id, version: role.version }
+  return {
+    input: { roleId: role.id, version: role.version },
+    profileVersion: role.matchingAnalysis.profileVersion,
+    jobDescriptionVersion: role.matchingAnalysis.jobDescriptionVersion,
+  }
 }
 
 export function useMatchingAnalysisSynchronization(data: RolesPageResponse | undefined) {
@@ -30,10 +41,16 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
   const failedOperationKeysRef = useRef(new Set<string>())
 
   const isCurrentOperation = useCallback(
-    (input: GetMatchingAnalysisStatusInput) => {
+    (operation: MatchingAnalysisOperation) => {
       const current = queryClient.getQueryData<RolesPageResponse>(ROLES_QUERY_KEY)
-      const role = current?.roles.find((candidate) => candidate.id === input.roleId)
-      return role?.version === input.version && role.matchingAnalysis?.status === "generating"
+      const role = current?.roles.find((candidate) => candidate.id === operation.input.roleId)
+      const analysis = role?.matchingAnalysis
+      return (
+        role?.version === operation.input.version &&
+        analysis?.status === "generating" &&
+        analysis.profileVersion === operation.profileVersion &&
+        analysis.jobDescriptionVersion === operation.jobDescriptionVersion
+      )
     },
     [queryClient],
   )
@@ -65,7 +82,9 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
   }, [])
 
   const mergeRoleSnapshot = useCallback(
-    (role: TargetRole, input: GetMatchingAnalysisStatusInput, controller: PollingController) => {
+    (responseRole: TargetRole, controller: PollingController) => {
+      const operation = controller.operation
+      const { input } = operation
       let merged = false
       queryClient.setQueryData<RolesPageResponse>(ROLES_QUERY_KEY, (current) => {
         if (!mountedRef.current || activeControllersRef.current.get(input.roleId) !== controller) {
@@ -73,23 +92,43 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
         }
         const currentRole = current?.roles.find((candidate) => candidate.id === input.roleId)
         const currentAnalysis = currentRole?.matchingAnalysis
-        const responseAnalysis = role.matchingAnalysis
+        const responseAnalysis = responseRole.matchingAnalysis
         if (
           !current ||
+          responseRole.id !== input.roleId ||
           currentRole?.version !== input.version ||
           currentAnalysis?.status !== "generating" ||
-          role.id !== input.roleId ||
+          currentAnalysis.profileVersion !== operation.profileVersion ||
+          currentAnalysis.jobDescriptionVersion !== operation.jobDescriptionVersion ||
           !responseAnalysis ||
-          responseAnalysis.profileVersion !== currentAnalysis.profileVersion ||
-          responseAnalysis.jobDescriptionVersion !== currentAnalysis.jobDescriptionVersion
+          responseAnalysis.profileVersion !== operation.profileVersion ||
+          responseAnalysis.jobDescriptionVersion !== operation.jobDescriptionVersion
         ) {
           return current
         }
+
+        const dependenciesAreFresh =
+          current.profileContext.exists &&
+          current.profileContext.version === responseAnalysis.profileVersion &&
+          currentRole.jobDescription.status === "ready" &&
+          currentRole.jobDescription.version === responseAnalysis.jobDescriptionVersion
+        const matchingAnalysis =
+          responseAnalysis.status === "current" && !dependenciesAreFresh
+            ? { ...responseAnalysis, status: "stale" as const }
+            : responseAnalysis
+
         merged = true
         return {
           ...current,
           roles: current.roles.map((candidate) =>
-            candidate.id === input.roleId ? role : candidate,
+            candidate.id === input.roleId
+              ? {
+                  ...candidate,
+                  version: responseRole.version,
+                  updatedAt: responseRole.updatedAt,
+                  matchingAnalysis,
+                }
+              : candidate,
           ),
         }
       })
@@ -101,11 +140,12 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
   const pollRef = useRef<(controller: PollingController) => Promise<void>>(async () => {})
   const poll = useCallback(
     async (controller: PollingController) => {
-      const input = controller.input
+      const operation = controller.operation
+      const { input } = operation
       if (
         !mountedRef.current ||
         activeControllersRef.current.get(input.roleId) !== controller ||
-        !isCurrentOperation(input)
+        !isCurrentOperation(operation)
       ) {
         stopController(input.roleId, controller)
         return
@@ -118,9 +158,9 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
         if (
           mountedRef.current &&
           activeControllersRef.current.get(input.roleId) === controller &&
-          isCurrentOperation(input)
+          isCurrentOperation(operation)
         ) {
-          failedOperationKeysRef.current.add(createOperationKey(input))
+          failedOperationKeysRef.current.add(createOperationKey(operation))
           stopController(input.roleId, controller)
           setSynchronizationErrorRoleIds((current) =>
             current.includes(input.roleId) ? current : [...current, input.roleId],
@@ -132,24 +172,24 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
       if (
         !mountedRef.current ||
         activeControllersRef.current.get(input.roleId) !== controller ||
-        !isCurrentOperation(input)
+        !isCurrentOperation(operation)
       ) {
         stopController(input.roleId, controller)
         return
       }
 
-      const nextInput = getGeneratingInput(role)
-      if (nextInput) controller.input = nextInput
-      if (!mergeRoleSnapshot(role, input, controller)) {
+      if (!mergeRoleSnapshot(role, controller)) {
         stopController(input.roleId, controller)
         return
       }
 
       clearSynchronizationError(input.roleId)
-      if (!nextInput) {
+      const nextOperation = getGeneratingOperation(role)
+      if (!nextOperation) {
         stopController(input.roleId, controller)
         return
       }
+      controller.operation = nextOperation
       controller.timer = setTimeout(
         () => void pollRef.current(controller),
         MATCHING_ANALYSIS_POLL_INTERVAL_MS,
@@ -160,16 +200,21 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
   pollRef.current = poll
 
   const startPolling = useCallback(
-    (input: GetMatchingAnalysisStatusInput) => {
-      if (!mountedRef.current || failedOperationKeysRef.current.has(createOperationKey(input))) {
+    (operation: MatchingAnalysisOperation) => {
+      if (
+        !mountedRef.current ||
+        failedOperationKeysRef.current.has(createOperationKey(operation))
+      ) {
         return
       }
-      const existing = activeControllersRef.current.get(input.roleId)
-      if (existing && createOperationKey(existing.input) === createOperationKey(input)) return
-      if (existing) stopController(input.roleId, existing)
+      const existing = activeControllersRef.current.get(operation.input.roleId)
+      if (existing && createOperationKey(existing.operation) === createOperationKey(operation)) {
+        return
+      }
+      if (existing) stopController(operation.input.roleId, existing)
 
-      const controller: PollingController = { input, timer: null }
-      activeControllersRef.current.set(input.roleId, controller)
+      const controller: PollingController = { operation, timer: null }
+      activeControllersRef.current.set(operation.input.roleId, controller)
       void pollRef.current(controller)
     },
     [stopController],
@@ -178,12 +223,14 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
   const restartSynchronization = useCallback(
     (input: GetMatchingAnalysisStatusInput) => {
       const current = queryClient.getQueryData<RolesPageResponse>(ROLES_QUERY_KEY)
-      if (!current || !isCurrentOperation(input)) return null
+      const role = current?.roles.find((candidate) => candidate.id === input.roleId)
+      const operation = role ? getGeneratingOperation(role) : null
+      if (!current || !operation || operation.input.version !== input.version) return null
       clearFailedOperations(input.roleId)
-      startPolling(input)
+      startPolling(operation)
       return current
     },
-    [clearFailedOperations, isCurrentOperation, queryClient, startPolling],
+    [clearFailedOperations, queryClient, startPolling],
   )
 
   useEffect(() => {
@@ -202,14 +249,17 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
     if (!data) return
     for (const [roleId, controller] of activeControllersRef.current) {
       const role = data.roles.find((candidate) => candidate.id === roleId)
-      const input = role ? getGeneratingInput(role) : null
-      if (!input || createOperationKey(input) !== createOperationKey(controller.input)) {
+      const operation = role ? getGeneratingOperation(role) : null
+      if (
+        !operation ||
+        createOperationKey(operation) !== createOperationKey(controller.operation)
+      ) {
         stopController(roleId, controller)
       }
     }
     for (const role of data.roles) {
-      const input = getGeneratingInput(role)
-      if (input) startPolling(input)
+      const operation = getGeneratingOperation(role)
+      if (operation) startPolling(operation)
     }
   }, [data, startPolling, stopController])
 

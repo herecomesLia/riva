@@ -503,6 +503,46 @@ describe("RolesView", () => {
     ).toBeEnabled()
   })
 
+  it("keeps stale results visible while a replacement JD is parsing", async () => {
+    const data = createRolesMockResponse("matchingAnalysisStale")
+    const analysis = data.roles[0]!.matchingAnalysis
+    const parsingRole = createRolesMockResponse("roleWithJobDescriptionParsing").roles[0]!
+    if (analysis?.status !== "stale" || parsingRole.jobDescription.status !== "parsing") {
+      throw new Error("Expected stale analysis and parsing JD fixtures.")
+    }
+    data.roles[0] = {
+      ...parsingRole,
+      matchingAnalysis: structuredClone(analysis),
+    }
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
+    expect(card).toHaveTextContent(analysis.result.matchedCapabilities[0]!)
+    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.jd.parsing.title"))
+    expect(
+      within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("keeps stale results visible when the profile becomes incomplete", async () => {
+    const data = createRolesMockResponse("matchingAnalysisStale")
+    const analysis = data.roles[0]!.matchingAnalysis
+    if (analysis?.status !== "stale" || !data.profileContext.exists) {
+      throw new Error("Expected stale analysis and existing profile fixtures.")
+    }
+    data.profileContext.completed = false
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("matching-analysis-card")
+    expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
+    expect(card).toHaveTextContent(analysis.result.matchedCapabilities[0]!)
+    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.incomplete.title"))
+    expect(
+      within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
+    ).not.toBeInTheDocument()
+  })
+
   it("shows a safe matching-analysis business failure and retry action", async () => {
     const data = createRolesMockResponse("matchingAnalysisFailed")
     const analysis = data.roles[0]!.matchingAnalysis

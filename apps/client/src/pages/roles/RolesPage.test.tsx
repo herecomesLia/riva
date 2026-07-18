@@ -572,6 +572,116 @@ describe("RolesPage", () => {
     expect(await screen.findByTestId("matching-analysis-result")).toBeInTheDocument()
   })
 
+  it("continues matching polling with each latest generating snapshot", async () => {
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    const generatingTwo = createNextGeneratingAnalysisResponse(initial)
+    const generatingThree = createNextGeneratingAnalysisResponse(generatingTwo)
+    const current = createCurrentMatchingAnalysisResponse(generatingThree)
+    const firstStatus = createDeferred<(typeof generatingTwo.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus)
+      .mockReturnValueOnce(firstStatus.promise)
+      .mockResolvedValueOnce(generatingThree.roles[0]!)
+      .mockResolvedValueOnce(current.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1))
+    vi.useFakeTimers()
+    await act(async () => firstStatus.resolve(generatingTwo.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(generatingTwo)
+    expect(getMatchingAnalysisStatus).toHaveBeenNthCalledWith(1, matchingPollingInput(initial))
+
+    await act(async () => vi.advanceTimersByTimeAsync(MATCHING_ANALYSIS_POLL_INTERVAL_MS))
+    expect(getMatchingAnalysisStatus).toHaveBeenNthCalledWith(
+      2,
+      matchingPollingInput(generatingTwo),
+    )
+    expect(queryClient.getQueryData(["roles"])).toEqual(generatingThree)
+
+    await act(async () => vi.advanceTimersByTimeAsync(MATCHING_ANALYSIS_POLL_INTERVAL_MS))
+    expect(getMatchingAnalysisStatus).toHaveBeenNthCalledWith(
+      3,
+      matchingPollingInput(generatingThree),
+    )
+    expect(queryClient.getQueryData(["roles"])).toEqual(current)
+  })
+
+  it("normalizes a completed result to stale when the profile advances during generation", async () => {
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    const role = initial.roles[0]!
+    if (!initial.profileContext.exists || role.matchingAnalysis?.status !== "generating") {
+      throw new Error("Expected an existing profile and generating analysis.")
+    }
+    initial.profileContext.version = 3
+    role.matchingAnalysis.profileVersion = 3
+    const current = createCurrentMatchingAnalysisResponse(initial)
+    const status = createDeferred<(typeof current.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus).mockReturnValue(status.promise)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1))
+    const profileUpdated = structuredClone(initial)
+    if (!profileUpdated.profileContext.exists) throw new Error("Expected an existing profile.")
+    profileUpdated.profileContext.version = 4
+    act(() => queryClient.setQueryData(["roles"], profileUpdated))
+    await act(async () => status.resolve(current.roles[0]!))
+
+    const cached = queryClient.getQueryData<ReturnType<typeof createRolesMockResponse>>(["roles"])!
+    expect(cached.profileContext).toMatchObject({ exists: true, version: 4 })
+    expect(cached.roles[0]!.matchingAnalysis).toMatchObject({
+      status: "stale",
+      profileVersion: 3,
+      result: current.roles[0]!.matchingAnalysis!.result,
+    })
+    expect(await screen.findByText(i18n.t("roles.matching.stale.title"))).toBeInTheDocument()
+    expect(screen.getByTestId("matching-analysis-result")).toBeInTheDocument()
+  })
+
+  it("does not let an old successful analysis response overwrite a new generation", async () => {
+    const generationA = createRolesMockResponse("matchingAnalysisGenerating")
+    const generationB = createGenerationForNextProfileVersion(generationA)
+    const currentA = createCurrentMatchingAnalysisResponse(generationA)
+    const statusA = createDeferred<(typeof currentA.roles)[number]>()
+    const statusB = createDeferred<(typeof generationB.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(generationA)
+    vi.mocked(getMatchingAnalysisStatus)
+      .mockReturnValueOnce(statusA.promise)
+      .mockReturnValueOnce(statusB.promise)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1))
+    act(() => queryClient.setQueryData(["roles"], generationB))
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(2))
+    await act(async () => statusA.resolve(currentA.roles[0]!))
+
+    expect(queryClient.getQueryData(["roles"])).toEqual(generationB)
+    expect(screen.queryByTestId("matching-analysis-result")).not.toBeInTheDocument()
+  })
+
+  it("does not let an old failed analysis request pollute a new generation", async () => {
+    const generationA = createRolesMockResponse("matchingAnalysisGenerating")
+    const generationB = createGenerationForNextProfileVersion(generationA)
+    const statusA = createDeferred<(typeof generationA.roles)[number]>()
+    const statusB = createDeferred<(typeof generationB.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(generationA)
+    vi.mocked(getMatchingAnalysisStatus)
+      .mockReturnValueOnce(statusA.promise)
+      .mockReturnValueOnce(statusB.promise)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1))
+    act(() => queryClient.setQueryData(["roles"], generationB))
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(2))
+    await act(async () => statusA.reject(new Error("old analysis transport details")))
+
+    expect(queryClient.getQueryData(["roles"])).toEqual(generationB)
+    expect(
+      screen.queryByText(i18n.t("roles.matching.synchronization.title")),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText("old analysis transport details")).not.toBeInTheDocument()
+  })
+
   it("stores a matching-analysis business failure and stops polling", async () => {
     const initial = createRolesMockResponse("matchingAnalysisGenerating")
     const failed = createFailedMatchingAnalysisResponse(initial)
@@ -592,12 +702,14 @@ describe("RolesPage", () => {
   it("restores the complete matching polling loop after synchronization retry", async () => {
     const initial = createRolesMockResponse("matchingAnalysisGenerating")
     const generatingTwo = createNextGeneratingAnalysisResponse(initial)
-    const current = createCurrentMatchingAnalysisResponse(generatingTwo)
+    const generatingThree = createNextGeneratingAnalysisResponse(generatingTwo)
+    const current = createCurrentMatchingAnalysisResponse(generatingThree)
     const resumedStatus = createDeferred<(typeof generatingTwo.roles)[number]>()
     vi.mocked(getRolesPage).mockResolvedValue(initial)
     vi.mocked(getMatchingAnalysisStatus)
       .mockRejectedValueOnce(new Error("analysis transport details"))
       .mockReturnValueOnce(resumedStatus.promise)
+      .mockResolvedValueOnce(generatingThree.roles[0]!)
       .mockResolvedValueOnce(current.roles[0]!)
     const { queryClient } = renderRolesPage()
 
@@ -615,11 +727,40 @@ describe("RolesPage", () => {
       screen.queryByText(i18n.t("roles.matching.synchronization.title")),
     ).not.toBeInTheDocument()
     await act(async () => vi.advanceTimersByTimeAsync(MATCHING_ANALYSIS_POLL_INTERVAL_MS))
+    expect(queryClient.getQueryData(["roles"])).toEqual(generatingThree)
+    await act(async () => vi.advanceTimersByTimeAsync(MATCHING_ANALYSIS_POLL_INTERVAL_MS))
     expect(queryClient.getQueryData(["roles"])).toEqual(current)
     expect(getMatchingAnalysisStatus).toHaveBeenNthCalledWith(
       3,
       matchingPollingInput(generatingTwo),
     )
+    expect(getMatchingAnalysisStatus).toHaveBeenNthCalledWith(
+      4,
+      matchingPollingInput(generatingThree),
+    )
+  })
+
+  it("cleans a matching polling timer when the page unmounts", async () => {
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    const generatingTwo = createNextGeneratingAnalysisResponse(initial)
+    const firstStatus = createDeferred<(typeof generatingTwo.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus).mockReturnValueOnce(firstStatus.promise)
+    const { queryClient, unmount } = renderRolesPage()
+
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1))
+    vi.useFakeTimers()
+    await act(async () => firstStatus.resolve(generatingTwo.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(generatingTwo)
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
+
+    unmount()
+    await act(async () => vi.advanceTimersByTimeAsync(MATCHING_ANALYSIS_POLL_INTERVAL_MS * 2))
+
+    expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1)
+    expect(queryClient.getQueryData(["roles"])).toEqual(generatingTwo)
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
   })
 
   it("regenerates stale analysis with current dependency versions", async () => {
@@ -949,6 +1090,19 @@ function createNextGeneratingAnalysisResponse(
     throw new Error("Expected a generating matching analysis.")
   }
   response.roles[0] = { ...role, version: role.version + 1 }
+  return response
+}
+
+function createGenerationForNextProfileVersion(
+  generating: ReturnType<typeof createRolesMockResponse>,
+) {
+  const response = structuredClone(generating)
+  const role = response.roles[0]!
+  if (!response.profileContext.exists || role.matchingAnalysis?.status !== "generating") {
+    throw new Error("Expected an existing profile and generating matching analysis.")
+  }
+  response.profileContext.version += 1
+  role.matchingAnalysis.profileVersion = response.profileContext.version
   return response
 }
 

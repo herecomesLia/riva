@@ -533,6 +533,33 @@ export const MatchingAnalysisCurrent = meta.story({
   },
 })
 
+const matchingSynchronizationErrorData = createRolesMockResponse("matchingAnalysisGenerating")
+
+export const MatchingAnalysisSynchronizationError = meta.story({
+  render: () => (
+    <RolesStoryHarness
+      actions={{}}
+      initialData={matchingSynchronizationErrorData}
+      matchingAnalysisSynchronizationErrorRoleIds={[matchingSynchronizationErrorData.roles[0]!.id]}
+    />
+  ),
+})
+
+const staleWhileParsingData = createRolesMockResponse("matchingAnalysisStale")
+const staleWhileParsingAnalysis = staleWhileParsingData.roles[0]!.matchingAnalysis
+const parsingRole = createRolesMockResponse("roleWithJobDescriptionParsing").roles[0]!
+if (staleWhileParsingAnalysis?.status !== "stale") {
+  throw new globalThis.Error("Expected a stale matching-analysis fixture.")
+}
+staleWhileParsingData.roles[0] = {
+  ...parsingRole,
+  matchingAnalysis: structuredClone(staleWhileParsingAnalysis),
+}
+
+export const StaleAnalysisWhileJobDescriptionParsing = meta.story({
+  render: () => <RolesStoryHarness actions={{}} initialData={staleWhileParsingData} />,
+})
+
 function createGeneratingAnalysisResponse(initial: RolesPageResponse) {
   const response = structuredClone(initial)
   const role = response.roles[0]!
