@@ -1,11 +1,12 @@
-import { act, screen, waitFor, within } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 import { RolesPage } from "@/pages/roles"
+import { JOB_DESCRIPTION_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useJobDescriptionSynchronization"
 import {
   archiveTargetRole,
   createTargetRole,
@@ -65,6 +66,10 @@ describe("RolesPage", () => {
     vi.mocked(getRolesPage).mockReset()
     vi.mocked(getJobDescriptionParsingStatus).mockReset()
     mutationMocks.forEach((mutation) => vi.mocked(mutation).mockReset())
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it("maps an initial request to the stable loading layout", async () => {
@@ -213,6 +218,175 @@ describe("RolesPage", () => {
     expect(await screen.findByText(i18n.t("roles.errors.requestFailed"))).toBeInTheDocument()
     expect(queryClient.getQueryData(["roles"])).toEqual(initial)
     expect(screen.queryByText("unsafe internal failure")).not.toBeInTheDocument()
+  })
+
+  it("automatically synchronizes a parsing JD returned by the initial page request", async () => {
+    const { initial, ready } = createJobDescriptionPollingResponses()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getJobDescriptionParsingStatus).mockResolvedValue(ready.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(ready))
+    expect(await screen.findByTestId("job-description-analysis")).toBeInTheDocument()
+  })
+
+  it("continues polling with each latest parsing snapshot until ready", async () => {
+    const { initial, parsingOne, parsingTwo, ready } = createJobDescriptionPollingResponses()
+    const firstStatus = createDeferred<(typeof parsingOne.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getJobDescriptionParsingStatus)
+      .mockReturnValueOnce(firstStatus.promise)
+      .mockResolvedValueOnce(parsingTwo.roles[0]!)
+      .mockResolvedValueOnce(ready.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    vi.useFakeTimers()
+    await act(async () => firstStatus.resolve(parsingOne.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(parsingOne)
+    expect(getJobDescriptionParsingStatus).toHaveBeenNthCalledWith(1, pollingInput(initial))
+
+    await act(async () => vi.advanceTimersByTimeAsync(JOB_DESCRIPTION_POLL_INTERVAL_MS))
+    expect(getJobDescriptionParsingStatus).toHaveBeenNthCalledWith(2, pollingInput(parsingOne))
+    expect(queryClient.getQueryData(["roles"])).toEqual(parsingTwo)
+
+    await act(async () => vi.advanceTimersByTimeAsync(JOB_DESCRIPTION_POLL_INTERVAL_MS))
+    expect(getJobDescriptionParsingStatus).toHaveBeenNthCalledWith(3, pollingInput(parsingTwo))
+    expect(queryClient.getQueryData(["roles"])).toEqual(ready)
+    expect(screen.queryByText(i18n.t("roles.jd.synchronization.title"))).not.toBeInTheDocument()
+  })
+
+  it("stops after consecutive parsing responses reach a business failure", async () => {
+    const { failed, initial, parsingOne } = createJobDescriptionPollingResponses()
+    const firstStatus = createDeferred<(typeof parsingOne.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getJobDescriptionParsingStatus)
+      .mockReturnValueOnce(firstStatus.promise)
+      .mockResolvedValueOnce(failed.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    vi.useFakeTimers()
+    await act(async () => firstStatus.resolve(parsingOne.roles[0]!))
+    await act(async () => vi.advanceTimersByTimeAsync(JOB_DESCRIPTION_POLL_INTERVAL_MS))
+
+    expect(queryClient.getQueryData(["roles"])).toEqual(failed)
+    expect(
+      screen.getByText(failed.roles[0]!.jobDescription.parsingFailureReason!),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("roles.jd.synchronization.title"))).not.toBeInTheDocument()
+    await act(async () => vi.advanceTimersByTimeAsync(JOB_DESCRIPTION_POLL_INTERVAL_MS * 2))
+    expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it("does not let an old successful response overwrite a replacement JD", async () => {
+    const user = userEvent.setup()
+    const { initial, parsing: parsingA, ready: readyA } = createJobDescriptionFlowResponses()
+    const parsingB = createReplacementParsingResponse(parsingA)
+    const readyB = createReadyResponseFromParsing(parsingB, "Replacement platform JD summary.")
+    const statusA = createDeferred<(typeof readyA.roles)[number]>()
+    const statusB = createDeferred<(typeof readyB.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(saveJobDescription).mockResolvedValue(parsingA)
+    vi.mocked(getJobDescriptionParsingStatus)
+      .mockReturnValueOnce(statusA.promise)
+      .mockReturnValueOnce(statusB.promise)
+    const { queryClient } = renderRolesPage()
+
+    await submitJobDescription(user, "Lead React architecture and TypeScript delivery.")
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    act(() => queryClient.setQueryData(["roles"], parsingB))
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(2))
+
+    await act(async () => statusA.resolve(readyA.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(parsingB)
+    expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
+    expect(
+      queryClient.getQueryData<ReturnType<typeof createRolesMockResponse>>(["roles"])!.roles[0],
+    ).toMatchObject({
+      version: parsingB.roles[0]!.version,
+      jobDescription: {
+        rawText: parsingB.roles[0]!.jobDescription.rawText,
+        version: parsingB.roles[0]!.jobDescription.version,
+      },
+    })
+
+    await act(async () => statusB.resolve(readyB.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(readyB)
+    expect(await screen.findByText("Replacement platform JD summary.")).toBeInTheDocument()
+  })
+
+  it("does not let an old failed request mark a replacement JD as unsynchronized", async () => {
+    const { initial } = createJobDescriptionPollingResponses()
+    const parsingB = createReplacementParsingResponse(initial)
+    const statusA = createDeferred<(typeof initial.roles)[number]>()
+    const statusB = createDeferred<(typeof initial.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getJobDescriptionParsingStatus)
+      .mockReturnValueOnce(statusA.promise)
+      .mockReturnValueOnce(statusB.promise)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    act(() => queryClient.setQueryData(["roles"], parsingB))
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(2))
+    await act(async () => statusA.reject(new Error("old request transport details")))
+
+    expect(queryClient.getQueryData(["roles"])).toEqual(parsingB)
+    expect(screen.queryByText(i18n.t("roles.jd.synchronization.title"))).not.toBeInTheDocument()
+    expect(screen.queryByText("old request transport details")).not.toBeInTheDocument()
+  })
+
+  it("manual synchronization retry restores the complete polling loop", async () => {
+    const { initial, parsingOne, ready } = createJobDescriptionPollingResponses()
+    const resumedStatus = createDeferred<(typeof parsingOne.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getJobDescriptionParsingStatus)
+      .mockRejectedValueOnce(new Error("temporary transport failure"))
+      .mockReturnValueOnce(resumedStatus.promise)
+      .mockResolvedValueOnce(ready.roles[0]!)
+    const { queryClient } = renderRolesPage()
+
+    const retry = await screen.findByRole("button", {
+      name: i18n.t("roles.jd.actions.resynchronize"),
+    })
+    vi.useFakeTimers()
+    fireEvent.click(retry)
+    await act(async () => Promise.resolve())
+    expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(2)
+    expect(screen.getByText(i18n.t("roles.jd.synchronization.title"))).toBeInTheDocument()
+
+    await act(async () => resumedStatus.resolve(parsingOne.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(parsingOne)
+    expect(screen.queryByText(i18n.t("roles.jd.synchronization.title"))).not.toBeInTheDocument()
+
+    await act(async () => vi.advanceTimersByTimeAsync(JOB_DESCRIPTION_POLL_INTERVAL_MS))
+    expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(3)
+    expect(queryClient.getQueryData(["roles"])).toEqual(ready)
+    expect(screen.queryByText(i18n.t("roles.jd.synchronization.title"))).not.toBeInTheDocument()
+  })
+
+  it("cleans a pending polling timer when the page unmounts", async () => {
+    const { initial, parsingOne } = createJobDescriptionPollingResponses()
+    const firstStatus = createDeferred<(typeof parsingOne.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getJobDescriptionParsingStatus).mockReturnValueOnce(firstStatus.promise)
+    const { queryClient, unmount } = renderRolesPage()
+
+    await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    vi.useFakeTimers()
+    await act(async () => firstStatus.resolve(parsingOne.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(parsingOne)
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
+
+    unmount()
+    await act(async () => vi.advanceTimersByTimeAsync(JOB_DESCRIPTION_POLL_INTERVAL_MS * 2))
+
+    expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1)
+    expect(queryClient.getQueryData(["roles"])).toEqual(parsingOne)
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
   })
 
   it("writes the parsing response to cache immediately after saving JD", async () => {
@@ -450,4 +624,105 @@ function createJobDescriptionRetryResponses() {
   }
 
   return { failed, parsing, ready }
+}
+
+function createJobDescriptionPollingResponses() {
+  const initial = createRolesMockResponse("roleWithJobDescriptionParsing")
+  const initialRole = initial.roles[0]!
+  if (initialRole.jobDescription.status !== "parsing") {
+    throw new Error("Expected the parsing JD fixture.")
+  }
+
+  const parsingOne = structuredClone(initial)
+  parsingOne.roles[0] = {
+    ...initialRole,
+    version: initialRole.version + 1,
+  }
+  const parsingOneRole = parsingOne.roles[0]!
+  if (parsingOneRole.jobDescription.status !== "parsing") {
+    throw new Error("Expected a parsing JD progression.")
+  }
+  const parsingTwo = structuredClone(parsingOne)
+  parsingTwo.roles[0] = {
+    ...parsingOneRole,
+    version: parsingOneRole.version + 1,
+  }
+  const parsingTwoRole = parsingTwo.roles[0]!
+  if (parsingTwoRole.jobDescription.status !== "parsing") {
+    throw new Error("Expected a parsing JD progression.")
+  }
+
+  const parsedFixture = createRolesMockResponse("roleWithParsedJobDescription").roles[0]!
+  if (parsedFixture.jobDescription.status !== "ready" || !parsedFixture.jobDescriptionAnalysis) {
+    throw new Error("Expected the ready JD fixture.")
+  }
+  const ready = structuredClone(parsingTwo)
+  ready.roles[0] = {
+    ...parsingTwoRole,
+    version: parsingTwoRole.version + 1,
+    jobDescription: {
+      ...parsingTwoRole.jobDescription,
+      status: "ready",
+    },
+    jobDescriptionAnalysis: {
+      ...parsedFixture.jobDescriptionAnalysis,
+      jobDescriptionVersion: parsingTwoRole.jobDescription.version,
+    },
+  }
+
+  const failed = structuredClone(parsingOne)
+  failed.roles[0] = {
+    ...parsingOneRole,
+    version: parsingOneRole.version + 1,
+    jobDescription: {
+      ...parsingOneRole.jobDescription,
+      status: "failed",
+      parsingFailureReason:
+        "We could not extract structured requirements from this JD. Please review the text and try again.",
+    },
+    jobDescriptionAnalysis: null,
+  }
+
+  return { failed, initial, parsingOne, parsingTwo, ready }
+}
+
+function pollingInput(response: ReturnType<typeof createRolesMockResponse>) {
+  const role = response.roles[0]!
+  if (role.jobDescription.status !== "parsing") {
+    throw new Error("Expected a parsing JD response.")
+  }
+  return {
+    roleId: role.id,
+    version: role.version,
+    jobDescriptionVersion: role.jobDescription.version,
+  }
+}
+
+function createReadyResponseFromParsing(
+  parsing: ReturnType<typeof createRolesMockResponse>,
+  summary: string,
+) {
+  const response = structuredClone(parsing)
+  const role = response.roles[0]!
+  if (role.jobDescription.status !== "parsing") {
+    throw new Error("Expected a parsing JD response.")
+  }
+  const parsedFixture = createRolesMockResponse("roleWithParsedJobDescription").roles[0]!
+  if (!parsedFixture.jobDescriptionAnalysis) {
+    throw new Error("Expected the ready JD fixture to include analysis.")
+  }
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    jobDescription: {
+      ...role.jobDescription,
+      status: "ready",
+    },
+    jobDescriptionAnalysis: {
+      ...parsedFixture.jobDescriptionAnalysis,
+      coreRequirementsSummary: summary,
+      jobDescriptionVersion: role.jobDescription.version,
+    },
+  }
+  return response
 }

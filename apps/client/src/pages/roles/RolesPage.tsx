@@ -1,16 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
 
-import type {
-  GetJobDescriptionParsingStatusInput,
-  RolesPageResponse,
-  TargetRole,
-} from "@/models/roles"
+import type { RolesPageResponse } from "@/models/roles"
 import {
   archiveTargetRole,
   createTargetRole,
   deleteTargetRole,
-  getJobDescriptionParsingStatus,
   getRolesPage,
   saveJobDescription,
   setCurrentTargetRole,
@@ -20,22 +14,24 @@ import {
 } from "@/services/roles"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
+import {
+  ROLES_QUERY_KEY,
+  useJobDescriptionSynchronization,
+} from "./hooks/useJobDescriptionSynchronization"
 import { RolesActionError } from "./roles-errors"
-
-const rolesQueryKey = ["roles"] as const
 
 export function RolesPage() {
   const queryClient = useQueryClient()
-  const [jobDescriptionSynchronizationErrorRoleIds, setJobDescriptionSynchronizationErrorRoleIds] =
-    useState<string[]>([])
   const rolesQuery = useQuery({
     queryFn: getRolesPage,
-    queryKey: rolesQueryKey,
+    queryKey: ROLES_QUERY_KEY,
     retry: false,
   })
+  const { clearSynchronizationError, restartSynchronization, synchronizationErrorRoleIds } =
+    useJobDescriptionSynchronization(rolesQuery.data)
 
   function setRolesResponse(response: RolesPageResponse) {
-    queryClient.setQueryData(rolesQueryKey, response)
+    queryClient.setQueryData(ROLES_QUERY_KEY, response)
     return response
   }
 
@@ -58,70 +54,6 @@ export function RolesPage() {
   const retryJobDescriptionParsingMutation = useMutation({
     mutationFn: startJobDescriptionParsing,
   })
-  const jobDescriptionStatusMutation = useMutation({
-    mutationFn: getJobDescriptionParsingStatus,
-  })
-
-  function setJobDescriptionSynchronizationError(roleId: string, hasError: boolean) {
-    setJobDescriptionSynchronizationErrorRoleIds((current) =>
-      hasError
-        ? current.includes(roleId)
-          ? current
-          : [...current, roleId]
-        : current.filter((candidate) => candidate !== roleId),
-    )
-  }
-
-  function mergeRoleSnapshot(role: TargetRole) {
-    const current = queryClient.getQueryData<RolesPageResponse>(rolesQueryKey)
-    if (!current || !current.roles.some((candidate) => candidate.id === role.id)) return current
-    return setRolesResponse({
-      ...current,
-      roles: current.roles.map((candidate) => (candidate.id === role.id ? role : candidate)),
-    })
-  }
-
-  function isCurrentParsingOperation(input: GetJobDescriptionParsingStatusInput) {
-    const current = queryClient.getQueryData<RolesPageResponse>(rolesQueryKey)
-    const role = current?.roles.find((candidate) => candidate.id === input.roleId)
-    return (
-      role?.version === input.version &&
-      role.jobDescription.status === "parsing" &&
-      role.jobDescription.version === input.jobDescriptionVersion
-    )
-  }
-
-  async function synchronizeJobDescription(input: GetJobDescriptionParsingStatusInput) {
-    try {
-      const role = await jobDescriptionStatusMutation.mutateAsync(input)
-      const response = mergeRoleSnapshot(role)
-      if (role.jobDescription.version === input.jobDescriptionVersion) {
-        setJobDescriptionSynchronizationError(input.roleId, false)
-      }
-      if (!response) throw new Error("Target role is no longer available.")
-      return response
-    } catch (error) {
-      if (isCurrentParsingOperation(input)) {
-        setJobDescriptionSynchronizationError(input.roleId, true)
-      }
-      throw error
-    }
-  }
-
-  function startBackgroundJobDescriptionSynchronization(
-    response: RolesPageResponse,
-    roleId: string,
-  ) {
-    const role = response.roles.find((candidate) => candidate.id === roleId)
-    if (role?.jobDescription.status !== "parsing") return
-    const input = {
-      roleId: role.id,
-      version: role.version,
-      jobDescriptionVersion: role.jobDescription.version,
-    }
-    void synchronizeJobDescription(input).catch(() => undefined)
-  }
-
   async function runMutation<Input>(
     mutate: (input: Input) => Promise<RolesPageResponse>,
     input: Input,
@@ -144,22 +76,18 @@ export function RolesPage() {
     retryJobDescriptionParsing: async (input) => {
       const response = await runMutation(retryJobDescriptionParsingMutation.mutateAsync, input)
       setRolesResponse(response)
-      setJobDescriptionSynchronizationError(input.roleId, false)
-      startBackgroundJobDescriptionSynchronization(response, input.roleId)
+      clearSynchronizationError(input.roleId)
       return response
     },
     retryJobDescriptionSynchronization: async (input) => {
-      try {
-        return await synchronizeJobDescription(input)
-      } catch {
-        throw new RolesActionError("requestFailed")
-      }
+      const response = restartSynchronization(input)
+      if (!response) throw new RolesActionError("requestFailed")
+      return response
     },
     saveJobDescription: async (input) => {
       const response = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
       setRolesResponse(response)
-      setJobDescriptionSynchronizationError(input.roleId, false)
-      startBackgroundJobDescriptionSynchronization(response, input.roleId)
+      clearSynchronizationError(input.roleId)
       return response
     },
     setCurrentTargetRole: (input) => runMutation(setCurrentMutation.mutateAsync, input),
@@ -172,7 +100,7 @@ export function RolesPage() {
       <RolesView
         actions={actions}
         content={{ status: "ready", data: rolesQuery.data }}
-        jobDescriptionSynchronizationErrorRoleIds={jobDescriptionSynchronizationErrorRoleIds}
+        jobDescriptionSynchronizationErrorRoleIds={synchronizationErrorRoleIds}
         variant="default"
       />
     )
