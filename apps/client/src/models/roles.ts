@@ -2,6 +2,8 @@ export type TargetRoleRecruitmentType = "campus" | "experienced"
 
 export type TargetRolePreparationStatus = "preparing" | "paused" | "archived"
 
+export type ActiveTargetRolePreparationStatus = Exclude<TargetRolePreparationStatus, "archived">
+
 export type TargetRoleExperienceRange = {
   minYears: number | null
   maxYears: number | null
@@ -9,17 +11,45 @@ export type TargetRoleExperienceRange = {
 
 export type JobDescriptionParsingStatus = "missing" | "parsing" | "ready" | "failed"
 
-export type JobDescription = {
-  rawText: string | null
-  /** Increments only when the saved JD text changes. */
-  version: number | null
-  status: JobDescriptionParsingStatus
-  parsingFailureReason: string | null
+export type MissingJobDescription = {
+  status: "missing"
+  rawText: null
+  version: null
+  parsingFailureReason: null
 }
+
+export type ParsingJobDescription = {
+  status: "parsing"
+  rawText: string
+  /** Increments only when the saved JD text changes. */
+  version: number
+  parsingFailureReason: null
+}
+
+export type ReadyJobDescription = {
+  status: "ready"
+  rawText: string
+  /** Increments only when the saved JD text changes. */
+  version: number
+  parsingFailureReason: null
+}
+
+export type FailedJobDescription = {
+  status: "failed"
+  rawText: string
+  /** Increments only when the saved JD text changes. */
+  version: number
+  parsingFailureReason: string
+}
+
+export type JobDescription =
+  MissingJobDescription | ParsingJobDescription | ReadyJobDescription | FailedJobDescription
 
 export type JobDescriptionAnalysis = {
   /** The JD version this structured result was parsed from. */
   jobDescriptionVersion: number
+  /** When structured JD parsing completed. */
+  parsedAt: string
   responsibilities: string[]
   requiredSkills: string[]
   preferredSkills: string[]
@@ -43,8 +73,6 @@ export type MatchingAnalysisResult = {
 }
 
 type MatchingAnalysisVersionContext = {
-  /** The target role revision used to generate this result. */
-  roleVersion: number
   /** The profile revision used to generate this result. */
   profileVersion: number
   /** The JD revision used to generate this result. */
@@ -59,6 +87,7 @@ export type GeneratingMatchingAnalysis = MatchingAnalysisVersionContext & {
 }
 
 export type CurrentMatchingAnalysis = MatchingAnalysisVersionContext & {
+  /** Recorded dependency versions must match the current profile and JD versions. */
   status: "current"
   generatedAt: string
   failureReason: null
@@ -66,6 +95,7 @@ export type CurrentMatchingAnalysis = MatchingAnalysisVersionContext & {
 }
 
 export type StaleMatchingAnalysis = MatchingAnalysisVersionContext & {
+  /** At least one recorded dependency version is older than its current counterpart. */
   status: "stale"
   generatedAt: string
   failureReason: null
@@ -85,7 +115,7 @@ export type MatchingAnalysis =
   | StaleMatchingAnalysis
   | FailedMatchingAnalysis
 
-export type TargetRole = {
+type TargetRoleBase = {
   id: string
   title: string
   company: string | null
@@ -100,22 +130,59 @@ export type TargetRole = {
   updatedAt: string
   /** Increments for every persisted target-role mutation. */
   version: number
-  jobDescription: JobDescription
-  /** Present only when the current JD version has been parsed successfully. */
-  jobDescriptionAnalysis: JobDescriptionAnalysis | null
   /** Absent until a matching analysis has been requested. */
   matchingAnalysis: MatchingAnalysis | null
 }
+
+/**
+ * The type parameter binds a ready JD to the version of its structured result.
+ * Use a literal version argument where that value is statically known.
+ */
+export type ReadyTargetRole<JobDescriptionVersion extends number = number> = TargetRoleBase & {
+  jobDescription: ReadyJobDescription & { version: JobDescriptionVersion }
+  jobDescriptionAnalysis: JobDescriptionAnalysis & {
+    jobDescriptionVersion: JobDescriptionVersion
+  }
+}
+
+export type TargetRoleWithoutReadyJobDescription = TargetRoleBase &
+  (
+    | {
+        jobDescription: MissingJobDescription
+        jobDescriptionAnalysis: null
+      }
+    | {
+        jobDescription: ParsingJobDescription
+        jobDescriptionAnalysis: null
+      }
+    | {
+        jobDescription: FailedJobDescription
+        jobDescriptionAnalysis: null
+      }
+  )
+
+export type TargetRole<JobDescriptionVersion extends number = number> =
+  ReadyTargetRole<JobDescriptionVersion> | TargetRoleWithoutReadyJobDescription
+
+export type MissingProfileContext = {
+  exists: false
+  version: null
+  completed: false
+}
+
+export type ExistingProfileContext = {
+  exists: true
+  version: number
+  completed: boolean
+}
+
+export type ProfileContext = MissingProfileContext | ExistingProfileContext
 
 export type RolesPageResponse = {
   roles: TargetRole[]
   /** Must identify the single role where `isCurrent` is true, when one exists. */
   currentRoleId: string | null
-  profileContext: {
-    exists: boolean
-    version: number | null
-    completed: boolean
-  }
+  profileContext: ProfileContext
 }
 
 export type CreateTargetRoleInput = {
@@ -124,7 +191,7 @@ export type CreateTargetRoleInput = {
   recruitmentType: TargetRoleRecruitmentType | null
   location: string | null
   experienceRange: TargetRoleExperienceRange | null
-  preparationStatus: TargetRolePreparationStatus
+  preparationStatus: ActiveTargetRolePreparationStatus
 }
 
 export type UpdateTargetRoleInput = {
@@ -145,7 +212,7 @@ export type SetCurrentTargetRoleInput = {
 export type UpdateTargetRolePreparationStatusInput = {
   roleId: string
   version: number
-  preparationStatus: TargetRolePreparationStatus
+  preparationStatus: ActiveTargetRolePreparationStatus
 }
 
 export type ArchiveTargetRoleInput = {
@@ -172,7 +239,6 @@ export type StartOrRetryJobDescriptionParsingInput = {
 
 export type GenerateOrRegenerateMatchingAnalysisInput = {
   roleId: string
+  /** Optimistic-concurrency version for the target role, not an analysis dependency. */
   version: number
-  profileVersion: number
-  jobDescriptionVersion: number
 }
