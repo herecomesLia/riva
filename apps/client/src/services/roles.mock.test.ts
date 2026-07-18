@@ -12,8 +12,10 @@ import {
   saveJobDescription,
   setCurrentTargetRole,
   startJobDescriptionParsing,
+  updateRolePreparationStatus,
   updateTargetRole,
 } from "@/services/roles"
+import type { TargetRole } from "@/models/roles"
 
 const newRole = {
   title: "Frontend Platform Engineer",
@@ -38,6 +40,24 @@ async function settle<T>(promise: Promise<T>) {
   return promise
 }
 
+function getJobDescriptionPollInput(role: TargetRole) {
+  const jobDescriptionVersion = role.jobDescription.version
+  if (jobDescriptionVersion === null) throw new Error("Cannot poll a missing JD.")
+  return { roleId: role.id, version: role.version, jobDescriptionVersion }
+}
+
+function getMatchingAnalysisPollInput(role: TargetRole) {
+  return { roleId: role.id, version: role.version }
+}
+
+function pollJobDescription(role: TargetRole) {
+  return settle(getJobDescriptionParsingStatus(getJobDescriptionPollInput(role)))
+}
+
+function pollMatchingAnalysis(role: TargetRole) {
+  return settle(getMatchingAnalysisStatus(getMatchingAnalysisPollInput(role)))
+}
+
 async function getCurrentRole() {
   const response = await settle(getRolesPage())
   const role = response.roles.find((candidate) => candidate.isCurrent)
@@ -51,7 +71,7 @@ async function saveAndParseCurrentRole(rawText: string) {
     saveJobDescription({ roleId: currentRole.id, version: currentRole.version, rawText }),
   )
   const parsingRole = parsing.roles.find((role) => role.id === currentRole.id)!
-  return settle(getJobDescriptionParsingStatus(parsingRole.id))
+  return pollJobDescription(parsingRole)
 }
 
 describe("roles stateful mock service", () => {
@@ -73,6 +93,43 @@ describe("roles stateful mock service", () => {
     expect(second.currentRoleId).toBe(first.currentRoleId)
     expect(second.roles.filter((role) => role.isCurrent)).toHaveLength(1)
     expect(second.roles).toHaveLength(2)
+  })
+
+  it("pauses and resumes preparation without changing the current role", async () => {
+    const initial = await getCurrentRole()
+
+    const paused = await settle(
+      updateRolePreparationStatus({
+        roleId: initial.id,
+        version: initial.version,
+        preparationStatus: "paused",
+      }),
+    )
+    const pausedRole = paused.roles.find((role) => role.id === initial.id)!
+
+    expect(paused).toMatchObject({ currentRoleId: initial.id })
+    expect(paused.profileContext).toBeDefined()
+    expect(pausedRole).toMatchObject({
+      preparationStatus: "paused",
+      isCurrent: true,
+      version: initial.version + 1,
+    })
+
+    const resumed = await settle(
+      updateRolePreparationStatus({
+        roleId: pausedRole.id,
+        version: pausedRole.version,
+        preparationStatus: "preparing",
+      }),
+    )
+    const resumedRole = resumed.roles.find((role) => role.id === initial.id)!
+
+    expect(resumed.currentRoleId).toBe(initial.id)
+    expect(resumedRole).toMatchObject({
+      preparationStatus: "preparing",
+      isCurrent: true,
+      version: pausedRole.version + 1,
+    })
   })
 
   it("atomically switches the current role", async () => {
@@ -109,6 +166,22 @@ describe("roles stateful mock service", () => {
     })
   })
 
+  it("rejects setting an archived role as current without partial writes", async () => {
+    resetRolesMockState("archivedRoles")
+    const before = await settle(getRolesPage())
+    const archivedRole = before.roles.find((role) => role.preparationStatus === "archived")!
+    const promise = setCurrentTargetRole({
+      roleId: archivedRole.id,
+      version: archivedRole.version,
+    })
+    const assertion = expect(promise).rejects.toThrow("archived target role")
+    await vi.runAllTimersAsync()
+    await assertion
+
+    const after = await settle(getRolesPage())
+    expect(after).toEqual(before)
+  })
+
   it("deletes the current role and promotes a preparing fallback", async () => {
     resetRolesMockState("noRoles")
     const first = await settle(createTargetRole(newRole))
@@ -122,6 +195,36 @@ describe("roles stateful mock service", () => {
 
     expect(deleted.currentRoleId).toBe(secondRole.id)
     expect(deleted.roles.map((role) => role.id)).not.toContain(firstRole.id)
+  })
+
+  it("clears current role state when deleting the only role", async () => {
+    resetRolesMockState("singleRoleWithoutJobDescription")
+    const role = await getCurrentRole()
+
+    const deleted = await settle(deleteTargetRole({ roleId: role.id, version: role.version }))
+
+    expect(deleted.roles).toEqual([])
+    expect(deleted.currentRoleId).toBeNull()
+    expect(deleted.roles.some((candidate) => candidate.isCurrent)).toBe(false)
+  })
+
+  it("returns independent role snapshots without exposing internal mock state", async () => {
+    resetRolesMockState("roleWithParsedJobDescription")
+    const first = await settle(getRolesPage())
+    const firstRole = first.roles[0]!
+    const firstAnalysis = firstRole.jobDescriptionAnalysis
+    if (!firstAnalysis) throw new Error("Expected the parsed JD fixture to include analysis.")
+
+    const originalTitle = firstRole.title
+    const originalRequiredSkill = firstAnalysis.requiredSkills[0]
+    firstRole.title = "Mutated role title"
+    firstAnalysis.requiredSkills[0] = "Mutated skill"
+
+    const second = await settle(getRolesPage())
+    expect(second.roles[0]).toMatchObject({ title: originalTitle })
+    expect(second.roles[0]!.jobDescriptionAnalysis?.requiredSkills[0]).toBe(originalRequiredSkill)
+    expect(second).not.toBe(first)
+    expect(second.roles[0]).not.toBe(firstRole)
   })
 
   it("rejects stale versions without partially writing the role", async () => {
@@ -158,7 +261,7 @@ describe("roles stateful mock service", () => {
     expect(parsingRole.jobDescription).toMatchObject({ status: "parsing", version: 1 })
     expect(parsingRole.jobDescriptionAnalysis).toBeNull()
 
-    const ready = await settle(getJobDescriptionParsingStatus(role.id))
+    const ready = await pollJobDescription(parsingRole)
     expect(ready.jobDescription.status).toBe("ready")
     expect(ready.jobDescriptionAnalysis).not.toBeNull()
   })
@@ -181,7 +284,7 @@ describe("roles stateful mock service", () => {
       }),
     )
     const retryingRole = retrying.roles[0]!
-    const ready = await settle(getJobDescriptionParsingStatus(retryingRole.id))
+    const ready = await pollJobDescription(retryingRole)
 
     expect(retryingRole.jobDescription.status).toBe("parsing")
     expect(ready.jobDescription.status).toBe("ready")
@@ -199,7 +302,7 @@ describe("roles stateful mock service", () => {
         jobDescriptionVersion: failed.jobDescription.version,
       }),
     )
-    const failedAgain = await settle(getJobDescriptionParsingStatus(retrying.roles[0]!.id))
+    const failedAgain = await pollJobDescription(retrying.roles[0]!)
 
     expect(failedAgain.jobDescription).toMatchObject({ status: "failed" })
     expect(failedAgain.jobDescriptionAnalysis).toBeNull()
@@ -226,6 +329,46 @@ describe("roles stateful mock service", () => {
     )
 
     expect(repeatedStart).toEqual(parsing)
+  })
+
+  it("does not let an old JD poll advance a newer parsing job", async () => {
+    resetRolesMockState("singleRoleWithoutJobDescription")
+    const initial = await getCurrentRole()
+    const responseA = await settle(
+      saveJobDescription({
+        roleId: initial.id,
+        version: initial.version,
+        rawText: "JD A requires React delivery experience.",
+      }),
+    )
+    const parsingA = responseA.roles[0]!
+    const responseB = await settle(
+      saveJobDescription({
+        roleId: parsingA.id,
+        version: parsingA.version,
+        rawText: "JD B requires TypeScript architecture experience.",
+      }),
+    )
+    const parsingB = responseB.roles[0]!
+
+    const stalePollResult = await settle(
+      getJobDescriptionParsingStatus(getJobDescriptionPollInput(parsingA)),
+    )
+
+    expect(stalePollResult.version).toBe(parsingB.version)
+    expect(stalePollResult.jobDescription).toMatchObject({
+      status: "parsing",
+      rawText: "JD B requires TypeScript architecture experience.",
+      version: 2,
+    })
+
+    const readyB = await pollJobDescription(parsingB)
+    expect(readyB.version).toBe(parsingB.version + 1)
+    expect(readyB.jobDescription).toMatchObject({
+      status: "ready",
+      rawText: "JD B requires TypeScript architecture experience.",
+      version: 2,
+    })
   })
 
   it("marks an existing matching analysis stale when JD text changes", async () => {
@@ -292,7 +435,7 @@ describe("roles stateful mock service", () => {
     const generatingRole = generating.roles[0]!
 
     expect(generatingRole.matchingAnalysis?.status).toBe("generating")
-    const current = await settle(getMatchingAnalysisStatus(generatingRole.id))
+    const current = await pollMatchingAnalysis(generatingRole)
 
     expect(current.matchingAnalysis).toMatchObject({
       status: "current",
@@ -316,6 +459,51 @@ describe("roles stateful mock service", () => {
     expect(repeatedGeneration).toEqual(generating)
   })
 
+  it("does not let an old analysis poll advance a newer retry task", async () => {
+    resetRolesMockState("singleRoleWithoutJobDescription")
+    const ready = await saveAndParseCurrentRole(
+      "Lead React delivery while the analysis-failure integration is unavailable.",
+    )
+    const responseA = await settle(
+      generateMatchingAnalysis({ roleId: ready.id, version: ready.version }),
+    )
+    const generatingA = responseA.roles[0]!
+    const failedA = await pollMatchingAnalysis(generatingA)
+    expect(failedA.matchingAnalysis?.status).toBe("failed")
+
+    const responseB = await settle(
+      generateMatchingAnalysis({ roleId: failedA.id, version: failedA.version }),
+    )
+    const generatingB = responseB.roles[0]!
+    const stalePollResult = await settle(
+      getMatchingAnalysisStatus(getMatchingAnalysisPollInput(generatingA)),
+    )
+
+    expect(stalePollResult.version).toBe(generatingB.version)
+    expect(stalePollResult.matchingAnalysis?.status).toBe("generating")
+
+    const failedB = await pollMatchingAnalysis(generatingB)
+    expect(failedB.matchingAnalysis?.status).toBe("failed")
+  })
+
+  it("retries a failed fixture analysis using current dependency versions", async () => {
+    resetRolesMockState("matchingAnalysisFailed")
+    const failed = await getCurrentRole()
+    expect(failed.matchingAnalysis?.status).toBe("failed")
+
+    const generating = await settle(
+      generateMatchingAnalysis({ roleId: failed.id, version: failed.version }),
+    )
+    const generatingRole = generating.roles[0]!
+    const current = await pollMatchingAnalysis(generatingRole)
+
+    expect(current.matchingAnalysis).toMatchObject({
+      status: "current",
+      profileVersion: 12,
+      jobDescriptionVersion: 4,
+    })
+  })
+
   it("records a matching-analysis generation failure", async () => {
     resetRolesMockState("singleRoleWithoutJobDescription")
     const ready = await saveAndParseCurrentRole(
@@ -326,7 +514,7 @@ describe("roles stateful mock service", () => {
     const generating = await settle(
       generateMatchingAnalysis({ roleId: ready.id, version: ready.version }),
     )
-    const failed = await settle(getMatchingAnalysisStatus(generating.roles[0]!.id))
+    const failed = await pollMatchingAnalysis(generating.roles[0]!)
 
     expect(failed.matchingAnalysis).toMatchObject({ status: "failed" })
   })
@@ -337,7 +525,7 @@ describe("roles stateful mock service", () => {
     const generating = await settle(
       generateMatchingAnalysis({ roleId: role.id, version: role.version }),
     )
-    const current = await settle(getMatchingAnalysisStatus(generating.roles[0]!.id))
+    const current = await pollMatchingAnalysis(generating.roles[0]!)
 
     expect(current.matchingAnalysis).toMatchObject({
       status: "current",

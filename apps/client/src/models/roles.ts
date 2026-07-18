@@ -237,8 +237,21 @@ export type StartOrRetryJobDescriptionParsingInput = {
   jobDescriptionVersion: number
 }
 
+export type GetJobDescriptionParsingStatusInput = {
+  roleId: string
+  /** Target-role version returned when this parsing job entered parsing. */
+  version: number
+  jobDescriptionVersion: number
+}
+
 export type GenerateOrRegenerateMatchingAnalysisInput = {
   roleId: string
   /** Optimistic-concurrency version for the target role, not an analysis dependency. */
+  version: number
+}
+
+export type GetMatchingAnalysisStatusInput = {
+  roleId: string
+  /** Target-role version returned when this generation entered generating. */
   version: number
 }

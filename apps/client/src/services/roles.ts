@@ -6,6 +6,8 @@ import type {
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
+  GetJobDescriptionParsingStatusInput,
+  GetMatchingAnalysisStatusInput,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
@@ -65,8 +67,10 @@ export function startJobDescriptionParsing(
   return env.mock ? rolesMockService.startJobDescriptionParsing(input) : realApiUnavailable()
 }
 
-export function getJobDescriptionParsingStatus(roleId: string): Promise<TargetRole> {
-  return env.mock ? rolesMockService.getJobDescriptionParsingStatus(roleId) : realApiUnavailable()
+export function getJobDescriptionParsingStatus(
+  input: GetJobDescriptionParsingStatusInput,
+): Promise<TargetRole> {
+  return env.mock ? rolesMockService.getJobDescriptionParsingStatus(input) : realApiUnavailable()
 }
 
 export function generateMatchingAnalysis(
@@ -75,6 +79,8 @@ export function generateMatchingAnalysis(
   return env.mock ? rolesMockService.generateMatchingAnalysis(input) : realApiUnavailable()
 }
 
-export function getMatchingAnalysisStatus(roleId: string): Promise<TargetRole> {
-  return env.mock ? rolesMockService.getMatchingAnalysisStatus(roleId) : realApiUnavailable()
+export function getMatchingAnalysisStatus(
+  input: GetMatchingAnalysisStatusInput,
+): Promise<TargetRole> {
+  return env.mock ? rolesMockService.getMatchingAnalysisStatus(input) : realApiUnavailable()
 }

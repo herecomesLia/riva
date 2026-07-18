@@ -5,6 +5,8 @@ import type {
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
+  GetJobDescriptionParsingStatusInput,
+  GetMatchingAnalysisStatusInput,
   JobDescriptionAnalysis,
   MatchingAnalysis,
   MatchingAnalysisResult,
@@ -383,11 +385,19 @@ export async function startJobDescriptionParsing(
   return setMockResponse(replaceRole(updatedRole))
 }
 
-export async function getJobDescriptionParsingStatus(roleId: string): Promise<TargetRole> {
+export async function getJobDescriptionParsingStatus(
+  input: GetJobDescriptionParsingStatusInput,
+): Promise<TargetRole> {
   await waitForMockDelay()
-  const role = requireRole(roleId)
+  const role = requireRole(input.roleId)
+  if (
+    role.version !== input.version ||
+    role.jobDescription.version !== input.jobDescriptionVersion ||
+    role.jobDescription.status !== "parsing"
+  ) {
+    return copy(role)
+  }
   const completedRole = completeJobDescriptionParsing(role)
-  if (completedRole === role) return copy(role)
   setMockResponse(replaceRole(completedRole))
   return copy(completedRole)
 }
@@ -426,11 +436,15 @@ export async function generateMatchingAnalysis(
   return setMockResponse(replaceRole(updatedRole))
 }
 
-export async function getMatchingAnalysisStatus(roleId: string): Promise<TargetRole> {
+export async function getMatchingAnalysisStatus(
+  input: GetMatchingAnalysisStatusInput,
+): Promise<TargetRole> {
   await waitForMockDelay()
-  const role = requireRole(roleId)
+  const role = requireRole(input.roleId)
+  if (role.version !== input.version || role.matchingAnalysis?.status !== "generating") {
+    return copy(role)
+  }
   const completedRole = completeMatchingAnalysis(role)
-  if (completedRole === role) return copy(role)
   setMockResponse(replaceRole(completedRole))
   return copy(completedRole)
 }
