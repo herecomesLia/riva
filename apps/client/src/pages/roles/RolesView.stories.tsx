@@ -2,6 +2,7 @@ import preview from "#storybook/preview"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { createRolesMockResponse } from "@/mocks/data/roles"
+import type { RolesPageResponse } from "@/models/roles"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { RolesView } from "./RolesView"
@@ -261,4 +262,218 @@ export const DeleteCurrentRole = meta.story({
       expect(screen.queryByText(deletedCurrentRole.title)).not.toBeInTheDocument(),
     )
   },
+})
+
+function createTransitionGate() {
+  let release!: () => void
+  let promise: Promise<void>
+
+  function reset() {
+    promise = new Promise<void>((resolve) => {
+      release = resolve
+    })
+  }
+
+  reset()
+  return { release: () => release(), reset, wait: () => promise }
+}
+
+function createParsingResponse(
+  initial: RolesPageResponse,
+  rawText: string,
+  incrementJobDescriptionVersion: boolean,
+) {
+  const response = structuredClone(initial)
+  const role = response.roles[0]!
+  const currentJobDescriptionVersion = role.jobDescription.version ?? 0
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    jobDescription: {
+      status: "parsing",
+      rawText,
+      version: incrementJobDescriptionVersion
+        ? currentJobDescriptionVersion + 1
+        : currentJobDescriptionVersion,
+      parsingFailureReason: null,
+    },
+    jobDescriptionAnalysis: null,
+    matchingAnalysis:
+      role.matchingAnalysis?.status === "current"
+        ? { ...role.matchingAnalysis, status: "stale" }
+        : role.matchingAnalysis,
+  }
+  return response
+}
+
+function createReadyResponse(parsing: RolesPageResponse, summary: string) {
+  const response = structuredClone(parsing)
+  const role = response.roles[0]!
+  if (role.jobDescription.status !== "parsing") {
+    throw new globalThis.Error("Expected a parsing JD story response.")
+  }
+  const analysisTemplate = createRolesMockResponse("roleWithParsedJobDescription").roles[0]!
+    .jobDescriptionAnalysis!
+  response.roles[0] = {
+    ...role,
+    version: role.version + 1,
+    jobDescription: {
+      ...role.jobDescription,
+      status: "ready",
+    },
+    jobDescriptionAnalysis: {
+      ...analysisTemplate,
+      coreRequirementsSummary: summary,
+      jobDescriptionVersion: role.jobDescription.version,
+    },
+  }
+  return response
+}
+
+const missingJdInitial = createRolesMockResponse("singleRoleWithoutJobDescription")
+const missingJdRawText =
+  "Lead React architecture and TypeScript delivery for a merchant operations platform."
+const missingJdParsing = createParsingResponse(missingJdInitial, missingJdRawText, true)
+const missingJdSummary = "Lead scalable React delivery for complex merchant workflows."
+const missingJdReady = createReadyResponse(missingJdParsing, missingJdSummary)
+const missingJdGate = createTransitionGate()
+
+export const JobDescriptionMissing = meta.story({
+  render: () => (
+    <RolesStoryHarness
+      actions={{ saveJobDescription: fn(async () => missingJdParsing) }}
+      initialData={missingJdInitial}
+      transitions={{
+        saveJobDescription: async () => {
+          await missingJdGate.wait()
+          return missingJdReady
+        },
+      }}
+    />
+  ),
+  play: async ({ userEvent }) => {
+    missingJdGate.reset()
+    await userEvent.click(screen.getByRole("button", { name: /粘贴 JD|paste JD/i }))
+    const dialog = await screen.findByRole("dialog")
+    await userEvent.type(within(dialog).getByLabelText(/JD 文本|JD text/i), missingJdRawText)
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: /保存并解析|save and parse/i }),
+    )
+    await waitFor(() => expect(screen.getAllByText(/解析中|parsing/i).length).toBeGreaterThan(0))
+    missingJdGate.release()
+    await expect(screen.findByText(missingJdSummary)).resolves.toBeVisible()
+  },
+})
+
+export const JobDescriptionParsing = meta.story({
+  args: {
+    content: {
+      status: "ready",
+      data: createRolesMockResponse("roleWithJobDescriptionParsing"),
+    },
+    variant: "default",
+  },
+})
+
+const failedJdInitial = createRolesMockResponse("roleWithJobDescriptionFailed")
+
+export const JobDescriptionFailed = meta.story({
+  args: {
+    content: { status: "ready", data: failedJdInitial },
+    variant: "default",
+  },
+})
+
+const failedRole = failedJdInitial.roles[0]!
+const retryJdParsing = createParsingResponse(
+  failedJdInitial,
+  failedRole.jobDescription.rawText!,
+  false,
+)
+const retryJdSummary = "Build reliable creator-facing web products with measurable performance."
+const retryJdReady = createReadyResponse(retryJdParsing, retryJdSummary)
+const retryJdGate = createTransitionGate()
+
+export const JobDescriptionRetry = meta.story({
+  render: () => (
+    <RolesStoryHarness
+      actions={{ retryJobDescriptionParsing: fn(async () => retryJdParsing) }}
+      initialData={failedJdInitial}
+      transitions={{
+        retryJobDescriptionParsing: async () => {
+          await retryJdGate.wait()
+          return retryJdReady
+        },
+      }}
+    />
+  ),
+  play: async ({ userEvent }) => {
+    retryJdGate.reset()
+    await userEvent.click(screen.getByRole("button", { name: /重试解析|retry parsing/i }))
+    await waitFor(() => expect(screen.getAllByText(/解析中|parsing/i).length).toBeGreaterThan(0))
+    retryJdGate.release()
+    await expect(screen.findByText(retryJdSummary)).resolves.toBeVisible()
+  },
+})
+
+export const JobDescriptionReady = meta.story({
+  args: {
+    content: {
+      status: "ready",
+      data: createRolesMockResponse("roleWithParsedJobDescription"),
+    },
+    variant: "default",
+  },
+})
+
+const replaceJdInitial = createRolesMockResponse("matchingAnalysisCurrent")
+const replacementRawText =
+  "Own platform engineering delivery, reliability standards, and cross-team technical direction."
+const replaceJdParsing = createParsingResponse(replaceJdInitial, replacementRawText, true)
+const replacementSummary = "Own reliable platform delivery and cross-team technical direction."
+const replaceJdReady = createReadyResponse(replaceJdParsing, replacementSummary)
+const replaceJdGate = createTransitionGate()
+
+export const ReplaceJobDescription = meta.story({
+  render: () => (
+    <RolesStoryHarness
+      actions={{ saveJobDescription: fn(async () => replaceJdParsing) }}
+      initialData={replaceJdInitial}
+      transitions={{
+        saveJobDescription: async () => {
+          await replaceJdGate.wait()
+          return replaceJdReady
+        },
+      }}
+    />
+  ),
+  play: async ({ userEvent }) => {
+    replaceJdGate.reset()
+    await userEvent.click(screen.getByRole("button", { name: /替换 JD|replace JD/i }))
+    const dialog = await screen.findByRole("dialog")
+    const input = within(dialog).getByLabelText(/JD 文本|JD text/i)
+    await userEvent.clear(input)
+    await userEvent.type(input, replacementRawText)
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: /保存并解析|save and parse/i }),
+    )
+    await waitFor(() => {
+      expect(screen.getAllByText(/解析中|parsing/i).length).toBeGreaterThan(0)
+      expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
+    })
+    replaceJdGate.release()
+    await expect(screen.findByText(replacementSummary)).resolves.toBeVisible()
+  },
+})
+
+const synchronizationErrorData = createRolesMockResponse("roleWithJobDescriptionParsing")
+
+export const JobDescriptionSynchronizationError = meta.story({
+  render: () => (
+    <RolesStoryHarness
+      actions={{}}
+      initialData={synchronizationErrorData}
+      jobDescriptionSynchronizationErrorRoleIds={[synchronizationErrorData.roles[0]!.id]}
+    />
+  ),
 })

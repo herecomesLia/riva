@@ -58,6 +58,42 @@ export const roles = {
     requestFailed: "暂时无法保存本次修改，请稍后重试。表单和现有岗位数据均已保留。",
     versionConflict: "岗位已在其他位置更新。请关闭表单，查看最新内容后再试。",
   },
+  jd: {
+    cardDescription: "粘贴岗位 JD，并查看结构化解析结果。",
+    actions: {
+      add: "粘贴岗位 JD",
+      replace: "编辑或替换 JD",
+      retry: "重试解析",
+      resynchronize: "重新同步状态",
+    },
+    editor: {
+      addTitle: "粘贴岗位 JD",
+      replaceTitle: "编辑或替换岗位 JD",
+      description: "第一版仅支持粘贴文本。保存后将开始结构化解析。",
+      fieldLabel: "岗位 JD 原文",
+      placeholder: "在这里粘贴完整的岗位职责、任职要求和加分项……",
+      required: "请粘贴岗位 JD 文本。",
+      save: "保存并解析",
+      saving: "正在保存",
+    },
+    failed: {
+      title: "JD 解析未完成",
+    },
+    synchronization: {
+      title: "暂时无法获取解析结果",
+      description: "JD 已保存并仍处于解析中。可以重新同步，不会重复创建解析任务。",
+    },
+    analysis: {
+      summary: "核心要求总结",
+      responsibilities: "岗位职责",
+      requiredSkills: "必备技能",
+      preferredSkills: "加分技能",
+      experienceRequirements: "经验要求",
+      softSkills: "软能力",
+      businessDomains: "业务领域",
+      keywords: "高频关键词",
+    },
+  },
   list: {
     title: "已保存岗位",
     description: "选择岗位可查看详情，不会改变当前默认岗位。",

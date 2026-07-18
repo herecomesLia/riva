@@ -19,6 +19,9 @@ function createActions(
     archiveTargetRole: vi.fn(async () => data),
     createTargetRole: vi.fn(async () => data),
     deleteTargetRole: vi.fn(async () => data),
+    retryJobDescriptionParsing: vi.fn(async () => data),
+    retryJobDescriptionSynchronization: vi.fn(async () => data),
+    saveJobDescription: vi.fn(async () => data),
     setCurrentTargetRole: vi.fn(async () => data),
     updateRolePreparationStatus: vi.fn(async () => data),
     updateTargetRole: vi.fn(async () => data),
@@ -320,6 +323,108 @@ describe("RolesView", () => {
     const blocker = await screen.findByRole("alertdialog")
     expect(within(blocker).getByText(i18n.t("roles.dialog.leavePageTitle"))).toBeInTheDocument()
     expect(router!.state.location.pathname).toBe("/roles")
+  })
+
+  it("opens an empty paste form for a missing job description", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("singleRoleWithoutJobDescription")
+    renderReadyView(data)
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.jd.actions.add") }))
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel"))).toHaveValue("")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.jd.editor.save") }))
+    expect(await within(dialog).findByText(i18n.t("roles.jd.editor.required"))).toBeInTheDocument()
+  })
+
+  it("shows parsing without exposing structured results early", async () => {
+    const data = createRolesMockResponse("roleWithJobDescriptionParsing")
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("job-description-card")
+    expect(card).toHaveTextContent(i18n.t("roles.jobDescriptionStatus.parsing.label"))
+    expect(card).toHaveTextContent(i18n.t("roles.jobDescriptionStatus.parsing.description"))
+    expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
+  })
+
+  it("shows the safe business failure and retry action", async () => {
+    const data = createRolesMockResponse("roleWithJobDescriptionFailed")
+    const role = data.roles[0]!
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("job-description-card")
+    expect(card).toHaveTextContent(role.jobDescription.parsingFailureReason!)
+    expect(
+      within(card).getByRole("button", { name: i18n.t("roles.jd.actions.retry") }),
+    ).toBeEnabled()
+  })
+
+  it("disables retry while a failed parse retry is pending", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("roleWithJobDescriptionFailed")
+    let resolveRetry!: (response: RolesPageResponse) => void
+    const retryJobDescriptionParsing = vi.fn(
+      () =>
+        new Promise<RolesPageResponse>((resolve) => {
+          resolveRetry = resolve
+        }),
+    )
+    renderReadyView(data, {
+      actions: createActions(data, { retryJobDescriptionParsing }),
+    })
+
+    const retry = await screen.findByRole("button", { name: i18n.t("roles.jd.actions.retry") })
+    await user.click(retry)
+
+    await waitFor(() => expect(retryJobDescriptionParsing).toHaveBeenCalledTimes(1))
+    expect(retry).toBeDisabled()
+    resolveRetry(data)
+  })
+
+  it("renders every structured section for a ready job description", async () => {
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    const analysis = data.roles[0]!.jobDescriptionAnalysis!
+    renderReadyView(data)
+
+    const result = await screen.findByTestId("job-description-analysis")
+    for (const key of [
+      "summary",
+      "responsibilities",
+      "requiredSkills",
+      "preferredSkills",
+      "experienceRequirements",
+      "softSkills",
+      "businessDomains",
+      "keywords",
+    ] as const) {
+      expect(
+        within(result).getByRole("heading", { name: i18n.t(`roles.jd.analysis.${key}`) }),
+      ).toBeInTheDocument()
+    }
+    expect(result).toHaveTextContent(analysis.coreRequirementsSummary)
+    expect(result).toHaveTextContent(analysis.responsibilities[0]!)
+    expect(result).toHaveTextContent(analysis.frequentKeywords[0]!)
+  })
+
+  it("keeps the pasted JD draft when saving fails", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("singleRoleWithoutJobDescription")
+    const saveJobDescription = vi.fn(async () => {
+      throw new Error("unsafe transport failure")
+    })
+    renderReadyView(data, { actions: createActions(data, { saveJobDescription }) })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.jd.actions.add") }))
+    const dialog = await screen.findByRole("dialog")
+    const textarea = within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel"))
+    await user.type(textarea, "Lead React architecture and TypeScript delivery.")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.jd.editor.save") }))
+
+    expect(
+      await within(dialog).findByText(i18n.t("roles.errors.requestFailed")),
+    ).toBeInTheDocument()
+    expect(textarea).toHaveValue("Lead React architecture and TypeScript delivery.")
+    expect(within(dialog).queryByText("unsafe transport failure")).not.toBeInTheDocument()
   })
 
   it("shows an explicit notice when no server current role exists", async () => {

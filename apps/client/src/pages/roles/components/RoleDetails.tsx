@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator"
 import type { TargetRole, TargetRoleExperienceRange } from "@/models/roles"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
+import { JobDescriptionCard } from "./JobDescriptionCard"
 
 export type RoleDetailsActions = {
   archive: () => void
@@ -26,14 +27,19 @@ export type RoleDetailsActions = {
   edit: () => void
   setCurrent: () => void
   togglePreparationStatus: () => void
+  editJobDescription: () => void
+  retryJobDescriptionParsing: () => void
+  retryJobDescriptionSynchronization: () => void
 }
 
 export function RoleDetails({
   actions,
   pending,
   role,
+  jobDescriptionSynchronizationError = false,
 }: {
   actions?: RoleDetailsActions
+  jobDescriptionSynchronizationError?: boolean
   pending?: boolean
   role: TargetRole
 }) {
@@ -133,17 +139,16 @@ export function RoleDetails({
 
         <Separator />
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <StatusSummary
-            description={
-              role.jobDescription.status === "failed"
-                ? role.jobDescription.parsingFailureReason
-                : t(`roles.jobDescriptionStatus.${role.jobDescription.status}.description`)
-            }
-            label={t(`roles.jobDescriptionStatus.${role.jobDescription.status}.label`)}
-            title={t("roles.details.sections.jobDescription")}
-            variant={role.jobDescription.status === "failed" ? "destructive" : "outline"}
-          />
+        <JobDescriptionCard
+          onEdit={actions?.editJobDescription}
+          onRetry={actions?.retryJobDescriptionParsing}
+          onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
+          pending={pending}
+          role={role}
+          synchronizationError={jobDescriptionSynchronizationError}
+        />
+
+        <div className="grid gap-4">
           <StatusSummary
             description={t(
               `roles.matchingAnalysisStatus.${role.matchingAnalysis?.status ?? "none"}.description`,

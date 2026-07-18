@@ -18,8 +18,11 @@ import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
+  GetJobDescriptionParsingStatusInput,
   RolesPageResponse,
+  SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
+  StartOrRetryJobDescriptionParsingInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
@@ -27,6 +30,7 @@ import type { Loadable } from "@/types"
 
 import { RoleDetails } from "./components/RoleDetails"
 import { RoleEditorDialog } from "./components/RoleEditorDialog"
+import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDialog"
 import { RolesHeader } from "./components/RolesHeader"
 import { RolesList } from "./components/RolesList"
 import {
@@ -41,6 +45,13 @@ export type RolesViewActions = {
   archiveTargetRole: (input: ArchiveTargetRoleInput) => Promise<RolesPageResponse>
   createTargetRole: (input: CreateTargetRoleInput) => Promise<RolesPageResponse>
   deleteTargetRole: (input: DeleteTargetRoleInput) => Promise<RolesPageResponse>
+  retryJobDescriptionParsing: (
+    input: StartOrRetryJobDescriptionParsingInput,
+  ) => Promise<RolesPageResponse>
+  retryJobDescriptionSynchronization: (
+    input: GetJobDescriptionParsingStatusInput,
+  ) => Promise<RolesPageResponse>
+  saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
   updateRolePreparationStatus: (
     input: UpdateTargetRolePreparationStatusInput,
@@ -54,6 +65,7 @@ export type RolesViewProps =
       content: Loadable<RolesPageResponse>
       actions?: RolesViewActions
       initialSelectedRoleId?: string
+      jobDescriptionSynchronizationErrorRoleIds?: string[]
     }
   | {
       variant: "error"
@@ -78,6 +90,9 @@ export function RolesView(props: RolesViewProps) {
           actions={props.actions}
           data={props.content.data}
           initialSelectedRoleId={props.initialSelectedRoleId}
+          jobDescriptionSynchronizationErrorRoleIds={
+            props.jobDescriptionSynchronizationErrorRoleIds ?? []
+          }
         />
       )}
     </div>
@@ -88,16 +103,19 @@ function RolesReadyView({
   actions,
   data,
   initialSelectedRoleId,
+  jobDescriptionSynchronizationErrorRoleIds,
 }: {
   actions?: RolesViewActions
   data: RolesPageResponse
   initialSelectedRoleId?: string
+  jobDescriptionSynchronizationErrorRoleIds: string[]
 }) {
   const { t } = useTranslation()
   const defaultSelectedRoleId =
     initialSelectedRoleId ?? data.currentRoleId ?? data.roles[0]?.id ?? null
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(defaultSelectedRoleId)
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null)
+  const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<"archive" | "delete" | null>(null)
@@ -114,6 +132,7 @@ function RolesReadyView({
 
   function closeEditor() {
     setEditorMode(null)
+    setIsJobDescriptionEditorOpen(false)
     setIsDirty(false)
   }
 
@@ -180,6 +199,29 @@ function RolesReadyView({
                         archive: () => setConfirmation("archive"),
                         delete: () => setConfirmation("delete"),
                         edit: () => setEditorMode("edit"),
+                        editJobDescription: () => setIsJobDescriptionEditorOpen(true),
+                        retryJobDescriptionParsing: () => {
+                          if (selectedRole.jobDescription.status !== "failed") return
+                          const jobDescriptionVersion = selectedRole.jobDescription.version
+                          void runAction(() =>
+                            actions.retryJobDescriptionParsing({
+                              roleId: selectedRole.id,
+                              version: selectedRole.version,
+                              jobDescriptionVersion,
+                            }),
+                          )
+                        },
+                        retryJobDescriptionSynchronization: () => {
+                          if (selectedRole.jobDescription.status !== "parsing") return
+                          const jobDescriptionVersion = selectedRole.jobDescription.version
+                          void runAction(() =>
+                            actions.retryJobDescriptionSynchronization({
+                              roleId: selectedRole.id,
+                              version: selectedRole.version,
+                              jobDescriptionVersion,
+                            }),
+                          )
+                        },
                         setCurrent: () =>
                           void runAction(() =>
                             actions.setCurrentTargetRole({
@@ -203,6 +245,9 @@ function RolesReadyView({
                 }
                 pending={pendingAction}
                 role={selectedRole}
+                jobDescriptionSynchronizationError={jobDescriptionSynchronizationErrorRoleIds.includes(
+                  selectedRole.id,
+                )}
               />
             ) : (
               <RolesNoSelectionState />
@@ -212,20 +257,32 @@ function RolesReadyView({
       )}
 
       {actions && (
-        <RoleEditorDialog
-          mode={editorMode ?? "create"}
-          onCreate={async (input) => {
-            await actions.createTargetRole(input)
-          }}
-          onDirtyChange={handleDirtyChange}
-          onOpenChange={(open) => !open && requestCloseEditor()}
-          onSaved={closeEditor}
-          onUpdate={async (input) => {
-            await actions.updateTargetRole(input)
-          }}
-          open={editorMode !== null}
-          role={editorMode === "edit" ? selectedRole : null}
-        />
+        <>
+          <RoleEditorDialog
+            mode={editorMode ?? "create"}
+            onCreate={async (input) => {
+              await actions.createTargetRole(input)
+            }}
+            onDirtyChange={handleDirtyChange}
+            onOpenChange={(open) => !open && requestCloseEditor()}
+            onSaved={closeEditor}
+            onUpdate={async (input) => {
+              await actions.updateTargetRole(input)
+            }}
+            open={editorMode !== null}
+            role={editorMode === "edit" ? selectedRole : null}
+          />
+          <JobDescriptionEditorDialog
+            onDirtyChange={handleDirtyChange}
+            onOpenChange={(open) => !open && requestCloseEditor()}
+            onSave={async (input) => {
+              await actions.saveJobDescription(input)
+            }}
+            onSaved={closeEditor}
+            open={isJobDescriptionEditorOpen}
+            role={selectedRole}
+          />
+        </>
       )}
 
       <ConfirmationDialog

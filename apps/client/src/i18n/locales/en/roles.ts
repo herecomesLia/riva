@@ -62,6 +62,43 @@ export const roles = {
     versionConflict:
       "This role changed elsewhere. Close the form, review the latest version, and try again.",
   },
+  jd: {
+    cardDescription: "Paste the role JD and review its structured analysis.",
+    actions: {
+      add: "Paste job description",
+      replace: "Edit or replace JD",
+      retry: "Retry parsing",
+      resynchronize: "Synchronize status",
+    },
+    editor: {
+      addTitle: "Paste job description",
+      replaceTitle: "Edit or replace job description",
+      description: "The first version supports pasted text only. Saving starts structured parsing.",
+      fieldLabel: "Job description text",
+      placeholder: "Paste the full responsibilities, requirements, and preferred qualifications…",
+      required: "Paste the job description text.",
+      save: "Save and parse",
+      saving: "Saving",
+    },
+    failed: {
+      title: "JD parsing did not complete",
+    },
+    synchronization: {
+      title: "Unable to retrieve the parsing result",
+      description:
+        "The JD is saved and remains in parsing. Synchronizing again will not create another parsing job.",
+    },
+    analysis: {
+      summary: "Core requirements",
+      responsibilities: "Responsibilities",
+      requiredSkills: "Required skills",
+      preferredSkills: "Preferred skills",
+      experienceRequirements: "Experience requirements",
+      softSkills: "Soft skills",
+      businessDomains: "Business domains",
+      keywords: "Frequent keywords",
+    },
+  },
   list: {
     title: "Saved roles",
     description: "Selecting a role shows its details without changing the current default role.",
