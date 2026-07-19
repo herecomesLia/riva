@@ -95,7 +95,7 @@ export function RoleEditorDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t(`roles.editor.${mode}.title`)}</DialogTitle>
+          <DialogTitle className="text-xl">{t(`roles.editor.${mode}.title`)}</DialogTitle>
           <DialogDescription>{t(`roles.editor.${mode}.description`)}</DialogDescription>
         </DialogHeader>
         <RoleEditorForm

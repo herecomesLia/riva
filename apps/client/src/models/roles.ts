@@ -45,6 +45,26 @@ export type FailedJobDescription = {
 export type JobDescription =
   MissingJobDescription | ParsingJobDescription | ReadyJobDescription | FailedJobDescription
 
+export type QualificationRequirements = {
+  education: string[]
+  graduationCohorts: string[]
+  majors: string[]
+  experience: string[]
+  languages: string[]
+  certifications: string[]
+  other: string[]
+}
+
+export type RequiredSkillGroups = {
+  programmingLanguages: string[]
+  frameworksAndLibraries: string[]
+  platforms: string[]
+  tools: string[]
+  conceptsAndMethods: string[]
+  databasesAndMiddleware: string[]
+  other: string[]
+}
+
 export type JobDescriptionAnalysis = {
   /** The JD version this structured result was parsed from. */
   jobDescriptionVersion: number
@@ -52,14 +72,14 @@ export type JobDescriptionAnalysis = {
   analysisVersion: number
   /** When structured JD parsing completed. */
   parsedAt: string
+  /** System-derived summary of the current structured modules. */
+  rivaSummary: string
   responsibilities: string[]
-  requiredSkills: string[]
-  preferredSkills: string[]
-  experienceRequirements: string[]
+  qualificationRequirements: QualificationRequirements
+  requiredSkills: RequiredSkillGroups
+  preferredQualifications: string[]
   softSkills: string[]
   businessDomains: string[]
-  frequentKeywords: string[]
-  coreRequirementsSummary: string
 }
 
 export type MatchingAnalysisStatus = "generating" | "current" | "stale" | "failed"
@@ -264,16 +284,10 @@ export type GetMatchingAnalysisStatusInput = {
 }
 
 export type JobDescriptionAnalysisListField =
-  | "responsibilities"
-  | "requiredSkills"
-  | "preferredSkills"
-  | "experienceRequirements"
-  | "softSkills"
-  | "businessDomains"
-  | "frequentKeywords"
+  "responsibilities" | "preferredQualifications" | "softSkills" | "businessDomains"
 
 export type JobDescriptionAnalysisModuleField =
-  "coreRequirementsSummary" | JobDescriptionAnalysisListField
+  JobDescriptionAnalysisListField | "qualificationRequirements" | "requiredSkills"
 
 export type UpdateJobDescriptionAnalysisModuleInput =
   | {
@@ -281,14 +295,22 @@ export type UpdateJobDescriptionAnalysisModuleInput =
       version: number
       jobDescriptionVersion: number
       analysisVersion: number
-      field: "coreRequirementsSummary"
-      value: string
+      field: JobDescriptionAnalysisListField
+      value: string[]
     }
   | {
       roleId: string
       version: number
       jobDescriptionVersion: number
       analysisVersion: number
-      field: JobDescriptionAnalysisListField
-      value: string[]
+      field: "qualificationRequirements"
+      value: QualificationRequirements
+    }
+  | {
+      roleId: string
+      version: number
+      jobDescriptionVersion: number
+      analysisVersion: number
+      field: "requiredSkills"
+      value: RequiredSkillGroups
     }

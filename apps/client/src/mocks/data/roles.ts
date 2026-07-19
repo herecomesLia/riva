@@ -47,18 +47,32 @@ function createJobDescriptionAnalysis(jobDescriptionVersion: number): JobDescrip
     jobDescriptionVersion,
     analysisVersion: 1,
     parsedAt: "2026-07-14T08:45:00.000Z",
+    rivaSummary: "负责可扩展前端架构与复杂业务交付，重点要求 React、TypeScript 和跨团队协作能力。",
     responsibilities: [
-      "Own frontend architecture and delivery for merchant-facing products.",
-      "Partner with product, design, and backend teams on complex workflows.",
+      "负责商家运营产品的前端架构与交付。",
+      "与产品、设计和后端团队协作，推进复杂业务流程。",
     ],
-    requiredSkills: ["React", "TypeScript", "Performance optimization"],
-    preferredSkills: ["Experimentation platforms", "Accessibility"],
-    experienceRequirements: ["Five or more years of frontend engineering experience."],
-    softSkills: ["Technical leadership", "Cross-functional communication"],
-    businessDomains: ["Merchant operations", "E-commerce platforms"],
-    frequentKeywords: ["React", "TypeScript", "Architecture", "Performance"],
-    coreRequirementsSummary:
-      "Deliver scalable React applications while guiding technical decisions across a product team.",
+    qualificationRequirements: {
+      education: ["本科及以上"],
+      graduationCohorts: [],
+      majors: ["计算机或相关专业"],
+      experience: ["五年以上前端工程经验"],
+      languages: [],
+      certifications: [],
+      other: [],
+    },
+    requiredSkills: {
+      programmingLanguages: ["TypeScript"],
+      frameworksAndLibraries: ["React"],
+      platforms: [],
+      tools: [],
+      conceptsAndMethods: ["前端架构", "性能优化"],
+      databasesAndMiddleware: [],
+      other: [],
+    },
+    preferredQualifications: ["有实验平台建设经验", "熟悉无障碍设计"],
+    softSkills: ["技术领导力", "跨团队沟通"],
+    businessDomains: ["商家运营", "电商平台"],
   }
 }
 

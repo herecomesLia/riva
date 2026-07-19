@@ -74,19 +74,60 @@ function createJobDescriptionAnalysis(jobDescriptionVersion: number): JobDescrip
     jobDescriptionVersion,
     analysisVersion: 1,
     parsedAt: nextTimestamp(),
+    rivaSummary: "负责可扩展前端架构与复杂业务交付，重点要求 React、TypeScript 和跨团队协作能力。",
     responsibilities: [
-      "Own frontend architecture and delivery for merchant-facing products.",
-      "Partner with product, design, and backend teams on complex workflows.",
+      "负责商家运营产品的前端架构与交付。",
+      "与产品、设计和后端团队协作，推进复杂业务流程。",
     ],
-    requiredSkills: ["React", "TypeScript", "Performance optimization"],
-    preferredSkills: ["Experimentation platforms", "Accessibility"],
-    experienceRequirements: ["Five or more years of frontend engineering experience."],
-    softSkills: ["Technical leadership", "Cross-functional communication"],
-    businessDomains: ["Merchant operations", "E-commerce platforms"],
-    frequentKeywords: ["React", "TypeScript", "Architecture", "Performance"],
-    coreRequirementsSummary:
-      "Deliver scalable React applications while guiding technical decisions across a product team.",
+    qualificationRequirements: {
+      education: ["本科及以上"],
+      graduationCohorts: [],
+      majors: ["计算机或相关专业"],
+      experience: ["五年以上前端工程经验"],
+      languages: [],
+      certifications: [],
+      other: [],
+    },
+    requiredSkills: {
+      programmingLanguages: ["TypeScript"],
+      frameworksAndLibraries: ["React"],
+      platforms: [],
+      tools: [],
+      conceptsAndMethods: ["前端架构", "性能优化"],
+      databasesAndMiddleware: [],
+      other: [],
+    },
+    preferredQualifications: ["有实验平台建设经验", "熟悉无障碍设计"],
+    softSkills: ["技术领导力", "跨团队沟通"],
+    businessDomains: ["商家运营", "电商平台"],
   }
+}
+
+function createRivaSummary(analysis: JobDescriptionAnalysis) {
+  const skills = [
+    ...analysis.requiredSkills.programmingLanguages,
+    ...analysis.requiredSkills.frameworksAndLibraries,
+    ...analysis.requiredSkills.conceptsAndMethods,
+  ].slice(0, 3)
+  const responsibility = analysis.responsibilities[0]?.replace(/[。.]$/, "")
+  const qualification = [
+    ...analysis.qualificationRequirements.education,
+    ...analysis.qualificationRequirements.majors,
+    ...analysis.qualificationRequirements.experience,
+  ][0]
+  const preferred = analysis.preferredQualifications[0]
+  const softSkill = analysis.softSkills[0]
+  const domain = analysis.businessDomains[0]
+  return [
+    responsibility,
+    skills.length ? `重点要求 ${skills.join("、")}` : null,
+    qualification ? `任职资格包括 ${qualification}` : null,
+    preferred ? `加分项为 ${preferred}` : null,
+    softSkill ? `强调 ${softSkill}` : null,
+    domain ? `业务领域为 ${domain}` : null,
+  ]
+    .filter(Boolean)
+    .join("；")
 }
 
 function createMatchingAnalysisResult(): MatchingAnalysisResult {
@@ -468,28 +509,61 @@ export async function updateJobDescriptionAnalysisModule(
   if (role.jobDescriptionAnalysis.analysisVersion !== input.analysisVersion) {
     throw new Error("Job description analysis version is out of date.")
   }
-  if (
-    (input.field === "coreRequirementsSummary" && typeof input.value !== "string") ||
-    (input.field !== "coreRequirementsSummary" &&
-      (!Array.isArray(input.value) || !input.value.every((item) => typeof item === "string")))
-  ) {
+  if (!isValidAnalysisModuleValue(input)) {
     throw new Error("Structured JD analysis field value is invalid.")
   }
 
-  const nextAnalysis =
-    input.field === "coreRequirementsSummary"
-      ? { ...role.jobDescriptionAnalysis, coreRequirementsSummary: input.value }
-      : { ...role.jobDescriptionAnalysis, [input.field]: [...input.value] }
+  const nextAnalysis: JobDescriptionAnalysis = {
+    ...role.jobDescriptionAnalysis,
+    [input.field]: copy(input.value),
+  }
   const updatedRole: ReadyTargetRole = {
     ...role,
     ...nextRoleVersion(role),
     jobDescriptionAnalysis: {
       ...nextAnalysis,
       analysisVersion: role.jobDescriptionAnalysis.analysisVersion + 1,
+      rivaSummary: createRivaSummary(nextAnalysis),
     },
     matchingAnalysis: invalidateMatchingAnalysisAfterAnalysisCorrection(role.matchingAnalysis),
   }
   return setMockResponse(replaceRole(updatedRole))
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+}
+
+function isQualificationRequirements(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false
+  return [
+    "education",
+    "graduationCohorts",
+    "majors",
+    "experience",
+    "languages",
+    "certifications",
+    "other",
+  ].every((key) => isStringList((value as Record<string, unknown>)[key]))
+}
+
+function isRequiredSkillGroups(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false
+  return [
+    "programmingLanguages",
+    "frameworksAndLibraries",
+    "platforms",
+    "tools",
+    "conceptsAndMethods",
+    "databasesAndMiddleware",
+    "other",
+  ].every((key) => isStringList((value as Record<string, unknown>)[key]))
+}
+
+function isValidAnalysisModuleValue(input: UpdateJobDescriptionAnalysisModuleInput) {
+  if (input.field === "qualificationRequirements") return isQualificationRequirements(input.value)
+  if (input.field === "requiredSkills") return isRequiredSkillGroups(input.value)
+  return isStringList(input.value)
 }
 
 export async function getMatchingAnalysisStatus(

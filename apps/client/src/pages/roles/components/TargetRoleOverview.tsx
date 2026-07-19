@@ -32,7 +32,7 @@ export function TargetRoleOverview({
 
   return (
     <Card
-      className="border border-border/70 bg-background/60 shadow-none"
+      className="border border-border/70 bg-card shadow-none"
       data-testid="target-role-overview"
       size="sm"
     >
@@ -44,8 +44,14 @@ export function TargetRoleOverview({
       <CardContent className="flex flex-col gap-6">
         {actions && (
           <div className="flex flex-wrap gap-2" data-testid="role-actions">
-            <Button disabled={pending} onClick={actions.edit} size="sm" variant="outline">
-              <PencilIcon data-icon="inline-start" />
+            <Button
+              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
+              disabled={pending}
+              onClick={actions.edit}
+              size="sm"
+              variant="outline"
+            >
+              <PencilIcon className="size-4" data-icon="inline-start" />
               {t("roles.actions.edit")}
             </Button>
             {!role.isCurrent && role.preparationStatus !== "archived" && (

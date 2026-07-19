@@ -51,7 +51,7 @@ function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-right text-xs font-medium">{value}</dd>
+      <dd className="min-w-0 text-right text-sm font-medium">{value}</dd>
     </div>
   )
 }

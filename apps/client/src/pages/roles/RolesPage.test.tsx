@@ -711,7 +711,12 @@ describe("RolesPage", () => {
       jobDescriptionAnalysis: {
         ...correctedRole.jobDescriptionAnalysis,
         analysisVersion: correctedRole.jobDescriptionAnalysis.analysisVersion + 1,
-        requiredSkills: ["React", "TypeScript", "Accessibility"],
+        requiredSkills: {
+          ...correctedRole.jobDescriptionAnalysis.requiredSkills,
+          programmingLanguages: ["TypeScript"],
+          frameworksAndLibraries: ["React"],
+          other: ["Accessibility"],
+        },
       },
       matchingAnalysis: null,
     }
@@ -731,9 +736,11 @@ describe("RolesPage", () => {
       }),
     )
     const dialog = await screen.findByRole("dialog")
-    const textarea = within(dialog).getByLabelText(i18n.t("roles.jd.analysisEditor.fieldLabel"))
+    const textarea = within(dialog).getByLabelText(
+      `${i18n.t("roles.jd.analysis.skillCategories.programmingLanguages")} 1`,
+    )
     await user.clear(textarea)
-    await user.type(textarea, "React\nTypeScript\nAccessibility")
+    await user.type(textarea, "TypeScript")
     await user.click(
       within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
     )
@@ -908,11 +915,12 @@ describe("RolesPage", () => {
     role.jobDescriptionAnalysis = {
       ...role.jobDescriptionAnalysis,
       analysisVersion: role.jobDescriptionAnalysis.analysisVersion + 1,
-      coreRequirementsSummary: "Corrected summary for the role.",
+      preferredQualifications: ["Corrected preferred qualification for the role."],
     }
-    role.matchingAnalysis = role.matchingAnalysis
-      ? { ...role.matchingAnalysis, status: "stale" }
-      : null
+    role.matchingAnalysis =
+      role.matchingAnalysis?.status === "current"
+        ? { ...role.matchingAnalysis, status: "stale" }
+        : null
     vi.mocked(getRolesPage).mockResolvedValue(initial)
     vi.mocked(updateJobDescriptionAnalysisModule).mockResolvedValue(next)
     const { queryClient } = renderRolesPage()
@@ -921,14 +929,16 @@ describe("RolesPage", () => {
     await user.click(
       await screen.findByRole("button", {
         name: i18n.t("roles.jd.actions.editModuleLabel", {
-          module: i18n.t("roles.jd.analysis.summary"),
+          module: i18n.t("roles.jd.analysis.preferredQualifications"),
         }),
       }),
     )
     const dialog = await screen.findByRole("dialog")
-    const field = within(dialog).getByLabelText(i18n.t("roles.jd.analysisEditor.fieldLabel"))
+    const field = within(dialog).getByLabelText(
+      `${i18n.t("roles.jd.analysis.preferredQualifications")} 1`,
+    )
     await user.clear(field)
-    await user.type(field, "Corrected summary for the role.")
+    await user.type(field, "Corrected preferred qualification for the role.")
     await user.click(
       within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
     )
@@ -939,13 +949,13 @@ describe("RolesPage", () => {
         version: initial.roles[0]!.version,
         jobDescriptionVersion: initial.roles[0]!.jobDescription.version,
         analysisVersion: initial.roles[0]!.jobDescriptionAnalysis?.analysisVersion,
-        field: "coreRequirementsSummary",
-        value: "Corrected summary for the role.",
+        field: "preferredQualifications",
+        value: ["Corrected preferred qualification for the role.", "熟悉无障碍设计"],
       },
       expect.anything(),
     )
     await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(next))
-    expect(screen.getByText("Corrected summary for the role.")).toBeInTheDocument()
+    expect(screen.getByText("Corrected preferred qualification for the role.")).toBeInTheDocument()
   })
 })
 
@@ -1166,7 +1176,7 @@ function createReadyResponseFromParsing(
     },
     jobDescriptionAnalysis: {
       ...parsedFixture.jobDescriptionAnalysis,
-      coreRequirementsSummary: summary,
+      rivaSummary: summary,
       jobDescriptionVersion: role.jobDescription.version,
     },
   }
@@ -1189,7 +1199,8 @@ function createGeneratingMatchingAnalysisResponse(
   if (
     !response.profileContext.exists ||
     !response.profileContext.completed ||
-    role.jobDescription.status !== "ready"
+    role.jobDescription.status !== "ready" ||
+    !role.jobDescriptionAnalysis
   ) {
     throw new Error("Expected complete matching-analysis prerequisites.")
   }

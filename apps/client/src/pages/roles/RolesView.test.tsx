@@ -310,7 +310,7 @@ describe("RolesView", () => {
       "true",
     )
     expect(screen.getByTestId("job-description-card")).toHaveTextContent(
-      i18n.t(`roles.jobDescriptionStatus.${otherRole.jobDescription.status}.label`),
+      i18n.t("roles.details.sections.jobDescription"),
     )
     const desktopSummary = within(screen.getByTestId("roles-desktop-navigation")).getByTestId(
       "target-role-progress-summary",
@@ -638,7 +638,6 @@ describe("RolesView", () => {
     renderReadyView(data, { initialActiveTab: "job-description" })
 
     const card = await screen.findByTestId("job-description-card")
-    expect(card).toHaveTextContent(i18n.t("roles.jobDescriptionStatus.parsing.label"))
     expect(card).toHaveTextContent(i18n.t("roles.jobDescriptionStatus.parsing.description"))
     expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
   })
@@ -700,23 +699,57 @@ describe("RolesView", () => {
 
     const result = await screen.findByTestId("job-description-analysis")
     for (const key of [
-      "summary",
+      "rivaSummary",
       "responsibilities",
       "requiredSkills",
-      "preferredSkills",
-      "experienceRequirements",
+      "qualificationRequirements",
+      "preferredQualifications",
       "softSkills",
       "businessDomains",
-      "keywords",
     ] as const) {
       expect(
         within(result).getByRole("heading", { name: i18n.t(`roles.jd.analysis.${key}`) }),
       ).toBeInTheDocument()
     }
-    expect(within(result).getAllByRole("button", { name: /^编辑 |^edit /i })).toHaveLength(8)
-    expect(result).toHaveTextContent(analysis.coreRequirementsSummary)
+    expect(within(result).getAllByRole("button", { name: /^编辑 |^edit /i })).toHaveLength(6)
+    expect(
+      within(result).queryByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.rivaSummary"),
+        }),
+      }),
+    ).not.toBeInTheDocument()
+    expect(result).not.toHaveTextContent("解析结果可按模块校正，修改后匹配分析需要重新生成。")
+    expect(result).not.toHaveTextContent("高频关键词")
+    expect(result).toHaveTextContent(analysis.rivaSummary)
     expect(result).toHaveTextContent(analysis.responsibilities[0]!)
-    expect(result).toHaveTextContent(analysis.frequentKeywords[0]!)
+    expect(result).toHaveTextContent(analysis.requiredSkills.programmingLanguages[0]!)
+    for (const key of [
+      "rivaSummary",
+      "responsibilities",
+      "qualificationRequirements",
+      "requiredSkills",
+      "preferredQualifications",
+      "softSkills",
+      "businessDomains",
+    ] as const) {
+      expect(
+        within(
+          within(result)
+            .getByRole("heading", { name: i18n.t(`roles.jd.analysis.${key}`) })
+            .closest("section")!,
+        )
+          .getByRole("heading")
+          .querySelector("svg"),
+      ).not.toBeNull()
+    }
+    const qualificationSection = within(result)
+      .getByRole("heading", { name: i18n.t("roles.jd.analysis.qualificationRequirements") })
+      .closest("section")!
+    const requiredSkillsSection = within(result)
+      .getByRole("heading", { name: i18n.t("roles.jd.analysis.requiredSkills") })
+      .closest("section")!
+    expect(qualificationSection.parentElement).toBe(requiredSkillsSection.parentElement)
   })
 
   it("opens a module-specific editor without opening the JD source editor", async () => {
@@ -728,28 +761,154 @@ describe("RolesView", () => {
       initialActiveTab: "job-description",
     })
 
-    const summaryTitle = i18n.t("roles.jd.analysis.summary")
+    const summaryTitle = i18n.t("roles.jd.analysis.preferredQualifications")
     await user.click(
       await screen.findByRole("button", {
         name: i18n.t("roles.jd.actions.editModuleLabel", { module: summaryTitle }),
       }),
     )
     const dialog = await screen.findByRole("dialog")
-    const textarea = within(dialog).getByLabelText(i18n.t("roles.jd.analysisEditor.fieldLabel"))
-    expect(textarea).toHaveValue(data.roles[0]!.jobDescriptionAnalysis!.coreRequirementsSummary)
+    const textarea = within(dialog).getByLabelText(`${summaryTitle} 1`)
+    expect(textarea).toHaveValue(data.roles[0]!.jobDescriptionAnalysis!.preferredQualifications[0])
     expect(
       within(dialog).queryByLabelText(i18n.t("roles.jd.editor.fieldLabel")),
     ).not.toBeInTheDocument()
 
     await user.clear(textarea)
-    await user.type(textarea, "Corrected structured summary.")
+    await user.type(textarea, "Corrected structured qualification.")
     await user.click(
       within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
     )
     expect(updateJobDescriptionAnalysisModule).toHaveBeenCalledWith(
       expect.objectContaining({
-        field: "coreRequirementsSummary",
-        value: "Corrected structured summary.",
+        field: "preferredQualifications",
+        value: ["Corrected structured qualification.", "熟悉无障碍设计"],
+      }),
+    )
+  })
+
+  it("renders only non-empty qualification and skill categories, while keeping preferred items semantic lists", async () => {
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    const analysis = data.roles[0]!.jobDescriptionAnalysis!
+    analysis.qualificationRequirements = {
+      education: ["本科及以上"],
+      graduationCohorts: [],
+      majors: ["计算机相关专业"],
+      experience: [],
+      languages: [],
+      certifications: [],
+      other: [],
+    }
+    analysis.requiredSkills = {
+      programmingLanguages: ["TypeScript"],
+      frameworksAndLibraries: [],
+      platforms: ["Kubernetes"],
+      tools: [],
+      conceptsAndMethods: [],
+      databasesAndMiddleware: [],
+      other: [],
+    }
+    renderReadyView(data, { initialActiveTab: "job-description" })
+
+    const result = await screen.findByTestId("job-description-analysis")
+    expect(result).toHaveTextContent(i18n.t("roles.jd.analysis.qualificationCategories.education"))
+    expect(result).toHaveTextContent(i18n.t("roles.jd.analysis.skillCategories.platforms"))
+    expect(result).not.toHaveTextContent(
+      i18n.t("roles.jd.analysis.qualificationCategories.graduationCohorts"),
+    )
+    expect(result).not.toHaveTextContent(
+      i18n.t("roles.jd.analysis.skillCategories.frameworksAndLibraries"),
+    )
+    const preferredSection = within(result)
+      .getByRole("heading", { name: i18n.t("roles.jd.analysis.preferredQualifications") })
+      .closest("section")!
+    expect(within(preferredSection).getByRole("list")).toBeInTheDocument()
+    expect(preferredSection.querySelector('[data-slot="badge"]')).toBeNull()
+    const softSkillsSection = within(result)
+      .getByRole("heading", { name: i18n.t("roles.jd.analysis.softSkills") })
+      .closest("section")!
+    expect(within(softSkillsSection).getByRole("list")).toBeInTheDocument()
+    expect(softSkillsSection.querySelector('[data-slot="badge"]')).toBeNull()
+  })
+
+  it("prefills and submits all qualification categories together", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    const updateJobDescriptionAnalysisModule = vi.fn(async () => data)
+    renderReadyView(data, {
+      actions: createActions(data, { updateJobDescriptionAnalysisModule }),
+      initialActiveTab: "job-description",
+    })
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.qualificationRequirements"),
+        }),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog")
+    const education = within(dialog).getByLabelText(
+      `${i18n.t("roles.jd.analysis.qualificationCategories.education")} 1`,
+    )
+    expect(education).toHaveValue("本科及以上")
+    await user.click(
+      within(dialog).getAllByRole("button", {
+        name: i18n.t("roles.jd.analysisEditor.addBullet"),
+      })[1]!,
+    )
+    const graduationCohorts = within(dialog).getByLabelText(
+      `${i18n.t("roles.jd.analysis.qualificationCategories.graduationCohorts")} 1`,
+    )
+    await user.type(graduationCohorts, "2027 届")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
+    )
+    expect(updateJobDescriptionAnalysisModule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "qualificationRequirements",
+        value: expect.objectContaining({ graduationCohorts: ["2027 届"] }),
+      }),
+    )
+  })
+
+  it("prefills and submits all required-skill categories together", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    const updateJobDescriptionAnalysisModule = vi.fn(async () => data)
+    renderReadyView(data, {
+      actions: createActions(data, { updateJobDescriptionAnalysisModule }),
+      initialActiveTab: "job-description",
+    })
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.requiredSkills"),
+        }),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog")
+    const programmingLanguages = within(dialog).getByLabelText(
+      `${i18n.t("roles.jd.analysis.skillCategories.programmingLanguages")} 1`,
+    )
+    expect(programmingLanguages).toHaveValue("TypeScript")
+    await user.click(
+      within(dialog).getAllByRole("button", {
+        name: i18n.t("roles.jd.analysisEditor.addBullet"),
+      })[3]!,
+    )
+    const tools = within(dialog).getByLabelText(
+      `${i18n.t("roles.jd.analysis.skillCategories.tools")} 1`,
+    )
+    await user.type(tools, "Docker")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
+    )
+    expect(updateJobDescriptionAnalysisModule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "requiredSkills",
+        value: expect.objectContaining({ tools: ["Docker"] }),
       }),
     )
   })
@@ -764,7 +923,7 @@ describe("RolesView", () => {
         initialActiveTab: "job-description",
       })
       expect(await screen.findByTestId("job-description-card")).not.toHaveTextContent(
-        i18n.t("roles.jd.analysis.correctionHint"),
+        "解析结果可按模块校正，修改后匹配分析需要重新生成。",
       )
       unmount()
     }

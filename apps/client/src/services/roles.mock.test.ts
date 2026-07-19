@@ -217,13 +217,15 @@ describe("roles stateful mock service", () => {
     if (!firstAnalysis) throw new Error("Expected the parsed JD fixture to include analysis.")
 
     const originalTitle = firstRole.title
-    const originalRequiredSkill = firstAnalysis.requiredSkills[0]
+    const originalRequiredSkill = firstAnalysis.requiredSkills.programmingLanguages[0]
     firstRole.title = "Mutated role title"
-    firstAnalysis.requiredSkills[0] = "Mutated skill"
+    firstAnalysis.requiredSkills.programmingLanguages[0] = "Mutated skill"
 
     const second = await settle(getRolesPage())
     expect(second.roles[0]).toMatchObject({ title: originalTitle })
-    expect(second.roles[0]!.jobDescriptionAnalysis?.requiredSkills[0]).toBe(originalRequiredSkill)
+    expect(second.roles[0]!.jobDescriptionAnalysis?.requiredSkills.programmingLanguages[0]).toBe(
+      originalRequiredSkill,
+    )
     expect(second).not.toBe(first)
     expect(second.roles[0]).not.toBe(firstRole)
   })
@@ -242,8 +244,11 @@ describe("roles stateful mock service", () => {
         version: before.version,
         jobDescriptionVersion: before.jobDescription.version,
         analysisVersion: previousAnalysis.analysisVersion,
-        field: "coreRequirementsSummary",
-        value: "Corrected core requirements with a clearer delivery focus.",
+        field: "qualificationRequirements",
+        value: {
+          ...previousAnalysis.qualificationRequirements,
+          experience: ["Three years of frontend engineering experience."],
+        },
       }),
     )
     const updated = response.roles.find((role) => role.id === before.id)!
@@ -254,11 +259,15 @@ describe("roles stateful mock service", () => {
     expect(updated.jobDescription.rawText).toBe(before.jobDescription.rawText)
     expect(updated.jobDescription.version).toBe(before.jobDescription.version)
     expect(updated.jobDescriptionAnalysis).toMatchObject({
-      coreRequirementsSummary: "Corrected core requirements with a clearer delivery focus.",
+      qualificationRequirements: {
+        ...previousAnalysis.qualificationRequirements,
+        experience: ["Three years of frontend engineering experience."],
+      },
       responsibilities: previousAnalysis.responsibilities,
       parsedAt: previousAnalysis.parsedAt,
       analysisVersion: previousAnalysis.analysisVersion + 1,
     })
+    expect(updated.jobDescriptionAnalysis.rivaSummary).not.toBe(previousAnalysis.rivaSummary)
     expect(updated.version).toBe(before.version + 1)
     expect(updated.matchingAnalysis).toEqual({ ...previousMatchingAnalysis, status: "stale" })
   })
@@ -275,16 +284,46 @@ describe("roles stateful mock service", () => {
         version: before.version,
         jobDescriptionVersion: before.jobDescription.version,
         analysisVersion: before.jobDescriptionAnalysis.analysisVersion,
-        field: "preferredSkills",
+        field: "preferredQualifications",
         value: ["Accessibility", "Experiment design", "Accessibility"],
       }),
     )
     const updated = response.roles.find((role) => role.id === before.id)!
-    expect(updated.jobDescriptionAnalysis?.preferredSkills).toEqual([
+    expect(updated.jobDescriptionAnalysis?.preferredQualifications).toEqual([
       "Accessibility",
       "Experiment design",
       "Accessibility",
     ])
+  })
+
+  it("updates all required-skill groups together without changing qualifications", async () => {
+    const before = await getCurrentRole()
+    if (before.jobDescription.status !== "ready" || !before.jobDescriptionAnalysis) {
+      throw new Error("Expected a ready JD analysis.")
+    }
+    const response = await settle(
+      updateJobDescriptionAnalysisModule({
+        roleId: before.id,
+        version: before.version,
+        jobDescriptionVersion: before.jobDescription.version,
+        analysisVersion: before.jobDescriptionAnalysis.analysisVersion,
+        field: "requiredSkills",
+        value: {
+          programmingLanguages: ["TypeScript", "Go"],
+          frameworksAndLibraries: ["React", "LangChain"],
+          platforms: ["Kubernetes"],
+          tools: ["Docker"],
+          conceptsAndMethods: ["RAG"],
+          databasesAndMiddleware: ["Redis"],
+          other: [],
+        },
+      }),
+    )
+    const updated = response.roles.find((role) => role.id === before.id)!.jobDescriptionAnalysis!
+    expect(updated.requiredSkills.platforms).toEqual(["Kubernetes"])
+    expect(updated.qualificationRequirements).toEqual(
+      before.jobDescriptionAnalysis.qualificationRequirements,
+    )
   })
 
   it("clears obsolete generating and failed analysis tasks after a structured correction", async () => {
@@ -300,7 +339,7 @@ describe("roles stateful mock service", () => {
           version: before.version,
           jobDescriptionVersion: before.jobDescription.version,
           analysisVersion: before.jobDescriptionAnalysis.analysisVersion,
-          field: "frequentKeywords",
+          field: "businessDomains",
           value: ["React", "TypeScript"],
         }),
       )
@@ -320,7 +359,7 @@ describe("roles stateful mock service", () => {
       jobDescriptionVersion: before.jobDescription.version,
       analysisVersion: before.jobDescriptionAnalysis.analysisVersion - 1,
       field: "requiredSkills",
-      value: ["React"],
+      value: { ...before.jobDescriptionAnalysis.requiredSkills, programmingLanguages: ["React"] },
     })
     const assertion = expect(promise).rejects.toThrow("analysis version is out of date")
     await vi.runAllTimersAsync()

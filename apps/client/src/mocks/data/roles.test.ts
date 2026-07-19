@@ -54,9 +54,10 @@ function expectConsistentJobDescription(role: TargetRole) {
       expect(jobDescriptionAnalysis?.analysisVersion).toBeGreaterThanOrEqual(1)
       expect(jobDescriptionAnalysis?.parsedAt).toMatch(/^2026-07-\d{2}T/)
       expect(jobDescriptionAnalysis?.responsibilities).not.toHaveLength(0)
-      expect(jobDescriptionAnalysis?.requiredSkills).not.toHaveLength(0)
-      expect(jobDescriptionAnalysis?.experienceRequirements).not.toHaveLength(0)
-      expect(jobDescriptionAnalysis?.coreRequirementsSummary.trim()).not.toBe("")
+      expect(jobDescriptionAnalysis?.requiredSkills.programmingLanguages).not.toHaveLength(0)
+      expect(jobDescriptionAnalysis?.qualificationRequirements.experience).not.toHaveLength(0)
+      expect(jobDescriptionAnalysis?.rivaSummary.trim()).not.toBe("")
+      expect("frequentKeywords" in (jobDescriptionAnalysis ?? {})).toBe(false)
   }
 }
 
@@ -133,6 +134,11 @@ function expectConsistentRolesResponse(response: RolesPageResponse) {
 }
 
 describe("roles mock scenarios", () => {
+  it("keeps generated summaries and removed keywords outside the module update contract", () => {
+    const analysis = createRolesMockResponse().roles[0]!.jobDescriptionAnalysis!
+    expect(analysis.rivaSummary).toBeTruthy()
+    expect("frequentKeywords" in analysis).toBe(false)
+  })
   it.each(scenarios)("keeps the %s response internally consistent", (scenario) => {
     expectConsistentRolesResponse(createRolesMockResponse(scenario))
   })
@@ -154,7 +160,7 @@ describe("roles mock scenarios", () => {
     }
 
     firstRole.title = "Mutated role title"
-    jobDescriptionAnalysis.requiredSkills[0] = "Mutated skill"
+    jobDescriptionAnalysis.requiredSkills.programmingLanguages[0] = "Mutated skill"
 
     expect(second).toEqual(rolesResponseMock)
     expect(second).not.toBe(first)

@@ -32,7 +32,7 @@ export function MatchingAnalysisCard({
 
   return (
     <Card
-      className="border border-border/70 bg-background/60 shadow-none"
+      className="border border-border/70 bg-card shadow-none"
       data-testid="matching-analysis-card"
       size="sm"
     >

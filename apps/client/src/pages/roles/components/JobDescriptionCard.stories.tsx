@@ -84,7 +84,7 @@ export const Ready = meta.story({
   },
 })
 
-export const EditSummary = meta.story({
+export const EditQualifications = meta.story({
   args: {
     onEdit: fn(),
     onEditAnalysisModule: fn(),
@@ -93,7 +93,7 @@ export const EditSummary = meta.story({
   },
   play: async ({ userEvent }) => {
     await userEvent.click(
-      screen.getByRole("button", { name: /编辑 核心要求总结|edit core requirements/i }),
+      screen.getByRole("button", { name: /编辑 任职资格|edit qualifications/i }),
     )
   },
 })
@@ -101,6 +101,96 @@ export const EditSummary = meta.story({
 export const LongJobDescription = meta.story({
   args: {
     onEdit: fn(),
+    role: createLongJobDescriptionResponse().roles[0]!,
+    synchronizationError: false,
+  },
+})
+
+export const InternshipJobDescription = meta.story({
+  args: (() => {
+    const role = roleFor("roleWithParsedJobDescription")
+    if (role.jobDescriptionAnalysis) {
+      role.jobDescriptionAnalysis.qualificationRequirements = {
+        ...role.jobDescriptionAnalysis.qualificationRequirements,
+        graduationCohorts: ["2027 届"],
+        experience: ["有三个月以上前端实习经验"],
+      }
+      role.jobDescriptionAnalysis.requiredSkills.platforms = ["云原生平台"]
+    }
+    return { onEditAnalysisModule: fn(), role, synchronizationError: false }
+  })(),
+})
+
+export const CampusJobDescription = meta.story({
+  args: (() => {
+    const role = roleFor("roleWithParsedJobDescription")
+    if (role.jobDescriptionAnalysis) {
+      role.jobDescriptionAnalysis.qualificationRequirements = {
+        ...role.jobDescriptionAnalysis.qualificationRequirements,
+        graduationCohorts: ["2027 届"],
+        experience: ["有 AI Agent 或 LLM 项目经验"],
+      }
+      role.jobDescriptionAnalysis.preferredQualifications = ["有开源项目贡献", "有相关竞赛经历"]
+    }
+    return { onEditAnalysisModule: fn(), role, synchronizationError: false }
+  })(),
+})
+
+export const SocialRecruitmentJobDescription = meta.story({
+  args: {
+    onEditAnalysisModule: fn(),
+    role: roleFor("roleWithParsedJobDescription"),
+    synchronizationError: false,
+  },
+})
+
+export const EmptyOptionalModules = meta.story({
+  args: (() => {
+    const role = roleFor("roleWithParsedJobDescription")
+    if (role.jobDescriptionAnalysis) {
+      role.jobDescriptionAnalysis.preferredQualifications = []
+      role.jobDescriptionAnalysis.softSkills = []
+      role.jobDescriptionAnalysis.businessDomains = []
+    }
+    return { onEditAnalysisModule: fn(), role, synchronizationError: false }
+  })(),
+})
+
+export const EditRequiredSkills = meta.story({
+  args: {
+    onEditAnalysisModule: fn(),
+    role: roleFor("roleWithParsedJobDescription"),
+    synchronizationError: false,
+  },
+})
+
+export const EditPreferredQualifications = meta.story({
+  args: {
+    onEditAnalysisModule: fn(),
+    role: roleFor("roleWithParsedJobDescription"),
+    synchronizationError: false,
+  },
+})
+
+export const EditBusinessDomains = meta.story({
+  args: {
+    onEditAnalysisModule: fn(),
+    role: roleFor("roleWithParsedJobDescription"),
+    synchronizationError: false,
+  },
+})
+
+export const SaveError = meta.story({
+  args: {
+    onEditAnalysisModule: fn(),
+    role: roleFor("roleWithParsedJobDescription"),
+    synchronizationError: false,
+  },
+})
+
+export const LongStructuredContent = meta.story({
+  args: {
+    onEditAnalysisModule: fn(),
     role: createLongJobDescriptionResponse().roles[0]!,
     synchronizationError: false,
   },

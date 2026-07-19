@@ -137,7 +137,7 @@ export function createReadyJobDescriptionResponse(parsing: RolesPageResponse, su
     jobDescription: { ...role.jobDescription, status: "ready" },
     jobDescriptionAnalysis: {
       ...template,
-      coreRequirementsSummary: summary,
+      rivaSummary: summary,
       jobDescriptionVersion: role.jobDescription.version,
     },
   }
@@ -150,7 +150,8 @@ export function createGeneratingAnalysisResponse(initial: RolesPageResponse) {
   if (
     !response.profileContext.exists ||
     !response.profileContext.completed ||
-    role.jobDescription.status !== "ready"
+    role.jobDescription.status !== "ready" ||
+    !role.jobDescriptionAnalysis
   ) {
     throw new Error("Expected complete analysis prerequisites.")
   }
@@ -161,6 +162,7 @@ export function createGeneratingAnalysisResponse(initial: RolesPageResponse) {
       status: "generating",
       profileVersion: response.profileContext.version,
       jobDescriptionVersion: role.jobDescription.version,
+      jobDescriptionAnalysisVersion: role.jobDescriptionAnalysis.analysisVersion,
       generatedAt: null,
       failureReason: null,
       result: null,

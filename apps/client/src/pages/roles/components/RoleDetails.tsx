@@ -44,11 +44,7 @@ export function RoleDetails({
   profileContext: ProfileContext
   role: TargetRole
 }) {
-  const { i18n, t } = useTranslation()
-  const updatedAt = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(role.updatedAt))
+  const { t } = useTranslation()
 
   return (
     <Card
@@ -61,10 +57,7 @@ export function RoleDetails({
             <CardTitle className="text-2xl font-semibold tracking-tight">
               <h2>{role.title}</h2>
             </CardTitle>
-            <CardDescription>
-              {role.company ?? t("roles.fallbackValue")} · {t("roles.summary.updatedAt")}{" "}
-              {updatedAt}
-            </CardDescription>
+            <CardDescription>{role.company ?? t("roles.fallbackValue")}</CardDescription>
           </div>
           <RoleStatusBadges role={role} />
         </div>
@@ -81,9 +74,22 @@ export function RoleDetails({
             data-testid="target-role-tabs-scroll"
           >
             <TabsList aria-label={t("roles.tabs.label")} className="min-w-max" variant="line">
-              <TabsTrigger value="overview">{t("roles.tabs.overview")}</TabsTrigger>
-              <TabsTrigger value="job-description">{t("roles.tabs.jobDescription")}</TabsTrigger>
-              <TabsTrigger value="matching-analysis">
+              <TabsTrigger
+                className="data-active:text-primary data-active:after:bg-primary"
+                value="overview"
+              >
+                {t("roles.tabs.overview")}
+              </TabsTrigger>
+              <TabsTrigger
+                className="data-active:text-primary data-active:after:bg-primary"
+                value="job-description"
+              >
+                {t("roles.tabs.jobDescription")}
+              </TabsTrigger>
+              <TabsTrigger
+                className="data-active:text-primary data-active:after:bg-primary"
+                value="matching-analysis"
+              >
                 {t("roles.tabs.matchingAnalysis")}
               </TabsTrigger>
             </TabsList>

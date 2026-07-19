@@ -1,7 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { z } from "zod"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -13,19 +12,47 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { FieldGroup } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
-import { Textarea } from "@/components/ui/textarea"
 import type {
   JobDescriptionAnalysisModuleField,
+  QualificationRequirements,
+  RequiredSkillGroups,
   TargetRole,
   UpdateJobDescriptionAnalysisModuleInput,
 } from "@/models/roles"
 
 import { getRolesActionErrorCode } from "../roles-errors"
+import { JobDescriptionBulletListEditor } from "./JobDescriptionBulletListEditor"
 
-const summarySchema = z.object({ value: z.string().trim().min(1, "required") })
-const listSchema = z.object({ value: z.string() })
+const qualificationFields = [
+  "education",
+  "graduationCohorts",
+  "majors",
+  "experience",
+  "languages",
+  "certifications",
+  "other",
+] as const satisfies (keyof QualificationRequirements)[]
+
+const skillFields = [
+  "programmingLanguages",
+  "frameworksAndLibraries",
+  "platforms",
+  "tools",
+  "conceptsAndMethods",
+  "databasesAndMiddleware",
+  "other",
+] as const satisfies (keyof RequiredSkillGroups)[]
+
+type EditorValues = Record<string, string[]>
+type ModuleUpdateContext = {
+  roleId: string
+  version: number
+  jobDescriptionVersion: number
+  analysisVersion: number
+  field: JobDescriptionAnalysisModuleField
+}
 
 export function JobDescriptionAnalysisEditorDialog({
   field,
@@ -54,14 +81,14 @@ export function JobDescriptionAnalysisEditorDialog({
             key={`${role.id}:${analysis.analysisVersion}:${field}`}
             analysisVersion={analysis.analysisVersion}
             field={field}
-            initialValue={getInitialValue(analysis, field)}
+            initialValues={getInitialValues(analysis, field)}
             jobDescriptionVersion={analysis.jobDescriptionVersion}
             onDirtyChange={onDirtyChange}
             onOpenChange={onOpenChange}
             onSave={onSave}
             onSaved={onSaved}
             role={role}
-            title={t(`roles.jd.analysis.${getFieldTranslationKey(field)}`)}
+            title={t(`roles.jd.analysis.${field}`)}
           />
         )}
       </DialogContent>
@@ -72,7 +99,7 @@ export function JobDescriptionAnalysisEditorDialog({
 function JobDescriptionAnalysisEditorForm({
   analysisVersion,
   field,
-  initialValue,
+  initialValues,
   jobDescriptionVersion,
   onDirtyChange,
   onOpenChange,
@@ -83,7 +110,7 @@ function JobDescriptionAnalysisEditorForm({
 }: {
   analysisVersion: number
   field: JobDescriptionAnalysisModuleField
-  initialValue: string
+  initialValues: EditorValues
   jobDescriptionVersion: number
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
@@ -94,31 +121,23 @@ function JobDescriptionAnalysisEditorForm({
 }) {
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState<"requestFailed" | "versionConflict" | null>(null)
-  const isSummary = field === "coreRequirementsSummary"
   const form = useForm({
-    defaultValues: { value: initialValue },
-    validators: { onSubmit: isSummary ? summarySchema : listSchema },
+    defaultValues: initialValues,
     onSubmit: async ({ value }) => {
       setSaveError(null)
-      const input = isSummary
-        ? {
-            roleId: role.id,
-            version: role.version,
-            jobDescriptionVersion,
-            analysisVersion,
-            field,
-            value: value.value.trim(),
-          }
-        : {
-            roleId: role.id,
-            version: role.version,
-            jobDescriptionVersion,
-            analysisVersion,
-            field,
-            value: parseList(value.value),
-          }
       try {
-        await onSave(input as UpdateJobDescriptionAnalysisModuleInput)
+        await onSave(
+          createSubmissionInput(
+            {
+              roleId: role.id,
+              version: role.version,
+              jobDescriptionVersion,
+              analysisVersion,
+              field,
+            },
+            value,
+          ),
+        )
         onSaved()
       } catch (error) {
         setSaveError(getRolesActionErrorCode(error))
@@ -126,17 +145,14 @@ function JobDescriptionAnalysisEditorForm({
     },
   })
 
+  const fields = getFields(field, t)
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{t("roles.jd.actions.editModuleLabel", { module: title })}</DialogTitle>
-        <DialogDescription>
-          {t(
-            isSummary
-              ? "roles.jd.analysisEditor.summaryDescription"
-              : "roles.jd.analysisEditor.listDescription",
-          )}
-        </DialogDescription>
+        <DialogTitle className="text-xl">
+          {t("roles.jd.actions.editModuleLabel", { module: title })}
+        </DialogTitle>
+        <DialogDescription>{t(getDescriptionKey(field))}</DialogDescription>
       </DialogHeader>
       <form
         className="mt-6 flex flex-col gap-6"
@@ -150,34 +166,18 @@ function JobDescriptionAnalysisEditorForm({
           {(isDirty) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
         </form.Subscribe>
         <FieldGroup>
-          <form.Field name="value">
-            {(input) => {
-              const invalid = input.state.meta.isTouched && !input.state.meta.isValid
-              return (
-                <Field invalid={invalid}>
-                  <FieldLabel htmlFor={input.name}>
-                    {t("roles.jd.analysisEditor.fieldLabel")}
-                  </FieldLabel>
-                  <FieldControl>
-                    <Textarea
-                      aria-invalid={invalid || undefined}
-                      aria-required={isSummary || undefined}
-                      className="min-h-48 resize-y"
-                      id={input.name}
-                      onBlur={input.handleBlur}
-                      onChange={(event) => input.handleChange(event.target.value)}
-                      value={input.state.value}
-                    />
-                  </FieldControl>
-                  <FieldError
-                    errors={input.state.meta.errors.map(() => ({
-                      message: t("roles.jd.analysisEditor.summaryRequired"),
-                    }))}
-                  />
-                </Field>
-              )
-            }}
-          </form.Field>
+          {fields.map(({ key, label }) => (
+            <form.Field key={key} name={key}>
+              {(input) => (
+                <JobDescriptionBulletListEditor
+                  description={t("roles.jd.analysisEditor.bulletListDescription")}
+                  items={input.state.value}
+                  label={label}
+                  onChange={input.handleChange}
+                />
+              )}
+            </form.Field>
+          ))}
         </FieldGroup>
         {saveError && (
           <Alert variant="destructive">
@@ -204,22 +204,85 @@ function JobDescriptionAnalysisEditorForm({
   )
 }
 
-function getInitialValue(
+function getInitialValues(
   analysis: NonNullable<TargetRole["jobDescriptionAnalysis"]>,
   field: JobDescriptionAnalysisModuleField,
+): EditorValues {
+  if (field === "qualificationRequirements" || field === "requiredSkills") {
+    return Object.fromEntries(
+      Object.entries(analysis[field]).map(([key, items]) => [key, [...items]]),
+    )
+  }
+  return { value: [...analysis[field]] }
+}
+
+function createSubmissionInput(
+  context: ModuleUpdateContext,
+  values: EditorValues,
+): UpdateJobDescriptionAnalysisModuleInput {
+  if (context.field === "qualificationRequirements") {
+    return {
+      ...context,
+      field: "qualificationRequirements",
+      value: createQualificationRequirements(values),
+    }
+  }
+  if (context.field === "requiredSkills") {
+    return { ...context, field: "requiredSkills", value: createRequiredSkillGroups(values) }
+  }
+  return { ...context, field: context.field, value: normalizeItems(values.value ?? []) }
+}
+
+function createQualificationRequirements(values: EditorValues): QualificationRequirements {
+  return {
+    education: normalizeItems(values.education ?? []),
+    graduationCohorts: normalizeItems(values.graduationCohorts ?? []),
+    majors: normalizeItems(values.majors ?? []),
+    experience: normalizeItems(values.experience ?? []),
+    languages: normalizeItems(values.languages ?? []),
+    certifications: normalizeItems(values.certifications ?? []),
+    other: normalizeItems(values.other ?? []),
+  }
+}
+
+function createRequiredSkillGroups(values: EditorValues): RequiredSkillGroups {
+  return {
+    programmingLanguages: normalizeItems(values.programmingLanguages ?? []),
+    frameworksAndLibraries: normalizeItems(values.frameworksAndLibraries ?? []),
+    platforms: normalizeItems(values.platforms ?? []),
+    tools: normalizeItems(values.tools ?? []),
+    conceptsAndMethods: normalizeItems(values.conceptsAndMethods ?? []),
+    databasesAndMiddleware: normalizeItems(values.databasesAndMiddleware ?? []),
+    other: normalizeItems(values.other ?? []),
+  }
+}
+
+function getFields(
+  field: JobDescriptionAnalysisModuleField,
+  t: ReturnType<typeof useTranslation>["t"],
 ) {
-  return field === "coreRequirementsSummary" ? analysis[field] : analysis[field].join("\n")
+  if (field === "qualificationRequirements") {
+    return qualificationFields.map((key) => ({
+      key,
+      label: t(`roles.jd.analysis.qualificationCategories.${key}`),
+    }))
+  }
+  if (field === "requiredSkills") {
+    return skillFields.map((key) => ({ key, label: t(`roles.jd.analysis.skillCategories.${key}`) }))
+  }
+  return [{ key: "value", label: t(`roles.jd.analysis.${field}`) }]
 }
 
-function getFieldTranslationKey(field: JobDescriptionAnalysisModuleField) {
-  return field === "frequentKeywords" ? "keywords" : field
+function getDescriptionKey(field: JobDescriptionAnalysisModuleField) {
+  if (field === "qualificationRequirements")
+    return "roles.jd.analysisEditor.qualificationsDescription"
+  if (field === "preferredQualifications")
+    return "roles.jd.analysisEditor.preferredQualificationsDescription"
+  return "roles.jd.analysisEditor.listDescription"
 }
 
-function parseList(value: string) {
-  return value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean)
+function normalizeItems(items: string[]) {
+  return items.map((item) => item.trim()).filter(Boolean)
 }
 
 function DraftStateSync({

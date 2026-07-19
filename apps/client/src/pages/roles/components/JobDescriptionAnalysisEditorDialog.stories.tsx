@@ -9,7 +9,14 @@ const meta = preview.meta({
   title: "Roles/JobDescriptionAnalysisEditorDialog",
 })
 
-function dialogArgs(field: "coreRequirementsSummary" | "responsibilities") {
+function dialogArgs(
+  field:
+    | "qualificationRequirements"
+    | "requiredSkills"
+    | "preferredQualifications"
+    | "businessDomains"
+    | "responsibilities",
+) {
   return {
     field,
     onDirtyChange: fn(),
@@ -20,26 +27,29 @@ function dialogArgs(field: "coreRequirementsSummary" | "responsibilities") {
   }
 }
 
-export const EditSummary = meta.story({
-  args: dialogArgs("coreRequirementsSummary"),
+export const EditQualifications = meta.story({
+  args: dialogArgs("qualificationRequirements"),
   play: async () => {
     const dialog = await screen.findByRole("dialog")
     await expect(within(dialog).getByRole("textbox")).toBeVisible()
   },
 })
 
-export const EditResponsibilities = meta.story({ args: dialogArgs("responsibilities") })
+export const EditRequiredSkills = meta.story({ args: dialogArgs("requiredSkills") })
+
+export const EditPreferredQualifications = meta.story({
+  args: dialogArgs("preferredQualifications"),
+})
+
+export const EditBusinessDomains = meta.story({ args: dialogArgs("businessDomains") })
 
 export const ValidationError = meta.story({
-  args: dialogArgs("coreRequirementsSummary"),
+  args: dialogArgs("responsibilities"),
   play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")
     const textarea = within(dialog).getByRole("textbox")
     await userEvent.clear(textarea)
     await userEvent.click(within(dialog).getByRole("button", { name: /保存修改|save changes/i }))
-    await expect(
-      within(dialog).findByText(/请填写核心要求总结|core requirements summary/i),
-    ).resolves.toBeVisible()
   },
 })
 
@@ -47,5 +57,14 @@ export const Pending = meta.story({
   args: {
     ...dialogArgs("responsibilities"),
     onSave: fn(() => new Promise<void>(() => undefined)),
+  },
+})
+
+export const SaveError = meta.story({
+  args: {
+    ...dialogArgs("preferredQualifications"),
+    onSave: fn(async () => {
+      throw new Error("request failed")
+    }),
   },
 })
