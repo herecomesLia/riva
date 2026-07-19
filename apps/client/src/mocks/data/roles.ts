@@ -45,6 +45,7 @@ function createMatchingAnalysisResult(): MatchingAnalysisResult {
 function createJobDescriptionAnalysis(jobDescriptionVersion: number): JobDescriptionAnalysis {
   return {
     jobDescriptionVersion,
+    analysisVersion: 1,
     parsedAt: "2026-07-14T08:45:00.000Z",
     responsibilities: [
       "Own frontend architecture and delivery for merchant-facing products.",
@@ -162,6 +163,7 @@ function createCurrentMatchingAnalysis(): MatchingAnalysis {
     status: "current",
     profileVersion: completeProfileContext.version,
     jobDescriptionVersion: 4,
+    jobDescriptionAnalysisVersion: 1,
     generatedAt: "2026-07-14T09:00:00.000Z",
     failureReason: null,
     result: createMatchingAnalysisResult(),
@@ -173,6 +175,7 @@ function createStaleMatchingAnalysis(): MatchingAnalysis {
     status: "stale",
     profileVersion: 11,
     jobDescriptionVersion: 3,
+    jobDescriptionAnalysisVersion: 1,
     generatedAt: "2026-07-10T10:30:00.000Z",
     failureReason: null,
     result: createMatchingAnalysisResult(),
@@ -184,6 +187,7 @@ function createGeneratingMatchingAnalysis(): MatchingAnalysis {
     status: "generating",
     profileVersion: completeProfileContext.version,
     jobDescriptionVersion: 4,
+    jobDescriptionAnalysisVersion: 1,
     generatedAt: null,
     failureReason: null,
     result: null,
@@ -195,6 +199,7 @@ function createFailedMatchingAnalysis(): MatchingAnalysis {
     status: "failed",
     profileVersion: completeProfileContext.version,
     jobDescriptionVersion: 4,
+    jobDescriptionAnalysisVersion: 1,
     generatedAt: null,
     failureReason:
       "The matching analysis could not be generated right now. Your profile and JD are preserved; please try again.",

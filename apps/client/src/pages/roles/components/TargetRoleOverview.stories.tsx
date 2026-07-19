@@ -18,6 +18,7 @@ function createActions(overrides: Partial<RoleDetailsActions> = {}): RoleDetails
     retryMatchingAnalysisSynchronization: fn(),
     setCurrent: fn(),
     togglePreparationStatus: fn(),
+    editJobDescriptionAnalysisModule: fn(),
     ...overrides,
   }
 }

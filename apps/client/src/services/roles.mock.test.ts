@@ -13,6 +13,7 @@ import {
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateRolePreparationStatus,
+  updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
 import type { TargetRole } from "@/models/roles"
@@ -227,6 +228,125 @@ describe("roles stateful mock service", () => {
     expect(second.roles[0]).not.toBe(firstRole)
   })
 
+  it("updates only the requested structured JD module and makes a current analysis stale", async () => {
+    const before = await getCurrentRole()
+    if (before.jobDescription.status !== "ready" || !before.jobDescriptionAnalysis) {
+      throw new Error("Expected a ready JD analysis.")
+    }
+    const previousAnalysis = structuredClone(before.jobDescriptionAnalysis)
+    const previousMatchingAnalysis = structuredClone(before.matchingAnalysis)
+
+    const response = await settle(
+      updateJobDescriptionAnalysisModule({
+        roleId: before.id,
+        version: before.version,
+        jobDescriptionVersion: before.jobDescription.version,
+        analysisVersion: previousAnalysis.analysisVersion,
+        field: "coreRequirementsSummary",
+        value: "Corrected core requirements with a clearer delivery focus.",
+      }),
+    )
+    const updated = response.roles.find((role) => role.id === before.id)!
+    if (updated.jobDescription.status !== "ready" || !updated.jobDescriptionAnalysis) {
+      throw new Error("Expected the structured JD analysis to remain ready.")
+    }
+
+    expect(updated.jobDescription.rawText).toBe(before.jobDescription.rawText)
+    expect(updated.jobDescription.version).toBe(before.jobDescription.version)
+    expect(updated.jobDescriptionAnalysis).toMatchObject({
+      coreRequirementsSummary: "Corrected core requirements with a clearer delivery focus.",
+      responsibilities: previousAnalysis.responsibilities,
+      parsedAt: previousAnalysis.parsedAt,
+      analysisVersion: previousAnalysis.analysisVersion + 1,
+    })
+    expect(updated.version).toBe(before.version + 1)
+    expect(updated.matchingAnalysis).toEqual({ ...previousMatchingAnalysis, status: "stale" })
+  })
+
+  it("accepts empty structured list modules while preserving the input order", async () => {
+    const before = await getCurrentRole()
+    if (before.jobDescription.status !== "ready" || !before.jobDescriptionAnalysis) {
+      throw new Error("Expected a ready JD analysis.")
+    }
+
+    const response = await settle(
+      updateJobDescriptionAnalysisModule({
+        roleId: before.id,
+        version: before.version,
+        jobDescriptionVersion: before.jobDescription.version,
+        analysisVersion: before.jobDescriptionAnalysis.analysisVersion,
+        field: "preferredSkills",
+        value: ["Accessibility", "Experiment design", "Accessibility"],
+      }),
+    )
+    const updated = response.roles.find((role) => role.id === before.id)!
+    expect(updated.jobDescriptionAnalysis?.preferredSkills).toEqual([
+      "Accessibility",
+      "Experiment design",
+      "Accessibility",
+    ])
+  })
+
+  it("clears obsolete generating and failed analysis tasks after a structured correction", async () => {
+    for (const scenario of ["matchingAnalysisGenerating", "matchingAnalysisFailed"] as const) {
+      resetRolesMockState(scenario)
+      const before = await getCurrentRole()
+      if (before.jobDescription.status !== "ready" || !before.jobDescriptionAnalysis) {
+        throw new Error("Expected a ready JD analysis.")
+      }
+      const response = await settle(
+        updateJobDescriptionAnalysisModule({
+          roleId: before.id,
+          version: before.version,
+          jobDescriptionVersion: before.jobDescription.version,
+          analysisVersion: before.jobDescriptionAnalysis.analysisVersion,
+          field: "frequentKeywords",
+          value: ["React", "TypeScript"],
+        }),
+      )
+
+      expect(response.roles.find((role) => role.id === before.id)!.matchingAnalysis).toBeNull()
+    }
+  })
+
+  it("rejects stale structured-analysis versions without partial writes", async () => {
+    const before = await getCurrentRole()
+    if (before.jobDescription.status !== "ready" || !before.jobDescriptionAnalysis) {
+      throw new Error("Expected a ready JD analysis.")
+    }
+    const promise = updateJobDescriptionAnalysisModule({
+      roleId: before.id,
+      version: before.version,
+      jobDescriptionVersion: before.jobDescription.version,
+      analysisVersion: before.jobDescriptionAnalysis.analysisVersion - 1,
+      field: "requiredSkills",
+      value: ["React"],
+    })
+    const assertion = expect(promise).rejects.toThrow("analysis version is out of date")
+    await vi.runAllTimersAsync()
+    await assertion
+
+    expect(await getCurrentRole()).toEqual(before)
+  })
+
+  it("rejects structured corrections before JD parsing is ready", async () => {
+    resetRolesMockState("roleWithJobDescriptionParsing")
+    const role = await getCurrentRole()
+    if (role.jobDescription.version === null) throw new Error("Expected a saved JD.")
+    const promise = updateJobDescriptionAnalysisModule({
+      roleId: role.id,
+      version: role.version,
+      jobDescriptionVersion: role.jobDescription.version,
+      analysisVersion: 1,
+      field: "responsibilities",
+      value: ["Review architecture decisions."],
+    })
+    const assertion = expect(promise).rejects.toThrow("parsed job description")
+    await vi.runAllTimersAsync()
+    await assertion
+    expect(await getCurrentRole()).toEqual(role)
+  })
+
   it("rejects stale versions without partially writing the role", async () => {
     const before = await getCurrentRole()
     const promise = updateTargetRole({
@@ -264,6 +384,7 @@ describe("roles stateful mock service", () => {
     const ready = await pollJobDescription(parsingRole)
     expect(ready.jobDescription.status).toBe("ready")
     expect(ready.jobDescriptionAnalysis).not.toBeNull()
+    expect(ready.jobDescriptionAnalysis?.analysisVersion).toBe(1)
   })
 
   it("keeps failed JD text and supports a successful retry", async () => {

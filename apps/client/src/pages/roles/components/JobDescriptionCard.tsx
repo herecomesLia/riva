@@ -1,4 +1,4 @@
-import { FilePenLineIcon, RefreshCwIcon } from "lucide-react"
+import { FilePenLineIcon, PencilIcon, RefreshCwIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -7,10 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type { JobDescriptionAnalysis, TargetRole } from "@/models/roles"
+import type {
+  JobDescriptionAnalysis,
+  JobDescriptionAnalysisModuleField,
+  TargetRole,
+} from "@/models/roles"
 
 export function JobDescriptionCard({
   onEdit,
+  onEditAnalysisModule,
   onRetry,
   onRetrySynchronization,
   pending,
@@ -18,6 +23,7 @@ export function JobDescriptionCard({
   synchronizationError,
 }: {
   onEdit?: () => void
+  onEditAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
   onRetry?: () => void
   onRetrySynchronization?: () => void
   pending?: boolean
@@ -66,7 +72,13 @@ export function JobDescriptionCard({
           />
         )}
         {jobDescription.status === "ready" && role.jobDescriptionAnalysis && (
-          <ReadyState analysis={role.jobDescriptionAnalysis} onEdit={onEdit} pending={pending} />
+          <ReadyState
+            analysis={role.jobDescriptionAnalysis}
+            canEditAnalysis={role.preparationStatus !== "archived"}
+            onEdit={onEdit}
+            onEditAnalysisModule={onEditAnalysisModule}
+            pending={pending}
+          />
         )}
       </CardContent>
     </Card>
@@ -169,11 +181,15 @@ function FailedState({
 
 function ReadyState({
   analysis,
+  canEditAnalysis,
   onEdit,
+  onEditAnalysisModule,
   pending,
 }: {
   analysis: JobDescriptionAnalysis
+  canEditAnalysis: boolean
   onEdit?: () => void
+  onEditAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
   pending?: boolean
 }) {
   const { t } = useTranslation()
@@ -187,49 +203,108 @@ function ReadyState({
           </Button>
         )}
       </div>
-      <AnalysisSection title={t("roles.jd.analysis.summary")}>
+      <p className="text-sm text-muted-foreground">{t("roles.jd.analysis.correctionHint")}</p>
+      <AnalysisSection
+        field="coreRequirementsSummary"
+        onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
+        title={t("roles.jd.analysis.summary")}
+      >
         <p className="text-sm leading-6">{analysis.coreRequirementsSummary}</p>
       </AnalysisSection>
       <div className="grid gap-4 xl:grid-cols-2">
         <AnalysisList
+          field="responsibilities"
           items={analysis.responsibilities}
+          onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
           title={t("roles.jd.analysis.responsibilities")}
         />
         <AnalysisList
+          field="experienceRequirements"
           items={analysis.experienceRequirements}
+          onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
           title={t("roles.jd.analysis.experienceRequirements")}
         />
         <AnalysisBadges
+          field="requiredSkills"
           items={analysis.requiredSkills}
+          onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
           title={t("roles.jd.analysis.requiredSkills")}
         />
         <AnalysisBadges
+          field="preferredSkills"
           items={analysis.preferredSkills}
+          onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
           title={t("roles.jd.analysis.preferredSkills")}
         />
-        <AnalysisBadges items={analysis.softSkills} title={t("roles.jd.analysis.softSkills")} />
         <AnalysisBadges
+          field="softSkills"
+          items={analysis.softSkills}
+          onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
+          title={t("roles.jd.analysis.softSkills")}
+        />
+        <AnalysisBadges
+          field="businessDomains"
           items={analysis.businessDomains}
+          onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
           title={t("roles.jd.analysis.businessDomains")}
         />
       </div>
-      <AnalysisBadges items={analysis.frequentKeywords} title={t("roles.jd.analysis.keywords")} />
+      <AnalysisBadges
+        field="frequentKeywords"
+        items={analysis.frequentKeywords}
+        onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
+        title={t("roles.jd.analysis.keywords")}
+      />
     </div>
   )
 }
 
-function AnalysisSection({ children, title }: { children: ReactNode; title: string }) {
+function AnalysisSection({
+  children,
+  field,
+  onEdit,
+  title,
+}: {
+  children: ReactNode
+  field: JobDescriptionAnalysisModuleField
+  onEdit?: (field: JobDescriptionAnalysisModuleField) => void
+  title: string
+}) {
+  const { t } = useTranslation()
   return (
     <section className="flex flex-col gap-3 rounded-xl border p-4">
-      <h4 className="font-heading font-medium">{title}</h4>
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="font-heading font-medium">{title}</h4>
+        {onEdit && (
+          <Button
+            aria-label={t("roles.jd.actions.editModuleLabel", { module: title })}
+            onClick={() => onEdit(field)}
+            size="xs"
+            variant="ghost"
+          >
+            <PencilIcon data-icon="inline-start" />
+            {t("roles.jd.actions.editModule")}
+          </Button>
+        )}
+      </div>
       {children}
     </section>
   )
 }
 
-function AnalysisList({ items, title }: { items: string[]; title: string }) {
+function AnalysisList({
+  field,
+  items,
+  onEdit,
+  title,
+}: {
+  field: JobDescriptionAnalysisModuleField
+  items: string[]
+  onEdit?: (field: JobDescriptionAnalysisModuleField) => void
+  title: string
+}) {
   return (
-    <AnalysisSection title={title}>
+    <AnalysisSection field={field} onEdit={onEdit} title={title}>
       <ul className="flex list-disc flex-col gap-2 pl-5 text-sm leading-6">
         {items.map((item) => (
           <li key={item}>{item}</li>
@@ -239,9 +314,19 @@ function AnalysisList({ items, title }: { items: string[]; title: string }) {
   )
 }
 
-function AnalysisBadges({ items, title }: { items: string[]; title: string }) {
+function AnalysisBadges({
+  field,
+  items,
+  onEdit,
+  title,
+}: {
+  field: JobDescriptionAnalysisModuleField
+  items: string[]
+  onEdit?: (field: JobDescriptionAnalysisModuleField) => void
+  title: string
+}) {
   return (
-    <AnalysisSection title={title}>
+    <AnalysisSection field={field} onEdit={onEdit} title={title}>
       <div className="flex flex-wrap gap-2">
         {items.map((item) => (
           <Badge key={item} variant="secondary">

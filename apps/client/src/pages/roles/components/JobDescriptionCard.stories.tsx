@@ -84,6 +84,20 @@ export const Ready = meta.story({
   },
 })
 
+export const EditSummary = meta.story({
+  args: {
+    onEdit: fn(),
+    onEditAnalysisModule: fn(),
+    role: roleFor("roleWithParsedJobDescription"),
+    synchronizationError: false,
+  },
+  play: async ({ userEvent }) => {
+    await userEvent.click(
+      screen.getByRole("button", { name: /编辑 核心要求总结|edit core requirements/i }),
+    )
+  },
+})
+
 export const LongJobDescription = meta.story({
   args: {
     onEdit: fn(),

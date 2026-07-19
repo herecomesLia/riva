@@ -20,6 +20,7 @@ import {
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateRolePreparationStatus,
+  updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
 import { renderWithProviders } from "@/test/render"
@@ -37,6 +38,7 @@ vi.mock("@/services/roles", async (importOriginal) => ({
   setCurrentTargetRole: vi.fn(),
   startJobDescriptionParsing: vi.fn(),
   updateRolePreparationStatus: vi.fn(),
+  updateJobDescriptionAnalysisModule: vi.fn(),
   updateTargetRole: vi.fn(),
 }))
 
@@ -63,6 +65,7 @@ const mutationMocks = [
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateRolePreparationStatus,
+  updateJobDescriptionAnalysisModule,
   updateTargetRole,
 ] as const
 
@@ -693,6 +696,53 @@ describe("RolesPage", () => {
     expect(screen.queryByText("old analysis transport details")).not.toBeInTheDocument()
   })
 
+  it("does not let an old matching response overwrite a corrected structured JD module", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    const oldCurrent = createCurrentMatchingAnalysisResponse(initial)
+    const corrected = structuredClone(initial)
+    const correctedRole = corrected.roles[0]!
+    if (correctedRole.jobDescription.status !== "ready" || !correctedRole.jobDescriptionAnalysis) {
+      throw new Error("Expected a ready structured JD analysis.")
+    }
+    corrected.roles[0] = {
+      ...correctedRole,
+      version: correctedRole.version + 1,
+      jobDescriptionAnalysis: {
+        ...correctedRole.jobDescriptionAnalysis,
+        analysisVersion: correctedRole.jobDescriptionAnalysis.analysisVersion + 1,
+        requiredSkills: ["React", "TypeScript", "Accessibility"],
+      },
+      matchingAnalysis: null,
+    }
+    const oldStatus = createDeferred<(typeof oldCurrent.roles)[number]>()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus).mockReturnValue(oldStatus.promise)
+    vi.mocked(updateJobDescriptionAnalysisModule).mockResolvedValue(corrected)
+    const { queryClient } = renderRolesPage()
+
+    await waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(1))
+    await openJobDescriptionTab()
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.requiredSkills"),
+        }),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog")
+    const textarea = within(dialog).getByLabelText(i18n.t("roles.jd.analysisEditor.fieldLabel"))
+    await user.clear(textarea)
+    await user.type(textarea, "React\nTypeScript\nAccessibility")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
+    )
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(corrected))
+
+    await act(async () => oldStatus.resolve(oldCurrent.roles[0]!))
+    expect(queryClient.getQueryData(["roles"])).toEqual(corrected)
+  })
+
   it("stores a matching-analysis business failure and stops polling", async () => {
     const initial = createRolesMockResponse("matchingAnalysisGenerating")
     const failed = createFailedMatchingAnalysisResponse(initial)
@@ -844,6 +894,58 @@ describe("RolesPage", () => {
     expect(cached.roles[1]).toEqual(untouchedRole)
     expect(cached.currentRoleId).toBe(initial.currentRoleId)
     expect(cached.profileContext).toEqual(initial.profileContext)
+  })
+
+  it("writes a structured JD module mutation response into the complete roles cache", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("matchingAnalysisCurrent")
+    const next = structuredClone(initial)
+    const role = next.roles[0]!
+    if (role.jobDescription.status !== "ready" || !role.jobDescriptionAnalysis) {
+      throw new Error("Expected a ready structured JD analysis.")
+    }
+    role.version += 1
+    role.jobDescriptionAnalysis = {
+      ...role.jobDescriptionAnalysis,
+      analysisVersion: role.jobDescriptionAnalysis.analysisVersion + 1,
+      coreRequirementsSummary: "Corrected summary for the role.",
+    }
+    role.matchingAnalysis = role.matchingAnalysis
+      ? { ...role.matchingAnalysis, status: "stale" }
+      : null
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(updateJobDescriptionAnalysisModule).mockResolvedValue(next)
+    const { queryClient } = renderRolesPage()
+
+    await openJobDescriptionTab()
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.summary"),
+        }),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog")
+    const field = within(dialog).getByLabelText(i18n.t("roles.jd.analysisEditor.fieldLabel"))
+    await user.clear(field)
+    await user.type(field, "Corrected summary for the role.")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
+    )
+
+    expect(updateJobDescriptionAnalysisModule).toHaveBeenCalledWith(
+      {
+        roleId: initial.roles[0]!.id,
+        version: initial.roles[0]!.version,
+        jobDescriptionVersion: initial.roles[0]!.jobDescription.version,
+        analysisVersion: initial.roles[0]!.jobDescriptionAnalysis?.analysisVersion,
+        field: "coreRequirementsSummary",
+        value: "Corrected summary for the role.",
+      },
+      expect.anything(),
+    )
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(next))
+    expect(screen.getByText("Corrected summary for the role.")).toBeInTheDocument()
   })
 })
 
@@ -1098,6 +1200,7 @@ function createGeneratingMatchingAnalysisResponse(
       status: "generating",
       profileVersion: response.profileContext.version,
       jobDescriptionVersion: role.jobDescription.version,
+      jobDescriptionAnalysisVersion: role.jobDescriptionAnalysis.analysisVersion,
       generatedAt: null,
       failureReason: null,
       result: null,

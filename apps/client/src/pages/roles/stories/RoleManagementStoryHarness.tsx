@@ -37,6 +37,7 @@ export function RoleManagementStoryHarness({
     saveJobDescription: wrap("saveJobDescription"),
     setCurrentTargetRole: wrap("setCurrentTargetRole"),
     updateRolePreparationStatus: wrap("updateRolePreparationStatus"),
+    updateJobDescriptionAnalysisModule: wrap("updateJobDescriptionAnalysisModule"),
     updateTargetRole: wrap("updateTargetRole"),
   }
 

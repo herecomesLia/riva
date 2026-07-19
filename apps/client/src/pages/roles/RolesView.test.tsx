@@ -27,6 +27,7 @@ function createActions(
     saveJobDescription: vi.fn(async () => data),
     setCurrentTargetRole: vi.fn(async () => data),
     updateRolePreparationStatus: vi.fn(async () => data),
+    updateJobDescriptionAnalysisModule: vi.fn(async () => data),
     updateTargetRole: vi.fn(async () => data),
     ...overrides,
   }
@@ -279,6 +280,19 @@ describe("RolesView", () => {
     await user.click(screen.getByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }))
     expect(screen.getByTestId("matching-analysis-card")).toBeInTheDocument()
     expect(screen.queryByTestId("job-description-card")).not.toBeInTheDocument()
+  })
+
+  it("keeps the tab strip horizontally scrollable while explicitly hiding vertical overflow", async () => {
+    renderReadyView(createRolesMockResponse("matchingAnalysisCurrent"))
+
+    expect(await screen.findByTestId("target-role-tabs-scroll")).toHaveClass(
+      "overflow-x-auto",
+      "overflow-y-hidden",
+      "pb-1",
+    )
+    expect(within(screen.getByTestId("target-role-tabs-scroll")).getAllByRole("tab")).toHaveLength(
+      3,
+    )
   })
 
   it("preserves the active tab and updates the progress summary when selection changes", async () => {
@@ -699,9 +713,61 @@ describe("RolesView", () => {
         within(result).getByRole("heading", { name: i18n.t(`roles.jd.analysis.${key}`) }),
       ).toBeInTheDocument()
     }
+    expect(within(result).getAllByRole("button", { name: /^编辑 |^edit /i })).toHaveLength(8)
     expect(result).toHaveTextContent(analysis.coreRequirementsSummary)
     expect(result).toHaveTextContent(analysis.responsibilities[0]!)
     expect(result).toHaveTextContent(analysis.frequentKeywords[0]!)
+  })
+
+  it("opens a module-specific editor without opening the JD source editor", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    const updateJobDescriptionAnalysisModule = vi.fn(async () => data)
+    renderReadyView(data, {
+      actions: createActions(data, { updateJobDescriptionAnalysisModule }),
+      initialActiveTab: "job-description",
+    })
+
+    const summaryTitle = i18n.t("roles.jd.analysis.summary")
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", { module: summaryTitle }),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog")
+    const textarea = within(dialog).getByLabelText(i18n.t("roles.jd.analysisEditor.fieldLabel"))
+    expect(textarea).toHaveValue(data.roles[0]!.jobDescriptionAnalysis!.coreRequirementsSummary)
+    expect(
+      within(dialog).queryByLabelText(i18n.t("roles.jd.editor.fieldLabel")),
+    ).not.toBeInTheDocument()
+
+    await user.clear(textarea)
+    await user.type(textarea, "Corrected structured summary.")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
+    )
+    expect(updateJobDescriptionAnalysisModule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "coreRequirementsSummary",
+        value: "Corrected structured summary.",
+      }),
+    )
+  })
+
+  it("only shows structured-module editors after JD parsing is ready", async () => {
+    for (const scenario of [
+      "singleRoleWithoutJobDescription",
+      "roleWithJobDescriptionParsing",
+      "roleWithJobDescriptionFailed",
+    ] as const) {
+      const { unmount } = renderReadyView(createRolesMockResponse(scenario), {
+        initialActiveTab: "job-description",
+      })
+      expect(await screen.findByTestId("job-description-card")).not.toHaveTextContent(
+        i18n.t("roles.jd.analysis.correctionHint"),
+      )
+      unmount()
+    }
   })
 
   it("keeps the pasted JD draft when saving fails", async () => {

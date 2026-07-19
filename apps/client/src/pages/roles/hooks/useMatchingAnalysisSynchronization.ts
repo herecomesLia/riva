@@ -12,6 +12,7 @@ type MatchingAnalysisOperation = {
   input: GetMatchingAnalysisStatusInput
   profileVersion: number
   jobDescriptionVersion: number
+  jobDescriptionAnalysisVersion: number
 }
 
 type PollingController = {
@@ -20,8 +21,8 @@ type PollingController = {
 }
 
 function createOperationKey(operation: MatchingAnalysisOperation) {
-  const { input, profileVersion, jobDescriptionVersion } = operation
-  return `${input.roleId}:${input.version}:${profileVersion}:${jobDescriptionVersion}`
+  const { input, profileVersion, jobDescriptionVersion, jobDescriptionAnalysisVersion } = operation
+  return `${input.roleId}:${input.version}:${profileVersion}:${jobDescriptionVersion}:${jobDescriptionAnalysisVersion}`
 }
 
 function getGeneratingOperation(role: TargetRole): MatchingAnalysisOperation | null {
@@ -30,6 +31,7 @@ function getGeneratingOperation(role: TargetRole): MatchingAnalysisOperation | n
     input: { roleId: role.id, version: role.version },
     profileVersion: role.matchingAnalysis.profileVersion,
     jobDescriptionVersion: role.matchingAnalysis.jobDescriptionVersion,
+    jobDescriptionAnalysisVersion: role.matchingAnalysis.jobDescriptionAnalysisVersion,
   }
 }
 
@@ -49,7 +51,8 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
         role?.version === operation.input.version &&
         analysis?.status === "generating" &&
         analysis.profileVersion === operation.profileVersion &&
-        analysis.jobDescriptionVersion === operation.jobDescriptionVersion
+        analysis.jobDescriptionVersion === operation.jobDescriptionVersion &&
+        analysis.jobDescriptionAnalysisVersion === operation.jobDescriptionAnalysisVersion
       )
     },
     [queryClient],
@@ -100,9 +103,12 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
           currentAnalysis?.status !== "generating" ||
           currentAnalysis.profileVersion !== operation.profileVersion ||
           currentAnalysis.jobDescriptionVersion !== operation.jobDescriptionVersion ||
+          currentAnalysis.jobDescriptionAnalysisVersion !==
+            operation.jobDescriptionAnalysisVersion ||
           !responseAnalysis ||
           responseAnalysis.profileVersion !== operation.profileVersion ||
-          responseAnalysis.jobDescriptionVersion !== operation.jobDescriptionVersion
+          responseAnalysis.jobDescriptionVersion !== operation.jobDescriptionVersion ||
+          responseAnalysis.jobDescriptionAnalysisVersion !== operation.jobDescriptionAnalysisVersion
         ) {
           return current
         }
@@ -111,7 +117,9 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
           current.profileContext.exists &&
           current.profileContext.version === responseAnalysis.profileVersion &&
           currentRole.jobDescription.status === "ready" &&
-          currentRole.jobDescription.version === responseAnalysis.jobDescriptionVersion
+          currentRole.jobDescription.version === responseAnalysis.jobDescriptionVersion &&
+          currentRole.jobDescriptionAnalysis?.analysisVersion ===
+            responseAnalysis.jobDescriptionAnalysisVersion
         const matchingAnalysis =
           responseAnalysis.status === "current" && !dependenciesAreFresh
             ? { ...responseAnalysis, status: "stale" as const }

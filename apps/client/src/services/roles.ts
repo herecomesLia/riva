@@ -13,6 +13,7 @@ import type {
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
   TargetRole,
+  UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
@@ -83,4 +84,12 @@ export function getMatchingAnalysisStatus(
   input: GetMatchingAnalysisStatusInput,
 ): Promise<TargetRole> {
   return env.mock ? rolesMockService.getMatchingAnalysisStatus(input) : realApiUnavailable()
+}
+
+export function updateJobDescriptionAnalysisModule(
+  input: UpdateJobDescriptionAnalysisModuleInput,
+): Promise<RolesPageResponse> {
+  return env.mock
+    ? rolesMockService.updateJobDescriptionAnalysisModule(input)
+    : realApiUnavailable()
 }

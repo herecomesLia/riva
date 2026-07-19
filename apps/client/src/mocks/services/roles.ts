@@ -16,6 +16,7 @@ import type {
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
   TargetRole,
+  UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
@@ -71,6 +72,7 @@ function nextRoleVersion(role: TargetRole) {
 function createJobDescriptionAnalysis(jobDescriptionVersion: number): JobDescriptionAnalysis {
   return {
     jobDescriptionVersion,
+    analysisVersion: 1,
     parsedAt: nextTimestamp(),
     responsibilities: [
       "Own frontend architecture and delivery for merchant-facing products.",
@@ -117,6 +119,15 @@ function markMatchingAnalysisStale(matchingAnalysis: MatchingAnalysis | null) {
   if (matchingAnalysis?.status === "current")
     return { ...matchingAnalysis, status: "stale" as const }
   if (matchingAnalysis?.status === "stale") return matchingAnalysis
+  return null
+}
+
+function invalidateMatchingAnalysisAfterAnalysisCorrection(
+  matchingAnalysis: MatchingAnalysis | null,
+) {
+  if (matchingAnalysis?.status === "current" || matchingAnalysis?.status === "stale") {
+    return { ...matchingAnalysis, status: "stale" as const }
+  }
   return null
 }
 
@@ -433,10 +444,50 @@ export async function generateMatchingAnalysis(
       status: "generating",
       profileVersion: mockResponse.profileContext.version,
       jobDescriptionVersion: role.jobDescription.version,
+      jobDescriptionAnalysisVersion: role.jobDescriptionAnalysis.analysisVersion,
       generatedAt: null,
       failureReason: null,
       result: null,
     },
+  }
+  return setMockResponse(replaceRole(updatedRole))
+}
+
+export async function updateJobDescriptionAnalysisModule(
+  input: UpdateJobDescriptionAnalysisModuleInput,
+): Promise<RolesPageResponse> {
+  await waitForMockDelay()
+  const role = requireRole(input.roleId)
+  requireCurrentVersion(role, input.version)
+  if (!isReadyTargetRole(role)) {
+    throw new Error("A parsed job description is required to update structured JD analysis.")
+  }
+  if (role.jobDescription.version !== input.jobDescriptionVersion) {
+    throw new Error("Job description version is out of date.")
+  }
+  if (role.jobDescriptionAnalysis.analysisVersion !== input.analysisVersion) {
+    throw new Error("Job description analysis version is out of date.")
+  }
+  if (
+    (input.field === "coreRequirementsSummary" && typeof input.value !== "string") ||
+    (input.field !== "coreRequirementsSummary" &&
+      (!Array.isArray(input.value) || !input.value.every((item) => typeof item === "string")))
+  ) {
+    throw new Error("Structured JD analysis field value is invalid.")
+  }
+
+  const nextAnalysis =
+    input.field === "coreRequirementsSummary"
+      ? { ...role.jobDescriptionAnalysis, coreRequirementsSummary: input.value }
+      : { ...role.jobDescriptionAnalysis, [input.field]: [...input.value] }
+  const updatedRole: ReadyTargetRole = {
+    ...role,
+    ...nextRoleVersion(role),
+    jobDescriptionAnalysis: {
+      ...nextAnalysis,
+      analysisVersion: role.jobDescriptionAnalysis.analysisVersion + 1,
+    },
+    matchingAnalysis: invalidateMatchingAnalysisAfterAnalysisCorrection(role.matchingAnalysis),
   }
   return setMockResponse(replaceRole(updatedRole))
 }

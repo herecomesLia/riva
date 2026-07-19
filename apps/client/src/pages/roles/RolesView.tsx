@@ -21,12 +21,14 @@ import type {
   GenerateOrRegenerateMatchingAnalysisInput,
   GetJobDescriptionParsingStatusInput,
   GetMatchingAnalysisStatusInput,
+  JobDescriptionAnalysisModuleField,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
+  UpdateJobDescriptionAnalysisModuleInput,
 } from "@/models/roles"
 import type { Loadable } from "@/types"
 
@@ -34,6 +36,7 @@ import { MobileTargetRoleSelector } from "./components/MobileTargetRoleSelector"
 import { RoleDetails, type TargetRoleTab } from "./components/RoleDetails"
 import { RoleEditorDialog } from "./components/RoleEditorDialog"
 import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDialog"
+import { JobDescriptionAnalysisEditorDialog } from "./components/JobDescriptionAnalysisEditorDialog"
 import { RolesHeader } from "./components/RolesHeader"
 import { RolesList } from "./components/RolesList"
 import { getRolesForCategory, type TargetRoleListCategory } from "./components/roles-list-utils"
@@ -66,6 +69,9 @@ export type RolesViewActions = {
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
   updateRolePreparationStatus: (
     input: UpdateTargetRolePreparationStatusInput,
+  ) => Promise<RolesPageResponse>
+  updateJobDescriptionAnalysisModule: (
+    input: UpdateJobDescriptionAnalysisModuleInput,
   ) => Promise<RolesPageResponse>
   updateTargetRole: (input: UpdateTargetRoleInput) => Promise<RolesPageResponse>
 }
@@ -142,6 +148,8 @@ function RolesReadyView({
   const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
+  const [jobDescriptionAnalysisEditorField, setJobDescriptionAnalysisEditorField] =
+    useState<JobDescriptionAnalysisModuleField | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<"archive" | "delete" | null>(null)
@@ -159,6 +167,7 @@ function RolesReadyView({
   function closeEditor() {
     setEditorMode(null)
     setIsJobDescriptionEditorOpen(false)
+    setJobDescriptionAnalysisEditorField(null)
     setIsDirty(false)
   }
 
@@ -256,6 +265,8 @@ function RolesReadyView({
                           delete: () => setConfirmation("delete"),
                           edit: () => setEditorMode("edit"),
                           editJobDescription: () => setIsJobDescriptionEditorOpen(true),
+                          editJobDescriptionAnalysisModule: (field) =>
+                            setJobDescriptionAnalysisEditorField(field),
                           generateMatchingAnalysis: () => {
                             if (
                               !data.profileContext.exists ||
@@ -368,6 +379,16 @@ function RolesReadyView({
             }}
             onSaved={closeEditor}
             open={isJobDescriptionEditorOpen}
+            role={selectedRole}
+          />
+          <JobDescriptionAnalysisEditorDialog
+            field={jobDescriptionAnalysisEditorField}
+            onDirtyChange={handleDirtyChange}
+            onOpenChange={(open) => !open && requestCloseEditor()}
+            onSave={async (input) => {
+              await actions.updateJobDescriptionAnalysisModule(input)
+            }}
+            onSaved={closeEditor}
             role={selectedRole}
           />
         </>

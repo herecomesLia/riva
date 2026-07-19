@@ -67,6 +67,10 @@ export const roles = {
     actions: {
       add: "Paste job description",
       replace: "Edit or replace JD",
+      editModule: "Edit",
+      editModuleLabel: "Edit {{module}}",
+      saveCorrection: "Save changes",
+      savingCorrection: "Saving",
       retry: "Retry parsing",
       resynchronize: "Synchronize status",
     },
@@ -89,6 +93,8 @@ export const roles = {
         "The JD is saved and remains in parsing. Synchronizing again will not create another parsing job.",
     },
     analysis: {
+      correctionHint:
+        "You can correct each parsed module. Updating it requires regenerating the match analysis.",
       summary: "Core requirements",
       responsibilities: "Responsibilities",
       requiredSkills: "Required skills",
@@ -97,6 +103,13 @@ export const roles = {
       softSkills: "Soft skills",
       businessDomains: "Business domains",
       keywords: "Frequent keywords",
+    },
+    analysisEditor: {
+      summaryDescription:
+        "Correct RIVA's core-requirements summary without changing or reparsing the JD text.",
+      listDescription: "Enter one item per line. This does not reparse the JD text.",
+      fieldLabel: "Content",
+      summaryRequired: "Enter the core requirements summary.",
     },
   },
   matching: {

@@ -48,6 +48,8 @@ export type JobDescription =
 export type JobDescriptionAnalysis = {
   /** The JD version this structured result was parsed from. */
   jobDescriptionVersion: number
+  /** Increments when the user corrects a structured JD module. */
+  analysisVersion: number
   /** When structured JD parsing completed. */
   parsedAt: string
   responsibilities: string[]
@@ -80,6 +82,8 @@ type MatchingAnalysisVersionContext = {
   profileVersion: number
   /** The JD revision used to generate this result. */
   jobDescriptionVersion: number
+  /** The structured JD analysis revision used to generate this result. */
+  jobDescriptionAnalysisVersion: number
 }
 
 export type GeneratingMatchingAnalysis = MatchingAnalysisVersionContext & {
@@ -258,3 +262,33 @@ export type GetMatchingAnalysisStatusInput = {
   /** Target-role version returned when this generation entered generating. */
   version: number
 }
+
+export type JobDescriptionAnalysisListField =
+  | "responsibilities"
+  | "requiredSkills"
+  | "preferredSkills"
+  | "experienceRequirements"
+  | "softSkills"
+  | "businessDomains"
+  | "frequentKeywords"
+
+export type JobDescriptionAnalysisModuleField =
+  "coreRequirementsSummary" | JobDescriptionAnalysisListField
+
+export type UpdateJobDescriptionAnalysisModuleInput =
+  | {
+      roleId: string
+      version: number
+      jobDescriptionVersion: number
+      analysisVersion: number
+      field: "coreRequirementsSummary"
+      value: string
+    }
+  | {
+      roleId: string
+      version: number
+      jobDescriptionVersion: number
+      analysisVersion: number
+      field: JobDescriptionAnalysisListField
+      value: string[]
+    }

@@ -10,6 +10,7 @@ import {
   saveJobDescription,
   setCurrentTargetRole,
   startJobDescriptionParsing,
+  updateJobDescriptionAnalysisModule,
   updateRolePreparationStatus,
   updateTargetRole,
 } from "@/services/roles"
@@ -62,6 +63,9 @@ export function RolesPage() {
   const retryJobDescriptionParsingMutation = useMutation({
     mutationFn: startJobDescriptionParsing,
   })
+  const updateJobDescriptionAnalysisModuleMutation = useMutation({
+    mutationFn: updateJobDescriptionAnalysisModule,
+  })
   async function runMutation<Input>(
     mutate: (input: Input) => Promise<RolesPageResponse>,
     input: Input,
@@ -70,7 +74,7 @@ export function RolesPage() {
       return await mutate(input)
     } catch (error) {
       throw new RolesActionError(
-        error instanceof Error && error.message === "Target role version is out of date."
+        error instanceof Error && error.message.endsWith("version is out of date.")
           ? "versionConflict"
           : "requestFailed",
       )
@@ -110,6 +114,15 @@ export function RolesPage() {
       return response
     },
     setCurrentTargetRole: (input) => runMutation(setCurrentMutation.mutateAsync, input),
+    updateJobDescriptionAnalysisModule: async (input) => {
+      const response = await runMutation(
+        updateJobDescriptionAnalysisModuleMutation.mutateAsync,
+        input,
+      )
+      setRolesResponse(response)
+      clearMatchingAnalysisSynchronizationError(input.roleId)
+      return response
+    },
     updateRolePreparationStatus: (input) => runMutation(preparationMutation.mutateAsync, input),
     updateTargetRole: (input) => runMutation(updateMutation.mutateAsync, input),
   }

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { ProfileContext, TargetRole } from "@/models/roles"
+import type { JobDescriptionAnalysisModuleField, ProfileContext, TargetRole } from "@/models/roles"
 
 import { JobDescriptionCard } from "./JobDescriptionCard"
 import { MatchingAnalysisCard } from "./MatchingAnalysisCard"
@@ -18,6 +18,7 @@ export type RoleDetailsActions = {
   setCurrent: () => void
   togglePreparationStatus: () => void
   editJobDescription: () => void
+  editJobDescriptionAnalysisModule: (field: JobDescriptionAnalysisModuleField) => void
   retryJobDescriptionParsing: () => void
   retryJobDescriptionSynchronization: () => void
   generateMatchingAnalysis: () => void
@@ -75,7 +76,10 @@ export function RoleDetails({
           onValueChange={(value) => onTabChange(value as TargetRoleTab)}
           value={activeTab}
         >
-          <div className="max-w-full overflow-x-auto" data-testid="target-role-tabs-scroll">
+          <div
+            className="max-w-full overflow-x-auto overflow-y-hidden pb-1"
+            data-testid="target-role-tabs-scroll"
+          >
             <TabsList aria-label={t("roles.tabs.label")} className="min-w-max" variant="line">
               <TabsTrigger value="overview">{t("roles.tabs.overview")}</TabsTrigger>
               <TabsTrigger value="job-description">{t("roles.tabs.jobDescription")}</TabsTrigger>
@@ -94,6 +98,7 @@ export function RoleDetails({
             {activeTab === "job-description" && (
               <JobDescriptionCard
                 onEdit={actions?.editJobDescription}
+                onEditAnalysisModule={actions?.editJobDescriptionAnalysisModule}
                 onRetry={actions?.retryJobDescriptionParsing}
                 onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
                 pending={pending}

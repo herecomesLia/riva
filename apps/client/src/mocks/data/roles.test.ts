@@ -51,6 +51,7 @@ function expectConsistentJobDescription(role: TargetRole) {
       expect(jobDescription.parsingFailureReason).toBeNull()
       expect(jobDescriptionAnalysis).not.toBeNull()
       expect(jobDescriptionAnalysis?.jobDescriptionVersion).toBe(jobDescription.version)
+      expect(jobDescriptionAnalysis?.analysisVersion).toBeGreaterThanOrEqual(1)
       expect(jobDescriptionAnalysis?.parsedAt).toMatch(/^2026-07-\d{2}T/)
       expect(jobDescriptionAnalysis?.responsibilities).not.toHaveLength(0)
       expect(jobDescriptionAnalysis?.requiredSkills).not.toHaveLength(0)
@@ -81,6 +82,9 @@ function expectConsistentMatchingAnalysis(response: RolesPageResponse, role: Tar
     case "current":
       expect(matchingAnalysis.profileVersion).toBe(response.profileContext.version)
       expect(matchingAnalysis.jobDescriptionVersion).toBe(role.jobDescription.version)
+      expect(matchingAnalysis.jobDescriptionAnalysisVersion).toBe(
+        role.jobDescriptionAnalysis?.analysisVersion,
+      )
       expect(matchingAnalysis.generatedAt).toMatch(/^2026-07-\d{2}T/)
       expect(matchingAnalysis.result).not.toBeNull()
       expect(matchingAnalysis.result.overallMatchScore).toBeGreaterThanOrEqual(0)
@@ -90,7 +94,9 @@ function expectConsistentMatchingAnalysis(response: RolesPageResponse, role: Tar
     case "stale":
       expect(
         matchingAnalysis.profileVersion < response.profileContext.version ||
-          matchingAnalysis.jobDescriptionVersion < role.jobDescription.version,
+          matchingAnalysis.jobDescriptionVersion < role.jobDescription.version ||
+          matchingAnalysis.jobDescriptionAnalysisVersion <
+            (role.jobDescriptionAnalysis?.analysisVersion ?? 0),
       ).toBe(true)
       expect(matchingAnalysis.generatedAt).toMatch(/^2026-07-\d{2}T/)
       expect(matchingAnalysis.result).not.toBeNull()

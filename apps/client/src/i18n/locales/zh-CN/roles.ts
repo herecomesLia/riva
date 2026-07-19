@@ -63,6 +63,10 @@ export const roles = {
     actions: {
       add: "粘贴岗位 JD",
       replace: "编辑或替换 JD",
+      editModule: "编辑",
+      editModuleLabel: "编辑 {{module}}",
+      saveCorrection: "保存修改",
+      savingCorrection: "正在保存",
       retry: "重试解析",
       resynchronize: "重新同步状态",
     },
@@ -84,6 +88,7 @@ export const roles = {
       description: "JD 已保存并仍处于解析中。可以重新同步，不会重复创建解析任务。",
     },
     analysis: {
+      correctionHint: "解析结果可按模块校正，修改后匹配分析需要重新生成。",
       summary: "核心要求总结",
       responsibilities: "岗位职责",
       requiredSkills: "必备技能",
@@ -92,6 +97,12 @@ export const roles = {
       softSkills: "软能力",
       businessDomains: "业务领域",
       keywords: "高频关键词",
+    },
+    analysisEditor: {
+      summaryDescription: "校正 RIVA 提取的核心要求总结，不会修改 JD 原文或重新解析。",
+      listDescription: "每行填写一项。修改不会重新解析 JD 原文。",
+      fieldLabel: "内容",
+      summaryRequired: "请填写核心要求总结。",
     },
   },
   matching: {
