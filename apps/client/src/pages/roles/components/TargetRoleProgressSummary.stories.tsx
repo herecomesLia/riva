@@ -10,11 +10,10 @@ const meta = preview.meta({
 
 function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   const response = createRoleStoryResponse(scenario)
-  return { profileContext: response.profileContext, role: response.roles[0]! }
+  return { role: response.roles[0]! }
 }
 
 export const Complete = meta.story({ args: argsFor("roleWithParsedJobDescription") })
-export const ProfileIncomplete = meta.story({ args: argsFor("profileIncomplete") })
 export const JobDescriptionMissing = meta.story({
   args: argsFor("singleRoleWithoutJobDescription"),
 })
@@ -30,7 +29,6 @@ const archivedResponse = createRoleStoryResponse("archivedRoles")
 
 export const ArchivedRole = meta.story({
   args: {
-    profileContext: archivedResponse.profileContext,
     role: archivedResponse.roles.find((role) => role.preparationStatus === "archived")!,
   },
 })

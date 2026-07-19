@@ -28,7 +28,11 @@ export function JobDescriptionCard({
   const { jobDescription } = role
 
   return (
-    <Card data-testid="job-description-card" size="sm">
+    <Card
+      className="border border-border/70 bg-background/60 shadow-none"
+      data-testid="job-description-card"
+      size="sm"
+    >
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-1">

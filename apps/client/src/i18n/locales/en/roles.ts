@@ -162,8 +162,18 @@ export const roles = {
     },
   },
   list: {
-    title: "Saved roles",
+    title: "My roles",
     description: "Selecting a role shows its details without changing the current default role.",
+    categoryLabel: "Role category",
+    categories: {
+      saved: "Saved ({{count}})",
+      archived: "Archived ({{count}})",
+    },
+    empty: {
+      saved: "No saved roles yet.",
+      archived: "No archived roles yet.",
+    },
+    matchScore: "Match score {{score}}%",
   },
   mobileSelector: {
     label: "Select a role to view",
@@ -176,13 +186,11 @@ export const roles = {
   },
   summary: {
     title: "Role progress",
+    roleStatus: "Role status",
     profile: "Job profile",
     jobDescription: "Job description",
     matchingAnalysis: "Match analysis",
-    currentScore: "Current match",
     updatedAt: "Last updated",
-    scoreStale: "Result out of date",
-    scoreUnavailable: "No current result",
     profileStatus: {
       missing: "Not created",
       incomplete: "Incomplete",

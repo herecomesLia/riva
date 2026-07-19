@@ -31,7 +31,11 @@ export function TargetRoleOverview({
   const { t } = useTranslation()
 
   return (
-    <Card data-testid="target-role-overview">
+    <Card
+      className="border border-border/70 bg-background/60 shadow-none"
+      data-testid="target-role-overview"
+      size="sm"
+    >
       <CardHeader>
         <CardTitle>
           <h3>{t("roles.details.sections.basics")}</h3>

@@ -31,7 +31,11 @@ export function MatchingAnalysisCard({
     profileContext.exists && profileContext.completed && role.jobDescription.status === "ready"
 
   return (
-    <Card data-testid="matching-analysis-card" size="sm">
+    <Card
+      className="border border-border/70 bg-background/60 shadow-none"
+      data-testid="matching-analysis-card"
+      size="sm"
+    >
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-1">

@@ -99,6 +99,100 @@ describe("RolesView", () => {
     expect(within(roleList).getByText(i18n.t("roles.preparationStatus.paused"))).toBeInTheDocument()
   })
 
+  it("shows My roles with saved and archived categories, filtering the visible list locally", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("archivedRoles")
+    const savedRole = data.roles.find((role) => role.preparationStatus !== "archived")!
+    const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
+    renderReadyView(data)
+
+    const desktopNavigation = await screen.findByTestId("roles-desktop-navigation")
+    expect(
+      await screen.findByRole("heading", { name: i18n.t("roles.list.title") }),
+    ).toBeInTheDocument()
+    expect(desktopNavigation).not.toHaveTextContent(i18n.t("roles.list.description"))
+    expect(
+      within(desktopNavigation).getByRole("tab", {
+        name: i18n.t("roles.list.categories.saved", { count: 1 }),
+      }),
+    ).toHaveAttribute("aria-selected", "true")
+    const savedList = within(desktopNavigation).getByRole("list", {
+      name: i18n.t("roles.list.title"),
+    })
+    expect(within(savedList).getByText(savedRole.title)).toBeInTheDocument()
+    expect(within(savedList).queryByText(archivedRole.title)).not.toBeInTheDocument()
+
+    await user.click(
+      within(desktopNavigation).getByRole("tab", {
+        name: i18n.t("roles.list.categories.archived", { count: 1 }),
+      }),
+    )
+
+    const archivedList = within(desktopNavigation).getByRole("list", {
+      name: i18n.t("roles.list.title"),
+    })
+    expect(within(archivedList).getByText(archivedRole.title)).toBeInTheDocument()
+    expect(within(archivedList).queryByText(savedRole.title)).not.toBeInTheDocument()
+    expect(screen.getByTestId("role-details-card")).toHaveTextContent(archivedRole.title)
+  })
+
+  it("shows match-score rings only for current or stale analyses and greys archived score indicators", async () => {
+    const data = createRolesMockResponse("archivedRoles")
+    const currentRole = data.roles.find((role) => role.isCurrent)!
+    const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
+    archivedRole.matchingAnalysis = structuredClone(currentRole.matchingAnalysis)
+    renderReadyView(data, { initialSelectedRoleId: archivedRole.id })
+
+    const archivedButton = await screen.findByRole("button", {
+      name: new RegExp(`^${archivedRole.title}`),
+    })
+    const scoreRing = within(archivedButton).getByTestId("role-match-score-ring")
+    const statusBadges = within(archivedButton).getByTestId("role-status-badges")
+
+    expect(scoreRing).toHaveTextContent("78%")
+    expect(scoreRing).toHaveAttribute("data-role-status", "archived")
+    expect(
+      within(statusBadges).getByText(i18n.t("roles.preparationStatus.archived")),
+    ).toHaveAttribute("data-role-status", "archived")
+  })
+
+  it("keeps the navigation available when the chosen category is empty", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("multipleRoles")
+    renderReadyView(data)
+
+    const desktopNavigation = await screen.findByTestId("roles-desktop-navigation")
+    await user.click(
+      within(desktopNavigation).getByRole("tab", {
+        name: i18n.t("roles.list.categories.archived", { count: 0 }),
+      }),
+    )
+
+    expect(
+      within(desktopNavigation).getByText(i18n.t("roles.list.empty.archived")),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId("roles-desktop-navigation")).toBeInTheDocument()
+    expect(screen.queryByTestId("role-details-card")).not.toBeInTheDocument()
+
+    await user.click(
+      within(desktopNavigation).getByRole("tab", {
+        name: i18n.t("roles.list.categories.saved", { count: 2 }),
+      }),
+    )
+    expect(screen.getByTestId("role-details-card")).toBeInTheDocument()
+  })
+
+  it("does not reserve a match-score ring for roles without an eligible analysis", async () => {
+    const data = createRolesMockResponse("multipleRoles")
+    const roleWithoutAnalysis = data.roles.find((role) => role.matchingAnalysis === null)!
+    renderReadyView(data)
+
+    const button = await screen.findByRole("button", {
+      name: new RegExp(`^${roleWithoutAnalysis.title}`),
+    })
+    expect(within(button).queryByTestId("role-match-score-ring")).not.toBeInTheDocument()
+  })
+
   it("keeps selected role separate from the server current role", async () => {
     const data = createRolesMockResponse("multipleRoles")
     const currentRole = data.roles.find((role) => role.isCurrent)!
@@ -216,6 +310,20 @@ describe("RolesView", () => {
     ).toBeInTheDocument()
   })
 
+  it("keeps the progress summary textual without status badges or a match score", async () => {
+    const data = createRolesMockResponse("matchingAnalysisCurrent")
+    renderReadyView(data)
+
+    const summary = within(await screen.findByTestId("roles-desktop-navigation")).getByTestId(
+      "target-role-progress-summary",
+    )
+    expect(within(summary).queryByTestId("role-status-badges")).not.toBeInTheDocument()
+    expect(summary).not.toHaveTextContent("78%")
+    expect(summary).not.toHaveTextContent(i18n.t("roles.summary.profile"))
+    expect(summary).toHaveTextContent(i18n.t("roles.summary.roleStatus"))
+    expect(summary).toHaveTextContent(i18n.t("roles.summary.updatedAt"))
+  })
+
   it("uses the mobile selector without changing the server current role", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("multipleRoles")
@@ -234,6 +342,24 @@ describe("RolesView", () => {
         i18n.t("roles.badges.current"),
       ),
     ).toBeInTheDocument()
+  })
+
+  it("keeps saved and archived categories available in the mobile selector", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("archivedRoles")
+    const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
+    const setCurrentTargetRole = vi.fn(async () => data)
+    renderReadyView(data, { actions: createActions(data, { setCurrentTargetRole }) })
+
+    const mobileSelector = await screen.findByTestId("mobile-role-selector")
+    await user.click(
+      within(mobileSelector).getByRole("tab", {
+        name: i18n.t("roles.list.categories.archived", { count: 1 }),
+      }),
+    )
+
+    expect(screen.getByTestId("role-details-card")).toHaveTextContent(archivedRole.title)
+    expect(setCurrentTargetRole).not.toHaveBeenCalled()
   })
 
   it("falls back to the current role after a selected role disappears and preserves the tab", async () => {
@@ -271,7 +397,39 @@ describe("RolesView", () => {
     renderReadyView(createRolesMockResponse("multipleRoles"))
 
     expect(await screen.findByTestId("roles-desktop-navigation")).toBeInTheDocument()
-    expect(screen.getByTestId("roles-list-scroll")).toBeInTheDocument()
+    expect(screen.getByTestId("roles-list-scroll")).toHaveClass(
+      "overflow-x-hidden",
+      "overflow-y-auto",
+      "[scrollbar-gutter:stable]",
+      "[scrollbar-width:thin]",
+      "pr-2.5",
+    )
+  })
+
+  it("uses a stable one-pixel role-card border and a non-shrinking match-score ring", async () => {
+    const data = createRolesMockResponse("multipleRoles")
+    const currentRole = data.roles.find((role) => role.isCurrent)!
+    const otherRole = data.roles.find((role) => !role.isCurrent)!
+    renderReadyView(data)
+
+    const roleButton = await screen.findByRole("button", {
+      name: new RegExp(`^${currentRole.title}`),
+    })
+    expect(roleButton).toHaveClass(
+      "border",
+      "focus-visible:border-primary",
+      "focus-visible:ring-1",
+      "active:not-aria-[haspopup]:translate-y-0",
+    )
+    expect(roleButton).toHaveClass("px-2.5", "py-2.5")
+    expect(screen.getByRole("button", { name: new RegExp(`^${otherRole.title}`) })).toHaveClass(
+      "border",
+      "hover:border-primary/60",
+    )
+    expect(within(roleButton).getByTestId("role-match-score-ring")).toHaveClass(
+      "basis-11",
+      "shrink-0",
+    )
   })
 
   it("validates required title, non-negative experience, and experience order", async () => {

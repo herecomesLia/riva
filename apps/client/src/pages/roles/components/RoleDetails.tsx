@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next"
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ProfileContext, TargetRole } from "@/models/roles"
 
@@ -42,63 +43,79 @@ export function RoleDetails({
   profileContext: ProfileContext
   role: TargetRole
 }) {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
+  const updatedAt = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(role.updatedAt))
 
   return (
-    <section className="flex min-w-0 flex-col gap-4" data-testid="role-details-card">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-heading text-2xl font-semibold tracking-tight">{role.title}</h2>
-          <p className="text-sm text-muted-foreground">
-            {role.company ?? t("roles.fallbackValue")}
-          </p>
+    <Card
+      className="min-w-0 border border-border/80 bg-card shadow-sm"
+      data-testid="role-details-card"
+    >
+      <CardHeader className="border-b border-border/70 pb-(--card-spacing)">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-1">
+            <CardTitle className="text-2xl font-semibold tracking-tight">
+              <h2>{role.title}</h2>
+            </CardTitle>
+            <CardDescription>
+              {role.company ?? t("roles.fallbackValue")} · {t("roles.summary.updatedAt")}{" "}
+              {updatedAt}
+            </CardDescription>
+          </div>
+          <RoleStatusBadges role={role} />
         </div>
-        <RoleStatusBadges role={role} />
-      </header>
+      </CardHeader>
 
-      <Tabs
-        className="min-w-0 gap-4"
-        onValueChange={(value) => onTabChange(value as TargetRoleTab)}
-        value={activeTab}
-      >
-        <div className="max-w-full overflow-x-auto" data-testid="target-role-tabs-scroll">
-          <TabsList aria-label={t("roles.tabs.label")} className="min-w-max" variant="line">
-            <TabsTrigger value="overview">{t("roles.tabs.overview")}</TabsTrigger>
-            <TabsTrigger value="job-description">{t("roles.tabs.jobDescription")}</TabsTrigger>
-            <TabsTrigger value="matching-analysis">{t("roles.tabs.matchingAnalysis")}</TabsTrigger>
-          </TabsList>
-        </div>
+      <CardContent className="min-w-0">
+        <Tabs
+          className="min-w-0 gap-5"
+          onValueChange={(value) => onTabChange(value as TargetRoleTab)}
+          value={activeTab}
+        >
+          <div className="max-w-full overflow-x-auto" data-testid="target-role-tabs-scroll">
+            <TabsList aria-label={t("roles.tabs.label")} className="min-w-max" variant="line">
+              <TabsTrigger value="overview">{t("roles.tabs.overview")}</TabsTrigger>
+              <TabsTrigger value="job-description">{t("roles.tabs.jobDescription")}</TabsTrigger>
+              <TabsTrigger value="matching-analysis">
+                {t("roles.tabs.matchingAnalysis")}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="overview">
-          {activeTab === "overview" && (
-            <TargetRoleOverview actions={actions} pending={pending} role={role} />
-          )}
-        </TabsContent>
-        <TabsContent value="job-description">
-          {activeTab === "job-description" && (
-            <JobDescriptionCard
-              onEdit={actions?.editJobDescription}
-              onRetry={actions?.retryJobDescriptionParsing}
-              onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
-              pending={pending}
-              role={role}
-              synchronizationError={jobDescriptionSynchronizationError}
-            />
-          )}
-        </TabsContent>
-        <TabsContent value="matching-analysis">
-          {activeTab === "matching-analysis" && (
-            <MatchingAnalysisCard
-              onGenerate={actions?.generateMatchingAnalysis}
-              onRetrySynchronization={actions?.retryMatchingAnalysisSynchronization}
-              pending={pending}
-              profileContext={profileContext}
-              role={role}
-              synchronizationError={matchingAnalysisSynchronizationError}
-            />
-          )}
-        </TabsContent>
-      </Tabs>
-    </section>
+          <TabsContent value="overview">
+            {activeTab === "overview" && (
+              <TargetRoleOverview actions={actions} pending={pending} role={role} />
+            )}
+          </TabsContent>
+          <TabsContent value="job-description">
+            {activeTab === "job-description" && (
+              <JobDescriptionCard
+                onEdit={actions?.editJobDescription}
+                onRetry={actions?.retryJobDescriptionParsing}
+                onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
+                pending={pending}
+                role={role}
+                synchronizationError={jobDescriptionSynchronizationError}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="matching-analysis">
+            {activeTab === "matching-analysis" && (
+              <MatchingAnalysisCard
+                onGenerate={actions?.generateMatchingAnalysis}
+                onRetrySynchronization={actions?.retryMatchingAnalysisSynchronization}
+                pending={pending}
+                profileContext={profileContext}
+                role={role}
+                synchronizationError={matchingAnalysisSynchronizationError}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   )
 }

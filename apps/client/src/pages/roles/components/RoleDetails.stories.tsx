@@ -24,13 +24,29 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTa
   )
 }
 
-export const Overview = meta.story({ render: () => <DetailsHarness /> })
-export const JobDescription = meta.story({
+function ArchivedDetailsHarness() {
+  const [activeTab, setActiveTab] = useState<TargetRoleTab>("overview")
+  const response = createRoleStoryResponse("archivedRoles")
+  const archivedRole = response.roles.find((role) => role.preparationStatus === "archived")!
+  return (
+    <RoleDetails
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      profileContext={response.profileContext}
+      role={archivedRole}
+    />
+  )
+}
+
+export const OverviewTab = meta.story({ render: () => <DetailsHarness /> })
+export const JobDescriptionTab = meta.story({
   render: () => <DetailsHarness initialTab="job-description" />,
 })
-export const MatchingAnalysis = meta.story({
+export const MatchingAnalysisTab = meta.story({
   render: () => <DetailsHarness initialTab="matching-analysis" />,
   play: async () => {
     await expect(screen.getByTestId("matching-analysis-result")).toBeVisible()
   },
 })
+
+export const ArchivedSelectedRole = meta.story({ render: () => <ArchivedDetailsHarness /> })

@@ -14,16 +14,20 @@ const multipleRolesResponse = createRoleStoryResponse("multipleRoles")
 const currentRole = multipleRolesResponse.roles.find((role) => role.isCurrent)!
 const selectedRole = multipleRolesResponse.roles.find((role) => !role.isCurrent)!
 
-export const SingleRole = meta.story({
+export const SavedRoles = meta.story({
   args: {
+    category: "saved",
+    onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: singleRoleResponse.roles,
     selectedRoleId: singleRoleResponse.currentRoleId,
   },
 })
 
-export const MultipleRoles = meta.story({
+export const MixedRoles = meta.story({
   args: {
+    category: "saved",
+    onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: multipleRolesResponse.roles,
     selectedRoleId: currentRole.id,
@@ -34,6 +38,8 @@ const onSelectRole = fn()
 
 export const SelectedRoleDifferentFromCurrent = meta.story({
   args: {
+    category: "saved",
+    onCategoryChange: fn(),
     onSelectRole,
     roles: multipleRolesResponse.roles,
     selectedRoleId: selectedRole.id,
@@ -52,18 +58,42 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
   },
 })
 
-export const ArchivedRole = meta.story({
+const archivedRolesResponse = createRoleStoryResponse("archivedRoles")
+const archivedRole = archivedRolesResponse.roles.find(
+  (role) => role.preparationStatus === "archived",
+)!
+
+export const ArchivedRoles = meta.story({
   args: {
+    category: "archived",
+    onCategoryChange: fn(),
     onSelectRole: fn(),
-    roles: createRoleStoryResponse("archivedRoles").roles,
-    selectedRoleId: "role_frontend_meituan",
+    roles: archivedRolesResponse.roles,
+    selectedRoleId: archivedRole.id,
   },
 })
 
-export const ManyRoles = meta.story({
+export const ScrollableRolesList = meta.story({
   args: {
+    category: "saved",
+    onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: createManyRolesResponse().roles,
     selectedRoleId: currentRole.id,
+  },
+})
+
+const scoreResponse = createRoleStoryResponse("matchingAnalysisCurrent")
+const roleWithoutScore = createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!
+roleWithoutScore.id = "role-without-match-score"
+roleWithoutScore.title = "Platform Product Manager"
+
+export const RolesWithAndWithoutMatchScore = meta.story({
+  args: {
+    category: "saved",
+    onCategoryChange: fn(),
+    onSelectRole: fn(),
+    roles: [scoreResponse.roles[0]!, roleWithoutScore],
+    selectedRoleId: scoreResponse.roles[0]!.id,
   },
 })

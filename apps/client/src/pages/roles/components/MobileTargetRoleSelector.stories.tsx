@@ -5,6 +5,7 @@ import { expect, fn, screen } from "storybook/test"
 
 import { createManyRolesResponse, createRoleStoryResponse } from "../stories/role-story-fixtures"
 import { MobileTargetRoleSelector } from "./MobileTargetRoleSelector"
+import type { TargetRoleListCategory } from "./roles-list-utils"
 
 const meta = preview.meta({
   component: MobileTargetRoleSelector,
@@ -19,9 +20,31 @@ function SelectorHarness({
   selectedRoleId: string
 }) {
   const [selectedId, setSelectedId] = useState(selectedRoleId)
-  const selectedRole = roles.find((role) => role.id === selectedId) ?? roles[0]!
+  const initialRole = roles.find((role) => role.id === selectedId) ?? roles[0]!
+  const [category, setCategory] = useState<TargetRoleListCategory>(
+    initialRole.preparationStatus === "archived" ? "archived" : "saved",
+  )
+  const selectedRole =
+    roles.find(
+      (role) =>
+        role.id === selectedId &&
+        (category === "archived"
+          ? role.preparationStatus === "archived"
+          : role.preparationStatus !== "archived"),
+    ) ?? null
   return (
     <MobileTargetRoleSelector
+      category={category}
+      onCategoryChange={(nextCategory) => {
+        setCategory(nextCategory)
+        setSelectedId(
+          roles.find((role) =>
+            nextCategory === "archived"
+              ? role.preparationStatus === "archived"
+              : role.preparationStatus !== "archived",
+          )?.id ?? "",
+        )
+      }}
       onSelectRole={setSelectedId}
       roles={roles}
       selectedRole={selectedRole}
@@ -35,6 +58,8 @@ const nonCurrentRole = multipleRoles.roles.find((role) => !role.isCurrent)!
 
 export const SingleRole = meta.story({
   args: {
+    category: "saved",
+    onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: createRoleStoryResponse("singleRoleWithoutJobDescription").roles,
     selectedRole: createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!,

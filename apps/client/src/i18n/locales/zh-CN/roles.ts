@@ -154,8 +154,18 @@ export const roles = {
     },
   },
   list: {
-    title: "已保存岗位",
+    title: "我的岗位",
     description: "选择岗位可查看详情，不会改变当前默认岗位。",
+    categoryLabel: "岗位分类",
+    categories: {
+      saved: "已保存 ({{count}})",
+      archived: "归档 ({{count}})",
+    },
+    empty: {
+      saved: "暂时没有已保存的岗位。",
+      archived: "暂时没有归档岗位。",
+    },
+    matchScore: "匹配度 {{score}}%",
   },
   mobileSelector: {
     label: "选择要查看的岗位",
@@ -168,13 +178,11 @@ export const roles = {
   },
   summary: {
     title: "岗位进度",
+    roleStatus: "岗位状态",
     profile: "求职档案",
     jobDescription: "岗位 JD",
     matchingAnalysis: "匹配分析",
-    currentScore: "当前匹配度",
     updatedAt: "最近更新",
-    scoreStale: "结果已过期",
-    scoreUnavailable: "暂无有效结果",
     profileStatus: {
       missing: "未创建",
       incomplete: "待完善",

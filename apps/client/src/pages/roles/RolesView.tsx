@@ -36,6 +36,7 @@ import { RoleEditorDialog } from "./components/RoleEditorDialog"
 import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDialog"
 import { RolesHeader } from "./components/RolesHeader"
 import { RolesList } from "./components/RolesList"
+import { getRolesForCategory, type TargetRoleListCategory } from "./components/roles-list-utils"
 import {
   RolesEmptyState,
   RolesErrorState,
@@ -133,7 +134,11 @@ function RolesReadyView({
   const { t } = useTranslation()
   const defaultSelectedRoleId =
     initialSelectedRoleId ?? data.currentRoleId ?? data.roles[0]?.id ?? null
+  const initiallySelectedRole = data.roles.find((role) => role.id === defaultSelectedRoleId)
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(defaultSelectedRoleId)
+  const [roleCategory, setRoleCategory] = useState<TargetRoleListCategory>(
+    initiallySelectedRole?.preparationStatus === "archived" ? "archived" : "saved",
+  )
   const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
@@ -177,11 +182,18 @@ function RolesReadyView({
     }
   }
 
+  const visibleRoles = getRolesForCategory(data.roles, roleCategory)
   const selectedRole =
-    data.roles.find((role) => role.id === selectedRoleId) ??
-    data.roles.find((role) => role.id === data.currentRoleId) ??
-    data.roles[0] ??
+    visibleRoles.find((role) => role.id === selectedRoleId) ??
+    visibleRoles.find((role) => role.id === data.currentRoleId) ??
+    visibleRoles[0] ??
     null
+
+  function handleRoleCategoryChange(category: TargetRoleListCategory) {
+    const nextRoles = getRolesForCategory(data.roles, category)
+    setRoleCategory(category)
+    setSelectedRoleId(nextRoles[0]?.id ?? null)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -206,35 +218,35 @@ function RolesReadyView({
               <AlertDescription>{t(`roles.errors.${actionError}`)}</AlertDescription>
             </Alert>
           )}
-          {selectedRole ? (
-            <div className="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
-              <aside
-                className="hidden min-h-0 gap-4 lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-6.5rem)] lg:self-start lg:flex-col"
-                data-testid="roles-desktop-navigation"
-              >
-                <RolesList
-                  className="min-h-0 flex-1"
-                  onSelectRole={setSelectedRoleId}
-                  roles={data.roles}
-                  selectedRoleId={selectedRole.id}
-                />
-                <TargetRoleProgressSummary
-                  profileContext={data.profileContext}
-                  role={selectedRole}
-                />
-              </aside>
-              <section className="flex min-w-0 flex-col gap-4">
-                <MobileTargetRoleSelector
-                  onSelectRole={setSelectedRoleId}
-                  roles={data.roles}
-                  selectedRole={selectedRole}
-                />
+          <div className="grid items-start gap-6 lg:grid-cols-[23rem_minmax(0,1fr)]">
+            <aside
+              className="hidden min-h-0 gap-4 lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-6.5rem)] lg:self-start lg:flex-col"
+              data-testid="roles-desktop-navigation"
+            >
+              <RolesList
+                category={roleCategory}
+                className="shrink-0"
+                onCategoryChange={handleRoleCategoryChange}
+                onSelectRole={setSelectedRoleId}
+                roles={data.roles}
+                selectedRoleId={selectedRole?.id ?? null}
+              />
+              {selectedRole && <TargetRoleProgressSummary role={selectedRole} />}
+            </aside>
+            <section className="flex min-w-0 flex-col gap-4">
+              <MobileTargetRoleSelector
+                category={roleCategory}
+                onCategoryChange={handleRoleCategoryChange}
+                onSelectRole={setSelectedRoleId}
+                roles={data.roles}
+                selectedRole={selectedRole}
+              />
+              {selectedRole && (
                 <div className="lg:hidden">
-                  <TargetRoleProgressSummary
-                    profileContext={data.profileContext}
-                    role={selectedRole}
-                  />
+                  <TargetRoleProgressSummary role={selectedRole} />
                 </div>
+              )}
+              {selectedRole ? (
                 <RoleDetails
                   activeTab={activeTab}
                   actions={
@@ -324,11 +336,11 @@ function RolesReadyView({
                     selectedRole.id,
                   )}
                 />
-              </section>
-            </div>
-          ) : (
-            <RolesNoSelectionState />
-          )}
+              ) : (
+                <RolesNoSelectionState />
+              )}
+            </section>
+          </div>
         </>
       )}
 

@@ -19,7 +19,7 @@ export function RolesLoadingState() {
   return (
     <div
       aria-busy="true"
-      className="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]"
+      className="grid items-start gap-6 lg:grid-cols-[23rem_minmax(0,1fr)]"
       data-testid="roles-loading-state"
     >
       <Card data-testid="roles-list-loading-card">
@@ -27,7 +27,6 @@ export function RolesLoadingState() {
           <CardTitle>
             <h2>{t("roles.list.title")}</h2>
           </CardTitle>
-          <CardDescription>{t("roles.list.description")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {Array.from({ length: 3 }, (_, index) => (
