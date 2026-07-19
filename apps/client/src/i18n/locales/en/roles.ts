@@ -165,6 +165,30 @@ export const roles = {
     title: "Saved roles",
     description: "Selecting a role shows its details without changing the current default role.",
   },
+  mobileSelector: {
+    label: "Select a role to view",
+  },
+  tabs: {
+    label: "Role content",
+    overview: "Overview",
+    jobDescription: "Job description",
+    matchingAnalysis: "Match analysis",
+  },
+  summary: {
+    title: "Role progress",
+    profile: "Job profile",
+    jobDescription: "Job description",
+    matchingAnalysis: "Match analysis",
+    currentScore: "Current match",
+    updatedAt: "Last updated",
+    scoreStale: "Result out of date",
+    scoreUnavailable: "No current result",
+    profileStatus: {
+      missing: "Not created",
+      incomplete: "Incomplete",
+      complete: "Complete",
+    },
+  },
   details: {
     title: "Role details",
     description: "Review role information, JD parsing, and match-analysis status.",

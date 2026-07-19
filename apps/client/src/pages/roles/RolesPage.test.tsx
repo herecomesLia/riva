@@ -235,6 +235,7 @@ describe("RolesPage", () => {
 
     await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(ready))
+    await openJobDescriptionTab()
     expect(await screen.findByTestId("job-description-analysis")).toBeInTheDocument()
   })
 
@@ -249,6 +250,7 @@ describe("RolesPage", () => {
     const { queryClient } = renderRolesPage()
 
     await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    await openJobDescriptionTab()
     vi.useFakeTimers()
     await act(async () => firstStatus.resolve(parsingOne.roles[0]!))
     expect(queryClient.getQueryData(["roles"])).toEqual(parsingOne)
@@ -274,6 +276,7 @@ describe("RolesPage", () => {
     const { queryClient } = renderRolesPage()
 
     await waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(1))
+    await openJobDescriptionTab()
     vi.useFakeTimers()
     await act(async () => firstStatus.resolve(parsingOne.roles[0]!))
     await act(async () => vi.advanceTimersByTimeAsync(JOB_DESCRIPTION_POLL_INTERVAL_MS))
@@ -355,6 +358,7 @@ describe("RolesPage", () => {
       .mockResolvedValueOnce(ready.roles[0]!)
     const { queryClient } = renderRolesPage()
 
+    await openJobDescriptionTab()
     const retry = await screen.findByRole("button", {
       name: i18n.t("roles.jd.actions.resynchronize"),
     })
@@ -425,6 +429,7 @@ describe("RolesPage", () => {
     await submitJobDescription(user, "Lead React architecture and TypeScript delivery.")
 
     await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(ready))
+    await openJobDescriptionTab()
     expect(await screen.findByTestId("job-description-analysis")).toBeInTheDocument()
   })
 
@@ -452,6 +457,7 @@ describe("RolesPage", () => {
     vi.mocked(getJobDescriptionParsingStatus).mockResolvedValue(ready.roles[0]!)
     const { queryClient } = renderRolesPage()
 
+    await openJobDescriptionTab()
     await screen.findByTestId("job-description-card")
     await user.click(screen.getByRole("button", { name: i18n.t("roles.jd.actions.retry") }))
 
@@ -503,6 +509,7 @@ describe("RolesPage", () => {
     vi.mocked(getJobDescriptionParsingStatus).mockReturnValue(new Promise(() => undefined))
     const { queryClient } = renderRolesPage()
 
+    await openJobDescriptionTab()
     await user.click(
       await screen.findByRole("button", { name: i18n.t("roles.jd.actions.replace") }),
     )
@@ -514,8 +521,8 @@ describe("RolesPage", () => {
 
     await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(parsing))
     expect(
-      await screen.findByText(i18n.t("roles.matchingAnalysisStatus.stale.label")),
-    ).toBeInTheDocument()
+      await screen.findAllByText(i18n.t("roles.matchingAnalysisStatus.stale.label")),
+    ).not.toHaveLength(0)
   })
 
   it.each([
@@ -532,6 +539,7 @@ describe("RolesPage", () => {
 
     renderRolesPage()
 
+    await openMatchingAnalysisTab()
     const card = await screen.findByTestId("matching-analysis-card")
     expect(
       within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
@@ -547,6 +555,7 @@ describe("RolesPage", () => {
     vi.mocked(getMatchingAnalysisStatus).mockReturnValue(new Promise(() => undefined))
     const { queryClient } = renderRolesPage()
 
+    await openMatchingAnalysisTab()
     await user.click(
       await screen.findByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
     )
@@ -569,6 +578,7 @@ describe("RolesPage", () => {
     const { queryClient } = renderRolesPage()
 
     await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(current))
+    await openMatchingAnalysisTab()
     expect(await screen.findByTestId("matching-analysis-result")).toBeInTheDocument()
   })
 
@@ -634,6 +644,7 @@ describe("RolesPage", () => {
       profileVersion: 3,
       result: current.roles[0]!.matchingAnalysis!.result,
     })
+    await openMatchingAnalysisTab()
     expect(await screen.findByText(i18n.t("roles.matching.stale.title"))).toBeInTheDocument()
     expect(screen.getByTestId("matching-analysis-result")).toBeInTheDocument()
   })
@@ -690,6 +701,7 @@ describe("RolesPage", () => {
     const { queryClient } = renderRolesPage()
 
     await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(failed))
+    await openMatchingAnalysisTab()
     expect(
       await screen.findByText(failed.roles[0]!.matchingAnalysis!.failureReason!),
     ).toBeInTheDocument()
@@ -713,6 +725,7 @@ describe("RolesPage", () => {
       .mockResolvedValueOnce(current.roles[0]!)
     const { queryClient } = renderRolesPage()
 
+    await openMatchingAnalysisTab()
     const retry = await screen.findByRole("button", {
       name: i18n.t("roles.matching.actions.resynchronize"),
     })
@@ -776,6 +789,7 @@ describe("RolesPage", () => {
     vi.mocked(getMatchingAnalysisStatus).mockResolvedValue(current.roles[0]!)
     const { queryClient } = renderRolesPage()
 
+    await openMatchingAnalysisTab()
     await user.click(
       await screen.findByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
     )
@@ -795,6 +809,7 @@ describe("RolesPage", () => {
     vi.mocked(generateMatchingAnalysis).mockRejectedValue(new Error("raw analysis service failure"))
     const { queryClient } = renderRolesPage()
 
+    await openMatchingAnalysisTab()
     const regenerate = await screen.findByRole("button", {
       name: i18n.t("roles.matching.actions.regenerate"),
     })
@@ -819,6 +834,7 @@ describe("RolesPage", () => {
     vi.mocked(getMatchingAnalysisStatus).mockResolvedValue(current.roles[0]!)
     const { queryClient } = renderRolesPage()
 
+    await openMatchingAnalysisTab()
     await user.click(
       await screen.findByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
     )
@@ -832,11 +848,20 @@ describe("RolesPage", () => {
 })
 
 async function submitJobDescription(user: ReturnType<typeof userEvent.setup>, rawText: string) {
+  await openJobDescriptionTab()
   await screen.findByTestId("job-description-card")
   await user.click(screen.getByRole("button", { name: i18n.t("roles.jd.actions.add") }))
   const dialog = await screen.findByRole("dialog")
   await user.type(within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel")), rawText)
   await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.jd.editor.save") }))
+}
+
+async function openJobDescriptionTab() {
+  fireEvent.click(await screen.findByRole("tab", { name: i18n.t("roles.tabs.jobDescription") }))
+}
+
+async function openMatchingAnalysisTab() {
+  fireEvent.click(await screen.findByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }))
 }
 
 function createJobDescriptionFlowResponses() {

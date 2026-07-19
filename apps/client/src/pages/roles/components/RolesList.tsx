@@ -2,15 +2,18 @@ import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 import type { TargetRole } from "@/models/roles"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
 
 export function RolesList({
+  className,
   roles,
   selectedRoleId,
   onSelectRole,
 }: {
+  className?: string
   roles: TargetRole[]
   selectedRoleId: string | null
   onSelectRole: (roleId: string) => void
@@ -18,14 +21,14 @@ export function RolesList({
   const { t } = useTranslation()
 
   return (
-    <Card className="h-fit" data-testid="roles-list-card">
+    <Card className={cn("flex min-h-0 flex-col", className)} data-testid="roles-list-card">
       <CardHeader>
         <CardTitle>
           <h2>{t("roles.list.title")}</h2>
         </CardTitle>
         <CardDescription>{t("roles.list.description")}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="min-h-0 overflow-y-auto" data-testid="roles-list-scroll">
         <div aria-label={t("roles.list.title")} className="flex flex-col gap-2" role="list">
           {roles.map((role) => (
             <div key={role.id} role="listitem">

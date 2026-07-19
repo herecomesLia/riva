@@ -2,29 +2,16 @@ import { useState } from "react"
 
 import type { RolesPageResponse } from "@/models/roles"
 
-import { RolesView, type RolesViewActions } from "./RolesView"
+import { RolesView, type RolesViewActions } from "../RolesView"
 
-export type RolesStoryTransitions = Partial<{
-  [Key in keyof RolesViewActions]: (
-    input: Parameters<RolesViewActions[Key]>[0],
-    response: RolesPageResponse,
-  ) => Promise<RolesPageResponse>
-}>
-
-export function RolesStoryHarness({
+export function RoleManagementStoryHarness({
   actions: actionOverrides,
   initialData,
   initialSelectedRoleId,
-  jobDescriptionSynchronizationErrorRoleIds = [],
-  matchingAnalysisSynchronizationErrorRoleIds = [],
-  transitions = {},
 }: {
   actions: Partial<RolesViewActions>
   initialData: RolesPageResponse
   initialSelectedRoleId?: string
-  jobDescriptionSynchronizationErrorRoleIds?: string[]
-  matchingAnalysisSynchronizationErrorRoleIds?: string[]
-  transitions?: RolesStoryTransitions
 }) {
   const [data, setData] = useState(() => structuredClone(initialData))
 
@@ -33,19 +20,9 @@ export function RolesStoryHarness({
       const action = actionOverrides[key] as
         ((value: Parameters<RolesViewActions[Key]>[0]) => Promise<RolesPageResponse>) | undefined
       const response = action ? await action(input) : data
-      const independentResponse = structuredClone(response)
-      setData(independentResponse)
-      const transition = transitions[key] as
-        | ((
-            value: Parameters<RolesViewActions[Key]>[0],
-            valueResponse: RolesPageResponse,
-          ) => Promise<RolesPageResponse>)
-        | undefined
-      if (!transition) return independentResponse
-
-      const settledResponse = structuredClone(await transition(input, independentResponse))
-      setData(settledResponse)
-      return settledResponse
+      const nextData = structuredClone(response)
+      setData(nextData)
+      return nextData
     }) as RolesViewActions[Key]
   }
 
@@ -68,8 +45,6 @@ export function RolesStoryHarness({
       actions={actions}
       content={{ status: "ready", data }}
       initialSelectedRoleId={initialSelectedRoleId}
-      jobDescriptionSynchronizationErrorRoleIds={jobDescriptionSynchronizationErrorRoleIds}
-      matchingAnalysisSynchronizationErrorRoleIds={matchingAnalysisSynchronizationErrorRoleIds}
       variant="default"
     />
   )

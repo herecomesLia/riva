@@ -9,6 +9,7 @@ import type { RolesPageResponse } from "@/models/roles"
 import { renderWithProviders } from "@/test/render"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
+import type { TargetRoleTab } from "./components/RoleDetails"
 import { RolesActionError } from "./roles-errors"
 
 function createActions(
@@ -35,7 +36,9 @@ function renderReadyView(
   data: RolesPageResponse,
   options: {
     actions?: RolesViewActions
+    initialActiveTab?: TargetRoleTab
     initialSelectedRoleId?: string
+    jobDescriptionSynchronizationErrorRoleIds?: string[]
     matchingAnalysisSynchronizationErrorRoleIds?: string[]
   } = {},
 ) {
@@ -43,7 +46,9 @@ function renderReadyView(
     <RolesView
       actions={options.actions ?? createActions(data)}
       content={{ status: "ready", data }}
+      initialActiveTab={options.initialActiveTab}
       initialSelectedRoleId={options.initialSelectedRoleId}
+      jobDescriptionSynchronizationErrorRoleIds={options.jobDescriptionSynchronizationErrorRoleIds}
       matchingAnalysisSynchronizationErrorRoleIds={
         options.matchingAnalysisSynchronizationErrorRoleIds
       }
@@ -154,6 +159,119 @@ describe("RolesView", () => {
     expect(currentButton).toHaveAttribute("aria-pressed", "false")
     expect(setCurrentTargetRole).not.toHaveBeenCalled()
     expect(within(currentButton).getByText(i18n.t("roles.badges.current"))).toBeInTheDocument()
+  })
+
+  it("defaults to overview and keeps inactive tab content out of the document", async () => {
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    renderReadyView(data)
+
+    expect(await screen.findByTestId("target-role-overview")).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: i18n.t("roles.tabs.overview") })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+    expect(screen.queryByTestId("job-description-card")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("matching-analysis-card")).not.toBeInTheDocument()
+  })
+
+  it("switches between JD and matching-analysis tabs", async () => {
+    const user = userEvent.setup()
+    renderReadyView(createRolesMockResponse("matchingAnalysisCurrent"))
+
+    await user.click(await screen.findByRole("tab", { name: i18n.t("roles.tabs.jobDescription") }))
+    expect(screen.getByTestId("job-description-card")).toBeInTheDocument()
+    expect(screen.queryByTestId("target-role-overview")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }))
+    expect(screen.getByTestId("matching-analysis-card")).toBeInTheDocument()
+    expect(screen.queryByTestId("job-description-card")).not.toBeInTheDocument()
+  })
+
+  it("preserves the active tab and updates the progress summary when selection changes", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("multipleRoles")
+    const currentRole = data.roles.find((role) => role.isCurrent)!
+    const otherRole = data.roles.find((role) => !role.isCurrent)!
+    renderReadyView(data)
+
+    await user.click(await screen.findByRole("tab", { name: i18n.t("roles.tabs.jobDescription") }))
+    await user.click(screen.getByRole("button", { name: new RegExp(`^${otherRole.title}`) }))
+
+    expect(screen.getByRole("tab", { name: i18n.t("roles.tabs.jobDescription") })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+    expect(screen.getByTestId("job-description-card")).toHaveTextContent(
+      i18n.t(`roles.jobDescriptionStatus.${otherRole.jobDescription.status}.label`),
+    )
+    const desktopSummary = within(screen.getByTestId("roles-desktop-navigation")).getByTestId(
+      "target-role-progress-summary",
+    )
+    expect(desktopSummary).toHaveTextContent(otherRole.title)
+    expect(desktopSummary).not.toHaveTextContent(i18n.t("roles.badges.current"))
+    expect(
+      within(screen.getByRole("button", { name: new RegExp(`^${currentRole.title}`) })).getByText(
+        i18n.t("roles.badges.current"),
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("uses the mobile selector without changing the server current role", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("multipleRoles")
+    const currentRole = data.roles.find((role) => role.isCurrent)!
+    const otherRole = data.roles.find((role) => !role.isCurrent)!
+    const setCurrentTargetRole = vi.fn(async () => data)
+    renderReadyView(data, { actions: createActions(data, { setCurrentTargetRole }) })
+
+    await user.click(await screen.findByTestId("mobile-role-selector-trigger"))
+    await user.click(await screen.findByRole("option", { name: new RegExp(otherRole.title) }))
+
+    expect(screen.getByTestId("role-details-card")).toHaveTextContent(otherRole.title)
+    expect(setCurrentTargetRole).not.toHaveBeenCalled()
+    expect(
+      within(screen.getByRole("button", { name: new RegExp(`^${currentRole.title}`) })).getByText(
+        i18n.t("roles.badges.current"),
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("falls back to the current role after a selected role disappears and preserves the tab", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("multipleRoles")
+    const currentRole = data.roles.find((role) => role.isCurrent)!
+    const selectedRole = data.roles.find((role) => !role.isCurrent)!
+    const actions = createActions(data)
+    const view = renderReadyView(data, {
+      actions,
+      initialSelectedRoleId: selectedRole.id,
+    })
+    await user.click(
+      await screen.findByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }),
+    )
+
+    const nextData = structuredClone(data)
+    nextData.roles = nextData.roles.filter((role) => role.id !== selectedRole.id)
+    view.rerender(
+      <RolesView
+        actions={actions}
+        content={{ status: "ready", data: nextData }}
+        variant="default"
+      />,
+    )
+
+    expect(screen.getByTestId("role-details-card")).toHaveTextContent(currentRole.title)
+    expect(
+      screen.getByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }),
+    ).toHaveAttribute("aria-selected", "true")
+    expect(screen.getByTestId("matching-analysis-card")).toBeInTheDocument()
+  })
+
+  it("exposes the sticky navigation and its internally scrollable role list", async () => {
+    renderReadyView(createRolesMockResponse("multipleRoles"))
+
+    expect(await screen.findByTestId("roles-desktop-navigation")).toBeInTheDocument()
+    expect(screen.getByTestId("roles-list-scroll")).toBeInTheDocument()
   })
 
   it("validates required title, non-negative experience, and experience order", async () => {
@@ -334,7 +452,7 @@ describe("RolesView", () => {
   it("opens an empty paste form for a missing job description", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("singleRoleWithoutJobDescription")
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "job-description" })
 
     await user.click(await screen.findByRole("button", { name: i18n.t("roles.jd.actions.add") }))
     const dialog = await screen.findByRole("dialog")
@@ -345,7 +463,7 @@ describe("RolesView", () => {
 
   it("shows parsing without exposing structured results early", async () => {
     const data = createRolesMockResponse("roleWithJobDescriptionParsing")
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "job-description" })
 
     const card = await screen.findByTestId("job-description-card")
     expect(card).toHaveTextContent(i18n.t("roles.jobDescriptionStatus.parsing.label"))
@@ -353,10 +471,25 @@ describe("RolesView", () => {
     expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
   })
 
+  it("keeps a JD synchronization error accessible from the JD tab", async () => {
+    const data = createRolesMockResponse("roleWithJobDescriptionParsing")
+    const role = data.roles[0]!
+    renderReadyView(data, {
+      initialActiveTab: "job-description",
+      jobDescriptionSynchronizationErrorRoleIds: [role.id],
+    })
+
+    const card = await screen.findByTestId("job-description-card")
+    expect(card).toHaveTextContent(i18n.t("roles.jd.synchronization.title"))
+    expect(
+      within(card).getByRole("button", { name: i18n.t("roles.jd.actions.resynchronize") }),
+    ).toBeEnabled()
+  })
+
   it("shows the safe business failure and retry action", async () => {
     const data = createRolesMockResponse("roleWithJobDescriptionFailed")
     const role = data.roles[0]!
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "job-description" })
 
     const card = await screen.findByTestId("job-description-card")
     expect(card).toHaveTextContent(role.jobDescription.parsingFailureReason!)
@@ -377,6 +510,7 @@ describe("RolesView", () => {
     )
     renderReadyView(data, {
       actions: createActions(data, { retryJobDescriptionParsing }),
+      initialActiveTab: "job-description",
     })
 
     const retry = await screen.findByRole("button", { name: i18n.t("roles.jd.actions.retry") })
@@ -390,7 +524,7 @@ describe("RolesView", () => {
   it("renders every structured section for a ready job description", async () => {
     const data = createRolesMockResponse("roleWithParsedJobDescription")
     const analysis = data.roles[0]!.jobDescriptionAnalysis!
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "job-description" })
 
     const result = await screen.findByTestId("job-description-analysis")
     for (const key of [
@@ -418,7 +552,10 @@ describe("RolesView", () => {
     const saveJobDescription = vi.fn(async () => {
       throw new Error("unsafe transport failure")
     })
-    renderReadyView(data, { actions: createActions(data, { saveJobDescription }) })
+    renderReadyView(data, {
+      actions: createActions(data, { saveJobDescription }),
+      initialActiveTab: "job-description",
+    })
 
     await user.click(await screen.findByRole("button", { name: i18n.t("roles.jd.actions.add") }))
     const dialog = await screen.findByRole("dialog")
@@ -435,7 +572,7 @@ describe("RolesView", () => {
 
   it("links to profile creation when no job profile exists", async () => {
     const data = createRolesMockResponse("profileMissing")
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.missing.title"))
@@ -448,7 +585,7 @@ describe("RolesView", () => {
 
   it("links to profile completion when the job profile is incomplete", async () => {
     const data = createRolesMockResponse("profileIncomplete")
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.incomplete.title"))
@@ -465,7 +602,7 @@ describe("RolesView", () => {
     ["roleWithJobDescriptionFailed", "failed"],
   ] as const)("blocks analysis for %s with the %s JD guidance", async (scenario, status) => {
     const data = createRolesMockResponse(scenario)
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t(`roles.matching.prerequisites.jd.${status}.title`))
@@ -478,7 +615,7 @@ describe("RolesView", () => {
     const data = createRolesMockResponse("matchingAnalysisCurrent")
     const analysis = data.roles[0]!.matchingAnalysis
     if (analysis?.status !== "current") throw new Error("Expected a current analysis fixture.")
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const result = await screen.findByTestId("matching-analysis-result")
     expect(result).toHaveTextContent(`${analysis.result.overallMatchScore}%`)
@@ -493,7 +630,7 @@ describe("RolesView", () => {
     const data = createRolesMockResponse("matchingAnalysisStale")
     const analysis = data.roles[0]!.matchingAnalysis
     if (analysis?.status !== "stale") throw new Error("Expected a stale analysis fixture.")
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
@@ -514,7 +651,7 @@ describe("RolesView", () => {
       ...parsingRole,
       matchingAnalysis: structuredClone(analysis),
     }
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
@@ -532,7 +669,7 @@ describe("RolesView", () => {
       throw new Error("Expected stale analysis and existing profile fixtures.")
     }
     data.profileContext.completed = false
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
@@ -547,7 +684,7 @@ describe("RolesView", () => {
     const data = createRolesMockResponse("matchingAnalysisFailed")
     const analysis = data.roles[0]!.matchingAnalysis
     if (analysis?.status !== "failed") throw new Error("Expected a failed analysis fixture.")
-    renderReadyView(data)
+    renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(analysis.failureReason)
@@ -568,6 +705,7 @@ describe("RolesView", () => {
     )
     renderReadyView(data, {
       actions: createActions(data, { generateMatchingAnalysis }),
+      initialActiveTab: "matching-analysis",
     })
 
     const generate = await screen.findByRole("button", {
@@ -588,6 +726,7 @@ describe("RolesView", () => {
     const data = createRolesMockResponse("matchingAnalysisGenerating")
     const role = data.roles[0]!
     renderReadyView(data, {
+      initialActiveTab: "matching-analysis",
       matchingAnalysisSynchronizationErrorRoleIds: [role.id],
     })
 

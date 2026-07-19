@@ -157,6 +157,30 @@ export const roles = {
     title: "已保存岗位",
     description: "选择岗位可查看详情，不会改变当前默认岗位。",
   },
+  mobileSelector: {
+    label: "选择要查看的岗位",
+  },
+  tabs: {
+    label: "岗位内容",
+    overview: "岗位概览",
+    jobDescription: "岗位 JD",
+    matchingAnalysis: "匹配分析",
+  },
+  summary: {
+    title: "岗位进度",
+    profile: "求职档案",
+    jobDescription: "岗位 JD",
+    matchingAnalysis: "匹配分析",
+    currentScore: "当前匹配度",
+    updatedAt: "最近更新",
+    scoreStale: "结果已过期",
+    scoreUnavailable: "暂无有效结果",
+    profileStatus: {
+      missing: "未创建",
+      incomplete: "待完善",
+      complete: "已完善",
+    },
+  },
   details: {
     title: "岗位详情",
     description: "查看岗位基础信息、JD 解析和匹配分析状态。",

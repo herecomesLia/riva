@@ -30,7 +30,8 @@ import type {
 } from "@/models/roles"
 import type { Loadable } from "@/types"
 
-import { RoleDetails } from "./components/RoleDetails"
+import { MobileTargetRoleSelector } from "./components/MobileTargetRoleSelector"
+import { RoleDetails, type TargetRoleTab } from "./components/RoleDetails"
 import { RoleEditorDialog } from "./components/RoleEditorDialog"
 import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDialog"
 import { RolesHeader } from "./components/RolesHeader"
@@ -41,6 +42,7 @@ import {
   RolesLoadingState,
   RolesNoSelectionState,
 } from "./components/RolesPageStates"
+import { TargetRoleProgressSummary } from "./components/TargetRoleProgressSummary"
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "./roles-errors"
 
 export type RolesViewActions = {
@@ -72,6 +74,7 @@ export type RolesViewProps =
       variant: "default"
       content: Loadable<RolesPageResponse>
       actions?: RolesViewActions
+      initialActiveTab?: TargetRoleTab
       initialSelectedRoleId?: string
       jobDescriptionSynchronizationErrorRoleIds?: string[]
       matchingAnalysisSynchronizationErrorRoleIds?: string[]
@@ -98,6 +101,7 @@ export function RolesView(props: RolesViewProps) {
         <RolesReadyView
           actions={props.actions}
           data={props.content.data}
+          initialActiveTab={props.initialActiveTab}
           initialSelectedRoleId={props.initialSelectedRoleId}
           jobDescriptionSynchronizationErrorRoleIds={
             props.jobDescriptionSynchronizationErrorRoleIds ?? []
@@ -114,12 +118,14 @@ export function RolesView(props: RolesViewProps) {
 function RolesReadyView({
   actions,
   data,
+  initialActiveTab,
   initialSelectedRoleId,
   jobDescriptionSynchronizationErrorRoleIds,
   matchingAnalysisSynchronizationErrorRoleIds,
 }: {
   actions?: RolesViewActions
   data: RolesPageResponse
+  initialActiveTab?: TargetRoleTab
   initialSelectedRoleId?: string
   jobDescriptionSynchronizationErrorRoleIds: string[]
   matchingAnalysisSynchronizationErrorRoleIds: string[]
@@ -128,6 +134,7 @@ function RolesReadyView({
   const defaultSelectedRoleId =
     initialSelectedRoleId ?? data.currentRoleId ?? data.roles[0]?.id ?? null
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(defaultSelectedRoleId)
+  const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
@@ -199,104 +206,129 @@ function RolesReadyView({
               <AlertDescription>{t(`roles.errors.${actionError}`)}</AlertDescription>
             </Alert>
           )}
-          <div className="grid gap-4 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,2fr)]">
-            <RolesList
-              onSelectRole={setSelectedRoleId}
-              roles={data.roles}
-              selectedRoleId={selectedRole?.id ?? null}
-            />
-            {selectedRole ? (
-              <RoleDetails
-                actions={
-                  actions
-                    ? {
-                        archive: () => setConfirmation("archive"),
-                        delete: () => setConfirmation("delete"),
-                        edit: () => setEditorMode("edit"),
-                        editJobDescription: () => setIsJobDescriptionEditorOpen(true),
-                        generateMatchingAnalysis: () => {
-                          if (
-                            !data.profileContext.exists ||
-                            !data.profileContext.completed ||
-                            selectedRole.jobDescription.status !== "ready" ||
-                            selectedRole.matchingAnalysis?.status === "generating" ||
-                            selectedRole.matchingAnalysis?.status === "current"
-                          ) {
-                            return
-                          }
-                          void runAction(() =>
-                            actions.generateMatchingAnalysis({
-                              roleId: selectedRole.id,
-                              version: selectedRole.version,
-                            }),
-                          )
-                        },
-                        retryJobDescriptionParsing: () => {
-                          if (selectedRole.jobDescription.status !== "failed") return
-                          const jobDescriptionVersion = selectedRole.jobDescription.version
-                          void runAction(() =>
-                            actions.retryJobDescriptionParsing({
-                              roleId: selectedRole.id,
-                              version: selectedRole.version,
-                              jobDescriptionVersion,
-                            }),
-                          )
-                        },
-                        retryJobDescriptionSynchronization: () => {
-                          if (selectedRole.jobDescription.status !== "parsing") return
-                          const jobDescriptionVersion = selectedRole.jobDescription.version
-                          void runAction(() =>
-                            actions.retryJobDescriptionSynchronization({
-                              roleId: selectedRole.id,
-                              version: selectedRole.version,
-                              jobDescriptionVersion,
-                            }),
-                          )
-                        },
-                        retryMatchingAnalysisSynchronization: () => {
-                          if (selectedRole.matchingAnalysis?.status !== "generating") return
-                          void runAction(() =>
-                            actions.retryMatchingAnalysisSynchronization({
-                              roleId: selectedRole.id,
-                              version: selectedRole.version,
-                            }),
-                          )
-                        },
-                        setCurrent: () =>
-                          void runAction(() =>
-                            actions.setCurrentTargetRole({
-                              roleId: selectedRole.id,
-                              version: selectedRole.version,
-                            }),
-                          ),
-                        togglePreparationStatus: () =>
-                          void runAction(() =>
-                            actions.updateRolePreparationStatus({
-                              roleId: selectedRole.id,
-                              version: selectedRole.version,
-                              preparationStatus:
-                                selectedRole.preparationStatus === "preparing"
-                                  ? "paused"
-                                  : "preparing",
-                            }),
-                          ),
-                      }
-                    : undefined
-                }
-                pending={pendingAction}
-                profileContext={data.profileContext}
-                role={selectedRole}
-                jobDescriptionSynchronizationError={jobDescriptionSynchronizationErrorRoleIds.includes(
-                  selectedRole.id,
-                )}
-                matchingAnalysisSynchronizationError={matchingAnalysisSynchronizationErrorRoleIds.includes(
-                  selectedRole.id,
-                )}
-              />
-            ) : (
-              <RolesNoSelectionState />
-            )}
-          </div>
+          {selectedRole ? (
+            <div className="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
+              <aside
+                className="hidden min-h-0 gap-4 lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-6.5rem)] lg:self-start lg:flex-col"
+                data-testid="roles-desktop-navigation"
+              >
+                <RolesList
+                  className="min-h-0 flex-1"
+                  onSelectRole={setSelectedRoleId}
+                  roles={data.roles}
+                  selectedRoleId={selectedRole.id}
+                />
+                <TargetRoleProgressSummary
+                  profileContext={data.profileContext}
+                  role={selectedRole}
+                />
+              </aside>
+              <section className="flex min-w-0 flex-col gap-4">
+                <MobileTargetRoleSelector
+                  onSelectRole={setSelectedRoleId}
+                  roles={data.roles}
+                  selectedRole={selectedRole}
+                />
+                <div className="lg:hidden">
+                  <TargetRoleProgressSummary
+                    profileContext={data.profileContext}
+                    role={selectedRole}
+                  />
+                </div>
+                <RoleDetails
+                  activeTab={activeTab}
+                  actions={
+                    actions
+                      ? {
+                          archive: () => setConfirmation("archive"),
+                          delete: () => setConfirmation("delete"),
+                          edit: () => setEditorMode("edit"),
+                          editJobDescription: () => setIsJobDescriptionEditorOpen(true),
+                          generateMatchingAnalysis: () => {
+                            if (
+                              !data.profileContext.exists ||
+                              !data.profileContext.completed ||
+                              selectedRole.jobDescription.status !== "ready" ||
+                              selectedRole.matchingAnalysis?.status === "generating" ||
+                              selectedRole.matchingAnalysis?.status === "current"
+                            ) {
+                              return
+                            }
+                            void runAction(() =>
+                              actions.generateMatchingAnalysis({
+                                roleId: selectedRole.id,
+                                version: selectedRole.version,
+                              }),
+                            )
+                          },
+                          retryJobDescriptionParsing: () => {
+                            if (selectedRole.jobDescription.status !== "failed") return
+                            const jobDescriptionVersion = selectedRole.jobDescription.version
+                            void runAction(() =>
+                              actions.retryJobDescriptionParsing({
+                                roleId: selectedRole.id,
+                                version: selectedRole.version,
+                                jobDescriptionVersion,
+                              }),
+                            )
+                          },
+                          retryJobDescriptionSynchronization: () => {
+                            if (selectedRole.jobDescription.status !== "parsing") return
+                            const jobDescriptionVersion = selectedRole.jobDescription.version
+                            void runAction(() =>
+                              actions.retryJobDescriptionSynchronization({
+                                roleId: selectedRole.id,
+                                version: selectedRole.version,
+                                jobDescriptionVersion,
+                              }),
+                            )
+                          },
+                          retryMatchingAnalysisSynchronization: () => {
+                            if (selectedRole.matchingAnalysis?.status !== "generating") return
+                            void runAction(() =>
+                              actions.retryMatchingAnalysisSynchronization({
+                                roleId: selectedRole.id,
+                                version: selectedRole.version,
+                              }),
+                            )
+                          },
+                          setCurrent: () =>
+                            void runAction(() =>
+                              actions.setCurrentTargetRole({
+                                roleId: selectedRole.id,
+                                version: selectedRole.version,
+                              }),
+                            ),
+                          togglePreparationStatus: () =>
+                            void runAction(() =>
+                              actions.updateRolePreparationStatus({
+                                roleId: selectedRole.id,
+                                version: selectedRole.version,
+                                preparationStatus:
+                                  selectedRole.preparationStatus === "preparing"
+                                    ? "paused"
+                                    : "preparing",
+                              }),
+                            ),
+                        }
+                      : undefined
+                  }
+                  onTabChange={setActiveTab}
+                  pending={pendingAction}
+                  profileContext={data.profileContext}
+                  role={selectedRole}
+                  jobDescriptionSynchronizationError={jobDescriptionSynchronizationErrorRoleIds.includes(
+                    selectedRole.id,
+                  )}
+                  matchingAnalysisSynchronizationError={matchingAnalysisSynchronizationErrorRoleIds.includes(
+                    selectedRole.id,
+                  )}
+                />
+              </section>
+            </div>
+          ) : (
+            <RolesNoSelectionState />
+          )}
         </>
       )}
 
