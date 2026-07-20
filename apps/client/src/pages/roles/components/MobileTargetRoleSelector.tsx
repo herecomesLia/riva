@@ -16,12 +16,14 @@ import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-u
 
 export function MobileTargetRoleSelector({
   category,
+  currentRoleId,
   onCategoryChange,
   onSelectRole,
   roles,
   selectedRole,
 }: {
   category: TargetRoleListCategory
+  currentRoleId: string | null
   onCategoryChange: (category: TargetRoleListCategory) => void
   onSelectRole: (roleId: string) => void
   roles: TargetRole[]
@@ -76,7 +78,7 @@ export function MobileTargetRoleSelector({
                 <SelectItem key={role.id} value={role.id}>
                   <span className="flex min-w-0 flex-col items-start gap-1.5 py-1">
                     <span className="max-w-56 truncate font-medium">{role.title}</span>
-                    <RoleStatusBadges role={role} />
+                    <RoleStatusBadges isCurrent={role.id === currentRoleId} role={role} />
                   </span>
                 </SelectItem>
               ))}

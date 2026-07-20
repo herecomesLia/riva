@@ -19,7 +19,7 @@ function useRandomBlink() {
 
   useEffect(() => {
     let cancelled = false
-    let timeoutId: ReturnType<typeof window.setTimeout> | undefined
+    let timeoutId: number | undefined
 
     function scheduleNextBlink() {
       timeoutId = window.setTimeout(
@@ -89,7 +89,7 @@ function usePasswordPeek(enabled: boolean) {
     }
 
     let cancelled = false
-    let timeoutId: ReturnType<typeof window.setTimeout> | undefined
+    let timeoutId: number | undefined
 
     function schedulePeek() {
       const delay = Math.random() * 3000 + 2000

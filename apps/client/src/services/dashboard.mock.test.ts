@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { resetRolesMockState } from "@/mocks/services/roles"
 import { getDashboardData } from "@/services/dashboard"
 import type { TargetRoleExperienceRange } from "@/models/roles"
-import {
-  getRolesPage,
-  resetRolesMockState,
-  setCurrentTargetRole,
-  updateTargetRole,
-} from "@/services/roles"
+import { getRolesPage, setCurrentTargetRole, updateTargetRole } from "@/services/roles"
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -94,7 +90,7 @@ describe("getDashboardData mock service", () => {
   it("reflects a target-role current switch on the next dashboard request", async () => {
     resetRolesMockState("multipleRoles")
     const roles = await settle(getRolesPage())
-    const nextRole = roles.roles.find((role) => !role.isCurrent)!
+    const nextRole = roles.roles.find((role) => role.id !== roles.currentRoleId)!
 
     await settle(setCurrentTargetRole({ roleId: nextRole.id, version: nextRole.version }))
     const dashboard = await settle(getDashboardData())
@@ -131,14 +127,17 @@ describe("getDashboardData mock service", () => {
     })
   })
 
-  it("returns no current-role summary when the roles domain has no current role", async () => {
-    resetRolesMockState("noRoles")
+  it.each(["noRoles", "rolesWithoutCurrent"] as const)(
+    "returns no current-role summary for the %s scenario",
+    async (scenario) => {
+      resetRolesMockState(scenario)
 
-    await expect(settle(getDashboardData())).resolves.toMatchObject({
-      currentRole: null,
-      metrics: { roleFit: { currentValue: null, previousValue: null } },
-    })
-  })
+      await expect(settle(getDashboardData())).resolves.toMatchObject({
+        currentRole: null,
+        metrics: { roleFit: { currentValue: null, previousValue: null } },
+      })
+    },
+  )
 
   it.each([
     "matchingAnalysisGenerating",

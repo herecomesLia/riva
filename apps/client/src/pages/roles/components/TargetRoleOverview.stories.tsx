@@ -36,15 +36,15 @@ const archivedRole = createRoleStoryResponse("archivedRoles").roles.find(
 )!
 
 export const CompleteRole = meta.story({
-  args: { actions: createActions(), role: readyRole },
+  args: { actions: createActions(), isCurrent: true, role: readyRole },
 })
 
 export const Paused = meta.story({
-  args: { actions: createActions(), role: pausedRole },
+  args: { actions: createActions(), isCurrent: false, role: pausedRole },
 })
 
 export const Archived = meta.story({
-  args: { actions: createActions(), role: archivedRole },
+  args: { actions: createActions(), isCurrent: false, role: archivedRole },
 })
 
 const setCurrent = fn()
@@ -53,6 +53,7 @@ const togglePreparationStatus = fn()
 export const NonCurrentActions = meta.story({
   args: {
     actions: createActions({ setCurrent, togglePreparationStatus }),
+    isCurrent: false,
     role: pausedRole,
   },
   play: async ({ userEvent }) => {
@@ -64,7 +65,7 @@ export const NonCurrentActions = meta.story({
 })
 
 export const Pending = meta.story({
-  args: { actions: createActions(), pending: true, role: readyRole },
+  args: { actions: createActions(), isCurrent: true, pending: true, role: readyRole },
   play: async () => {
     const actions = within(screen.getByTestId("role-actions"))
     for (const button of actions.getAllByRole("button")) {

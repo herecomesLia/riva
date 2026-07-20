@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { profileResponseMock } from "@/mocks/data/profile"
+import { resetProfileMockState } from "@/mocks/services/profile"
 import {
   createManualJobProfile,
   getJobProfile,
@@ -8,7 +9,6 @@ import {
   getResumeUpdateStatus,
   regenerateMatchingAnalysis,
   resetInitialResumeImport,
-  resetProfileMockState,
   saveProfileSection,
   startInitialResumeRecognition,
   startUpdatedResumeRecognition,

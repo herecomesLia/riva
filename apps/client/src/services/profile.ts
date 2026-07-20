@@ -13,10 +13,6 @@ function realApiUnavailable(): never {
   throw new Error("Real job profile API is not implemented.")
 }
 
-export function resetProfileMockState() {
-  profileMockService.resetProfileMockState()
-}
-
 export function getJobProfile(): Promise<JobProfileSnapshot> {
   return env.mock ? profileMockService.getJobProfile() : realApiUnavailable()
 }

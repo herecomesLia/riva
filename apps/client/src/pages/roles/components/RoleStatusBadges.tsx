@@ -4,12 +4,12 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { TargetRole } from "@/models/roles"
 
-export function RoleStatusBadges({ role }: { role: TargetRole }) {
+export function RoleStatusBadges({ isCurrent, role }: { isCurrent: boolean; role: TargetRole }) {
   const { t } = useTranslation()
 
   return (
     <div className="flex flex-wrap gap-1.5" data-testid="role-status-badges">
-      {role.isCurrent && (
+      {isCurrent && (
         <Badge className="bg-primary text-primary-foreground" data-role-status="current">
           {t("roles.badges.current")}
         </Badge>

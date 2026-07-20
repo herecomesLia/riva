@@ -1,4 +1,8 @@
 import { createRolesMockResponse, type RolesMockScenario } from "@/mocks/data/roles"
+import {
+  createJobDescriptionAnalysisFixture,
+  createMatchingAnalysisResultFixture,
+} from "@/mocks/data/role-fixture-builders"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   ArchiveTargetRoleInput,
@@ -9,7 +13,6 @@ import type {
   GetMatchingAnalysisStatusInput,
   JobDescriptionAnalysis,
   MatchingAnalysis,
-  MatchingAnalysisResult,
   ReadyTargetRole,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
@@ -69,40 +72,6 @@ function nextRoleVersion(role: TargetRole) {
   return { updatedAt: nextTimestamp(), version: role.version + 1 }
 }
 
-function createJobDescriptionAnalysis(jobDescriptionVersion: number): JobDescriptionAnalysis {
-  return {
-    jobDescriptionVersion,
-    analysisVersion: 1,
-    parsedAt: nextTimestamp(),
-    rivaSummary: "负责可扩展前端架构与复杂业务交付，重点要求 React、TypeScript 和跨团队协作能力。",
-    responsibilities: [
-      "负责商家运营产品的前端架构与交付。",
-      "与产品、设计和后端团队协作，推进复杂业务流程。",
-    ],
-    qualificationRequirements: {
-      education: ["本科及以上"],
-      graduationCohorts: [],
-      majors: ["计算机或相关专业"],
-      experience: ["五年以上前端工程经验"],
-      languages: [],
-      certifications: [],
-      other: [],
-    },
-    requiredSkills: {
-      programmingLanguages: ["TypeScript"],
-      frameworksAndLibraries: ["React"],
-      platforms: [],
-      tools: [],
-      conceptsAndMethods: ["前端架构", "性能优化"],
-      databasesAndMiddleware: [],
-      other: [],
-    },
-    preferredQualifications: ["有实验平台建设经验", "熟悉无障碍设计"],
-    softSkills: ["技术领导力", "跨团队沟通"],
-    businessDomains: ["商家运营", "电商平台"],
-  }
-}
-
 function createRivaSummary(analysis: JobDescriptionAnalysis) {
   const skills = [
     ...analysis.requiredSkills.programmingLanguages,
@@ -128,32 +97,6 @@ function createRivaSummary(analysis: JobDescriptionAnalysis) {
   ]
     .filter(Boolean)
     .join("；")
-}
-
-function createMatchingAnalysisResult(): MatchingAnalysisResult {
-  return {
-    overallMatchScore: 78,
-    coreRequirementsSummary:
-      "Lead complex React product delivery with strong engineering judgment and measurable impact.",
-    matchedCapabilities: ["React architecture", "TypeScript", "Design systems"],
-    missingCapabilities: ["Large-scale experimentation"],
-    underrepresentedCapabilities: ["Cross-functional technical leadership"],
-    resumeHighlights: [
-      "Led the merchant operations console from architecture through delivery.",
-      "Improved Core Web Vitals pass rate from 71% to 94%.",
-    ],
-    resumeGaps: [
-      "Describe experimentation design and decision-making with more concrete examples.",
-    ],
-    highRiskQuestions: [
-      "How did you align partner teams when frontend architecture decisions affected delivery scope?",
-      "Which experiment metrics did you use to decide whether a product change should ship?",
-    ],
-    preparationRecommendations: [
-      "Prepare a STAR narrative about balancing delivery speed and frontend quality.",
-      "Quantify the impact of technical leadership across partner teams.",
-    ],
-  }
 }
 
 function markMatchingAnalysisStale(matchingAnalysis: MatchingAnalysis | null) {
@@ -194,17 +137,11 @@ function isReadyTargetRole(role: TargetRole): role is ReadyTargetRole {
   return role.jobDescription.status === "ready" && role.jobDescriptionAnalysis !== null
 }
 
-function pickCurrentFallback(roles: TargetRole[]) {
-  return roles.find((role) => role.preparationStatus === "preparing") ?? null
-}
-
-function updateCurrentRole(roles: TargetRole[], currentRoleId: string | null) {
-  const changedAt = nextTimestamp()
-  return roles.map((role) => {
-    const isCurrent = role.id === currentRoleId
-    if (role.isCurrent === isCurrent) return role
-    return { ...role, isCurrent, updatedAt: changedAt, version: role.version + 1 }
-  })
+function resolveFallbackCurrentRoleId(roles: TargetRole[], excludedRoleId?: string) {
+  return (
+    roles.find((role) => role.id !== excludedRoleId && role.preparationStatus === "preparing")
+      ?.id ?? null
+  )
 }
 
 function completeJobDescriptionParsing(role: TargetRole): TargetRole {
@@ -230,7 +167,10 @@ function completeJobDescriptionParsing(role: TargetRole): TargetRole {
     ...role,
     ...versionUpdate,
     jobDescription: { ...role.jobDescription, status: "ready" },
-    jobDescriptionAnalysis: createJobDescriptionAnalysis(jobDescriptionVersion),
+    jobDescriptionAnalysis: createJobDescriptionAnalysisFixture({
+      jobDescriptionVersion,
+      parsedAt: nextTimestamp(),
+    }),
   } as ReadyTargetRole
 }
 
@@ -262,7 +202,7 @@ function completeMatchingAnalysis(role: TargetRole): TargetRole {
       ...matchingAnalysis,
       status: "current",
       generatedAt: nextTimestamp(),
-      result: createMatchingAnalysisResult(),
+      result: createMatchingAnalysisResultFixture(),
     },
   }
 }
@@ -276,7 +216,7 @@ export async function createTargetRole(input: CreateTargetRoleInput): Promise<Ro
   await waitForMockDelay()
   const createdAt = nextTimestamp()
   createdRoleCount += 1
-  const isCurrent = mockResponse.currentRoleId === null
+  const becomesCurrent = mockResponse.roles.length === 0
   const role: TargetRole = {
     id: `role_created_${createdRoleCount}`,
     title: input.title,
@@ -285,7 +225,6 @@ export async function createTargetRole(input: CreateTargetRoleInput): Promise<Ro
     location: input.location,
     experienceRange: input.experienceRange,
     preparationStatus: input.preparationStatus,
-    isCurrent,
     createdAt,
     updatedAt: createdAt,
     version: 1,
@@ -301,7 +240,7 @@ export async function createTargetRole(input: CreateTargetRoleInput): Promise<Ro
   return setMockResponse({
     ...mockResponse,
     roles: [...mockResponse.roles, role],
-    currentRoleId: isCurrent ? role.id : mockResponse.currentRoleId,
+    currentRoleId: becomesCurrent ? role.id : mockResponse.currentRoleId,
   })
 }
 
@@ -334,7 +273,6 @@ export async function setCurrentTargetRole(
   return setMockResponse({
     ...mockResponse,
     currentRoleId: role.id,
-    roles: updateCurrentRole(mockResponse.roles, role.id),
   })
 }
 
@@ -361,18 +299,16 @@ export async function archiveTargetRole(input: ArchiveTargetRoleInput): Promise<
     ...role,
     ...nextRoleVersion(role),
     preparationStatus: "archived",
-    isCurrent: false,
   }
   const rolesAfterArchive = mockResponse.roles.map((candidate) =>
     candidate.id === role.id ? archivedRole : candidate,
   )
-  const fallback = role.isCurrent ? pickCurrentFallback(rolesAfterArchive) : null
-  const currentRoleId = role.isCurrent ? (fallback?.id ?? null) : mockResponse.currentRoleId
-  const roles = role.isCurrent
-    ? updateCurrentRole(rolesAfterArchive, currentRoleId)
-    : rolesAfterArchive
+  const wasCurrent = mockResponse.currentRoleId === role.id
+  const currentRoleId = wasCurrent
+    ? resolveFallbackCurrentRoleId(rolesAfterArchive, role.id)
+    : mockResponse.currentRoleId
 
-  return setMockResponse({ ...mockResponse, currentRoleId, roles })
+  return setMockResponse({ ...mockResponse, currentRoleId, roles: rolesAfterArchive })
 }
 
 export async function deleteTargetRole(input: DeleteTargetRoleInput): Promise<RolesPageResponse> {
@@ -381,11 +317,12 @@ export async function deleteTargetRole(input: DeleteTargetRoleInput): Promise<Ro
   requireCurrentVersion(role, input.version)
 
   const remainingRoles = mockResponse.roles.filter((candidate) => candidate.id !== role.id)
-  const fallback = role.isCurrent ? pickCurrentFallback(remainingRoles) : null
-  const currentRoleId = role.isCurrent ? (fallback?.id ?? null) : mockResponse.currentRoleId
-  const roles = role.isCurrent ? updateCurrentRole(remainingRoles, currentRoleId) : remainingRoles
+  const wasCurrent = mockResponse.currentRoleId === role.id
+  const currentRoleId = wasCurrent
+    ? resolveFallbackCurrentRoleId(remainingRoles, role.id)
+    : mockResponse.currentRoleId
 
-  return setMockResponse({ ...mockResponse, currentRoleId, roles })
+  return setMockResponse({ ...mockResponse, currentRoleId, roles: remainingRoles })
 }
 
 export async function saveJobDescription(

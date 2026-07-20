@@ -151,8 +151,6 @@ type TargetRoleBase = {
   experienceRange: TargetRoleExperienceRange | null
   /** Whether the user is actively preparing for this saved role. */
   preparationStatus: TargetRolePreparationStatus
-  /** Whether this role is the default context for Dashboard and training. */
-  isCurrent: boolean
   createdAt: string
   updatedAt: string
   /** Increments for every persisted target-role mutation. */
@@ -207,7 +205,11 @@ export type ProfileContext = MissingProfileContext | ExistingProfileContext
 
 export type RolesPageResponse = {
   roles: TargetRole[]
-  /** Must identify the single role where `isCurrent` is true, when one exists. */
+  /**
+   * The default role used by Dashboard and training, or `null` when no default exists.
+   * A non-null ID must identify an unarchived role in `roles`. The current role may be
+   * either preparing or paused.
+   */
   currentRoleId: string | null
   profileContext: ProfileContext
 }

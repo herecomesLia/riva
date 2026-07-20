@@ -235,16 +235,23 @@ function RolesReadyView({
               <RolesList
                 category={roleCategory}
                 className="shrink-0"
+                currentRoleId={data.currentRoleId}
                 onCategoryChange={handleRoleCategoryChange}
                 onSelectRole={setSelectedRoleId}
                 roles={data.roles}
                 selectedRoleId={selectedRole?.id ?? null}
               />
-              {selectedRole && <TargetRoleProgressSummary role={selectedRole} />}
+              {selectedRole && (
+                <TargetRoleProgressSummary
+                  isCurrent={selectedRole.id === data.currentRoleId}
+                  role={selectedRole}
+                />
+              )}
             </aside>
             <section className="flex min-w-0 flex-col gap-4">
               <MobileTargetRoleSelector
                 category={roleCategory}
+                currentRoleId={data.currentRoleId}
                 onCategoryChange={handleRoleCategoryChange}
                 onSelectRole={setSelectedRoleId}
                 roles={data.roles}
@@ -252,7 +259,10 @@ function RolesReadyView({
               />
               {selectedRole && (
                 <div className="lg:hidden">
-                  <TargetRoleProgressSummary role={selectedRole} />
+                  <TargetRoleProgressSummary
+                    isCurrent={selectedRole.id === data.currentRoleId}
+                    role={selectedRole}
+                  />
                 </div>
               )}
               {selectedRole ? (
@@ -336,6 +346,7 @@ function RolesReadyView({
                         }
                       : undefined
                   }
+                  currentRoleId={data.currentRoleId}
                   onTabChange={setActiveTab}
                   pending={pendingAction}
                   profileContext={data.profileContext}

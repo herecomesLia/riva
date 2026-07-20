@@ -21,10 +21,12 @@ import type { RoleDetailsActions } from "./RoleDetails"
 
 export function TargetRoleOverview({
   actions,
+  isCurrent,
   pending,
   role,
 }: {
   actions?: RoleDetailsActions
+  isCurrent: boolean
   pending?: boolean
   role: TargetRole
 }) {
@@ -54,7 +56,7 @@ export function TargetRoleOverview({
               <PencilIcon className="size-4" data-icon="inline-start" />
               {t("roles.actions.edit")}
             </Button>
-            {!role.isCurrent && role.preparationStatus !== "archived" && (
+            {!isCurrent && role.preparationStatus !== "archived" && (
               <Button disabled={pending} onClick={actions.setCurrent} size="sm" variant="outline">
                 <StarIcon data-icon="inline-start" />
                 {t("roles.actions.setCurrent")}

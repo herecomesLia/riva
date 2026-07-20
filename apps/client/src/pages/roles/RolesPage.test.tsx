@@ -165,15 +165,12 @@ describe("RolesPage", () => {
     expect(queryClient.getQueryData(["roles"])).toEqual(created)
   })
 
-  it("keeps exactly one current role after setting a different current role", async () => {
+  it("stores only the returned current role ID after setting a different current role", async () => {
     const user = userEvent.setup()
     const initial = createRolesMockResponse("multipleRoles")
     const next = structuredClone(initial)
-    const nextCurrent = next.roles.find((role) => !role.isCurrent)!
+    const nextCurrent = next.roles.find((role) => role.id !== next.currentRoleId)!
     next.currentRoleId = nextCurrent.id
-    next.roles.forEach((role) => {
-      role.isCurrent = role.id === nextCurrent.id
-    })
     vi.mocked(getRolesPage).mockResolvedValue(initial)
     vi.mocked(setCurrentTargetRole).mockResolvedValue(next)
     const { queryClient } = renderRolesPage()
@@ -185,20 +182,19 @@ describe("RolesPage", () => {
 
     await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(next))
     const cached = queryClient.getQueryData<ReturnType<typeof createRolesMockResponse>>(["roles"])!
-    expect(cached.roles.filter((role) => role.isCurrent)).toHaveLength(1)
     expect(cached.currentRoleId).toBe(nextCurrent.id)
+    expect(cached.roles.every((role) => !("isCurrent" in role))).toBe(true)
   })
 
   it("uses the service fallback after deleting the current role", async () => {
     const user = userEvent.setup()
     const initial = createRolesMockResponse("multipleRoles")
-    const current = initial.roles.find((role) => role.isCurrent)!
-    const fallback = initial.roles.find((role) => !role.isCurrent)!
+    const current = initial.roles.find((role) => role.id === initial.currentRoleId)!
+    const fallback = initial.roles.find((role) => role.id !== initial.currentRoleId)!
     fallback.preparationStatus = "preparing"
     const response = structuredClone(initial)
     response.roles = response.roles.filter((role) => role.id !== current.id)
     response.currentRoleId = fallback.id
-    response.roles[0]!.isCurrent = true
     vi.mocked(getRolesPage).mockResolvedValue(initial)
     vi.mocked(deleteTargetRole).mockResolvedValue(response)
     const { queryClient } = renderRolesPage()
@@ -217,7 +213,7 @@ describe("RolesPage", () => {
   it("preserves cached data when a mutation fails", async () => {
     const user = userEvent.setup()
     const initial = createRolesMockResponse("multipleRoles")
-    const otherRole = initial.roles.find((role) => !role.isCurrent)!
+    const otherRole = initial.roles.find((role) => role.id !== initial.currentRoleId)!
     vi.mocked(getRolesPage).mockResolvedValue(initial)
     vi.mocked(setCurrentTargetRole).mockRejectedValue(new Error("unsafe internal failure"))
     const { queryClient } = renderRolesPage()

@@ -28,6 +28,7 @@ export type RoleDetailsActions = {
 export function RoleDetails({
   actions,
   activeTab,
+  currentRoleId,
   onTabChange,
   pending,
   profileContext,
@@ -37,6 +38,7 @@ export function RoleDetails({
 }: {
   actions?: RoleDetailsActions
   activeTab: TargetRoleTab
+  currentRoleId: string | null
   jobDescriptionSynchronizationError?: boolean
   matchingAnalysisSynchronizationError?: boolean
   onTabChange: (tab: TargetRoleTab) => void
@@ -45,6 +47,7 @@ export function RoleDetails({
   role: TargetRole
 }) {
   const { t } = useTranslation()
+  const isCurrent = role.id === currentRoleId
 
   return (
     <Card
@@ -59,7 +62,7 @@ export function RoleDetails({
             </CardTitle>
             <CardDescription>{role.company ?? t("roles.fallbackValue")}</CardDescription>
           </div>
-          <RoleStatusBadges role={role} />
+          <RoleStatusBadges isCurrent={isCurrent} role={role} />
         </div>
       </CardHeader>
 
@@ -97,7 +100,12 @@ export function RoleDetails({
 
           <TabsContent value="overview">
             {activeTab === "overview" && (
-              <TargetRoleOverview actions={actions} pending={pending} role={role} />
+              <TargetRoleOverview
+                actions={actions}
+                isCurrent={isCurrent}
+                pending={pending}
+                role={role}
+              />
             )}
           </TabsContent>
           <TabsContent value="job-description">

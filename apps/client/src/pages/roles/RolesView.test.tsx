@@ -139,7 +139,7 @@ describe("RolesView", () => {
 
   it("shows match-score rings only for current or stale analyses and greys archived score indicators", async () => {
     const data = createRolesMockResponse("archivedRoles")
-    const currentRole = data.roles.find((role) => role.isCurrent)!
+    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
     const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
     archivedRole.matchingAnalysis = structuredClone(currentRole.matchingAnalysis)
     renderReadyView(data, { initialSelectedRoleId: archivedRole.id })
@@ -196,8 +196,8 @@ describe("RolesView", () => {
 
   it("keeps selected role separate from the server current role", async () => {
     const data = createRolesMockResponse("multipleRoles")
-    const currentRole = data.roles.find((role) => role.isCurrent)!
-    const selectedRole = data.roles.find((role) => !role.isCurrent)!
+    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
+    const selectedRole = data.roles.find((role) => role.id !== data.currentRoleId)!
     renderReadyView(data, { initialSelectedRoleId: selectedRole.id })
 
     const currentButton = await screen.findByRole("button", {
@@ -236,8 +236,8 @@ describe("RolesView", () => {
     const user = userEvent.setup()
     const setCurrentTargetRole = vi.fn(async () => data)
     const data = createRolesMockResponse("multipleRoles")
-    const currentRole = data.roles.find((role) => role.isCurrent)!
-    const otherRole = data.roles.find((role) => !role.isCurrent)!
+    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
+    const otherRole = data.roles.find((role) => role.id !== data.currentRoleId)!
     renderReadyView(data, { actions: createActions(data, { setCurrentTargetRole }) })
 
     const currentButton = await screen.findByRole("button", {
@@ -298,8 +298,8 @@ describe("RolesView", () => {
   it("preserves the active tab and updates the progress summary when selection changes", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("multipleRoles")
-    const currentRole = data.roles.find((role) => role.isCurrent)!
-    const otherRole = data.roles.find((role) => !role.isCurrent)!
+    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
+    const otherRole = data.roles.find((role) => role.id !== data.currentRoleId)!
     renderReadyView(data)
 
     await user.click(await screen.findByRole("tab", { name: i18n.t("roles.tabs.jobDescription") }))
@@ -341,8 +341,8 @@ describe("RolesView", () => {
   it("uses the mobile selector without changing the server current role", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("multipleRoles")
-    const currentRole = data.roles.find((role) => role.isCurrent)!
-    const otherRole = data.roles.find((role) => !role.isCurrent)!
+    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
+    const otherRole = data.roles.find((role) => role.id !== data.currentRoleId)!
     const setCurrentTargetRole = vi.fn(async () => data)
     renderReadyView(data, { actions: createActions(data, { setCurrentTargetRole }) })
 
@@ -379,8 +379,8 @@ describe("RolesView", () => {
   it("falls back to the current role after a selected role disappears and preserves the tab", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("multipleRoles")
-    const currentRole = data.roles.find((role) => role.isCurrent)!
-    const selectedRole = data.roles.find((role) => !role.isCurrent)!
+    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
+    const selectedRole = data.roles.find((role) => role.id !== data.currentRoleId)!
     const actions = createActions(data)
     const view = renderReadyView(data, {
       actions,
@@ -422,8 +422,8 @@ describe("RolesView", () => {
 
   it("uses a stable one-pixel role-card border and a non-shrinking match-score ring", async () => {
     const data = createRolesMockResponse("multipleRoles")
-    const currentRole = data.roles.find((role) => role.isCurrent)!
-    const otherRole = data.roles.find((role) => !role.isCurrent)!
+    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
+    const otherRole = data.roles.find((role) => role.id !== data.currentRoleId)!
     renderReadyView(data)
 
     const roleButton = await screen.findByRole("button", {
@@ -479,7 +479,7 @@ describe("RolesView", () => {
   it("chooses independent current and preparation actions with the selected role version", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("multipleRoles")
-    const selectedRole = data.roles.find((role) => !role.isCurrent)!
+    const selectedRole = data.roles.find((role) => role.id !== data.currentRoleId)!
     const actions = createActions(data)
     renderReadyView(data, { actions, initialSelectedRoleId: selectedRole.id })
 
@@ -1130,11 +1130,7 @@ describe("RolesView", () => {
   })
 
   it("shows an explicit notice when no server current role exists", async () => {
-    const data = createRolesMockResponse("multipleRoles")
-    data.currentRoleId = null
-    data.roles.forEach((role) => {
-      role.isCurrent = false
-    })
+    const data = createRolesMockResponse("rolesWithoutCurrent")
 
     renderReadyView(data)
 

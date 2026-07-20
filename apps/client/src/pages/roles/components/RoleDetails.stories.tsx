@@ -17,6 +17,7 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTa
   return (
     <RoleDetails
       activeTab={activeTab}
+      currentRoleId={response.currentRoleId}
       onTabChange={setActiveTab}
       profileContext={response.profileContext}
       role={response.roles[0]!}
@@ -31,6 +32,7 @@ function ArchivedDetailsHarness() {
   return (
     <RoleDetails
       activeTab={activeTab}
+      currentRoleId={response.currentRoleId}
       onTabChange={setActiveTab}
       profileContext={response.profileContext}
       role={archivedRole}

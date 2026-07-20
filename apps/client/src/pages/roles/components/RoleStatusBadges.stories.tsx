@@ -11,15 +11,22 @@ const meta = preview.meta({
 const multipleRoles = createRoleStoryResponse("multipleRoles")
 
 export const CurrentPreparing = meta.story({
-  args: { role: multipleRoles.roles.find((role) => role.isCurrent)! },
+  args: {
+    isCurrent: true,
+    role: multipleRoles.roles.find((role) => role.id === multipleRoles.currentRoleId)!,
+  },
 })
 
 export const Paused = meta.story({
-  args: { role: multipleRoles.roles.find((role) => role.preparationStatus === "paused")! },
+  args: {
+    isCurrent: false,
+    role: multipleRoles.roles.find((role) => role.preparationStatus === "paused")!,
+  },
 })
 
 export const Archived = meta.story({
   args: {
+    isCurrent: false,
     role: createRoleStoryResponse("archivedRoles").roles.find(
       (role) => role.preparationStatus === "archived",
     )!,

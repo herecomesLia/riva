@@ -7,6 +7,10 @@ import { playwright } from "@vitest/browser-playwright"
 import { defineConfig } from "vitest/config"
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
+const chromiumExecutablePath = process.env.CHROMIUM_BIN
+const storybookBrowserProvider = playwright(
+  chromiumExecutablePath ? { launchOptions: { executablePath: chromiumExecutablePath } } : {},
+)
 
 export default defineConfig({
   define: {
@@ -86,7 +90,7 @@ export default defineConfig({
             enabled: true,
             headless: true,
             instances: [{ browser: "chromium" }],
-            provider: playwright({}),
+            provider: storybookBrowserProvider,
           },
         },
       },

@@ -1,6 +1,5 @@
 import { env } from "@/app/env"
 import * as rolesMockService from "@/mocks/services/roles"
-import type { RolesMockScenario } from "@/mocks/data/roles"
 import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
@@ -20,10 +19,6 @@ import type {
 
 function realApiUnavailable(): never {
   throw new Error("Real target role API is not implemented.")
-}
-
-export function resetRolesMockState(scenario?: RolesMockScenario) {
-  rolesMockService.resetRolesMockState(scenario)
 }
 
 export function getRolesPage(): Promise<RolesPageResponse> {

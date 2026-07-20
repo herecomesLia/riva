@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
-import type { JobProfileSnapshot } from "@/models/profile"
+import type { JobProfileSnapshot, ResumeUploadInput } from "@/models/profile"
 import {
   createManualJobProfile,
   getJobProfile,
@@ -104,7 +104,7 @@ export function ProfilePage() {
     },
   })
   const uploadInitialMutation = useMutation({
-    mutationFn: async (input) => {
+    mutationFn: async (input: ResumeUploadInput) => {
       setSynchronizationError(null)
       const snapshot = setSnapshot(await uploadInitialResume(input))
       const profile = snapshot.profile
@@ -113,7 +113,7 @@ export function ProfilePage() {
     },
   })
   const uploadUpdatedMutation = useMutation({
-    mutationFn: async (input) => {
+    mutationFn: async (input: ResumeUploadInput) => {
       setSynchronizationError(null)
       const snapshot = setSnapshot(await uploadUpdatedResume(input))
       const profile = snapshot.profile

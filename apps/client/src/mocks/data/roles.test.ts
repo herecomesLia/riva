@@ -5,6 +5,10 @@ import {
   rolesResponseMock,
   type RolesMockScenario,
 } from "@/mocks/data/roles"
+import {
+  createJobDescriptionAnalysisFixture,
+  createMatchingAnalysisResultFixture,
+} from "@/mocks/data/role-fixture-builders"
 import type { RolesPageResponse, TargetRole } from "@/models/roles"
 
 const scenarios: RolesMockScenario[] = [
@@ -109,17 +113,18 @@ function expectConsistentMatchingAnalysis(response: RolesPageResponse, role: Tar
 }
 
 function expectConsistentRolesResponse(response: RolesPageResponse) {
-  const currentRoles = response.roles.filter((role) => role.isCurrent)
-
   if (response.profileContext.exists) {
     expect(response.profileContext.version).toBeTypeOf("number")
   } else {
     expect(response.profileContext).toEqual({ exists: false, version: null, completed: false })
   }
 
-  expect(currentRoles).toHaveLength(response.currentRoleId ? 1 : 0)
-  expect(currentRoles[0]?.id ?? null).toBe(response.currentRoleId)
   if (response.roles.length === 0) expect(response.currentRoleId).toBeNull()
+  if (response.currentRoleId !== null) {
+    const currentRole = response.roles.find((role) => role.id === response.currentRoleId)
+    expect(currentRole).toBeDefined()
+    expect(currentRole?.preparationStatus).not.toBe("archived")
+  }
 
   for (const role of response.roles) {
     expect(role.id).toMatch(/^role_/)
@@ -127,7 +132,7 @@ function expectConsistentRolesResponse(response: RolesPageResponse) {
     expect(role.updatedAt).toMatch(/^2026-\d{2}-\d{2}T/)
     expect(Number.isNaN(Date.parse(role.createdAt))).toBe(false)
     expect(Number.isNaN(Date.parse(role.updatedAt))).toBe(false)
-    expect(role.preparationStatus === "archived" && role.isCurrent).toBe(false)
+    expect("isCurrent" in role).toBe(false)
 
     expectConsistentJobDescription(role)
     expectConsistentMatchingAnalysis(response, role)
@@ -157,7 +162,35 @@ describe("roles mock scenarios", () => {
     expect(activeRoles.length).toBeGreaterThan(0)
     expect(activeRoles.every((role) => role.preparationStatus === "paused")).toBe(true)
     expect(response.currentRoleId).toBeNull()
-    expect(response.roles.some((role) => role.isCurrent)).toBe(false)
+  })
+
+  it("returns independent mutable data from the shared fixture builders", () => {
+    const firstAnalysis = createJobDescriptionAnalysisFixture({
+      jobDescriptionVersion: 4,
+      parsedAt: "2026-07-14T08:45:00.000Z",
+    })
+    const secondAnalysis = createJobDescriptionAnalysisFixture({
+      jobDescriptionVersion: 4,
+      parsedAt: "2026-07-14T08:45:00.000Z",
+    })
+    const firstResult = createMatchingAnalysisResultFixture()
+    const secondResult = createMatchingAnalysisResultFixture()
+
+    expect(firstAnalysis).not.toBe(secondAnalysis)
+    expect(firstAnalysis.responsibilities).not.toBe(secondAnalysis.responsibilities)
+    expect(firstAnalysis.requiredSkills.programmingLanguages).not.toBe(
+      secondAnalysis.requiredSkills.programmingLanguages,
+    )
+    expect(firstResult).not.toBe(secondResult)
+    expect(firstResult.highRiskQuestions).not.toBe(secondResult.highRiskQuestions)
+
+    firstAnalysis.responsibilities[0] = "Mutated responsibility"
+    firstAnalysis.requiredSkills.programmingLanguages[0] = "Mutated language"
+    firstResult.highRiskQuestions[0] = "Mutated question"
+
+    expect(secondAnalysis.responsibilities[0]).not.toBe("Mutated responsibility")
+    expect(secondAnalysis.requiredSkills.programmingLanguages[0]).not.toBe("Mutated language")
+    expect(secondResult.highRiskQuestions[0]).not.toBe("Mutated question")
   })
 
   it("returns an independent deep copy for each scenario request", () => {

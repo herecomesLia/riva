@@ -4,7 +4,13 @@ import { useTranslation } from "react-i18next"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { TargetRole } from "@/models/roles"
 
-export function TargetRoleProgressSummary({ role }: { role: TargetRole }) {
+export function TargetRoleProgressSummary({
+  isCurrent,
+  role,
+}: {
+  isCurrent: boolean
+  role: TargetRole
+}) {
   const { i18n, t } = useTranslation()
   const matchingStatus = role.matchingAnalysis?.status ?? "none"
   const updatedAt = new Intl.DateTimeFormat(i18n.language, {
@@ -25,7 +31,7 @@ export function TargetRoleProgressSummary({ role }: { role: TargetRole }) {
           <SummaryRow
             label={t("roles.summary.roleStatus")}
             value={
-              role.isCurrent
+              isCurrent
                 ? `${t("roles.badges.current")} · ${t(
                     `roles.preparationStatus.${role.preparationStatus}`,
                   )}`

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   archiveTargetRole,
   createTargetRole,
@@ -8,7 +9,6 @@ import {
   getJobDescriptionParsingStatus,
   getMatchingAnalysisStatus,
   getRolesPage,
-  resetRolesMockState,
   saveJobDescription,
   setCurrentTargetRole,
   startJobDescriptionParsing,
@@ -61,7 +61,7 @@ function pollMatchingAnalysis(role: TargetRole) {
 
 async function getCurrentRole() {
   const response = await settle(getRolesPage())
-  const role = response.roles.find((candidate) => candidate.isCurrent)
+  const role = response.roles.find((candidate) => candidate.id === response.currentRoleId)
   if (!role) throw new Error("The mock response does not have a current role.")
   return role
 }
@@ -83,7 +83,8 @@ describe("roles stateful mock service", () => {
 
     expect(response.currentRoleId).toBe("role_created_1")
     expect(response.roles).toHaveLength(1)
-    expect(response.roles[0]).toMatchObject({ isCurrent: true, version: 1 })
+    expect(response.roles[0]).toMatchObject({ version: 1 })
+    expect(response.roles[0]).not.toHaveProperty("isCurrent")
   })
 
   it("keeps the existing current role when creating additional roles", async () => {
@@ -92,8 +93,18 @@ describe("roles stateful mock service", () => {
     const second = await settle(createTargetRole({ ...newRole, title: "Frontend Engineer" }))
 
     expect(second.currentRoleId).toBe(first.currentRoleId)
-    expect(second.roles.filter((role) => role.isCurrent)).toHaveLength(1)
+    expect(second.roles.every((role) => !("isCurrent" in role))).toBe(true)
     expect(second.roles).toHaveLength(2)
+  })
+
+  it("does not invent a current role when adding to an existing no-current collection", async () => {
+    resetRolesMockState("rolesWithoutCurrent")
+
+    const response = await settle(createTargetRole(newRole))
+
+    expect(response.roles).toHaveLength(3)
+    expect(response.currentRoleId).toBeNull()
+    expect(response.roles.every((role) => !("isCurrent" in role))).toBe(true)
   })
 
   it("pauses and resumes preparation without changing the current role", async () => {
@@ -112,7 +123,6 @@ describe("roles stateful mock service", () => {
     expect(paused.profileContext).toBeDefined()
     expect(pausedRole).toMatchObject({
       preparationStatus: "paused",
-      isCurrent: true,
       version: initial.version + 1,
     })
 
@@ -128,7 +138,6 @@ describe("roles stateful mock service", () => {
     expect(resumed.currentRoleId).toBe(initial.id)
     expect(resumedRole).toMatchObject({
       preparationStatus: "preparing",
-      isCurrent: true,
       version: pausedRole.version + 1,
     })
   })
@@ -145,8 +154,11 @@ describe("roles stateful mock service", () => {
     )
 
     expect(switched.currentRoleId).toBe(secondRole.id)
-    expect(switched.roles.find((role) => role.id === firstRole.id)!.isCurrent).toBe(false)
-    expect(switched.roles.find((role) => role.id === secondRole.id)!.isCurrent).toBe(true)
+    expect(switched.roles).toEqual(second.roles)
+    expect(switched.roles.find((role) => role.id === firstRole.id)?.version).toBe(firstRole.version)
+    expect(switched.roles.find((role) => role.id === secondRole.id)?.version).toBe(
+      secondRole.version,
+    )
   })
 
   it("archives the current role and promotes a preparing fallback", async () => {
@@ -162,7 +174,6 @@ describe("roles stateful mock service", () => {
 
     expect(archived.currentRoleId).toBe(secondRole.id)
     expect(archived.roles.find((role) => role.id === firstRole.id)).toMatchObject({
-      isCurrent: false,
       preparationStatus: "archived",
     })
   })
@@ -179,7 +190,7 @@ describe("roles stateful mock service", () => {
     expect(remainingRoles.length).toBeGreaterThan(0)
     expect(remainingRoles.every((role) => role.preparationStatus === "paused")).toBe(true)
     expect(archived.currentRoleId).toBeNull()
-    expect(archived.roles.some((role) => role.isCurrent)).toBe(false)
+    expect(archived.roles.every((role) => !("isCurrent" in role))).toBe(true)
   })
 
   it("rejects setting an archived role as current without partial writes", async () => {
@@ -224,7 +235,7 @@ describe("roles stateful mock service", () => {
     expect(deleted.roles.length).toBeGreaterThan(0)
     expect(deleted.roles.every((role) => role.preparationStatus === "paused")).toBe(true)
     expect(deleted.currentRoleId).toBeNull()
-    expect(deleted.roles.some((role) => role.isCurrent)).toBe(false)
+    expect(deleted.roles.every((role) => !("isCurrent" in role))).toBe(true)
   })
 
   it("clears current role state when deleting the only role", async () => {
@@ -235,7 +246,6 @@ describe("roles stateful mock service", () => {
 
     expect(deleted.roles).toEqual([])
     expect(deleted.currentRoleId).toBeNull()
-    expect(deleted.roles.some((candidate) => candidate.isCurrent)).toBe(false)
   })
 
   it("returns independent role snapshots without exposing internal mock state", async () => {

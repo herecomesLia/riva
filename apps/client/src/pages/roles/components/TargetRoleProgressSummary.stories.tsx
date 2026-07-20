@@ -10,7 +10,8 @@ const meta = preview.meta({
 
 function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   const response = createRoleStoryResponse(scenario)
-  return { role: response.roles[0]! }
+  const role = response.roles[0]!
+  return { isCurrent: role.id === response.currentRoleId, role }
 }
 
 export const ParsedJobDescription = meta.story({
@@ -32,6 +33,7 @@ const archivedResponse = createRoleStoryResponse("archivedRoles")
 
 export const ArchivedRole = meta.story({
   args: {
+    isCurrent: false,
     role: archivedResponse.roles.find((role) => role.preparationStatus === "archived")!,
   },
 })

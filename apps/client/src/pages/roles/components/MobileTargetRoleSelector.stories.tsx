@@ -13,9 +13,11 @@ const meta = preview.meta({
 })
 
 function SelectorHarness({
+  currentRoleId,
   roles,
   selectedRoleId,
 }: {
+  currentRoleId: string | null
   roles: ReturnType<typeof createRoleStoryResponse>["roles"]
   selectedRoleId: string
 }) {
@@ -35,6 +37,7 @@ function SelectorHarness({
   return (
     <MobileTargetRoleSelector
       category={category}
+      currentRoleId={currentRoleId}
       onCategoryChange={(nextCategory) => {
         setCategory(nextCategory)
         setSelectedId(
@@ -53,12 +56,13 @@ function SelectorHarness({
 }
 
 const multipleRoles = createRoleStoryResponse("multipleRoles")
-const currentRole = multipleRoles.roles.find((role) => role.isCurrent)!
-const nonCurrentRole = multipleRoles.roles.find((role) => !role.isCurrent)!
+const currentRole = multipleRoles.roles.find((role) => role.id === multipleRoles.currentRoleId)!
+const nonCurrentRole = multipleRoles.roles.find((role) => role.id !== multipleRoles.currentRoleId)!
 
 export const SingleRole = meta.story({
   args: {
     category: "saved",
+    currentRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription").currentRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: createRoleStoryResponse("singleRoleWithoutJobDescription").roles,
@@ -67,7 +71,13 @@ export const SingleRole = meta.story({
 })
 
 export const CurrentAndSelectedDifferent = meta.story({
-  render: () => <SelectorHarness roles={multipleRoles.roles} selectedRoleId={nonCurrentRole.id} />,
+  render: () => (
+    <SelectorHarness
+      currentRoleId={multipleRoles.currentRoleId}
+      roles={multipleRoles.roles}
+      selectedRoleId={nonCurrentRole.id}
+    />
+  ),
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByTestId("mobile-role-selector-trigger"))
     await userEvent.click(
@@ -83,13 +93,25 @@ export const ArchivedSelected = meta.story({
   render: () => {
     const response = createRoleStoryResponse("archivedRoles")
     const archived = response.roles.find((role) => role.preparationStatus === "archived")!
-    return <SelectorHarness roles={response.roles} selectedRoleId={archived.id} />
+    return (
+      <SelectorHarness
+        currentRoleId={response.currentRoleId}
+        roles={response.roles}
+        selectedRoleId={archived.id}
+      />
+    )
   },
 })
 
 export const ManyRoles = meta.story({
   render: () => {
     const response = createManyRolesResponse()
-    return <SelectorHarness roles={response.roles} selectedRoleId={response.currentRoleId!} />
+    return (
+      <SelectorHarness
+        currentRoleId={response.currentRoleId}
+        roles={response.roles}
+        selectedRoleId={response.currentRoleId!}
+      />
+    )
   },
 })

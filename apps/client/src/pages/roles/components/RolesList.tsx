@@ -11,6 +11,7 @@ import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-u
 export function RolesList({
   category,
   className,
+  currentRoleId,
   onCategoryChange,
   roles,
   selectedRoleId,
@@ -18,6 +19,7 @@ export function RolesList({
 }: {
   category: TargetRoleListCategory
   className?: string
+  currentRoleId: string | null
   onCategoryChange: (category: TargetRoleListCategory) => void
   roles: TargetRole[]
   selectedRoleId: string | null
@@ -73,6 +75,7 @@ export function RolesList({
           {visibleRoles.map((role) => (
             <div key={role.id} role="listitem">
               <RoleListItem
+                isCurrent={role.id === currentRoleId}
                 onSelectRole={onSelectRole}
                 role={role}
                 selected={selectedRoleId === role.id}
@@ -91,10 +94,12 @@ export function RolesList({
 }
 
 function RoleListItem({
+  isCurrent,
   onSelectRole,
   role,
   selected,
 }: {
+  isCurrent: boolean
   onSelectRole: (roleId: string) => void
   role: TargetRole
   selected: boolean
@@ -126,7 +131,7 @@ function RoleListItem({
           <span className="w-full truncate text-xs text-muted-foreground">
             {role.company ?? t("roles.fallbackValue")}
           </span>
-          <RoleStatusBadges role={role} />
+          <RoleStatusBadges isCurrent={isCurrent} role={role} />
         </span>
         {score !== null && <RoleMatchScoreRing archived={isArchived} score={score} />}
       </span>

@@ -31,7 +31,6 @@ export function createManyRolesResponse() {
       id: `role-many-${String(index + 3).padStart(2, "0")}`,
       title,
       company: index % 2 === 0 ? "Northstar Labs" : "Harbor Cloud",
-      isCurrent: false,
       createdAt: `2026-07-${String(index + 1).padStart(2, "0")}T08:00:00.000Z`,
       updatedAt: `2026-07-${String(index + 1).padStart(2, "0")}T09:00:00.000Z`,
     })),
