@@ -318,12 +318,12 @@ function AnalysisSection({
         {onEdit && field && (
           <Button
             aria-label={t("roles.jd.actions.editModuleLabel", { module: title })}
-            className="h-6 border-primary px-2 text-sm text-primary hover:bg-primary/10 hover:text-primary"
+            className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
             onClick={() => onEdit(field)}
             size="xs"
             variant="outline"
           >
-            <PencilIcon className="size-4" data-icon="inline-start" />
+            <PencilIcon data-icon="inline-start" />
             {t("roles.jd.actions.editModule")}
           </Button>
         )}
