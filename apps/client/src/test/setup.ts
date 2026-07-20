@@ -46,7 +46,20 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   value: ResizeObserver,
 })
 
-const matchMediaMock = vi.fn()
+function createMatchMediaResult(query: string) {
+  return {
+    addEventListener: vi.fn(),
+    addListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+    matches: false,
+    media: query,
+    onchange: null,
+    removeEventListener: vi.fn(),
+    removeListener: vi.fn(),
+  }
+}
+
+const matchMediaMock = vi.fn(createMatchMediaResult)
 const scrollToMock = vi.fn()
 
 Object.defineProperty(window, "matchMedia", {
@@ -61,16 +74,7 @@ Object.defineProperty(window, "scrollTo", {
 
 function resetBrowserMocks() {
   matchMediaMock.mockReset()
-  matchMediaMock.mockImplementation((query: string) => ({
-    addEventListener: vi.fn(),
-    addListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-    matches: false,
-    media: query,
-    onchange: null,
-    removeEventListener: vi.fn(),
-    removeListener: vi.fn(),
-  }))
+  matchMediaMock.mockImplementation(createMatchMediaResult)
   scrollToMock.mockReset()
 }
 

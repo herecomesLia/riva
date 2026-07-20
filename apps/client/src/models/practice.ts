@@ -205,3 +205,10 @@ export type PracticePageResponse = {
   setupContext: PracticeSetupContext
   session: PracticeSessionState
 }
+
+export type StartPracticeSessionInput = ActivePracticeSelection
+
+export type GetQuestionGenerationStatusInput = {
+  sessionId: string
+  version: number
+}
