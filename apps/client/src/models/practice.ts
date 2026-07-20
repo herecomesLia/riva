@@ -13,10 +13,15 @@ export type PracticeSetupSelection = {
   prioritizeWeaknesses: boolean
 }
 
+export type ActivePracticeSelection = Omit<PracticeSetupSelection, "targetRoleId"> & {
+  targetRoleId: string
+}
+
 export type PracticeTargetRoleOption = {
   id: string
   title: string
   company: string | null
+  supportedQuestionTypes: PracticeQuestionType[]
 }
 
 export type PracticeSetupContext = {
@@ -35,11 +40,25 @@ export type PracticeQuestionCard = {
   difficulty: PracticeDifficulty
   assessedCapabilities: string[]
   recommendedMaterials: string[]
-  answerHints: string[]
-  answerFramework: string[] | null
+  answerHints: PracticeGuidance<string[]>
+  answerFramework: PracticeGuidance<string[]>
   isSaved: boolean
   isMarkedWeak: boolean
 }
+
+export type PracticeGuidance<T> =
+  | {
+      status: "notRequested"
+      content: null
+    }
+  | {
+      status: "revealed"
+      content: T
+    }
+  | {
+      status: "unavailable"
+      content: null
+    }
 
 export type PracticeAnswer = {
   id: string
@@ -116,13 +135,14 @@ export type PracticeReview = {
   improvementSuggestions: string[]
   reusableAnswerStructure: string[]
   exposedWeaknesses: string[]
-  shouldRetry: boolean
   recommendation: PracticeRecommendation
 }
 
 type PracticeActiveSessionBase = {
   sessionId: string
-  selection: PracticeSetupSelection
+  /** Positive integer incremented by persisted session state changes. */
+  version: number
+  selection: ActivePracticeSelection
   startedAt: string
 }
 

@@ -1,4 +1,5 @@
 import type {
+  ActivePracticeSelection,
   AnsweredPracticeFollowUpExchange,
   PracticeAnswer,
   PracticeDimensionScore,
@@ -8,7 +9,6 @@ import type {
   PracticeQuestionCard,
   PracticeReview,
   PracticeSetupContext,
-  PracticeSetupSelection,
 } from "@/models/practice"
 
 const targetRoles = [
@@ -16,11 +16,24 @@ const targetRoles = [
     id: "role_frontend_bytedance",
     title: "Senior Frontend Engineer",
     company: "ByteDance",
+    supportedQuestionTypes: [
+      "projectDeepDive",
+      "behavioral",
+      "businessUnderstanding",
+      "motivation",
+      "technicalFoundation",
+    ],
   },
   {
     id: "role_product_manager_meituan",
     title: "Product Manager",
     company: "Meituan",
+    supportedQuestionTypes: [
+      "projectDeepDive",
+      "behavioral",
+      "businessUnderstanding",
+      "motivation",
+    ],
   },
 ] satisfies PracticeSetupContext["targetRoles"]
 
@@ -38,11 +51,12 @@ const defaultSelection = {
   questionType: "projectDeepDive",
   difficulty: "basic",
   source: "personalized",
-  prioritizeWeaknesses: true,
-} satisfies PracticeSetupSelection
+  prioritizeWeaknesses: false,
+} satisfies ActivePracticeSelection
 
 const activeSession = {
   sessionId: "practice_session_20260720_01",
+  version: 1,
   selection: defaultSelection,
   startedAt: "2026-07-20T01:30:00.000Z",
 } as const
@@ -54,8 +68,14 @@ const question = {
   difficulty: "basic",
   assessedCapabilities: ["问题分析", "技术决策", "跨团队协作", "结果量化"],
   recommendedMaterials: ["全球电商结算页性能优化项目", "性能监控平台建设经历"],
-  answerHints: ["明确优化前的业务或体验问题", "说明你个人负责的关键决策", "用数据对比优化前后结果"],
-  answerFramework: ["背景与目标", "定位过程", "个人行动", "量化结果与复盘"],
+  answerHints: {
+    status: "notRequested",
+    content: null,
+  },
+  answerFramework: {
+    status: "notRequested",
+    content: null,
+  },
   isSaved: false,
   isMarkedWeak: true,
 } satisfies PracticeQuestionCard
@@ -159,7 +179,6 @@ const retryReview = {
     "补充风险控制和复盘",
   ],
   exposedWeaknesses: ["个人影响力表达", "风险控制"],
-  shouldRetry: true,
   recommendation: {
     action: "retryCurrent",
     reason: "补齐推动过程和风险控制后重答，能让这段经历更符合高级岗位的能力要求。",
@@ -173,7 +192,6 @@ const nextReview = {
   improvementSuggestions: ["将背景控制在两句话内，优先呈现关键判断和取舍"],
   reusableAnswerStructure: ["业务问题", "数据定位", "关键取舍", "推动落地", "结果验证"],
   exposedWeaknesses: ["表达精炼度"],
-  shouldRetry: false,
   recommendation: {
     action: "nextQuestion",
     reason: "当前题已覆盖项目深挖的核心要求，下一题可继续训练高压场景下的技术取舍。",

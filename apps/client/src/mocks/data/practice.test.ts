@@ -5,7 +5,12 @@ import {
   practiceResponseMock,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
-import type { PracticePageResponse, PracticeScoreDimension } from "@/models/practice"
+import type {
+  PracticeGuidance,
+  PracticePageResponse,
+  PracticeQuestionCard,
+  PracticeScoreDimension,
+} from "@/models/practice"
 
 const scenarios: PracticeMockScenario[] = [
   "setupReady",
@@ -32,8 +37,29 @@ const scoreDimensions = new Set<PracticeScoreDimension>([
   "riskControl",
 ])
 
+function expectConsistentGuidance(guidance: PracticeGuidance<string[]>) {
+  switch (guidance.status) {
+    case "notRequested":
+    case "unavailable":
+      expect(guidance.content).toBeNull()
+      return
+    case "revealed":
+      expect(guidance.content).not.toHaveLength(0)
+  }
+}
+
+function expectUnrequestedGuidance(question: PracticeQuestionCard) {
+  expect(question.answerHints).toEqual({ status: "notRequested", content: null })
+  expect(question.answerFramework).toEqual({ status: "notRequested", content: null })
+}
+
 function expectConsistentPracticeResponse(response: PracticePageResponse) {
   const { setupContext, session } = response
+
+  for (const role of setupContext.targetRoles) {
+    expect(role.supportedQuestionTypes.length).toBeGreaterThan(0)
+    expect(new Set(role.supportedQuestionTypes).size).toBe(role.supportedQuestionTypes.length)
+  }
 
   if (setupContext.defaultTargetRoleId !== null) {
     expect(
@@ -41,28 +67,49 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
     ).toBe(true)
   }
 
-  if (session.selection.targetRoleId !== null) {
-    expect(
-      setupContext.targetRoles.some((role) => role.id === session.selection.targetRoleId),
-    ).toBe(true)
+  if (session.status === "setup") {
+    expect("question" in session).toBe(false)
+    expect("sessionId" in session).toBe(false)
+    expect("version" in session).toBe(false)
+
+    if (session.selection.targetRoleId !== null) {
+      const selectedRole = setupContext.targetRoles.find(
+        (role) => role.id === session.selection.targetRoleId,
+      )
+      expect(selectedRole).toBeDefined()
+      expect(selectedRole?.supportedQuestionTypes).toContain(session.selection.questionType)
+    }
+    return
   }
 
+  expect(session.selection.targetRoleId).toBeTypeOf("string")
+  expect(Number.isInteger(session.version)).toBe(true)
+  expect(session.version).toBeGreaterThan(0)
+
+  const selectedRole = setupContext.targetRoles.find(
+    (role) => role.id === session.selection.targetRoleId,
+  )
+  expect(selectedRole).toBeDefined()
+  expect(selectedRole?.supportedQuestionTypes).toContain(session.selection.questionType)
+
   switch (session.status) {
-    case "setup":
-      expect("question" in session).toBe(false)
-      expect("sessionId" in session).toBe(false)
-      return
     case "generatingQuestion":
       expect("question" in session).toBe(false)
       expect(session.sessionId).toMatch(/^practice_session_/)
       return
     case "answering":
       expect(session.question.id).toMatch(/^practice_question_/)
+      expect(session.question.questionType).toBe(session.selection.questionType)
+      expectConsistentGuidance(session.question.answerHints)
+      expectConsistentGuidance(session.question.answerFramework)
+      expectUnrequestedGuidance(session.question)
       expect("mainAnswer" in session).toBe(false)
       expect("evaluation" in session).toBe(false)
       expect("review" in session).toBe(false)
       return
     case "answeringFollowUp":
+      expect(session.question.questionType).toBe(session.selection.questionType)
+      expectUnrequestedGuidance(session.question)
       expect(session.mainAnswer.order).toBe(1)
       expect(session.currentFollowUp.status).toBe("awaitingAnswer")
       expect(session.currentFollowUp.answer).toBeNull()
@@ -73,6 +120,8 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect("evaluation" in session).toBe(false)
       return
     case "evaluating":
+      expect(session.question.questionType).toBe(session.selection.questionType)
+      expectUnrequestedGuidance(session.question)
       expect(session.mainAnswer.content.trim()).not.toBe("")
       expect(session.followUpExchanges.every((exchange) => exchange.answer.content.trim())).toBe(
         true,
@@ -83,6 +132,8 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
     case "review": {
       const dimensions = session.evaluation.dimensionScores
 
+      expect(session.question.questionType).toBe(session.selection.questionType)
+      expectUnrequestedGuidance(session.question)
       expect(dimensions).toHaveLength(scoreDimensions.size)
       expect(new Set(dimensions.map(({ dimension }) => dimension))).toEqual(scoreDimensions)
       expect(dimensions.every(({ score }) => score >= 0 && score <= 100)).toBe(true)
@@ -94,9 +145,7 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.review.improvementSuggestions).not.toHaveLength(0)
       expect(session.review.reusableAnswerStructure).not.toHaveLength(0)
       expect(session.review.exposedWeaknesses).not.toHaveLength(0)
-      expect(session.review.shouldRetry).toBe(
-        session.review.recommendation.action === "retryCurrent",
-      )
+      expect("shouldRetry" in session.review).toBe(false)
       return
     }
     case "completed":
@@ -120,6 +169,46 @@ describe("practice mock scenarios", () => {
     expect("review" in session).toBe(false)
   })
 
+  it("does not reveal answer guidance in ordinary question snapshots", () => {
+    const scenarioNames: PracticeMockScenario[] = [
+      "answeringQuestion",
+      "answeringFollowUp",
+      "evaluatingAnswer",
+      "reviewRetryRecommended",
+      "reviewNextRecommended",
+    ]
+
+    for (const scenario of scenarioNames) {
+      const { session } = createPracticeMockResponse(scenario)
+      if (!("question" in session)) {
+        throw new Error(`${scenario} must include a question.`)
+      }
+      expectUnrequestedGuidance(session.question)
+    }
+  })
+
+  it("uses content only for revealed guidance", () => {
+    const notRequested = {
+      status: "notRequested",
+      content: null,
+    } satisfies PracticeGuidance<string[]>
+    const unavailable = {
+      status: "unavailable",
+      content: null,
+    } satisfies PracticeGuidance<string[]>
+    const revealed = {
+      status: "revealed",
+      content: ["先说明背景，再说明个人行动。"],
+    } satisfies PracticeGuidance<string[]>
+
+    expectConsistentGuidance(notRequested)
+    expectConsistentGuidance(unavailable)
+    expectConsistentGuidance(revealed)
+    expect(notRequested.content).toBeNull()
+    expect(unavailable.content).toBeNull()
+    expect(revealed.content).toEqual(["先说明背景，再说明个人行动。"])
+  })
+
   it("keeps a main answer and an unanswered current follow-up in follow-up state", () => {
     const { session } = createPracticeMockResponse("answeringFollowUp")
 
@@ -136,6 +225,52 @@ describe("practice mock scenarios", () => {
     expect(session.status).toBe("evaluating")
     expect("evaluation" in session).toBe(false)
     expect("review" in session).toBe(false)
+  })
+
+  it("uses recommendation action as the only retry decision", () => {
+    const retry = createPracticeMockResponse("reviewRetryRecommended")
+    const next = createPracticeMockResponse("reviewNextRecommended")
+
+    expect(retry.session.status).toBe("review")
+    expect(next.session.status).toBe("review")
+    if (retry.session.status !== "review" || next.session.status !== "review") return
+
+    expect(retry.session.review.recommendation.action).toBe("retryCurrent")
+    expect(next.session.review.recommendation.action).toBe("nextQuestion")
+    expect("shouldRetry" in retry.session.review).toBe(false)
+    expect("shouldRetry" in next.session.review).toBe(false)
+  })
+
+  it("keeps the default question type supported by the default target role", () => {
+    const response = createPracticeMockResponse("setupReady")
+    const { defaultTargetRoleId } = response.setupContext
+    const defaultRole = response.setupContext.targetRoles.find(
+      (role) => role.id === defaultTargetRoleId,
+    )
+
+    expect(defaultRole).toBeDefined()
+    expect(defaultRole?.supportedQuestionTypes).toContain(response.session.selection.questionType)
+    expect(response.session.selection.prioritizeWeaknesses).toBe(false)
+  })
+
+  it("declares role-specific supported question types", () => {
+    const { targetRoles } = createPracticeMockResponse().setupContext
+    const frontendRole = targetRoles.find((role) => role.id === "role_frontend_bytedance")
+    const productRole = targetRoles.find((role) => role.id === "role_product_manager_meituan")
+
+    expect(frontendRole?.supportedQuestionTypes).toEqual([
+      "projectDeepDive",
+      "behavioral",
+      "businessUnderstanding",
+      "motivation",
+      "technicalFoundation",
+    ])
+    expect(productRole?.supportedQuestionTypes).toEqual([
+      "projectDeepDive",
+      "behavioral",
+      "businessUnderstanding",
+      "motivation",
+    ])
   })
 
   it("keeps empty source scenarios aligned with their selected source", () => {
@@ -169,8 +304,12 @@ describe("practice mock scenarios", () => {
 
   it("does not leak fixture mutations into later requests", () => {
     const first = createPracticeMockResponse("answeringQuestion")
+    const firstRole = first.setupContext.targetRoles[0]
 
-    first.setupContext.targetRoles[0]!.title = "Mutated role"
+    if (!firstRole) {
+      throw new Error("The answering fixture must include a target role.")
+    }
+    firstRole.title = "Mutated role"
     if (first.session.status !== "answering") {
       throw new Error("The answering fixture must use the answering state.")
     }
