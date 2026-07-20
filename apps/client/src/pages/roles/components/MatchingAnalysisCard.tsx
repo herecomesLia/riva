@@ -1,5 +1,18 @@
 import { Link } from "@tanstack/react-router"
-import { ArrowRightIcon, RefreshCwIcon, SparklesIcon } from "lucide-react"
+import {
+  ArrowRightIcon,
+  CircleCheckIcon,
+  CircleXIcon,
+  ClipboardCheckIcon,
+  EyeOffIcon,
+  FileCheckIcon,
+  FileWarningIcon,
+  LightbulbIcon,
+  MessageCircleQuestionIcon,
+  RefreshCwIcon,
+  SparklesIcon,
+  type LucideIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -27,6 +40,8 @@ export function MatchingAnalysisCard({
   const { t } = useTranslation()
   const analysis = role.matchingAnalysis
   const status = analysis?.status ?? "none"
+  const result =
+    analysis?.status === "current" || analysis?.status === "stale" ? analysis.result : null
   const canGenerate =
     profileContext.exists && profileContext.completed && role.jobDescription.status === "ready"
 
@@ -37,16 +52,34 @@ export function MatchingAnalysisCard({
       size="sm"
     >
       <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-x-6">
           <div className="flex flex-col gap-1">
-            <CardTitle>
-              <h3>{t("roles.details.sections.matchingAnalysis")}</h3>
-            </CardTitle>
-            <CardDescription>{t("roles.matching.cardDescription")}</CardDescription>
+            <div className="flex min-h-9 items-center">
+              <CardTitle>
+                <h3>{t("roles.details.sections.matchingAnalysis")}</h3>
+              </CardTitle>
+            </div>
+            <CardDescription className="min-h-5 leading-5">
+              {t("roles.matching.cardDescription")}
+            </CardDescription>
           </div>
-          <Badge variant={status === "failed" ? "destructive" : "outline"}>
-            {t(`roles.matchingAnalysisStatus.${status}.label`)}
-          </Badge>
+          <div className="flex items-end justify-between gap-4 sm:justify-end">
+            {result && (
+              <div className="flex items-end gap-2 whitespace-nowrap">
+                <span className="font-heading text-4xl leading-none font-bold text-primary">
+                  {result.overallMatchScore}%
+                </span>
+                <span className="text-sm leading-none text-muted-foreground">
+                  {t("roles.matching.result.overallMatch")}
+                </span>
+              </div>
+            )}
+            {status !== "current" && (
+              <Badge variant={status === "failed" ? "destructive" : "outline"}>
+                {t(`roles.matchingAnalysisStatus.${status}.label`)}
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -227,44 +260,45 @@ function MatchingAnalysisResultView({ result }: { result: MatchingAnalysisResult
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-4" data-testid="matching-analysis-result">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>
-            <h4>{t("roles.matching.result.overallMatch")}</h4>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="font-heading text-4xl font-medium">{result.overallMatchScore}%</p>
-        </CardContent>
-      </Card>
       <ResultText
+        icon={ClipboardCheckIcon}
         text={result.coreRequirementsSummary}
         title={t("roles.matching.result.coreRequirements")}
       />
       <div className="grid gap-4 xl:grid-cols-2">
         <ResultList
+          icon={CircleCheckIcon}
           items={result.matchedCapabilities}
           title={t("roles.matching.result.matchedCapabilities")}
         />
         <ResultList
+          icon={CircleXIcon}
           items={result.missingCapabilities}
           title={t("roles.matching.result.missingCapabilities")}
         />
         <ResultList
+          icon={EyeOffIcon}
           items={result.underrepresentedCapabilities}
           title={t("roles.matching.result.underrepresentedCapabilities")}
         />
         <ResultList
+          icon={FileCheckIcon}
           items={result.resumeHighlights}
           title={t("roles.matching.result.resumeHighlights")}
         />
-        <ResultList items={result.resumeGaps} title={t("roles.matching.result.resumeGaps")} />
         <ResultList
+          icon={FileWarningIcon}
+          items={result.resumeGaps}
+          title={t("roles.matching.result.resumeGaps")}
+        />
+        <ResultList
+          icon={MessageCircleQuestionIcon}
           items={result.highRiskQuestions}
           title={t("roles.matching.result.highRiskQuestions")}
         />
       </div>
       <ResultList
+        icon={LightbulbIcon}
         items={result.preparationRecommendations}
         title={t("roles.matching.result.preparationRecommendations")}
       />
@@ -272,12 +306,23 @@ function MatchingAnalysisResultView({ result }: { result: MatchingAnalysisResult
   )
 }
 
-function ResultText({ text, title }: { text: string; title: string }) {
+function ResultText({
+  icon: Icon,
+  text,
+  title,
+}: {
+  icon: LucideIcon
+  text: string
+  title: string
+}) {
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle>
-          <h4>{title}</h4>
+          <h4 className="flex items-center gap-2">
+            <Icon aria-hidden="true" className="size-4 text-primary" />
+            {title}
+          </h4>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -287,12 +332,23 @@ function ResultText({ text, title }: { text: string; title: string }) {
   )
 }
 
-function ResultList({ items, title }: { items: string[]; title: string }) {
+function ResultList({
+  icon: Icon,
+  items,
+  title,
+}: {
+  icon: LucideIcon
+  items: string[]
+  title: string
+}) {
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle>
-          <h4>{title}</h4>
+          <h4 className="flex items-center gap-2">
+            <Icon aria-hidden="true" className="size-4 text-primary" />
+            {title}
+          </h4>
         </CardTitle>
       </CardHeader>
       <CardContent>

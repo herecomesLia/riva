@@ -1001,12 +1001,19 @@ describe("RolesView", () => {
     renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const result = await screen.findByTestId("matching-analysis-result")
-    expect(result).toHaveTextContent(`${analysis.result.overallMatchScore}%`)
+    const card = screen.getByTestId("matching-analysis-card")
+    expect(
+      within(result).queryByText(`${analysis.result.overallMatchScore}%`),
+    ).not.toBeInTheDocument()
+    expect(within(card).getByText(`${analysis.result.overallMatchScore}%`)).toHaveClass(
+      "text-primary",
+    )
+    expect(
+      within(card).queryByText(i18n.t("roles.matchingAnalysisStatus.current.label")),
+    ).not.toBeInTheDocument()
     expect(result).toHaveTextContent(analysis.result.coreRequirementsSummary)
     expect(result).toHaveTextContent(analysis.result.highRiskQuestions[0]!)
-    expect(
-      within(screen.getByTestId("matching-analysis-card")).queryByRole("button"),
-    ).not.toBeInTheDocument()
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument()
   })
 
   it("keeps stale results visible and offers regeneration", async () => {

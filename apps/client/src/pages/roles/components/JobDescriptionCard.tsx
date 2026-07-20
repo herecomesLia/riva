@@ -54,7 +54,7 @@ export function JobDescriptionCard({
     >
       <CardHeader>
         <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-h-9 flex-wrap items-center justify-between gap-3">
             <CardTitle>
               <h3>{t("roles.details.sections.jobDescription")}</h3>
             </CardTitle>
@@ -71,7 +71,9 @@ export function JobDescriptionCard({
               </Button>
             )}
           </div>
-          <CardDescription>{t("roles.jd.cardDescription")}</CardDescription>
+          <CardDescription className="min-h-5 leading-5">
+            {t("roles.jd.cardDescription")}
+          </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
