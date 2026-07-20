@@ -225,6 +225,7 @@ export type RolesMockScenario =
   | "noRoles"
   | "singleRoleWithoutJobDescription"
   | "multipleRoles"
+  | "rolesWithoutCurrent"
   | "roleWithJobDescriptionParsing"
   | "roleWithJobDescriptionFailed"
   | "roleWithParsedJobDescription"
@@ -267,6 +268,24 @@ const rolesMockScenarios = {
       }),
     ],
     currentRoleId: "role_frontend_bytedance",
+    profileContext: completeProfileContext,
+  },
+  rolesWithoutCurrent: {
+    roles: [
+      createReadyJobDescriptionRole(
+        "role_frontend_bytedance",
+        "Senior Frontend Engineer",
+        4,
+        null,
+        { preparationStatus: "paused" },
+      ),
+      createMissingJobDescriptionRole("role_product_manager_meituan", "Product Manager", {
+        company: "Meituan",
+        location: "Beijing",
+        preparationStatus: "paused",
+      }),
+    ],
+    currentRoleId: null,
     profileContext: completeProfileContext,
   },
   roleWithJobDescriptionParsing: {

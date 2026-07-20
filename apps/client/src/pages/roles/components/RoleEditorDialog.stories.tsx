@@ -96,17 +96,37 @@ export const ExperienceRangeError = meta.story({
   },
 })
 
+const failedUpdate = fn(async () => {
+  throw new Error("transport detail")
+})
+const saveErrorOnSaved = fn()
+
 export const SaveError = meta.story({
   args: {
     mode: "edit",
     onCreate: fn(async () => undefined),
     onDirtyChange: fn(),
     onOpenChange: fn(),
-    onSaved: fn(),
-    onUpdate: fn(async () => {
-      throw new Error("transport detail")
-    }),
+    onSaved: saveErrorOnSaved,
+    onUpdate: failedUpdate,
     open: true,
     role,
+  },
+  play: async ({ userEvent }) => {
+    const dialog = await screen.findByRole("dialog")
+    const title = within(dialog).getByLabelText(/岗位名称|role title/i)
+    const retainedTitle = "Principal Frontend Engineer"
+    await userEvent.clear(title)
+    await userEvent.type(title, retainedTitle)
+    await userEvent.click(within(dialog).getByRole("button", { name: /^保存$|^save$/i }))
+
+    await expect(failedUpdate).toHaveBeenCalledTimes(1)
+    await expect(
+      within(dialog).findByText(/暂时无法保存本次修改|We could not save this change/i),
+    ).resolves.toBeVisible()
+    await expect(within(dialog).queryByText("transport detail")).not.toBeInTheDocument()
+    await expect(dialog).toBeVisible()
+    await expect(title).toHaveValue(retainedTitle)
+    await expect(saveErrorOnSaved).not.toHaveBeenCalled()
   },
 })

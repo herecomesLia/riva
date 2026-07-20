@@ -4,11 +4,9 @@ import preview from "#storybook/preview"
 import { expect, fn, screen } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
-import type { RolesPageResponse, TargetRole } from "@/models/roles"
+import type { RolesMockScenario } from "@/mocks/data/roles"
 
 import {
-  createCurrentAnalysisResponse,
-  createGeneratingAnalysisResponse,
   createLongMatchingAnalysisResponse,
   createRoleStoryResponse,
   createStaleWhileParsingResponse,
@@ -51,17 +49,17 @@ export const SynchronizationError = meta.story({
 
 function SynchronizationRetryHarness() {
   const initial = createRoleStoryResponse("matchingAnalysisGenerating")
-  const current = createCurrentAnalysisResponse(initial)
-  const [role, setRole] = useState<TargetRole>(initial.roles[0]!)
+  const completed = createRoleStoryResponse("matchingAnalysisCurrent")
+  const [response, setResponse] = useState(initial)
   const [synchronizationError, setSynchronizationError] = useState(true)
   return (
     <MatchingAnalysisCard
       onRetrySynchronization={() => {
         setSynchronizationError(false)
-        setRole(current.roles[0]!)
+        setResponse(completed)
       }}
-      profileContext={initial.profileContext}
-      role={role}
+      profileContext={response.profileContext}
+      role={response.roles[0]!}
       synchronizationError={synchronizationError}
     />
   )
@@ -92,25 +90,24 @@ export const StaleWhileJobDescriptionParsing = meta.story({
   },
 })
 
+const longMatchingAnalysis = createLongMatchingAnalysisResponse()
+
 export const LongMatchingAnalysis = meta.story({
   args: {
-    profileContext: createLongMatchingAnalysisResponse().profileContext,
-    role: createLongMatchingAnalysisResponse().roles[0]!,
+    profileContext: longMatchingAnalysis.profileContext,
+    role: longMatchingAnalysis.roles[0]!,
     synchronizationError: false,
   },
 })
 
-function AnalysisFlowHarness({ initial }: { initial: RolesPageResponse }) {
-  const [response, setResponse] = useState(initial)
+function AnalysisFlowHarness({ initialScenario }: { initialScenario: RolesMockScenario }) {
+  const [response, setResponse] = useState(() => createRoleStoryResponse(initialScenario))
+  const completed = createRoleStoryResponse("matchingAnalysisCurrent")
   const role = response.roles[0]!
-  const generate = () => {
-    const generating = createGeneratingAnalysisResponse(response)
-    setResponse(createCurrentAnalysisResponse(generating))
-  }
 
   return (
     <MatchingAnalysisCard
-      onGenerate={generate}
+      onGenerate={() => setResponse(completed)}
       profileContext={response.profileContext}
       role={role}
       synchronizationError={false}
@@ -119,9 +116,7 @@ function AnalysisFlowHarness({ initial }: { initial: RolesPageResponse }) {
 }
 
 export const Generate = meta.story({
-  render: () => (
-    <AnalysisFlowHarness initial={createRoleStoryResponse("roleWithParsedJobDescription")} />
-  ),
+  render: () => <AnalysisFlowHarness initialScenario="roleWithParsedJobDescription" />,
   play: async ({ userEvent }) => {
     await userEvent.click(
       screen.getByRole("button", { name: /生成匹配分析|generate match analysis/i }),
@@ -131,31 +126,15 @@ export const Generate = meta.story({
 })
 
 export const RegenerateStale = meta.story({
-  render: () => <AnalysisFlowHarness initial={createRoleStoryResponse("matchingAnalysisStale")} />,
+  render: () => <AnalysisFlowHarness initialScenario="matchingAnalysisStale" />,
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByRole("button", { name: /重新生成分析|regenerate analysis/i }))
     await expect(screen.getByTestId("matching-analysis-result")).toBeVisible()
   },
 })
 
-function RetryHarness() {
-  const initial = createRoleStoryResponse("matchingAnalysisFailed")
-  const [role, setRole] = useState<TargetRole>(initial.roles[0]!)
-  return (
-    <MatchingAnalysisCard
-      onGenerate={() => {
-        const generating = createGeneratingAnalysisResponse({ ...initial, roles: [role] })
-        setRole(createCurrentAnalysisResponse(generating).roles[0]!)
-      }}
-      profileContext={initial.profileContext}
-      role={role}
-      synchronizationError={false}
-    />
-  )
-}
-
 export const RetryFailed = meta.story({
-  render: () => <RetryHarness />,
+  render: () => <AnalysisFlowHarness initialScenario="matchingAnalysisFailed" />,
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByRole("button", { name: /重试生成|retry generation/i }))
     await expect(screen.getByTestId("matching-analysis-result")).toBeVisible()

@@ -167,6 +167,21 @@ describe("roles stateful mock service", () => {
     })
   })
 
+  it("leaves no current role when archiving the current role with only paused roles left", async () => {
+    resetRolesMockState("multipleRoles")
+    const currentRole = await getCurrentRole()
+
+    const archived = await settle(
+      archiveTargetRole({ roleId: currentRole.id, version: currentRole.version }),
+    )
+    const remainingRoles = archived.roles.filter((role) => role.preparationStatus !== "archived")
+
+    expect(remainingRoles.length).toBeGreaterThan(0)
+    expect(remainingRoles.every((role) => role.preparationStatus === "paused")).toBe(true)
+    expect(archived.currentRoleId).toBeNull()
+    expect(archived.roles.some((role) => role.isCurrent)).toBe(false)
+  })
+
   it("rejects setting an archived role as current without partial writes", async () => {
     resetRolesMockState("archivedRoles")
     const before = await settle(getRolesPage())
@@ -196,6 +211,20 @@ describe("roles stateful mock service", () => {
 
     expect(deleted.currentRoleId).toBe(secondRole.id)
     expect(deleted.roles.map((role) => role.id)).not.toContain(firstRole.id)
+  })
+
+  it("leaves no current role when deleting the current role with only paused roles left", async () => {
+    resetRolesMockState("multipleRoles")
+    const currentRole = await getCurrentRole()
+
+    const deleted = await settle(
+      deleteTargetRole({ roleId: currentRole.id, version: currentRole.version }),
+    )
+
+    expect(deleted.roles.length).toBeGreaterThan(0)
+    expect(deleted.roles.every((role) => role.preparationStatus === "paused")).toBe(true)
+    expect(deleted.currentRoleId).toBeNull()
+    expect(deleted.roles.some((role) => role.isCurrent)).toBe(false)
   })
 
   it("clears current role state when deleting the only role", async () => {

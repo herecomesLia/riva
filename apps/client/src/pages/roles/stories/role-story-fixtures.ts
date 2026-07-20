@@ -9,15 +9,6 @@ export function createRoleStoryRole(scenario: Exclude<RolesMockScenario, "noRole
   return createRolesMockResponse(scenario).roles[0]!
 }
 
-export function createNoCurrentRoleResponse() {
-  const response = createRolesMockResponse("multipleRoles")
-  response.currentRoleId = null
-  response.roles.forEach((role) => {
-    role.isCurrent = false
-  })
-  return response
-}
-
 export function createManyRolesResponse() {
   const response = createRolesMockResponse("multipleRoles")
   const template = response.roles[1]!
@@ -97,96 +88,6 @@ export function createStaleWhileParsingResponse() {
   response.roles[0] = {
     ...parsingRole,
     matchingAnalysis: structuredClone(staleAnalysis),
-  }
-  return response
-}
-
-export function createParsingJobDescriptionResponse(initial: RolesPageResponse, rawText: string) {
-  const response = structuredClone(initial)
-  const role = response.roles[0]!
-  const version = (role.jobDescription.version ?? 0) + 1
-  response.roles[0] = {
-    ...role,
-    version: role.version + 1,
-    jobDescription: {
-      status: "parsing",
-      rawText,
-      version,
-      parsingFailureReason: null,
-    },
-    jobDescriptionAnalysis: null,
-    matchingAnalysis:
-      role.matchingAnalysis?.status === "current"
-        ? { ...role.matchingAnalysis, status: "stale" }
-        : role.matchingAnalysis,
-  }
-  return response
-}
-
-export function createReadyJobDescriptionResponse(parsing: RolesPageResponse, summary: string) {
-  const response = structuredClone(parsing)
-  const role = response.roles[0]!
-  if (role.jobDescription.status !== "parsing") {
-    throw new Error("Expected a parsing JD fixture.")
-  }
-  const template = createRolesMockResponse("roleWithParsedJobDescription").roles[0]!
-    .jobDescriptionAnalysis!
-  response.roles[0] = {
-    ...role,
-    version: role.version + 1,
-    jobDescription: { ...role.jobDescription, status: "ready" },
-    jobDescriptionAnalysis: {
-      ...template,
-      rivaSummary: summary,
-      jobDescriptionVersion: role.jobDescription.version,
-    },
-  }
-  return response
-}
-
-export function createGeneratingAnalysisResponse(initial: RolesPageResponse) {
-  const response = structuredClone(initial)
-  const role = response.roles[0]!
-  if (
-    !response.profileContext.exists ||
-    !response.profileContext.completed ||
-    role.jobDescription.status !== "ready" ||
-    !role.jobDescriptionAnalysis
-  ) {
-    throw new Error("Expected complete analysis prerequisites.")
-  }
-  response.roles[0] = {
-    ...role,
-    version: role.version + 1,
-    matchingAnalysis: {
-      status: "generating",
-      profileVersion: response.profileContext.version,
-      jobDescriptionVersion: role.jobDescription.version,
-      jobDescriptionAnalysisVersion: role.jobDescriptionAnalysis.analysisVersion,
-      generatedAt: null,
-      failureReason: null,
-      result: null,
-    },
-  }
-  return response
-}
-
-export function createCurrentAnalysisResponse(generating: RolesPageResponse) {
-  const response = structuredClone(generating)
-  const role = response.roles[0]!
-  const source = createRolesMockResponse("matchingAnalysisCurrent").roles[0]!.matchingAnalysis
-  if (role.matchingAnalysis?.status !== "generating" || source?.status !== "current") {
-    throw new Error("Expected generating and current analysis fixtures.")
-  }
-  response.roles[0] = {
-    ...role,
-    version: role.version + 1,
-    matchingAnalysis: {
-      ...role.matchingAnalysis,
-      status: "current",
-      generatedAt: "2026-07-18T09:00:00.000Z",
-      result: structuredClone(source.result),
-    },
   }
   return response
 }

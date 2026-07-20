@@ -13,7 +13,10 @@ function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   return { role: response.roles[0]! }
 }
 
-export const Complete = meta.story({ args: argsFor("roleWithParsedJobDescription") })
+export const ParsedJobDescription = meta.story({
+  args: argsFor("roleWithParsedJobDescription"),
+})
+export const Complete = meta.story({ args: argsFor("matchingAnalysisCurrent") })
 export const JobDescriptionMissing = meta.story({
   args: argsFor("singleRoleWithoutJobDescription"),
 })

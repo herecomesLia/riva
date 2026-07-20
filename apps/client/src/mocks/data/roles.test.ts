@@ -11,6 +11,7 @@ const scenarios: RolesMockScenario[] = [
   "noRoles",
   "singleRoleWithoutJobDescription",
   "multipleRoles",
+  "rolesWithoutCurrent",
   "roleWithJobDescriptionParsing",
   "roleWithJobDescriptionFailed",
   "roleWithParsedJobDescription",
@@ -147,6 +148,16 @@ describe("roles mock scenarios", () => {
     const response = createRolesMockResponse("roleWithParsedJobDescription")
 
     expect(response.roles[0]?.matchingAnalysis).toBeNull()
+  })
+
+  it("keeps paused roles without an automatically promoted current role", () => {
+    const response = createRolesMockResponse("rolesWithoutCurrent")
+    const activeRoles = response.roles.filter((role) => role.preparationStatus !== "archived")
+
+    expect(activeRoles.length).toBeGreaterThan(0)
+    expect(activeRoles.every((role) => role.preparationStatus === "paused")).toBe(true)
+    expect(response.currentRoleId).toBeNull()
+    expect(response.roles.some((role) => role.isCurrent)).toBe(false)
   })
 
   it("returns an independent deep copy for each scenario request", () => {

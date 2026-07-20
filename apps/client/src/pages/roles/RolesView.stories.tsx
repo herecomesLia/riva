@@ -7,7 +7,6 @@ import {
   createLongJobDescriptionResponse,
   createLongMatchingAnalysisResponse,
   createManyRolesResponse,
-  createNoCurrentRoleResponse,
   createRoleStoryResponse,
 } from "./stories/role-story-fixtures"
 
@@ -58,7 +57,7 @@ export const MultipleRoles = meta.story({
 
 export const NoCurrentRole = meta.story({
   args: {
-    content: { status: "ready", data: createNoCurrentRoleResponse() },
+    content: { status: "ready", data: createRoleStoryResponse("rolesWithoutCurrent") },
     variant: "default",
   },
 })
