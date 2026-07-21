@@ -6,17 +6,17 @@ import type {
   PracticePageResponse,
   PracticeQuestionType,
   PracticeSetupContext,
+  PracticeSetupSelection,
   PracticeTargetRoleOption,
   StartPracticeSessionInput,
 } from "@/models/practice"
 import type { TargetRole } from "@/models/roles"
 
-const allQuestionTypes: PracticeQuestionType[] = [
+const commonQuestionTypes: PracticeQuestionType[] = [
   "projectDeepDive",
   "behavioral",
   "businessUnderstanding",
   "motivation",
-  "technicalFoundation",
 ]
 
 const practiceRoleMetadata = new Map(
@@ -45,7 +45,7 @@ function toPracticeRoleOption(role: TargetRole): PracticeTargetRoleOption {
     id: role.id,
     title: role.title,
     company: role.company,
-    supportedQuestionTypes: copy(practiceRoleMetadata.get(role.id) ?? allQuestionTypes),
+    supportedQuestionTypes: copy(practiceRoleMetadata.get(role.id) ?? commonQuestionTypes),
   }
 }
 
@@ -65,26 +65,38 @@ async function getCurrentSetupContext(): Promise<PracticeSetupContext> {
   }
 }
 
+export function reconcilePracticeSetupSelection(
+  context: PracticeSetupContext,
+  selection: PracticeSetupSelection,
+): PracticeSetupSelection {
+  const defaultRole = context.targetRoles.find((role) => role.id === context.defaultTargetRoleId)
+  const selectedRole = defaultRole
+    ? defaultRole
+    : (context.targetRoles.find((role) => role.id === selection.targetRoleId) ??
+      context.targetRoles[0])
+
+  if (!selectedRole) return { ...selection, targetRoleId: null }
+
+  return {
+    ...selection,
+    targetRoleId: selectedRole.id,
+    questionType: selectedRole.supportedQuestionTypes.includes(selection.questionType)
+      ? selection.questionType
+      : (selectedRole.supportedQuestionTypes[0] ?? selection.questionType),
+  }
+}
+
 function withSetupContext(setupContext: PracticeSetupContext): PracticePageResponse {
   if (mockResponse.session.status !== "setup") {
     return { ...mockResponse, setupContext }
   }
-
-  const selectedRoleExists = setupContext.targetRoles.some(
-    (role) => role.id === mockResponse.session.selection.targetRoleId,
-  )
 
   return {
     ...mockResponse,
     setupContext,
     session: {
       ...mockResponse.session,
-      selection: {
-        ...mockResponse.session.selection,
-        targetRoleId: selectedRoleExists
-          ? mockResponse.session.selection.targetRoleId
-          : setupContext.defaultTargetRoleId,
-      },
+      selection: reconcilePracticeSetupSelection(setupContext, mockResponse.session.selection),
     },
   }
 }

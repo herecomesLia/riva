@@ -76,6 +76,18 @@ describe("PracticeView", () => {
     ).not.toBeChecked()
   })
 
+  it("renders the setup selection returned by the service without reapplying a default", async () => {
+    const data = createPracticeMockResponse("setupReady")
+    if (data.session.status !== "setup") return
+    data.session.selection.targetRoleId = "role_product_manager_meituan"
+
+    renderReadyView(data)
+
+    expect(await screen.findByTestId("practice-target-role-trigger")).toHaveTextContent(
+      "Product Manager",
+    )
+  })
+
   it("submits changed question type, difficulty, source, and weakness preference", async () => {
     const user = userEvent.setup()
     const onStart = vi.fn(async () => undefined)

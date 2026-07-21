@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { resetPracticeMockState } from "@/mocks/services/practice"
+import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { reconcilePracticeSetupSelection, resetPracticeMockState } from "@/mocks/services/practice"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   getPracticePage,
   getQuestionGenerationStatus,
   startPracticeSession,
 } from "@/services/practice"
+import { createTargetRole, getRolesPage, setCurrentTargetRole } from "@/services/roles"
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -34,6 +36,110 @@ describe("practice stateful mock service", () => {
       title: "Product Manager",
       company: "Meituan",
     })
+  })
+
+  it("synchronizes the practice default after the current role changes", async () => {
+    resetPracticeMockState("noEligibleHistoryQuestions")
+    const before = await settle(getPracticePage())
+    const roles = await settle(getRolesPage())
+    const productManager = roles.roles.find((role) => role.id === "role_product_manager_meituan")
+    if (!productManager) throw new Error("Expected the Product Manager role fixture.")
+
+    await settle(
+      setCurrentTargetRole({ roleId: productManager.id, version: productManager.version }),
+    )
+    const response = await settle(getPracticePage())
+    if (response.session.status !== "setup" || before.session.status !== "setup") return
+
+    expect(response.setupContext.defaultTargetRoleId).toBe(productManager.id)
+    expect(response.session.selection.targetRoleId).toBe(productManager.id)
+    expect(
+      response.setupContext.targetRoles
+        .find((role) => role.id === productManager.id)
+        ?.supportedQuestionTypes.includes(response.session.selection.questionType),
+    ).toBe(true)
+    expect(response.session.selection).toMatchObject({
+      difficulty: before.session.selection.difficulty,
+      source: before.session.selection.source,
+      prioritizeWeaknesses: before.session.selection.prioritizeWeaknesses,
+    })
+  })
+
+  it("falls back to an existing selected role when no current role exists", async () => {
+    resetRolesMockState("rolesWithoutCurrent")
+
+    const response = await settle(getPracticePage())
+    if (response.session.status !== "setup") return
+
+    expect(response.setupContext.defaultTargetRoleId).toBeNull()
+    expect(response.session.selection.targetRoleId).toBe("role_frontend_bytedance")
+    expect(
+      response.setupContext.targetRoles.some(
+        (role) => role.id === response.session.selection.targetRoleId,
+      ),
+    ).toBe(true)
+  })
+
+  it("uses the first supported question type when the current role rejects the selection", () => {
+    const fixture = createPracticeMockResponse("setupReady")
+    if (fixture.session.status !== "setup") return
+    const productManager = fixture.setupContext.targetRoles.find(
+      (role) => role.id === "role_product_manager_meituan",
+    )
+    if (!productManager) throw new Error("Expected the Product Manager role fixture.")
+
+    const selection = reconcilePracticeSetupSelection(
+      {
+        ...fixture.setupContext,
+        defaultTargetRoleId: productManager.id,
+      },
+      {
+        ...fixture.session.selection,
+        questionType: "technicalFoundation",
+        difficulty: "pressure",
+        source: "saved",
+        prioritizeWeaknesses: true,
+      },
+    )
+
+    expect(selection).toEqual({
+      targetRoleId: productManager.id,
+      questionType: productManager.supportedQuestionTypes[0],
+      difficulty: "pressure",
+      source: "saved",
+      prioritizeWeaknesses: true,
+    })
+  })
+
+  it("does not grant technical questions to roles without practice metadata", async () => {
+    const roles = await settle(
+      createTargetRole({
+        title: "HR Business Partner",
+        company: "Riva",
+        recruitmentType: null,
+        location: null,
+        experienceRange: null,
+        preparationStatus: "preparing",
+      }),
+    )
+    const createdRole = roles.roles.find((role) => role.title === "HR Business Partner")
+    if (!createdRole) throw new Error("Expected the newly created role.")
+
+    const response = await settle(getPracticePage())
+    const practiceRole = response.setupContext.targetRoles.find(
+      (role) => role.id === createdRole.id,
+    )
+
+    expect(practiceRole?.supportedQuestionTypes).toEqual([
+      "projectDeepDive",
+      "behavioral",
+      "businessUnderstanding",
+      "motivation",
+    ])
+    expect(practiceRole?.supportedQuestionTypes).not.toContain("technicalFoundation")
+    expect(new Set(practiceRole?.supportedQuestionTypes).size).toBe(
+      practiceRole?.supportedQuestionTypes.length,
+    )
   })
 
   it("moves from setup through generation to an answering snapshot", async () => {
@@ -89,6 +195,36 @@ describe("practice stateful mock service", () => {
 
     const current = await settle(getPracticePage())
     expect(current.session).toEqual(second.session)
+  })
+
+  it("does not rewrite an active session after the current role changes", async () => {
+    const setup = await settle(getPracticePage())
+    const frontendRoleId = setup.setupContext.defaultTargetRoleId
+    if (!frontendRoleId) throw new Error("Expected the Frontend role to be current.")
+
+    const active = await settle(
+      startPracticeSession({
+        ...setup.session.selection,
+        targetRoleId: frontendRoleId,
+        questionType: "technicalFoundation",
+      }),
+    )
+    if (active.session.status !== "generatingQuestion") return
+
+    const roles = await settle(getRolesPage())
+    const productManager = roles.roles.find((role) => role.id === "role_product_manager_meituan")
+    if (!productManager) throw new Error("Expected the Product Manager role fixture.")
+    await settle(
+      setCurrentTargetRole({ roleId: productManager.id, version: productManager.version }),
+    )
+
+    const response = await settle(getPracticePage())
+    expect(response.setupContext.defaultTargetRoleId).toBe(productManager.id)
+    expect(response.session).toEqual(active.session)
+    expect(response.session.selection).toMatchObject({
+      targetRoleId: frontendRoleId,
+      questionType: "technicalFoundation",
+    })
   })
 
   it("returns independent deep copies", async () => {

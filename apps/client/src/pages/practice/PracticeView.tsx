@@ -132,8 +132,7 @@ function resolveActiveSelection(
   selection: PracticeSetupSelection,
   context: PracticePageResponse["setupContext"],
 ): ActivePracticeSelection | null {
-  const targetRoleId =
-    selection.targetRoleId ?? context.defaultTargetRoleId ?? context.targetRoles[0]?.id ?? null
+  const targetRoleId = selection.targetRoleId
   if (!targetRoleId) return null
 
   const role = context.targetRoles.find((candidate) => candidate.id === targetRoleId)
