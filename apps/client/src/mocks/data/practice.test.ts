@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  createGeneratedPracticeQuestionGuidance,
   createGeneratedPracticeQuestion,
   createPracticeMockResponse,
   practiceResponseMock,
@@ -222,6 +223,38 @@ describe("practice mock scenarios", () => {
         selection,
       }).isSaved,
     ).toBe(true)
+  })
+
+  it.each(questionTypes)("provides safe, independent %s guidance", (questionType) => {
+    const first = createGeneratedPracticeQuestionGuidance(questionType)
+    const second = createGeneratedPracticeQuestionGuidance(questionType)
+    const hiddenMaterialPattern = /参考答案|完整评分标准|内部追问策略/
+
+    expect(first.hints).not.toHaveLength(0)
+    expect(first.framework).not.toHaveLength(0)
+    expect([...first.hints, ...first.framework].join(" ")).not.toMatch(hiddenMaterialPattern)
+    expect(first.hints).not.toBe(second.hints)
+    expect(first.framework).not.toBe(second.framework)
+
+    first.hints[0] = "Mutated hint"
+    first.framework[0] = "Mutated framework"
+    expect(second.hints[0]).not.toBe("Mutated hint")
+    expect(second.framework[0]).not.toBe("Mutated framework")
+  })
+
+  it("keeps question-type guidance semantically distinct", () => {
+    const behavioral = createGeneratedPracticeQuestionGuidance("behavioral")
+    const motivation = createGeneratedPracticeQuestionGuidance("motivation")
+    const technical = createGeneratedPracticeQuestionGuidance("technicalFoundation")
+
+    expect(behavioral.hints.join(" ")).toMatch(/情境|冲突|挑战|协作|复盘/)
+    expect(behavioral.framework.join(" ")).toContain("Situation")
+    expect(motivation.hints.join(" ")).toMatch(/岗位|经历|价值|职业发展/)
+    expect(motivation.hints.join(" ")).not.toContain("性能问题")
+    const technicalContent = [...technical.hints, ...technical.framework].join(" ")
+    for (const concept of ["原理", "方案", "权衡", "验证"]) {
+      expect(technicalContent).toContain(concept)
+    }
   })
   it.each(scenarios)("keeps the %s response internally consistent", (scenario) => {
     expectConsistentPracticeResponse(createPracticeMockResponse(scenario))

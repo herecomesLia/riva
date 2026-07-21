@@ -13,12 +13,12 @@ const defaultArgs = {
   interactionLocked: false,
   isPending: false,
   onDraftChange: fn(),
-  onSubmit: fn(async () => undefined),
+  onSubmit: fn(async () => "executed" as const),
 }
 
 export const Default = meta.story({ args: defaultArgs })
 
-const pendingSubmit = fn((_content: string) => new Promise<void>(() => undefined))
+const pendingSubmit = fn((_content: string) => new Promise<"executed" | "ignored">(() => undefined))
 
 function PendingComposer() {
   const [pending, setPending] = useState(false)
@@ -28,9 +28,9 @@ function PendingComposer() {
       interactionLocked={pending}
       isPending={pending}
       onDraftChange={fn()}
-      onSubmit={async (content) => {
+      onSubmit={(content) => {
         setPending(true)
-        await pendingSubmit(content)
+        return pendingSubmit(content)
       }}
     />
   )

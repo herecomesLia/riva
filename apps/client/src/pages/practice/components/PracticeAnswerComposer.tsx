@@ -11,13 +11,15 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 
+import type { PracticeInteractionResult } from "../practice-interaction"
+
 const answerSchema = z.object({ content: z.string().trim().min(1) })
 
 type PracticeAnswerComposerProps = {
   interactionLocked: boolean
   isPending: boolean
   onDraftChange: (isDirty: boolean) => void
-  onSubmit: (content: string) => Promise<void>
+  onSubmit: (content: string) => Promise<PracticeInteractionResult>
 }
 
 export function PracticeAnswerComposer({
@@ -35,9 +37,11 @@ export function PracticeAnswerComposer({
       if (interactionLocked) return
       setSubmitError(false)
       try {
-        await onSubmit(value.content.trim())
-        form.reset()
-        onDraftChange(false)
+        const result = await onSubmit(value.content.trim())
+        if (result === "executed") {
+          form.reset()
+          onDraftChange(false)
+        }
       } catch {
         setSubmitError(true)
       }

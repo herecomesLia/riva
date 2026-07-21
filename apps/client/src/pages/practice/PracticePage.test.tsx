@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -346,6 +346,78 @@ describe("PracticePage", () => {
     expect(
       await screen.findByRole("button", { name: i18n.t("practice.questionActions.unsave") }),
     ).toBeEnabled()
+  })
+
+  it("keeps an unsubmitted draft when a same-frame mutation is ignored", async () => {
+    const user = userEvent.setup()
+    const answering = createPracticeMockResponse("answeringQuestion")
+    const saved = createPracticeMockResponse("answeringSavedQuestion")
+    if (answering.session.status !== "answering" || saved.session.status !== "answering") {
+      throw new Error("Answering fixtures are required.")
+    }
+    saved.session.version = answering.session.version + 1
+    const saving = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(answering)
+    vi.mocked(setQuestionSaved).mockReturnValue(saving.promise)
+    const { router } = renderPracticePage()
+    const answer = "这段回答不能因为同步锁忽略提交而被清空。"
+    const textarea = await screen.findByLabelText(i18n.t("practice.answer.label"))
+    await user.type(textarea, answer)
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }))
+      fireEvent.click(screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+    })
+
+    await waitFor(() => expect(setQuestionSaved).toHaveBeenCalledTimes(1))
+    expect(submitPracticeAnswer).not.toHaveBeenCalled()
+    expect(textarea).toHaveValue(answer)
+    act(() => {
+      void router?.navigate({ to: "/profile" })
+    })
+    expect(await screen.findByText(i18n.t("practice.dialog.leaveTitle"))).toBeInTheDocument()
+    expect(router?.state.location.pathname).toBe("/practice")
+
+    await act(async () => {
+      saving.resolve(saved)
+      await saving.promise
+    })
+  })
+
+  it("keeps the draft and route blocker after same-frame duplicate submission fails", async () => {
+    const user = userEvent.setup()
+    const answering = createPracticeMockResponse("answeringQuestion")
+    if (answering.session.status !== "answering")
+      throw new Error("An answering fixture is required.")
+    const submission = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(answering)
+    vi.mocked(submitPracticeAnswer).mockReturnValue(submission.promise)
+    const { router } = renderPracticePage()
+    const answer = "第一次提交失败后必须保留的完整回答。"
+    const textarea = await screen.findByLabelText(i18n.t("practice.answer.label"))
+    await user.type(textarea, answer)
+    const submitButton = screen.getByRole("button", { name: i18n.t("practice.answer.submit") })
+
+    act(() => {
+      fireEvent.click(submitButton)
+      fireEvent.click(submitButton)
+    })
+
+    await waitFor(() => expect(submitPracticeAnswer).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      submission.reject(new Error("unsafe submission details"))
+      await submission.promise.catch(() => undefined)
+    })
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.submitDescription"),
+    )
+    expect(textarea).toHaveValue(answer)
+    act(() => {
+      void router?.navigate({ to: "/profile" })
+    })
+    expect(await screen.findByText(i18n.t("practice.dialog.leaveTitle"))).toBeInTheDocument()
+    expect(router?.state.location.pathname).toBe("/practice")
   })
 
   it("updates saved and weak question state from mutation snapshots", async () => {

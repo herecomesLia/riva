@@ -16,6 +16,7 @@ import {
   submitPracticeAnswer,
 } from "@/services/practice"
 import { createTargetRole, getRolesPage, setCurrentTargetRole } from "@/services/roles"
+import type { PracticeAnsweringState, PracticeQuestionType } from "@/models/practice"
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -30,6 +31,30 @@ afterEach(() => {
 async function settle<T>(promise: Promise<T>) {
   await vi.runAllTimersAsync()
   return promise
+}
+
+async function generateQuestion(
+  questionType: PracticeQuestionType,
+): Promise<PracticeAnsweringState> {
+  const setup = await settle(getPracticePage())
+  const targetRoleId = setup.setupContext.defaultTargetRoleId
+  if (!targetRoleId) throw new Error("The default practice setup must include a current role.")
+  const generating = await settle(
+    startPracticeSession({ ...setup.session.selection, targetRoleId, questionType }),
+  )
+  if (generating.session.status !== "generatingQuestion") {
+    throw new Error("The practice session must be generating a question.")
+  }
+  const input = {
+    sessionId: generating.session.sessionId,
+    version: generating.session.version,
+  }
+  await settle(getQuestionGenerationStatus(input))
+  const response = await settle(getQuestionGenerationStatus(input))
+  if (response.session.status !== "answering") {
+    throw new Error("Question generation must produce an answering session.")
+  }
+  return response.session
 }
 
 describe("practice stateful mock service", () => {
@@ -375,6 +400,71 @@ describe("practice stateful mock service", () => {
     expect(saved.session.question.isSaved).toBe(true)
     expect(weak.session.question).toMatchObject({ isSaved: true, isMarkedWeak: true })
     expect(weak.session.version).toBe(initial.session.version + 4)
+  })
+
+  it("reveals behavioral hints without project-performance guidance", async () => {
+    const initial = await generateQuestion("behavioral")
+    const hinted = await settle(
+      requestPracticeHint({
+        sessionId: initial.sessionId,
+        version: initial.version,
+        questionId: initial.question.id,
+      }),
+    )
+    if (hinted.session.status !== "answering") return
+
+    expect(hinted.session.question.id).toBe(initial.question.id)
+    expect(hinted.session.version).toBe(initial.version + 1)
+    expect(hinted.session.question.answerHints.content?.join(" ")).toMatch(
+      /情境|冲突|挑战|行动|协作|复盘/,
+    )
+    expect(hinted.session.question.answerHints.content?.join(" ")).not.toContain("性能问题")
+  })
+
+  it("reveals a motivation-specific answer framework", async () => {
+    const initial = await generateQuestion("motivation")
+    const framed = await settle(
+      requestAnswerFramework({
+        sessionId: initial.sessionId,
+        version: initial.version,
+        questionId: initial.question.id,
+      }),
+    )
+    if (framed.session.status !== "answering") return
+
+    expect(framed.session.question.id).toBe(initial.question.id)
+    expect(framed.session.version).toBe(initial.version + 1)
+    expect(framed.session.question.answerFramework.content?.join(" ")).toMatch(
+      /岗位|经历|价值|职业/,
+    )
+  })
+
+  it("reveals technical hints and framework with principles, tradeoffs, and validation", async () => {
+    const initial = await generateQuestion("technicalFoundation")
+    const input = {
+      sessionId: initial.sessionId,
+      version: initial.version,
+      questionId: initial.question.id,
+    }
+    const hinted = await settle(requestPracticeHint(input))
+    if (hinted.session.status !== "answering") return
+    const framed = await settle(
+      requestAnswerFramework({ ...input, version: hinted.session.version }),
+    )
+    if (framed.session.status !== "answering") return
+
+    expect(framed.session.question.id).toBe(initial.question.id)
+    expect(framed.session.version).toBe(initial.version + 2)
+    const technicalContent = [
+      ...(framed.session.question.answerHints.content ?? []),
+      ...(framed.session.question.answerFramework.content ?? []),
+    ].join(" ")
+    for (const concept of ["原理", "方案", "权衡", "验证"]) {
+      expect(technicalContent).toContain(concept)
+    }
+    expect(JSON.stringify(framed.session.question)).not.toMatch(
+      /参考答案|完整评分标准|内部追问策略/,
+    )
   })
 
   it("submits a trimmed main answer into an evaluating snapshot", async () => {

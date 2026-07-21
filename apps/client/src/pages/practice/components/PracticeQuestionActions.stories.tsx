@@ -3,8 +3,8 @@ import { expect, fn, screen, userEvent } from "storybook/test"
 
 import { PracticeQuestionActions } from "./PracticeQuestionActions"
 
-const skip = fn(async () => undefined)
-const end = fn(async () => undefined)
+const skip = fn(async () => "executed" as const)
+const end = fn(async () => "executed" as const)
 
 const meta = preview.meta({
   component: PracticeQuestionActions,
@@ -20,8 +20,8 @@ const defaultArgs = {
   isSkipPending: false,
   isWeakPending: false,
   onEnd: end,
-  onSetSaved: fn(async () => undefined),
-  onSetWeak: fn(async () => undefined),
+  onSetSaved: fn(async () => "executed" as const),
+  onSetWeak: fn(async () => "executed" as const),
   onSkip: skip,
 }
 

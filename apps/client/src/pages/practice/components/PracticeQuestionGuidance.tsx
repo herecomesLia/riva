@@ -8,14 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Spinner } from "@/components/ui/spinner"
 import type { PracticeGuidance } from "@/models/practice"
 
+import type { PracticeInteractionResult } from "../practice-interaction"
+
 type PracticeQuestionGuidanceProps = {
   answerFramework: PracticeGuidance<string[]>
   answerHints: PracticeGuidance<string[]>
   interactionLocked: boolean
   isFrameworkPending: boolean
   isHintPending: boolean
-  onRequestFramework: () => Promise<void>
-  onRequestHint: () => Promise<void>
+  onRequestFramework: () => Promise<PracticeInteractionResult>
+  onRequestHint: () => Promise<PracticeInteractionResult>
 }
 
 export function PracticeQuestionGuidance({

@@ -24,13 +24,13 @@ export const LoadError = meta.story({
 function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
   return {
     answeringActions: {
-      onEnd: fn(async () => undefined),
-      onRequestFramework: fn(async () => undefined),
-      onRequestHint: fn(async () => undefined),
-      onSetSaved: fn(async () => undefined),
-      onSetWeak: fn(async () => undefined),
-      onSkip: fn(async () => undefined),
-      onSubmitAnswer: fn(async () => undefined),
+      onEnd: fn(async () => "executed" as const),
+      onRequestFramework: fn(async () => "executed" as const),
+      onRequestHint: fn(async () => "executed" as const),
+      onSetSaved: fn(async () => "executed" as const),
+      onSetWeak: fn(async () => "executed" as const),
+      onSkip: fn(async () => "executed" as const),
+      onSubmitAnswer: fn(async () => "executed" as const),
     },
     answeringPending: {
       end: false,

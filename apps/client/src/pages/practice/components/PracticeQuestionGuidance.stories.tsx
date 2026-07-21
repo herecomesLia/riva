@@ -1,7 +1,10 @@
 import preview from "#storybook/preview"
 import { expect, fn, userEvent } from "storybook/test"
 
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import {
+  createGeneratedPracticeQuestionGuidance,
+  createPracticeMockResponse,
+} from "@/mocks/data/practice"
 
 import { PracticeQuestionGuidance } from "./PracticeQuestionGuidance"
 
@@ -18,8 +21,8 @@ const defaultArgs = {
   interactionLocked: false,
   isFrameworkPending: false,
   isHintPending: false,
-  onRequestFramework: fn(async () => undefined),
-  onRequestHint: fn(async () => undefined),
+  onRequestFramework: fn(async () => "executed" as const),
+  onRequestHint: fn(async () => "executed" as const),
 }
 
 const meta = preview.meta({
@@ -38,6 +41,44 @@ export const FrameworkRevealed = meta.story({
   args: {
     ...defaultArgs,
     answerFramework: getQuestion("answeringFrameworkRevealed").answerFramework,
+  },
+})
+
+const behavioralGuidance = createGeneratedPracticeQuestionGuidance("behavioral")
+
+export const BehavioralHintRevealed = meta.story({
+  args: {
+    ...defaultArgs,
+    answerHints: { status: "revealed", content: behavioralGuidance.hints },
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/具体情境|specific situation/i)).toBeVisible()
+  },
+})
+
+const motivationGuidance = createGeneratedPracticeQuestionGuidance("motivation")
+
+export const MotivationFrameworkRevealed = meta.story({
+  args: {
+    ...defaultArgs,
+    answerFramework: { status: "revealed", content: motivationGuidance.framework },
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/岗位吸引力|role appeal/i)).toBeVisible()
+  },
+})
+
+const technicalGuidance = createGeneratedPracticeQuestionGuidance("technicalFoundation")
+
+export const TechnicalGuidanceRevealed = meta.story({
+  args: {
+    ...defaultArgs,
+    answerHints: { status: "revealed", content: technicalGuidance.hints },
+    answerFramework: { status: "revealed", content: technicalGuidance.framework },
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/相关概念|related concepts/i)).toBeVisible()
+    await expect(canvas.getByText(/权衡与验证|tradeoffs and validation/i)).toBeVisible()
   },
 })
 

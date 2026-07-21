@@ -61,6 +61,11 @@ type GeneratedQuestionTemplate = {
   recommendedMaterials: readonly string[]
 }
 
+type GeneratedQuestionGuidanceTemplate = {
+  hints: readonly string[]
+  framework: readonly string[]
+}
+
 const generatedQuestionTemplates = {
   projectDeepDive: {
     prompts: [
@@ -104,6 +109,94 @@ const generatedQuestionTemplates = {
   },
 } satisfies Record<PracticeQuestionType, GeneratedQuestionTemplate>
 
+const generatedQuestionGuidanceTemplates = {
+  projectDeepDive: {
+    hints: [
+      "先交代项目背景、业务目标和关键约束。",
+      "明确你的个人职责，以及你实际负责解决的问题。",
+      "说明关键决策、备选方案和做出取舍的依据。",
+      "补充你如何推动协作方落地方案并处理阻力。",
+      "用量化指标呈现结果，并说明结果如何得到验证。",
+    ],
+    framework: [
+      "背景与目标：说明项目要解决的问题、目标和约束。",
+      "个人职责：界定你的责任范围和需要推动的关键事项。",
+      "决策与行动：展开关键判断、方案取舍和推动过程。",
+      "结果与复盘：呈现量化结果、验证方式和后续改进。",
+    ],
+  },
+  behavioral: {
+    hints: [
+      "选择一个具体情境，说明当时的目标和你的角色。",
+      "明确冲突、挑战或压力来自哪里。",
+      "聚焦你个人采取的行动，而不是只描述团队做了什么。",
+      "说明你如何沟通、协调并推动相关方形成共识。",
+      "交代最终结果，以及你从这次经历中得到的复盘。",
+    ],
+    framework: [
+      "情境（Situation）：交代背景、目标和关键参与方。",
+      "任务（Task）：说明你承担的责任和面对的挑战。",
+      "行动（Action）：具体展开你的判断、沟通和推动动作。",
+      "结果（Result）：说明结果、证据和事后复盘。",
+    ],
+  },
+  businessUnderstanding: {
+    hints: [
+      "先明确要支持的业务目标和问题边界。",
+      "指出用于判断优先级和效果的核心指标。",
+      "识别用户、业务方和交付团队等关键利益相关方。",
+      "比较不同方案的收益、成本、风险和取舍。",
+      "说明最终决策对业务结果产生了什么影响。",
+    ],
+    framework: [
+      "业务目标：定义问题、目标用户和成功指标。",
+      "关键洞察：说明数据依据与利益相关方诉求。",
+      "方案取舍：比较选项并解释最终决策。",
+      "业务影响：呈现结果、验证方式和后续调整。",
+    ],
+  },
+  motivation: {
+    hints: [
+      "具体说明你为什么选择这个岗位，而不是泛泛表达兴趣。",
+      "连接过往经历、能力积累与岗位的核心要求。",
+      "说明你能为团队或业务带来的独特价值。",
+      "交代这个岗位与你下一阶段职业发展目标的关系。",
+    ],
+    framework: [
+      "岗位吸引力：说明你对岗位职责和机会的理解。",
+      "经历连接：用相关经历证明能力与岗位要求匹配。",
+      "可贡献价值：概括你能解决的问题和带来的价值。",
+      "发展目标：说明岗位与长期职业方向如何衔接。",
+    ],
+  },
+  technicalFoundation: {
+    hints: [
+      "先准确界定相关概念、工作原理和适用边界。",
+      "分析问题可能出现的原因，并说明排查顺序。",
+      "提出可落地的分析或设计方案。",
+      "比较方案在复杂度、性能、维护性和风险上的权衡。",
+      "说明如何验证方案有效，并控制上线或演进风险。",
+    ],
+    framework: [
+      "概念与原理：定义核心概念并解释运行机制。",
+      "原因分析：列出关键影响因素和定位思路。",
+      "方案设计：给出步骤、边界和必要的工程措施。",
+      "权衡与验证：说明取舍、验证指标和风险控制。",
+    ],
+  },
+} satisfies Record<PracticeQuestionType, GeneratedQuestionGuidanceTemplate>
+
+export function createGeneratedPracticeQuestionGuidance(questionType: PracticeQuestionType): {
+  hints: string[]
+  framework: string[]
+} {
+  const template = generatedQuestionGuidanceTemplates[questionType]
+  return {
+    hints: [...template.hints],
+    framework: [...template.framework],
+  }
+}
+
 export function createGeneratedPracticeQuestion({
   sessionId,
   ordinal,
@@ -143,24 +236,13 @@ const question = createGeneratedPracticeQuestion({
   selection: defaultSelection,
 })
 
-export const practiceAnswerHintContent = [
-  "先界定性能问题对业务和用户的影响。",
-  "重点说明你个人做出的判断、取舍和推动动作。",
-  "用指标解释结果，并补充验证方式。",
-]
-
-export const practiceAnswerFrameworkContent = [
-  "背景：用一两句话说明问题和目标。",
-  "任务：明确你的职责与关键约束。",
-  "行动：按判断、方案、协作和风险控制展开。",
-  "结果：用指标呈现结果，并说明如何验证。",
-]
+const defaultGuidance = createGeneratedPracticeQuestionGuidance(question.questionType)
 
 const hintRevealedQuestion = {
   ...question,
   answerHints: {
     status: "revealed",
-    content: practiceAnswerHintContent,
+    content: defaultGuidance.hints,
   },
 } satisfies PracticeQuestionCard
 
@@ -168,7 +250,7 @@ const frameworkRevealedQuestion = {
   ...question,
   answerFramework: {
     status: "revealed",
-    content: practiceAnswerFrameworkContent,
+    content: defaultGuidance.framework,
   },
 } satisfies PracticeQuestionCard
 

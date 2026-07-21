@@ -31,6 +31,7 @@ import {
   synchronizePracticeMutationResponse,
   synchronizeQuestionGenerationResponse,
 } from "./practice-cache"
+import type { PracticeInteractionResult } from "./practice-interaction"
 import { PracticeView } from "./PracticeView"
 
 const PRACTICE_QUERY_KEY = ["practice"] as const
@@ -112,11 +113,14 @@ export function PracticePage() {
     void generationQuery.refetch()
   }
 
-  async function runQuestionMutation(operation: () => Promise<PracticePageResponse>) {
-    if (questionMutationLock.current) return
+  async function runQuestionMutation(
+    operation: () => Promise<PracticePageResponse>,
+  ): Promise<PracticeInteractionResult> {
+    if (questionMutationLock.current) return "ignored"
     questionMutationLock.current = true
     try {
       await operation()
+      return "executed"
     } finally {
       questionMutationLock.current = false
     }
@@ -127,25 +131,25 @@ export function PracticePage() {
       <PracticeView
         answeringActions={{
           onEnd: async (input: RequestEndPracticeSessionInput) => {
-            await runQuestionMutation(() => endMutation.mutateAsync(input))
+            return runQuestionMutation(() => endMutation.mutateAsync(input))
           },
           onRequestFramework: async (input: RequestAnswerFrameworkInput) => {
-            await runQuestionMutation(() => frameworkMutation.mutateAsync(input))
+            return runQuestionMutation(() => frameworkMutation.mutateAsync(input))
           },
           onRequestHint: async (input: RequestPracticeHintInput) => {
-            await runQuestionMutation(() => hintMutation.mutateAsync(input))
+            return runQuestionMutation(() => hintMutation.mutateAsync(input))
           },
           onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
-            await runQuestionMutation(() => savedMutation.mutateAsync(input))
+            return runQuestionMutation(() => savedMutation.mutateAsync(input))
           },
           onSetWeak: async (input: SetPracticeQuestionWeakInput) => {
-            await runQuestionMutation(() => weakMutation.mutateAsync(input))
+            return runQuestionMutation(() => weakMutation.mutateAsync(input))
           },
           onSkip: async (input: SkipPracticeQuestionInput) => {
-            await runQuestionMutation(() => skipMutation.mutateAsync(input))
+            return runQuestionMutation(() => skipMutation.mutateAsync(input))
           },
           onSubmitAnswer: async (input: SubmitPracticeAnswerInput) => {
-            await runQuestionMutation(() => submitAnswerMutation.mutateAsync(input))
+            return runQuestionMutation(() => submitAnswerMutation.mutateAsync(input))
           },
         }}
         answeringPending={{

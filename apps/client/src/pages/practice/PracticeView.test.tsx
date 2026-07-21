@@ -18,13 +18,13 @@ function createAnsweringActions(
   overrides: Partial<PracticeAnsweringActions> = {},
 ): PracticeAnsweringActions {
   return {
-    onEnd: vi.fn(async () => undefined),
-    onRequestFramework: vi.fn(async () => undefined),
-    onRequestHint: vi.fn(async () => undefined),
-    onSetSaved: vi.fn(async () => undefined),
-    onSetWeak: vi.fn(async () => undefined),
-    onSkip: vi.fn(async () => undefined),
-    onSubmitAnswer: vi.fn(async () => undefined),
+    onEnd: vi.fn(async () => "executed" as const),
+    onRequestFramework: vi.fn(async () => "executed" as const),
+    onRequestHint: vi.fn(async () => "executed" as const),
+    onSetSaved: vi.fn(async () => "executed" as const),
+    onSetWeak: vi.fn(async () => "executed" as const),
+    onSkip: vi.fn(async () => "executed" as const),
+    onSubmitAnswer: vi.fn(async () => "executed" as const),
     ...overrides,
   }
 }
@@ -331,16 +331,51 @@ describe("PracticeView", () => {
     expect(actions.onRequestFramework).toHaveBeenCalledWith(expectedInput)
   })
 
+  it("keeps ignored guidance requests available without showing errors", async () => {
+    const user = userEvent.setup()
+    const requestHint = vi
+      .fn<PracticeAnsweringActions["onRequestHint"]>()
+      .mockResolvedValueOnce("ignored")
+      .mockResolvedValueOnce("executed")
+    const requestFramework = vi
+      .fn<PracticeAnsweringActions["onRequestFramework"]>()
+      .mockResolvedValueOnce("ignored")
+      .mockResolvedValueOnce("executed")
+    renderReadyView(createPracticeMockResponse("answeringQuestion"), {
+      answeringActions: createAnsweringActions({
+        onRequestFramework: requestFramework,
+        onRequestHint: requestHint,
+      }),
+    })
+
+    const hintButton = await screen.findByRole("button", {
+      name: i18n.t("practice.guidance.requestHint"),
+    })
+    const frameworkButton = screen.getByRole("button", {
+      name: i18n.t("practice.guidance.requestFramework"),
+    })
+    await user.click(hintButton)
+    await user.click(hintButton)
+    await user.click(frameworkButton)
+    await user.click(frameworkButton)
+
+    expect(requestHint).toHaveBeenCalledTimes(2)
+    expect(requestFramework).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(hintButton).toBeEnabled()
+    expect(frameworkButton).toBeEnabled()
+  })
+
   it("shows safe guidance errors and allows retry", async () => {
     const user = userEvent.setup()
     const requestHint = vi
       .fn<PracticeAnsweringActions["onRequestHint"]>()
       .mockRejectedValueOnce(new Error("unsafe hint details"))
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce("executed")
     const requestFramework = vi
       .fn<PracticeAnsweringActions["onRequestFramework"]>()
       .mockRejectedValueOnce(new Error("unsafe framework details"))
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce("executed")
     renderReadyView(createPracticeMockResponse("answeringQuestion"), {
       answeringActions: createAnsweringActions({
         onRequestFramework: requestFramework,

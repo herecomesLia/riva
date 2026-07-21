@@ -41,15 +41,16 @@ import { PracticeQuestionActions } from "./components/PracticeQuestionActions"
 import { PracticeQuestionCard } from "./components/PracticeQuestionCard"
 import { PracticeQuestionGuidance } from "./components/PracticeQuestionGuidance"
 import { PracticeSessionHeader } from "./components/PracticeSessionHeader"
+import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
-  onEnd: (input: RequestEndPracticeSessionInput) => Promise<void>
-  onRequestFramework: (input: RequestAnswerFrameworkInput) => Promise<void>
-  onRequestHint: (input: RequestPracticeHintInput) => Promise<void>
-  onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<void>
-  onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<void>
-  onSkip: (input: SkipPracticeQuestionInput) => Promise<void>
-  onSubmitAnswer: (input: SubmitPracticeAnswerInput) => Promise<void>
+  onEnd: (input: RequestEndPracticeSessionInput) => Promise<PracticeInteractionResult>
+  onRequestFramework: (input: RequestAnswerFrameworkInput) => Promise<PracticeInteractionResult>
+  onRequestHint: (input: RequestPracticeHintInput) => Promise<PracticeInteractionResult>
+  onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
+  onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<PracticeInteractionResult>
+  onSkip: (input: SkipPracticeQuestionInput) => Promise<PracticeInteractionResult>
+  onSubmitAnswer: (input: SubmitPracticeAnswerInput) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeAnsweringPending = {

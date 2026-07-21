@@ -17,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 
+import type { PracticeInteractionResult } from "../practice-interaction"
+
 type PracticeQuestionActionsProps = {
   interactionLocked: boolean
   isEndPending: boolean
@@ -25,10 +27,10 @@ type PracticeQuestionActionsProps = {
   isSavedPending: boolean
   isSkipPending: boolean
   isWeakPending: boolean
-  onEnd: () => Promise<void>
-  onSetSaved: (isSaved: boolean) => Promise<void>
-  onSetWeak: (isMarkedWeak: boolean) => Promise<void>
-  onSkip: () => Promise<void>
+  onEnd: () => Promise<PracticeInteractionResult>
+  onSetSaved: (isSaved: boolean) => Promise<PracticeInteractionResult>
+  onSetWeak: (isMarkedWeak: boolean) => Promise<PracticeInteractionResult>
+  onSkip: () => Promise<PracticeInteractionResult>
 }
 
 type ActionError = "saved" | "weak" | "skip" | "end" | null
@@ -75,8 +77,8 @@ export function PracticeQuestionActions({
     if (interactionLocked) return
     setActionError(null)
     try {
-      await onSkip()
-      setSkipOpen(false)
+      const result = await onSkip()
+      if (result === "executed") setSkipOpen(false)
     } catch {
       setActionError("skip")
     }
@@ -86,8 +88,8 @@ export function PracticeQuestionActions({
     if (interactionLocked) return
     setActionError(null)
     try {
-      await onEnd()
-      setEndOpen(false)
+      const result = await onEnd()
+      if (result === "executed") setEndOpen(false)
     } catch {
       setActionError("end")
     }

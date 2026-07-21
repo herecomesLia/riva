@@ -1,8 +1,7 @@
 import {
   createGeneratedPracticeQuestion,
+  createGeneratedPracticeQuestionGuidance,
   createPracticeMockResponse,
-  practiceAnswerFrameworkContent,
-  practiceAnswerHintContent,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
 import { getRolesPage } from "@/mocks/services/roles"
@@ -239,6 +238,7 @@ export async function requestPracticeHint(
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   if (session.question.answerHints.status !== "notRequested") return copy(mockResponse)
+  const guidance = createGeneratedPracticeQuestionGuidance(session.question.questionType)
 
   return setMockResponse({
     ...mockResponse,
@@ -247,7 +247,7 @@ export async function requestPracticeHint(
       version: session.version + 1,
       question: {
         ...session.question,
-        answerHints: { status: "revealed", content: copy(practiceAnswerHintContent) },
+        answerHints: { status: "revealed", content: copy(guidance.hints) },
       },
     },
   })
@@ -259,6 +259,7 @@ export async function requestAnswerFramework(
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   if (session.question.answerFramework.status !== "notRequested") return copy(mockResponse)
+  const guidance = createGeneratedPracticeQuestionGuidance(session.question.questionType)
 
   return setMockResponse({
     ...mockResponse,
@@ -269,7 +270,7 @@ export async function requestAnswerFramework(
         ...session.question,
         answerFramework: {
           status: "revealed",
-          content: copy(practiceAnswerFrameworkContent),
+          content: copy(guidance.framework),
         },
       },
     },
