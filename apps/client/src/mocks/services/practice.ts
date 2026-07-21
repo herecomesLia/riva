@@ -15,6 +15,7 @@ import type {
   EndPracticeFollowUpsInput,
   PracticePageResponse,
   PracticeAttemptRecord,
+  PracticeCompletedState,
   PracticeQuestionMutationInput,
   PracticeQuestionType,
   RequestAnswerFrameworkInput,
@@ -529,6 +530,43 @@ function toAttemptRecord(
   }
 }
 
+function createCompletedPracticeSession({
+  session,
+  records,
+  completedAt,
+  nextStepSuggestion,
+}: {
+  session: Pick<
+    PracticeCompletedState,
+    "sessionId" | "version" | "selection" | "startedAt" | "attemptId" | "attemptNumber"
+  >
+  records: PracticeAttemptRecord[]
+  completedAt: string
+  nextStepSuggestion: string
+}): PracticeCompletedState {
+  const latestByQuestion = new Map<string, PracticeAttemptRecord>()
+  for (const record of records) latestByQuestion.set(record.question.id, record)
+  const uniqueRecords = [...latestByQuestion.values()]
+  return {
+    status: "completed",
+    ...session,
+    attemptRecords: copy(records),
+    completedAt,
+    questionsCompleted: uniqueRecords.length,
+    retryCount: records.length - uniqueRecords.length,
+    savedQuestionCount: uniqueRecords.filter((record) => record.isSaved).length,
+    newWeaknessCount: uniqueRecords.filter((record) => record.isMarkedWeak).length,
+    averageScore:
+      records.length === 0
+        ? 0
+        : Math.round(
+            records.reduce((total, record) => total + record.evaluation.overallScore, 0) /
+              records.length,
+          ),
+    nextStepSuggestion,
+  }
+}
+
 function requireEvaluatingSession(input: GetPracticeEvaluationStatusInput) {
   const session = mockResponse.session
   if (
@@ -680,29 +718,15 @@ export async function endPracticeSession(
     throw new Error("Practice session version is out of date.")
   }
   const records = [...copy(session.attemptRecords), toAttemptRecord(session)]
-  const averageScore = Math.round(
-    records.reduce((total, record) => total + record.evaluation.overallScore, 0) / records.length,
-  )
 
   return setMockResponse({
     ...mockResponse,
-    session: {
-      status: "completed",
-      sessionId: session.sessionId,
-      version: session.version + 1,
-      selection: copy(session.selection),
-      startedAt: session.startedAt,
-      attemptId: session.attemptId,
-      attemptNumber: session.attemptNumber,
-      attemptRecords: records,
+    session: createCompletedPracticeSession({
+      session: { ...session, version: session.version + 1 },
+      records,
       completedAt: nextMutationTimestamp(),
-      questionsCompleted: new Set(records.map((record) => record.question.id)).size,
-      retryCount: records.length - new Set(records.map((record) => record.question.id)).size,
-      savedQuestionCount: records.filter((record) => record.isSaved).length,
-      newWeaknessCount: records.filter((record) => record.isMarkedWeak).length,
-      averageScore,
       nextStepSuggestion: "根据本轮复盘优先补足薄弱项，再开始下一轮专项练习。",
-    },
+    }),
   })
 }
 
@@ -738,22 +762,11 @@ export async function requestEndPracticeSession(
 
   return setMockResponse({
     ...mockResponse,
-    session: {
-      status: "completed",
-      sessionId: session.sessionId,
-      version: session.version + 1,
-      selection: copy(session.selection),
-      startedAt: session.startedAt,
-      attemptId: session.attemptId,
-      attemptNumber: session.attemptNumber,
-      attemptRecords: copy(session.attemptRecords),
+    session: createCompletedPracticeSession({
+      session: { ...session, version: session.version + 1 },
+      records: copy(session.attemptRecords),
       completedAt: nextMutationTimestamp(),
-      questionsCompleted: 0,
-      retryCount: 0,
-      savedQuestionCount: 0,
-      newWeaknessCount: 0,
-      averageScore: 0,
       nextStepSuggestion: "本轮在提交回答前结束。可重新开始专项练习。",
-    },
+    }),
   })
 }

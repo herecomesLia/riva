@@ -45,6 +45,7 @@ import {
 import {
   synchronizePracticeEvaluationResponse,
   synchronizePracticeMutationResponse,
+  synchronizePracticeSessionMutationResponse,
   synchronizeQuestionGenerationResponse,
 } from "./practice-cache"
 import type { PracticeInteractionResult } from "./practice-interaction"
@@ -353,7 +354,14 @@ function usePracticeSessionMutation<TInput>(
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn,
-    onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
+    onSuccess: (response, input) =>
+      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
+        synchronizePracticeSessionMutationResponse(
+          current,
+          response,
+          input as EndPracticeSessionInput,
+        ),
+      ),
   })
 }
 

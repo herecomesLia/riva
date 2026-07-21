@@ -73,6 +73,9 @@ export const practice = {
     actionTitle: "Action not completed",
     savedDescription: "The saved state did not change. Please try again.",
     weakDescription: "The weak-question state did not change. Please try again.",
+    retryDescription: "Unable to retry this question right now. Please try again.",
+    nextDescription: "Unable to generate the next question right now. Please try again.",
+    reviewEndDescription: "Unable to end this session right now. Please try again.",
     skipDescription: "The question was not skipped. Please try again.",
     endDescription: "Your practice session is still active. Please try again.",
     followUpSubmitTitle: "Follow-up answer not submitted",
@@ -218,6 +221,8 @@ export const practice = {
     retryCurrent: "Retry this question",
     nextQuestion: "Continue to next question",
     endSession: "End this session",
+    endConfirmTitle: "End this targeted-practice session?",
+    endConfirmDescription: "Completed question reviews will be kept.",
   },
   completed: {
     title: "This targeted-practice session has ended",

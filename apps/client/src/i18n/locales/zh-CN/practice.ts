@@ -68,6 +68,9 @@ export const practice = {
     actionTitle: "操作未完成",
     savedDescription: "收藏状态没有改变，请稍后重试。",
     weakDescription: "薄弱题状态没有改变，请稍后重试。",
+    retryDescription: "暂时无法重练当前题，请稍后重试。",
+    nextDescription: "暂时无法生成下一题，请稍后重试。",
+    reviewEndDescription: "暂时无法结束本轮练习，请稍后重试。",
     skipDescription: "当前题没有被跳过，请稍后重试。",
     endDescription: "本轮练习仍在继续，请稍后重试。",
     followUpSubmitTitle: "追问回答提交失败",
@@ -204,6 +207,8 @@ export const practice = {
     retryCurrent: "重练当前题",
     nextQuestion: "继续下一题",
     endSession: "结束本轮练习",
+    endConfirmTitle: "结束本轮专项练习？",
+    endConfirmDescription: "将保留已完成题目的复盘记录。",
   },
   completed: {
     title: "本轮专项练习已结束",

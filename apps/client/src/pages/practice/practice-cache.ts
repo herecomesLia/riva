@@ -1,9 +1,35 @@
 import type {
+  EndPracticeSessionInput,
   GetQuestionGenerationStatusInput,
   GetPracticeEvaluationStatusInput,
   PracticePageResponse,
   PracticeQuestionMutationInput,
 } from "@/models/practice"
+
+export function synchronizePracticeSessionMutationResponse(
+  current: PracticePageResponse | undefined,
+  response: PracticePageResponse,
+  request: EndPracticeSessionInput,
+) {
+  if (!current || !("sessionId" in current.session) || !("version" in current.session)) {
+    return current
+  }
+  if (
+    current.session.sessionId !== request.sessionId ||
+    current.session.version !== request.version
+  ) {
+    return current
+  }
+  const responseSession = response.session
+  if (
+    responseSession.status !== "completed" ||
+    responseSession.sessionId !== request.sessionId ||
+    responseSession.version < request.version
+  ) {
+    return current
+  }
+  return response
+}
 
 export function synchronizeQuestionGenerationResponse(
   current: PracticePageResponse | undefined,
