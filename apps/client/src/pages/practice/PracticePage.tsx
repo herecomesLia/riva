@@ -3,12 +3,14 @@ import { useEffect, useRef } from "react"
 
 import type {
   GetQuestionGenerationStatusInput,
+  GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticePageResponse,
   PracticeQuestionMutationInput,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
+  RetryPracticeEvaluationInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -19,10 +21,12 @@ import type {
 import {
   endPracticeFollowUps,
   getPracticePage,
+  getPracticeEvaluationStatus,
   getQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
+  retryPracticeEvaluation,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -32,6 +36,7 @@ import {
 } from "@/services/practice"
 
 import {
+  synchronizePracticeEvaluationResponse,
   synchronizePracticeMutationResponse,
   synchronizeQuestionGenerationResponse,
 } from "./practice-cache"
@@ -61,6 +66,7 @@ export function PracticePage() {
   const endFollowUpMutation = usePracticeMutation(endPracticeFollowUps)
   const skipMutation = usePracticeMutation(skipPracticeQuestion)
   const endMutation = usePracticeMutation(requestEndPracticeSession)
+  const retryEvaluationMutation = usePracticeMutation(retryPracticeEvaluation)
   const isQuestionMutationPending =
     hintMutation.isPending ||
     frameworkMutation.isPending ||
@@ -96,6 +102,33 @@ export function PracticePage() {
       query.state.data?.session.status === "generatingQuestion" ? 500 : false,
     retry: false,
   })
+  const evaluationSession =
+    practiceQuery.data?.session.status === "evaluating" ? practiceQuery.data.session : null
+  const evaluationSessionId = evaluationSession?.sessionId
+  const evaluationVersion = evaluationSession?.version
+  const evaluationQuestionId = evaluationSession?.question.id
+  const evaluationQuery = useQuery({
+    enabled: evaluationSession !== null,
+    queryFn: () => {
+      if (!evaluationSessionId || evaluationVersion === undefined || !evaluationQuestionId) {
+        throw new Error("An evaluating practice session is required.")
+      }
+      return getPracticeEvaluationStatus({
+        sessionId: evaluationSessionId,
+        version: evaluationVersion,
+        questionId: evaluationQuestionId,
+      })
+    },
+    queryKey: [
+      ...PRACTICE_QUERY_KEY,
+      "evaluation",
+      evaluationSessionId,
+      evaluationVersion,
+      evaluationQuestionId,
+    ],
+    refetchInterval: (query) => (query.state.data?.session.status === "evaluating" ? 500 : false),
+    retry: false,
+  })
 
   useEffect(() => {
     if (!generationQuery.data || !generationSessionId || generationVersion === undefined) {
@@ -112,6 +145,33 @@ export function PracticePage() {
     )
   }, [generationQuery.data, generationSessionId, generationVersion, queryClient])
 
+  useEffect(() => {
+    if (
+      !evaluationQuery.data ||
+      !evaluationSessionId ||
+      evaluationVersion === undefined ||
+      !evaluationQuestionId
+    ) {
+      return
+    }
+
+    const request: GetPracticeEvaluationStatusInput = {
+      sessionId: evaluationSessionId,
+      version: evaluationVersion,
+      questionId: evaluationQuestionId,
+    }
+    const response = evaluationQuery.data
+    queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
+      synchronizePracticeEvaluationResponse(current, response, request),
+    )
+  }, [
+    evaluationQuery.data,
+    evaluationQuestionId,
+    evaluationSessionId,
+    evaluationVersion,
+    queryClient,
+  ])
+
   async function start(input: StartPracticeSessionInput) {
     await startMutation.mutateAsync(input)
   }
@@ -119,6 +179,17 @@ export function PracticePage() {
   function retryGeneration() {
     if (practiceQuery.data?.session.status !== "generatingQuestion") return
     void generationQuery.refetch()
+  }
+
+  function retryEvaluation() {
+    const session = practiceQuery.data?.session
+    if (session?.status !== "evaluating" || retryEvaluationMutation.isPending) return
+    const input: RetryPracticeEvaluationInput = {
+      sessionId: session.sessionId,
+      version: session.version,
+      questionId: session.question.id,
+    }
+    void retryEvaluationMutation.mutateAsync(input).catch(() => undefined)
   }
 
   async function runQuestionMutation(
@@ -183,13 +254,36 @@ export function PracticePage() {
           interactionLocked: isQuestionMutationPending,
           submit: submitFollowUpMutation.isPending,
         }}
+        reviewActions={{
+          onEndSession: () => undefined,
+          onNextQuestion: () => undefined,
+          onRetryCurrent: () => undefined,
+          onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
+            return runQuestionMutation(() => savedMutation.mutateAsync(input))
+          },
+          onSetWeak: async (input: SetPracticeQuestionWeakInput) => {
+            return runQuestionMutation(() => weakMutation.mutateAsync(input))
+          },
+        }}
+        reviewPending={{
+          interactionLocked: savedMutation.isPending || weakMutation.isPending,
+          saved: savedMutation.isPending,
+          weak: weakMutation.isPending,
+        }}
         content={{ status: "ready", data: practiceQuery.data }}
+        evaluationError={
+          evaluationQuery.isError ||
+          evaluationQuery.errorUpdatedAt > evaluationQuery.dataUpdatedAt ||
+          retryEvaluationMutation.isError
+        }
         generationError={
           generationQuery.isError || generationQuery.errorUpdatedAt > generationQuery.dataUpdatedAt
         }
         isGenerationRetrying={generationQuery.isFetching}
+        isEvaluationRetrying={retryEvaluationMutation.isPending}
         isStarting={startMutation.isPending}
         onRetryGeneration={retryGeneration}
+        onRetryEvaluation={retryEvaluation}
         onStart={start}
         variant="default"
       />

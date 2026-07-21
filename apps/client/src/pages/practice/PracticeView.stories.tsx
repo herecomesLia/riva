@@ -51,11 +51,22 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
       interactionLocked: false,
       submit: false,
     },
+    reviewActions: {
+      onEndSession: fn(),
+      onNextQuestion: fn(),
+      onRetryCurrent: fn(),
+      onSetSaved: fn(async () => "executed" as const),
+      onSetWeak: fn(async () => "executed" as const),
+    },
+    reviewPending: { interactionLocked: false, saved: false, weak: false },
     content: { data: createPracticeMockResponse(scenario), status: "ready" as const },
+    evaluationError: false,
     generationError: false,
+    isEvaluationRetrying: false,
     isGenerationRetrying: false,
     isStarting: false,
     onRetryGeneration: fn(),
+    onRetryEvaluation: fn(),
     onStart: fn(async () => undefined),
     variant: "default" as const,
   }
@@ -165,6 +176,46 @@ export const FollowUpCompleted = meta.story({
     await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
     await expect(canvas.getByTestId("practice-conversation-timeline")).toBeVisible()
   },
+})
+
+export const Evaluating = meta.story({
+  args: readyArgs("evaluatingAnswer"),
+})
+
+export const EvaluationError = meta.story({
+  args: { ...readyArgs("evaluatingAnswer"), evaluationError: true },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-evaluation-error")).toBeVisible()
+    await expect(canvas.queryByText(/unsafe|stack|exception/i)).not.toBeInTheDocument()
+  },
+})
+
+export const BalancedReview = meta.story({
+  args: readyArgs("reviewBalanced"),
+})
+
+export const HighScoreReview = meta.story({
+  args: readyArgs("reviewHighScore"),
+})
+
+export const LowScoreReview = meta.story({
+  args: readyArgs("reviewLowScore"),
+})
+
+export const RetryRecommended = meta.story({
+  args: readyArgs("reviewRetryRecommended"),
+})
+
+export const NextQuestionRecommended = meta.story({
+  args: readyArgs("reviewNextRecommended"),
+})
+
+export const LongReviewContent = meta.story({
+  args: readyArgs("reviewLongContent"),
+})
+
+export const NoNewWeaknesses = meta.story({
+  args: readyArgs("reviewNoNewWeaknesses"),
 })
 
 export const FollowUpEndedEarly = meta.story({

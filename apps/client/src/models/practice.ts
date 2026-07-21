@@ -224,6 +224,14 @@ export type GetQuestionGenerationStatusInput = {
   version: number
 }
 
+export type GetPracticeEvaluationStatusInput = {
+  sessionId: string
+  version: number
+  questionId: string
+}
+
+export type RetryPracticeEvaluationInput = GetPracticeEvaluationStatusInput
+
 export type PracticeQuestionMutationInput = {
   sessionId: string
   version: number

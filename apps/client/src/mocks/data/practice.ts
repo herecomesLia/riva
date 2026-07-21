@@ -470,6 +470,24 @@ const evaluation = {
   evaluatedAt: "2026-07-20T01:38:00.000Z",
 } satisfies PracticeEvaluation
 
+const highScoreEvaluation = {
+  overallScore: 94,
+  dimensionScores: scoreDimensions.map((item) => ({
+    ...item,
+    score: Math.min(100, item.score + 8),
+  })),
+  evaluatedAt: "2026-07-20T01:38:00.000Z",
+} satisfies PracticeEvaluation
+
+const lowScoreEvaluation = {
+  overallScore: 58,
+  dimensionScores: scoreDimensions.map((item) => ({
+    ...item,
+    score: Math.max(0, item.score - 27),
+  })),
+  evaluatedAt: "2026-07-20T01:38:00.000Z",
+} satisfies PracticeEvaluation
+
 const retryReview = {
   overallPerformance: "回答有清晰的性能优化主线和量化结果，但个人推动过程与风险控制仍不够完整。",
   highlights: ["用 P75 可交互时间和退出率呈现业务结果", "通过设备分层灰度增强归因可信度"],
@@ -510,6 +528,77 @@ const nextReview = {
   },
 } satisfies PracticeReview
 
+const highScoreReview = {
+  overallPerformance: "回答主线清晰、个人贡献突出，并使用充分的数据和验证过程建立了可信度。",
+  highlights: ["快速界定了业务影响和技术瓶颈", "关键取舍、协作动作与量化结果形成完整闭环"],
+  mainIssues: ["可以进一步压缩背景信息，使关键决策更快被识别"],
+  improvementSuggestions: ["将背景压缩为目标和约束两句话，把更多时间留给决策依据和复盘"],
+  reusableAnswerStructure: [
+    "目标与约束",
+    "个人判断",
+    "关键取舍",
+    "推动落地",
+    "量化验证",
+    "复盘沉淀",
+  ],
+  exposedWeaknesses: ["表达精炼度"],
+  recommendation: {
+    action: "nextQuestion",
+    reason: "本题能力证据已经完整，可以进入更高压力的技术取舍训练。",
+    nextQuestion: {
+      questionType: "technicalFoundation",
+      difficulty: "pressure",
+      focusAreas: ["技术取舍", "验证与风险"],
+    },
+  },
+} satisfies PracticeReview
+
+const lowScoreReview = {
+  overallPerformance:
+    "回答提到了性能优化动作，但问题背景、个人职责、决策依据和结果证据尚未形成完整闭环。",
+  highlights: ["识别了首屏包体和同步请求两个具体方向"],
+  mainIssues: ["个人行动与团队行动边界不清楚", "缺少能够验证优化结果的指标和对照依据"],
+  improvementSuggestions: [
+    "明确说明自己负责的分析和推动动作",
+    "补充优化前后指标、实验范围与风险控制",
+  ],
+  reusableAnswerStructure: [
+    "业务问题",
+    "个人职责",
+    "分析依据",
+    "方案取舍",
+    "结果证据",
+    "风险与复盘",
+  ],
+  exposedWeaknesses: ["个人贡献表达", "结果与数据支撑", "风险控制"],
+  recommendation: {
+    action: "retryCurrent",
+    reason: "建议按可复用结构补齐个人行动和结果证据后重答当前题。",
+  },
+} satisfies PracticeReview
+
+const longReview = {
+  ...retryReview,
+  overallPerformance:
+    "回答能够从业务影响切入，逐步说明问题定位、方案设计、跨团队推动和结果验证，整体叙述具有较好的完整性。当前最需要继续加强的是把每一次关键判断和候选人本人的具体动作建立更直接的对应关系，并明确说明灰度阶段观察了哪些指标、如何设置告警阈值、什么情况下启动回滚，以及这些机制如何帮助团队在控制发布风险的同时验证性能收益。",
+  improvementSuggestions: [
+    "将推动过程拆成发现分歧、澄清约束、提出可验证方案和促成决策四个连续动作，并分别说明你提供了什么信息、影响了哪位协作方以及最终形成了什么共识。",
+    "把结果验证补充为优化前基线、实验组与对照组差异、持续观察周期、异常告警阈值和回滚条件，避免只用一个上线后的最终指标概括全部验证过程。",
+  ],
+} satisfies PracticeReview
+
+const noNewWeaknessesReview = {
+  ...nextReview,
+  exposedWeaknesses: [],
+} satisfies PracticeReview
+
+export function createPracticeMockEvaluationResult(): {
+  evaluation: PracticeEvaluation
+  review: PracticeReview
+} {
+  return structuredClone({ evaluation, review: nextReview })
+}
+
 export type PracticeMockScenario =
   | "setupReady"
   | "noRoles"
@@ -529,6 +618,11 @@ export type PracticeMockScenario =
   | "evaluatingAnswer"
   | "reviewRetryRecommended"
   | "reviewNextRecommended"
+  | "reviewBalanced"
+  | "reviewHighScore"
+  | "reviewLowScore"
+  | "reviewLongContent"
+  | "reviewNoNewWeaknesses"
   | "completedSession"
 
 const practiceMockScenarios = {
@@ -737,6 +831,71 @@ const practiceMockScenarios = {
       },
       evaluation,
       review: nextReview,
+    },
+  },
+  reviewBalanced: {
+    setupContext,
+    session: {
+      status: "review",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: completedProjectFollowUps,
+      followUpCompletion: { status: "completed", reason: "allAnswered" },
+      evaluation,
+      review: nextReview,
+    },
+  },
+  reviewHighScore: {
+    setupContext,
+    session: {
+      status: "review",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: completedProjectFollowUps,
+      followUpCompletion: { status: "completed", reason: "allAnswered" },
+      evaluation: highScoreEvaluation,
+      review: highScoreReview,
+    },
+  },
+  reviewLowScore: {
+    setupContext,
+    session: {
+      status: "review",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: completedProjectFollowUps,
+      followUpCompletion: { status: "completed", reason: "allAnswered" },
+      evaluation: lowScoreEvaluation,
+      review: lowScoreReview,
+    },
+  },
+  reviewLongContent: {
+    setupContext,
+    session: {
+      status: "review",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: completedProjectFollowUps,
+      followUpCompletion: { status: "completed", reason: "allAnswered" },
+      evaluation,
+      review: longReview,
+    },
+  },
+  reviewNoNewWeaknesses: {
+    setupContext,
+    session: {
+      status: "review",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: completedProjectFollowUps,
+      followUpCompletion: { status: "completed", reason: "allAnswered" },
+      evaluation,
+      review: noNewWeaknessesReview,
     },
   },
   completedSession: {

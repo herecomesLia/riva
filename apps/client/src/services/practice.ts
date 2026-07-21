@@ -2,11 +2,13 @@ import { env } from "@/app/env"
 import * as practiceMockService from "@/mocks/services/practice"
 import type {
   GetQuestionGenerationStatusInput,
+  GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticePageResponse,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
+  RetryPracticeEvaluationInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -33,6 +35,18 @@ export function getQuestionGenerationStatus(
   input: GetQuestionGenerationStatusInput,
 ): Promise<PracticePageResponse> {
   return env.mock ? practiceMockService.getQuestionGenerationStatus(input) : realApiUnavailable()
+}
+
+export function getPracticeEvaluationStatus(
+  input: GetPracticeEvaluationStatusInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.getPracticeEvaluationStatus(input) : realApiUnavailable()
+}
+
+export function retryPracticeEvaluation(
+  input: RetryPracticeEvaluationInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.retryPracticeEvaluation(input) : realApiUnavailable()
 }
 
 export function requestPracticeHint(

@@ -4,6 +4,7 @@ import {
   createGeneratedPracticeQuestionGuidance,
   createGeneratedPracticeQuestion,
   createPracticeFollowUpQuestion,
+  createPracticeMockEvaluationResult,
   createPracticeMockResponse,
   getPracticeFollowUpPrompts,
   practiceResponseMock,
@@ -39,6 +40,11 @@ const scenarios: PracticeMockScenario[] = [
   "evaluatingAnswer",
   "reviewRetryRecommended",
   "reviewNextRecommended",
+  "reviewBalanced",
+  "reviewHighScore",
+  "reviewLowScore",
+  "reviewLongContent",
+  "reviewNoNewWeaknesses",
   "completedSession",
 ]
 
@@ -229,9 +235,10 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.review.mainIssues).not.toHaveLength(0)
       expect(session.review.improvementSuggestions).not.toHaveLength(0)
       expect(session.review.reusableAnswerStructure).not.toHaveLength(0)
-      expect(session.review.exposedWeaknesses).not.toHaveLength(0)
+      expect(session.review.exposedWeaknesses.every((item) => item.trim())).toBe(true)
       expect("shouldRetry" in session.review).toBe(false)
       expect("currentFollowUp" in session).toBe(false)
+      expect("submittedAt" in session).toBe(false)
       expectCompletedFollowUpsMatchPlan({
         question: session.question,
         exchanges: session.followUpExchanges,
@@ -391,6 +398,11 @@ describe("practice mock scenarios", () => {
       "evaluatingAnswer",
       "reviewRetryRecommended",
       "reviewNextRecommended",
+      "reviewBalanced",
+      "reviewHighScore",
+      "reviewLowScore",
+      "reviewLongContent",
+      "reviewNoNewWeaknesses",
     ]
 
     for (const scenario of scenarioNames) {
@@ -473,6 +485,18 @@ describe("practice mock scenarios", () => {
     expect(next.session.review.recommendation.action).toBe("nextQuestion")
     expect("shouldRetry" in retry.session.review).toBe(false)
     expect("shouldRetry" in next.session.review).toBe(false)
+  })
+
+  it("returns independent mock evaluation results", () => {
+    const first = createPracticeMockEvaluationResult()
+    const second = createPracticeMockEvaluationResult()
+
+    const firstDimension = first.evaluation.dimensionScores[0]
+    if (!firstDimension) throw new Error("A mock evaluation must include score dimensions.")
+    firstDimension.explanation = "Mutated explanation"
+    first.review.highlights[0] = "Mutated highlight"
+    expect(second.evaluation.dimensionScores[0]?.explanation).not.toBe("Mutated explanation")
+    expect(second.review.highlights[0]).not.toBe("Mutated highlight")
   })
 
   it("keeps the default question type supported by the default target role", () => {

@@ -14,6 +14,8 @@ import {
   type PracticeAnsweringPending,
   type PracticeFollowUpActions,
   type PracticeFollowUpPending,
+  type PracticeReviewActions,
+  type PracticeReviewPending,
 } from "./PracticeView"
 
 function createAnsweringActions(
@@ -58,6 +60,25 @@ const followUpPending: PracticeFollowUpPending = {
   submit: false,
 }
 
+function createReviewActions(
+  overrides: Partial<PracticeReviewActions> = {},
+): PracticeReviewActions {
+  return {
+    onEndSession: vi.fn(),
+    onNextQuestion: vi.fn(),
+    onRetryCurrent: vi.fn(),
+    onSetSaved: vi.fn(async () => "executed" as const),
+    onSetWeak: vi.fn(async () => "executed" as const),
+    ...overrides,
+  }
+}
+
+const reviewPending: PracticeReviewPending = {
+  interactionLocked: false,
+  saved: false,
+  weak: false,
+}
+
 function renderReadyView(
   data: PracticePageResponse,
   options: {
@@ -70,6 +91,11 @@ function renderReadyView(
     answeringPending?: PracticeAnsweringPending
     followUpActions?: PracticeFollowUpActions
     followUpPending?: PracticeFollowUpPending
+    reviewActions?: PracticeReviewActions
+    reviewPending?: PracticeReviewPending
+    evaluationError?: boolean
+    isEvaluationRetrying?: boolean
+    onRetryEvaluation?: () => void
   } = {},
 ) {
   const onStart = options.onStart ?? vi.fn(async () => undefined)
@@ -80,11 +106,16 @@ function renderReadyView(
       answeringPending={options.answeringPending ?? answeringPending}
       followUpActions={options.followUpActions ?? createFollowUpActions()}
       followUpPending={options.followUpPending ?? followUpPending}
+      reviewActions={options.reviewActions ?? createReviewActions()}
+      reviewPending={options.reviewPending ?? reviewPending}
       content={{ status: "ready", data }}
+      evaluationError={options.evaluationError ?? false}
       generationError={options.generationError ?? false}
+      isEvaluationRetrying={options.isEvaluationRetrying ?? false}
       isGenerationRetrying={options.isGenerationRetrying ?? false}
       isStarting={options.isStarting ?? false}
       onRetryGeneration={options.onRetryGeneration ?? vi.fn()}
+      onRetryEvaluation={options.onRetryEvaluation ?? vi.fn()}
       onStart={onStart}
       variant="default"
     />,
@@ -688,5 +719,109 @@ describe("PracticeView", () => {
       i18n.t("practice.followUp.yourFollowUpAnswer", { count: unanswered.order }),
     )
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
+  })
+
+  it("shows a safe evaluation error and retries without losing the conversation", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("evaluatingAnswer")
+    const onRetryEvaluation = vi.fn()
+    renderReadyView(data, { evaluationError: true, onRetryEvaluation })
+    if (data.session.status !== "evaluating") return
+
+    expect(await screen.findByTestId("practice-conversation-timeline")).toHaveTextContent(
+      data.session.mainAnswer.content,
+    )
+    const error = screen.getByTestId("practice-evaluation-error")
+    expect(error).toHaveTextContent(i18n.t("practice.errors.evaluationDescription"))
+    expect(error).not.toHaveTextContent("stack trace")
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.evaluating.retry") }))
+    expect(onRetryEvaluation).toHaveBeenCalledOnce()
+  })
+
+  it("renders all eight score dimensions with response explanations", async () => {
+    const data = createPracticeMockResponse("reviewBalanced")
+    renderReadyView(data)
+    if (data.session.status !== "review") return
+
+    const dimensions = await screen.findByTestId("practice-dimension-scores")
+    for (const item of data.session.evaluation.dimensionScores) {
+      expect(dimensions).toHaveTextContent(i18n.t(`practice.scoreDimensions.${item.dimension}`))
+      expect(dimensions).toHaveTextContent(item.explanation)
+      expect(dimensions).toHaveTextContent(
+        i18n.t("practice.review.dimensionScore", { score: item.score }),
+      )
+    }
+  })
+
+  it("keeps highlights, issues, improvements, structure, and weaknesses in distinct sections", async () => {
+    const data = createPracticeMockResponse("reviewRetryRecommended")
+    renderReadyView(data)
+    if (data.session.status !== "review") return
+
+    const review = await screen.findByTestId("practice-review-state")
+    for (const item of data.session.review.highlights) expect(review).toHaveTextContent(item)
+    for (const item of data.session.review.mainIssues) expect(review).toHaveTextContent(item)
+    for (const item of data.session.review.improvementSuggestions)
+      expect(review).toHaveTextContent(item)
+    for (const item of data.session.review.exposedWeaknesses) expect(review).toHaveTextContent(item)
+    expect(screen.getByTestId("practice-reusable-structure")).toHaveTextContent(
+      i18n.t("practice.review.reusableStructureDescription"),
+    )
+  })
+
+  it("shows retry and next-question recommendations directly from the response", async () => {
+    const retry = createPracticeMockResponse("reviewRetryRecommended")
+    const { unmount } = renderReadyView(retry)
+    if (retry.session.status !== "review") return
+    expect(await screen.findByTestId("practice-recommendation")).toHaveTextContent(
+      retry.session.review.recommendation.reason,
+    )
+    expect(screen.getByTestId("practice-recommendation")).toHaveTextContent(
+      i18n.t("practice.review.retryRecommended"),
+    )
+    unmount()
+
+    const next = createPracticeMockResponse("reviewNextRecommended")
+    renderReadyView(next)
+    if (
+      next.session.status !== "review" ||
+      next.session.review.recommendation.action !== "nextQuestion"
+    )
+      return
+    const recommendation = await screen.findByTestId("practice-recommendation")
+    expect(recommendation).toHaveTextContent(next.session.review.recommendation.reason)
+    expect(recommendation).toHaveTextContent(
+      i18n.t(
+        `practice.questionTypes.${next.session.review.recommendation.nextQuestion.questionType}`,
+      ),
+    )
+  })
+
+  it("exposes review action callbacks without implementing their state transitions", async () => {
+    const user = userEvent.setup()
+    const actions = createReviewActions()
+    renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewActions: actions })
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.review.retryCurrent") }),
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.review.nextQuestion") }))
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.review.endSession") }))
+    expect(actions.onRetryCurrent).toHaveBeenCalledOnce()
+    expect(actions.onNextQuestion).toHaveBeenCalledOnce()
+    expect(actions.onEndSession).toHaveBeenCalledOnce()
+  })
+
+  it("renders long review content and the no-new-weaknesses state", async () => {
+    const long = createPracticeMockResponse("reviewLongContent")
+    const { unmount } = renderReadyView(long)
+    if (long.session.status !== "review") return
+    expect(await screen.findByTestId("practice-review-state")).toHaveTextContent(
+      long.session.review.overallPerformance,
+    )
+    unmount()
+
+    renderReadyView(createPracticeMockResponse("reviewNoNewWeaknesses"))
+    expect(await screen.findByText(i18n.t("practice.review.noNewWeaknesses"))).toBeVisible()
   })
 })

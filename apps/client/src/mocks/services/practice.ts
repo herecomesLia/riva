@@ -1,6 +1,7 @@
 import {
   createGeneratedPracticeQuestion,
   createGeneratedPracticeQuestionGuidance,
+  createPracticeMockEvaluationResult,
   createPracticeFollowUpQuestion,
   createPracticeMockResponse,
   getPracticeFollowUpPrompts,
@@ -10,6 +11,7 @@ import { getRolesPage } from "@/mocks/services/roles"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   GetQuestionGenerationStatusInput,
+  GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticePageResponse,
   PracticeQuestionMutationInput,
@@ -17,6 +19,7 @@ import type {
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
+  RetryPracticeEvaluationInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -47,6 +50,7 @@ let mockResponse = createPracticeMockResponse()
 let sessionSequence = 0
 let mutationSequence = 0
 const generationPollCounts = new Map<string, number>()
+const evaluationPollCounts = new Map<string, number>()
 const questionOrdinals = new Map<string, number>()
 
 function copy<T>(value: T): T {
@@ -58,6 +62,7 @@ export function resetPracticeMockState(scenario: PracticeMockScenario = "setupRe
   sessionSequence = 0
   mutationSequence = 0
   generationPollCounts.clear()
+  evaluationPollCounts.clear()
   questionOrdinals.clear()
 }
 
@@ -247,6 +252,19 @@ function requireCurrentFollowUp(
   return session
 }
 
+function requireCurrentReviewableQuestion(input: PracticeQuestionMutationInput) {
+  const session = mockResponse.session
+  if (
+    (session.status !== "answering" && session.status !== "review") ||
+    session.sessionId !== input.sessionId ||
+    session.version !== input.version ||
+    session.question.id !== input.questionId
+  ) {
+    throw new Error("Practice question version is out of date.")
+  }
+  return session
+}
+
 function nextMutationTimestamp() {
   mutationSequence += 1
   return new Date(Date.UTC(2026, 6, 20, 3, mutationSequence)).toISOString()
@@ -301,7 +319,7 @@ export async function setQuestionSaved(
   input: SetPracticeQuestionSavedInput,
 ): Promise<PracticePageResponse> {
   await waitForMockDelay()
-  const session = requireCurrentQuestion(input)
+  const session = requireCurrentReviewableQuestion(input)
   if (session.question.isSaved === input.isSaved) return copy(mockResponse)
 
   return setMockResponse({
@@ -318,7 +336,7 @@ export async function setQuestionWeak(
   input: SetPracticeQuestionWeakInput,
 ): Promise<PracticePageResponse> {
   await waitForMockDelay()
-  const session = requireCurrentQuestion(input)
+  const session = requireCurrentReviewableQuestion(input)
   if (session.question.isMarkedWeak === input.isMarkedWeak) return copy(mockResponse)
 
   return setMockResponse({
@@ -467,6 +485,69 @@ export async function endPracticeFollowUps(
         unansweredQuestion: copy(session.currentFollowUp.question),
       },
       submittedAt: nextMutationTimestamp(),
+    },
+  })
+}
+
+function evaluationAttemptKey(sessionId: string, version: number) {
+  return `${sessionId}:${version}`
+}
+
+function requireEvaluatingSession(input: GetPracticeEvaluationStatusInput) {
+  const session = mockResponse.session
+  if (
+    session.status !== "evaluating" ||
+    session.sessionId !== input.sessionId ||
+    session.version !== input.version ||
+    session.question.id !== input.questionId
+  ) {
+    throw new Error("Practice evaluation version is out of date.")
+  }
+  return session
+}
+
+export async function getPracticeEvaluationStatus(
+  input: GetPracticeEvaluationStatusInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireEvaluatingSession(input)
+  const attemptKey = evaluationAttemptKey(session.sessionId, session.version)
+  const pollCount = (evaluationPollCounts.get(attemptKey) ?? 0) + 1
+  evaluationPollCounts.set(attemptKey, pollCount)
+  if (pollCount < 2) return copy(mockResponse)
+
+  const result = createPracticeMockEvaluationResult()
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      status: "review",
+      sessionId: session.sessionId,
+      version: session.version + 1,
+      selection: copy(session.selection),
+      startedAt: session.startedAt,
+      question: copy(session.question),
+      mainAnswer: copy(session.mainAnswer),
+      followUpExchanges: copy(session.followUpExchanges),
+      followUpCompletion: copy(session.followUpCompletion),
+      evaluation: result.evaluation,
+      review: result.review,
+    },
+  })
+}
+
+export async function retryPracticeEvaluation(
+  input: RetryPracticeEvaluationInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireEvaluatingSession(input)
+  const nextVersion = session.version + 1
+  evaluationPollCounts.set(evaluationAttemptKey(session.sessionId, nextVersion), 0)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: nextVersion,
     },
   })
 }

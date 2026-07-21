@@ -1,5 +1,6 @@
 import type {
   GetQuestionGenerationStatusInput,
+  GetPracticeEvaluationStatusInput,
   PracticePageResponse,
   PracticeQuestionMutationInput,
 } from "@/models/practice"
@@ -21,6 +22,33 @@ export function synchronizeQuestionGenerationResponse(
   if (
     !("sessionId" in responseSession) ||
     responseSession.sessionId !== request.sessionId ||
+    responseSession.version < request.version
+  ) {
+    return current
+  }
+
+  return response
+}
+
+export function synchronizePracticeEvaluationResponse(
+  current: PracticePageResponse | undefined,
+  response: PracticePageResponse,
+  request: GetPracticeEvaluationStatusInput,
+) {
+  if (current?.session.status !== "evaluating") return current
+  if (
+    current.session.sessionId !== request.sessionId ||
+    current.session.version !== request.version ||
+    current.session.question.id !== request.questionId
+  ) {
+    return current
+  }
+
+  const responseSession = response.session
+  if (
+    (responseSession.status !== "evaluating" && responseSession.status !== "review") ||
+    responseSession.sessionId !== request.sessionId ||
+    responseSession.question.id !== request.questionId ||
     responseSession.version < request.version
   ) {
     return current

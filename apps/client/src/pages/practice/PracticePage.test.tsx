@@ -10,10 +10,12 @@ import { PracticePage } from "@/pages/practice"
 import {
   endPracticeFollowUps,
   getPracticePage,
+  getPracticeEvaluationStatus,
   getQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
+  retryPracticeEvaluation,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -26,11 +28,13 @@ import { renderWithProviders } from "@/test/render"
 vi.mock("@/services/practice", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/practice")>()),
   getPracticePage: vi.fn(),
+  getPracticeEvaluationStatus: vi.fn(),
   getQuestionGenerationStatus: vi.fn(),
   endPracticeFollowUps: vi.fn(),
   requestAnswerFramework: vi.fn(),
   requestEndPracticeSession: vi.fn(),
   requestPracticeHint: vi.fn(),
+  retryPracticeEvaluation: vi.fn(),
   setQuestionSaved: vi.fn(),
   setQuestionWeak: vi.fn(),
   skipPracticeQuestion: vi.fn(),
@@ -59,11 +63,13 @@ describe("PracticePage", () => {
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
     vi.mocked(getPracticePage).mockReset()
+    vi.mocked(getPracticeEvaluationStatus).mockReset()
     vi.mocked(getQuestionGenerationStatus).mockReset()
     vi.mocked(endPracticeFollowUps).mockReset()
     vi.mocked(requestAnswerFramework).mockReset()
     vi.mocked(requestEndPracticeSession).mockReset()
     vi.mocked(requestPracticeHint).mockReset()
+    vi.mocked(retryPracticeEvaluation).mockReset()
     vi.mocked(setQuestionSaved).mockReset()
     vi.mocked(setQuestionWeak).mockReset()
     vi.mocked(skipPracticeQuestion).mockReset()
@@ -211,6 +217,145 @@ describe("PracticePage", () => {
         i18n.t("practice.difficulty.pressure"),
       ),
     )
+  })
+
+  it("polls an evaluating snapshot into a review without calculating scores locally", async () => {
+    const evaluating = createPracticeMockResponse("evaluatingAnswer")
+    const review = createPracticeMockResponse("reviewBalanced")
+    if (evaluating.session.status !== "evaluating" || review.session.status !== "review") {
+      throw new Error("Evaluating and review fixtures are required.")
+    }
+    review.session.version = evaluating.session.version + 1
+    vi.mocked(getPracticePage).mockResolvedValue(evaluating)
+    vi.mocked(getPracticeEvaluationStatus).mockResolvedValue(review)
+
+    renderPracticePage()
+
+    expect(await screen.findByTestId("practice-review-state")).toHaveTextContent(
+      String(review.session.evaluation.overallScore),
+    )
+    expect(getPracticeEvaluationStatus).toHaveBeenCalledWith({
+      sessionId: evaluating.session.sessionId,
+      version: evaluating.session.version,
+      questionId: evaluating.session.question.id,
+    })
+  })
+
+  it("retries failed evaluation with a new version while preserving the conversation", async () => {
+    const user = userEvent.setup()
+    const evaluating = createPracticeMockResponse("evaluatingAnswer")
+    if (evaluating.session.status !== "evaluating") {
+      throw new Error("An evaluating fixture is required.")
+    }
+    const retried = structuredClone(evaluating)
+    if (retried.session.status !== "evaluating") return
+    retried.session.version += 1
+    const nextPoll = createDeferred<PracticePageResponse>()
+    const retryAttempt = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(evaluating)
+    vi.mocked(getPracticeEvaluationStatus)
+      .mockRejectedValueOnce(new Error("unsafe evaluation prompt and stack"))
+      .mockReturnValueOnce(nextPoll.promise)
+    vi.mocked(retryPracticeEvaluation).mockReturnValue(retryAttempt.promise)
+
+    renderPracticePage()
+
+    const error = await screen.findByTestId("practice-evaluation-error")
+    expect(error).toHaveTextContent(i18n.t("practice.errors.evaluationDescription"))
+    expect(error).not.toHaveTextContent("unsafe evaluation prompt and stack")
+    expect(screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
+      evaluating.session.mainAnswer.content,
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.evaluating.retry") }))
+
+    const retryingButton = screen.getByRole("button", {
+      name: i18n.t("practice.evaluating.retrying"),
+    })
+    expect(retryingButton).toBeDisabled()
+    await user.click(retryingButton)
+    expect(retryPracticeEvaluation).toHaveBeenCalledOnce()
+    expect(vi.mocked(retryPracticeEvaluation).mock.calls[0]?.[0]).toEqual({
+      sessionId: evaluating.session.sessionId,
+      version: evaluating.session.version,
+      questionId: evaluating.session.question.id,
+    })
+    await act(async () => {
+      retryAttempt.resolve(retried)
+      await retryAttempt.promise
+    })
+    await waitFor(() => expect(getPracticeEvaluationStatus).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(getPracticeEvaluationStatus).mock.calls[1]?.[0]).toEqual({
+      sessionId: retried.session.sessionId,
+      version: retried.session.version,
+      questionId: retried.session.question.id,
+    })
+    expect(screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
+      evaluating.session.mainAnswer.content,
+    )
+  })
+
+  it("does not let a stale evaluation response overwrite a newer answer attempt", async () => {
+    const evaluating = createPracticeMockResponse("evaluatingAnswer")
+    const staleReview = createPracticeMockResponse("reviewBalanced")
+    const newer = createPracticeMockResponse("evaluatingNoFollowUp")
+    if (
+      evaluating.session.status !== "evaluating" ||
+      staleReview.session.status !== "review" ||
+      newer.session.status !== "evaluating"
+    ) {
+      throw new Error("Evaluation fixtures are required.")
+    }
+    staleReview.session.sessionId = evaluating.session.sessionId
+    staleReview.session.version = evaluating.session.version + 1
+    newer.session.sessionId = "practice_session_new_answer_attempt"
+    newer.session.version = evaluating.session.version + 2
+    const poll = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(evaluating)
+    vi.mocked(getPracticeEvaluationStatus)
+      .mockReturnValueOnce(poll.promise)
+      .mockReturnValue(new Promise(() => undefined))
+    const renderResult = renderPracticePage()
+
+    expect(await screen.findByTestId("practice-evaluating-state")).toBeInTheDocument()
+    await waitFor(() => expect(getPracticeEvaluationStatus).toHaveBeenCalledTimes(1))
+    act(() => {
+      renderResult.queryClient.setQueryData(["practice"], newer)
+    })
+    await act(async () => {
+      poll.resolve(staleReview)
+      await poll.promise
+    })
+
+    expect(renderResult.queryClient.getQueryData(["practice"])).toEqual(newer)
+    expect(screen.queryByTestId("practice-review-state")).not.toBeInTheDocument()
+  })
+
+  it("updates review saved state only from the returned service snapshot", async () => {
+    const user = userEvent.setup()
+    const review = createPracticeMockResponse("reviewBalanced")
+    const saved = structuredClone(review)
+    if (review.session.status !== "review" || saved.session.status !== "review") {
+      throw new Error("Review fixtures are required.")
+    }
+    saved.session.version += 1
+    saved.session.question.isSaved = true
+    vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(setQuestionSaved).mockResolvedValue(saved)
+
+    renderPracticePage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.save") }),
+    )
+    expect(vi.mocked(setQuestionSaved).mock.calls[0]?.[0]).toEqual({
+      sessionId: review.session.sessionId,
+      version: review.session.version,
+      questionId: review.session.question.id,
+      isSaved: true,
+    })
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.unsave") }),
+    ).toHaveAttribute("aria-pressed", "true")
   })
 
   it("prevents duplicate main-answer submission and enters follow-up", async () => {
