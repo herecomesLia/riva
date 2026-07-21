@@ -62,6 +62,7 @@ export function PracticeReviewActions({
       if (action === "end") setEndOpen(false)
     } catch {
       setError(action)
+      if (action === "end") setEndOpen(false)
     }
   }
 
@@ -114,7 +115,13 @@ export function PracticeReviewActions({
             {isNextPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
             {t("practice.review.nextQuestion")}
           </Button>
-          <Button disabled={interactionLocked} onClick={() => setEndOpen(true)} variant="outline">
+          <Button
+            disabled={interactionLocked}
+            onClick={() => {
+              if (!interactionLocked) setEndOpen(true)
+            }}
+            variant="outline"
+          >
             {isEndPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
             {t("practice.review.endSession")}
           </Button>

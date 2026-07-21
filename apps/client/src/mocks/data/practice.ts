@@ -304,6 +304,7 @@ const behavioralSelection = {
 const behavioralActiveSession = {
   ...activeSession,
   sessionId: "practice_session_behavioral_20260720_01",
+  attemptId: "practice_session_behavioral_20260720_01_attempt_1",
   selection: behavioralSelection,
 } as const
 
@@ -321,6 +322,7 @@ const motivationSelection = {
 const motivationActiveSession = {
   ...activeSession,
   sessionId: "practice_session_motivation_20260720_01",
+  attemptId: "practice_session_motivation_20260720_01_attempt_1",
   selection: motivationSelection,
 } as const
 

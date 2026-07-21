@@ -17,6 +17,7 @@ import {
   type PracticeReviewActions,
   type PracticeReviewPending,
 } from "./PracticeView"
+import { PracticeReviewActions as PracticeReviewActionsComponent } from "./components/PracticeReviewActions"
 
 function createAnsweringActions(
   overrides: Partial<PracticeAnsweringActions> = {},
@@ -132,6 +133,149 @@ function getStartButton() {
 }
 
 describe("PracticeView", () => {
+  it("confirms ending a reviewed session before invoking the action", async () => {
+    const user = userEvent.setup()
+    const onEndSession = vi.fn(async () => "executed" as const)
+    renderReadyView(createPracticeMockResponse("reviewBalanced"), {
+      reviewActions: createReviewActions({ onEndSession }),
+    })
+    await screen.findByTestId("practice-review-state")
+    await user.click(screen.getByRole("button", { name: /结束本轮练习/i }))
+    expect(onEndSession).not.toHaveBeenCalled()
+    expect(
+      screen.getByRole("heading", { name: i18n.t("practice.review.endConfirmTitle") }),
+    ).toBeVisible()
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.dialog.stay") }))
+    expect(onEndSession).not.toHaveBeenCalled()
+  })
+
+  it("shows safe review-action errors without exposing service details", async () => {
+    const user = userEvent.setup()
+    renderReadyView(createPracticeMockResponse("reviewBalanced"), {
+      reviewActions: createReviewActions({
+        onRetryCurrent: vi.fn(async () => {
+          throw new Error("internal version 99")
+        }),
+      }),
+    })
+    await screen.findByTestId("practice-review-state")
+    await user.click(screen.getByRole("button", { name: /重练当前题/i }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.retryDescription"),
+    )
+    expect(screen.queryByText("internal version 99")).not.toBeInTheDocument()
+  })
+
+  it("keeps review actions safe when retry, next, or end are ignored", async () => {
+    const user = userEvent.setup()
+    const actions = createReviewActions({
+      onEndSession: vi.fn(async () => "ignored" as const),
+      onNextQuestion: vi.fn(async () => "ignored" as const),
+      onRetryCurrent: vi.fn(async () => "ignored" as const),
+    })
+    renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewActions: actions })
+    await screen.findByTestId("practice-review-state")
+    await user.click(screen.getByRole("button", { name: /重练当前题/i }))
+    await user.click(screen.getByRole("button", { name: /继续下一题/i }))
+    await user.click(screen.getByRole("button", { name: /结束本轮练习/i }))
+    await user.click(screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!)
+    expect(actions.onRetryCurrent).toHaveBeenCalledTimes(1)
+    expect(actions.onNextQuestion).toHaveBeenCalledTimes(1)
+    expect(actions.onEndSession).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(screen.getByTestId("practice-review-state")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.dialog.stay") }))
+    expect(screen.getByRole("button", { name: /重练当前题/i })).toBeEnabled()
+    expect(screen.getByRole("button", { name: /继续下一题/i })).toBeEnabled()
+    expect(screen.getByRole("button", { name: /结束本轮练习/i })).toBeEnabled()
+  })
+
+  it("shows safe next and end failures while remaining in review", async () => {
+    const user = userEvent.setup()
+    const internal = "Practice session version 17 is stale"
+    const actions = createReviewActions({
+      onEndSession: vi.fn(async () => {
+        throw new Error(internal)
+      }),
+      onNextQuestion: vi.fn(async () => {
+        throw new Error(internal)
+      }),
+    })
+    renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewActions: actions })
+    await screen.findByTestId("practice-review-state")
+    await user.click(screen.getByRole("button", { name: /继续下一题/i }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.nextDescription"),
+    )
+    expect(screen.queryByText(internal)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /继续下一题/i })).toBeEnabled()
+    await user.click(screen.getByRole("button", { name: /结束本轮练习/i }))
+    await user.click(screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!)
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.reviewEndDescription"),
+    )
+    expect(screen.queryByText(internal)).not.toBeInTheDocument()
+    expect(screen.getByTestId("practice-review-state")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /结束本轮练习/i })).toBeEnabled()
+  })
+
+  it.each(["retry", "next", "end"] as const)(
+    "disables all review actions while %s is pending",
+    async (pendingAction) => {
+      const pending = { ...reviewPending, interactionLocked: true, [pendingAction]: true }
+      renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewPending: pending })
+      await screen.findByTestId("practice-review-state")
+      for (const name of [
+        /重练当前题/i,
+        /继续下一题/i,
+        /结束本轮练习/i,
+        /收藏题目/i,
+        /标记(为)?薄弱题/i,
+      ]) {
+        expect(screen.getByRole("button", { name })).toBeDisabled()
+      }
+    },
+  )
+
+  it("disables both end confirmation controls while ending is pending", async () => {
+    const user = userEvent.setup()
+    const props = {
+      isMarkedWeak: false,
+      isSaved: false,
+      isSavedPending: false,
+      isWeakPending: false,
+      onEndSession: vi.fn(async () => "executed" as const),
+      onNextQuestion: vi.fn(async () => "executed" as const),
+      onRetryCurrent: vi.fn(async () => "executed" as const),
+      onSetSaved: vi.fn(async (_isSaved: boolean) => "executed" as const),
+      onSetWeak: vi.fn(async (_isMarkedWeak: boolean) => "executed" as const),
+    }
+    const { rerender } = renderWithProviders(
+      <PracticeReviewActionsComponent
+        {...props}
+        interactionLocked={false}
+        isEndPending={false}
+        isNextPending={false}
+        isRetryPending={false}
+      />,
+      { router: false },
+    )
+    await user.click(screen.getByRole("button", { name: /结束本轮练习/i }))
+    rerender(
+      <PracticeReviewActionsComponent
+        {...props}
+        interactionLocked
+        isEndPending
+        isNextPending={false}
+        isRetryPending={false}
+      />,
+    )
+    const dialog = await screen.findByRole("alertdialog")
+    expect(
+      within(dialog).getByRole("button", { name: i18n.t("practice.dialog.stay") }),
+    ).toBeDisabled()
+    expect(within(dialog).getByRole("button", { name: /结束本轮练习/i })).toBeDisabled()
+  })
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
   })

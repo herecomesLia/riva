@@ -159,7 +159,141 @@ async function finishCurrentAttempt(initial: PracticeAnsweringState): Promise<Pr
   return reviewed.session
 }
 
+async function setCurrentQuestionFlags(
+  initial: PracticeAnsweringState,
+  flags: { isSaved: boolean; isMarkedWeak: boolean },
+): Promise<PracticeAnsweringState> {
+  let session = initial
+
+  if (session.question.isSaved !== flags.isSaved) {
+    const response = await settle(
+      setQuestionSaved({
+        sessionId: session.sessionId,
+        version: session.version,
+        questionId: session.question.id,
+        isSaved: flags.isSaved,
+      }),
+    )
+    if (response.session.status !== "answering") {
+      throw new Error("Saving a current question must preserve the answering session.")
+    }
+    session = response.session
+  }
+
+  if (session.question.isMarkedWeak !== flags.isMarkedWeak) {
+    const response = await settle(
+      setQuestionWeak({
+        sessionId: session.sessionId,
+        version: session.version,
+        questionId: session.question.id,
+        isMarkedWeak: flags.isMarkedWeak,
+      }),
+    )
+    if (response.session.status !== "answering") {
+      throw new Error("Marking a current question weak must preserve the answering session.")
+    }
+    session = response.session
+  }
+
+  return session
+}
+
+async function completeRetriedQuestionWithFinalFlags(
+  firstFlags: { isSaved: boolean; isMarkedWeak: boolean },
+  secondFlags: { isSaved: boolean; isMarkedWeak: boolean },
+) {
+  const firstAnswering = await setCurrentQuestionFlags(
+    await generateQuestion("motivation"),
+    firstFlags,
+  )
+  const firstReview = await finishCurrentAttempt(firstAnswering)
+  const retried = await settle(
+    retryCurrentPracticeQuestion({
+      sessionId: firstReview.sessionId,
+      version: firstReview.version,
+      questionId: firstReview.question.id,
+    }),
+  )
+  if (retried.session.status !== "answering") {
+    throw new Error("Retrying a reviewed question must return an answering session.")
+  }
+  const secondAnswering = await setCurrentQuestionFlags(retried.session, secondFlags)
+  const secondReview = await finishCurrentAttempt(secondAnswering)
+  const completed = await settle(
+    endPracticeSession({ sessionId: secondReview.sessionId, version: secondReview.version }),
+  )
+  if (completed.session.status !== "completed") {
+    throw new Error("Finishing the retried question must complete the session.")
+  }
+
+  return { completed: completed.session, firstReview, retried: retried.session, secondReview }
+}
+
 describe("practice stateful mock service", () => {
+  it("counts saved and weak status once when both retries end enabled", async () => {
+    const { completed, firstReview, retried, secondReview } =
+      await completeRetriedQuestionWithFinalFlags(
+        { isSaved: true, isMarkedWeak: true },
+        { isSaved: true, isMarkedWeak: true },
+      )
+
+    expect(retried.sessionId).toBe(firstReview.sessionId)
+    expect(secondReview.sessionId).toBe(firstReview.sessionId)
+    expect(retried.question.id).toBe(firstReview.question.id)
+    expect(secondReview.question.id).toBe(firstReview.question.id)
+    expect(retried.attemptId).not.toBe(firstReview.attemptId)
+    expect(secondReview.attemptId).toBe(retried.attemptId)
+    expect(completed).toMatchObject({
+      questionsCompleted: 1,
+      retryCount: 1,
+      savedQuestionCount: 1,
+      newWeaknessCount: 1,
+    })
+    expect(completed.attemptRecords).toHaveLength(2)
+    expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([true, true])
+    expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([true, true])
+  })
+
+  it("uses the final retried attempt when saved and weak status are cancelled", async () => {
+    const { completed, firstReview, retried, secondReview } =
+      await completeRetriedQuestionWithFinalFlags(
+        { isSaved: true, isMarkedWeak: true },
+        { isSaved: false, isMarkedWeak: false },
+      )
+
+    expect(retried.sessionId).toBe(firstReview.sessionId)
+    expect(secondReview.question.id).toBe(firstReview.question.id)
+    expect(retried.attemptId).not.toBe(firstReview.attemptId)
+    expect(completed).toMatchObject({
+      questionsCompleted: 1,
+      retryCount: 1,
+      savedQuestionCount: 0,
+      newWeaknessCount: 0,
+    })
+    expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([true, false])
+    expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([true, false])
+  })
+
+  it("uses the final retried attempt when saved and weak status are newly enabled", async () => {
+    const { completed, firstReview, retried, secondReview } =
+      await completeRetriedQuestionWithFinalFlags(
+        { isSaved: false, isMarkedWeak: false },
+        { isSaved: true, isMarkedWeak: true },
+      )
+
+    expect(retried.sessionId).toBe(firstReview.sessionId)
+    expect(secondReview.question.id).toBe(firstReview.question.id)
+    expect(retried.attemptId).not.toBe(firstReview.attemptId)
+    expect(completed).toMatchObject({
+      questionsCompleted: 1,
+      retryCount: 1,
+      savedQuestionCount: 1,
+      newWeaknessCount: 1,
+    })
+    expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([false, true])
+    expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([false, true])
+  })
+
   it("retries one question within the same session and archives both scored attempts", async () => {
     const firstReview = await finishCurrentAttempt(await generateQuestion("behavioral"))
     const retried = await settle(
@@ -232,6 +366,37 @@ describe("practice stateful mock service", () => {
     expect(next.session.question.difficulty).toBe(
       firstReview.review.recommendation.nextQuestion.difficulty,
     )
+  })
+
+  it("keeps completed history when ending before the generated next question is answered", async () => {
+    const firstReview = await finishCurrentAttempt(await generateQuestion("motivation"))
+    const generating = await settle(
+      continueToNextPracticeQuestion({
+        sessionId: firstReview.sessionId,
+        version: firstReview.version,
+        questionId: firstReview.question.id,
+      }),
+    )
+    if (generating.session.status !== "generatingQuestion") throw new Error("Expected generation.")
+    const input = { sessionId: generating.session.sessionId, version: generating.session.version }
+    await settle(getQuestionGenerationStatus(input))
+    const next = await settle(getQuestionGenerationStatus(input))
+    if (next.session.status !== "answering") throw new Error("Expected answering next question.")
+    const completed = await settle(
+      requestEndPracticeSession({
+        sessionId: next.session.sessionId,
+        version: next.session.version,
+        questionId: next.session.question.id,
+      }),
+    )
+    if (completed.session.status !== "completed") throw new Error("Expected completed session.")
+    expect(completed.session.attemptRecords).toHaveLength(1)
+    expect(completed.session.questionsCompleted).toBe(1)
+    expect(completed.session.retryCount).toBe(0)
+    expect(completed.session.averageScore).toBe(firstReview.evaluation.overallScore)
+    expect("question" in completed.session).toBe(false)
+    expect("mainAnswer" in completed.session).toBe(false)
+    expect("review" in completed.session).toBe(false)
   })
   it("preserves a reviewed attempt when retrying and completes a session with records", async () => {
     const review = await completeQuestionToReview("behavioral")

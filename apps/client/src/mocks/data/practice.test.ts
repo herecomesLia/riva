@@ -48,6 +48,10 @@ const scenarios: PracticeMockScenario[] = [
   "reviewMotivation",
   "reviewFollowUpEndedEarly",
   "completedSession",
+  "retryingCurrentQuestion",
+  "generatingNextQuestion",
+  "completedWithRetries",
+  "completedWithWeakQuestions",
 ]
 
 const scoreDimensions = new Set<PracticeScoreDimension>([
@@ -160,6 +164,15 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
   }
 
   expect(session.selection.targetRoleId).toBeTypeOf("string")
+  expect(Number.isInteger(session.attemptNumber)).toBe(true)
+  expect(session.attemptNumber).toBeGreaterThan(0)
+  expect(session.attemptId).toBe(`${session.sessionId}_attempt_${session.attemptNumber}`)
+  expect(session.attemptRecords.map((record) => record.attemptNumber)).toEqual(
+    session.attemptRecords.map((_, index) => index + 1),
+  )
+  expect(new Set(session.attemptRecords.map((record) => record.attemptId)).size).toBe(
+    session.attemptRecords.length,
+  )
   expect(Number.isInteger(session.version)).toBe(true)
   expect(session.version).toBeGreaterThan(0)
 
@@ -241,6 +254,9 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect("shouldRetry" in session.review).toBe(false)
       expect("currentFollowUp" in session).toBe(false)
       expect("submittedAt" in session).toBe(false)
+      expect(session.attemptRecords.some((record) => record.attemptId === session.attemptId)).toBe(
+        false,
+      )
       expectCompletedFollowUpsMatchPlan({
         question: session.question,
         exchanges: session.followUpExchanges,
@@ -248,11 +264,30 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       })
       return
     }
-    case "completed":
-      expect(session.questionsCompleted).toBeGreaterThan(0)
+    case "completed": {
+      const latest = new Map(session.attemptRecords.map((record) => [record.question.id, record]))
+      const records = session.attemptRecords
+      expect(session.questionsCompleted).toBe(latest.size)
+      expect(session.retryCount).toBe(records.length - latest.size)
+      expect(session.savedQuestionCount).toBe(
+        [...latest.values()].filter((record) => record.isSaved).length,
+      )
+      expect(session.newWeaknessCount).toBe(
+        [...latest.values()].filter((record) => record.isMarkedWeak).length,
+      )
+      expect(session.averageScore).toBe(
+        records.length === 0
+          ? 0
+          : Math.round(
+              records.reduce((sum, record) => sum + record.evaluation.overallScore, 0) /
+                records.length,
+            ),
+      )
       expect("question" in session).toBe(false)
       expect("mainAnswer" in session).toBe(false)
       expect("currentFollowUp" in session).toBe(false)
+      return
+    }
   }
 }
 

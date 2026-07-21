@@ -7,6 +7,7 @@ import { defaultLanguage } from "@/i18n/resources"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
 import type { PracticePageResponse } from "@/models/practice"
 import { PracticePage } from "@/pages/practice"
+import { synchronizePracticeSessionMutationResponse } from "@/pages/practice/practice-cache"
 import {
   endPracticeFollowUps,
   getPracticePage,
@@ -16,6 +17,9 @@ import {
   requestEndPracticeSession,
   requestPracticeHint,
   retryPracticeEvaluation,
+  retryCurrentPracticeQuestion,
+  continueToNextPracticeQuestion,
+  endPracticeSession,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -35,6 +39,9 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   requestEndPracticeSession: vi.fn(),
   requestPracticeHint: vi.fn(),
   retryPracticeEvaluation: vi.fn(),
+  retryCurrentPracticeQuestion: vi.fn(),
+  continueToNextPracticeQuestion: vi.fn(),
+  endPracticeSession: vi.fn(),
   setQuestionSaved: vi.fn(),
   setQuestionWeak: vi.fn(),
   skipPracticeQuestion: vi.fn(),
@@ -60,6 +67,20 @@ function renderPracticePage() {
 }
 
 describe("PracticePage", () => {
+  it("accepts only a newer completed response for the same session-ending request", () => {
+    const current = createPracticeMockResponse("reviewBalanced")
+    const completed = createPracticeMockResponse("completedSession")
+    if (current.session.status !== "review" || completed.session.status !== "completed") return
+    completed.session.sessionId = current.session.sessionId
+    completed.session.version = current.session.version + 1
+    const request = { sessionId: current.session.sessionId, version: current.session.version }
+    expect(synchronizePracticeSessionMutationResponse(current, completed, request)).toBe(completed)
+    completed.session.version = current.session.version
+    expect(synchronizePracticeSessionMutationResponse(current, completed, request)).toBe(current)
+    completed.session.version = current.session.version + 1
+    completed.session.sessionId = "other_session"
+    expect(synchronizePracticeSessionMutationResponse(current, completed, request)).toBe(current)
+  })
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
     vi.mocked(getPracticePage).mockReset()
@@ -70,6 +91,9 @@ describe("PracticePage", () => {
     vi.mocked(requestEndPracticeSession).mockReset()
     vi.mocked(requestPracticeHint).mockReset()
     vi.mocked(retryPracticeEvaluation).mockReset()
+    vi.mocked(retryCurrentPracticeQuestion).mockReset()
+    vi.mocked(continueToNextPracticeQuestion).mockReset()
+    vi.mocked(endPracticeSession).mockReset()
     vi.mocked(setQuestionSaved).mockReset()
     vi.mocked(setQuestionWeak).mockReset()
     vi.mocked(skipPracticeQuestion).mockReset()
@@ -358,6 +382,189 @@ describe("PracticePage", () => {
     expect(
       await screen.findByRole("button", { name: i18n.t("practice.questionActions.unsave") }),
     ).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("synchronously locks duplicate retry-current clicks", async () => {
+    const review = createPracticeMockResponse("reviewBalanced")
+    const retrying = createPracticeMockResponse("retryingCurrentQuestion")
+    if (review.session.status !== "review" || retrying.session.status !== "answering") return
+    retrying.session.sessionId = review.session.sessionId
+    retrying.session.version = review.session.version + 1
+    const deferred = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(retryCurrentPracticeQuestion).mockReturnValue(deferred.promise)
+    renderPracticePage()
+    const retryButton = await screen.findByRole("button", { name: /重练当前题/i })
+    act(() => {
+      fireEvent.click(retryButton)
+      fireEvent.click(retryButton)
+    })
+    await waitFor(() => expect(retryCurrentPracticeQuestion).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    await act(async () => {
+      deferred.resolve(retrying)
+      await deferred.promise
+    })
+    expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
+  })
+
+  it("synchronously locks duplicate next-question clicks", async () => {
+    const review = createPracticeMockResponse("reviewBalanced")
+    const generating = createPracticeMockResponse("generatingNextQuestion")
+    if (review.session.status !== "review" || generating.session.status !== "generatingQuestion")
+      return
+    generating.session.sessionId = review.session.sessionId
+    generating.session.version = review.session.version + 1
+    const deferred = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
+    renderPracticePage()
+    const nextButton = await screen.findByRole("button", { name: /继续下一题/i })
+    act(() => {
+      fireEvent.click(nextButton)
+      fireEvent.click(nextButton)
+    })
+    await waitFor(() => expect(continueToNextPracticeQuestion).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    await act(async () => {
+      deferred.resolve(generating)
+      await deferred.promise
+    })
+    expect(await screen.findByTestId("practice-generating-state")).toBeInTheDocument()
+  })
+
+  it("synchronously locks duplicate end confirmations", async () => {
+    const user = userEvent.setup()
+    const review = createPracticeMockResponse("reviewBalanced")
+    const completed = createPracticeMockResponse("completedSession")
+    if (review.session.status !== "review" || completed.session.status !== "completed") return
+    completed.session.sessionId = review.session.sessionId
+    completed.session.version = review.session.version + 1
+    const deferred = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(endPracticeSession).mockReturnValue(deferred.promise)
+    renderPracticePage()
+    await user.click(await screen.findByRole("button", { name: /结束本轮练习/i }))
+    const confirm = screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!
+    act(() => {
+      fireEvent.click(confirm)
+      fireEvent.click(confirm)
+    })
+    await waitFor(() => expect(endPracticeSession).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      deferred.resolve(completed)
+      await deferred.promise
+    })
+    expect(await screen.findByTestId("practice-completed-state")).toBeInTheDocument()
+  })
+
+  it("locks every review action while next-question is pending", async () => {
+    const review = createPracticeMockResponse("reviewBalanced")
+    const generating = createPracticeMockResponse("generatingNextQuestion")
+    const deferred = createDeferred<PracticePageResponse>()
+    if (review.session.status !== "review" || generating.session.status !== "generatingQuestion")
+      return
+    generating.session.sessionId = review.session.sessionId
+    generating.session.version = review.session.version + 1
+    vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
+    renderPracticePage()
+    const nextButton = await screen.findByRole("button", { name: /继续下一题/i })
+    const retryButton = screen.getByRole("button", { name: /重练当前题/i })
+    const endButton = screen.getByRole("button", { name: /结束本轮练习/i })
+    const savedButton = screen.getByRole("button", { name: /收藏题目/i })
+    const weakButton = screen.getByRole("button", { name: /标记(为)?薄弱题/i })
+    act(() => {
+      fireEvent.click(nextButton)
+      fireEvent.click(retryButton)
+      fireEvent.click(endButton)
+      fireEvent.click(savedButton)
+      fireEvent.click(weakButton)
+    })
+    await waitFor(() => expect(continueToNextPracticeQuestion).toHaveBeenCalledTimes(1))
+    for (const name of [/重练当前题/i, /结束本轮练习/i, /收藏题目/i, /标记(为)?薄弱题/i]) {
+      for (const button of screen.getAllByRole("button", { hidden: true, name })) {
+        expect(button).toBeDisabled()
+      }
+    }
+    expect(retryCurrentPracticeQuestion).not.toHaveBeenCalled()
+    expect(endPracticeSession).not.toHaveBeenCalled()
+    expect(setQuestionSaved).not.toHaveBeenCalled()
+    expect(setQuestionWeak).not.toHaveBeenCalled()
+    await act(async () => {
+      deferred.resolve(generating)
+      await deferred.promise
+    })
+    expect(await screen.findByTestId("practice-generating-state")).toBeInTheDocument()
+  })
+
+  it("locks every review action while retry-current is pending", async () => {
+    const review = createPracticeMockResponse("reviewBalanced")
+    const retrying = createPracticeMockResponse("retryingCurrentQuestion")
+    const deferred = createDeferred<PracticePageResponse>()
+    if (review.session.status !== "review" || retrying.session.status !== "answering") return
+    retrying.session.sessionId = review.session.sessionId
+    retrying.session.version = review.session.version + 1
+    vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(retryCurrentPracticeQuestion).mockReturnValue(deferred.promise)
+    renderPracticePage()
+    const retryButton = await screen.findByRole("button", { name: /重练当前题/i })
+    const nextButton = screen.getByRole("button", { name: /继续下一题/i })
+    const endButton = screen.getByRole("button", { name: /结束本轮练习/i })
+    const savedButton = screen.getByRole("button", { name: /收藏题目/i })
+    const weakButton = screen.getByRole("button", { name: /标记(为)?薄弱题/i })
+    act(() => {
+      fireEvent.click(retryButton)
+      fireEvent.click(nextButton)
+      fireEvent.click(endButton)
+      fireEvent.click(savedButton)
+      fireEvent.click(weakButton)
+    })
+    await waitFor(() => expect(retryCurrentPracticeQuestion).toHaveBeenCalledTimes(1))
+    for (const name of [/继续下一题/i, /结束本轮练习/i, /收藏题目/i, /标记(为)?薄弱题/i]) {
+      for (const button of screen.getAllByRole("button", { hidden: true, name })) {
+        expect(button).toBeDisabled()
+      }
+    }
+    expect(continueToNextPracticeQuestion).not.toHaveBeenCalled()
+    expect(endPracticeSession).not.toHaveBeenCalled()
+    expect(setQuestionSaved).not.toHaveBeenCalled()
+    expect(setQuestionWeak).not.toHaveBeenCalled()
+    await act(async () => {
+      deferred.resolve(retrying)
+      await deferred.promise
+    })
+    expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
+  })
+
+  it("does not let a stale completed response overwrite a newer cache state", async () => {
+    const user = userEvent.setup()
+    const review = createPracticeMockResponse("reviewBalanced")
+    const completed = createPracticeMockResponse("completedSession")
+    const newer = createPracticeMockResponse("reviewBalanced")
+    if (
+      review.session.status !== "review" ||
+      completed.session.status !== "completed" ||
+      newer.session.status !== "review"
+    )
+      return
+    completed.session.sessionId = review.session.sessionId
+    completed.session.version = review.session.version + 1
+    newer.session.sessionId = review.session.sessionId
+    newer.session.version = review.session.version + 2
+    const deferred = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(endPracticeSession).mockReturnValue(deferred.promise)
+    const result = renderPracticePage()
+    await user.click(await screen.findByRole("button", { name: /结束本轮练习/i }))
+    await user.click(screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!)
+    act(() => result.queryClient.setQueryData(["practice"], newer))
+    await act(async () => {
+      deferred.resolve(completed)
+      await deferred.promise
+    })
+    expect(result.queryClient.getQueryData(["practice"])).toEqual(newer)
+    expect(screen.queryByTestId("practice-completed-state")).not.toBeInTheDocument()
   })
 
   it("prevents duplicate main-answer submission and enters follow-up", async () => {

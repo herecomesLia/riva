@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, fn, userEvent } from "storybook/test"
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
@@ -79,6 +79,18 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
   }
 }
 
+async function getVisiblePracticeEndDialog() {
+  return waitFor(() => {
+    const dialog = [...screen.getAllByRole("alertdialog")].reverse().find((candidate) =>
+      within(candidate).queryByRole("heading", {
+        name: /结束本轮专项练习|end this targeted-practice/i,
+      }),
+    )
+    if (!dialog) throw new Error("Expected an open confirmation dialog.")
+    return dialog
+  })
+}
+
 export const NoRoles = meta.story({ args: readyArgs("noRoles") })
 
 export const DefaultSetup = meta.story({ args: readyArgs("setupReady") })
@@ -108,7 +120,7 @@ export const RetryingCurrentQuestion = meta.story({ args: readyArgs("retryingCur
 export const GeneratingNextQuestion = meta.story({ args: readyArgs("generatingNextQuestion") })
 
 export const NextQuestionError = meta.story({
-  args: { ...readyArgs("generatingQuestion"), generationError: true },
+  args: { ...readyArgs("generatingNextQuestion"), generationError: true },
 })
 
 export const CompletedSession = meta.story({ args: readyArgs("completedSession") })
@@ -235,6 +247,134 @@ export const RetryRecommended = meta.story({
 
 export const NextQuestionRecommended = meta.story({
   args: readyArgs("reviewNextRecommended"),
+})
+
+export const ReviewActionPending = meta.story({
+  args: {
+    ...readyArgs("reviewBalanced"),
+    reviewPending: {
+      ...readyArgs("reviewBalanced").reviewPending,
+      interactionLocked: true,
+      retry: true,
+    },
+  },
+  play: async ({ canvas }) => {
+    for (const name of [
+      /重练当前题|retry current question/i,
+      /继续下一题|next question/i,
+      /结束本轮练习|end this session/i,
+      /收藏题目|save question/i,
+      /标记为薄弱题|mark as weak/i,
+    ]) {
+      await expect(canvas.getByRole("button", { name })).toBeDisabled()
+    }
+    await expect(
+      canvas
+        .getByRole("button", { name: /重练当前题|retry current question/i })
+        .querySelector('[data-slot="spinner"]'),
+    ).toBeVisible()
+  },
+})
+
+const reviewRetryErrorAction = fn(async () => {
+  throw new Error("internal")
+})
+
+export const ReviewRetryError = meta.story({
+  args: {
+    ...readyArgs("reviewBalanced"),
+    reviewActions: {
+      ...readyArgs("reviewBalanced").reviewActions,
+      onRetryCurrent: reviewRetryErrorAction,
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: /重练当前题|retry current question/i }),
+    )
+    await expect(reviewRetryErrorAction).toHaveBeenCalledTimes(1)
+    await expect(canvas.getByRole("alert")).toBeVisible()
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent("internal")
+  },
+})
+
+const reviewNextErrorAction = fn(async () => {
+  throw new Error("internal")
+})
+
+export const ReviewNextError = meta.story({
+  args: {
+    ...readyArgs("reviewBalanced"),
+    reviewActions: {
+      ...readyArgs("reviewBalanced").reviewActions,
+      onNextQuestion: reviewNextErrorAction,
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /继续下一题|next question/i }))
+    await expect(reviewNextErrorAction).toHaveBeenCalledTimes(1)
+    await expect(canvas.getByRole("alert")).toBeVisible()
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent("internal")
+  },
+})
+
+const reviewEndErrorAction = fn(async () => {
+  throw new Error("internal")
+})
+
+export const ReviewEndError = meta.story({
+  args: {
+    ...readyArgs("reviewBalanced"),
+    reviewActions: {
+      ...readyArgs("reviewBalanced").reviewActions,
+      onEndSession: reviewEndErrorAction,
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /结束本轮练习|end this session/i }))
+    const dialog = await getVisiblePracticeEndDialog()
+    await expect(
+      within(dialog).getByRole("heading", { name: /结束本轮专项练习|end this targeted-practice/i }),
+    ).toBeInTheDocument()
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: /结束本轮练习|end this session/i }),
+    )
+    await expect(reviewEndErrorAction).toHaveBeenCalledTimes(1)
+    await expect(canvas.getByRole("alert")).toBeVisible()
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent("internal")
+  },
+})
+
+const endSessionConfirmationAction = fn(async () => "executed" as const)
+
+export const EndSessionConfirmation = meta.story({
+  args: {
+    ...readyArgs("reviewBalanced"),
+    reviewActions: {
+      ...readyArgs("reviewBalanced").reviewActions,
+      onEndSession: endSessionConfirmationAction,
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /结束本轮练习|end this session/i }))
+    await expect(endSessionConfirmationAction).not.toHaveBeenCalled()
+    const firstDialog = await getVisiblePracticeEndDialog()
+    await expect(
+      within(firstDialog).getByRole("heading", {
+        name: /结束本轮专项练习|end this targeted-practice/i,
+      }),
+    ).toBeInTheDocument()
+    await userEvent.click(
+      within(firstDialog).getByRole("button", { name: /继续回答|keep answering/i }),
+    )
+    await waitFor(() => expect(firstDialog).not.toBeVisible())
+    await userEvent.click(canvas.getByRole("button", { name: /结束本轮练习|end this session/i }))
+    const secondDialog = await getVisiblePracticeEndDialog()
+    await userEvent.click(
+      within(secondDialog).getByRole("button", { name: /结束本轮练习|end this session/i }),
+    )
+    await expect(endSessionConfirmationAction).toHaveBeenCalledTimes(1)
+  },
 })
 
 export const LongReviewContent = meta.story({
