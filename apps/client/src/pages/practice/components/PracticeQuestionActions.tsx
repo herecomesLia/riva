@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 
 type PracticeQuestionActionsProps = {
+  interactionLocked: boolean
   isEndPending: boolean
   isMarkedWeak: boolean
   isSaved: boolean
@@ -33,6 +34,7 @@ type PracticeQuestionActionsProps = {
 type ActionError = "saved" | "weak" | "skip" | "end" | null
 
 export function PracticeQuestionActions({
+  interactionLocked,
   isEndPending,
   isMarkedWeak,
   isSaved,
@@ -50,7 +52,7 @@ export function PracticeQuestionActions({
   const [endOpen, setEndOpen] = useState(false)
 
   async function setSaved() {
-    if (isSavedPending) return
+    if (interactionLocked) return
     setActionError(null)
     try {
       await onSetSaved(!isSaved)
@@ -60,7 +62,7 @@ export function PracticeQuestionActions({
   }
 
   async function setWeak() {
-    if (isWeakPending) return
+    if (interactionLocked) return
     setActionError(null)
     try {
       await onSetWeak(!isMarkedWeak)
@@ -70,7 +72,7 @@ export function PracticeQuestionActions({
   }
 
   async function skip() {
-    if (isSkipPending) return
+    if (interactionLocked) return
     setActionError(null)
     try {
       await onSkip()
@@ -81,7 +83,7 @@ export function PracticeQuestionActions({
   }
 
   async function end() {
-    if (isEndPending) return
+    if (interactionLocked) return
     setActionError(null)
     try {
       await onEnd()
@@ -96,7 +98,7 @@ export function PracticeQuestionActions({
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button
           aria-pressed={isSaved}
-          disabled={isSavedPending}
+          disabled={interactionLocked}
           onClick={() => void setSaved()}
           type="button"
           variant="outline"
@@ -110,7 +112,7 @@ export function PracticeQuestionActions({
         </Button>
         <Button
           aria-pressed={isMarkedWeak}
-          disabled={isWeakPending}
+          disabled={interactionLocked}
           onClick={() => void setWeak()}
           type="button"
           variant="outline"
@@ -127,7 +129,7 @@ export function PracticeQuestionActions({
         <AlertDialog onOpenChange={setSkipOpen} open={skipOpen}>
           <AlertDialogTrigger
             render={
-              <Button disabled={isSkipPending} type="button" variant="outline">
+              <Button disabled={interactionLocked} type="button" variant="outline">
                 <SkipForwardIcon data-icon="inline-start" />
                 {t("practice.questionActions.skip")}
               </Button>
@@ -144,10 +146,10 @@ export function PracticeQuestionActions({
               <ActionErrorAlert description={t("practice.errors.skipDescription")} />
             ) : null}
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isSkipPending}>
+              <AlertDialogCancel disabled={interactionLocked}>
                 {t("practice.dialog.cancel")}
               </AlertDialogCancel>
-              <AlertDialogAction disabled={isSkipPending} onClick={() => void skip()}>
+              <AlertDialogAction disabled={interactionLocked} onClick={() => void skip()}>
                 {isSkipPending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : null}
                 {t("practice.dialog.confirmSkip")}
               </AlertDialogAction>
@@ -157,7 +159,7 @@ export function PracticeQuestionActions({
         <AlertDialog onOpenChange={setEndOpen} open={endOpen}>
           <AlertDialogTrigger
             render={
-              <Button disabled={isEndPending} type="button" variant="ghost">
+              <Button disabled={interactionLocked} type="button" variant="ghost">
                 <LogOutIcon data-icon="inline-start" />
                 {t("practice.questionActions.end")}
               </Button>
@@ -172,11 +174,11 @@ export function PracticeQuestionActions({
               <ActionErrorAlert description={t("practice.errors.endDescription")} />
             ) : null}
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isEndPending}>
+              <AlertDialogCancel disabled={interactionLocked}>
                 {t("practice.dialog.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
-                disabled={isEndPending}
+                disabled={interactionLocked}
                 onClick={() => void end()}
                 variant="destructive"
               >

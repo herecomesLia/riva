@@ -114,24 +114,26 @@ describe("PracticePage", () => {
     })
   })
 
-  it("shows generation failure with preserved settings and retries with them", async () => {
+  it("retries a failed generation query without creating a new session", async () => {
     const user = userEvent.setup()
     const generating = createPracticeMockResponse("generatingQuestion")
-    const retrying = createPracticeMockResponse("generatingQuestion")
+    const answering = createPracticeMockResponse("answeringQuestion")
     if (
       generating.session.status !== "generatingQuestion" ||
-      retrying.session.status !== "generatingQuestion"
+      answering.session.status !== "answering"
     ) {
-      throw new Error("Generation fixtures must use the generating state.")
+      throw new Error("Generating and answering fixtures are required.")
     }
     generating.session.selection.difficulty = "pressure"
-    retrying.session.sessionId = "practice_session_retry"
-    retrying.session.selection = structuredClone(generating.session.selection)
+    answering.session.sessionId = generating.session.sessionId
+    answering.session.version = generating.session.version + 1
+    answering.session.selection = structuredClone(generating.session.selection)
+    answering.session.startedAt = generating.session.startedAt
+    const retryQuery = createDeferred<PracticePageResponse>()
     vi.mocked(getPracticePage).mockResolvedValue(generating)
     vi.mocked(getQuestionGenerationStatus)
       .mockRejectedValueOnce(new Error("unsafe generation details"))
-      .mockReturnValue(new Promise(() => undefined))
-    vi.mocked(startPracticeSession).mockResolvedValue(retrying)
+      .mockReturnValueOnce(retryQuery.promise)
 
     renderPracticePage()
 
@@ -141,9 +143,28 @@ describe("PracticePage", () => {
     await user.click(
       screen.getByRole("button", { name: i18n.t("practice.actions.retryGeneration") }),
     )
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.actions.retryingGeneration") }),
+    ).toBeDisabled()
 
-    expect(vi.mocked(startPracticeSession).mock.calls[0]?.[0]).toEqual(generating.session.selection)
-    expect(await screen.findByTestId("practice-generating-state")).toBeInTheDocument()
+    const expectedInput = {
+      sessionId: generating.session.sessionId,
+      version: generating.session.version,
+    }
+    await waitFor(() => expect(getQuestionGenerationStatus).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(getQuestionGenerationStatus).mock.calls).toEqual([
+      [expectedInput],
+      [expectedInput],
+    ])
+    expect(startPracticeSession).not.toHaveBeenCalled()
+    await act(async () => {
+      retryQuery.resolve(answering)
+      await retryQuery.promise
+    })
+    expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
+    expect(answering.session.sessionId).toBe(generating.session.sessionId)
+    expect(answering.session.selection).toEqual(generating.session.selection)
+    expect(answering.session.startedAt).toBe(generating.session.startedAt)
   })
 
   it("does not let a stale poll response overwrite a newer session", async () => {
@@ -209,14 +230,122 @@ describe("PracticePage", () => {
       name: i18n.t("practice.answer.submitting"),
     })
     expect(pendingButton).toBeDisabled()
+    expect(screen.getByLabelText(i18n.t("practice.answer.label"))).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.guidance.requestHint") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.guidance.requestFramework") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.markWeak") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.skip") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.end") }),
+    ).toBeDisabled()
     await user.click(pendingButton)
     expect(submitPracticeAnswer).toHaveBeenCalledTimes(1)
+    expect(requestPracticeHint).not.toHaveBeenCalled()
+    expect(requestAnswerFramework).not.toHaveBeenCalled()
+    expect(setQuestionSaved).not.toHaveBeenCalled()
+    expect(setQuestionWeak).not.toHaveBeenCalled()
+    expect(skipPracticeQuestion).not.toHaveBeenCalled()
+    expect(requestEndPracticeSession).not.toHaveBeenCalled()
 
     await act(async () => {
       submission.resolve(evaluating)
       await submission.promise
     })
     expect(await screen.findByTestId("practice-evaluating-state")).toBeInTheDocument()
+  })
+
+  it("locks every versioned action while a hint request is pending", async () => {
+    const user = userEvent.setup()
+    const answering = createPracticeMockResponse("answeringQuestion")
+    const hinted = createPracticeMockResponse("answeringHintRevealed")
+    if (answering.session.status !== "answering" || hinted.session.status !== "answering") {
+      throw new Error("Answering fixtures are required.")
+    }
+    hinted.session.version = answering.session.version + 1
+    const request = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(answering)
+    vi.mocked(requestPracticeHint).mockReturnValue(request.promise)
+
+    renderPracticePage()
+
+    const textarea = await screen.findByLabelText(i18n.t("practice.answer.label"))
+    await user.type(textarea, "我先说明背景。")
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.guidance.requestHint") }))
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.guidance.requestHint") }),
+    ).toBeDisabled()
+    const lockedButtonNames = [
+      i18n.t("practice.guidance.requestFramework"),
+      i18n.t("practice.questionActions.save"),
+      i18n.t("practice.questionActions.markWeak"),
+      i18n.t("practice.questionActions.skip"),
+      i18n.t("practice.questionActions.end"),
+      i18n.t("practice.answer.submit"),
+    ]
+    for (const name of lockedButtonNames) {
+      expect(screen.getByRole("button", { name })).toBeDisabled()
+    }
+    expect(textarea).toBeEnabled()
+    await user.type(textarea, "我仍可继续编辑。")
+    expect(textarea).toHaveValue("我先说明背景。我仍可继续编辑。")
+
+    await act(async () => {
+      request.resolve(hinted)
+      await request.promise
+    })
+
+    expect(
+      await screen.findByText(hinted.session.question.answerHints.content?.[0] ?? ""),
+    ).toBeVisible()
+    for (const name of lockedButtonNames.slice(0, -1)) {
+      expect(screen.getByRole("button", { name })).toBeEnabled()
+    }
+    expect(screen.getByRole("button", { name: i18n.t("practice.answer.submit") })).toBeEnabled()
+  })
+
+  it("does not start a weak mutation while saving is pending", async () => {
+    const user = userEvent.setup()
+    const answering = createPracticeMockResponse("answeringQuestion")
+    const saved = createPracticeMockResponse("answeringSavedQuestion")
+    if (answering.session.status !== "answering" || saved.session.status !== "answering") {
+      throw new Error("Answering fixtures are required.")
+    }
+    saved.session.version = answering.session.version + 1
+    const request = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(answering)
+    vi.mocked(setQuestionSaved).mockReturnValue(request.promise)
+
+    renderPracticePage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.save") }),
+    )
+    const weakButton = screen.getByRole("button", {
+      name: i18n.t("practice.questionActions.markWeak"),
+    })
+    expect(weakButton).toBeDisabled()
+    await user.click(weakButton)
+    expect(setQuestionWeak).not.toHaveBeenCalled()
+
+    await act(async () => {
+      request.resolve(saved)
+      await request.promise
+    })
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.unsave") }),
+    ).toBeEnabled()
   })
 
   it("updates saved and weak question state from mutation snapshots", async () => {

@@ -33,6 +33,7 @@ const answeringPending: PracticeAnsweringPending = {
   end: false,
   framework: false,
   hint: false,
+  interactionLocked: false,
   saved: false,
   skip: false,
   submitAnswer: false,
@@ -43,6 +44,7 @@ function renderReadyView(
   data: PracticePageResponse,
   options: {
     generationError?: boolean
+    isGenerationRetrying?: boolean
     isStarting?: boolean
     onRetryGeneration?: () => void
     onStart?: (input: ActivePracticeSelection) => Promise<void>
@@ -58,6 +60,7 @@ function renderReadyView(
       answeringPending={options.answeringPending ?? answeringPending}
       content={{ status: "ready", data }}
       generationError={options.generationError ?? false}
+      isGenerationRetrying={options.isGenerationRetrying ?? false}
       isStarting={options.isStarting ?? false}
       onRetryGeneration={options.onRetryGeneration ?? vi.fn()}
       onStart={onStart}

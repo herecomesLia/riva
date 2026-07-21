@@ -14,12 +14,14 @@ import { Textarea } from "@/components/ui/textarea"
 const answerSchema = z.object({ content: z.string().trim().min(1) })
 
 type PracticeAnswerComposerProps = {
+  interactionLocked: boolean
   isPending: boolean
   onDraftChange: (isDirty: boolean) => void
   onSubmit: (content: string) => Promise<void>
 }
 
 export function PracticeAnswerComposer({
+  interactionLocked,
   isPending,
   onDraftChange,
   onSubmit,
@@ -30,7 +32,7 @@ export function PracticeAnswerComposer({
     defaultValues: { content: "" },
     validators: { onSubmit: answerSchema },
     onSubmit: async ({ value }) => {
-      if (isPending) return
+      if (interactionLocked) return
       setSubmitError(false)
       try {
         await onSubmit(value.content.trim())
@@ -81,7 +83,7 @@ export function PracticeAnswerComposer({
                     {t("practice.answer.characterCount", { count: field.state.value.length })}
                   </FieldDescription>
                   <Button
-                    disabled={isPending || field.state.value.trim().length === 0}
+                    disabled={interactionLocked || field.state.value.trim().length === 0}
                     type="submit"
                   >
                     {isPending ? (

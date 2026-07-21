@@ -12,6 +12,7 @@ const meta = preview.meta({
 })
 
 const defaultArgs = {
+  interactionLocked: false,
   isEndPending: false,
   isMarkedWeak: false,
   isSaved: false,

@@ -11,6 +11,7 @@ import type { PracticeGuidance } from "@/models/practice"
 type PracticeQuestionGuidanceProps = {
   answerFramework: PracticeGuidance<string[]>
   answerHints: PracticeGuidance<string[]>
+  interactionLocked: boolean
   isFrameworkPending: boolean
   isHintPending: boolean
   onRequestFramework: () => Promise<void>
@@ -20,6 +21,7 @@ type PracticeQuestionGuidanceProps = {
 export function PracticeQuestionGuidance({
   answerFramework,
   answerHints,
+  interactionLocked,
   isFrameworkPending,
   isHintPending,
   onRequestFramework,
@@ -30,7 +32,7 @@ export function PracticeQuestionGuidance({
   const [frameworkError, setFrameworkError] = useState(false)
 
   async function requestHint() {
-    if (isHintPending || answerHints.status !== "notRequested") return
+    if (interactionLocked || answerHints.status !== "notRequested") return
     setHintError(false)
     try {
       await onRequestHint()
@@ -40,7 +42,7 @@ export function PracticeQuestionGuidance({
   }
 
   async function requestFramework() {
-    if (isFrameworkPending || answerFramework.status !== "notRequested") return
+    if (interactionLocked || answerFramework.status !== "notRequested") return
     setFrameworkError(false)
     try {
       await onRequestFramework()
@@ -59,6 +61,7 @@ export function PracticeQuestionGuidance({
         errorTitle={t("practice.errors.hintTitle")}
         icon={LightbulbIcon}
         isPending={isHintPending}
+        interactionLocked={interactionLocked}
         onRequest={() => void requestHint()}
         requestLabel={t("practice.guidance.requestHint")}
         status={answerHints.status}
@@ -73,6 +76,7 @@ export function PracticeQuestionGuidance({
         errorTitle={t("practice.errors.frameworkTitle")}
         icon={ListTreeIcon}
         isPending={isFrameworkPending}
+        interactionLocked={interactionLocked}
         onRequest={() => void requestFramework()}
         requestLabel={t("practice.guidance.requestFramework")}
         status={answerFramework.status}
@@ -90,6 +94,7 @@ type GuidanceCardProps = {
   errorDescription: string
   errorTitle: string
   icon: typeof LightbulbIcon
+  interactionLocked: boolean
   isPending: boolean
   onRequest: () => void
   requestLabel: string
@@ -105,6 +110,7 @@ function GuidanceCard({
   errorDescription,
   errorTitle,
   icon: Icon,
+  interactionLocked,
   isPending,
   onRequest,
   requestLabel,
@@ -136,7 +142,7 @@ function GuidanceCard({
           <p className="text-sm text-muted-foreground">{unavailableLabel}</p>
         ) : null}
         {status === "notRequested" ? (
-          <Button disabled={isPending} onClick={onRequest} type="button" variant="outline">
+          <Button disabled={interactionLocked} onClick={onRequest} type="button" variant="outline">
             {isPending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : null}
             {requestLabel}
           </Button>

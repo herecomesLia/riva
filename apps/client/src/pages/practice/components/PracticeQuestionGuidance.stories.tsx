@@ -15,6 +15,7 @@ const defaultQuestion = getQuestion("answeringQuestion")
 const defaultArgs = {
   answerFramework: defaultQuestion.answerFramework,
   answerHints: defaultQuestion.answerHints,
+  interactionLocked: false,
   isFrameworkPending: false,
   isHintPending: false,
   onRequestFramework: fn(async () => undefined),

@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  createGeneratedPracticeQuestion,
   createPracticeMockResponse,
   practiceResponseMock,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
 import type {
+  ActivePracticeSelection,
   PracticeGuidance,
   PracticePageResponse,
   PracticeQuestionCard,
+  PracticeQuestionType,
   PracticeScoreDimension,
 } from "@/models/practice"
 
@@ -40,6 +43,14 @@ const scoreDimensions = new Set<PracticeScoreDimension>([
   "communication",
   "riskControl",
 ])
+
+const questionTypes: PracticeQuestionType[] = [
+  "projectDeepDive",
+  "behavioral",
+  "businessUnderstanding",
+  "motivation",
+  "technicalFoundation",
+]
 
 function expectConsistentGuidance(guidance: PracticeGuidance<string[]>) {
   switch (guidance.status) {
@@ -160,6 +171,58 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
 }
 
 describe("practice mock scenarios", () => {
+  it.each(questionTypes)(
+    "generates stable %s questions from the active selection",
+    (questionType) => {
+      const selection = {
+        targetRoleId: "role_frontend_bytedance",
+        questionType,
+        difficulty: "pressure",
+        source: "personalized",
+        prioritizeWeaknesses: false,
+      } satisfies ActivePracticeSelection
+      const first = createGeneratedPracticeQuestion({
+        sessionId: "practice_session_factory",
+        ordinal: 1,
+        selection,
+      })
+      const second = createGeneratedPracticeQuestion({
+        sessionId: "practice_session_factory",
+        ordinal: 2,
+        selection,
+      })
+
+      expect(first).toMatchObject({
+        questionType,
+        difficulty: "pressure",
+        answerHints: { status: "notRequested", content: null },
+        answerFramework: { status: "notRequested", content: null },
+        isSaved: false,
+        isMarkedWeak: false,
+      })
+      expect(first.id).toContain("practice_session_factory")
+      expect(second.id).not.toBe(first.id)
+      expect(second.prompt).not.toBe(first.prompt)
+    },
+  )
+
+  it("marks saved-source generated questions as saved", () => {
+    const selection = {
+      targetRoleId: "role_frontend_bytedance",
+      questionType: "projectDeepDive",
+      difficulty: "basic",
+      source: "saved",
+      prioritizeWeaknesses: false,
+    } satisfies ActivePracticeSelection
+
+    expect(
+      createGeneratedPracticeQuestion({
+        sessionId: "practice_session_saved",
+        ordinal: 1,
+        selection,
+      }).isSaved,
+    ).toBe(true)
+  })
   it.each(scenarios)("keeps the %s response internally consistent", (scenario) => {
     expectConsistentPracticeResponse(createPracticeMockResponse(scenario))
   })

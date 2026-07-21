@@ -10,6 +10,7 @@ const meta = preview.meta({
 })
 
 const defaultArgs = {
+  interactionLocked: false,
   isPending: false,
   onDraftChange: fn(),
   onSubmit: fn(async () => undefined),
@@ -24,6 +25,7 @@ function PendingComposer() {
 
   return (
     <PracticeAnswerComposer
+      interactionLocked={pending}
       isPending={pending}
       onDraftChange={fn()}
       onSubmit={async (content) => {

@@ -1,4 +1,5 @@
 import {
+  createGeneratedPracticeQuestion,
   createPracticeMockResponse,
   practiceAnswerFrameworkContent,
   practiceAnswerHintContent,
@@ -43,6 +44,7 @@ let mockResponse = createPracticeMockResponse()
 let sessionSequence = 0
 let mutationSequence = 0
 const generationPollCounts = new Map<string, number>()
+const questionOrdinals = new Map<string, number>()
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -53,6 +55,7 @@ export function resetPracticeMockState(scenario: PracticeMockScenario = "setupRe
   sessionSequence = 0
   mutationSequence = 0
   generationPollCounts.clear()
+  questionOrdinals.clear()
 }
 
 function toPracticeRoleOption(role: TargetRole): PracticeTargetRoleOption {
@@ -149,12 +152,14 @@ export async function startPracticeSession(
   const current = await getPracticePage()
   requireValidSelection(current.setupContext, input)
   sessionSequence += 1
+  const sessionId = `practice_session_generated_${sessionSequence}`
+  questionOrdinals.set(sessionId, 0)
 
   return setMockResponse({
     ...current,
     session: {
       status: "generatingQuestion",
-      sessionId: `practice_session_generated_${sessionSequence}`,
+      sessionId,
       version: 1,
       selection: copy(input),
       startedAt: new Date(Date.UTC(2026, 6, 20, 2, sessionSequence)).toISOString(),
@@ -168,19 +173,23 @@ function completeQuestionGeneration(): PracticePageResponse {
     throw new Error("Practice session is not generating a question.")
   }
 
-  const answeringFixture = createPracticeMockResponse("answeringQuestion")
-  if (answeringFixture.session.status !== "answering") {
-    throw new Error("The answering fixture must use the answering state.")
-  }
+  const ordinal = (questionOrdinals.get(currentSession.sessionId) ?? 0) + 1
+  const question = createGeneratedPracticeQuestion({
+    sessionId: currentSession.sessionId,
+    ordinal,
+    selection: currentSession.selection,
+  })
+  questionOrdinals.set(currentSession.sessionId, ordinal)
 
   return {
     ...mockResponse,
     session: {
-      ...answeringFixture.session,
+      status: "answering",
       sessionId: currentSession.sessionId,
       version: currentSession.version + 1,
       selection: copy(currentSession.selection),
       startedAt: currentSession.startedAt,
+      question,
     },
   }
 }
@@ -333,6 +342,7 @@ export async function skipPracticeQuestion(
 ): Promise<PracticePageResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
+  if (!questionOrdinals.has(session.sessionId)) questionOrdinals.set(session.sessionId, 1)
   generationPollCounts.set(session.sessionId, 0)
 
   return setMockResponse({

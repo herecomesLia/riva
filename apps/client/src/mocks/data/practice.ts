@@ -7,6 +7,7 @@ import type {
   PracticeFollowUpQuestion,
   PracticePageResponse,
   PracticeQuestionCard,
+  PracticeQuestionType,
   PracticeReview,
   PracticeSetupContext,
 } from "@/models/practice"
@@ -54,6 +55,81 @@ const defaultSelection = {
   prioritizeWeaknesses: false,
 } satisfies ActivePracticeSelection
 
+type GeneratedQuestionTemplate = {
+  prompts: readonly [string, string]
+  assessedCapabilities: readonly string[]
+  recommendedMaterials: readonly string[]
+}
+
+const generatedQuestionTemplates = {
+  projectDeepDive: {
+    prompts: [
+      "请介绍一次你主导前端性能优化的经历，并说明你如何定位问题、推动落地和验证结果。",
+      "请选择一个你深度参与的复杂项目，说明你做出的关键技术取舍、遇到的阻力以及最终结果。",
+    ],
+    assessedCapabilities: ["问题分析", "技术决策", "跨团队协作", "结果量化"],
+    recommendedMaterials: ["全球电商结算页性能优化项目", "性能监控平台建设经历"],
+  },
+  behavioral: {
+    prompts: [
+      "请介绍一次你与关键协作方存在明显分歧的经历，你如何推动团队形成共识并完成目标？",
+      "请回顾一次高压期限下出现突发问题的经历，你如何确定优先级、协调资源并控制影响？",
+    ],
+    assessedCapabilities: ["协作沟通", "冲突处理", "推动力", "复盘意识"],
+    recommendedMaterials: ["跨团队项目协作经历", "线上突发事件处理经历"],
+  },
+  businessUnderstanding: {
+    prompts: [
+      "请介绍一次你基于业务目标调整产品或技术优先级的经历，并说明你的判断依据和结果。",
+      "面对用户体验与短期业务收益之间的冲突时，你会如何分析取舍并推动决策？",
+    ],
+    assessedCapabilities: ["业务判断", "优先级管理", "数据分析", "利益相关方沟通"],
+    recommendedMaterials: ["核心指标改进项目", "产品或技术优先级调整经历"],
+  },
+  motivation: {
+    prompts: [
+      "为什么你希望应聘当前目标岗位？请结合过往经历说明你的匹配点和下一阶段目标。",
+      "请说明你选择这个职业方向的关键原因，以及当前岗位如何连接你的长期发展计划。",
+    ],
+    assessedCapabilities: ["求职动机", "岗位认知", "自我认知", "职业规划"],
+    recommendedMaterials: ["职业选择关键节点", "与目标岗位相关的成长经历"],
+  },
+  technicalFoundation: {
+    prompts: [
+      "请解释 React 页面出现重复渲染的常见原因，并说明你会如何定位和验证优化效果。",
+      "设计一个需要长期演进的前端数据请求层时，你会如何处理类型安全、缓存一致性和错误边界？",
+    ],
+    assessedCapabilities: ["技术原理", "问题定位", "工程设计", "风险意识"],
+    recommendedMaterials: ["React 性能排查经历", "前端基础设施设计经历"],
+  },
+} satisfies Record<PracticeQuestionType, GeneratedQuestionTemplate>
+
+export function createGeneratedPracticeQuestion({
+  sessionId,
+  ordinal,
+  selection,
+}: {
+  sessionId: string
+  ordinal: number
+  selection: ActivePracticeSelection
+}): PracticeQuestionCard {
+  const template = generatedQuestionTemplates[selection.questionType]
+  const prompt = template.prompts[(ordinal - 1) % template.prompts.length] ?? template.prompts[0]
+
+  return {
+    id: `practice_question_${sessionId}_${ordinal}`,
+    prompt,
+    questionType: selection.questionType,
+    difficulty: selection.difficulty,
+    assessedCapabilities: [...template.assessedCapabilities],
+    recommendedMaterials: [...template.recommendedMaterials],
+    answerHints: { status: "notRequested", content: null },
+    answerFramework: { status: "notRequested", content: null },
+    isSaved: selection.source === "saved",
+    isMarkedWeak: false,
+  }
+}
+
 const activeSession = {
   sessionId: "practice_session_20260720_01",
   version: 1,
@@ -61,24 +137,11 @@ const activeSession = {
   startedAt: "2026-07-20T01:30:00.000Z",
 } as const
 
-const question = {
-  id: "practice_question_checkout_performance",
-  prompt: "请介绍一次你主导前端性能优化的经历，并说明你如何定位问题、推动落地和验证结果。",
-  questionType: "projectDeepDive",
-  difficulty: "basic",
-  assessedCapabilities: ["问题分析", "技术决策", "跨团队协作", "结果量化"],
-  recommendedMaterials: ["全球电商结算页性能优化项目", "性能监控平台建设经历"],
-  answerHints: {
-    status: "notRequested",
-    content: null,
-  },
-  answerFramework: {
-    status: "notRequested",
-    content: null,
-  },
-  isSaved: false,
-  isMarkedWeak: false,
-} satisfies PracticeQuestionCard
+const question = createGeneratedPracticeQuestion({
+  sessionId: activeSession.sessionId,
+  ordinal: 1,
+  selection: defaultSelection,
+})
 
 export const practiceAnswerHintContent = [
   "先界定性能问题对业务和用户的影响。",

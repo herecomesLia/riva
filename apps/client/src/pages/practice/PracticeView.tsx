@@ -56,6 +56,7 @@ export type PracticeAnsweringPending = {
   end: boolean
   framework: boolean
   hint: boolean
+  interactionLocked: boolean
   saved: boolean
   skip: boolean
   submitAnswer: boolean
@@ -78,6 +79,7 @@ type PracticeViewProps =
       answeringActions: PracticeAnsweringActions
       answeringPending: PracticeAnsweringPending
       generationError: boolean
+      isGenerationRetrying: boolean
       isStarting: boolean
       onRetryGeneration: () => void
       onStart: (input: ActivePracticeSelection) => Promise<void>
@@ -149,7 +151,7 @@ function PracticeViewContent(props: PracticeViewProps) {
       return (
         <PracticeGenerationErrorState
           context={setupContext}
-          isRetrying={props.isStarting}
+          isRetrying={props.isGenerationRetrying}
           onRetry={props.onRetryGeneration}
           selection={session.selection}
         />
@@ -234,6 +236,7 @@ function PracticeAnsweringView({
       <PracticeSessionHeader context={context} selection={session.selection} />
       <PracticeQuestionCard question={session.question} />
       <PracticeAnswerComposer
+        interactionLocked={pending.interactionLocked}
         isPending={pending.submitAnswer}
         onDraftChange={setIsDraftDirty}
         onSubmit={(content) => actions.onSubmitAnswer({ ...mutationInput, content })}
@@ -241,12 +244,14 @@ function PracticeAnsweringView({
       <PracticeQuestionGuidance
         answerFramework={session.question.answerFramework}
         answerHints={session.question.answerHints}
+        interactionLocked={pending.interactionLocked}
         isFrameworkPending={pending.framework}
         isHintPending={pending.hint}
         onRequestFramework={() => actions.onRequestFramework(mutationInput)}
         onRequestHint={() => actions.onRequestHint(mutationInput)}
       />
       <PracticeQuestionActions
+        interactionLocked={pending.interactionLocked}
         isEndPending={pending.end}
         isMarkedWeak={session.question.isMarkedWeak}
         isSaved={session.question.isSaved}

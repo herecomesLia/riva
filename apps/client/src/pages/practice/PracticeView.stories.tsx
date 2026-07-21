@@ -36,6 +36,7 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
       end: false,
       framework: false,
       hint: false,
+      interactionLocked: false,
       saved: false,
       skip: false,
       submitAnswer: false,
@@ -43,6 +44,7 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
     },
     content: { data: createPracticeMockResponse(scenario), status: "ready" as const },
     generationError: false,
+    isGenerationRetrying: false,
     isStarting: false,
     onRetryGeneration: fn(),
     onStart: fn(async () => undefined),
@@ -72,4 +74,24 @@ export const GeneratingQuestion = meta.story({ args: readyArgs("generatingQuesti
 
 export const GenerationError = meta.story({
   args: { ...readyArgs("generatingQuestion"), generationError: true },
+})
+
+export const InteractionLocked = meta.story({
+  args: {
+    ...readyArgs("answeringQuestion"),
+    answeringPending: {
+      ...readyArgs("answeringQuestion").answeringPending,
+      hint: true,
+      interactionLocked: true,
+    },
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("button", { name: /请求提示|request hint/i })).toBeDisabled()
+    await expect(
+      canvas.getByRole("button", { name: /请求答题框架|request answer framework/i }),
+    ).toBeDisabled()
+    await expect(canvas.getByRole("button", { name: /收藏题目|save question/i })).toBeDisabled()
+    await expect(canvas.getByRole("button", { name: /标记为薄弱题|mark as weak/i })).toBeDisabled()
+    await expect(canvas.getByRole("textbox")).toBeEnabled()
+  },
 })

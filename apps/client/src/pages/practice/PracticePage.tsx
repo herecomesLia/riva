@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 
 import type {
   GetQuestionGenerationStatusInput,
@@ -37,6 +37,7 @@ const PRACTICE_QUERY_KEY = ["practice"] as const
 
 export function PracticePage() {
   const queryClient = useQueryClient()
+  const questionMutationLock = useRef(false)
   const practiceQuery = useQuery({
     queryFn: getPracticePage,
     queryKey: PRACTICE_QUERY_KEY,
@@ -53,6 +54,14 @@ export function PracticePage() {
   const submitAnswerMutation = usePracticeMutation(submitPracticeAnswer)
   const skipMutation = usePracticeMutation(skipPracticeQuestion)
   const endMutation = usePracticeMutation(requestEndPracticeSession)
+  const isQuestionMutationPending =
+    hintMutation.isPending ||
+    frameworkMutation.isPending ||
+    savedMutation.isPending ||
+    weakMutation.isPending ||
+    submitAnswerMutation.isPending ||
+    skipMutation.isPending ||
+    endMutation.isPending
   const generationSession =
     practiceQuery.data?.session.status === "generatingQuestion" ? practiceQuery.data.session : null
   const generationSessionId = generationSession?.sessionId
@@ -100,7 +109,17 @@ export function PracticePage() {
 
   function retryGeneration() {
     if (practiceQuery.data?.session.status !== "generatingQuestion") return
-    void startMutation.mutateAsync(practiceQuery.data.session.selection).catch(() => undefined)
+    void generationQuery.refetch()
+  }
+
+  async function runQuestionMutation(operation: () => Promise<PracticePageResponse>) {
+    if (questionMutationLock.current) return
+    questionMutationLock.current = true
+    try {
+      await operation()
+    } finally {
+      questionMutationLock.current = false
+    }
   }
 
   if (practiceQuery.data !== undefined) {
@@ -108,38 +127,42 @@ export function PracticePage() {
       <PracticeView
         answeringActions={{
           onEnd: async (input: RequestEndPracticeSessionInput) => {
-            await endMutation.mutateAsync(input)
+            await runQuestionMutation(() => endMutation.mutateAsync(input))
           },
           onRequestFramework: async (input: RequestAnswerFrameworkInput) => {
-            await frameworkMutation.mutateAsync(input)
+            await runQuestionMutation(() => frameworkMutation.mutateAsync(input))
           },
           onRequestHint: async (input: RequestPracticeHintInput) => {
-            await hintMutation.mutateAsync(input)
+            await runQuestionMutation(() => hintMutation.mutateAsync(input))
           },
           onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
-            await savedMutation.mutateAsync(input)
+            await runQuestionMutation(() => savedMutation.mutateAsync(input))
           },
           onSetWeak: async (input: SetPracticeQuestionWeakInput) => {
-            await weakMutation.mutateAsync(input)
+            await runQuestionMutation(() => weakMutation.mutateAsync(input))
           },
           onSkip: async (input: SkipPracticeQuestionInput) => {
-            await skipMutation.mutateAsync(input)
+            await runQuestionMutation(() => skipMutation.mutateAsync(input))
           },
           onSubmitAnswer: async (input: SubmitPracticeAnswerInput) => {
-            await submitAnswerMutation.mutateAsync(input)
+            await runQuestionMutation(() => submitAnswerMutation.mutateAsync(input))
           },
         }}
         answeringPending={{
           end: endMutation.isPending,
           framework: frameworkMutation.isPending,
           hint: hintMutation.isPending,
+          interactionLocked: isQuestionMutationPending,
           saved: savedMutation.isPending,
           skip: skipMutation.isPending,
           submitAnswer: submitAnswerMutation.isPending,
           weak: weakMutation.isPending,
         }}
         content={{ status: "ready", data: practiceQuery.data }}
-        generationError={generationQuery.isError}
+        generationError={
+          generationQuery.isError || generationQuery.errorUpdatedAt > generationQuery.dataUpdatedAt
+        }
+        isGenerationRetrying={generationQuery.isFetching}
         isStarting={startMutation.isPending}
         onRetryGeneration={retryGeneration}
         onStart={start}
