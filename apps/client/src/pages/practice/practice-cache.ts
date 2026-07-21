@@ -24,7 +24,7 @@ export function synchronizePracticeSessionMutationResponse(
   if (
     responseSession.status !== "completed" ||
     responseSession.sessionId !== request.sessionId ||
-    responseSession.version < request.version
+    responseSession.version < request.version + 1
   ) {
     return current
   }

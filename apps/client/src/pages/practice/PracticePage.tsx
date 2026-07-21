@@ -25,7 +25,6 @@ import {
   endPracticeFollowUps,
   getPracticePage,
   getPracticeEvaluationStatus,
-  getNextQuestionGenerationStatus,
   getQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
@@ -99,13 +98,10 @@ export function PracticePage() {
       if (!generationSessionId || generationVersion === undefined) {
         throw new Error("A generating practice session is required.")
       }
-      const input = {
+      return getQuestionGenerationStatus({
         sessionId: generationSessionId,
         version: generationVersion,
-      }
-      return generationSession.previousAttempt
-        ? getNextQuestionGenerationStatus(input)
-        : getQuestionGenerationStatus(input)
+      })
     },
     queryKey: [
       ...PRACTICE_QUERY_KEY,

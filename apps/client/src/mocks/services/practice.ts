@@ -530,16 +530,18 @@ function toAttemptRecord(
   }
 }
 
+type PracticeCompletionBase = Pick<
+  PracticeCompletedState,
+  "sessionId" | "version" | "selection" | "startedAt" | "attemptId" | "attemptNumber"
+>
+
 function createCompletedPracticeSession({
   session,
   records,
   completedAt,
   nextStepSuggestion,
 }: {
-  session: Pick<
-    PracticeCompletedState,
-    "sessionId" | "version" | "selection" | "startedAt" | "attemptId" | "attemptNumber"
-  >
+  session: PracticeCompletionBase
   records: PracticeAttemptRecord[]
   completedAt: string
   nextStepSuggestion: string
@@ -548,8 +550,8 @@ function createCompletedPracticeSession({
   for (const record of records) latestByQuestion.set(record.question.id, record)
   const uniqueRecords = [...latestByQuestion.values()]
   return {
-    status: "completed",
     ...session,
+    status: "completed",
     attemptRecords: copy(records),
     completedAt,
     questionsCompleted: uniqueRecords.length,
@@ -699,12 +701,6 @@ export async function continueToNextPracticeQuestion(
   })
 }
 
-export async function getNextQuestionGenerationStatus(
-  input: GetQuestionGenerationStatusInput,
-): Promise<PracticePageResponse> {
-  return getQuestionGenerationStatus(input)
-}
-
 export async function endPracticeSession(
   input: EndPracticeSessionInput,
 ): Promise<PracticePageResponse> {
@@ -718,11 +714,19 @@ export async function endPracticeSession(
     throw new Error("Practice session version is out of date.")
   }
   const records = [...copy(session.attemptRecords), toAttemptRecord(session)]
+  const completionBase: PracticeCompletionBase = {
+    sessionId: session.sessionId,
+    version: session.version + 1,
+    selection: copy(session.selection),
+    startedAt: session.startedAt,
+    attemptId: session.attemptId,
+    attemptNumber: session.attemptNumber,
+  }
 
   return setMockResponse({
     ...mockResponse,
     session: createCompletedPracticeSession({
-      session: { ...session, version: session.version + 1 },
+      session: completionBase,
       records,
       completedAt: nextMutationTimestamp(),
       nextStepSuggestion: "根据本轮复盘优先补足薄弱项，再开始下一轮专项练习。",
@@ -759,11 +763,19 @@ export async function requestEndPracticeSession(
 ): Promise<PracticePageResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
+  const completionBase: PracticeCompletionBase = {
+    sessionId: session.sessionId,
+    version: session.version + 1,
+    selection: copy(session.selection),
+    startedAt: session.startedAt,
+    attemptId: session.attemptId,
+    attemptNumber: session.attemptNumber,
+  }
 
   return setMockResponse({
     ...mockResponse,
     session: createCompletedPracticeSession({
-      session: { ...session, version: session.version + 1 },
+      session: completionBase,
       records: copy(session.attemptRecords),
       completedAt: nextMutationTimestamp(),
       nextStepSuggestion: "本轮在提交回答前结束。可重新开始专项练习。",

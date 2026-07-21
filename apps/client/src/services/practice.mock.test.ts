@@ -126,7 +126,113 @@ async function completeQuestionToReview(
   return completed.session
 }
 
+async function finishCurrentAttempt(initial: PracticeAnsweringState): Promise<PracticeReviewState> {
+  let response = await settle(
+    submitPrimaryAnswer({
+      sessionId: initial.sessionId,
+      version: initial.version,
+      questionId: initial.question.id,
+      content: "我会说明背景、个人行动、证据、取舍和结果。",
+    }),
+  )
+  while (response.session.status === "answeringFollowUp") {
+    const session = response.session
+    response = await settle(
+      submitFollowUpAnswer({
+        sessionId: session.sessionId,
+        version: session.version,
+        questionId: session.question.id,
+        followUpQuestionId: session.currentFollowUp.question.id,
+        content: "我补充关键证据、协作取舍和风险控制。",
+      }),
+    )
+  }
+  if (response.session.status !== "evaluating") throw new Error("Expected evaluating session.")
+  const input = {
+    sessionId: response.session.sessionId,
+    version: response.session.version,
+    questionId: response.session.question.id,
+  }
+  await settle(getPracticeEvaluationStatus(input))
+  const reviewed = await settle(getPracticeEvaluationStatus(input))
+  if (reviewed.session.status !== "review") throw new Error("Expected review session.")
+  return reviewed.session
+}
+
 describe("practice stateful mock service", () => {
+  it("retries one question within the same session and archives both scored attempts", async () => {
+    const firstReview = await finishCurrentAttempt(await generateQuestion("behavioral"))
+    const retried = await settle(
+      retryCurrentPracticeQuestion({
+        sessionId: firstReview.sessionId,
+        version: firstReview.version,
+        questionId: firstReview.question.id,
+      }),
+    )
+    if (retried.session.status !== "answering") throw new Error("Expected retry answering state.")
+    expect(retried.session.sessionId).toBe(firstReview.sessionId)
+    expect(retried.session.question.id).toBe(firstReview.question.id)
+    expect(retried.session.attemptNumber).toBe(2)
+    expect(retried.session.attemptId).not.toBe(firstReview.attemptId)
+    expect(retried.session.attemptRecords).toHaveLength(1)
+    const staleRetry = retryCurrentPracticeQuestion({
+      sessionId: firstReview.sessionId,
+      version: firstReview.version,
+      questionId: firstReview.question.id,
+    })
+    const staleRetryAssertion = expect(staleRetry).rejects.toThrow()
+    await vi.runAllTimersAsync()
+    await staleRetryAssertion
+
+    const secondReview = await finishCurrentAttempt(retried.session)
+    const completed = await settle(
+      endPracticeSession({ sessionId: secondReview.sessionId, version: secondReview.version }),
+    )
+    if (completed.session.status !== "completed") throw new Error("Expected completed session.")
+    expect(completed.session.attemptRecords).toHaveLength(2)
+    expect(completed.session.questionsCompleted).toBe(1)
+    expect(completed.session.retryCount).toBe(1)
+    expect(completed.session.averageScore).toBe(
+      Math.round(
+        completed.session.attemptRecords.reduce(
+          (sum, record) => sum + record.evaluation.overallScore,
+          0,
+        ) / 2,
+      ),
+    )
+    expect("question" in completed.session).toBe(false)
+    expect("review" in completed.session).toBe(false)
+  })
+
+  it("continues to a distinct recommended question within the same session", async () => {
+    const firstReview = await finishCurrentAttempt(await generateQuestion("motivation"))
+    if (firstReview.review.recommendation.action !== "nextQuestion") {
+      throw new Error("Expected the completed motivation attempt to recommend the next question.")
+    }
+    const generating = await settle(
+      continueToNextPracticeQuestion({
+        sessionId: firstReview.sessionId,
+        version: firstReview.version,
+        questionId: firstReview.question.id,
+      }),
+    )
+    if (generating.session.status !== "generatingQuestion") throw new Error("Expected generation.")
+    const input = { sessionId: generating.session.sessionId, version: generating.session.version }
+    await settle(getQuestionGenerationStatus(input))
+    const next = await settle(getQuestionGenerationStatus(input))
+    if (next.session.status !== "answering") throw new Error("Expected next answering state.")
+    expect(next.session.sessionId).toBe(firstReview.sessionId)
+    expect(next.session.attemptNumber).toBe(2)
+    expect(next.session.attemptRecords).toHaveLength(1)
+    expect(next.session.question.id).not.toBe(firstReview.question.id)
+    expect(next.session.question.prompt).not.toBe(firstReview.question.prompt)
+    expect(next.session.question.questionType).toBe(
+      firstReview.review.recommendation.nextQuestion.questionType,
+    )
+    expect(next.session.question.difficulty).toBe(
+      firstReview.review.recommendation.nextQuestion.difficulty,
+    )
+  })
   it("preserves a reviewed attempt when retrying and completes a session with records", async () => {
     const review = await completeQuestionToReview("behavioral")
     const retried = await settle(
@@ -952,6 +1058,9 @@ describe("practice stateful mock service", () => {
       version: ending.session.version + 1,
       questionsCompleted: 0,
     })
+    expect("question" in ended.session).toBe(false)
+    expect("mainAnswer" in ended.session).toBe(false)
+    expect("review" in ended.session).toBe(false)
   })
 
   it("returns independent deep copies", async () => {

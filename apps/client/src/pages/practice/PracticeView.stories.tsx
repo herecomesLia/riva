@@ -103,9 +103,9 @@ export const GenerationError = meta.story({
   args: { ...readyArgs("generatingQuestion"), generationError: true },
 })
 
-export const RetryingCurrentQuestion = meta.story({ args: readyArgs("answeringQuestion") })
+export const RetryingCurrentQuestion = meta.story({ args: readyArgs("retryingCurrentQuestion") })
 
-export const GeneratingNextQuestion = meta.story({ args: readyArgs("generatingQuestion") })
+export const GeneratingNextQuestion = meta.story({ args: readyArgs("generatingNextQuestion") })
 
 export const NextQuestionError = meta.story({
   args: { ...readyArgs("generatingQuestion"), generationError: true },
@@ -113,9 +113,11 @@ export const NextQuestionError = meta.story({
 
 export const CompletedSession = meta.story({ args: readyArgs("completedSession") })
 
-export const CompletedWithRetries = meta.story({ args: readyArgs("completedSession") })
+export const CompletedWithRetries = meta.story({ args: readyArgs("completedWithRetries") })
 
-export const CompletedWithWeakQuestions = meta.story({ args: readyArgs("completedSession") })
+export const CompletedWithWeakQuestions = meta.story({
+  args: readyArgs("completedWithWeakQuestions"),
+})
 
 export const InteractionLocked = meta.story({
   args: {

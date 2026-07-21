@@ -296,8 +296,6 @@ export type RetryCurrentPracticeQuestionInput = PracticeQuestionMutationInput
 
 export type ContinueToNextPracticeQuestionInput = PracticeQuestionMutationInput
 
-export type GetNextQuestionGenerationStatusInput = GetQuestionGenerationStatusInput
-
 export type EndPracticeSessionInput = {
   sessionId: string
   version: number

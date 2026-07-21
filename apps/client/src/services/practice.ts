@@ -11,7 +11,6 @@ import type {
   RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
-  GetNextQuestionGenerationStatusInput,
   EndPracticeSessionInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
@@ -39,14 +38,6 @@ export function getQuestionGenerationStatus(
   input: GetQuestionGenerationStatusInput,
 ): Promise<PracticePageResponse> {
   return env.mock ? practiceMockService.getQuestionGenerationStatus(input) : realApiUnavailable()
-}
-
-export function getNextQuestionGenerationStatus(
-  input: GetNextQuestionGenerationStatusInput,
-): Promise<PracticePageResponse> {
-  return env.mock
-    ? practiceMockService.getNextQuestionGenerationStatus(input)
-    : realApiUnavailable()
 }
 
 export function getPracticeEvaluationStatus(

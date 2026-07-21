@@ -885,6 +885,21 @@ function createPracticeReviewState(session: PracticeEvaluatingState): PracticeRe
   }
 }
 
+const archivedProjectAttempt = {
+  attemptId: activeSession.attemptId,
+  attemptNumber: 1,
+  completedAt: evaluation.evaluatedAt,
+  selection: defaultSelection,
+  question,
+  mainAnswer,
+  followUpExchanges: completedProjectFollowUps,
+  followUpCompletion: { status: "completed", reason: "allAnswered" },
+  evaluation,
+  review: nextReview,
+  isSaved: false,
+  isMarkedWeak: false,
+} satisfies PracticeAttemptRecord
+
 export type PracticeMockScenario =
   | "setupReady"
   | "noRoles"
@@ -912,6 +927,10 @@ export type PracticeMockScenario =
   | "reviewMotivation"
   | "reviewFollowUpEndedEarly"
   | "completedSession"
+  | "retryingCurrentQuestion"
+  | "generatingNextQuestion"
+  | "completedWithRetries"
+  | "completedWithWeakQuestions"
 
 const practiceMockScenarios = {
   setupReady: {
@@ -958,6 +977,28 @@ const practiceMockScenarios = {
       status: "generatingQuestion",
       ...activeSession,
       previousAttempt: null,
+    },
+  },
+  generatingNextQuestion: {
+    setupContext,
+    session: {
+      status: "generatingQuestion",
+      ...activeSession,
+      attemptId: `${activeSession.sessionId}_attempt_2`,
+      attemptNumber: 2,
+      attemptRecords: [archivedProjectAttempt],
+      previousAttempt: archivedProjectAttempt,
+    },
+  },
+  retryingCurrentQuestion: {
+    setupContext,
+    session: {
+      status: "answering",
+      ...activeSession,
+      attemptId: `${activeSession.sessionId}_attempt_2`,
+      attemptNumber: 2,
+      attemptRecords: [archivedProjectAttempt],
+      question,
     },
   },
   answeringQuestion: {
@@ -1219,13 +1260,53 @@ const practiceMockScenarios = {
     session: {
       status: "completed",
       ...activeSession,
+      attemptRecords: [archivedProjectAttempt],
       completedAt: "2026-07-20T01:40:00.000Z",
       questionsCompleted: 1,
       retryCount: 0,
       savedQuestionCount: 0,
       newWeaknessCount: 0,
-      averageScore: 78,
+      averageScore: evaluation.overallScore,
       nextStepSuggestion: "继续围绕项目深挖补充量化证据，再进入下一轮练习。",
+    },
+  },
+  completedWithRetries: {
+    setupContext,
+    session: {
+      status: "completed",
+      ...activeSession,
+      attemptId: `${activeSession.sessionId}_attempt_2`,
+      attemptNumber: 2,
+      attemptRecords: [
+        archivedProjectAttempt,
+        {
+          ...archivedProjectAttempt,
+          attemptId: `${activeSession.sessionId}_attempt_2`,
+          attemptNumber: 2,
+        },
+      ],
+      completedAt: "2026-07-20T01:41:00.000Z",
+      questionsCompleted: 1,
+      retryCount: 1,
+      savedQuestionCount: 0,
+      newWeaknessCount: 0,
+      averageScore: evaluation.overallScore,
+      nextStepSuggestion: "继续围绕项目深挖补充量化证据，再进入下一轮练习。",
+    },
+  },
+  completedWithWeakQuestions: {
+    setupContext,
+    session: {
+      status: "completed",
+      ...activeSession,
+      attemptRecords: [{ ...archivedProjectAttempt, isMarkedWeak: true }],
+      completedAt: "2026-07-20T01:41:00.000Z",
+      questionsCompleted: 1,
+      retryCount: 0,
+      savedQuestionCount: 0,
+      newWeaknessCount: 1,
+      averageScore: evaluation.overallScore,
+      nextStepSuggestion: "优先补足本轮暴露的薄弱项。",
     },
   },
 } satisfies Record<PracticeMockScenario, PracticePageResponse>
