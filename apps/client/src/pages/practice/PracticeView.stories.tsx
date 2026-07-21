@@ -167,6 +167,15 @@ export const FollowUpCompleted = meta.story({
   },
 })
 
+export const FollowUpEndedEarly = meta.story({
+  args: readyArgs("evaluatingFollowUpEndedEarly"),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
+    await expect(canvas.getByTestId("practice-follow-up-incomplete")).toBeVisible()
+    await expect(canvas.queryByRole("textbox")).not.toBeInTheDocument()
+  },
+})
+
 export const NoFollowUpRequired = meta.story({
   args: readyArgs("evaluatingNoFollowUp"),
   play: async ({ canvas }) => {

@@ -116,6 +116,7 @@ export const practice = {
     followUpNumber: "Riva · Follow-up {{count}}",
     yourFollowUpAnswer: "Your follow-up answer {{count}}",
     currentFollowUp: "Riva · Current follow-up {{count}}",
+    unansweredFollowUp: "Riva · Unanswered follow-up {{count}}",
     composerTitle: "Answer the current follow-up",
     composerDescription:
       "Add the key details, then Riva will decide whether another follow-up is needed.",

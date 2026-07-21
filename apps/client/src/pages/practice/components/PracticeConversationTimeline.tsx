@@ -63,9 +63,21 @@ export function PracticeConversationTimeline({
           />
         ) : null}
         {followUpCompletion?.status === "endedEarly" ? (
-          <p className="text-sm text-muted-foreground" data-testid="practice-follow-up-incomplete">
-            {t("practice.followUp.endedEarly")}
-          </p>
+          <>
+            <CoachMessage
+              incomplete
+              label={t("practice.followUp.unansweredFollowUp", {
+                count: followUpCompletion.unansweredQuestion.order,
+              })}
+              text={followUpCompletion.unansweredQuestion.prompt}
+            />
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="practice-follow-up-incomplete"
+            >
+              {t("practice.followUp.endedEarly")}
+            </p>
+          </>
         ) : null}
       </CardContent>
     </Card>
@@ -74,10 +86,12 @@ export function PracticeConversationTimeline({
 
 function CoachMessage({
   current = false,
+  incomplete = false,
   label,
   text,
 }: {
   current?: boolean
+  incomplete?: boolean
   label: string
   text: string
 }) {
@@ -85,7 +99,7 @@ function CoachMessage({
     <Message align="start" aria-current={current ? "step" : undefined}>
       <MessageContent>
         <MessageHeader>{label}</MessageHeader>
-        <Bubble align="start" variant={current ? "tinted" : "muted"}>
+        <Bubble align="start" variant={current ? "tinted" : incomplete ? "secondary" : "muted"}>
           <BubbleContent>{text}</BubbleContent>
         </Bubble>
       </MessageContent>

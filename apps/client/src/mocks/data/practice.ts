@@ -66,6 +66,10 @@ type GeneratedQuestionGuidanceTemplate = {
   framework: readonly string[]
 }
 
+type PracticeFollowUpTemplate = {
+  prompts: readonly string[]
+}
+
 const generatedQuestionTemplates = {
   projectDeepDive: {
     prompts: [
@@ -186,6 +190,54 @@ const generatedQuestionGuidanceTemplates = {
   },
 } satisfies Record<PracticeQuestionType, GeneratedQuestionGuidanceTemplate>
 
+const practiceFollowUpTemplates = {
+  projectDeepDive: {
+    prompts: [
+      "你如何验证结果主要来自你的关键决策，而不是同期的其他变化？",
+      "推进过程中最大的分歧是什么，你具体如何促成团队达成一致？",
+    ],
+  },
+  behavioral: {
+    prompts: ["如果重新处理这次冲突，你会调整哪一个具体行动，为什么？"],
+  },
+  businessUnderstanding: {
+    prompts: ["当核心指标与关键利益相关方诉求冲突时，你会如何确定最终取舍？"],
+  },
+  motivation: {
+    prompts: [],
+  },
+  technicalFoundation: {
+    prompts: [
+      "你会优先验证哪个关键假设，并用什么证据判断方案有效？",
+      "这个方案最需要防范的风险是什么，你会如何设计降级或回滚措施？",
+    ],
+  },
+} satisfies Record<PracticeQuestionType, PracticeFollowUpTemplate>
+
+export function getPracticeFollowUpPrompts(questionType: PracticeQuestionType): string[] {
+  return [...practiceFollowUpTemplates[questionType].prompts]
+}
+
+export function createPracticeFollowUpQuestion({
+  question,
+  order,
+  createdAt,
+}: {
+  question: PracticeQuestionCard
+  order: number
+  createdAt: string
+}): PracticeFollowUpQuestion {
+  const prompt = getPracticeFollowUpPrompts(question.questionType)[order - 1]
+  if (!prompt) throw new Error("Practice follow-up order is outside the mock plan.")
+
+  return {
+    id: `${question.id}_follow_up_${order}`,
+    prompt,
+    createdAt,
+    order,
+  }
+}
+
 export function createGeneratedPracticeQuestionGuidance(questionType: PracticeQuestionType): {
   hints: string[]
   framework: string[]
@@ -236,6 +288,40 @@ const question = createGeneratedPracticeQuestion({
   selection: defaultSelection,
 })
 
+const behavioralSelection = {
+  ...defaultSelection,
+  questionType: "behavioral",
+} satisfies ActivePracticeSelection
+
+const behavioralActiveSession = {
+  ...activeSession,
+  sessionId: "practice_session_behavioral_20260720_01",
+  selection: behavioralSelection,
+} as const
+
+const behavioralQuestion = createGeneratedPracticeQuestion({
+  sessionId: behavioralActiveSession.sessionId,
+  ordinal: 1,
+  selection: behavioralSelection,
+})
+
+const motivationSelection = {
+  ...defaultSelection,
+  questionType: "motivation",
+} satisfies ActivePracticeSelection
+
+const motivationActiveSession = {
+  ...activeSession,
+  sessionId: "practice_session_motivation_20260720_01",
+  selection: motivationSelection,
+} as const
+
+const motivationQuestion = createGeneratedPracticeQuestion({
+  sessionId: motivationActiveSession.sessionId,
+  ordinal: 1,
+  selection: motivationSelection,
+})
+
 const defaultGuidance = createGeneratedPracticeQuestionGuidance(question.questionType)
 
 const hintRevealedQuestion = {
@@ -272,16 +358,31 @@ const mainAnswer = {
   order: 1,
 } satisfies PracticeAnswer
 
-const answeredFollowUpQuestion = {
-  id: "practice_follow_up_tradeoff",
-  prompt: "你如何证明退出率下降主要来自这次性能优化，而不是同期的其他改动？",
-  createdAt: "2026-07-20T01:35:05.000Z",
+const behavioralMainAnswer = {
+  id: "practice_answer_behavioral_main_01",
+  content:
+    "在一次跨团队发布中，业务方希望按原计划全量上线，但监控显示核心链路仍有风险。我先与对方确认共同目标，再用灰度数据说明影响范围，推动双方同意分阶段发布，并明确每阶段的验证指标。最终版本按期覆盖核心用户，且没有出现重大线上问题。",
+  createdAt: "2026-07-20T01:35:00.000Z",
   order: 1,
-} satisfies PracticeFollowUpQuestion
+} satisfies PracticeAnswer
 
-const answeredFollowUp = {
+const motivationMainAnswer = {
+  id: "practice_answer_motivation_main_01",
+  content:
+    "我希望应聘这个岗位，是因为它同时需要复杂前端系统建设和跨团队推动能力。过去几年我持续负责性能治理与基础设施建设，既能解决工程问题，也能把技术结果连接到业务指标。下一阶段我希望承担更完整的技术决策责任，并帮助团队建立可持续的工程能力。",
+  createdAt: "2026-07-20T01:35:00.000Z",
+  order: 1,
+} satisfies PracticeAnswer
+
+const firstProjectFollowUpQuestion = createPracticeFollowUpQuestion({
+  question,
+  order: 1,
+  createdAt: "2026-07-20T01:35:05.000Z",
+})
+
+const firstAnsweredProjectFollowUp = {
   status: "answered",
-  question: answeredFollowUpQuestion,
+  question: firstProjectFollowUpQuestion,
   answer: {
     id: "practice_answer_follow_up_01",
     content:
@@ -291,12 +392,34 @@ const answeredFollowUp = {
   },
 } satisfies AnsweredPracticeFollowUpExchange
 
-const pendingFollowUpQuestion = {
-  id: "practice_follow_up_collaboration",
-  prompt: "当团队对拆包方案的收益存在质疑时，你具体如何推动大家达成一致？",
-  createdAt: "2026-07-20T01:37:05.000Z",
+const secondProjectFollowUpQuestion = createPracticeFollowUpQuestion({
+  question,
   order: 2,
-} satisfies PracticeFollowUpQuestion
+  createdAt: "2026-07-20T01:37:05.000Z",
+})
+
+const secondAnsweredProjectFollowUp = {
+  status: "answered",
+  question: secondProjectFollowUpQuestion,
+  answer: {
+    id: "practice_answer_follow_up_02",
+    content:
+      "我先把争议拆成包体收益、改造成本和发布风险三部分，用现网数据估算收益，再推动团队用一个低风险路由做小范围实验。实验结果达到约定阈值后，我们共同评审分阶段方案，并为每一阶段设置监控和回滚条件。",
+    createdAt: "2026-07-20T01:39:00.000Z",
+    order: 3,
+  },
+} satisfies AnsweredPracticeFollowUpExchange
+
+const completedProjectFollowUps = [
+  firstAnsweredProjectFollowUp,
+  secondAnsweredProjectFollowUp,
+] satisfies AnsweredPracticeFollowUpExchange[]
+
+const behavioralFollowUpQuestion = createPracticeFollowUpQuestion({
+  question: behavioralQuestion,
+  order: 1,
+  createdAt: "2026-07-20T01:35:05.000Z",
+})
 
 const scoreDimensions = [
   {
@@ -350,7 +473,7 @@ const evaluation = {
 const retryReview = {
   overallPerformance: "回答有清晰的性能优化主线和量化结果，但个人推动过程与风险控制仍不够完整。",
   highlights: ["用 P75 可交互时间和退出率呈现业务结果", "通过设备分层灰度增强归因可信度"],
-  mainIssues: ["没有具体说明如何处理团队分歧", "缺少上线风险、回滚条件和持续监控"],
+  mainIssues: ["团队分歧处理过程还可以补充更具体的个人沟通动作", "风险控制仍缺少持续监控细节"],
   improvementSuggestions: [
     "补充推动拆包方案达成一致的关键沟通动作",
     "说明灰度指标、告警阈值和回滚预案",
@@ -398,9 +521,11 @@ export type PracticeMockScenario =
   | "answeringFrameworkRevealed"
   | "answeringSavedQuestion"
   | "answeringWeakQuestion"
+  | "answeringFirstFollowUp"
   | "answeringSingleFollowUp"
   | "answeringFollowUp"
   | "evaluatingNoFollowUp"
+  | "evaluatingFollowUpEndedEarly"
   | "evaluatingAnswer"
   | "reviewRetryRecommended"
   | "reviewNextRecommended"
@@ -492,7 +617,7 @@ const practiceMockScenarios = {
       question: weakQuestion,
     },
   },
-  answeringSingleFollowUp: {
+  answeringFirstFollowUp: {
     setupContext,
     session: {
       status: "answeringFollowUp",
@@ -502,7 +627,22 @@ const practiceMockScenarios = {
       followUpExchanges: [],
       currentFollowUp: {
         status: "awaitingAnswer",
-        question: answeredFollowUpQuestion,
+        question: firstProjectFollowUpQuestion,
+        answer: null,
+      },
+    },
+  },
+  answeringSingleFollowUp: {
+    setupContext,
+    session: {
+      status: "answeringFollowUp",
+      ...behavioralActiveSession,
+      question: behavioralQuestion,
+      mainAnswer: behavioralMainAnswer,
+      followUpExchanges: [],
+      currentFollowUp: {
+        status: "awaitingAnswer",
+        question: behavioralFollowUpQuestion,
         answer: null,
       },
     },
@@ -514,10 +654,10 @@ const practiceMockScenarios = {
       ...activeSession,
       question,
       mainAnswer,
-      followUpExchanges: [answeredFollowUp],
+      followUpExchanges: [firstAnsweredProjectFollowUp],
       currentFollowUp: {
         status: "awaitingAnswer",
-        question: pendingFollowUpQuestion,
+        question: secondProjectFollowUpQuestion,
         answer: null,
       },
     },
@@ -526,15 +666,30 @@ const practiceMockScenarios = {
     setupContext,
     session: {
       status: "evaluating",
-      ...activeSession,
-      question,
-      mainAnswer,
+      ...motivationActiveSession,
+      question: motivationQuestion,
+      mainAnswer: motivationMainAnswer,
       followUpExchanges: [],
       followUpCompletion: {
         status: "completed",
         reason: "noFollowUpRequired",
       },
       submittedAt: "2026-07-20T01:35:00.000Z",
+    },
+  },
+  evaluatingFollowUpEndedEarly: {
+    setupContext,
+    session: {
+      status: "evaluating",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: [firstAnsweredProjectFollowUp],
+      followUpCompletion: {
+        status: "endedEarly",
+        unansweredQuestion: secondProjectFollowUpQuestion,
+      },
+      submittedAt: "2026-07-20T01:38:00.000Z",
     },
   },
   evaluatingAnswer: {
@@ -544,12 +699,12 @@ const practiceMockScenarios = {
       ...activeSession,
       question,
       mainAnswer,
-      followUpExchanges: [answeredFollowUp],
+      followUpExchanges: completedProjectFollowUps,
       followUpCompletion: {
         status: "completed",
         reason: "allAnswered",
       },
-      submittedAt: "2026-07-20T01:37:00.000Z",
+      submittedAt: "2026-07-20T01:39:00.000Z",
     },
   },
   reviewRetryRecommended: {
@@ -559,7 +714,7 @@ const practiceMockScenarios = {
       ...activeSession,
       question,
       mainAnswer,
-      followUpExchanges: [answeredFollowUp],
+      followUpExchanges: completedProjectFollowUps,
       followUpCompletion: {
         status: "completed",
         reason: "allAnswered",
@@ -575,7 +730,7 @@ const practiceMockScenarios = {
       ...activeSession,
       question,
       mainAnswer,
-      followUpExchanges: [answeredFollowUp],
+      followUpExchanges: completedProjectFollowUps,
       followUpCompletion: {
         status: "completed",
         reason: "allAnswered",

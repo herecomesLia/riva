@@ -110,6 +110,7 @@ export const practice = {
     followUpNumber: "Riva · 追问 {{count}}",
     yourFollowUpAnswer: "你的追问回答 {{count}}",
     currentFollowUp: "Riva · 当前追问 {{count}}",
+    unansweredFollowUp: "Riva · 未回答追问 {{count}}",
     composerTitle: "回答当前追问",
     composerDescription: "补充关键细节后提交，Riva 会判断是否需要继续追问。",
     answerLabel: "当前追问回答",

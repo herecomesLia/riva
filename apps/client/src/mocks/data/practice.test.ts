@@ -3,13 +3,17 @@ import { describe, expect, it } from "vitest"
 import {
   createGeneratedPracticeQuestionGuidance,
   createGeneratedPracticeQuestion,
+  createPracticeFollowUpQuestion,
   createPracticeMockResponse,
+  getPracticeFollowUpPrompts,
   practiceResponseMock,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
 import type {
   ActivePracticeSelection,
   PracticeGuidance,
+  PracticeFollowUpCompletion,
+  PracticeFollowUpQuestion,
   PracticePageResponse,
   PracticeQuestionCard,
   PracticeQuestionType,
@@ -27,9 +31,11 @@ const scenarios: PracticeMockScenario[] = [
   "answeringFrameworkRevealed",
   "answeringSavedQuestion",
   "answeringWeakQuestion",
+  "answeringFirstFollowUp",
   "answeringSingleFollowUp",
   "answeringFollowUp",
   "evaluatingNoFollowUp",
+  "evaluatingFollowUpEndedEarly",
   "evaluatingAnswer",
   "reviewRetryRecommended",
   "reviewNextRecommended",
@@ -69,6 +75,51 @@ function expectConsistentGuidance(guidance: PracticeGuidance<string[]>) {
 function expectUnrequestedGuidance(question: PracticeQuestionCard) {
   expect(question.answerHints).toEqual({ status: "notRequested", content: null })
   expect(question.answerFramework).toEqual({ status: "notRequested", content: null })
+}
+
+function expectFollowUpQuestionMatchesPlan(
+  question: PracticeQuestionCard,
+  followUp: PracticeFollowUpQuestion,
+) {
+  const prompts = getPracticeFollowUpPrompts(question.questionType)
+  expect(followUp.order).toBeGreaterThan(0)
+  expect(followUp.order).toBeLessThanOrEqual(prompts.length)
+  expect(followUp.prompt).toBe(prompts[followUp.order - 1])
+  expect(followUp.id).toBe(`${question.id}_follow_up_${followUp.order}`)
+}
+
+function expectCompletedFollowUpsMatchPlan({
+  question,
+  exchanges,
+  completion,
+}: {
+  question: PracticeQuestionCard
+  exchanges: Array<{ question: PracticeFollowUpQuestion; answer: { order: number } }>
+  completion: PracticeFollowUpCompletion
+}) {
+  const prompts = getPracticeFollowUpPrompts(question.questionType)
+  exchanges.forEach((exchange, index) => {
+    expectFollowUpQuestionMatchesPlan(question, exchange.question)
+    expect(exchange.question.order).toBe(index + 1)
+    expect(exchange.answer.order).toBe(index + 2)
+  })
+
+  if (completion.status === "endedEarly") {
+    expect(completion.unansweredQuestion.order).toBe(exchanges.length + 1)
+    expectFollowUpQuestionMatchesPlan(question, completion.unansweredQuestion)
+    return
+  }
+
+  if (completion.reason === "noFollowUpRequired") {
+    expect(prompts).toHaveLength(0)
+    expect(exchanges).toHaveLength(0)
+    return
+  }
+
+  expect(exchanges).toHaveLength(prompts.length)
+  expect(exchanges.map(({ question: followUp }) => followUp.order)).toEqual(
+    prompts.map((_, index) => index + 1),
+  )
 }
 
 function expectConsistentPracticeResponse(response: PracticePageResponse) {
@@ -131,6 +182,12 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.currentFollowUp.status).toBe("awaitingAnswer")
       expect(session.currentFollowUp.answer).toBeNull()
       expect(session.currentFollowUp.question.order).toBe(session.followUpExchanges.length + 1)
+      expectFollowUpQuestionMatchesPlan(session.question, session.currentFollowUp.question)
+      session.followUpExchanges.forEach((exchange, index) => {
+        expectFollowUpQuestionMatchesPlan(session.question, exchange.question)
+        expect(exchange.question.order).toBe(index + 1)
+        expect(exchange.answer.order).toBe(index + 2)
+      })
       expect(session.followUpExchanges.every((exchange) => exchange.status === "answered")).toBe(
         true,
       )
@@ -151,6 +208,11 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       } else {
         expect(session.followUpCompletion.unansweredQuestion.prompt.trim()).not.toBe("")
       }
+      expectCompletedFollowUpsMatchPlan({
+        question: session.question,
+        exchanges: session.followUpExchanges,
+        completion: session.followUpCompletion,
+      })
       return
     case "review": {
       const dimensions = session.evaluation.dimensionScores
@@ -170,6 +232,11 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.review.exposedWeaknesses).not.toHaveLength(0)
       expect("shouldRetry" in session.review).toBe(false)
       expect("currentFollowUp" in session).toBe(false)
+      expectCompletedFollowUpsMatchPlan({
+        question: session.question,
+        exchanges: session.followUpExchanges,
+        completion: session.followUpCompletion,
+      })
       return
     }
     case "completed":
@@ -181,6 +248,42 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
 }
 
 describe("practice mock scenarios", () => {
+  it("returns independent deterministic follow-up plans for every question type", () => {
+    const expectedCounts: Record<PracticeQuestionType, number> = {
+      projectDeepDive: 2,
+      behavioral: 1,
+      businessUnderstanding: 1,
+      motivation: 0,
+      technicalFoundation: 2,
+    }
+
+    for (const questionType of questionTypes) {
+      const first = getPracticeFollowUpPrompts(questionType)
+      const second = getPracticeFollowUpPrompts(questionType)
+      expect(first).toHaveLength(expectedCounts[questionType])
+      expect(first).not.toBe(second)
+
+      if (first.length > 0) {
+        first[0] = "Mutated follow-up"
+        expect(second[0]).not.toBe("Mutated follow-up")
+      }
+    }
+  })
+
+  it("creates follow-up questions from the same plan without exposing future prompts", () => {
+    const response = createPracticeMockResponse("answeringQuestion")
+    if (response.session.status !== "answering") return
+    const followUp = createPracticeFollowUpQuestion({
+      question: response.session.question,
+      order: 1,
+      createdAt: "2026-07-20T02:00:00.000Z",
+    })
+
+    expectFollowUpQuestionMatchesPlan(response.session.question, followUp)
+    expect("followUpPlan" in response.session).toBe(false)
+    expect("futureFollowUps" in response.session).toBe(false)
+  })
+
   it.each(questionTypes)(
     "generates stable %s questions from the active selection",
     (questionType) => {
@@ -280,9 +383,11 @@ describe("practice mock scenarios", () => {
   it("does not reveal answer guidance in ordinary question snapshots", () => {
     const scenarioNames: PracticeMockScenario[] = [
       "answeringQuestion",
+      "answeringFirstFollowUp",
       "answeringSingleFollowUp",
       "answeringFollowUp",
       "evaluatingNoFollowUp",
+      "evaluatingFollowUpEndedEarly",
       "evaluatingAnswer",
       "reviewRetryRecommended",
       "reviewNextRecommended",

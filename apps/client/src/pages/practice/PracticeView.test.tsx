@@ -651,4 +651,42 @@ describe("PracticeView", () => {
     )
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
   })
+
+  it("shows the unanswered follow-up in order after follow-ups end early", async () => {
+    const data = createPracticeMockResponse("evaluatingFollowUpEndedEarly")
+    renderReadyView(data)
+    if (
+      data.session.status !== "evaluating" ||
+      data.session.followUpCompletion.status !== "endedEarly"
+    ) {
+      return
+    }
+
+    const timeline = await screen.findByTestId("practice-conversation-timeline")
+    const answered = data.session.followUpExchanges[0]
+    if (!answered) throw new Error("The ended-early fixture must contain an answered follow-up.")
+    const unanswered = data.session.followUpCompletion.unansweredQuestion
+    const orderedText = [
+      data.session.question.prompt,
+      data.session.mainAnswer.content,
+      answered.question.prompt,
+      answered.answer.content,
+      unanswered.prompt,
+      i18n.t("practice.followUp.endedEarly"),
+    ]
+    let previousIndex = -1
+    for (const text of orderedText) {
+      const index = timeline.textContent?.indexOf(text) ?? -1
+      expect(index).toBeGreaterThan(previousIndex)
+      previousIndex = index
+    }
+
+    expect(timeline).toHaveTextContent(
+      i18n.t("practice.followUp.unansweredFollowUp", { count: unanswered.order }),
+    )
+    expect(timeline).not.toHaveTextContent(
+      i18n.t("practice.followUp.yourFollowUpAnswer", { count: unanswered.order }),
+    )
+    expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
+  })
 })

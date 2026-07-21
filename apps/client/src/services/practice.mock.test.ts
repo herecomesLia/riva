@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeMockResponse, getPracticeFollowUpPrompts } from "@/mocks/data/practice"
 import { reconcilePracticeSetupSelection, resetPracticeMockState } from "@/mocks/services/practice"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import {
@@ -493,6 +493,7 @@ describe("practice stateful mock service", () => {
     expect(response.session.currentFollowUp.question).toMatchObject({
       id: `${initial.session.question.id}_follow_up_1`,
       order: 1,
+      prompt: getPracticeFollowUpPrompts(initial.session.question.questionType)[0],
     })
     expect(response.session.version).toBe(initial.session.version + 1)
 
@@ -596,6 +597,9 @@ describe("practice stateful mock service", () => {
 
     expect(second.session.followUpExchanges.map(({ question }) => question.order)).toEqual([1])
     expect(second.session.currentFollowUp.question.order).toBe(2)
+    expect(second.session.currentFollowUp.question.prompt).toBe(
+      getPracticeFollowUpPrompts(second.session.question.questionType)[1],
+    )
     expect(second.session.currentFollowUp.question.id).not.toBe(firstInput.followUpQuestionId)
     expect(second.session.version).toBe(first.session.version + 1)
 
@@ -622,7 +626,7 @@ describe("practice stateful mock service", () => {
   })
 
   it("records an unanswered follow-up when the candidate ends early", async () => {
-    resetPracticeMockState("answeringSingleFollowUp")
+    resetPracticeMockState("answeringFollowUp")
     const initial = await settle(getPracticePage())
     if (initial.session.status !== "answeringFollowUp") return
 
@@ -641,6 +645,7 @@ describe("practice stateful mock service", () => {
       status: "endedEarly",
       unansweredQuestion: initial.session.currentFollowUp.question,
     })
+    expect(completed.session.followUpExchanges).toEqual(initial.session.followUpExchanges)
     expect("currentFollowUp" in completed.session).toBe(false)
   })
 

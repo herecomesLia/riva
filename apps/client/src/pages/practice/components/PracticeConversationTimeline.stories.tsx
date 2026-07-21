@@ -14,6 +14,11 @@ if (completed.session.status !== "evaluating") {
   throw new Error("The completed timeline story requires an evaluating fixture.")
 }
 
+const endedEarly = createPracticeMockResponse("evaluatingFollowUpEndedEarly")
+if (endedEarly.session.status !== "evaluating") {
+  throw new Error("The ended-early timeline story requires an evaluating fixture.")
+}
+
 const meta = preview.meta({
   component: PracticeConversationTimeline,
   title: "Practice/Components/ConversationTimeline",
@@ -34,5 +39,14 @@ export const Completed = meta.story({
     followUpExchanges: completed.session.followUpExchanges,
     mainAnswer: completed.session.mainAnswer,
     question: completed.session.question,
+  },
+})
+
+export const FollowUpEndedEarly = meta.story({
+  args: {
+    followUpCompletion: endedEarly.session.followUpCompletion,
+    followUpExchanges: endedEarly.session.followUpExchanges,
+    mainAnswer: endedEarly.session.mainAnswer,
+    question: endedEarly.session.question,
   },
 })

@@ -1,7 +1,9 @@
 import {
   createGeneratedPracticeQuestion,
   createGeneratedPracticeQuestionGuidance,
+  createPracticeFollowUpQuestion,
   createPracticeMockResponse,
+  getPracticeFollowUpPrompts,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
 import { getRolesPage } from "@/mocks/services/roles"
@@ -46,20 +48,6 @@ let sessionSequence = 0
 let mutationSequence = 0
 const generationPollCounts = new Map<string, number>()
 const questionOrdinals = new Map<string, number>()
-
-const followUpQuestionTemplates = {
-  projectDeepDive: [
-    "你如何验证结果主要来自你的关键决策，而不是同期的其他变化？",
-    "推进过程中最大的分歧是什么，你具体如何促成团队达成一致？",
-  ],
-  behavioral: ["如果重新处理这次冲突，你会调整哪一个具体行动，为什么？"],
-  businessUnderstanding: ["当核心指标与关键利益相关方诉求冲突时，你会如何确定最终取舍？"],
-  motivation: [],
-  technicalFoundation: [
-    "你会优先验证哪个关键假设，并用什么证据判断方案有效？",
-    "这个方案最需要防范的风险是什么，你会如何设计降级或回滚措施？",
-  ],
-} satisfies Record<PracticeQuestionType, readonly string[]>
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -358,7 +346,7 @@ export async function submitPrimaryAnswer(
     createdAt: submittedAt,
     order: 1,
   }
-  const followUpPrompts = followUpQuestionTemplates[session.question.questionType]
+  const followUpPrompts = getPracticeFollowUpPrompts(session.question.questionType)
   const firstPrompt = followUpPrompts[0]
 
   if (!firstPrompt) {
@@ -386,12 +374,11 @@ export async function submitPrimaryAnswer(
       followUpExchanges: [],
       currentFollowUp: {
         status: "awaitingAnswer",
-        question: {
-          id: `${session.question.id}_follow_up_1`,
-          prompt: firstPrompt,
-          createdAt: submittedAt,
+        question: createPracticeFollowUpQuestion({
+          question: session.question,
           order: 1,
-        },
+          createdAt: submittedAt,
+        }),
         answer: null,
       },
     },
@@ -417,7 +404,7 @@ export async function submitFollowUpAnswer(
     },
   }
   const followUpExchanges = [...session.followUpExchanges, answeredExchange]
-  const prompts = followUpQuestionTemplates[session.question.questionType]
+  const prompts = getPracticeFollowUpPrompts(session.question.questionType)
   const nextOrder = session.currentFollowUp.question.order + 1
   const nextPrompt = prompts[nextOrder - 1]
 
@@ -447,12 +434,11 @@ export async function submitFollowUpAnswer(
       followUpExchanges,
       currentFollowUp: {
         status: "awaitingAnswer",
-        question: {
-          id: `${session.question.id}_follow_up_${nextOrder}`,
-          prompt: nextPrompt,
-          createdAt: submittedAt,
+        question: createPracticeFollowUpQuestion({
+          question: session.question,
           order: nextOrder,
-        },
+          createdAt: submittedAt,
+        }),
         answer: null,
       },
     },

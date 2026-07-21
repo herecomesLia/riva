@@ -216,7 +216,7 @@ describe("PracticePage", () => {
   it("prevents duplicate main-answer submission and enters follow-up", async () => {
     const user = userEvent.setup()
     const answering = createPracticeMockResponse("answeringQuestion")
-    const following = createPracticeMockResponse("answeringSingleFollowUp")
+    const following = createPracticeMockResponse("answeringFirstFollowUp")
     if (
       answering.session.status !== "answering" ||
       following.session.status !== "answeringFollowUp"
@@ -553,8 +553,7 @@ describe("PracticePage", () => {
 
     expect(renderResult.queryClient.getQueryData(["practice"])).toEqual(newer)
     expect(await screen.findByTestId("practice-evaluating-state")).toBeInTheDocument()
-    expect(
-      screen.queryByText(staleNext.session.currentFollowUp.question.prompt),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId("practice-answering-follow-up-state")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
   })
 })
