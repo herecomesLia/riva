@@ -64,6 +64,9 @@ function createReviewActions(
   overrides: Partial<PracticeReviewActions> = {},
 ): PracticeReviewActions {
   return {
+    onEndSession: vi.fn(async () => "executed" as const),
+    onNextQuestion: vi.fn(async () => "executed" as const),
+    onRetryCurrent: vi.fn(async () => "executed" as const),
     onSetSaved: vi.fn(async () => "executed" as const),
     onSetWeak: vi.fn(async () => "executed" as const),
     ...overrides,
@@ -71,7 +74,10 @@ function createReviewActions(
 }
 
 const reviewPending: PracticeReviewPending = {
+  end: false,
   interactionLocked: false,
+  next: false,
+  retry: false,
   saved: false,
   weak: false,
 }
@@ -794,20 +800,16 @@ describe("PracticeView", () => {
     )
   })
 
-  it("keeps recommendations read-only and only exposes real saved and weak actions", async () => {
+  it("exposes implemented review lifecycle actions alongside saved and weak actions", async () => {
     const data = createPracticeMockResponse("reviewBalanced")
     renderReadyView(data)
 
     await screen.findByTestId("practice-review-state")
+    expect(screen.getByRole("button", { name: /重练当前题|retry current question/i })).toBeEnabled()
     expect(
-      screen.queryByRole("button", { name: /重练当前题|retry current question/i }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole("button", { name: /继续下一题|continue to next question/i }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole("button", { name: /结束本轮练习|end practice session/i }),
-    ).not.toBeInTheDocument()
+      screen.getByRole("button", { name: /继续下一题|continue to next question/i }),
+    ).toBeEnabled()
+    expect(screen.getByRole("button", { name: /结束本轮练习|end this session/i })).toBeEnabled()
     expect(
       screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }),
     ).toBeEnabled()

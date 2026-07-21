@@ -138,12 +138,31 @@ export type PracticeReview = {
   recommendation: PracticeRecommendation
 }
 
+export type PracticeAttemptRecord = {
+  attemptId: string
+  attemptNumber: number
+  completedAt: string
+  selection: ActivePracticeSelection
+  question: PracticeQuestionCard
+  mainAnswer: PracticeAnswer
+  followUpExchanges: AnsweredPracticeFollowUpExchange[]
+  followUpCompletion: PracticeFollowUpCompletion
+  evaluation: PracticeEvaluation
+  review: PracticeReview
+  isSaved: boolean
+  isMarkedWeak: boolean
+}
+
 type PracticeActiveSessionBase = {
   sessionId: string
   /** Positive integer incremented by persisted session state changes. */
   version: number
   selection: ActivePracticeSelection
   startedAt: string
+  attemptId: string
+  attemptNumber: number
+  /** Completed attempts in this session; the active attempt is added after evaluation. */
+  attemptRecords: PracticeAttemptRecord[]
 }
 
 type PracticeQuestionSessionBase = PracticeActiveSessionBase & {
@@ -173,6 +192,7 @@ export type PracticeSetupState = {
 
 export type PracticeGeneratingQuestionState = PracticeActiveSessionBase & {
   status: "generatingQuestion"
+  previousAttempt: PracticeAttemptRecord | null
 }
 
 export type PracticeAnsweringState = PracticeQuestionSessionBase & {
@@ -201,6 +221,11 @@ export type PracticeCompletedState = PracticeActiveSessionBase & {
   status: "completed"
   completedAt: string
   questionsCompleted: number
+  retryCount: number
+  savedQuestionCount: number
+  newWeaknessCount: number
+  averageScore: number
+  nextStepSuggestion: string
 }
 
 export type PracticeSessionState =
@@ -266,3 +291,14 @@ export type RequestAnswerFrameworkInput = PracticeQuestionMutationInput
 export type SkipPracticeQuestionInput = PracticeQuestionMutationInput
 
 export type RequestEndPracticeSessionInput = PracticeQuestionMutationInput
+
+export type RetryCurrentPracticeQuestionInput = PracticeQuestionMutationInput
+
+export type ContinueToNextPracticeQuestionInput = PracticeQuestionMutationInput
+
+export type GetNextQuestionGenerationStatusInput = GetQuestionGenerationStatusInput
+
+export type EndPracticeSessionInput = {
+  sessionId: string
+  version: number
+}

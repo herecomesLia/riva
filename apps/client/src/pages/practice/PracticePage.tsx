@@ -11,6 +11,9 @@ import type {
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
   RetryPracticeEvaluationInput,
+  RetryCurrentPracticeQuestionInput,
+  ContinueToNextPracticeQuestionInput,
+  EndPracticeSessionInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -22,11 +25,15 @@ import {
   endPracticeFollowUps,
   getPracticePage,
   getPracticeEvaluationStatus,
+  getNextQuestionGenerationStatus,
   getQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
   retryPracticeEvaluation,
+  retryCurrentPracticeQuestion,
+  continueToNextPracticeQuestion,
+  endPracticeSession,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -68,6 +75,9 @@ export function PracticePage() {
   const skipMutation = usePracticeMutation(skipPracticeQuestion)
   const endMutation = usePracticeMutation(requestEndPracticeSession)
   const retryEvaluationMutation = usePracticeMutation(retryPracticeEvaluation)
+  const retryCurrentMutation = usePracticeMutation(retryCurrentPracticeQuestion)
+  const nextQuestionMutation = usePracticeMutation(continueToNextPracticeQuestion)
+  const completeSessionMutation = usePracticeSessionMutation(endPracticeSession)
   const isQuestionMutationPending =
     hintMutation.isPending ||
     frameworkMutation.isPending ||
@@ -88,10 +98,13 @@ export function PracticePage() {
       if (!generationSessionId || generationVersion === undefined) {
         throw new Error("A generating practice session is required.")
       }
-      return getQuestionGenerationStatus({
+      const input = {
         sessionId: generationSessionId,
         version: generationVersion,
-      })
+      }
+      return generationSession.previousAttempt
+        ? getNextQuestionGenerationStatus(input)
+        : getQuestionGenerationStatus(input)
     },
     queryKey: [
       ...PRACTICE_QUERY_KEY,
@@ -274,9 +287,26 @@ export function PracticePage() {
           onSetWeak: async (input: SetPracticeQuestionWeakInput) => {
             return runQuestionMutation(() => weakMutation.mutateAsync(input))
           },
+          onRetryCurrent: async (input: RetryCurrentPracticeQuestionInput) => {
+            return runQuestionMutation(() => retryCurrentMutation.mutateAsync(input))
+          },
+          onNextQuestion: async (input: ContinueToNextPracticeQuestionInput) => {
+            return runQuestionMutation(() => nextQuestionMutation.mutateAsync(input))
+          },
+          onEndSession: async (input: EndPracticeSessionInput) => {
+            return runQuestionMutation(() => completeSessionMutation.mutateAsync(input))
+          },
         }}
         reviewPending={{
-          interactionLocked: savedMutation.isPending || weakMutation.isPending,
+          interactionLocked:
+            savedMutation.isPending ||
+            weakMutation.isPending ||
+            retryCurrentMutation.isPending ||
+            nextQuestionMutation.isPending ||
+            completeSessionMutation.isPending,
+          end: completeSessionMutation.isPending,
+          next: nextQuestionMutation.isPending,
+          retry: retryCurrentMutation.isPending,
           saved: savedMutation.isPending,
           weak: weakMutation.isPending,
         }}
@@ -315,6 +345,16 @@ export function PracticePage() {
   }
 
   return <PracticeView content={{ status: "loading" }} variant="default" />
+}
+
+function usePracticeSessionMutation<TInput>(
+  mutationFn: (input: TInput) => Promise<PracticePageResponse>,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
+  })
 }
 
 function usePracticeMutation<TInput extends PracticeQuestionMutationInput>(

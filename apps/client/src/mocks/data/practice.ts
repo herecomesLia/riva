@@ -2,6 +2,7 @@ import type {
   ActivePracticeSelection,
   AnsweredPracticeFollowUpExchange,
   PracticeAnswer,
+  PracticeAttemptRecord,
   PracticeDimensionScore,
   PracticeEvaluation,
   PracticeEvaluatingState,
@@ -284,6 +285,9 @@ const activeSession = {
   version: 1,
   selection: defaultSelection,
   startedAt: "2026-07-20T01:30:00.000Z",
+  attemptId: "practice_session_20260720_01_attempt_1",
+  attemptNumber: 1,
+  attemptRecords: [] as PracticeAttemptRecord[],
 } as const
 
 const question = createGeneratedPracticeQuestion({
@@ -869,6 +873,9 @@ function createPracticeReviewState(session: PracticeEvaluatingState): PracticeRe
     version: session.version + 1,
     selection: session.selection,
     startedAt: session.startedAt,
+    attemptId: session.attemptId,
+    attemptNumber: session.attemptNumber,
+    attemptRecords: session.attemptRecords,
     question: session.question,
     mainAnswer: session.mainAnswer,
     followUpExchanges: session.followUpExchanges,
@@ -950,6 +957,7 @@ const practiceMockScenarios = {
     session: {
       status: "generatingQuestion",
       ...activeSession,
+      previousAttempt: null,
     },
   },
   answeringQuestion: {
@@ -1213,6 +1221,11 @@ const practiceMockScenarios = {
       ...activeSession,
       completedAt: "2026-07-20T01:40:00.000Z",
       questionsCompleted: 1,
+      retryCount: 0,
+      savedQuestionCount: 0,
+      newWeaknessCount: 0,
+      averageScore: 78,
+      nextStepSuggestion: "继续围绕项目深挖补充量化证据，再进入下一轮练习。",
     },
   },
 } satisfies Record<PracticeMockScenario, PracticePageResponse>

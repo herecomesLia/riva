@@ -52,10 +52,20 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
       submit: false,
     },
     reviewActions: {
+      onEndSession: fn(async () => "executed" as const),
+      onNextQuestion: fn(async () => "executed" as const),
+      onRetryCurrent: fn(async () => "executed" as const),
       onSetSaved: fn(async () => "executed" as const),
       onSetWeak: fn(async () => "executed" as const),
     },
-    reviewPending: { interactionLocked: false, saved: false, weak: false },
+    reviewPending: {
+      end: false,
+      interactionLocked: false,
+      next: false,
+      retry: false,
+      saved: false,
+      weak: false,
+    },
     content: { data: createPracticeMockResponse(scenario), status: "ready" as const },
     evaluationError: false,
     generationError: false,
@@ -92,6 +102,20 @@ export const GeneratingQuestion = meta.story({ args: readyArgs("generatingQuesti
 export const GenerationError = meta.story({
   args: { ...readyArgs("generatingQuestion"), generationError: true },
 })
+
+export const RetryingCurrentQuestion = meta.story({ args: readyArgs("answeringQuestion") })
+
+export const GeneratingNextQuestion = meta.story({ args: readyArgs("generatingQuestion") })
+
+export const NextQuestionError = meta.story({
+  args: { ...readyArgs("generatingQuestion"), generationError: true },
+})
+
+export const CompletedSession = meta.story({ args: readyArgs("completedSession") })
+
+export const CompletedWithRetries = meta.story({ args: readyArgs("completedSession") })
+
+export const CompletedWithWeakQuestions = meta.story({ args: readyArgs("completedSession") })
 
 export const InteractionLocked = meta.story({
   args: {

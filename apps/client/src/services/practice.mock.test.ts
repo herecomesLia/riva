@@ -12,6 +12,9 @@ import {
   requestEndPracticeSession,
   requestPracticeHint,
   retryPracticeEvaluation,
+  retryCurrentPracticeQuestion,
+  continueToNextPracticeQuestion,
+  endPracticeSession,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -124,6 +127,47 @@ async function completeQuestionToReview(
 }
 
 describe("practice stateful mock service", () => {
+  it("preserves a reviewed attempt when retrying and completes a session with records", async () => {
+    const review = await completeQuestionToReview("behavioral")
+    const retried = await settle(
+      retryCurrentPracticeQuestion({
+        sessionId: review.sessionId,
+        version: review.version,
+        questionId: review.question.id,
+      }),
+    )
+    expect(retried.session.status).toBe("answering")
+    if (retried.session.status !== "answering") return
+    expect(retried.session.attemptId).not.toBe(review.attemptId)
+    expect(retried.session.attemptRecords).toHaveLength(1)
+    expect(retried.session.attemptRecords[0]?.attemptId).toBe(review.attemptId)
+
+    const nextReview = await completeQuestionToReview("motivation")
+    const completed = await settle(
+      endPracticeSession({ sessionId: nextReview.sessionId, version: nextReview.version }),
+    )
+    expect(completed.session.status).toBe("completed")
+    if (completed.session.status !== "completed") return
+    expect(completed.session.attemptRecords).toHaveLength(1)
+    expect(completed.session.averageScore).toBeGreaterThan(0)
+  })
+
+  it("moves a reviewed attempt into deterministic next-question generation", async () => {
+    const review = await completeQuestionToReview("motivation")
+    const generating = await settle(
+      continueToNextPracticeQuestion({
+        sessionId: review.sessionId,
+        version: review.version,
+        questionId: review.question.id,
+      }),
+    )
+    expect(generating.session).toMatchObject({
+      status: "generatingQuestion",
+      sessionId: review.sessionId,
+    })
+    if (generating.session.status !== "generatingQuestion") return
+    expect(generating.session.previousAttempt?.attemptId).toBe(review.attemptId)
+  })
   it("projects current target-role data from the roles mock service", async () => {
     const response = await settle(getPracticePage())
 

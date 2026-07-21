@@ -11,19 +11,31 @@ import type { PracticeInteractionResult } from "../practice-interaction"
 export function PracticeReviewActions({
   interactionLocked,
   isMarkedWeak,
+  isEndPending,
+  isNextPending,
+  isRetryPending,
   isSaved,
   isSavedPending,
   isWeakPending,
   onSetSaved,
   onSetWeak,
+  onEndSession,
+  onNextQuestion,
+  onRetryCurrent,
 }: {
   interactionLocked: boolean
+  isEndPending: boolean
+  isNextPending: boolean
+  isRetryPending: boolean
   isMarkedWeak: boolean
   isSaved: boolean
   isSavedPending: boolean
   isWeakPending: boolean
   onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
   onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
+  onEndSession: () => Promise<PracticeInteractionResult>
+  onNextQuestion: () => Promise<PracticeInteractionResult>
+  onRetryCurrent: () => Promise<PracticeInteractionResult>
 }) {
   const { t } = useTranslation()
   const [error, setError] = useState<"saved" | "weak" | null>(null)
@@ -65,6 +77,26 @@ export function PracticeReviewActions({
           </Alert>
         )}
         <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={interactionLocked}
+            onClick={() => void onRetryCurrent()}
+            variant="outline"
+          >
+            {isRetryPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+            {t("practice.review.retryCurrent")}
+          </Button>
+          <Button disabled={interactionLocked} onClick={() => void onNextQuestion()}>
+            {isNextPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+            {t("practice.review.nextQuestion")}
+          </Button>
+          <Button
+            disabled={interactionLocked}
+            onClick={() => void onEndSession()}
+            variant="outline"
+          >
+            {isEndPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+            {t("practice.review.endSession")}
+          </Button>
           <Button
             aria-pressed={isSaved}
             disabled={interactionLocked}

@@ -242,7 +242,6 @@ describe("PracticePage", () => {
   })
 
   it("retries failed evaluation with a new version while preserving the conversation", async () => {
-    const user = userEvent.setup()
     const evaluating = createPracticeMockResponse("evaluatingAnswer")
     if (evaluating.session.status !== "evaluating") {
       throw new Error("An evaluating fixture is required.")
@@ -266,13 +265,16 @@ describe("PracticePage", () => {
     expect(screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
       evaluating.session.mainAnswer.content,
     )
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.evaluating.retry") }))
+    const retryButton = screen.getByRole("button", { name: i18n.t("practice.evaluating.retry") })
+    act(() => {
+      fireEvent.click(retryButton)
+      fireEvent.click(retryButton)
+    })
 
-    const retryingButton = screen.getByRole("button", {
+    const retryingButton = await screen.findByRole("button", {
       name: i18n.t("practice.evaluating.retrying"),
     })
     expect(retryingButton).toBeDisabled()
-    await user.click(retryingButton)
     expect(retryPracticeEvaluation).toHaveBeenCalledOnce()
     expect(vi.mocked(retryPracticeEvaluation).mock.calls[0]?.[0]).toEqual({
       sessionId: evaluating.session.sessionId,

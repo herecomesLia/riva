@@ -21,6 +21,10 @@ import type {
   PracticeEvaluatingState,
   PracticePageResponse,
   PracticeReviewState,
+  PracticeCompletedState,
+  RetryCurrentPracticeQuestionInput,
+  ContinueToNextPracticeQuestionInput,
+  EndPracticeSessionInput,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
@@ -92,12 +96,18 @@ export type PracticeAnsweringPending = {
 }
 
 export type PracticeReviewActions = {
+  onEndSession: (input: EndPracticeSessionInput) => Promise<PracticeInteractionResult>
+  onNextQuestion: (input: ContinueToNextPracticeQuestionInput) => Promise<PracticeInteractionResult>
+  onRetryCurrent: (input: RetryCurrentPracticeQuestionInput) => Promise<PracticeInteractionResult>
   onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
   onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeReviewPending = {
+  end: boolean
   interactionLocked: boolean
+  next: boolean
+  retry: boolean
   saved: boolean
   weak: boolean
 }
@@ -253,14 +263,7 @@ function PracticeViewContent(props: PracticeViewProps) {
   }
 
   if (session.status === "completed") {
-    return (
-      <Card data-testid="practice-completed-state">
-        <CardHeader>
-          <CardTitle>{t("practice.completed.title")}</CardTitle>
-          <CardDescription>{t("practice.completed.description")}</CardDescription>
-        </CardHeader>
-      </Card>
-    )
+    return <PracticeCompletedView session={session} />
   }
 
   return (
@@ -382,6 +385,7 @@ function PracticeReviewView({
   pending: PracticeReviewPending
   session: PracticeReviewState
 }) {
+  const { t } = useTranslation()
   const mutationInput = {
     sessionId: session.sessionId,
     version: session.version,
@@ -391,6 +395,9 @@ function PracticeReviewView({
   return (
     <div className="flex flex-col gap-5" data-testid="practice-review-state">
       <PracticeSessionHeader context={context} selection={session.selection} />
+      <p className="text-sm text-muted-foreground">
+        {t("practice.review.attempt", { count: session.attemptNumber })}
+      </p>
       <PracticeScoreOverview
         evaluation={session.evaluation}
         overallPerformance={session.review.overallPerformance}
@@ -412,10 +419,38 @@ function PracticeReviewView({
         isSaved={session.question.isSaved}
         isSavedPending={pending.saved}
         isWeakPending={pending.weak}
+        isEndPending={pending.end}
+        isNextPending={pending.next}
+        isRetryPending={pending.retry}
+        onEndSession={() =>
+          actions.onEndSession({ sessionId: session.sessionId, version: session.version })
+        }
+        onNextQuestion={() => actions.onNextQuestion(mutationInput)}
+        onRetryCurrent={() => actions.onRetryCurrent(mutationInput)}
         onSetSaved={(isSaved) => actions.onSetSaved({ ...mutationInput, isSaved })}
         onSetWeak={(isMarkedWeak) => actions.onSetWeak({ ...mutationInput, isMarkedWeak })}
       />
     </div>
+  )
+}
+
+function PracticeCompletedView({ session }: { session: PracticeCompletedState }) {
+  const { t } = useTranslation()
+  return (
+    <Card data-testid="practice-completed-state">
+      <CardHeader>
+        <CardTitle>{t("practice.completed.title")}</CardTitle>
+        <CardDescription>{t("practice.completed.description")}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        <p>{t("practice.completed.questions", { count: session.questionsCompleted })}</p>
+        <p>{t("practice.completed.retries", { count: session.retryCount })}</p>
+        <p>{t("practice.completed.saved", { count: session.savedQuestionCount })}</p>
+        <p>{t("practice.completed.weak", { count: session.newWeaknessCount })}</p>
+        <p>{t("practice.completed.average", { score: session.averageScore })}</p>
+        <p className="text-muted-foreground">{session.nextStepSuggestion}</p>
+      </CardContent>
+    </Card>
   )
 }
 

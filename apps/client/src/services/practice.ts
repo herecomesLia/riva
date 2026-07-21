@@ -9,6 +9,10 @@ import type {
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
   RetryPracticeEvaluationInput,
+  RetryCurrentPracticeQuestionInput,
+  ContinueToNextPracticeQuestionInput,
+  GetNextQuestionGenerationStatusInput,
+  EndPracticeSessionInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -37,6 +41,14 @@ export function getQuestionGenerationStatus(
   return env.mock ? practiceMockService.getQuestionGenerationStatus(input) : realApiUnavailable()
 }
 
+export function getNextQuestionGenerationStatus(
+  input: GetNextQuestionGenerationStatusInput,
+): Promise<PracticePageResponse> {
+  return env.mock
+    ? practiceMockService.getNextQuestionGenerationStatus(input)
+    : realApiUnavailable()
+}
+
 export function getPracticeEvaluationStatus(
   input: GetPracticeEvaluationStatusInput,
 ): Promise<PracticePageResponse> {
@@ -47,6 +59,22 @@ export function retryPracticeEvaluation(
   input: RetryPracticeEvaluationInput,
 ): Promise<PracticePageResponse> {
   return env.mock ? practiceMockService.retryPracticeEvaluation(input) : realApiUnavailable()
+}
+
+export function retryCurrentPracticeQuestion(
+  input: RetryCurrentPracticeQuestionInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.retryCurrentPracticeQuestion(input) : realApiUnavailable()
+}
+
+export function continueToNextPracticeQuestion(
+  input: ContinueToNextPracticeQuestionInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.continueToNextPracticeQuestion(input) : realApiUnavailable()
+}
+
+export function endPracticeSession(input: EndPracticeSessionInput): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.endPracticeSession(input) : realApiUnavailable()
 }
 
 export function requestPracticeHint(

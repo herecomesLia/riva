@@ -14,12 +14,16 @@ import type {
   GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticePageResponse,
+  PracticeAttemptRecord,
   PracticeQuestionMutationInput,
   PracticeQuestionType,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
   RetryPracticeEvaluationInput,
+  RetryCurrentPracticeQuestionInput,
+  ContinueToNextPracticeQuestionInput,
+  EndPracticeSessionInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -171,6 +175,10 @@ export async function startPracticeSession(
       version: 1,
       selection: copy(input),
       startedAt: new Date(Date.UTC(2026, 6, 20, 2, sessionSequence)).toISOString(),
+      attemptId: `${sessionId}_attempt_1`,
+      attemptNumber: 1,
+      attemptRecords: [],
+      previousAttempt: null,
     },
   })
 }
@@ -197,6 +205,9 @@ function completeQuestionGeneration(): PracticePageResponse {
       version: currentSession.version + 1,
       selection: copy(currentSession.selection),
       startedAt: currentSession.startedAt,
+      attemptId: currentSession.attemptId,
+      attemptNumber: currentSession.attemptNumber,
+      attemptRecords: copy(currentSession.attemptRecords),
       question,
     },
   }
@@ -435,6 +446,9 @@ export async function submitFollowUpAnswer(
         version: session.version + 1,
         selection: copy(session.selection),
         startedAt: session.startedAt,
+        attemptId: session.attemptId,
+        attemptNumber: session.attemptNumber,
+        attemptRecords: copy(session.attemptRecords),
         question: copy(session.question),
         mainAnswer: copy(session.mainAnswer),
         followUpExchanges,
@@ -477,6 +491,9 @@ export async function endPracticeFollowUps(
       version: session.version + 1,
       selection: copy(session.selection),
       startedAt: session.startedAt,
+      attemptId: session.attemptId,
+      attemptNumber: session.attemptNumber,
+      attemptRecords: copy(session.attemptRecords),
       question: copy(session.question),
       mainAnswer: copy(session.mainAnswer),
       followUpExchanges: copy(session.followUpExchanges),
@@ -491,6 +508,25 @@ export async function endPracticeFollowUps(
 
 function evaluationAttemptKey(sessionId: string, version: number) {
   return `${sessionId}:${version}`
+}
+
+function toAttemptRecord(
+  session: import("@/models/practice").PracticeReviewState,
+): PracticeAttemptRecord {
+  return {
+    attemptId: session.attemptId,
+    attemptNumber: session.attemptNumber,
+    completedAt: session.evaluation.evaluatedAt,
+    selection: copy(session.selection),
+    question: copy(session.question),
+    mainAnswer: copy(session.mainAnswer),
+    followUpExchanges: copy(session.followUpExchanges),
+    followUpCompletion: copy(session.followUpCompletion),
+    evaluation: copy(session.evaluation),
+    review: copy(session.review),
+    isSaved: session.question.isSaved,
+    isMarkedWeak: session.question.isMarkedWeak,
+  }
 }
 
 function requireEvaluatingSession(input: GetPracticeEvaluationStatusInput) {
@@ -525,6 +561,9 @@ export async function getPracticeEvaluationStatus(
       version: session.version + 1,
       selection: copy(session.selection),
       startedAt: session.startedAt,
+      attemptId: session.attemptId,
+      attemptNumber: session.attemptNumber,
+      attemptRecords: copy(session.attemptRecords),
       question: copy(session.question),
       mainAnswer: copy(session.mainAnswer),
       followUpExchanges: copy(session.followUpExchanges),
@@ -552,6 +591,121 @@ export async function retryPracticeEvaluation(
   })
 }
 
+function requireReview(input: PracticeQuestionMutationInput) {
+  const session = mockResponse.session
+  if (
+    session.status !== "review" ||
+    session.sessionId !== input.sessionId ||
+    session.version !== input.version ||
+    session.question.id !== input.questionId
+  ) {
+    throw new Error("Practice review version is out of date.")
+  }
+  return session
+}
+
+export async function retryCurrentPracticeQuestion(
+  input: RetryCurrentPracticeQuestionInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireReview(input)
+  const previousAttempt = toAttemptRecord(session)
+  const nextAttemptNumber = session.attemptNumber + 1
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      status: "answering",
+      sessionId: session.sessionId,
+      version: session.version + 1,
+      selection: copy(session.selection),
+      startedAt: session.startedAt,
+      attemptId: `${session.sessionId}_attempt_${nextAttemptNumber}`,
+      attemptNumber: nextAttemptNumber,
+      attemptRecords: [...copy(session.attemptRecords), previousAttempt],
+      question: copy(session.question),
+    },
+  })
+}
+
+export async function continueToNextPracticeQuestion(
+  input: ContinueToNextPracticeQuestionInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireReview(input)
+  const previousAttempt = toAttemptRecord(session)
+  const recommendation = session.review.recommendation
+  const selection =
+    recommendation.action === "nextQuestion"
+      ? {
+          ...session.selection,
+          questionType: recommendation.nextQuestion.questionType,
+          difficulty: recommendation.nextQuestion.difficulty,
+        }
+      : session.selection
+  generationPollCounts.set(session.sessionId, 0)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      status: "generatingQuestion",
+      sessionId: session.sessionId,
+      version: session.version + 1,
+      selection: copy(selection),
+      startedAt: session.startedAt,
+      attemptId: `${session.sessionId}_attempt_${session.attemptNumber + 1}`,
+      attemptNumber: session.attemptNumber + 1,
+      attemptRecords: [...copy(session.attemptRecords), previousAttempt],
+      previousAttempt,
+    },
+  })
+}
+
+export async function getNextQuestionGenerationStatus(
+  input: GetQuestionGenerationStatusInput,
+): Promise<PracticePageResponse> {
+  return getQuestionGenerationStatus(input)
+}
+
+export async function endPracticeSession(
+  input: EndPracticeSessionInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = mockResponse.session
+  if (
+    session.status !== "review" ||
+    session.sessionId !== input.sessionId ||
+    session.version !== input.version
+  ) {
+    throw new Error("Practice session version is out of date.")
+  }
+  const records = [...copy(session.attemptRecords), toAttemptRecord(session)]
+  const averageScore = Math.round(
+    records.reduce((total, record) => total + record.evaluation.overallScore, 0) / records.length,
+  )
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      status: "completed",
+      sessionId: session.sessionId,
+      version: session.version + 1,
+      selection: copy(session.selection),
+      startedAt: session.startedAt,
+      attemptId: session.attemptId,
+      attemptNumber: session.attemptNumber,
+      attemptRecords: records,
+      completedAt: nextMutationTimestamp(),
+      questionsCompleted: new Set(records.map((record) => record.question.id)).size,
+      retryCount: records.length - new Set(records.map((record) => record.question.id)).size,
+      savedQuestionCount: records.filter((record) => record.isSaved).length,
+      newWeaknessCount: records.filter((record) => record.isMarkedWeak).length,
+      averageScore,
+      nextStepSuggestion: "根据本轮复盘优先补足薄弱项，再开始下一轮专项练习。",
+    },
+  })
+}
+
 export async function skipPracticeQuestion(
   input: SkipPracticeQuestionInput,
 ): Promise<PracticePageResponse> {
@@ -568,6 +722,10 @@ export async function skipPracticeQuestion(
       version: session.version + 1,
       selection: copy(session.selection),
       startedAt: session.startedAt,
+      attemptId: session.attemptId,
+      attemptNumber: session.attemptNumber,
+      attemptRecords: copy(session.attemptRecords),
+      previousAttempt: null,
     },
   })
 }
@@ -586,8 +744,16 @@ export async function requestEndPracticeSession(
       version: session.version + 1,
       selection: copy(session.selection),
       startedAt: session.startedAt,
+      attemptId: session.attemptId,
+      attemptNumber: session.attemptNumber,
+      attemptRecords: copy(session.attemptRecords),
       completedAt: nextMutationTimestamp(),
       questionsCompleted: 0,
+      retryCount: 0,
+      savedQuestionCount: 0,
+      newWeaknessCount: 0,
+      averageScore: 0,
+      nextStepSuggestion: "本轮在提交回答前结束。可重新开始专项练习。",
     },
   })
 }
