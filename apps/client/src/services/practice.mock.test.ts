@@ -6,7 +6,14 @@ import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   getPracticePage,
   getQuestionGenerationStatus,
+  requestAnswerFramework,
+  requestEndPracticeSession,
+  requestPracticeHint,
+  setQuestionSaved,
+  setQuestionWeak,
+  skipPracticeQuestion,
   startPracticeSession,
+  submitPracticeAnswer,
 } from "@/services/practice"
 import { createTargetRole, getRolesPage, setCurrentTargetRole } from "@/services/roles"
 
@@ -224,6 +231,127 @@ describe("practice stateful mock service", () => {
     expect(response.session.selection).toMatchObject({
       targetRoleId: frontendRoleId,
       questionType: "technicalFoundation",
+    })
+  })
+
+  it("reveals guidance once and persists saved and weak states", async () => {
+    resetPracticeMockState("answeringQuestion")
+    const initial = await settle(getPracticePage())
+    if (initial.session.status !== "answering") return
+    const questionInput = {
+      sessionId: initial.session.sessionId,
+      version: initial.session.version,
+      questionId: initial.session.question.id,
+    }
+
+    const hinted = await settle(requestPracticeHint(questionInput))
+    if (hinted.session.status !== "answering") return
+    expect(hinted.session.question.answerHints.status).toBe("revealed")
+    expect(hinted.session.question.answerHints.content).not.toHaveLength(0)
+
+    const duplicateHint = await settle(
+      requestPracticeHint({ ...questionInput, version: hinted.session.version }),
+    )
+    if (duplicateHint.session.status !== "answering") return
+    expect(duplicateHint.session.version).toBe(hinted.session.version)
+
+    const framed = await settle(
+      requestAnswerFramework({ ...questionInput, version: hinted.session.version }),
+    )
+    if (framed.session.status !== "answering") return
+    expect(framed.session.question.answerFramework.status).toBe("revealed")
+
+    const saved = await settle(
+      setQuestionSaved({ ...questionInput, version: framed.session.version, isSaved: true }),
+    )
+    if (saved.session.status !== "answering") return
+    const weak = await settle(
+      setQuestionWeak({
+        ...questionInput,
+        version: saved.session.version,
+        isMarkedWeak: true,
+      }),
+    )
+    if (weak.session.status !== "answering") return
+
+    expect(saved.session.question.isSaved).toBe(true)
+    expect(weak.session.question).toMatchObject({ isSaved: true, isMarkedWeak: true })
+    expect(weak.session.version).toBe(initial.session.version + 4)
+  })
+
+  it("submits a trimmed main answer into an evaluating snapshot", async () => {
+    resetPracticeMockState("answeringQuestion")
+    const initial = await settle(getPracticePage())
+    if (initial.session.status !== "answering") return
+
+    const response = await settle(
+      submitPracticeAnswer({
+        sessionId: initial.session.sessionId,
+        version: initial.session.version,
+        questionId: initial.session.question.id,
+        content: "  我通过性能数据定位瓶颈，并推动拆包方案落地。  ",
+      }),
+    )
+
+    expect(response.session.status).toBe("evaluating")
+    if (response.session.status !== "evaluating") return
+    expect(response.session.mainAnswer).toMatchObject({
+      content: "我通过性能数据定位瓶颈，并推动拆包方案落地。",
+      order: 1,
+    })
+    expect(response.session.followUpExchanges).toEqual([])
+    expect(response.session.version).toBe(initial.session.version + 1)
+  })
+
+  it("rejects an empty answer without changing the answering snapshot", async () => {
+    resetPracticeMockState("answeringQuestion")
+    const initial = await settle(getPracticePage())
+    if (initial.session.status !== "answering") return
+    const submission = submitPracticeAnswer({
+      sessionId: initial.session.sessionId,
+      version: initial.session.version,
+      questionId: initial.session.question.id,
+      content: "   ",
+    })
+    const assertion = expect(submission).rejects.toThrow("cannot be empty")
+
+    await vi.runAllTimersAsync()
+    await assertion
+    expect((await settle(getPracticePage())).session).toEqual(initial.session)
+  })
+
+  it("skips into generation and ends from an answering snapshot", async () => {
+    resetPracticeMockState("answeringQuestion")
+    const initial = await settle(getPracticePage())
+    if (initial.session.status !== "answering") return
+    const input = {
+      sessionId: initial.session.sessionId,
+      version: initial.session.version,
+      questionId: initial.session.question.id,
+    }
+
+    const skipped = await settle(skipPracticeQuestion(input))
+    expect(skipped.session).toMatchObject({
+      status: "generatingQuestion",
+      sessionId: initial.session.sessionId,
+      version: initial.session.version + 1,
+    })
+
+    resetPracticeMockState("answeringQuestion")
+    const ending = await settle(getPracticePage())
+    if (ending.session.status !== "answering") return
+    const ended = await settle(
+      requestEndPracticeSession({
+        sessionId: ending.session.sessionId,
+        version: ending.session.version,
+        questionId: ending.session.question.id,
+      }),
+    )
+    expect(ended.session).toMatchObject({
+      status: "completed",
+      sessionId: ending.session.sessionId,
+      version: ending.session.version + 1,
+      questionsCompleted: 0,
     })
   })
 

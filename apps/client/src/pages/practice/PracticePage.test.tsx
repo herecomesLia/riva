@@ -10,7 +10,14 @@ import { PracticePage } from "@/pages/practice"
 import {
   getPracticePage,
   getQuestionGenerationStatus,
+  requestAnswerFramework,
+  requestEndPracticeSession,
+  requestPracticeHint,
+  setQuestionSaved,
+  setQuestionWeak,
+  skipPracticeQuestion,
   startPracticeSession,
+  submitPracticeAnswer,
 } from "@/services/practice"
 import { renderWithProviders } from "@/test/render"
 
@@ -18,7 +25,14 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/practice")>()),
   getPracticePage: vi.fn(),
   getQuestionGenerationStatus: vi.fn(),
+  requestAnswerFramework: vi.fn(),
+  requestEndPracticeSession: vi.fn(),
+  requestPracticeHint: vi.fn(),
+  setQuestionSaved: vi.fn(),
+  setQuestionWeak: vi.fn(),
+  skipPracticeQuestion: vi.fn(),
   startPracticeSession: vi.fn(),
+  submitPracticeAnswer: vi.fn(),
 }))
 
 function createDeferred<T>() {
@@ -42,7 +56,14 @@ describe("PracticePage", () => {
     await i18n.changeLanguage(defaultLanguage)
     vi.mocked(getPracticePage).mockReset()
     vi.mocked(getQuestionGenerationStatus).mockReset()
+    vi.mocked(requestAnswerFramework).mockReset()
+    vi.mocked(requestEndPracticeSession).mockReset()
+    vi.mocked(requestPracticeHint).mockReset()
+    vi.mocked(setQuestionSaved).mockReset()
+    vi.mocked(setQuestionWeak).mockReset()
+    vi.mocked(skipPracticeQuestion).mockReset()
     vi.mocked(startPracticeSession).mockReset()
+    vi.mocked(submitPracticeAnswer).mockReset()
   })
 
   it("shows structured loading content while setup data is pending", async () => {
@@ -83,7 +104,7 @@ describe("PracticePage", () => {
 
     renderPracticePage()
 
-    expect(await screen.findByTestId("practice-question-ready-state")).toHaveTextContent(
+    expect(await screen.findByTestId("practice-answering-state")).toHaveTextContent(
       answering.session.status === "answering" ? answering.session.question.prompt : "",
     )
     expect(getQuestionGenerationStatus).toHaveBeenCalledWith({
@@ -163,5 +184,74 @@ describe("PracticePage", () => {
         i18n.t("practice.difficulty.pressure"),
       ),
     )
+  })
+
+  it("prevents duplicate main-answer submission and enters evaluating", async () => {
+    const user = userEvent.setup()
+    const answering = createPracticeMockResponse("answeringQuestion")
+    const evaluating = createPracticeMockResponse("evaluatingAnswer")
+    if (answering.session.status !== "answering" || evaluating.session.status !== "evaluating") {
+      throw new Error("Answering and evaluating fixtures are required.")
+    }
+    evaluating.session.version = answering.session.version + 1
+    const submission = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(answering)
+    vi.mocked(submitPracticeAnswer).mockReturnValue(submission.promise)
+
+    renderPracticePage()
+
+    await user.type(
+      await screen.findByLabelText(i18n.t("practice.answer.label")),
+      "我负责定位问题并推动方案落地。",
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+    const pendingButton = await screen.findByRole("button", {
+      name: i18n.t("practice.answer.submitting"),
+    })
+    expect(pendingButton).toBeDisabled()
+    await user.click(pendingButton)
+    expect(submitPracticeAnswer).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      submission.resolve(evaluating)
+      await submission.promise
+    })
+    expect(await screen.findByTestId("practice-evaluating-state")).toBeInTheDocument()
+  })
+
+  it("updates saved and weak question state from mutation snapshots", async () => {
+    const user = userEvent.setup()
+    const answering = createPracticeMockResponse("answeringQuestion")
+    const saved = createPracticeMockResponse("answeringSavedQuestion")
+    const weak = createPracticeMockResponse("answeringWeakQuestion")
+    if (
+      answering.session.status !== "answering" ||
+      saved.session.status !== "answering" ||
+      weak.session.status !== "answering"
+    ) {
+      throw new Error("Answering fixtures are required.")
+    }
+    saved.session.version = answering.session.version + 1
+    weak.session.version = saved.session.version + 1
+    weak.session.question.isSaved = true
+    vi.mocked(getPracticePage).mockResolvedValue(answering)
+    vi.mocked(setQuestionSaved).mockResolvedValue(saved)
+    vi.mocked(setQuestionWeak).mockResolvedValue(weak)
+
+    renderPracticePage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.save") }),
+    )
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.unsave") }),
+    ).toHaveAttribute("aria-pressed", "true")
+
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.markWeak") }),
+    )
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.unmarkWeak") }),
+    ).toHaveAttribute("aria-pressed", "true")
   })
 })

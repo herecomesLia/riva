@@ -212,3 +212,29 @@ export type GetQuestionGenerationStatusInput = {
   sessionId: string
   version: number
 }
+
+export type PracticeQuestionMutationInput = {
+  sessionId: string
+  version: number
+  questionId: string
+}
+
+export type SubmitPracticeAnswerInput = PracticeQuestionMutationInput & {
+  content: string
+}
+
+export type SetPracticeQuestionSavedInput = PracticeQuestionMutationInput & {
+  isSaved: boolean
+}
+
+export type SetPracticeQuestionWeakInput = PracticeQuestionMutationInput & {
+  isMarkedWeak: boolean
+}
+
+export type RequestPracticeHintInput = PracticeQuestionMutationInput
+
+export type RequestAnswerFrameworkInput = PracticeQuestionMutationInput
+
+export type SkipPracticeQuestionInput = PracticeQuestionMutationInput
+
+export type RequestEndPracticeSessionInput = PracticeQuestionMutationInput

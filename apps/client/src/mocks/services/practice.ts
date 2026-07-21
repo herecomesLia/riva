@@ -1,14 +1,27 @@
-import { createPracticeMockResponse, type PracticeMockScenario } from "@/mocks/data/practice"
+import {
+  createPracticeMockResponse,
+  practiceAnswerFrameworkContent,
+  practiceAnswerHintContent,
+  type PracticeMockScenario,
+} from "@/mocks/data/practice"
 import { getRolesPage } from "@/mocks/services/roles"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   GetQuestionGenerationStatusInput,
   PracticePageResponse,
+  PracticeQuestionMutationInput,
   PracticeQuestionType,
+  RequestAnswerFrameworkInput,
+  RequestEndPracticeSessionInput,
+  RequestPracticeHintInput,
+  SetPracticeQuestionSavedInput,
+  SetPracticeQuestionWeakInput,
+  SkipPracticeQuestionInput,
   PracticeSetupContext,
   PracticeSetupSelection,
   PracticeTargetRoleOption,
   StartPracticeSessionInput,
+  SubmitPracticeAnswerInput,
 } from "@/models/practice"
 import type { TargetRole } from "@/models/roles"
 
@@ -28,6 +41,7 @@ const practiceRoleMetadata = new Map(
 
 let mockResponse = createPracticeMockResponse()
 let sessionSequence = 0
+let mutationSequence = 0
 const generationPollCounts = new Map<string, number>()
 
 function copy<T>(value: T): T {
@@ -37,6 +51,7 @@ function copy<T>(value: T): T {
 export function resetPracticeMockState(scenario: PracticeMockScenario = "setupReady") {
   mockResponse = createPracticeMockResponse(scenario)
   sessionSequence = 0
+  mutationSequence = 0
   generationPollCounts.clear()
 }
 
@@ -189,4 +204,165 @@ export async function getQuestionGenerationStatus(
 
   if (pollCount < 2) return copy(mockResponse)
   return setMockResponse(completeQuestionGeneration())
+}
+
+function requireCurrentQuestion(input: PracticeQuestionMutationInput) {
+  const session = mockResponse.session
+  if (
+    session.status !== "answering" ||
+    session.sessionId !== input.sessionId ||
+    session.version !== input.version ||
+    session.question.id !== input.questionId
+  ) {
+    throw new Error("Practice question version is out of date.")
+  }
+  return session
+}
+
+function nextMutationTimestamp() {
+  mutationSequence += 1
+  return new Date(Date.UTC(2026, 6, 20, 3, mutationSequence)).toISOString()
+}
+
+export async function requestPracticeHint(
+  input: RequestPracticeHintInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+  if (session.question.answerHints.status !== "notRequested") return copy(mockResponse)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      question: {
+        ...session.question,
+        answerHints: { status: "revealed", content: copy(practiceAnswerHintContent) },
+      },
+    },
+  })
+}
+
+export async function requestAnswerFramework(
+  input: RequestAnswerFrameworkInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+  if (session.question.answerFramework.status !== "notRequested") return copy(mockResponse)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      question: {
+        ...session.question,
+        answerFramework: {
+          status: "revealed",
+          content: copy(practiceAnswerFrameworkContent),
+        },
+      },
+    },
+  })
+}
+
+export async function setQuestionSaved(
+  input: SetPracticeQuestionSavedInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+  if (session.question.isSaved === input.isSaved) return copy(mockResponse)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      question: { ...session.question, isSaved: input.isSaved },
+    },
+  })
+}
+
+export async function setQuestionWeak(
+  input: SetPracticeQuestionWeakInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+  if (session.question.isMarkedWeak === input.isMarkedWeak) return copy(mockResponse)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      question: { ...session.question, isMarkedWeak: input.isMarkedWeak },
+    },
+  })
+}
+
+export async function submitPracticeAnswer(
+  input: SubmitPracticeAnswerInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+  const content = input.content.trim()
+  if (!content) throw new Error("Practice answer cannot be empty.")
+  const submittedAt = nextMutationTimestamp()
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      status: "evaluating",
+      version: session.version + 1,
+      mainAnswer: {
+        id: `${session.sessionId}_answer_1`,
+        content,
+        createdAt: submittedAt,
+        order: 1,
+      },
+      followUpExchanges: [],
+      submittedAt,
+    },
+  })
+}
+
+export async function skipPracticeQuestion(
+  input: SkipPracticeQuestionInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+  generationPollCounts.set(session.sessionId, 0)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      status: "generatingQuestion",
+      sessionId: session.sessionId,
+      version: session.version + 1,
+      selection: copy(session.selection),
+      startedAt: session.startedAt,
+    },
+  })
+}
+
+export async function requestEndPracticeSession(
+  input: RequestEndPracticeSessionInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      status: "completed",
+      sessionId: session.sessionId,
+      version: session.version + 1,
+      selection: copy(session.selection),
+      startedAt: session.startedAt,
+      completedAt: nextMutationTimestamp(),
+      questionsCompleted: 0,
+    },
+  })
 }

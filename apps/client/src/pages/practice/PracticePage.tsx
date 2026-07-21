@@ -4,15 +4,33 @@ import { useEffect } from "react"
 import type {
   GetQuestionGenerationStatusInput,
   PracticePageResponse,
+  PracticeQuestionMutationInput,
+  RequestAnswerFrameworkInput,
+  RequestEndPracticeSessionInput,
+  RequestPracticeHintInput,
+  SetPracticeQuestionSavedInput,
+  SetPracticeQuestionWeakInput,
+  SkipPracticeQuestionInput,
   StartPracticeSessionInput,
+  SubmitPracticeAnswerInput,
 } from "@/models/practice"
 import {
   getPracticePage,
   getQuestionGenerationStatus,
+  requestAnswerFramework,
+  requestEndPracticeSession,
+  requestPracticeHint,
+  setQuestionSaved,
+  setQuestionWeak,
+  skipPracticeQuestion,
   startPracticeSession,
+  submitPracticeAnswer,
 } from "@/services/practice"
 
-import { synchronizeQuestionGenerationResponse } from "./practice-cache"
+import {
+  synchronizePracticeMutationResponse,
+  synchronizeQuestionGenerationResponse,
+} from "./practice-cache"
 import { PracticeView } from "./PracticeView"
 
 const PRACTICE_QUERY_KEY = ["practice"] as const
@@ -28,6 +46,13 @@ export function PracticePage() {
     mutationFn: startPracticeSession,
     onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
   })
+  const hintMutation = usePracticeMutation(requestPracticeHint)
+  const frameworkMutation = usePracticeMutation(requestAnswerFramework)
+  const savedMutation = usePracticeMutation(setQuestionSaved)
+  const weakMutation = usePracticeMutation(setQuestionWeak)
+  const submitAnswerMutation = usePracticeMutation(submitPracticeAnswer)
+  const skipMutation = usePracticeMutation(skipPracticeQuestion)
+  const endMutation = usePracticeMutation(requestEndPracticeSession)
   const generationSession =
     practiceQuery.data?.session.status === "generatingQuestion" ? practiceQuery.data.session : null
   const generationSessionId = generationSession?.sessionId
@@ -81,6 +106,38 @@ export function PracticePage() {
   if (practiceQuery.data !== undefined) {
     return (
       <PracticeView
+        answeringActions={{
+          onEnd: async (input: RequestEndPracticeSessionInput) => {
+            await endMutation.mutateAsync(input)
+          },
+          onRequestFramework: async (input: RequestAnswerFrameworkInput) => {
+            await frameworkMutation.mutateAsync(input)
+          },
+          onRequestHint: async (input: RequestPracticeHintInput) => {
+            await hintMutation.mutateAsync(input)
+          },
+          onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
+            await savedMutation.mutateAsync(input)
+          },
+          onSetWeak: async (input: SetPracticeQuestionWeakInput) => {
+            await weakMutation.mutateAsync(input)
+          },
+          onSkip: async (input: SkipPracticeQuestionInput) => {
+            await skipMutation.mutateAsync(input)
+          },
+          onSubmitAnswer: async (input: SubmitPracticeAnswerInput) => {
+            await submitAnswerMutation.mutateAsync(input)
+          },
+        }}
+        answeringPending={{
+          end: endMutation.isPending,
+          framework: frameworkMutation.isPending,
+          hint: hintMutation.isPending,
+          saved: savedMutation.isPending,
+          skip: skipMutation.isPending,
+          submitAnswer: submitAnswerMutation.isPending,
+          weak: weakMutation.isPending,
+        }}
         content={{ status: "ready", data: practiceQuery.data }}
         generationError={generationQuery.isError}
         isStarting={startMutation.isPending}
@@ -106,4 +163,19 @@ export function PracticePage() {
   }
 
   return <PracticeView content={{ status: "loading" }} variant="default" />
+}
+
+function usePracticeMutation<TInput extends PracticeQuestionMutationInput>(
+  mutationFn: (input: TInput) => Promise<PracticePageResponse>,
+) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn,
+    onSuccess: (response, input) => {
+      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
+        synchronizePracticeMutationResponse(current, response, input),
+      )
+    },
+  })
 }

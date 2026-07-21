@@ -23,6 +23,24 @@ export const LoadError = meta.story({
 
 function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
   return {
+    answeringActions: {
+      onEnd: fn(async () => undefined),
+      onRequestFramework: fn(async () => undefined),
+      onRequestHint: fn(async () => undefined),
+      onSetSaved: fn(async () => undefined),
+      onSetWeak: fn(async () => undefined),
+      onSkip: fn(async () => undefined),
+      onSubmitAnswer: fn(async () => undefined),
+    },
+    answeringPending: {
+      end: false,
+      framework: false,
+      hint: false,
+      saved: false,
+      skip: false,
+      submitAnswer: false,
+      weak: false,
+    },
     content: { data: createPracticeMockResponse(scenario), status: "ready" as const },
     generationError: false,
     isStarting: false,

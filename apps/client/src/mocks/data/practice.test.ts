@@ -19,6 +19,10 @@ const scenarios: PracticeMockScenario[] = [
   "noEligibleHistoryQuestions",
   "generatingQuestion",
   "answeringQuestion",
+  "answeringHintRevealed",
+  "answeringFrameworkRevealed",
+  "answeringSavedQuestion",
+  "answeringWeakQuestion",
   "answeringFollowUp",
   "evaluatingAnswer",
   "reviewRetryRecommended",
@@ -102,7 +106,6 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.question.questionType).toBe(session.selection.questionType)
       expectConsistentGuidance(session.question.answerHints)
       expectConsistentGuidance(session.question.answerFramework)
-      expectUnrequestedGuidance(session.question)
       expect("mainAnswer" in session).toBe(false)
       expect("evaluation" in session).toBe(false)
       expect("review" in session).toBe(false)
@@ -185,6 +188,25 @@ describe("practice mock scenarios", () => {
       }
       expectUnrequestedGuidance(session.question)
     }
+  })
+
+  it("stores revealed hint and framework content in dedicated scenarios", () => {
+    const hint = createPracticeMockResponse("answeringHintRevealed")
+    const framework = createPracticeMockResponse("answeringFrameworkRevealed")
+    if (hint.session.status !== "answering" || framework.session.status !== "answering") return
+
+    expect(hint.session.question.answerHints.status).toBe("revealed")
+    expect(hint.session.question.answerHints.content).not.toHaveLength(0)
+    expect(hint.session.question.answerFramework).toEqual({
+      status: "notRequested",
+      content: null,
+    })
+    expect(framework.session.question.answerFramework.status).toBe("revealed")
+    expect(framework.session.question.answerFramework.content).not.toHaveLength(0)
+    expect(framework.session.question.answerHints).toEqual({
+      status: "notRequested",
+      content: null,
+    })
   })
 
   it("uses content only for revealed guidance", () => {

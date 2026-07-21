@@ -77,6 +77,45 @@ const question = {
     content: null,
   },
   isSaved: false,
+  isMarkedWeak: false,
+} satisfies PracticeQuestionCard
+
+export const practiceAnswerHintContent = [
+  "先界定性能问题对业务和用户的影响。",
+  "重点说明你个人做出的判断、取舍和推动动作。",
+  "用指标解释结果，并补充验证方式。",
+]
+
+export const practiceAnswerFrameworkContent = [
+  "背景：用一两句话说明问题和目标。",
+  "任务：明确你的职责与关键约束。",
+  "行动：按判断、方案、协作和风险控制展开。",
+  "结果：用指标呈现结果，并说明如何验证。",
+]
+
+const hintRevealedQuestion = {
+  ...question,
+  answerHints: {
+    status: "revealed",
+    content: practiceAnswerHintContent,
+  },
+} satisfies PracticeQuestionCard
+
+const frameworkRevealedQuestion = {
+  ...question,
+  answerFramework: {
+    status: "revealed",
+    content: practiceAnswerFrameworkContent,
+  },
+} satisfies PracticeQuestionCard
+
+const savedQuestion = {
+  ...question,
+  isSaved: true,
+} satisfies PracticeQuestionCard
+
+const weakQuestion = {
+  ...question,
   isMarkedWeak: true,
 } satisfies PracticeQuestionCard
 
@@ -210,6 +249,10 @@ export type PracticeMockScenario =
   | "noEligibleHistoryQuestions"
   | "generatingQuestion"
   | "answeringQuestion"
+  | "answeringHintRevealed"
+  | "answeringFrameworkRevealed"
+  | "answeringSavedQuestion"
+  | "answeringWeakQuestion"
   | "answeringFollowUp"
   | "evaluatingAnswer"
   | "reviewRetryRecommended"
@@ -268,6 +311,38 @@ const practiceMockScenarios = {
       status: "answering",
       ...activeSession,
       question,
+    },
+  },
+  answeringHintRevealed: {
+    setupContext,
+    session: {
+      status: "answering",
+      ...activeSession,
+      question: hintRevealedQuestion,
+    },
+  },
+  answeringFrameworkRevealed: {
+    setupContext,
+    session: {
+      status: "answering",
+      ...activeSession,
+      question: frameworkRevealedQuestion,
+    },
+  },
+  answeringSavedQuestion: {
+    setupContext,
+    session: {
+      status: "answering",
+      ...activeSession,
+      question: savedQuestion,
+    },
+  },
+  answeringWeakQuestion: {
+    setupContext,
+    session: {
+      status: "answering",
+      ...activeSession,
+      question: weakQuestion,
     },
   },
   answeringFollowUp: {

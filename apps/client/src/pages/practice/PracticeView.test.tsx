@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react"
+import { act, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -8,7 +8,36 @@ import { createPracticeMockResponse } from "@/mocks/data/practice"
 import type { ActivePracticeSelection, PracticePageResponse } from "@/models/practice"
 import { renderWithProviders } from "@/test/render"
 
-import { PracticeView } from "./PracticeView"
+import {
+  PracticeView,
+  type PracticeAnsweringActions,
+  type PracticeAnsweringPending,
+} from "./PracticeView"
+
+function createAnsweringActions(
+  overrides: Partial<PracticeAnsweringActions> = {},
+): PracticeAnsweringActions {
+  return {
+    onEnd: vi.fn(async () => undefined),
+    onRequestFramework: vi.fn(async () => undefined),
+    onRequestHint: vi.fn(async () => undefined),
+    onSetSaved: vi.fn(async () => undefined),
+    onSetWeak: vi.fn(async () => undefined),
+    onSkip: vi.fn(async () => undefined),
+    onSubmitAnswer: vi.fn(async () => undefined),
+    ...overrides,
+  }
+}
+
+const answeringPending: PracticeAnsweringPending = {
+  end: false,
+  framework: false,
+  hint: false,
+  saved: false,
+  skip: false,
+  submitAnswer: false,
+  weak: false,
+}
 
 function renderReadyView(
   data: PracticePageResponse,
@@ -17,11 +46,16 @@ function renderReadyView(
     isStarting?: boolean
     onRetryGeneration?: () => void
     onStart?: (input: ActivePracticeSelection) => Promise<void>
+    answeringActions?: PracticeAnsweringActions
+    answeringPending?: PracticeAnsweringPending
   } = {},
 ) {
   const onStart = options.onStart ?? vi.fn(async () => undefined)
-  renderWithProviders(
+  const actions = options.answeringActions ?? createAnsweringActions()
+  const renderResult = renderWithProviders(
     <PracticeView
+      answeringActions={actions}
+      answeringPending={options.answeringPending ?? answeringPending}
       content={{ status: "ready", data }}
       generationError={options.generationError ?? false}
       isStarting={options.isStarting ?? false}
@@ -31,7 +65,7 @@ function renderReadyView(
     />,
     { router: { initialEntries: ["/practice"] } },
   )
-  return { onStart }
+  return { actions, onStart, ...renderResult }
 }
 
 function getStartButton() {
@@ -208,5 +242,231 @@ describe("PracticeView", () => {
       }),
     )
     expect(onRetryGeneration).toHaveBeenCalledTimes(1)
+  })
+
+  it("shows the question card without internal scoring or answer content", async () => {
+    const data = createPracticeMockResponse("answeringQuestion")
+    renderReadyView(data)
+    if (data.session.status !== "answering") return
+
+    const card = await screen.findByTestId("practice-question-card")
+    expect(card).toHaveTextContent(data.session.question.prompt)
+    expect(card).toHaveTextContent(data.session.question.assessedCapabilities[0] ?? "")
+    expect(card).toHaveTextContent(data.session.question.recommendedMaterials[0] ?? "")
+    expect(screen.queryByText(/完整参考答案|完整评分标准|内部追问策略/)).not.toBeInTheDocument()
+  })
+
+  it("keeps an empty answer from being submitted", async () => {
+    const { actions } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.answer.submit") }),
+    ).toBeDisabled()
+    expect(actions.onSubmitAnswer).not.toHaveBeenCalled()
+  })
+
+  it("submits the main answer with the current session contract", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("answeringQuestion")
+    const { actions } = renderReadyView(data)
+    if (data.session.status !== "answering") return
+
+    await user.type(
+      await screen.findByLabelText(i18n.t("practice.answer.label")),
+      "我先定位性能瓶颈，再推动团队按阶段上线优化。",
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+
+    expect(actions.onSubmitAnswer).toHaveBeenCalledWith({
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+      content: "我先定位性能瓶颈，再推动团队按阶段上线优化。",
+    })
+  })
+
+  it("preserves the answer draft after a safe submission error", async () => {
+    const user = userEvent.setup()
+    const answer = "这是一段需要在失败后保留的回答。"
+    const actions = createAnsweringActions({
+      onSubmitAnswer: vi.fn(async () => {
+        throw new Error("unsafe submission detail")
+      }),
+    })
+    renderReadyView(createPracticeMockResponse("answeringQuestion"), { answeringActions: actions })
+
+    const textarea = await screen.findByLabelText(i18n.t("practice.answer.label"))
+    await user.type(textarea, answer)
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.submitDescription"),
+    )
+    expect(screen.queryByText("unsafe submission detail")).not.toBeInTheDocument()
+    expect(textarea).toHaveValue(answer)
+  })
+
+  it("requests hint and answer framework separately", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("answeringQuestion")
+    const { actions } = renderReadyView(data)
+    if (data.session.status !== "answering") return
+    const expectedInput = {
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+    }
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.guidance.requestHint") }),
+    )
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("practice.guidance.requestFramework") }),
+    )
+
+    expect(actions.onRequestHint).toHaveBeenCalledWith(expectedInput)
+    expect(actions.onRequestFramework).toHaveBeenCalledWith(expectedInput)
+  })
+
+  it("shows safe guidance errors and allows retry", async () => {
+    const user = userEvent.setup()
+    const requestHint = vi
+      .fn<PracticeAnsweringActions["onRequestHint"]>()
+      .mockRejectedValueOnce(new Error("unsafe hint details"))
+      .mockResolvedValueOnce(undefined)
+    const requestFramework = vi
+      .fn<PracticeAnsweringActions["onRequestFramework"]>()
+      .mockRejectedValueOnce(new Error("unsafe framework details"))
+      .mockResolvedValueOnce(undefined)
+    renderReadyView(createPracticeMockResponse("answeringQuestion"), {
+      answeringActions: createAnsweringActions({
+        onRequestFramework: requestFramework,
+        onRequestHint: requestHint,
+      }),
+    })
+
+    const hintButton = await screen.findByRole("button", {
+      name: i18n.t("practice.guidance.requestHint"),
+    })
+    const frameworkButton = screen.getByRole("button", {
+      name: i18n.t("practice.guidance.requestFramework"),
+    })
+    await user.click(hintButton)
+    expect(await screen.findByText(i18n.t("practice.errors.hintDescription"))).toBeInTheDocument()
+    expect(screen.queryByText("unsafe hint details")).not.toBeInTheDocument()
+    await user.click(hintButton)
+
+    await user.click(frameworkButton)
+    expect(
+      await screen.findByText(i18n.t("practice.errors.frameworkDescription")),
+    ).toBeInTheDocument()
+    expect(screen.queryByText("unsafe framework details")).not.toBeInTheDocument()
+    await user.click(frameworkButton)
+
+    expect(requestHint).toHaveBeenCalledTimes(2)
+    expect(requestFramework).toHaveBeenCalledTimes(2)
+  })
+
+  it("requests saved and weak state changes without optimistic UI", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("answeringQuestion")
+    const { actions } = renderReadyView(data)
+    if (data.session.status !== "answering") return
+
+    const saveButton = await screen.findByRole("button", {
+      name: i18n.t("practice.questionActions.save"),
+    })
+    const weakButton = screen.getByRole("button", {
+      name: i18n.t("practice.questionActions.markWeak"),
+    })
+    await user.click(saveButton)
+    await user.click(weakButton)
+
+    expect(actions.onSetSaved).toHaveBeenCalledWith({
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+      isSaved: true,
+    })
+    expect(actions.onSetWeak).toHaveBeenCalledWith({
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+      isMarkedWeak: true,
+    })
+    expect(saveButton).toHaveAttribute("aria-pressed", "false")
+    expect(weakButton).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("keeps server question states after save and weak actions fail", async () => {
+    const user = userEvent.setup()
+    const actions = createAnsweringActions({
+      onSetSaved: vi.fn(async () => {
+        throw new Error("unsafe saved details")
+      }),
+      onSetWeak: vi.fn(async () => {
+        throw new Error("unsafe weak details")
+      }),
+    })
+    renderReadyView(createPracticeMockResponse("answeringQuestion"), { answeringActions: actions })
+
+    const saveButton = await screen.findByRole("button", {
+      name: i18n.t("practice.questionActions.save"),
+    })
+    const weakButton = screen.getByRole("button", {
+      name: i18n.t("practice.questionActions.markWeak"),
+    })
+    await user.click(saveButton)
+    expect(await screen.findByText(i18n.t("practice.errors.savedDescription"))).toBeInTheDocument()
+    expect(saveButton).toHaveAttribute("aria-pressed", "false")
+
+    await user.click(weakButton)
+    expect(await screen.findByText(i18n.t("practice.errors.weakDescription"))).toBeInTheDocument()
+    expect(weakButton).toHaveAttribute("aria-pressed", "false")
+    expect(screen.queryByText(/unsafe saved details|unsafe weak details/)).not.toBeInTheDocument()
+  })
+
+  it("requires confirmation before skipping the current question", async () => {
+    const user = userEvent.setup()
+    const { actions } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.skip") }),
+    )
+    expect(actions.onSkip).not.toHaveBeenCalled()
+    const dialog = screen.getByRole("alertdialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("practice.dialog.confirmSkip") }),
+    )
+    expect(actions.onSkip).toHaveBeenCalledTimes(1)
+  })
+
+  it("requires confirmation before ending the practice session", async () => {
+    const user = userEvent.setup()
+    const { actions } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.questionActions.end") }),
+    )
+    expect(actions.onEnd).not.toHaveBeenCalled()
+    const dialog = screen.getByRole("alertdialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("practice.dialog.confirmEnd") }),
+    )
+    expect(actions.onEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it("blocks route changes while an unsubmitted draft exists", async () => {
+    const user = userEvent.setup()
+    const { router } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+
+    await user.type(await screen.findByLabelText(i18n.t("practice.answer.label")), "尚未提交的回答")
+    act(() => {
+      void router?.navigate({ to: "/profile" })
+    })
+
+    const dialog = await screen.findByRole("alertdialog")
+    expect(within(dialog).getByText(i18n.t("practice.dialog.leaveTitle"))).toBeInTheDocument()
+    expect(router?.state.location.pathname).toBe("/practice")
   })
 })
