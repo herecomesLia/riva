@@ -75,6 +75,9 @@ export const practice = {
     weakDescription: "The weak-question state did not change. Please try again.",
     skipDescription: "The question was not skipped. Please try again.",
     endDescription: "Your practice session is still active. Please try again.",
+    followUpSubmitTitle: "Follow-up answer not submitted",
+    followUpSubmitDescription: "Your follow-up draft is still here. Please try again.",
+    endFollowUpDescription: "The follow-up is still active. Please try again.",
   },
   generation: {
     title: "Generating your question",
@@ -104,6 +107,32 @@ export const practice = {
     characterCount: "{{count}} characters",
     submit: "Submit answer",
     submitting: "Submitting",
+  },
+  followUp: {
+    timelineTitle: "Question conversation",
+    timelineDescription: "Submitted answers are read-only. The current follow-up is highlighted.",
+    mainQuestion: "Riva · Main question",
+    yourMainAnswer: "Your main answer",
+    followUpNumber: "Riva · Follow-up {{count}}",
+    yourFollowUpAnswer: "Your follow-up answer {{count}}",
+    currentFollowUp: "Riva · Current follow-up {{count}}",
+    composerTitle: "Answer the current follow-up",
+    composerDescription:
+      "Add the key details, then Riva will decide whether another follow-up is needed.",
+    answerLabel: "Current follow-up answer",
+    answerPlaceholder: "Add your specific reasoning, actions, or evidence for this follow-up…",
+    submit: "Submit follow-up answer",
+    submitting: "Submitting follow-up answer",
+    processing: "Riva is reviewing your answer and preparing the next step…",
+    processingDescription: "Your answer was sent. Riva is deciding whether to follow up again.",
+    endAnswering: "End this question",
+    endDialogTitle: "End the current follow-up?",
+    endDialogDescription:
+      "The current follow-up will be recorded as incomplete, then scoring will begin.",
+    confirmEnd: "End and start scoring",
+    ending: "Ending",
+    endedEarly:
+      "You ended the follow-up early. The unanswered follow-up was recorded as incomplete.",
   },
   guidance: {
     title: "Answer guidance",
@@ -136,12 +165,16 @@ export const practice = {
     confirmEnd: "End practice",
     leaveTitle: "Leave and discard your answer?",
     leaveDescription: "This answer has not been submitted. Leaving will discard the draft.",
+    leaveFollowUpTitle: "Leave and discard the follow-up answer?",
+    leaveFollowUpDescription:
+      "This follow-up answer has not been submitted. Leaving will discard the draft.",
     stay: "Keep answering",
     leave: "Leave page",
   },
   evaluating: {
     title: "Processing your answer",
-    description: "Your main answer was submitted. Follow-ups and review arrive in later steps.",
+    description:
+      "This question is complete. Riva is preparing the score, which will be shown in the next step.",
   },
   completed: {
     title: "This targeted-practice session has ended",

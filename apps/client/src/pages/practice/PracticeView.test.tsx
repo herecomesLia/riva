@@ -12,6 +12,8 @@ import {
   PracticeView,
   type PracticeAnsweringActions,
   type PracticeAnsweringPending,
+  type PracticeFollowUpActions,
+  type PracticeFollowUpPending,
 } from "./PracticeView"
 
 function createAnsweringActions(
@@ -40,6 +42,22 @@ const answeringPending: PracticeAnsweringPending = {
   weak: false,
 }
 
+function createFollowUpActions(
+  overrides: Partial<PracticeFollowUpActions> = {},
+): PracticeFollowUpActions {
+  return {
+    onEndFollowUps: vi.fn(async () => "executed" as const),
+    onSubmitFollowUp: vi.fn(async () => "executed" as const),
+    ...overrides,
+  }
+}
+
+const followUpPending: PracticeFollowUpPending = {
+  end: false,
+  interactionLocked: false,
+  submit: false,
+}
+
 function renderReadyView(
   data: PracticePageResponse,
   options: {
@@ -50,6 +68,8 @@ function renderReadyView(
     onStart?: (input: ActivePracticeSelection) => Promise<void>
     answeringActions?: PracticeAnsweringActions
     answeringPending?: PracticeAnsweringPending
+    followUpActions?: PracticeFollowUpActions
+    followUpPending?: PracticeFollowUpPending
   } = {},
 ) {
   const onStart = options.onStart ?? vi.fn(async () => undefined)
@@ -58,6 +78,8 @@ function renderReadyView(
     <PracticeView
       answeringActions={actions}
       answeringPending={options.answeringPending ?? answeringPending}
+      followUpActions={options.followUpActions ?? createFollowUpActions()}
+      followUpPending={options.followUpPending ?? followUpPending}
       content={{ status: "ready", data }}
       generationError={options.generationError ?? false}
       isGenerationRetrying={options.isGenerationRetrying ?? false}
@@ -506,5 +528,127 @@ describe("PracticeView", () => {
     const dialog = await screen.findByRole("alertdialog")
     expect(within(dialog).getByText(i18n.t("practice.dialog.leaveTitle"))).toBeInTheDocument()
     expect(router?.state.location.pathname).toBe("/practice")
+  })
+
+  it("renders the complete follow-up timeline in conversation order", async () => {
+    const data = createPracticeMockResponse("answeringFollowUp")
+    renderReadyView(data)
+    if (data.session.status !== "answeringFollowUp") return
+
+    const timeline = await screen.findByTestId("practice-conversation-timeline")
+    const content = timeline.textContent ?? ""
+    const orderedText = [
+      data.session.question.prompt,
+      data.session.mainAnswer.content,
+      data.session.followUpExchanges[0]?.question.prompt ?? "",
+      data.session.followUpExchanges[0]?.answer.content ?? "",
+      data.session.currentFollowUp.question.prompt,
+    ]
+    let previousIndex = -1
+    for (const text of orderedText) {
+      const index = content.indexOf(text)
+      expect(index).toBeGreaterThan(previousIndex)
+      previousIndex = index
+    }
+    expect(
+      within(timeline)
+        .getByText(data.session.currentFollowUp.question.prompt)
+        .closest("[aria-current='step']"),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole("textbox")).toHaveLength(1)
+  })
+
+  it("submits the current follow-up with its exact version and question IDs", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const actions = createFollowUpActions()
+    renderReadyView(data, { followUpActions: actions })
+    if (data.session.status !== "answeringFollowUp") return
+
+    await user.type(
+      await screen.findByLabelText(i18n.t("practice.followUp.answerLabel")),
+      "我会把验证标准前置，并在关键节点主动同步风险。",
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.followUp.submit") }))
+
+    expect(actions.onSubmitFollowUp).toHaveBeenCalledWith({
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+      followUpQuestionId: data.session.currentFollowUp.question.id,
+      content: "我会把验证标准前置，并在关键节点主动同步风险。",
+    })
+  })
+
+  it("preserves a follow-up draft after a safe submit error", async () => {
+    const user = userEvent.setup()
+    const actions = createFollowUpActions({
+      onSubmitFollowUp: vi.fn(async () => {
+        throw new Error("unsafe details")
+      }),
+    })
+    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+      followUpActions: actions,
+    })
+    const textbox = await screen.findByLabelText(i18n.t("practice.followUp.answerLabel"))
+    await user.type(textbox, "失败后仍需保留的追问回答")
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.followUp.submit") }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.followUpSubmitDescription"),
+    )
+    expect(textbox).toHaveValue("失败后仍需保留的追问回答")
+    expect(screen.queryByText("unsafe details")).not.toBeInTheDocument()
+  })
+
+  it("shows real processing state while waiting for the next follow-up", async () => {
+    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+      followUpPending: { end: false, interactionLocked: true, submit: true },
+    })
+
+    expect(await screen.findByText(i18n.t("practice.followUp.processing"))).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.followUp.submitting") }),
+    ).toBeDisabled()
+    expect(screen.getByLabelText(i18n.t("practice.followUp.answerLabel"))).toBeDisabled()
+  })
+
+  it("requires an explicit confirmation before ending an unanswered follow-up", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const actions = createFollowUpActions()
+    renderReadyView(data, { followUpActions: actions })
+    if (data.session.status !== "answeringFollowUp") return
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.followUp.endAnswering") }),
+    )
+    expect(actions.onEndFollowUps).not.toHaveBeenCalled()
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: i18n.t("practice.followUp.confirmEnd"),
+      }),
+    )
+
+    expect(actions.onEndFollowUps).toHaveBeenCalledWith({
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+      followUpQuestionId: data.session.currentFollowUp.question.id,
+    })
+  })
+
+  it("keeps the completed timeline visible while scoring is pending", async () => {
+    const data = createPracticeMockResponse("evaluatingNoFollowUp")
+    renderReadyView(data)
+    if (data.session.status !== "evaluating") return
+
+    const timeline = await screen.findByTestId("practice-conversation-timeline")
+    expect(timeline).toHaveTextContent(data.session.question.prompt)
+    expect(timeline).toHaveTextContent(data.session.mainAnswer.content)
+    expect(screen.getByTestId("practice-evaluating-state")).toHaveTextContent(
+      i18n.t("practice.evaluating.title"),
+    )
+    expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
   })
 })

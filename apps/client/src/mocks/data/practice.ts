@@ -398,7 +398,9 @@ export type PracticeMockScenario =
   | "answeringFrameworkRevealed"
   | "answeringSavedQuestion"
   | "answeringWeakQuestion"
+  | "answeringSingleFollowUp"
   | "answeringFollowUp"
+  | "evaluatingNoFollowUp"
   | "evaluatingAnswer"
   | "reviewRetryRecommended"
   | "reviewNextRecommended"
@@ -490,6 +492,21 @@ const practiceMockScenarios = {
       question: weakQuestion,
     },
   },
+  answeringSingleFollowUp: {
+    setupContext,
+    session: {
+      status: "answeringFollowUp",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: [],
+      currentFollowUp: {
+        status: "awaitingAnswer",
+        question: answeredFollowUpQuestion,
+        answer: null,
+      },
+    },
+  },
   answeringFollowUp: {
     setupContext,
     session: {
@@ -505,6 +522,21 @@ const practiceMockScenarios = {
       },
     },
   },
+  evaluatingNoFollowUp: {
+    setupContext,
+    session: {
+      status: "evaluating",
+      ...activeSession,
+      question,
+      mainAnswer,
+      followUpExchanges: [],
+      followUpCompletion: {
+        status: "completed",
+        reason: "noFollowUpRequired",
+      },
+      submittedAt: "2026-07-20T01:35:00.000Z",
+    },
+  },
   evaluatingAnswer: {
     setupContext,
     session: {
@@ -513,6 +545,10 @@ const practiceMockScenarios = {
       question,
       mainAnswer,
       followUpExchanges: [answeredFollowUp],
+      followUpCompletion: {
+        status: "completed",
+        reason: "allAnswered",
+      },
       submittedAt: "2026-07-20T01:37:00.000Z",
     },
   },
@@ -524,6 +560,10 @@ const practiceMockScenarios = {
       question,
       mainAnswer,
       followUpExchanges: [answeredFollowUp],
+      followUpCompletion: {
+        status: "completed",
+        reason: "allAnswered",
+      },
       evaluation,
       review: retryReview,
     },
@@ -536,6 +576,10 @@ const practiceMockScenarios = {
       question,
       mainAnswer,
       followUpExchanges: [answeredFollowUp],
+      followUpCompletion: {
+        status: "completed",
+        reason: "allAnswered",
+      },
       evaluation,
       review: nextReview,
     },

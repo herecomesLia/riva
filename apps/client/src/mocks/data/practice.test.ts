@@ -27,7 +27,9 @@ const scenarios: PracticeMockScenario[] = [
   "answeringFrameworkRevealed",
   "answeringSavedQuestion",
   "answeringWeakQuestion",
+  "answeringSingleFollowUp",
   "answeringFollowUp",
+  "evaluatingNoFollowUp",
   "evaluatingAnswer",
   "reviewRetryRecommended",
   "reviewNextRecommended",
@@ -143,6 +145,12 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       )
       expect("evaluation" in session).toBe(false)
       expect("review" in session).toBe(false)
+      expect("currentFollowUp" in session).toBe(false)
+      if (session.followUpCompletion.status === "completed") {
+        expect(["noFollowUpRequired", "allAnswered"]).toContain(session.followUpCompletion.reason)
+      } else {
+        expect(session.followUpCompletion.unansweredQuestion.prompt.trim()).not.toBe("")
+      }
       return
     case "review": {
       const dimensions = session.evaluation.dimensionScores
@@ -161,6 +169,7 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.review.reusableAnswerStructure).not.toHaveLength(0)
       expect(session.review.exposedWeaknesses).not.toHaveLength(0)
       expect("shouldRetry" in session.review).toBe(false)
+      expect("currentFollowUp" in session).toBe(false)
       return
     }
     case "completed":
@@ -271,7 +280,9 @@ describe("practice mock scenarios", () => {
   it("does not reveal answer guidance in ordinary question snapshots", () => {
     const scenarioNames: PracticeMockScenario[] = [
       "answeringQuestion",
+      "answeringSingleFollowUp",
       "answeringFollowUp",
+      "evaluatingNoFollowUp",
       "evaluatingAnswer",
       "reviewRetryRecommended",
       "reviewNextRecommended",

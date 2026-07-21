@@ -8,6 +8,7 @@ import { getRolesPage } from "@/mocks/services/roles"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   GetQuestionGenerationStatusInput,
+  EndPracticeFollowUpsInput,
   PracticePageResponse,
   PracticeQuestionMutationInput,
   PracticeQuestionType,
@@ -21,7 +22,8 @@ import type {
   PracticeSetupSelection,
   PracticeTargetRoleOption,
   StartPracticeSessionInput,
-  SubmitPracticeAnswerInput,
+  SubmitFollowUpAnswerInput,
+  SubmitPrimaryAnswerInput,
 } from "@/models/practice"
 import type { TargetRole } from "@/models/roles"
 
@@ -44,6 +46,20 @@ let sessionSequence = 0
 let mutationSequence = 0
 const generationPollCounts = new Map<string, number>()
 const questionOrdinals = new Map<string, number>()
+
+const followUpQuestionTemplates = {
+  projectDeepDive: [
+    "你如何验证结果主要来自你的关键决策，而不是同期的其他变化？",
+    "推进过程中最大的分歧是什么，你具体如何促成团队达成一致？",
+  ],
+  behavioral: ["如果重新处理这次冲突，你会调整哪一个具体行动，为什么？"],
+  businessUnderstanding: ["当核心指标与关键利益相关方诉求冲突时，你会如何确定最终取舍？"],
+  motivation: [],
+  technicalFoundation: [
+    "你会优先验证哪个关键假设，并用什么证据判断方案有效？",
+    "这个方案最需要防范的风险是什么，你会如何设计降级或回滚措施？",
+  ],
+} satisfies Record<PracticeQuestionType, readonly string[]>
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -227,6 +243,22 @@ function requireCurrentQuestion(input: PracticeQuestionMutationInput) {
   return session
 }
 
+function requireCurrentFollowUp(
+  input: PracticeQuestionMutationInput & { followUpQuestionId: string },
+) {
+  const session = mockResponse.session
+  if (
+    session.status !== "answeringFollowUp" ||
+    session.sessionId !== input.sessionId ||
+    session.version !== input.version ||
+    session.question.id !== input.questionId ||
+    session.currentFollowUp.question.id !== input.followUpQuestionId
+  ) {
+    throw new Error("Practice follow-up version is out of date.")
+  }
+  return session
+}
+
 function nextMutationTimestamp() {
   mutationSequence += 1
   return new Date(Date.UTC(2026, 6, 20, 3, mutationSequence)).toISOString()
@@ -311,8 +343,8 @@ export async function setQuestionWeak(
   })
 }
 
-export async function submitPracticeAnswer(
-  input: SubmitPracticeAnswerInput,
+export async function submitPrimaryAnswer(
+  input: SubmitPrimaryAnswerInput,
 ): Promise<PracticePageResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
@@ -320,20 +352,135 @@ export async function submitPracticeAnswer(
   if (!content) throw new Error("Practice answer cannot be empty.")
   const submittedAt = nextMutationTimestamp()
 
+  const mainAnswer = {
+    id: `${session.sessionId}_answer_1`,
+    content,
+    createdAt: submittedAt,
+    order: 1,
+  }
+  const followUpPrompts = followUpQuestionTemplates[session.question.questionType]
+  const firstPrompt = followUpPrompts[0]
+
+  if (!firstPrompt) {
+    return setMockResponse({
+      ...mockResponse,
+      session: {
+        ...session,
+        status: "evaluating",
+        version: session.version + 1,
+        mainAnswer,
+        followUpExchanges: [],
+        followUpCompletion: { status: "completed", reason: "noFollowUpRequired" },
+        submittedAt,
+      },
+    })
+  }
+
   return setMockResponse({
     ...mockResponse,
     session: {
       ...session,
-      status: "evaluating",
+      status: "answeringFollowUp",
       version: session.version + 1,
-      mainAnswer: {
-        id: `${session.sessionId}_answer_1`,
-        content,
-        createdAt: submittedAt,
-        order: 1,
-      },
+      mainAnswer,
       followUpExchanges: [],
-      submittedAt,
+      currentFollowUp: {
+        status: "awaitingAnswer",
+        question: {
+          id: `${session.question.id}_follow_up_1`,
+          prompt: firstPrompt,
+          createdAt: submittedAt,
+          order: 1,
+        },
+        answer: null,
+      },
+    },
+  })
+}
+
+export async function submitFollowUpAnswer(
+  input: SubmitFollowUpAnswerInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentFollowUp(input)
+  const content = input.content.trim()
+  if (!content) throw new Error("Practice follow-up answer cannot be empty.")
+  const submittedAt = nextMutationTimestamp()
+  const answeredExchange = {
+    status: "answered" as const,
+    question: copy(session.currentFollowUp.question),
+    answer: {
+      id: `${session.sessionId}_answer_${session.currentFollowUp.question.order + 1}`,
+      content,
+      createdAt: submittedAt,
+      order: session.currentFollowUp.question.order + 1,
+    },
+  }
+  const followUpExchanges = [...session.followUpExchanges, answeredExchange]
+  const prompts = followUpQuestionTemplates[session.question.questionType]
+  const nextOrder = session.currentFollowUp.question.order + 1
+  const nextPrompt = prompts[nextOrder - 1]
+
+  if (!nextPrompt) {
+    return setMockResponse({
+      ...mockResponse,
+      session: {
+        status: "evaluating",
+        sessionId: session.sessionId,
+        version: session.version + 1,
+        selection: copy(session.selection),
+        startedAt: session.startedAt,
+        question: copy(session.question),
+        mainAnswer: copy(session.mainAnswer),
+        followUpExchanges,
+        followUpCompletion: { status: "completed", reason: "allAnswered" },
+        submittedAt,
+      },
+    })
+  }
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      followUpExchanges,
+      currentFollowUp: {
+        status: "awaitingAnswer",
+        question: {
+          id: `${session.question.id}_follow_up_${nextOrder}`,
+          prompt: nextPrompt,
+          createdAt: submittedAt,
+          order: nextOrder,
+        },
+        answer: null,
+      },
+    },
+  })
+}
+
+export async function endPracticeFollowUps(
+  input: EndPracticeFollowUpsInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentFollowUp(input)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      status: "evaluating",
+      sessionId: session.sessionId,
+      version: session.version + 1,
+      selection: copy(session.selection),
+      startedAt: session.startedAt,
+      question: copy(session.question),
+      mainAnswer: copy(session.mainAnswer),
+      followUpExchanges: copy(session.followUpExchanges),
+      followUpCompletion: {
+        status: "endedEarly",
+        unansweredQuestion: copy(session.currentFollowUp.question),
+      },
+      submittedAt: nextMutationTimestamp(),
     },
   })
 }

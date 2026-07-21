@@ -153,7 +153,18 @@ type PracticeQuestionSessionBase = PracticeActiveSessionBase & {
 type PracticeSubmittedAnswerRecord = PracticeQuestionSessionBase & {
   mainAnswer: PracticeAnswer
   followUpExchanges: AnsweredPracticeFollowUpExchange[]
+  followUpCompletion: PracticeFollowUpCompletion
 }
+
+export type PracticeFollowUpCompletion =
+  | {
+      status: "completed"
+      reason: "noFollowUpRequired" | "allAnswered"
+    }
+  | {
+      status: "endedEarly"
+      unansweredQuestion: PracticeFollowUpQuestion
+    }
 
 export type PracticeSetupState = {
   status: "setup"
@@ -219,8 +230,17 @@ export type PracticeQuestionMutationInput = {
   questionId: string
 }
 
-export type SubmitPracticeAnswerInput = PracticeQuestionMutationInput & {
+export type SubmitPrimaryAnswerInput = PracticeQuestionMutationInput & {
   content: string
+}
+
+export type SubmitFollowUpAnswerInput = PracticeQuestionMutationInput & {
+  followUpQuestionId: string
+  content: string
+}
+
+export type EndPracticeFollowUpsInput = PracticeQuestionMutationInput & {
+  followUpQuestionId: string
 }
 
 export type SetPracticeQuestionSavedInput = PracticeQuestionMutationInput & {

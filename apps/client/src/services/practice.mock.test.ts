@@ -4,6 +4,7 @@ import { createPracticeMockResponse } from "@/mocks/data/practice"
 import { reconcilePracticeSetupSelection, resetPracticeMockState } from "@/mocks/services/practice"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import {
+  endPracticeFollowUps,
   getPracticePage,
   getQuestionGenerationStatus,
   requestAnswerFramework,
@@ -13,7 +14,8 @@ import {
   setQuestionWeak,
   skipPracticeQuestion,
   startPracticeSession,
-  submitPracticeAnswer,
+  submitFollowUpAnswer,
+  submitPrimaryAnswer,
 } from "@/services/practice"
 import { createTargetRole, getRolesPage, setCurrentTargetRole } from "@/services/roles"
 import type { PracticeAnsweringState, PracticeQuestionType } from "@/models/practice"
@@ -467,13 +469,13 @@ describe("practice stateful mock service", () => {
     )
   })
 
-  it("submits a trimmed main answer into an evaluating snapshot", async () => {
+  it("submits a trimmed main answer once and enters a stable follow-up", async () => {
     resetPracticeMockState("answeringQuestion")
     const initial = await settle(getPracticePage())
     if (initial.session.status !== "answering") return
 
     const response = await settle(
-      submitPracticeAnswer({
+      submitPrimaryAnswer({
         sessionId: initial.session.sessionId,
         version: initial.session.version,
         questionId: initial.session.question.id,
@@ -481,21 +483,172 @@ describe("practice stateful mock service", () => {
       }),
     )
 
-    expect(response.session.status).toBe("evaluating")
-    if (response.session.status !== "evaluating") return
+    expect(response.session.status).toBe("answeringFollowUp")
+    if (response.session.status !== "answeringFollowUp") return
     expect(response.session.mainAnswer).toMatchObject({
       content: "我通过性能数据定位瓶颈，并推动拆包方案落地。",
       order: 1,
     })
     expect(response.session.followUpExchanges).toEqual([])
+    expect(response.session.currentFollowUp.question).toMatchObject({
+      id: `${initial.session.question.id}_follow_up_1`,
+      order: 1,
+    })
     expect(response.session.version).toBe(initial.session.version + 1)
+
+    const duplicate = submitPrimaryAnswer({
+      sessionId: initial.session.sessionId,
+      version: initial.session.version,
+      questionId: initial.session.question.id,
+      content: "重复提交",
+    })
+    const assertion = expect(duplicate).rejects.toThrow("out of date")
+    await vi.runAllTimersAsync()
+    await assertion
+  })
+
+  it("enters evaluating directly when the stable question plan needs no follow-up", async () => {
+    const initial = await generateQuestion("motivation")
+
+    const response = await settle(
+      submitPrimaryAnswer({
+        sessionId: initial.sessionId,
+        version: initial.version,
+        questionId: initial.question.id,
+        content: "这个岗位连接了我的产品经历和下一阶段发展目标。",
+      }),
+    )
+
+    expect(response.session.status).toBe("evaluating")
+    if (response.session.status !== "evaluating") return
+    expect(response.session.followUpExchanges).toEqual([])
+    expect(response.session.followUpCompletion).toEqual({
+      status: "completed",
+      reason: "noFollowUpRequired",
+    })
+  })
+
+  it("binds one behavioral follow-up answer to the current question and completes", async () => {
+    const initial = await generateQuestion("behavioral")
+    const following = await settle(
+      submitPrimaryAnswer({
+        sessionId: initial.sessionId,
+        version: initial.version,
+        questionId: initial.question.id,
+        content: "我先对齐共同目标，再用事实拆解分歧并推动小范围验证。",
+      }),
+    )
+    if (following.session.status !== "answeringFollowUp") {
+      throw new Error("Behavioral practice must have one follow-up.")
+    }
+    const current = following.session.currentFollowUp.question
+
+    const completed = await settle(
+      submitFollowUpAnswer({
+        sessionId: following.session.sessionId,
+        version: following.session.version,
+        questionId: following.session.question.id,
+        followUpQuestionId: current.id,
+        content: "  我会更早确认对方的约束，并把验证标准写清楚。  ",
+      }),
+    )
+
+    expect(completed.session.status).toBe("evaluating")
+    if (completed.session.status !== "evaluating") return
+    expect(completed.session.followUpExchanges).toHaveLength(1)
+    expect(completed.session.followUpExchanges[0]).toMatchObject({
+      question: { id: current.id, order: 1 },
+      answer: {
+        content: "我会更早确认对方的约束，并把验证标准写清楚。",
+        order: 2,
+      },
+    })
+    expect(completed.session.followUpCompletion).toEqual({
+      status: "completed",
+      reason: "allAnswered",
+    })
+  })
+
+  it("keeps multiple follow-ups ordered and rejects a stale previous-follow-up operation", async () => {
+    const initial = await generateQuestion("projectDeepDive")
+    const first = await settle(
+      submitPrimaryAnswer({
+        sessionId: initial.sessionId,
+        version: initial.version,
+        questionId: initial.question.id,
+        content: "我定位关键瓶颈、推动方案落地并用实验验证结果。",
+      }),
+    )
+    if (first.session.status !== "answeringFollowUp") {
+      throw new Error("Project practice must have follow-ups.")
+    }
+    const firstInput = {
+      sessionId: first.session.sessionId,
+      version: first.session.version,
+      questionId: first.session.question.id,
+      followUpQuestionId: first.session.currentFollowUp.question.id,
+      content: "我使用分层灰度和对照数据验证归因。",
+    }
+    const second = await settle(submitFollowUpAnswer(firstInput))
+    if (second.session.status !== "answeringFollowUp") {
+      throw new Error("Project practice must continue to a second follow-up.")
+    }
+
+    expect(second.session.followUpExchanges.map(({ question }) => question.order)).toEqual([1])
+    expect(second.session.currentFollowUp.question.order).toBe(2)
+    expect(second.session.currentFollowUp.question.id).not.toBe(firstInput.followUpQuestionId)
+    expect(second.session.version).toBe(first.session.version + 1)
+
+    const stale = submitFollowUpAnswer(firstInput)
+    const staleAssertion = expect(stale).rejects.toThrow("out of date")
+    await vi.runAllTimersAsync()
+    await staleAssertion
+
+    const completed = await settle(
+      submitFollowUpAnswer({
+        sessionId: second.session.sessionId,
+        version: second.session.version,
+        questionId: second.session.question.id,
+        followUpQuestionId: second.session.currentFollowUp.question.id,
+        content: "我用数据澄清收益，并先通过小范围实验建立共识。",
+      }),
+    )
+    expect(completed.session.status).toBe("evaluating")
+    if (completed.session.status !== "evaluating") return
+    expect(completed.session.followUpExchanges.map(({ question }) => question.order)).toEqual([
+      1, 2,
+    ])
+    expect(completed.session.version).toBe(second.session.version + 1)
+  })
+
+  it("records an unanswered follow-up when the candidate ends early", async () => {
+    resetPracticeMockState("answeringSingleFollowUp")
+    const initial = await settle(getPracticePage())
+    if (initial.session.status !== "answeringFollowUp") return
+
+    const completed = await settle(
+      endPracticeFollowUps({
+        sessionId: initial.session.sessionId,
+        version: initial.session.version,
+        questionId: initial.session.question.id,
+        followUpQuestionId: initial.session.currentFollowUp.question.id,
+      }),
+    )
+
+    expect(completed.session.status).toBe("evaluating")
+    if (completed.session.status !== "evaluating") return
+    expect(completed.session.followUpCompletion).toEqual({
+      status: "endedEarly",
+      unansweredQuestion: initial.session.currentFollowUp.question,
+    })
+    expect("currentFollowUp" in completed.session).toBe(false)
   })
 
   it("rejects an empty answer without changing the answering snapshot", async () => {
     resetPracticeMockState("answeringQuestion")
     const initial = await settle(getPracticePage())
     if (initial.session.status !== "answering") return
-    const submission = submitPracticeAnswer({
+    const submission = submitPrimaryAnswer({
       sessionId: initial.session.sessionId,
       version: initial.session.version,
       questionId: initial.session.question.id,

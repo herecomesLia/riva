@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, fn } from "storybook/test"
+import { expect, fn, userEvent } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
@@ -41,6 +41,15 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
       skip: false,
       submitAnswer: false,
       weak: false,
+    },
+    followUpActions: {
+      onEndFollowUps: fn(async () => "executed" as const),
+      onSubmitFollowUp: fn(async () => "executed" as const),
+    },
+    followUpPending: {
+      end: false,
+      interactionLocked: false,
+      submit: false,
     },
     content: { data: createPracticeMockResponse(scenario), status: "ready" as const },
     generationError: false,
@@ -93,5 +102,75 @@ export const InteractionLocked = meta.story({
     await expect(canvas.getByRole("button", { name: /收藏题目|save question/i })).toBeDisabled()
     await expect(canvas.getByRole("button", { name: /标记为薄弱题|mark as weak/i })).toBeDisabled()
     await expect(canvas.getByRole("textbox")).toBeEnabled()
+  },
+})
+
+export const SingleFollowUp = meta.story({
+  args: readyArgs("answeringSingleFollowUp"),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-answering-follow-up-state")).toBeVisible()
+    await expect(canvas.getAllByRole("textbox")).toHaveLength(1)
+  },
+})
+
+export const MultipleFollowUps = meta.story({
+  args: readyArgs("answeringFollowUp"),
+  play: async ({ canvas }) => {
+    const timeline = canvas.getByTestId("practice-conversation-timeline")
+    await expect(timeline).toBeVisible()
+    await expect(timeline).toHaveTextContent(/追问 1|Follow-up 1/i)
+    await expect(timeline).toHaveTextContent(/当前追问 2|Current follow-up 2/i)
+  },
+})
+
+export const WaitingForFollowUp = meta.story({
+  args: {
+    ...readyArgs("answeringFollowUp"),
+    followUpPending: { end: false, interactionLocked: true, submit: true },
+  },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByText(/正在分析回答并准备下一步|reviewing your answer and preparing/i),
+    ).toBeVisible()
+  },
+})
+
+const rejectedFollowUp = fn(async () => {
+  throw new Error("unsafe story error")
+})
+
+export const FollowUpSubmitError = meta.story({
+  args: {
+    ...readyArgs("answeringSingleFollowUp"),
+    followUpActions: {
+      ...readyArgs("answeringSingleFollowUp").followUpActions,
+      onSubmitFollowUp: rejectedFollowUp,
+    },
+  },
+  play: async ({ canvas }) => {
+    const textbox = canvas.getByRole("textbox")
+    await userEvent.type(textbox, "失败后保留的追问回答")
+    await userEvent.click(
+      canvas.getByRole("button", { name: /提交追问回答|submit follow-up answer/i }),
+    )
+    await expect(rejectedFollowUp).toHaveBeenCalled()
+    await expect(canvas.getByRole("alert")).toBeVisible()
+    await expect(textbox).toHaveValue("失败后保留的追问回答")
+  },
+})
+
+export const FollowUpCompleted = meta.story({
+  args: readyArgs("evaluatingAnswer"),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
+    await expect(canvas.getByTestId("practice-conversation-timeline")).toBeVisible()
+  },
+})
+
+export const NoFollowUpRequired = meta.story({
+  args: readyArgs("evaluatingNoFollowUp"),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
+    await expect(canvas.queryByText(/追问 1|Follow-up 1/i)).not.toBeInTheDocument()
   },
 })

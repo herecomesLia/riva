@@ -2,6 +2,7 @@ import { env } from "@/app/env"
 import * as practiceMockService from "@/mocks/services/practice"
 import type {
   GetQuestionGenerationStatusInput,
+  EndPracticeFollowUpsInput,
   PracticePageResponse,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
@@ -10,7 +11,8 @@ import type {
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
   StartPracticeSessionInput,
-  SubmitPracticeAnswerInput,
+  SubmitFollowUpAnswerInput,
+  SubmitPrimaryAnswerInput,
 } from "@/models/practice"
 
 function realApiUnavailable(): never {
@@ -57,10 +59,22 @@ export function setQuestionWeak(
   return env.mock ? practiceMockService.setQuestionWeak(input) : realApiUnavailable()
 }
 
-export function submitPracticeAnswer(
-  input: SubmitPracticeAnswerInput,
+export function submitPrimaryAnswer(
+  input: SubmitPrimaryAnswerInput,
 ): Promise<PracticePageResponse> {
-  return env.mock ? practiceMockService.submitPracticeAnswer(input) : realApiUnavailable()
+  return env.mock ? practiceMockService.submitPrimaryAnswer(input) : realApiUnavailable()
+}
+
+export function submitFollowUpAnswer(
+  input: SubmitFollowUpAnswerInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.submitFollowUpAnswer(input) : realApiUnavailable()
+}
+
+export function endPracticeFollowUps(
+  input: EndPracticeFollowUpsInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.endPracticeFollowUps(input) : realApiUnavailable()
 }
 
 export function skipPracticeQuestion(

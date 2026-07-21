@@ -15,7 +15,10 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
   ActivePracticeSelection,
+  EndPracticeFollowUpsInput,
+  PracticeAnsweringFollowUpState,
   PracticeAnsweringState,
+  PracticeEvaluatingState,
   PracticePageResponse,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
@@ -24,7 +27,8 @@ import type {
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
   PracticeSetupSelection,
-  SubmitPracticeAnswerInput,
+  SubmitFollowUpAnswerInput,
+  SubmitPrimaryAnswerInput,
 } from "@/models/practice"
 
 import {
@@ -41,6 +45,8 @@ import { PracticeQuestionActions } from "./components/PracticeQuestionActions"
 import { PracticeQuestionCard } from "./components/PracticeQuestionCard"
 import { PracticeQuestionGuidance } from "./components/PracticeQuestionGuidance"
 import { PracticeSessionHeader } from "./components/PracticeSessionHeader"
+import { PracticeConversationTimeline } from "./components/PracticeConversationTimeline"
+import { PracticeFollowUpComposer } from "./components/PracticeFollowUpComposer"
 import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
@@ -50,7 +56,18 @@ export type PracticeAnsweringActions = {
   onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
   onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<PracticeInteractionResult>
   onSkip: (input: SkipPracticeQuestionInput) => Promise<PracticeInteractionResult>
-  onSubmitAnswer: (input: SubmitPracticeAnswerInput) => Promise<PracticeInteractionResult>
+  onSubmitAnswer: (input: SubmitPrimaryAnswerInput) => Promise<PracticeInteractionResult>
+}
+
+export type PracticeFollowUpActions = {
+  onEndFollowUps: (input: EndPracticeFollowUpsInput) => Promise<PracticeInteractionResult>
+  onSubmitFollowUp: (input: SubmitFollowUpAnswerInput) => Promise<PracticeInteractionResult>
+}
+
+export type PracticeFollowUpPending = {
+  end: boolean
+  interactionLocked: boolean
+  submit: boolean
 }
 
 export type PracticeAnsweringPending = {
@@ -79,6 +96,8 @@ type PracticeViewProps =
       content: { status: "ready"; data: PracticePageResponse }
       answeringActions: PracticeAnsweringActions
       answeringPending: PracticeAnsweringPending
+      followUpActions: PracticeFollowUpActions
+      followUpPending: PracticeFollowUpPending
       generationError: boolean
       isGenerationRetrying: boolean
       isStarting: boolean
@@ -173,15 +192,19 @@ function PracticeViewContent(props: PracticeViewProps) {
     )
   }
 
-  if (session.status === "evaluating") {
+  if (session.status === "answeringFollowUp") {
     return (
-      <Card aria-live="polite" data-testid="practice-evaluating-state">
-        <CardHeader>
-          <CardTitle>{t("practice.evaluating.title")}</CardTitle>
-          <CardDescription>{t("practice.evaluating.description")}</CardDescription>
-        </CardHeader>
-      </Card>
+      <PracticeFollowUpView
+        actions={props.followUpActions}
+        context={setupContext}
+        pending={props.followUpPending}
+        session={session}
+      />
     )
+  }
+
+  if (session.status === "evaluating") {
+    return <PracticeEvaluatingView context={setupContext} session={session} />
   }
 
   if (session.status === "completed") {
@@ -204,6 +227,101 @@ function PracticeViewContent(props: PracticeViewProps) {
         <CardDescription>{t("practice.ready.description")}</CardDescription>
       </CardHeader>
     </Card>
+  )
+}
+
+function PracticeFollowUpView({
+  actions,
+  context,
+  pending,
+  session,
+}: {
+  actions: PracticeFollowUpActions
+  context: PracticePageResponse["setupContext"]
+  pending: PracticeFollowUpPending
+  session: PracticeAnsweringFollowUpState
+}) {
+  const { t } = useTranslation()
+  const [isDraftDirty, setIsDraftDirty] = useState(false)
+  const blocker = useBlocker({
+    disabled: !isDraftDirty,
+    enableBeforeUnload: isDraftDirty,
+    shouldBlockFn: () => isDraftDirty,
+    withResolver: true,
+  })
+  const mutationInput = {
+    sessionId: session.sessionId,
+    version: session.version,
+    questionId: session.question.id,
+    followUpQuestionId: session.currentFollowUp.question.id,
+  }
+
+  return (
+    <div className="flex flex-col gap-5" data-testid="practice-answering-follow-up-state">
+      <PracticeSessionHeader context={context} selection={session.selection} />
+      <PracticeConversationTimeline
+        currentFollowUp={session.currentFollowUp}
+        followUpExchanges={session.followUpExchanges}
+        mainAnswer={session.mainAnswer}
+        question={session.question}
+      />
+      <PracticeFollowUpComposer
+        key={session.currentFollowUp.question.id}
+        interactionLocked={pending.interactionLocked}
+        isEndPending={pending.end}
+        isPending={pending.submit}
+        onDraftChange={setIsDraftDirty}
+        onEnd={() => actions.onEndFollowUps(mutationInput)}
+        onSubmit={(content) => actions.onSubmitFollowUp({ ...mutationInput, content })}
+      />
+
+      <AlertDialog open={blocker.status === "blocked"}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("practice.dialog.leaveFollowUpTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("practice.dialog.leaveFollowUpDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>
+              {t("practice.dialog.stay")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => blocker.proceed?.()} variant="destructive">
+              {t("practice.dialog.leave")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+function PracticeEvaluatingView({
+  context,
+  session,
+}: {
+  context: PracticePageResponse["setupContext"]
+  session: PracticeEvaluatingState
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex flex-col gap-5" data-testid="practice-evaluating-state">
+      <PracticeSessionHeader context={context} selection={session.selection} />
+      <PracticeConversationTimeline
+        followUpCompletion={session.followUpCompletion}
+        followUpExchanges={session.followUpExchanges}
+        mainAnswer={session.mainAnswer}
+        question={session.question}
+      />
+      <Card aria-live="polite">
+        <CardHeader>
+          <CardTitle>{t("practice.evaluating.title")}</CardTitle>
+          <CardDescription>{t("practice.evaluating.description")}</CardDescription>
+        </CardHeader>
+      </Card>
+    </div>
   )
 }
 

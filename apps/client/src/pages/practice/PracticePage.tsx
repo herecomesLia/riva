@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react"
 
 import type {
   GetQuestionGenerationStatusInput,
+  EndPracticeFollowUpsInput,
   PracticePageResponse,
   PracticeQuestionMutationInput,
   RequestAnswerFrameworkInput,
@@ -12,9 +13,11 @@ import type {
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
   StartPracticeSessionInput,
-  SubmitPracticeAnswerInput,
+  SubmitFollowUpAnswerInput,
+  SubmitPrimaryAnswerInput,
 } from "@/models/practice"
 import {
+  endPracticeFollowUps,
   getPracticePage,
   getQuestionGenerationStatus,
   requestAnswerFramework,
@@ -24,7 +27,8 @@ import {
   setQuestionWeak,
   skipPracticeQuestion,
   startPracticeSession,
-  submitPracticeAnswer,
+  submitFollowUpAnswer,
+  submitPrimaryAnswer,
 } from "@/services/practice"
 
 import {
@@ -52,7 +56,9 @@ export function PracticePage() {
   const frameworkMutation = usePracticeMutation(requestAnswerFramework)
   const savedMutation = usePracticeMutation(setQuestionSaved)
   const weakMutation = usePracticeMutation(setQuestionWeak)
-  const submitAnswerMutation = usePracticeMutation(submitPracticeAnswer)
+  const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
+  const submitFollowUpMutation = usePracticeMutation(submitFollowUpAnswer)
+  const endFollowUpMutation = usePracticeMutation(endPracticeFollowUps)
   const skipMutation = usePracticeMutation(skipPracticeQuestion)
   const endMutation = usePracticeMutation(requestEndPracticeSession)
   const isQuestionMutationPending =
@@ -61,6 +67,8 @@ export function PracticePage() {
     savedMutation.isPending ||
     weakMutation.isPending ||
     submitAnswerMutation.isPending ||
+    submitFollowUpMutation.isPending ||
+    endFollowUpMutation.isPending ||
     skipMutation.isPending ||
     endMutation.isPending
   const generationSession =
@@ -148,7 +156,7 @@ export function PracticePage() {
           onSkip: async (input: SkipPracticeQuestionInput) => {
             return runQuestionMutation(() => skipMutation.mutateAsync(input))
           },
-          onSubmitAnswer: async (input: SubmitPracticeAnswerInput) => {
+          onSubmitAnswer: async (input: SubmitPrimaryAnswerInput) => {
             return runQuestionMutation(() => submitAnswerMutation.mutateAsync(input))
           },
         }}
@@ -161,6 +169,19 @@ export function PracticePage() {
           skip: skipMutation.isPending,
           submitAnswer: submitAnswerMutation.isPending,
           weak: weakMutation.isPending,
+        }}
+        followUpActions={{
+          onEndFollowUps: async (input: EndPracticeFollowUpsInput) => {
+            return runQuestionMutation(() => endFollowUpMutation.mutateAsync(input))
+          },
+          onSubmitFollowUp: async (input: SubmitFollowUpAnswerInput) => {
+            return runQuestionMutation(() => submitFollowUpMutation.mutateAsync(input))
+          },
+        }}
+        followUpPending={{
+          end: endFollowUpMutation.isPending,
+          interactionLocked: isQuestionMutationPending,
+          submit: submitFollowUpMutation.isPending,
         }}
         content={{ status: "ready", data: practiceQuery.data }}
         generationError={
