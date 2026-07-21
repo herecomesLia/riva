@@ -52,9 +52,6 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
       submit: false,
     },
     reviewActions: {
-      onEndSession: fn(),
-      onNextQuestion: fn(),
-      onRetryCurrent: fn(),
       onSetSaved: fn(async () => "executed" as const),
       onSetWeak: fn(async () => "executed" as const),
     },
@@ -182,6 +179,10 @@ export const Evaluating = meta.story({
   args: readyArgs("evaluatingAnswer"),
 })
 
+export const EvaluationPending = meta.story({
+  args: readyArgs("evaluatingAnswer"),
+})
+
 export const EvaluationError = meta.story({
   args: { ...readyArgs("evaluatingAnswer"), evaluationError: true },
   play: async ({ canvas }) => {
@@ -216,6 +217,14 @@ export const LongReviewContent = meta.story({
 
 export const NoNewWeaknesses = meta.story({
   args: readyArgs("reviewNoNewWeaknesses"),
+})
+
+export const MotivationReview = meta.story({
+  args: readyArgs("reviewMotivation"),
+})
+
+export const FollowUpEndedEarlyReview = meta.story({
+  args: readyArgs("reviewFollowUpEndedEarly"),
 })
 
 export const FollowUpEndedEarly = meta.story({

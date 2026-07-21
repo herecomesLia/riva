@@ -20,7 +20,11 @@ import {
   submitPrimaryAnswer,
 } from "@/services/practice"
 import { createTargetRole, getRolesPage, setCurrentTargetRole } from "@/services/roles"
-import type { PracticeAnsweringState, PracticeQuestionType } from "@/models/practice"
+import type {
+  PracticeAnsweringState,
+  PracticeQuestionType,
+  PracticeReviewState,
+} from "@/models/practice"
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -59,6 +63,64 @@ async function generateQuestion(
     throw new Error("Question generation must produce an answering session.")
   }
   return response.session
+}
+
+async function completeQuestionToReview(
+  questionType: PracticeQuestionType,
+  options: { endFollowUpsEarly?: boolean } = {},
+): Promise<PracticeReviewState> {
+  const initial = await generateQuestion(questionType)
+  let response = await settle(
+    submitPrimaryAnswer({
+      sessionId: initial.sessionId,
+      version: initial.version,
+      questionId: initial.question.id,
+      content: "我会说明具体背景、个人判断、协作动作和可验证的结果。",
+    }),
+  )
+
+  while (response.session.status === "answeringFollowUp") {
+    const session = response.session
+    if (options.endFollowUpsEarly) {
+      response = await settle(
+        endPracticeFollowUps({
+          sessionId: session.sessionId,
+          version: session.version,
+          questionId: session.question.id,
+          followUpQuestionId: session.currentFollowUp.question.id,
+        }),
+      )
+      break
+    }
+    response = await settle(
+      submitFollowUpAnswer({
+        sessionId: session.sessionId,
+        version: session.version,
+        questionId: session.question.id,
+        followUpQuestionId: session.currentFollowUp.question.id,
+        content: "我补充说明具体证据、方案取舍、验证方式和风险控制。",
+      }),
+    )
+  }
+
+  if (response.session.status !== "evaluating") {
+    throw new Error("A completed answer must enter evaluation.")
+  }
+  const submittedAt = response.session.submittedAt
+  const input = {
+    sessionId: response.session.sessionId,
+    version: response.session.version,
+    questionId: response.session.question.id,
+  }
+  await settle(getPracticeEvaluationStatus(input))
+  const completed = await settle(getPracticeEvaluationStatus(input))
+  if (completed.session.status !== "review") {
+    throw new Error("Evaluation must produce a review.")
+  }
+  if (Date.parse(completed.session.evaluation.evaluatedAt) < Date.parse(submittedAt)) {
+    throw new Error("Evaluation must not be timestamped before answer submission.")
+  }
+  return completed.session
 }
 
 describe("practice stateful mock service", () => {
@@ -670,10 +732,69 @@ describe("practice stateful mock service", () => {
     expect(completed.session.version).toBe(initial.session.version + 1)
     expect(completed.session.mainAnswer).toEqual(initial.session.mainAnswer)
     expect(completed.session.followUpExchanges).toEqual(initial.session.followUpExchanges)
+    expect(Date.parse(completed.session.evaluation.evaluatedAt)).toBeGreaterThanOrEqual(
+      Date.parse(initial.session.submittedAt),
+    )
     expect(completed.session.evaluation.dimensionScores).toHaveLength(8)
     expect(
       completed.session.evaluation.dimensionScores.every((item) => item.explanation.trim()),
     ).toBe(true)
+  })
+
+  it.each([
+    ["projectDeepDive", /性能优化|P75|灰度/, /性能治理/],
+    ["behavioral", /情境|协作|行动|复盘/, /协作/],
+    ["businessUnderstanding", /业务目标|指标|利益相关方|业务影响/, /业务/],
+    ["motivation", /岗位|经历|价值|职业/, /性能优化|P75|首屏包体|拆包|性能治理/],
+    ["technicalFoundation", /原理|方案|权衡|验证|风险/, /技术/],
+  ] satisfies Array<[PracticeQuestionType, RegExp, RegExp]>)(
+    "generates a semantic %s evaluation from the real answer flow",
+    async (questionType, include, exclude) => {
+      const review = await completeQuestionToReview(questionType)
+      const content = JSON.stringify({ evaluation: review.evaluation, review: review.review })
+
+      expect(content).toMatch(include)
+      if (questionType === "motivation") expect(content).not.toMatch(exclude)
+      else expect(content).toMatch(exclude)
+      expect(review.evaluation.dimensionScores).toHaveLength(8)
+      expect(
+        new Set(review.evaluation.dimensionScores.map(({ dimension }) => dimension)).size,
+      ).toBe(8)
+      expect(
+        review.evaluation.dimensionScores.every(
+          ({ score }) => Number.isInteger(score) && score >= 0 && score <= 100,
+        ),
+      ).toBe(true)
+      if (review.review.recommendation.action === "nextQuestion") {
+        expect(review.review.recommendation.nextQuestion.questionType).toBe(questionType)
+        expect(review.review.recommendation.nextQuestion.difficulty).toBe(
+          review.selection.difficulty,
+        )
+        const current = await settle(getPracticePage())
+        const role = current.setupContext.targetRoles.find(
+          (candidate) => candidate.id === review.selection.targetRoleId,
+        )
+        expect(role?.supportedQuestionTypes).toContain(
+          review.review.recommendation.nextQuestion.questionType,
+        )
+      }
+    },
+  )
+
+  it("uses the follow-up completion state to lower an early-ended review and recommend retry", async () => {
+    const complete = await completeQuestionToReview("projectDeepDive")
+    resetPracticeMockState()
+    const endedEarly = await completeQuestionToReview("projectDeepDive", {
+      endFollowUpsEarly: true,
+    })
+
+    expect(complete.followUpCompletion).toEqual({ status: "completed", reason: "allAnswered" })
+    expect(endedEarly.followUpCompletion.status).toBe("endedEarly")
+    expect(endedEarly.evaluation.overallScore).toBeLessThan(complete.evaluation.overallScore)
+    expect(endedEarly.review.recommendation.action).toBe("retryCurrent")
+    expect(endedEarly.review.overallPerformance).toContain("追问提前结束")
+    expect(endedEarly.review.mainIssues.join(" ")).toContain("未回答追问")
+    expect(endedEarly.review.highlights).not.toContain("追问回答补充了关键证据、取舍或风险信息")
   })
 
   it("retries evaluation as a new version and rejects the stale attempt", async () => {

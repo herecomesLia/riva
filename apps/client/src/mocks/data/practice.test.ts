@@ -45,6 +45,8 @@ const scenarios: PracticeMockScenario[] = [
   "reviewLowScore",
   "reviewLongContent",
   "reviewNoNewWeaknesses",
+  "reviewMotivation",
+  "reviewFollowUpEndedEarly",
   "completedSession",
 ]
 
@@ -488,8 +490,12 @@ describe("practice mock scenarios", () => {
   })
 
   it("returns independent mock evaluation results", () => {
-    const first = createPracticeMockEvaluationResult()
-    const second = createPracticeMockEvaluationResult()
+    const response = createPracticeMockResponse("evaluatingAnswer")
+    if (response.session.status !== "evaluating") {
+      throw new Error("An evaluating fixture is required.")
+    }
+    const first = createPracticeMockEvaluationResult(response.session)
+    const second = createPracticeMockEvaluationResult(response.session)
 
     const firstDimension = first.evaluation.dimensionScores[0]
     if (!firstDimension) throw new Error("A mock evaluation must include score dimensions.")

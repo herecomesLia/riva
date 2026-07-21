@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
@@ -14,9 +14,6 @@ export function PracticeReviewActions({
   isSaved,
   isSavedPending,
   isWeakPending,
-  onEndSession,
-  onNextQuestion,
-  onRetryCurrent,
   onSetSaved,
   onSetWeak,
 }: {
@@ -25,9 +22,6 @@ export function PracticeReviewActions({
   isSaved: boolean
   isSavedPending: boolean
   isWeakPending: boolean
-  onEndSession: () => void
-  onNextQuestion: () => void
-  onRetryCurrent: () => void
   onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
   onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
 }) {
@@ -56,7 +50,6 @@ export function PracticeReviewActions({
     <Card>
       <CardHeader>
         <CardTitle>{t("practice.review.actionsTitle")}</CardTitle>
-        <CardDescription>{t("practice.review.actionsDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {error && (
@@ -72,13 +65,6 @@ export function PracticeReviewActions({
           </Alert>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={onRetryCurrent} variant="outline">
-            {t("practice.review.retryCurrent")}
-          </Button>
-          <Button onClick={onNextQuestion}>{t("practice.review.nextQuestion")}</Button>
-          <Button onClick={onEndSession} variant="outline">
-            {t("practice.review.endSession")}
-          </Button>
           <Button
             aria-pressed={isSaved}
             disabled={interactionLocked}

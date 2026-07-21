@@ -516,7 +516,7 @@ export async function getPracticeEvaluationStatus(
   evaluationPollCounts.set(attemptKey, pollCount)
   if (pollCount < 2) return copy(mockResponse)
 
-  const result = createPracticeMockEvaluationResult()
+  const result = createPracticeMockEvaluationResult(session)
   return setMockResponse({
     ...mockResponse,
     session: {

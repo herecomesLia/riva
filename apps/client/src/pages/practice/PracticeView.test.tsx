@@ -64,9 +64,6 @@ function createReviewActions(
   overrides: Partial<PracticeReviewActions> = {},
 ): PracticeReviewActions {
   return {
-    onEndSession: vi.fn(),
-    onNextQuestion: vi.fn(),
-    onRetryCurrent: vi.fn(),
     onSetSaved: vi.fn(async () => "executed" as const),
     onSetWeak: vi.fn(async () => "executed" as const),
     ...overrides,
@@ -797,19 +794,47 @@ describe("PracticeView", () => {
     )
   })
 
-  it("exposes review action callbacks without implementing their state transitions", async () => {
-    const user = userEvent.setup()
-    const actions = createReviewActions()
-    renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewActions: actions })
+  it("keeps recommendations read-only and only exposes real saved and weak actions", async () => {
+    const data = createPracticeMockResponse("reviewBalanced")
+    renderReadyView(data)
 
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("practice.review.retryCurrent") }),
-    )
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.review.nextQuestion") }))
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.review.endSession") }))
-    expect(actions.onRetryCurrent).toHaveBeenCalledOnce()
-    expect(actions.onNextQuestion).toHaveBeenCalledOnce()
-    expect(actions.onEndSession).toHaveBeenCalledOnce()
+    await screen.findByTestId("practice-review-state")
+    expect(
+      screen.queryByRole("button", { name: /重练当前题|retry current question/i }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: /继续下一题|continue to next question/i }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: /结束本轮练习|end practice session/i }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }),
+    ).toBeEnabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.markWeak") }),
+    ).toBeEnabled()
+  })
+
+  it("keeps the complete read-only conversation in the review context", async () => {
+    const data = createPracticeMockResponse("reviewFollowUpEndedEarly")
+    renderReadyView(data)
+    if (
+      data.session.status !== "review" ||
+      data.session.followUpCompletion.status !== "endedEarly"
+    ) {
+      return
+    }
+
+    const timeline = await screen.findByTestId("practice-conversation-timeline")
+    expect(timeline).toHaveTextContent(data.session.question.prompt)
+    expect(timeline).toHaveTextContent(data.session.mainAnswer.content)
+    for (const exchange of data.session.followUpExchanges) {
+      expect(timeline).toHaveTextContent(exchange.question.prompt)
+      expect(timeline).toHaveTextContent(exchange.answer.content)
+    }
+    expect(timeline).toHaveTextContent(data.session.followUpCompletion.unansweredQuestion.prompt)
+    expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
   })
 
   it("renders long review content and the no-new-weaknesses state", async () => {

@@ -92,9 +92,6 @@ export type PracticeAnsweringPending = {
 }
 
 export type PracticeReviewActions = {
-  onEndSession: () => void
-  onNextQuestion: () => void
-  onRetryCurrent: () => void
   onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
   onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<PracticeInteractionResult>
 }
@@ -398,6 +395,12 @@ function PracticeReviewView({
         evaluation={session.evaluation}
         overallPerformance={session.review.overallPerformance}
       />
+      <PracticeConversationTimeline
+        followUpCompletion={session.followUpCompletion}
+        followUpExchanges={session.followUpExchanges}
+        mainAnswer={session.mainAnswer}
+        question={session.question}
+      />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
       <PracticeReviewSummary review={session.review} />
       <PracticeReusableStructure items={session.review.reusableAnswerStructure} />
@@ -409,9 +412,6 @@ function PracticeReviewView({
         isSaved={session.question.isSaved}
         isSavedPending={pending.saved}
         isWeakPending={pending.weak}
-        onEndSession={actions.onEndSession}
-        onNextQuestion={actions.onNextQuestion}
-        onRetryCurrent={actions.onRetryCurrent}
         onSetSaved={(isSaved) => actions.onSetSaved({ ...mutationInput, isSaved })}
         onSetWeak={(isMarkedWeak) => actions.onSetWeak({ ...mutationInput, isMarkedWeak })}
       />

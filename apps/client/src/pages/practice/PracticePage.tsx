@@ -48,6 +48,7 @@ const PRACTICE_QUERY_KEY = ["practice"] as const
 export function PracticePage() {
   const queryClient = useQueryClient()
   const questionMutationLock = useRef(false)
+  const evaluationRetryLock = useRef(false)
   const practiceQuery = useQuery({
     queryFn: getPracticePage,
     queryKey: PRACTICE_QUERY_KEY,
@@ -183,13 +184,25 @@ export function PracticePage() {
 
   function retryEvaluation() {
     const session = practiceQuery.data?.session
-    if (session?.status !== "evaluating" || retryEvaluationMutation.isPending) return
+    if (
+      session?.status !== "evaluating" ||
+      retryEvaluationMutation.isPending ||
+      evaluationRetryLock.current
+    ) {
+      return
+    }
     const input: RetryPracticeEvaluationInput = {
       sessionId: session.sessionId,
       version: session.version,
       questionId: session.question.id,
     }
-    void retryEvaluationMutation.mutateAsync(input).catch(() => undefined)
+    evaluationRetryLock.current = true
+    void retryEvaluationMutation
+      .mutateAsync(input)
+      .catch(() => undefined)
+      .finally(() => {
+        evaluationRetryLock.current = false
+      })
   }
 
   async function runQuestionMutation(
@@ -255,9 +268,6 @@ export function PracticePage() {
           submit: submitFollowUpMutation.isPending,
         }}
         reviewActions={{
-          onEndSession: () => undefined,
-          onNextQuestion: () => undefined,
-          onRetryCurrent: () => undefined,
           onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
             return runQuestionMutation(() => savedMutation.mutateAsync(input))
           },
