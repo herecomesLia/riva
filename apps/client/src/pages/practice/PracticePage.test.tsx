@@ -417,6 +417,7 @@ describe("PracticePage", () => {
     generating.session.version = review.session.version + 1
     const deferred = createDeferred<PracticePageResponse>()
     vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(getQuestionGenerationStatus).mockResolvedValue(generating)
     vi.mocked(continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     renderPracticePage()
     const nextButton = await screen.findByRole("button", { name: /继续下一题/i })
@@ -467,6 +468,7 @@ describe("PracticePage", () => {
     generating.session.sessionId = review.session.sessionId
     generating.session.version = review.session.version + 1
     vi.mocked(getPracticePage).mockResolvedValue(review)
+    vi.mocked(getQuestionGenerationStatus).mockResolvedValue(generating)
     vi.mocked(continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     renderPracticePage()
     const nextButton = await screen.findByRole("button", { name: /继续下一题/i })
@@ -888,6 +890,7 @@ describe("PracticePage", () => {
     newer.session.version = following.session.version + 2
     const submission = createDeferred<PracticePageResponse>()
     vi.mocked(getPracticePage).mockResolvedValue(following)
+    vi.mocked(getPracticeEvaluationStatus).mockResolvedValue(newer)
     vi.mocked(submitFollowUpAnswer).mockReturnValue(submission.promise)
     const renderResult = renderPracticePage()
 

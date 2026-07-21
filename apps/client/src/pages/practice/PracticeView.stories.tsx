@@ -1,5 +1,6 @@
 import preview from "#storybook/preview"
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test"
+import { useRouter } from "@tanstack/react-router"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
@@ -10,7 +11,7 @@ const meta = preview.meta({
   component: PracticeView,
   decorators: [withRouter],
   parameters: { router: { initialEntries: ["/practice"] } },
-  title: "Pages/Practice",
+  title: "Pages/Practice/PracticeView",
 })
 
 export const Loading = meta.story({
@@ -151,6 +152,31 @@ export const InteractionLocked = meta.story({
   },
 })
 
+function DraftLeaveProtectionStory() {
+  const router = useRouter()
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PracticeView {...readyArgs("answeringQuestion")} />
+      <button onClick={() => void router.navigate({ to: "/profile" })} type="button">
+        Leave practice
+      </button>
+    </div>
+  )
+}
+
+export const DraftLeaveProtection = meta.story({
+  render: () => <DraftLeaveProtectionStory />,
+  play: async ({ canvas }) => {
+    await userEvent.type(canvas.getByRole("textbox"), "未提交的专项练习草稿")
+    await userEvent.click(canvas.getByRole("button", { name: "Leave practice" }))
+    const dialog = await screen.findByRole("alertdialog")
+    await expect(
+      within(dialog).getByRole("heading", { name: /离开并放弃回答|leave and discard/i }),
+    ).toBeVisible()
+  },
+})
+
 export const SingleFollowUp = meta.story({
   args: readyArgs("answeringSingleFollowUp"),
   play: async ({ canvas }) => {
@@ -214,10 +240,6 @@ export const FollowUpCompleted = meta.story({
 })
 
 export const Evaluating = meta.story({
-  args: readyArgs("evaluatingAnswer"),
-})
-
-export const EvaluationPending = meta.story({
   args: readyArgs("evaluatingAnswer"),
 })
 

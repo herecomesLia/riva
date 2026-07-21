@@ -27,7 +27,17 @@ const defaultArgs = {
 
 const meta = preview.meta({
   component: PracticeQuestionGuidance,
-  title: "Practice/Components/QuestionGuidance",
+  title: "Practice/PracticeQuestionGuidance",
+})
+
+const requestHint = fn(async () => "executed" as const)
+
+export const RequestHint = meta.story({
+  args: { ...defaultArgs, onRequestHint: requestHint },
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /请求提示|request hint/i }))
+    await expect(requestHint).toHaveBeenCalledTimes(1)
+  },
 })
 
 export const HintRevealed = meta.story({

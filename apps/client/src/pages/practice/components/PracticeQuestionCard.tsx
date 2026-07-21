@@ -13,7 +13,7 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
   const { t } = useTranslation()
 
   return (
-    <Card data-testid="practice-question-card">
+    <Card className="min-w-0" data-testid="practice-question-card">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{t(`practice.questionTypes.${question.questionType}`)}</Badge>
@@ -32,7 +32,7 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
           ) : null}
         </div>
         <CardTitle>
-          <h3 className="text-xl leading-8">{question.prompt}</h3>
+          <h3 className="wrap-break-word text-xl leading-8">{question.prompt}</h3>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -58,7 +58,9 @@ function QuestionMetadata({ items, title }: { items: string[]; title: string }) 
       <ul className="flex flex-wrap gap-2">
         {items.map((item) => (
           <li key={item}>
-            <Badge variant="outline">{item}</Badge>
+            <Badge className="max-w-full whitespace-normal wrap-break-word" variant="outline">
+              {item}
+            </Badge>
           </li>
         ))}
       </ul>

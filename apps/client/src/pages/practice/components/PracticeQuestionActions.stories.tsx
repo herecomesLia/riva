@@ -8,7 +8,7 @@ const end = fn(async () => "executed" as const)
 
 const meta = preview.meta({
   component: PracticeQuestionActions,
-  title: "Practice/Components/QuestionActions",
+  title: "Practice/PracticeQuestionActions",
 })
 
 const defaultArgs = {

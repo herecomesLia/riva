@@ -12,7 +12,7 @@ function getQuestion(scenario: Parameters<typeof createPracticeMockResponse>[0])
 
 const meta = preview.meta({
   component: PracticeQuestionCard,
-  title: "Practice/Components/QuestionCard",
+  title: "Practice/PracticeQuestionCard",
 })
 
 export const DefaultQuestion = meta.story({

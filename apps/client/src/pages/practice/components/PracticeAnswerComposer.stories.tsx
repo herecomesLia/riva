@@ -6,7 +6,7 @@ import { PracticeAnswerComposer } from "./PracticeAnswerComposer"
 
 const meta = preview.meta({
   component: PracticeAnswerComposer,
-  title: "Practice/Components/AnswerComposer",
+  title: "Practice/PracticeAnswerComposer",
 })
 
 const defaultArgs = {

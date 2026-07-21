@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react"
+import { act, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -290,6 +290,61 @@ describe("PracticeView", () => {
       screen.getByRole("heading", { name: i18n.t("practice.setup.title") }),
     ).toBeInTheDocument()
     expect(screen.getByTestId("practice-loading-state")).toHaveAttribute("aria-busy", "true")
+  })
+
+  it("moves focus to the current practice region after a session phase changes", async () => {
+    const answering = createPracticeMockResponse("answeringQuestion")
+    const review = createPracticeMockResponse("reviewBalanced")
+    const actions = createAnsweringActions()
+    const followUpActions = createFollowUpActions()
+    const reviewActions = createReviewActions()
+    const { rerender } = renderWithProviders(
+      <PracticeView
+        answeringActions={actions}
+        answeringPending={answeringPending}
+        content={{ status: "ready", data: answering }}
+        evaluationError={false}
+        followUpActions={followUpActions}
+        followUpPending={followUpPending}
+        generationError={false}
+        isEvaluationRetrying={false}
+        isGenerationRetrying={false}
+        isStarting={false}
+        onRetryEvaluation={vi.fn()}
+        onRetryGeneration={vi.fn()}
+        onStart={vi.fn(async () => undefined)}
+        reviewActions={reviewActions}
+        reviewPending={reviewPending}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/practice"] } },
+    )
+
+    expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
+
+    rerender(
+      <PracticeView
+        answeringActions={actions}
+        answeringPending={answeringPending}
+        content={{ status: "ready", data: review }}
+        evaluationError={false}
+        followUpActions={followUpActions}
+        followUpPending={followUpPending}
+        generationError={false}
+        isEvaluationRetrying={false}
+        isGenerationRetrying={false}
+        isStarting={false}
+        onRetryEvaluation={vi.fn()}
+        onRetryGeneration={vi.fn()}
+        onStart={vi.fn(async () => undefined)}
+        reviewActions={reviewActions}
+        reviewPending={reviewPending}
+        variant="default"
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByTestId("practice-state-region")).toHaveFocus())
+    expect(screen.getByTestId("practice-review-state")).toBeInTheDocument()
   })
 
   it("selects the current target role and recommended defaults", async () => {

@@ -144,7 +144,12 @@ function GuidanceCard({
           <p className="text-sm text-muted-foreground">{unavailableLabel}</p>
         ) : null}
         {status === "notRequested" ? (
-          <Button disabled={interactionLocked} onClick={onRequest} type="button" variant="outline">
+          <Button
+            disabled={interactionLocked || isPending}
+            onClick={onRequest}
+            type="button"
+            variant="outline"
+          >
             {isPending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : null}
             {requestLabel}
           </Button>

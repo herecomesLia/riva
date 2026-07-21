@@ -87,7 +87,9 @@ export function PracticeAnswerComposer({
                     {t("practice.answer.characterCount", { count: field.state.value.length })}
                   </FieldDescription>
                   <Button
-                    disabled={interactionLocked || field.state.value.trim().length === 0}
+                    disabled={
+                      interactionLocked || isPending || field.state.value.trim().length === 0
+                    }
                     type="submit"
                   >
                     {isPending ? (

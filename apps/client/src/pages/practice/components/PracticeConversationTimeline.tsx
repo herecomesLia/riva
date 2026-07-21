@@ -29,7 +29,7 @@ export function PracticeConversationTimeline({
   const { t } = useTranslation()
 
   return (
-    <Card data-testid="practice-conversation-timeline">
+    <Card className="min-w-0" data-testid="practice-conversation-timeline">
       <CardHeader>
         <CardTitle>{t("practice.followUp.timelineTitle")}</CardTitle>
         <CardDescription>{t("practice.followUp.timelineDescription")}</CardDescription>

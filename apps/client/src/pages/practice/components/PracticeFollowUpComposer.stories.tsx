@@ -15,7 +15,7 @@ const defaultArgs = {
 
 const meta = preview.meta({
   component: PracticeFollowUpComposer,
-  title: "Practice/Components/FollowUpComposer",
+  title: "Practice/PracticeFollowUpComposer",
 })
 
 export const Default = meta.story({ args: defaultArgs })

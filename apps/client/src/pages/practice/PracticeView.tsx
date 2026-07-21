@@ -1,5 +1,5 @@
 import { useBlocker } from "@tanstack/react-router"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -142,12 +142,36 @@ type PracticeViewProps =
     }
 
 export function PracticeView(props: PracticeViewProps) {
+  const stateRegionRef = useRef<HTMLDivElement>(null)
+  const stateKey = getPracticeStateKey(props)
+  const previousStateKey = useRef(stateKey)
+
+  useEffect(() => {
+    if (previousStateKey.current === stateKey) return
+
+    previousStateKey.current = stateKey
+    stateRegionRef.current?.focus()
+  }, [stateKey])
+
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
       <PracticeHeader />
-      <PracticeViewContent {...props} />
+      <div
+        className="min-w-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        data-testid="practice-state-region"
+        ref={stateRegionRef}
+        tabIndex={-1}
+      >
+        <PracticeViewContent {...props} />
+      </div>
     </div>
   )
+}
+
+function getPracticeStateKey(props: PracticeViewProps) {
+  if (props.variant === "error") return "load-error"
+  if (props.content.status === "loading") return "loading"
+  return `session:${props.content.data.session.status}`
 }
 
 function PracticeHeader() {

@@ -21,7 +21,7 @@ if (endedEarly.session.status !== "evaluating") {
 
 const meta = preview.meta({
   component: PracticeConversationTimeline,
-  title: "Practice/Components/ConversationTimeline",
+  title: "Practice/PracticeConversationTimeline",
 })
 
 export const MultipleFollowUps = meta.story({

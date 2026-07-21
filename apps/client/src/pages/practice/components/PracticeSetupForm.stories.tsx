@@ -12,7 +12,7 @@ if (response.session.selection.targetRoleId === null) {
 
 const meta = preview.meta({
   component: PracticeSetupForm,
-  title: "Practice/Components/SetupForm",
+  title: "Practice/PracticeSetupForm",
 })
 
 const defaultArgs = {
@@ -33,5 +33,15 @@ export const Pending = meta.story({
   args: { ...defaultArgs, isPending: true },
   play: async ({ canvas }) => {
     await expect(canvas.getByRole("button", { name: /正在开始|starting/i })).toBeDisabled()
+  },
+})
+
+const startPractice = fn(async () => undefined)
+
+export const StartPractice = meta.story({
+  args: { ...defaultArgs, onStart: startPractice },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /开始练习|start practice/i }))
+    await expect(startPractice).toHaveBeenCalledTimes(1)
   },
 })

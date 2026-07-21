@@ -127,7 +127,11 @@ export function PracticeFollowUpComposer({
                     <AlertDialog onOpenChange={setEndDialogOpen} open={endDialogOpen}>
                       <AlertDialogTrigger
                         render={
-                          <Button disabled={interactionLocked} type="button" variant="outline" />
+                          <Button
+                            disabled={interactionLocked || isPending || isEndPending}
+                            type="button"
+                            variant="outline"
+                          />
                         }
                       >
                         {t("practice.followUp.endAnswering")}
@@ -150,11 +154,13 @@ export function PracticeFollowUpComposer({
                           </Alert>
                         ) : null}
                         <AlertDialogFooter>
-                          <AlertDialogCancel disabled={interactionLocked}>
+                          <AlertDialogCancel
+                            disabled={interactionLocked || isPending || isEndPending}
+                          >
                             {t("practice.dialog.cancel")}
                           </AlertDialogCancel>
                           <AlertDialogAction
-                            disabled={interactionLocked}
+                            disabled={interactionLocked || isPending || isEndPending}
                             onClick={(event) => {
                               event.preventDefault()
                               void endFollowUps()
@@ -172,7 +178,12 @@ export function PracticeFollowUpComposer({
                       </AlertDialogContent>
                     </AlertDialog>
                     <Button
-                      disabled={interactionLocked || field.state.value.trim().length === 0}
+                      disabled={
+                        interactionLocked ||
+                        isPending ||
+                        isEndPending ||
+                        field.state.value.trim().length === 0
+                      }
                       type="submit"
                     >
                       {isPending ? (
