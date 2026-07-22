@@ -155,6 +155,36 @@ export const practice = {
     requestFramework: "Request answer framework",
     frameworkUnavailable: "No answer framework is available for this question.",
   },
+  referenceAnswer: {
+    title: "RIVA example answer",
+    description: "After thinking independently, compare your response with a useful example.",
+    kind: {
+      personalizedExample: "Personalized example answer",
+      technicalReference: "Technical reference answer",
+    },
+    request: "View RIVA example answer",
+    generating: "Generating example answer",
+    confirmTitle: "View the RIVA example answer?",
+    confirmDescription:
+      "This attempt will be marked as having used a reference answer. Think through and organize your own answer first, then use the example as additional guidance.",
+    continueIndependently: "Keep answering independently",
+    confirm: "View example answer",
+    keyPoints: "Key points",
+    commonMistakes: "Common mistakes",
+    viewedBeforeSubmission: "Reference answer viewed before submission",
+    assistedRetry: "Reference-assisted retry",
+    disclaimer: {
+      personalizedExample:
+        "This example uses the current question, target role, and available experience. Rewrite it with your real experience; do not copy it or invent details.",
+      technicalReference:
+        "This reference covers the core knowledge. Wording and implementations may vary; focus on principles, boundaries, and trade-offs.",
+    },
+    requestErrorTitle: "RIVA example answer unavailable",
+    requestErrorDescription: "Your draft is still here. Please try again shortly.",
+    unavailable: "The reference answer is temporarily unavailable.",
+    expand: "Expand reference answer",
+    collapse: "Collapse reference answer",
+  },
   questionActions: {
     title: "Question actions",
     save: "Save question",

@@ -1,6 +1,7 @@
 import {
   createGeneratedPracticeQuestion,
   createGeneratedPracticeQuestionGuidance,
+  createPracticeReferenceAnswer,
   createPracticeMockEvaluationResult,
   createPracticeFollowUpQuestion,
   createPracticeMockResponse,
@@ -22,6 +23,7 @@ import type {
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
+  RequestPracticeReferenceAnswerInput,
   RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
@@ -305,6 +307,13 @@ function nextMutationTimestamp() {
   return new Date(Date.UTC(2026, 6, 20, 3, mutationSequence)).toISOString()
 }
 
+function currentTargetRoleTitle(targetRoleId: string) {
+  return (
+    mockResponse.setupContext.targetRoles.find((role) => role.id === targetRoleId)?.title ??
+    "Target role"
+  )
+}
+
 export async function requestPracticeHint(
   input: RequestPracticeHintInput,
 ): Promise<PracticePageResponse> {
@@ -344,6 +353,34 @@ export async function requestAnswerFramework(
         answerFramework: {
           status: "revealed",
           content: copy(guidance.framework),
+        },
+      },
+    },
+  })
+}
+
+export async function requestPracticeReferenceAnswer(
+  input: RequestPracticeReferenceAnswerInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentQuestion(input)
+  if (session.question.referenceAnswer.status !== "notRequested") return copy(mockResponse)
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      question: {
+        ...session.question,
+        referenceAnswer: {
+          status: "revealed",
+          content: createPracticeReferenceAnswer(
+            session.question.questionType,
+            currentTargetRoleTitle(session.selection.targetRoleId),
+            session.question.prompt,
+          ),
+          viewedBeforeSubmission: true,
         },
       },
     },
@@ -616,6 +653,18 @@ export async function getPracticeEvaluationStatus(
   if (pollCount < 2) return copy(mockResponse)
 
   const result = createPracticeMockEvaluationResult(session)
+  const referenceAnswer =
+    session.question.referenceAnswer.status === "revealed"
+      ? copy(session.question.referenceAnswer)
+      : {
+          status: "revealed" as const,
+          content: createPracticeReferenceAnswer(
+            session.question.questionType,
+            currentTargetRoleTitle(session.selection.targetRoleId),
+            session.question.prompt,
+          ),
+          viewedBeforeSubmission: false,
+        }
   return setMockResponse({
     ...mockResponse,
     session: {
@@ -627,7 +676,7 @@ export async function getPracticeEvaluationStatus(
       attemptId: session.attemptId,
       attemptNumber: session.attemptNumber,
       attemptRecords: copy(session.attemptRecords),
-      question: copy(session.question),
+      question: { ...copy(session.question), referenceAnswer },
       mainAnswer: copy(session.mainAnswer),
       followUpExchanges: copy(session.followUpExchanges),
       followUpCompletion: copy(session.followUpCompletion),
@@ -672,6 +721,9 @@ export async function retryCurrentPracticeQuestion(
 ): Promise<PracticePageResponse> {
   await waitForMockDelay()
   const session = requireReview(input)
+  if (session.question.referenceAnswer.status !== "revealed") {
+    throw new Error("Practice review reference answer is missing.")
+  }
   const previousAttempt = toAttemptRecord(session)
   const nextAttemptNumber = session.attemptNumber + 1
 
@@ -686,7 +738,14 @@ export async function retryCurrentPracticeQuestion(
       attemptId: `${session.sessionId}_attempt_${nextAttemptNumber}`,
       attemptNumber: nextAttemptNumber,
       attemptRecords: [...copy(session.attemptRecords), previousAttempt],
-      question: copy(session.question),
+      question: {
+        ...copy(session.question),
+        referenceAnswer: {
+          status: "revealed",
+          content: copy(session.question.referenceAnswer.content),
+          viewedBeforeSubmission: true,
+        },
+      },
     },
   })
 }

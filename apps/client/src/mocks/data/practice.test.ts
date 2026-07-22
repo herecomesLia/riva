@@ -6,6 +6,7 @@ import {
   createPracticeFollowUpQuestion,
   createPracticeMockEvaluationResult,
   createPracticeMockResponse,
+  createPracticeReferenceAnswer,
   getPracticeFollowUpPrompts,
   practiceResponseMock,
   type PracticeMockScenario,
@@ -87,6 +88,21 @@ function expectConsistentGuidance(guidance: PracticeGuidance<string[]>) {
 function expectUnrequestedGuidance(question: PracticeQuestionCard) {
   expect(question.answerHints).toEqual({ status: "notRequested", content: null })
   expect(question.answerFramework).toEqual({ status: "notRequested", content: null })
+}
+
+function expectConsistentReferenceAnswer(question: PracticeQuestionCard) {
+  const state = question.referenceAnswer
+  if (state.status === "revealed") {
+    expect(state.content.answer.trim()).not.toBe("")
+    expect(state.content.kind).toBe(
+      question.questionType === "technicalFoundation"
+        ? "technicalReference"
+        : "personalizedExample",
+    )
+    return
+  }
+  expect(state.content).toBeNull()
+  expect(state.viewedBeforeSubmission).toBe(false)
 }
 
 function expectFollowUpQuestionMatchesPlan(
@@ -191,6 +207,7 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
   expect(new Set(session.attemptRecords.map((record) => record.attemptId)).size).toBe(
     session.attemptRecords.length,
   )
+  session.attemptRecords.forEach((record) => expectConsistentReferenceAnswer(record.question))
   expect(Number.isInteger(session.version)).toBe(true)
   expect(session.version).toBeGreaterThan(0)
 
@@ -210,6 +227,7 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.question.questionType).toBe(session.selection.questionType)
       expectConsistentGuidance(session.question.answerHints)
       expectConsistentGuidance(session.question.answerFramework)
+      expectConsistentReferenceAnswer(session.question)
       expect("mainAnswer" in session).toBe(false)
       expect("evaluation" in session).toBe(false)
       expect("review" in session).toBe(false)
@@ -258,6 +276,8 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
 
       expect(session.question.questionType).toBe(session.selection.questionType)
       expectUnrequestedGuidance(session.question)
+      expectConsistentReferenceAnswer(session.question)
+      expect(session.question.referenceAnswer.status).toBe("revealed")
       expect(dimensions).toHaveLength(scoreDimensions.size)
       expect(new Set(dimensions.map(({ dimension }) => dimension))).toEqual(scoreDimensions)
       expect(dimensions.every(({ score }) => score >= 0 && score <= 100)).toBe(true)
@@ -310,6 +330,28 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
 }
 
 describe("practice mock scenarios", () => {
+  it("provides deterministic, type-correct reference answers for all five question types", () => {
+    for (const questionType of questionTypes) {
+      const first = createPracticeReferenceAnswer(questionType)
+      expect(createPracticeReferenceAnswer(questionType)).toEqual(first)
+      expect(first.answer.trim()).not.toBe("")
+      expect(first.keyPoints.length).toBeGreaterThan(0)
+      expect(first.commonMistakes.length).toBeGreaterThan(0)
+      expect(first.kind).toBe(
+        questionType === "technicalFoundation" ? "technicalReference" : "personalizedExample",
+      )
+    }
+  })
+
+  it("does not include hidden reference content on a new question", () => {
+    const response = createPracticeMockResponse("answeringQuestion")
+    if (response.session.status !== "answering") return
+    expect(response.session.question.referenceAnswer).toEqual({
+      status: "notRequested",
+      content: null,
+      viewedBeforeSubmission: false,
+    })
+  })
   it("returns independent deterministic follow-up plans for every question type", () => {
     const expectedCounts: Record<PracticeQuestionType, number> = {
       projectDeepDive: 2,

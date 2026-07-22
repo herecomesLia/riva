@@ -38,6 +38,7 @@ import type {
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
+  RequestPracticeReferenceAnswerInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -71,12 +72,16 @@ import {
 } from "./components/PracticeReviewDetails"
 import { PracticeRecommendationCard } from "./components/PracticeRecommendationCard"
 import { PracticeReviewActions } from "./components/PracticeReviewActions"
+import { PracticeReferenceAnswer } from "./components/PracticeReferenceAnswer"
 import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
   onEnd: (input: RequestEndPracticeSessionInput) => Promise<PracticeInteractionResult>
   onRequestFramework: (input: RequestAnswerFrameworkInput) => Promise<PracticeInteractionResult>
   onRequestHint: (input: RequestPracticeHintInput) => Promise<PracticeInteractionResult>
+  onRequestReferenceAnswer?: (
+    input: RequestPracticeReferenceAnswerInput,
+  ) => Promise<PracticeInteractionResult>
   onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
   onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<PracticeInteractionResult>
   onSkip: (input: SkipPracticeQuestionInput) => Promise<PracticeInteractionResult>
@@ -98,6 +103,7 @@ export type PracticeAnsweringPending = {
   end: boolean
   framework: boolean
   hint: boolean
+  referenceAnswer?: boolean
   interactionLocked: boolean
   saved: boolean
   skip: boolean
@@ -456,6 +462,7 @@ function PracticeReviewView({
       />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
       <PracticeReviewSummary review={session.review} />
+      <PracticeReferenceAnswer mode="review" state={session.question.referenceAnswer} />
       <PracticeReusableStructure items={session.review.reusableAnswerStructure} />
       <PracticeWeaknesses items={session.review.exposedWeaknesses} />
       <PracticeRecommendationCard recommendation={session.review.recommendation} />
@@ -585,6 +592,17 @@ function PracticeAnsweringView({
         isHintPending={pending.hint}
         onRequestFramework={() => actions.onRequestFramework(mutationInput)}
         onRequestHint={() => actions.onRequestHint(mutationInput)}
+      />
+      <PracticeReferenceAnswer
+        assistedRetry={session.attemptNumber > 1}
+        interactionLocked={pending.interactionLocked}
+        isPending={pending.referenceAnswer}
+        onRequest={
+          actions.onRequestReferenceAnswer
+            ? () => actions.onRequestReferenceAnswer?.(mutationInput) ?? Promise.resolve("ignored")
+            : undefined
+        }
+        state={session.question.referenceAnswer}
       />
       <PracticeQuestionActions
         interactionLocked={pending.interactionLocked}

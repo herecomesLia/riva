@@ -145,6 +145,36 @@ export const practice = {
     requestFramework: "请求答题框架",
     frameworkUnavailable: "本题暂时没有可用答题框架。",
   },
+  referenceAnswer: {
+    title: "RIVA 示例回答",
+    description: "在独立思考后查看一份用于比较表达方式和知识覆盖的参考。",
+    kind: {
+      personalizedExample: "个性化示例回答",
+      technicalReference: "技术参考答案",
+    },
+    request: "查看 RIVA 示例回答",
+    generating: "正在生成示例回答",
+    confirmTitle: "查看 RIVA 示例回答？",
+    confirmDescription:
+      "查看后，本次尝试将标记为使用过参考答案。建议先独立思考并组织回答，再将示例作为补充参考。",
+    continueIndependently: "继续独立作答",
+    confirm: "查看示例回答",
+    keyPoints: "关键要点",
+    commonMistakes: "常见误区",
+    viewedBeforeSubmission: "本次作答前已查看参考答案",
+    assistedRetry: "本次为参考答案辅助重练",
+    disclaimer: {
+      personalizedExample:
+        "该示例基于当前问题、目标岗位与可用经历生成，请结合自己的真实经历改写，不建议照抄或虚构细节。",
+      technicalReference:
+        "该参考答案覆盖本题核心知识点。具体表达和实现方案可能不唯一，请重点理解原理、边界与取舍。",
+    },
+    requestErrorTitle: "RIVA 示例回答获取失败",
+    requestErrorDescription: "你的回答草稿仍然保留，请稍后重试。",
+    unavailable: "参考答案暂不可用。",
+    expand: "展开参考答案",
+    collapse: "收起参考答案",
+  },
   questionActions: {
     title: "题目操作",
     save: "收藏题目",

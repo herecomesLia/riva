@@ -10,6 +10,7 @@ import type {
   PracticePageResponse,
   PracticeQuestionCard,
   PracticeQuestionType,
+  PracticeReferenceAnswer,
   PracticeRecommendation,
   PracticeReview,
   PracticeReviewState,
@@ -195,6 +196,86 @@ const generatedQuestionGuidanceTemplates = {
   },
 } satisfies Record<PracticeQuestionType, GeneratedQuestionGuidanceTemplate>
 
+const referenceAnswerTemplates = {
+  projectDeepDive: {
+    kind: "personalizedExample",
+    answer:
+      "我会选用推荐材料中的“全球电商结算页性能优化项目”来回答。项目目标是改善结算页在中低端设备上的交互体验，我负责定位前端瓶颈并推动方案落地。我先按设备与网络条件拆分性能数据，结合性能监控和调用链确认主要耗时来自首屏包体与非关键请求竞争。评估整包重构和渐进优化后，我选择先拆分非关键模块、调整请求优先级，并与产品和服务端共同确定灰度范围。上线时按设备分层观察 P75 可交互时间、退出率和异常率，用灰度组与对照组验证变化；结果以项目已有监控数据为准。复盘时我会补充说明方案的适用边界、回滚信号，以及后续如何把一次优化沉淀成持续监控机制。",
+    keyPoints: [
+      "界定个人职责与业务目标",
+      "用分层数据定位瓶颈并解释取舍",
+      "通过灰度对照和监控验证结果",
+    ],
+    commonMistakes: ["只罗列团队动作，没有说明个人判断", "编造项目中不存在的指标或成果"],
+  },
+  behavioral: {
+    kind: "personalizedExample",
+    answer:
+      "我会使用推荐材料中的跨团队项目协作经历。面对关键协作方对发布范围的分歧，我先把双方共同目标、各自约束和不可接受风险写清楚，再分别确认分歧究竟来自数据判断还是交付压力。作为推进人，我提出用小范围验证代替一次性争论：先约定成功指标、观察周期和停止条件，再让各方共同评审结果。这个过程让讨论从立场转向证据，也保留了必要的风险控制。最终结果应只陈述现有经历中能够核实的交付和影响；复盘时我会说明，如果重来，我会更早暴露依赖并预留决策时间。",
+    keyPoints: [
+      "明确冲突情境、个人任务和各方约束",
+      "用共同目标与小范围验证推动共识",
+      "呈现可核实结果并给出复盘",
+    ],
+    commonMistakes: ["把冲突描述成对方的问题", "只说善于沟通而没有具体行动"],
+  },
+  businessUnderstanding: {
+    kind: "personalizedExample",
+    answer:
+      "我会从推荐材料中的核心指标改进项目切入。先明确本次调整服务的业务目标和目标用户，再区分领先指标、结果指标与风险指标。我负责把候选方案按用户价值、预期收益、交付成本和可逆性放在同一框架中比较，并访谈产品、运营和交付团队确认约束。若短期收益与体验冲突，我会优先设计可验证、可回退的小步方案，提前约定指标窗口和决策阈值。最后只引用现有项目中已有的数据说明影响，并补充没有达到预期时如何复盘假设、调整优先级。",
+    keyPoints: [
+      "从业务目标和目标用户定义问题",
+      "比较收益、成本、风险与可逆性",
+      "用指标窗口和回退条件验证决策",
+    ],
+    commonMistakes: ["把业务理解等同于追求单一收入指标", "没有说明利益相关方和风险边界"],
+  },
+  motivation: {
+    kind: "personalizedExample",
+    answer:
+      "我希望应聘当前目标岗位，是因为岗位同时要求复杂问题分析、工程化建设和跨团队推动，这与我在性能优化及监控平台建设中的积累直接相连。过去的经历让我确认，我最有动力解决的不是单个页面问题，而是把定位方法、质量标准和协作机制沉淀为团队可复用的能力。基于当前可用材料，我能贡献的是性能治理、前端基础设施设计和用证据推动技术决策的经验。下一阶段我希望承担更完整的决策责任，但不会把尚未经历过的业务或成果包装成既有经验；我会坦诚说明能力边界和入职后的学习计划。",
+    keyPoints: [
+      "把岗位吸引力与真实经历连接",
+      "说明可贡献价值和下一阶段目标",
+      "坦诚能力边界与学习计划",
+    ],
+    commonMistakes: ["只表达对公司或技术的泛泛兴趣", "用虚构经历证明岗位匹配"],
+  },
+  technicalFoundation: {
+    kind: "technicalReference",
+    answer:
+      "React 重复渲染首先要区分“组件函数再次执行”和“浏览器产生多余绘制”。常见原因包括父组件更新向下传播、Context value 或对象/函数引用不稳定、订阅粒度过粗，以及 effect 更新状态形成额外渲染；开发环境下 Strict Mode 的重复调用也不能直接当作生产问题。排查时先用 React DevTools Profiler 记录交互，确认触发源、提交次数和耗时，再检查 props 引用、Context 更新与 effect 依赖。优化应从缩小状态与订阅范围开始，只有在渲染成本确实较高且输入可稳定时再使用 memo、useMemo 或 useCallback，因为缓存本身有复杂度和比较成本。边界上要避免为消除所有函数执行而牺牲正确性，也要分别验证开发与生产构建。最终用相同场景下的 Profiler commit、交互耗时和浏览器性能数据对比，并通过功能测试确认没有引入陈旧闭包或状态不同步。",
+    keyPoints: [
+      "区分 React 渲染、提交与浏览器绘制",
+      "用 Profiler 定位更新来源和真实成本",
+      "优先缩小状态范围，再权衡记忆化",
+      "在生产构建与一致场景中验证",
+    ],
+    commonMistakes: [
+      "把 Strict Mode 开发期行为直接判定为线上缺陷",
+      "无差别添加 memo 和 useCallback",
+      "只看渲染次数，不验证交互耗时与正确性",
+    ],
+  },
+} as const satisfies Record<PracticeQuestionType, Omit<PracticeReferenceAnswer, "generatedAt">>
+
+export function createPracticeReferenceAnswer(
+  questionType: PracticeQuestionType,
+  targetRoleTitle = "Senior Frontend Engineer",
+  questionPrompt?: string,
+): PracticeReferenceAnswer {
+  const template = structuredClone(referenceAnswerTemplates[questionType])
+  const context = questionPrompt
+    ? `围绕问题“${questionPrompt}”，针对目标岗位“${targetRoleTitle}”，`
+    : `针对目标岗位“${targetRoleTitle}”，`
+  return {
+    ...template,
+    answer:
+      template.kind === "personalizedExample" ? `${context}${template.answer}` : template.answer,
+    generatedAt: "2026-07-20T03:00:00.000Z",
+  }
+}
+
 const practiceFollowUpTemplates = {
   projectDeepDive: {
     prompts: [
@@ -275,6 +356,11 @@ export function createGeneratedPracticeQuestion({
     recommendedMaterials: [...template.recommendedMaterials],
     answerHints: { status: "notRequested", content: null },
     answerFramework: { status: "notRequested", content: null },
+    referenceAnswer: {
+      status: "notRequested",
+      content: null,
+      viewedBeforeSubmission: false,
+    },
     isSaved: selection.source === "saved",
     isMarkedWeak: false,
   }
@@ -878,7 +964,21 @@ function createPracticeReviewState(session: PracticeEvaluatingState): PracticeRe
     attemptId: session.attemptId,
     attemptNumber: session.attemptNumber,
     attemptRecords: session.attemptRecords,
-    question: session.question,
+    question: {
+      ...session.question,
+      referenceAnswer:
+        session.question.referenceAnswer.status === "revealed"
+          ? session.question.referenceAnswer
+          : {
+              status: "revealed",
+              content: createPracticeReferenceAnswer(
+                session.question.questionType,
+                targetRoles.find((role) => role.id === session.selection.targetRoleId)?.title,
+                session.question.prompt,
+              ),
+              viewedBeforeSubmission: false,
+            },
+    },
     mainAnswer: session.mainAnswer,
     followUpExchanges: session.followUpExchanges,
     followUpCompletion: session.followUpCompletion,
@@ -1318,5 +1418,35 @@ export const practiceResponseMock = practiceMockScenarios.setupReady
 export function createPracticeMockResponse(
   scenario: PracticeMockScenario = "setupReady",
 ): PracticePageResponse {
-  return structuredClone(practiceMockScenarios[scenario])
+  const response = structuredClone(practiceMockScenarios[scenario])
+  if (response.session.status === "review") {
+    const roleTitle = response.setupContext.targetRoles.find(
+      (role) => role.id === response.session.selection.targetRoleId,
+    )?.title
+    response.session.question.referenceAnswer = {
+      status: "revealed",
+      content: createPracticeReferenceAnswer(
+        response.session.question.questionType,
+        roleTitle,
+        response.session.question.prompt,
+      ),
+      viewedBeforeSubmission: false,
+    }
+  }
+  if (response.session.status === "completed") {
+    for (const record of response.session.attemptRecords) {
+      record.question.referenceAnswer = {
+        status: "revealed",
+        content: createPracticeReferenceAnswer(
+          record.question.questionType,
+          response.setupContext.targetRoles.find(
+            (role) => role.id === record.selection.targetRoleId,
+          )?.title,
+          record.question.prompt,
+        ),
+        viewedBeforeSubmission: false,
+      }
+    }
+  }
+  return response
 }

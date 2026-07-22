@@ -24,6 +24,25 @@ export type PracticeTargetRoleOption = {
   supportedQuestionTypes: PracticeQuestionType[]
 }
 
+export type PracticeReferenceAnswerKind = "personalizedExample" | "technicalReference"
+
+export type PracticeReferenceAnswer = {
+  kind: PracticeReferenceAnswerKind
+  answer: string
+  keyPoints: string[]
+  commonMistakes: string[]
+  generatedAt: string
+}
+
+export type PracticeReferenceAnswerState =
+  | { status: "notRequested"; content: null; viewedBeforeSubmission: false }
+  | {
+      status: "revealed"
+      content: PracticeReferenceAnswer
+      viewedBeforeSubmission: boolean
+    }
+  | { status: "unavailable"; content: null; viewedBeforeSubmission: false }
+
 export type PracticeSetupContext = {
   targetRoles: PracticeTargetRoleOption[]
   defaultTargetRoleId: string | null
@@ -42,6 +61,7 @@ export type PracticeQuestionCard = {
   recommendedMaterials: string[]
   answerHints: PracticeGuidance<string[]>
   answerFramework: PracticeGuidance<string[]>
+  referenceAnswer: PracticeReferenceAnswerState
   isSaved: boolean
   isMarkedWeak: boolean
 }
@@ -287,6 +307,8 @@ export type SetPracticeQuestionWeakInput = PracticeQuestionMutationInput & {
 export type RequestPracticeHintInput = PracticeQuestionMutationInput
 
 export type RequestAnswerFrameworkInput = PracticeQuestionMutationInput
+
+export type RequestPracticeReferenceAnswerInput = PracticeQuestionMutationInput
 
 export type SkipPracticeQuestionInput = PracticeQuestionMutationInput
 

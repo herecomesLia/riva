@@ -10,6 +10,7 @@ import type {
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
+  RequestPracticeReferenceAnswerInput,
   RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
@@ -86,6 +87,12 @@ export function requestAnswerFramework(
   input: RequestAnswerFrameworkInput,
 ): Promise<PracticePageResponse> {
   return env.mock ? practiceMockService.requestAnswerFramework(input) : realApiUnavailable()
+}
+
+export function requestPracticeReferenceAnswer(
+  input: RequestPracticeReferenceAnswerInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.requestPracticeReferenceAnswer(input) : realApiUnavailable()
 }
 
 export function setQuestionSaved(

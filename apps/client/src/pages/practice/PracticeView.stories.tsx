@@ -3,7 +3,7 @@ import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test"
 import { useRouter, useRouterState } from "@tanstack/react-router"
 
 import { withRouter } from "#storybook/decorators/with-router"
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeMockResponse, createPracticeReferenceAnswer } from "@/mocks/data/practice"
 
 import { PracticeView } from "./PracticeView"
 
@@ -215,6 +215,49 @@ export const InteractionLocked = meta.story({
   },
 })
 
+export const AnsweringReferenceAnswerHidden = meta.story({
+  args: readyArgs("answeringQuestion"),
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: /RIVA 示例回答|RIVA example answer/i }),
+    ).toBeVisible()
+    await expect(canvas.queryByText(/我会选用推荐材料|I would use/i)).not.toBeInTheDocument()
+  },
+})
+
+function withReferenceAnswer(
+  scenario: "answeringQuestion" | "reviewBalanced",
+  questionType: "projectDeepDive" | "technicalFoundation",
+  viewedBeforeSubmission: boolean,
+) {
+  const args = readyArgs(scenario)
+  const response = structuredClone(args.content.data)
+  if (!("question" in response.session)) throw new Error("Question fixture required.")
+  response.session.question.questionType = questionType
+  response.session.selection.questionType = questionType
+  response.session.question.referenceAnswer = {
+    status: "revealed",
+    content: createPracticeReferenceAnswer(questionType),
+    viewedBeforeSubmission,
+  }
+  return { ...args, content: { data: response, status: "ready" as const } }
+}
+
+export const AnsweringReferenceAnswerRevealed = meta.story({
+  args: withReferenceAnswer("answeringQuestion", "projectDeepDive", true),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/个性化示例回答|personalized example answer/i)).toBeVisible()
+    await expect(canvas.getByText(/我会选用推荐材料中的/)).toBeVisible()
+  },
+})
+
+export const AnsweringTechnicalReference = meta.story({
+  args: withReferenceAnswer("answeringQuestion", "technicalFoundation", true),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/技术参考答案|technical reference answer/i)).toBeVisible()
+  },
+})
+
 function DraftLeaveProtectionStory() {
   const router = useRouter()
 
@@ -316,6 +359,28 @@ export const EvaluationError = meta.story({
 
 export const BalancedReview = meta.story({
   args: readyArgs("reviewBalanced"),
+})
+
+export const ReviewWithPersonalizedExample = meta.story({
+  args: withReferenceAnswer("reviewBalanced", "projectDeepDive", false),
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /展开参考答案|expand reference/i }))
+    await expect(canvas.getByText(/我会选用推荐材料中的/)).toBeVisible()
+  },
+})
+
+export const ReviewWithTechnicalReference = meta.story({
+  args: withReferenceAnswer("reviewBalanced", "technicalFoundation", false),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/技术参考答案|technical reference answer/i)).toBeVisible()
+  },
+})
+
+export const ReviewAssistedAttempt = meta.story({
+  args: withReferenceAnswer("reviewBalanced", "projectDeepDive", true),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/作答前已查看|viewed before submission/i)).toBeVisible()
+  },
 })
 
 export const HighScoreReview = meta.story({

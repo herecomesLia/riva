@@ -12,6 +12,7 @@ import type {
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
+  RequestPracticeReferenceAnswerInput,
   RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
@@ -32,6 +33,7 @@ import {
   prepareNextPracticeSession,
   requestEndPracticeSession,
   requestPracticeHint,
+  requestPracticeReferenceAnswer,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
@@ -78,6 +80,7 @@ export function PracticePage() {
   })
   const hintMutation = usePracticeMutation(requestPracticeHint)
   const frameworkMutation = usePracticeMutation(requestAnswerFramework)
+  const referenceAnswerMutation = usePracticeMutation(requestPracticeReferenceAnswer)
   const savedMutation = usePracticeMutation(setQuestionSaved)
   const weakMutation = usePracticeMutation(setQuestionWeak)
   const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
@@ -92,6 +95,7 @@ export function PracticePage() {
   const isQuestionMutationPending =
     hintMutation.isPending ||
     frameworkMutation.isPending ||
+    referenceAnswerMutation.isPending ||
     savedMutation.isPending ||
     weakMutation.isPending ||
     submitAnswerMutation.isPending ||
@@ -276,6 +280,9 @@ export function PracticePage() {
           onRequestHint: async (input: RequestPracticeHintInput) => {
             return runQuestionMutation(() => hintMutation.mutateAsync(input))
           },
+          onRequestReferenceAnswer: async (input: RequestPracticeReferenceAnswerInput) => {
+            return runQuestionMutation(() => referenceAnswerMutation.mutateAsync(input))
+          },
           onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
             return runQuestionMutation(() => savedMutation.mutateAsync(input))
           },
@@ -293,6 +300,7 @@ export function PracticePage() {
           end: endMutation.isPending,
           framework: frameworkMutation.isPending,
           hint: hintMutation.isPending,
+          referenceAnswer: referenceAnswerMutation.isPending,
           interactionLocked: isQuestionMutationPending,
           saved: savedMutation.isPending,
           skip: skipMutation.isPending,

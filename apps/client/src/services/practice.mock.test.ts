@@ -11,6 +11,7 @@ import {
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
+  requestPracticeReferenceAnswer,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
@@ -231,6 +232,99 @@ async function completeRetriedQuestionWithFinalFlags(
 }
 
 describe("practice stateful mock service", () => {
+  it("reveals a versioned reference answer without leaving answering", async () => {
+    const initial = await generateQuestion("projectDeepDive")
+    const input = {
+      sessionId: initial.sessionId,
+      version: initial.version,
+      questionId: initial.question.id,
+    }
+    const response = await settle(requestPracticeReferenceAnswer(input))
+    expect(response.session).toMatchObject({
+      status: "answering",
+      sessionId: initial.sessionId,
+      version: initial.version + 1,
+      question: { referenceAnswer: { status: "revealed", viewedBeforeSubmission: true } },
+    })
+    if (response.session.status !== "answering") return
+    expect(response.session.question.referenceAnswer.content).not.toBeNull()
+    const staleRequest = requestPracticeReferenceAnswer(input)
+    const staleExpectation = expect(staleRequest).rejects.toThrow()
+    await vi.runAllTimersAsync()
+    await staleExpectation
+  })
+
+  it("rejects an unknown question when requesting a reference answer", async () => {
+    const initial = await generateQuestion("behavioral")
+    const invalidRequest = requestPracticeReferenceAnswer({
+      sessionId: initial.sessionId,
+      version: initial.version,
+      questionId: "unknown-question",
+    })
+    const invalidExpectation = expect(invalidRequest).rejects.toThrow()
+    await vi.runAllTimersAsync()
+    await invalidExpectation
+  })
+
+  it("adds an unassisted reference answer to review when it was not requested", async () => {
+    const review = await completeQuestionToReview("technicalFoundation")
+    expect(review.question.referenceAnswer).toMatchObject({
+      status: "revealed",
+      viewedBeforeSubmission: false,
+      content: { kind: "technicalReference" },
+    })
+  })
+
+  it("preserves the same reference answer for retry and resets it for the next question", async () => {
+    const initial = await generateQuestion("projectDeepDive")
+    const revealedResponse = await settle(
+      requestPracticeReferenceAnswer({
+        sessionId: initial.sessionId,
+        version: initial.version,
+        questionId: initial.question.id,
+      }),
+    )
+    if (revealedResponse.session.status !== "answering") throw new Error("Expected answering.")
+    const review = await finishCurrentAttempt(revealedResponse.session)
+    const original = review.question.referenceAnswer
+    const retried = await settle(
+      retryCurrentPracticeQuestion({
+        sessionId: review.sessionId,
+        version: review.version,
+        questionId: review.question.id,
+      }),
+    )
+    if (retried.session.status !== "answering") throw new Error("Expected retry answering.")
+    expect(retried.session.question.referenceAnswer).toEqual({
+      ...original,
+      viewedBeforeSubmission: true,
+    })
+    expect(retried.session.attemptRecords[0]?.question.referenceAnswer).toEqual(original)
+
+    resetPracticeMockState()
+    const nextReview = await completeQuestionToReview("motivation")
+    const generating = await settle(
+      continueToNextPracticeQuestion({
+        sessionId: nextReview.sessionId,
+        version: nextReview.version,
+        questionId: nextReview.question.id,
+      }),
+    )
+    if (generating.session.status !== "generatingQuestion") throw new Error("Expected generating.")
+    const generationInput = {
+      sessionId: generating.session.sessionId,
+      version: generating.session.version,
+    }
+    await settle(getQuestionGenerationStatus(generationInput))
+    const next = await settle(getQuestionGenerationStatus(generationInput))
+    if (next.session.status !== "answering") throw new Error("Expected next question.")
+    expect(next.session.question.referenceAnswer).toEqual({
+      status: "notRequested",
+      content: null,
+      viewedBeforeSubmission: false,
+    })
+  })
+
   it("counts saved and weak status once when both retries end enabled", async () => {
     const { completed, firstReview, retried, secondReview } =
       await completeRetriedQuestionWithFinalFlags(

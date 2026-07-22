@@ -1,10 +1,10 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeMockResponse, createPracticeReferenceAnswer } from "@/mocks/data/practice"
 import type { PracticePageResponse } from "@/models/practice"
 import { PracticePage } from "@/pages/practice"
 import { synchronizePracticeSessionMutationResponse } from "@/pages/practice/practice-cache"
@@ -16,6 +16,7 @@ import {
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
+  requestPracticeReferenceAnswer,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
@@ -39,6 +40,7 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   requestAnswerFramework: vi.fn(),
   requestEndPracticeSession: vi.fn(),
   requestPracticeHint: vi.fn(),
+  requestPracticeReferenceAnswer: vi.fn(),
   retryPracticeEvaluation: vi.fn(),
   retryCurrentPracticeQuestion: vi.fn(),
   continueToNextPracticeQuestion: vi.fn(),
@@ -92,6 +94,7 @@ describe("PracticePage", () => {
     vi.mocked(requestAnswerFramework).mockReset()
     vi.mocked(requestEndPracticeSession).mockReset()
     vi.mocked(requestPracticeHint).mockReset()
+    vi.mocked(requestPracticeReferenceAnswer).mockReset()
     vi.mocked(retryPracticeEvaluation).mockReset()
     vi.mocked(retryCurrentPracticeQuestion).mockReset()
     vi.mocked(continueToNextPracticeQuestion).mockReset()
@@ -117,6 +120,52 @@ describe("PracticePage", () => {
       screen.getByRole("heading", { name: i18n.t("practice.setup.title") }),
     ).toBeInTheDocument()
     expect(screen.getByTestId("practice-loading-state")).toBeInTheDocument()
+  })
+
+  it("confirms, locks, preserves the draft, and applies the reference-answer snapshot", async () => {
+    const initial = createPracticeMockResponse("answeringQuestion")
+    if (initial.session.status !== "answering") throw new Error("Answering fixture required.")
+    const revealed = structuredClone(initial)
+    if (revealed.session.status !== "answering") throw new Error("Answering fixture required.")
+    const revealedSession = revealed.session
+    revealedSession.version += 1
+    revealedSession.question.referenceAnswer = {
+      status: "revealed",
+      content: createPracticeReferenceAnswer(initial.session.question.questionType),
+      viewedBeforeSubmission: true,
+    }
+    const request = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(initial)
+    vi.mocked(requestPracticeReferenceAnswer).mockReturnValue(request.promise)
+    const user = userEvent.setup()
+    renderPracticePage()
+
+    const textbox = await screen.findByRole("textbox")
+    const submitButton = screen.getByRole("button", { name: i18n.t("practice.answer.submit") })
+    await user.type(textbox, "保留这份草稿")
+    expect(screen.queryByText(revealedSession.question.referenceAnswer.content.answer)).toBeNull()
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("practice.referenceAnswer.request") }),
+    )
+    expect(requestPracticeReferenceAnswer).not.toHaveBeenCalled()
+    const dialog = screen.getByRole("alertdialog")
+    const confirm = within(dialog).getByRole("button", {
+      name: i18n.t("practice.referenceAnswer.confirm"),
+    })
+    await user.click(confirm)
+    expect(requestPracticeReferenceAnswer).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(requestPracticeReferenceAnswer).mock.calls[0]?.[0]).toEqual({
+      sessionId: initial.session.sessionId,
+      version: initial.session.version,
+      questionId: initial.session.question.id,
+    })
+    expect(submitButton).toBeDisabled()
+
+    request.resolve(revealed)
+    expect(
+      await screen.findByText(revealedSession.question.referenceAnswer.content.answer),
+    ).toBeVisible()
+    expect(textbox).toHaveValue("保留这份草稿")
   })
 
   it("shows a safe load error and retries", async () => {
