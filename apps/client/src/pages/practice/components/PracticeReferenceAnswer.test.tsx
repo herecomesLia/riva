@@ -14,12 +14,23 @@ const notRequested = {
   viewedBeforeSubmission: false,
 } as const
 
+function answeringProps(onRequest: () => Promise<"executed" | "ignored">) {
+  return {
+    assistedRetry: false,
+    interactionLocked: false,
+    isPending: false,
+    mode: "answering" as const,
+    onRequest,
+    state: notRequested,
+  }
+}
+
 describe("PracticeReferenceAnswer", () => {
   it("only requests after confirmation and rejects same-frame double confirmation", async () => {
     let resolveRequest: ((value: "executed") => void) | undefined
     const onRequest = vi.fn(() => new Promise<"executed">((resolve) => (resolveRequest = resolve)))
     const user = userEvent.setup()
-    renderWithProviders(<PracticeReferenceAnswer onRequest={onRequest} state={notRequested} />, {
+    renderWithProviders(<PracticeReferenceAnswer {...answeringProps(onRequest)} />, {
       router: false,
     })
 
@@ -58,7 +69,7 @@ describe("PracticeReferenceAnswer", () => {
   it("keeps confirmation available without an error when the interaction is ignored", async () => {
     const onRequest = vi.fn(async () => "ignored" as const)
     const user = userEvent.setup()
-    renderWithProviders(<PracticeReferenceAnswer onRequest={onRequest} state={notRequested} />, {
+    renderWithProviders(<PracticeReferenceAnswer {...answeringProps(onRequest)} />, {
       router: false,
     })
     await user.click(
@@ -74,9 +85,23 @@ describe("PracticeReferenceAnswer", () => {
   })
 
   it("shows technical content and safe request errors", async () => {
-    const technical = createPracticeReferenceAnswer("technicalFoundation")
+    const technicalResponse = createPracticeMockResponse("answeringQuestion")
+    if (technicalResponse.session.status !== "answering") throw new Error("Question required.")
+    const technicalQuestion = {
+      ...technicalResponse.session.question,
+      templateId: "technicalFoundation.reactRepeatedRendering" as const,
+      questionType: "technicalFoundation" as const,
+    }
+    const technical = createPracticeReferenceAnswer({
+      templateId: technicalQuestion.templateId,
+      questionType: technicalQuestion.questionType,
+      targetRoleTitle: "Senior Frontend Engineer",
+      questionPrompt: technicalQuestion.prompt,
+      recommendedMaterials: technicalQuestion.recommendedMaterials,
+    })
     const { rerender } = renderWithProviders(
       <PracticeReferenceAnswer
+        mode="review"
         state={{ status: "revealed", content: technical, viewedBeforeSubmission: true }}
       />,
       { router: false },
@@ -88,7 +113,7 @@ describe("PracticeReferenceAnswer", () => {
     const onRequest = vi.fn(async () => {
       throw new Error("session-id secret stack")
     })
-    rerender(<PracticeReferenceAnswer onRequest={onRequest} state={notRequested} />)
+    rerender(<PracticeReferenceAnswer {...answeringProps(onRequest)} />)
     const user = userEvent.setup()
     await user.click(
       screen.getByRole("button", { name: i18n.t("practice.referenceAnswer.request") }),

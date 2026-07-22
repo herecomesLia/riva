@@ -18,6 +18,7 @@ import type {
   PracticeFollowUpQuestion,
   PracticePageResponse,
   PracticeQuestionCard,
+  PracticeQuestionTemplateId,
   PracticeQuestionType,
   PracticeScoreDimension,
 } from "@/models/practice"
@@ -74,6 +75,29 @@ const questionTypes: PracticeQuestionType[] = [
   "technicalFoundation",
 ]
 
+const templateIds = [
+  "projectDeepDive.performanceOptimization",
+  "projectDeepDive.complexProjectTradeoff",
+  "behavioral.stakeholderConflict",
+  "behavioral.incidentUnderPressure",
+  "businessUnderstanding.priorityAdjustment",
+  "businessUnderstanding.experienceVsRevenueTradeoff",
+  "motivation.roleMotivation",
+  "motivation.careerDirection",
+  "technicalFoundation.reactRepeatedRendering",
+  "technicalFoundation.requestLayerDesign",
+] as const satisfies readonly PracticeQuestionTemplateId[]
+
+function referenceForQuestion(question: PracticeQuestionCard) {
+  return createPracticeReferenceAnswer({
+    templateId: question.templateId,
+    questionType: question.questionType,
+    targetRoleTitle: "Senior Frontend Engineer",
+    questionPrompt: question.prompt,
+    recommendedMaterials: question.recommendedMaterials,
+  })
+}
+
 function expectConsistentGuidance(guidance: PracticeGuidance<string[]>) {
   switch (guidance.status) {
     case "notRequested":
@@ -91,6 +115,7 @@ function expectUnrequestedGuidance(question: PracticeQuestionCard) {
 }
 
 function expectConsistentReferenceAnswer(question: PracticeQuestionCard) {
+  expect(question.templateId.startsWith(`${question.questionType}.`)).toBe(true)
   const state = question.referenceAnswer
   if (state.status === "revealed") {
     expect(state.content.answer.trim()).not.toBe("")
@@ -330,17 +355,49 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
 }
 
 describe("practice mock scenarios", () => {
-  it("provides deterministic, type-correct reference answers for all five question types", () => {
+  it("maps all ten stable template IDs to unique, type-correct reference answers", () => {
+    const generatedIds: PracticeQuestionTemplateId[] = []
+    const answers = new Map<PracticeQuestionTemplateId, string>()
     for (const questionType of questionTypes) {
-      const first = createPracticeReferenceAnswer(questionType)
-      expect(createPracticeReferenceAnswer(questionType)).toEqual(first)
-      expect(first.answer.trim()).not.toBe("")
-      expect(first.keyPoints.length).toBeGreaterThan(0)
-      expect(first.commonMistakes.length).toBeGreaterThan(0)
-      expect(first.kind).toBe(
-        questionType === "technicalFoundation" ? "technicalReference" : "personalizedExample",
-      )
+      const selection = {
+        targetRoleId: "role_frontend_bytedance",
+        questionType,
+        difficulty: "basic",
+        source: "personalized",
+        prioritizeWeaknesses: false,
+      } satisfies ActivePracticeSelection
+      const typeAnswers: string[] = []
+      for (const ordinal of [1, 2]) {
+        const question = createGeneratedPracticeQuestion({
+          sessionId: `template_${questionType}`,
+          ordinal,
+          selection,
+        })
+        const first = referenceForQuestion(question)
+        generatedIds.push(question.templateId)
+        answers.set(question.templateId, first.answer)
+        typeAnswers.push(first.answer)
+        expect(referenceForQuestion(question)).toEqual(first)
+        expect(question.templateId.startsWith(`${question.questionType}.`)).toBe(true)
+        expect(first.answer.trim()).not.toBe("")
+        expect(first.keyPoints.length).toBeGreaterThan(0)
+        expect(first.commonMistakes.length).toBeGreaterThan(0)
+        expect(first.kind).toBe(
+          questionType === "technicalFoundation" ? "technicalReference" : "personalizedExample",
+        )
+      }
+      expect(typeAnswers[0]).not.toBe(typeAnswers[1])
     }
+    expect(generatedIds).toEqual(templateIds)
+    expect(new Set(answers.values()).size).toBe(templateIds.length)
+
+    const react = answers.get("technicalFoundation.reactRepeatedRendering") ?? ""
+    const requestLayer = answers.get("technicalFoundation.requestLayerDesign") ?? ""
+    expect(react).toMatch(/Profiler|重复渲染/)
+    expect(requestLayer).toMatch(/类型安全/)
+    expect(requestLayer).toMatch(/缓存 key|缓存/)
+    expect(requestLayer).toMatch(/错误边界|错误分类/)
+    expect(requestLayer).not.toBe(react)
   })
 
   it("does not include hidden reference content on a new question", () => {
@@ -420,6 +477,9 @@ describe("practice mock scenarios", () => {
       expect(first.id).toContain("practice_session_factory")
       expect(second.id).not.toBe(first.id)
       expect(second.prompt).not.toBe(first.prompt)
+      expect(first.templateId.startsWith(`${questionType}.`)).toBe(true)
+      expect(second.templateId.startsWith(`${questionType}.`)).toBe(true)
+      expect(second.templateId).not.toBe(first.templateId)
     },
   )
 

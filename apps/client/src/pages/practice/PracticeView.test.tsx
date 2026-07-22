@@ -18,7 +18,33 @@ import {
   type PracticeReviewActions,
   type PracticeReviewPending,
 } from "./PracticeView"
+import { isCurrentPracticeAttemptRetry } from "./practice-attempt"
 import { PracticeReviewActions as PracticeReviewActionsComponent } from "./components/PracticeReviewActions"
+
+describe("isCurrentPracticeAttemptRetry", () => {
+  it("uses the previous archived question ID instead of attempt number", () => {
+    const answering = createPracticeMockResponse("answeringQuestion")
+    const completed = createPracticeMockResponse("completedSession")
+    if (answering.session.status !== "answering" || completed.session.status !== "completed") {
+      throw new Error("Practice fixtures required.")
+    }
+    const previousAttempt = structuredClone(completed.session.attemptRecords[0])
+    if (!previousAttempt) throw new Error("Attempt fixture required.")
+
+    answering.session.attemptNumber = 2
+    answering.session.attemptRecords = [
+      { ...previousAttempt, question: answering.session.question },
+    ]
+    expect(isCurrentPracticeAttemptRetry(answering.session)).toBe(true)
+
+    answering.session.attemptRecords = [previousAttempt]
+    answering.session.question = {
+      ...answering.session.question,
+      id: `${answering.session.question.id}_next`,
+    }
+    expect(isCurrentPracticeAttemptRetry(answering.session)).toBe(false)
+  })
+})
 
 function createAnsweringActions(
   overrides: Partial<PracticeAnsweringActions> = {},
@@ -27,6 +53,7 @@ function createAnsweringActions(
     onEnd: vi.fn(async () => "executed" as const),
     onRequestFramework: vi.fn(async () => "executed" as const),
     onRequestHint: vi.fn(async () => "executed" as const),
+    onRequestReferenceAnswer: vi.fn(async () => "executed" as const),
     onSetSaved: vi.fn(async () => "executed" as const),
     onSetWeak: vi.fn(async () => "executed" as const),
     onSkip: vi.fn(async () => "executed" as const),
@@ -39,6 +66,7 @@ const answeringPending: PracticeAnsweringPending = {
   end: false,
   framework: false,
   hint: false,
+  referenceAnswer: false,
   interactionLocked: false,
   saved: false,
   skip: false,

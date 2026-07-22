@@ -1,6 +1,18 @@
 export type PracticeQuestionType =
   "projectDeepDive" | "behavioral" | "businessUnderstanding" | "motivation" | "technicalFoundation"
 
+export type PracticeQuestionTemplateId =
+  | "projectDeepDive.performanceOptimization"
+  | "projectDeepDive.complexProjectTradeoff"
+  | "behavioral.stakeholderConflict"
+  | "behavioral.incidentUnderPressure"
+  | "businessUnderstanding.priorityAdjustment"
+  | "businessUnderstanding.experienceVsRevenueTradeoff"
+  | "motivation.roleMotivation"
+  | "motivation.careerDirection"
+  | "technicalFoundation.reactRepeatedRendering"
+  | "technicalFoundation.requestLayerDesign"
+
 export type PracticeDifficulty = "basic" | "pressure"
 
 export type PracticeQuestionSource = "personalized" | "saved" | "history"
@@ -54,6 +66,7 @@ export type PracticeSetupContext = {
 
 export type PracticeQuestionCard = {
   id: string
+  templateId: PracticeQuestionTemplateId
   prompt: string
   questionType: PracticeQuestionType
   difficulty: PracticeDifficulty

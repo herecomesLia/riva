@@ -28,8 +28,10 @@ import { createTargetRole, getRolesPage, setCurrentTargetRole } from "@/services
 import type {
   PracticeAnsweringState,
   PracticeQuestionType,
+  PracticeReferenceAnswer,
   PracticeReviewState,
 } from "@/models/practice"
+import { isCurrentPracticeAttemptRetry } from "@/pages/practice/practice-attempt"
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -161,6 +163,47 @@ async function finishCurrentAttempt(initial: PracticeAnsweringState): Promise<Pr
   return reviewed.session
 }
 
+async function continueToSecondQuestion(
+  questionType: PracticeQuestionType,
+): Promise<PracticeAnsweringState> {
+  const firstReview = await finishCurrentAttempt(await generateQuestion(questionType))
+  const generating = await settle(
+    continueToNextPracticeQuestion({
+      sessionId: firstReview.sessionId,
+      version: firstReview.version,
+      questionId: firstReview.question.id,
+    }),
+  )
+  if (generating.session.status !== "generatingQuestion") throw new Error("Expected generation.")
+  const input = { sessionId: generating.session.sessionId, version: generating.session.version }
+  await settle(getQuestionGenerationStatus(input))
+  const next = await settle(getQuestionGenerationStatus(input))
+  if (next.session.status !== "answering") throw new Error("Expected second question.")
+  return next.session
+}
+
+async function revealReferenceAnswer(session: PracticeAnsweringState) {
+  const response = await settle(
+    requestPracticeReferenceAnswer({
+      sessionId: session.sessionId,
+      version: session.version,
+      questionId: session.question.id,
+    }),
+  )
+  if (response.session.status !== "answering") throw new Error("Expected answering session.")
+  if (response.session.question.referenceAnswer.status !== "revealed") {
+    throw new Error("Expected revealed reference answer.")
+  }
+  return response.session
+}
+
+function getRevealedReferenceAnswer(session: PracticeAnsweringState): PracticeReferenceAnswer {
+  if (session.question.referenceAnswer.status !== "revealed") {
+    throw new Error("Expected revealed reference answer.")
+  }
+  return session.question.referenceAnswer.content
+}
+
 async function setCurrentQuestionFlags(
   initial: PracticeAnsweringState,
   flags: { isSaved: boolean; isMarkedWeak: boolean },
@@ -232,6 +275,48 @@ async function completeRetriedQuestionWithFinalFlags(
 }
 
 describe("practice stateful mock service", () => {
+  it("matches both technical questions to different template-specific answers", async () => {
+    const first = await revealReferenceAnswer(await generateQuestion("technicalFoundation"))
+    const firstReference = getRevealedReferenceAnswer(first)
+    expect(first.question.templateId).toBe("technicalFoundation.reactRepeatedRendering")
+    expect(firstReference.answer).toMatch(/React|Profiler/)
+
+    resetPracticeMockState()
+    const second = await revealReferenceAnswer(
+      await continueToSecondQuestion("technicalFoundation"),
+    )
+    const secondReference = getRevealedReferenceAnswer(second)
+    expect(second.question.templateId).toBe("technicalFoundation.requestLayerDesign")
+    expect(secondReference.answer).toMatch(/类型安全/)
+    expect(secondReference.answer).toMatch(/缓存 key|缓存一致性/)
+    expect(secondReference.answer).toMatch(/错误边界|错误分类/)
+    expect(secondReference.answer).not.toBe(firstReference.answer)
+    expect(secondReference.answer).not.toMatch(/^React 重复渲染/)
+  })
+
+  it.each([
+    ["projectDeepDive", "projectDeepDive.complexProjectTradeoff", /备选方案|技术取舍/],
+    ["behavioral", "behavioral.incidentUnderPressure", /高压期限|优先级/],
+    [
+      "businessUnderstanding",
+      "businessUnderstanding.experienceVsRevenueTradeoff",
+      /用户体验|短期业务收益/,
+    ],
+    ["motivation", "motivation.careerDirection", /职业方向|长期规划/],
+  ] as const)(
+    "matches the second %s question to its own reference",
+    async (questionType, id, pattern) => {
+      const first = await revealReferenceAnswer(await generateQuestion(questionType))
+      const firstReference = getRevealedReferenceAnswer(first)
+      resetPracticeMockState()
+      const second = await revealReferenceAnswer(await continueToSecondQuestion(questionType))
+      const secondReference = getRevealedReferenceAnswer(second)
+      expect(second.question.templateId).toBe(id)
+      expect(secondReference.answer).toMatch(pattern)
+      expect(secondReference.answer).not.toBe(firstReference.answer)
+    },
+  )
+
   it("reveals a versioned reference answer without leaving answering", async () => {
     const initial = await generateQuestion("projectDeepDive")
     const input = {
@@ -295,10 +380,13 @@ describe("practice stateful mock service", () => {
       }),
     )
     if (retried.session.status !== "answering") throw new Error("Expected retry answering.")
+    expect(isCurrentPracticeAttemptRetry(retried.session)).toBe(true)
+    expect(retried.session.question.templateId).toBe(review.question.templateId)
     expect(retried.session.question.referenceAnswer).toEqual({
       ...original,
       viewedBeforeSubmission: true,
     })
+    expect(retried.session.attemptRecords[0]?.question.templateId).toBe(review.question.templateId)
     expect(retried.session.attemptRecords[0]?.question.referenceAnswer).toEqual(original)
 
     resetPracticeMockState()
@@ -318,6 +406,7 @@ describe("practice stateful mock service", () => {
     await settle(getQuestionGenerationStatus(generationInput))
     const next = await settle(getQuestionGenerationStatus(generationInput))
     if (next.session.status !== "answering") throw new Error("Expected next question.")
+    expect(isCurrentPracticeAttemptRetry(next.session)).toBe(false)
     expect(next.session.question.referenceAnswer).toEqual({
       status: "notRequested",
       content: null,

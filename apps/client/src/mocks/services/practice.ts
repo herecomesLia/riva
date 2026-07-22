@@ -375,11 +375,13 @@ export async function requestPracticeReferenceAnswer(
         ...session.question,
         referenceAnswer: {
           status: "revealed",
-          content: createPracticeReferenceAnswer(
-            session.question.questionType,
-            currentTargetRoleTitle(session.selection.targetRoleId),
-            session.question.prompt,
-          ),
+          content: createPracticeReferenceAnswer({
+            templateId: session.question.templateId,
+            questionType: session.question.questionType,
+            targetRoleTitle: currentTargetRoleTitle(session.selection.targetRoleId),
+            questionPrompt: session.question.prompt,
+            recommendedMaterials: session.question.recommendedMaterials,
+          }),
           viewedBeforeSubmission: true,
         },
       },
@@ -658,11 +660,13 @@ export async function getPracticeEvaluationStatus(
       ? copy(session.question.referenceAnswer)
       : {
           status: "revealed" as const,
-          content: createPracticeReferenceAnswer(
-            session.question.questionType,
-            currentTargetRoleTitle(session.selection.targetRoleId),
-            session.question.prompt,
-          ),
+          content: createPracticeReferenceAnswer({
+            templateId: session.question.templateId,
+            questionType: session.question.questionType,
+            targetRoleTitle: currentTargetRoleTitle(session.selection.targetRoleId),
+            questionPrompt: session.question.prompt,
+            recommendedMaterials: session.question.recommendedMaterials,
+          }),
           viewedBeforeSubmission: false,
         }
   return setMockResponse({

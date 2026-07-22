@@ -73,13 +73,14 @@ import {
 import { PracticeRecommendationCard } from "./components/PracticeRecommendationCard"
 import { PracticeReviewActions } from "./components/PracticeReviewActions"
 import { PracticeReferenceAnswer } from "./components/PracticeReferenceAnswer"
+import { isCurrentPracticeAttemptRetry } from "./practice-attempt"
 import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
   onEnd: (input: RequestEndPracticeSessionInput) => Promise<PracticeInteractionResult>
   onRequestFramework: (input: RequestAnswerFrameworkInput) => Promise<PracticeInteractionResult>
   onRequestHint: (input: RequestPracticeHintInput) => Promise<PracticeInteractionResult>
-  onRequestReferenceAnswer?: (
+  onRequestReferenceAnswer: (
     input: RequestPracticeReferenceAnswerInput,
   ) => Promise<PracticeInteractionResult>
   onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
@@ -103,7 +104,7 @@ export type PracticeAnsweringPending = {
   end: boolean
   framework: boolean
   hint: boolean
-  referenceAnswer?: boolean
+  referenceAnswer: boolean
   interactionLocked: boolean
   saved: boolean
   skip: boolean
@@ -594,14 +595,15 @@ function PracticeAnsweringView({
         onRequestHint={() => actions.onRequestHint(mutationInput)}
       />
       <PracticeReferenceAnswer
-        assistedRetry={session.attemptNumber > 1}
+        assistedRetry={
+          isCurrentPracticeAttemptRetry(session) &&
+          session.question.referenceAnswer.status === "revealed" &&
+          session.question.referenceAnswer.viewedBeforeSubmission
+        }
         interactionLocked={pending.interactionLocked}
         isPending={pending.referenceAnswer}
-        onRequest={
-          actions.onRequestReferenceAnswer
-            ? () => actions.onRequestReferenceAnswer?.(mutationInput) ?? Promise.resolve("ignored")
-            : undefined
-        }
+        mode="answering"
+        onRequest={() => actions.onRequestReferenceAnswer(mutationInput)}
         state={session.question.referenceAnswer}
       />
       <PracticeQuestionActions

@@ -131,7 +131,13 @@ describe("PracticePage", () => {
     revealedSession.version += 1
     revealedSession.question.referenceAnswer = {
       status: "revealed",
-      content: createPracticeReferenceAnswer(initial.session.question.questionType),
+      content: createPracticeReferenceAnswer({
+        templateId: initial.session.question.templateId,
+        questionType: initial.session.question.questionType,
+        targetRoleTitle: "Senior Frontend Engineer",
+        questionPrompt: initial.session.question.prompt,
+        recommendedMaterials: initial.session.question.recommendedMaterials,
+      }),
       viewedBeforeSubmission: true,
     }
     const request = createDeferred<PracticePageResponse>()

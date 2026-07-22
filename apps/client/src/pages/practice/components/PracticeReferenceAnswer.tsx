@@ -22,23 +22,29 @@ import type { PracticeReferenceAnswerState } from "@/models/practice"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 
-type Props = {
-  state: PracticeReferenceAnswerState
-  mode?: "answering" | "review" | "readonly"
-  isPending?: boolean
-  interactionLocked?: boolean
-  assistedRetry?: boolean
-  onRequest?: () => Promise<PracticeInteractionResult>
-}
+type Props =
+  | {
+      mode: "answering"
+      state: PracticeReferenceAnswerState
+      isPending: boolean
+      interactionLocked: boolean
+      assistedRetry: boolean
+      onRequest: () => Promise<PracticeInteractionResult>
+    }
+  | {
+      mode: "review" | "readonly"
+      state: PracticeReferenceAnswerState
+      assistedRetry?: boolean
+      isPending?: never
+      interactionLocked?: never
+      onRequest?: never
+    }
 
-export function PracticeReferenceAnswer({
-  state,
-  mode = "answering",
-  isPending = false,
-  interactionLocked = false,
-  assistedRetry = false,
-  onRequest,
-}: Props) {
+export function PracticeReferenceAnswer(props: Props) {
+  const { mode, state } = props
+  const isPending = mode === "answering" ? props.isPending : false
+  const interactionLocked = mode === "answering" ? props.interactionLocked : false
+  const assistedRetry = props.assistedRetry ?? false
   const { t } = useTranslation()
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [requestError, setRequestError] = useState(false)
@@ -46,11 +52,11 @@ export function PracticeReferenceAnswer({
   const [expanded, setExpanded] = useState(mode === "answering")
 
   async function confirmRequest() {
-    if (!onRequest || requestLock.current || isPending) return
+    if (mode !== "answering" || requestLock.current || isPending) return
     requestLock.current = true
     setRequestError(false)
     try {
-      const result = await onRequest()
+      const result = await props.onRequest()
       if (result === "executed") setConfirmationOpen(false)
     } catch {
       setConfirmationOpen(false)
