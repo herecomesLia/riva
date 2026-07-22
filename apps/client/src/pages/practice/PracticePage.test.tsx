@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { createPracticeMockResponse, createPracticeReferenceAnswer } from "@/mocks/data/practice"
+import {
+  createPracticeMockResponse,
+  createPracticeReferenceAnswer,
+  getPracticeFollowUpPlan,
+} from "@/mocks/data/practice"
 import type { PracticePageResponse } from "@/models/practice"
 import { PracticePage } from "@/pages/practice"
 import { synchronizePracticeSessionMutationResponse } from "@/pages/practice/practice-cache"
@@ -17,6 +21,9 @@ import {
   requestEndPracticeSession,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
+  requestPracticeFollowUpFramework,
+  requestPracticeFollowUpHint,
+  requestPracticeFollowUpReferenceAnswer,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
@@ -41,6 +48,9 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   requestEndPracticeSession: vi.fn(),
   requestPracticeHint: vi.fn(),
   requestPracticeReferenceAnswer: vi.fn(),
+  requestPracticeFollowUpFramework: vi.fn(),
+  requestPracticeFollowUpHint: vi.fn(),
+  requestPracticeFollowUpReferenceAnswer: vi.fn(),
   retryPracticeEvaluation: vi.fn(),
   retryCurrentPracticeQuestion: vi.fn(),
   continueToNextPracticeQuestion: vi.fn(),
@@ -95,6 +105,9 @@ describe("PracticePage", () => {
     vi.mocked(requestEndPracticeSession).mockReset()
     vi.mocked(requestPracticeHint).mockReset()
     vi.mocked(requestPracticeReferenceAnswer).mockReset()
+    vi.mocked(requestPracticeFollowUpFramework).mockReset()
+    vi.mocked(requestPracticeFollowUpHint).mockReset()
+    vi.mocked(requestPracticeFollowUpReferenceAnswer).mockReset()
     vi.mocked(retryPracticeEvaluation).mockReset()
     vi.mocked(retryCurrentPracticeQuestion).mockReset()
     vi.mocked(continueToNextPracticeQuestion).mockReset()
@@ -1024,6 +1037,47 @@ describe("PracticePage", () => {
     expect(
       await screen.findByRole("button", { name: i18n.t("practice.questionActions.unmarkWeak") }),
     ).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("synchronously locks duplicate follow-up assistance and preserves the draft on cache sync", async () => {
+    const initial = createPracticeMockResponse("answeringSingleFollowUp")
+    if (initial.session.status !== "answeringFollowUp") {
+      throw new Error("Follow-up fixture required.")
+    }
+    const revealed = structuredClone(initial)
+    if (revealed.session.status !== "answeringFollowUp") {
+      throw new Error("Follow-up fixture required.")
+    }
+    revealed.session.version += 1
+    const template = getPracticeFollowUpPlan(revealed.session.question.templateId)[0]!
+    revealed.session.currentFollowUp.question.answerHints = {
+      status: "revealed",
+      content: [...template.answerHints],
+    }
+    const request = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(initial)
+    vi.mocked(requestPracticeFollowUpHint).mockReturnValue(request.promise)
+    const user = userEvent.setup()
+    renderPracticePage()
+    const textbox = await screen.findByLabelText(i18n.t("practice.followUp.answerLabel"))
+    await user.type(textbox, "辅助请求期间继续保留并编辑的草稿")
+    const hint = screen.getByRole("button", {
+      name: i18n.t("practice.followUpAssistance.viewHint"),
+    })
+
+    fireEvent.click(hint)
+    fireEvent.click(hint)
+    await waitFor(() => expect(requestPracticeFollowUpHint).toHaveBeenCalledTimes(1))
+    expect(textbox).toBeEnabled()
+    expect(textbox).toHaveValue("辅助请求期间继续保留并编辑的草稿")
+    expect(screen.getByRole("button", { name: i18n.t("practice.followUp.submit") })).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.followUp.endAnswering") }),
+    ).toBeDisabled()
+
+    await act(async () => request.resolve(revealed))
+    expect(await screen.findByText(template.answerHints[0]!)).toBeVisible()
+    expect(textbox).toHaveValue("辅助请求期间继续保留并编辑的草稿")
   })
 
   it("submits a follow-up once, keeps the failed draft, and keeps route blocking active", async () => {

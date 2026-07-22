@@ -11,6 +11,9 @@ import type {
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
   RequestPracticeReferenceAnswerInput,
+  RequestPracticeFollowUpFrameworkInput,
+  RequestPracticeFollowUpHintInput,
+  RequestPracticeFollowUpReferenceAnswerInput,
   RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
@@ -93,6 +96,28 @@ export function requestPracticeReferenceAnswer(
   input: RequestPracticeReferenceAnswerInput,
 ): Promise<PracticePageResponse> {
   return env.mock ? practiceMockService.requestPracticeReferenceAnswer(input) : realApiUnavailable()
+}
+
+export function requestPracticeFollowUpHint(
+  input: RequestPracticeFollowUpHintInput,
+): Promise<PracticePageResponse> {
+  return env.mock ? practiceMockService.requestPracticeFollowUpHint(input) : realApiUnavailable()
+}
+
+export function requestPracticeFollowUpFramework(
+  input: RequestPracticeFollowUpFrameworkInput,
+): Promise<PracticePageResponse> {
+  return env.mock
+    ? practiceMockService.requestPracticeFollowUpFramework(input)
+    : realApiUnavailable()
+}
+
+export function requestPracticeFollowUpReferenceAnswer(
+  input: RequestPracticeFollowUpReferenceAnswerInput,
+): Promise<PracticePageResponse> {
+  return env.mock
+    ? practiceMockService.requestPracticeFollowUpReferenceAnswer(input)
+    : realApiUnavailable()
 }
 
 export function setQuestionSaved(

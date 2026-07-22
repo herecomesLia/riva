@@ -39,6 +39,9 @@ import type {
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
   RequestPracticeReferenceAnswerInput,
+  RequestPracticeFollowUpFrameworkInput,
+  RequestPracticeFollowUpHintInput,
+  RequestPracticeFollowUpReferenceAnswerInput,
   SetPracticeQuestionSavedInput,
   SetPracticeQuestionWeakInput,
   SkipPracticeQuestionInput,
@@ -62,6 +65,8 @@ import { PracticeQuestionGuidance } from "./components/PracticeQuestionGuidance"
 import { PracticeSessionHeader } from "./components/PracticeSessionHeader"
 import { PracticeConversationTimeline } from "./components/PracticeConversationTimeline"
 import { PracticeFollowUpComposer } from "./components/PracticeFollowUpComposer"
+import { PracticeFollowUpAssistance } from "./components/PracticeFollowUpAssistance"
+import { PracticeFollowUpReview } from "./components/PracticeFollowUpReview"
 import { PracticeEvaluationStatus } from "./components/PracticeEvaluationStatus"
 import { PracticeScoreOverview } from "./components/PracticeScoreOverview"
 import { PracticeDimensionScores } from "./components/PracticeDimensionScores"
@@ -90,13 +95,23 @@ export type PracticeAnsweringActions = {
 }
 
 export type PracticeFollowUpActions = {
+  onRequestHint: (input: RequestPracticeFollowUpHintInput) => Promise<PracticeInteractionResult>
+  onRequestFramework: (
+    input: RequestPracticeFollowUpFrameworkInput,
+  ) => Promise<PracticeInteractionResult>
+  onRequestReferenceAnswer: (
+    input: RequestPracticeFollowUpReferenceAnswerInput,
+  ) => Promise<PracticeInteractionResult>
   onEndFollowUps: (input: EndPracticeFollowUpsInput) => Promise<PracticeInteractionResult>
   onSubmitFollowUp: (input: SubmitFollowUpAnswerInput) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeFollowUpPending = {
   end: boolean
+  framework: boolean
+  hint: boolean
   interactionLocked: boolean
+  referenceAnswer: boolean
   submit: boolean
 }
 
@@ -364,6 +379,14 @@ function PracticeFollowUpView({
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
+      <PracticeFollowUpAssistance
+        interactionLocked={pending.interactionLocked}
+        onRequestFramework={() => actions.onRequestFramework(mutationInput)}
+        onRequestHint={() => actions.onRequestHint(mutationInput)}
+        onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
+        pending={pending}
+        question={session.currentFollowUp.question}
+      />
       <PracticeFollowUpComposer
         key={session.currentFollowUp.question.id}
         interactionLocked={pending.interactionLocked}
@@ -460,6 +483,10 @@ function PracticeReviewView({
         followUpExchanges={session.followUpExchanges}
         mainAnswer={session.mainAnswer}
         question={session.question}
+      />
+      <PracticeFollowUpReview
+        completion={session.followUpCompletion}
+        exchanges={session.followUpExchanges}
       />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
       <PracticeReviewSummary review={session.review} />

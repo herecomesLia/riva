@@ -55,11 +55,17 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
     },
     followUpActions: {
       onEndFollowUps: fn(async () => "executed" as const),
+      onRequestFramework: fn(async () => "executed" as const),
+      onRequestHint: fn(async () => "executed" as const),
+      onRequestReferenceAnswer: fn(async () => "executed" as const),
       onSubmitFollowUp: fn(async () => "executed" as const),
     },
     followUpPending: {
       end: false,
+      framework: false,
+      hint: false,
       interactionLocked: false,
+      referenceAnswer: false,
       submit: false,
     },
     reviewActions: {
@@ -353,6 +359,77 @@ export const SingleFollowUp = meta.story({
   },
 })
 
+export const FollowUpWithAssistance = meta.story({
+  args: readyArgs("answeringSingleFollowUp"),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-follow-up-assistance")).toBeVisible()
+    await expect(
+      canvas.getAllByRole("button", { name: /查看追问提示|view follow-up hint/i }),
+    ).toHaveLength(1)
+  },
+})
+
+export const FollowUpHintPending = meta.story({
+  args: {
+    ...readyArgs("answeringSingleFollowUp"),
+    followUpPending: {
+      end: false,
+      framework: false,
+      hint: true,
+      interactionLocked: true,
+      referenceAnswer: false,
+      submit: false,
+    },
+  },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: /正在生成追问提示|generating follow-up hint/i }),
+    ).toBeDisabled()
+    await expect(
+      canvas.getByRole("button", { name: /提交追问回答|submit follow-up answer/i }),
+    ).toBeDisabled()
+    await expect(canvas.getByRole("textbox")).toBeEnabled()
+  },
+})
+
+export const FollowUpReferencePending = meta.story({
+  args: {
+    ...readyArgs("answeringSingleFollowUp"),
+    followUpPending: {
+      end: false,
+      framework: false,
+      hint: false,
+      interactionLocked: true,
+      referenceAnswer: true,
+      submit: false,
+    },
+  },
+})
+
+export const FollowUpReferenceError = meta.story({
+  args: {
+    ...readyArgs("answeringSingleFollowUp"),
+    followUpActions: {
+      ...readyArgs("answeringSingleFollowUp").followUpActions,
+      onRequestReferenceAnswer: fn(async () => {
+        throw new Error("internal sessionId=secret version=9 stack")
+      }),
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByRole("textbox"), "保留草稿")
+    await userEvent.click(
+      canvas.getByRole("button", { name: /查看 RIVA 参考补充|view RIVA reference supplement/i }),
+    )
+    const dialog = within(document.body).getByRole("alertdialog")
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: /查看参考补充|view reference supplement/i }),
+    )
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/sessionId|version=9|stack/)
+    await expect(canvas.getByRole("textbox")).toHaveValue("保留草稿")
+  },
+})
+
 export const MultipleFollowUps = meta.story({
   args: readyArgs("answeringFollowUp"),
   play: async ({ canvas }) => {
@@ -366,7 +443,14 @@ export const MultipleFollowUps = meta.story({
 export const WaitingForFollowUp = meta.story({
   args: {
     ...readyArgs("answeringFollowUp"),
-    followUpPending: { end: false, interactionLocked: true, submit: true },
+    followUpPending: {
+      end: false,
+      framework: false,
+      hint: false,
+      interactionLocked: true,
+      referenceAnswer: false,
+      submit: true,
+    },
   },
   play: async ({ canvas }) => {
     await expect(
@@ -620,6 +704,26 @@ export const MotivationReview = meta.story({
 
 export const FollowUpEndedEarlyReview = meta.story({
   args: readyArgs("reviewFollowUpEndedEarly"),
+})
+
+export const FollowUpReviewWithReferences = meta.story({
+  args: readyArgs("reviewBalanced"),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-follow-up-review")).toBeVisible()
+    await expect(
+      canvas.getAllByRole("button", { name: /展开 RIVA|expand RIVA/i }),
+    ).not.toHaveLength(0)
+  },
+})
+
+export const FollowUpReviewWithUnansweredReference = meta.story({
+  args: readyArgs("reviewFollowUpEndedEarly"),
+  play: async ({ canvas, userEvent }) => {
+    const review = canvas.getByTestId("practice-follow-up-review")
+    const buttons = within(review).getAllByRole("button", { name: /展开 RIVA|expand RIVA/i })
+    await userEvent.click(buttons.at(-1)!)
+    await expect(within(review).getByText(/未回答|Unanswered/i)).toBeVisible()
+  },
 })
 
 export const FollowUpEndedEarly = meta.story({

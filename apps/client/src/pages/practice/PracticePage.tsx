@@ -13,6 +13,9 @@ import type {
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
   RequestPracticeReferenceAnswerInput,
+  RequestPracticeFollowUpFrameworkInput,
+  RequestPracticeFollowUpHintInput,
+  RequestPracticeFollowUpReferenceAnswerInput,
   RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
@@ -34,6 +37,9 @@ import {
   requestEndPracticeSession,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
+  requestPracticeFollowUpFramework,
+  requestPracticeFollowUpHint,
+  requestPracticeFollowUpReferenceAnswer,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
@@ -81,6 +87,11 @@ export function PracticePage() {
   const hintMutation = usePracticeMutation(requestPracticeHint)
   const frameworkMutation = usePracticeMutation(requestAnswerFramework)
   const referenceAnswerMutation = usePracticeMutation(requestPracticeReferenceAnswer)
+  const followUpHintMutation = usePracticeMutation(requestPracticeFollowUpHint)
+  const followUpFrameworkMutation = usePracticeMutation(requestPracticeFollowUpFramework)
+  const followUpReferenceAnswerMutation = usePracticeMutation(
+    requestPracticeFollowUpReferenceAnswer,
+  )
   const savedMutation = usePracticeMutation(setQuestionSaved)
   const weakMutation = usePracticeMutation(setQuestionWeak)
   const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
@@ -96,6 +107,9 @@ export function PracticePage() {
     hintMutation.isPending ||
     frameworkMutation.isPending ||
     referenceAnswerMutation.isPending ||
+    followUpHintMutation.isPending ||
+    followUpFrameworkMutation.isPending ||
+    followUpReferenceAnswerMutation.isPending ||
     savedMutation.isPending ||
     weakMutation.isPending ||
     submitAnswerMutation.isPending ||
@@ -308,6 +322,15 @@ export function PracticePage() {
           weak: weakMutation.isPending,
         }}
         followUpActions={{
+          onRequestFramework: async (input: RequestPracticeFollowUpFrameworkInput) => {
+            return runQuestionMutation(() => followUpFrameworkMutation.mutateAsync(input))
+          },
+          onRequestHint: async (input: RequestPracticeFollowUpHintInput) => {
+            return runQuestionMutation(() => followUpHintMutation.mutateAsync(input))
+          },
+          onRequestReferenceAnswer: async (input: RequestPracticeFollowUpReferenceAnswerInput) => {
+            return runQuestionMutation(() => followUpReferenceAnswerMutation.mutateAsync(input))
+          },
           onEndFollowUps: async (input: EndPracticeFollowUpsInput) => {
             return runQuestionMutation(() => endFollowUpMutation.mutateAsync(input))
           },
@@ -317,7 +340,10 @@ export function PracticePage() {
         }}
         followUpPending={{
           end: endFollowUpMutation.isPending,
+          framework: followUpFrameworkMutation.isPending,
+          hint: followUpHintMutation.isPending,
           interactionLocked: isQuestionMutationPending,
+          referenceAnswer: followUpReferenceAnswerMutation.isPending,
           submit: submitFollowUpMutation.isPending,
         }}
         reviewActions={{

@@ -13,6 +13,20 @@ export type PracticeQuestionTemplateId =
   | "technicalFoundation.reactRepeatedRendering"
   | "technicalFoundation.requestLayerDesign"
 
+export type PracticeFollowUpTemplateId =
+  | "projectDeepDive.performanceOptimization.resultAttribution"
+  | "projectDeepDive.performanceOptimization.stakeholderDisagreement"
+  | "projectDeepDive.complexProjectTradeoff.decisionCriteria"
+  | "projectDeepDive.complexProjectTradeoff.resistanceHandling"
+  | "behavioral.stakeholderConflict.reflection"
+  | "behavioral.incidentUnderPressure.priorityDecision"
+  | "businessUnderstanding.priorityAdjustment.validation"
+  | "businessUnderstanding.experienceVsRevenueTradeoff.guardrails"
+  | "technicalFoundation.reactRepeatedRendering.firstHypothesis"
+  | "technicalFoundation.reactRepeatedRendering.regressionRisk"
+  | "technicalFoundation.requestLayerDesign.consistencyRisk"
+  | "technicalFoundation.requestLayerDesign.failureRecovery"
+
 export type PracticeDifficulty = "basic" | "pressure"
 
 export type PracticeQuestionSource = "personalized" | "saved" | "history"
@@ -100,11 +114,35 @@ export type PracticeAnswer = {
   order: number
 }
 
+export type PracticeFollowUpReferenceAnswerKind = "personalizedSupplement" | "technicalReference"
+
+export type PracticeFollowUpReferenceAnswer = {
+  kind: PracticeFollowUpReferenceAnswerKind
+  addressedGap: string
+  answer: string
+  keyPoints: string[]
+  commonMistakes: string[]
+  generatedAt: string
+}
+
+export type PracticeFollowUpReferenceAnswerState =
+  | { status: "notRequested"; content: null; viewedBeforeSubmission: false }
+  | {
+      status: "revealed"
+      content: PracticeFollowUpReferenceAnswer
+      viewedBeforeSubmission: boolean
+    }
+  | { status: "unavailable"; content: null; viewedBeforeSubmission: false }
+
 export type PracticeFollowUpQuestion = {
   id: string
+  templateId: PracticeFollowUpTemplateId
   prompt: string
   createdAt: string
   order: number
+  answerHints: PracticeGuidance<string[]>
+  answerFramework: PracticeGuidance<string[]>
+  referenceAnswer: PracticeFollowUpReferenceAnswerState
 }
 
 export type AnsweredPracticeFollowUpExchange = {
@@ -296,18 +334,25 @@ export type PracticeQuestionMutationInput = {
   questionId: string
 }
 
+export type PracticeFollowUpMutationInput = PracticeQuestionMutationInput & {
+  followUpQuestionId: string
+}
+
 export type SubmitPrimaryAnswerInput = PracticeQuestionMutationInput & {
   content: string
 }
 
-export type SubmitFollowUpAnswerInput = PracticeQuestionMutationInput & {
-  followUpQuestionId: string
+export type SubmitFollowUpAnswerInput = PracticeFollowUpMutationInput & {
   content: string
 }
 
-export type EndPracticeFollowUpsInput = PracticeQuestionMutationInput & {
-  followUpQuestionId: string
-}
+export type EndPracticeFollowUpsInput = PracticeFollowUpMutationInput
+
+export type RequestPracticeFollowUpHintInput = PracticeFollowUpMutationInput
+
+export type RequestPracticeFollowUpFrameworkInput = PracticeFollowUpMutationInput
+
+export type RequestPracticeFollowUpReferenceAnswerInput = PracticeFollowUpMutationInput
 
 export type SetPracticeQuestionSavedInput = PracticeQuestionMutationInput & {
   isSaved: boolean

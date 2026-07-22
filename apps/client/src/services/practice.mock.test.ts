@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { createPracticeMockResponse, getPracticeFollowUpPrompts } from "@/mocks/data/practice"
+import { createPracticeMockResponse, getPracticeFollowUpPlan } from "@/mocks/data/practice"
 import { reconcilePracticeSetupSelection, resetPracticeMockState } from "@/mocks/services/practice"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import {
@@ -12,6 +12,9 @@ import {
   requestEndPracticeSession,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
+  requestPracticeFollowUpFramework,
+  requestPracticeFollowUpHint,
+  requestPracticeFollowUpReferenceAnswer,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
@@ -1056,7 +1059,7 @@ describe("practice stateful mock service", () => {
     expect(response.session.currentFollowUp.question).toMatchObject({
       id: `${initial.session.question.id}_follow_up_1`,
       order: 1,
-      prompt: getPracticeFollowUpPrompts(initial.session.question.questionType)[0],
+      prompt: getPracticeFollowUpPlan(initial.session.question.templateId)[0]?.prompt,
     })
     expect(response.session.version).toBe(initial.session.version + 1)
 
@@ -1090,6 +1093,83 @@ describe("practice stateful mock service", () => {
       status: "completed",
       reason: "noFollowUpRequired",
     })
+  })
+
+  it("reveals versioned assistance only on the current concrete follow-up", async () => {
+    resetPracticeMockState("answeringFirstFollowUp")
+    const initial = await settle(getPracticePage())
+    if (initial.session.status !== "answeringFollowUp") return
+    const baseInput = {
+      sessionId: initial.session.sessionId,
+      version: initial.session.version,
+      questionId: initial.session.question.id,
+      followUpQuestionId: initial.session.currentFollowUp.question.id,
+    }
+
+    const hinted = await settle(requestPracticeFollowUpHint(baseInput))
+    if (hinted.session.status !== "answeringFollowUp") return
+    expect(hinted.session.version).toBe(initial.session.version + 1)
+    expect(hinted.session.mainAnswer).toEqual(initial.session.mainAnswer)
+    expect(hinted.session.followUpExchanges).toEqual(initial.session.followUpExchanges)
+    expect(hinted.session.currentFollowUp.question.answerHints.status).toBe("revealed")
+    expect(hinted.session.currentFollowUp.question.answerFramework.status).toBe("notRequested")
+    expect(hinted.session.currentFollowUp.question.referenceAnswer.status).toBe("notRequested")
+
+    const frameworkInput = { ...baseInput, version: hinted.session.version }
+    const framed = await settle(requestPracticeFollowUpFramework(frameworkInput))
+    if (framed.session.status !== "answeringFollowUp") return
+    expect(framed.session.version).toBe(hinted.session.version + 1)
+    expect(framed.session.currentFollowUp.question.answerFramework.status).toBe("revealed")
+
+    const referenceInput = { ...baseInput, version: framed.session.version }
+    const referenced = await settle(requestPracticeFollowUpReferenceAnswer(referenceInput))
+    if (referenced.session.status !== "answeringFollowUp") return
+    const reference = referenced.session.currentFollowUp.question.referenceAnswer
+    expect(referenced.session.version).toBe(framed.session.version + 1)
+    expect(reference.status).toBe("revealed")
+    if (reference.status !== "revealed") return
+    expect(reference.viewedBeforeSubmission).toBe(true)
+    expect(reference.content.answer).toContain(referenced.session.currentFollowUp.question.prompt)
+    expect(reference.content.answer).toContain(referenced.session.question.prompt)
+    expect(reference.content.answer).toContain("Senior Frontend Engineer")
+
+    const repeated = await settle(
+      requestPracticeFollowUpReferenceAnswer({
+        ...referenceInput,
+        version: referenced.session.version,
+      }),
+    )
+    expect(repeated).toEqual(referenced)
+
+    for (const invalid of [
+      { ...baseInput, version: initial.session.version },
+      { ...baseInput, version: referenced.session.version, questionId: "wrong-question" },
+      {
+        ...baseInput,
+        version: referenced.session.version,
+        followUpQuestionId: "wrong-follow-up",
+      },
+    ]) {
+      const request = requestPracticeFollowUpHint(invalid)
+      const assertion = expect(request).rejects.toThrow("out of date")
+      await vi.runAllTimersAsync()
+      await assertion
+    }
+
+    const submitted = await settle(
+      submitFollowUpAnswer({
+        ...baseInput,
+        version: referenced.session.version,
+        content: "我补充真实的对照证据和归因边界。",
+      }),
+    )
+    if (submitted.session.status !== "answeringFollowUp") return
+    expect(submitted.session.followUpExchanges[0]?.question).toEqual(
+      referenced.session.currentFollowUp.question,
+    )
+    expect(submitted.session.currentFollowUp.question.answerHints.status).toBe("notRequested")
+    expect(submitted.session.currentFollowUp.question.answerFramework.status).toBe("notRequested")
+    expect(submitted.session.currentFollowUp.question.referenceAnswer.status).toBe("notRequested")
   })
 
   it("binds one behavioral follow-up answer to the current question and completes", async () => {
@@ -1161,7 +1241,7 @@ describe("practice stateful mock service", () => {
     expect(second.session.followUpExchanges.map(({ question }) => question.order)).toEqual([1])
     expect(second.session.currentFollowUp.question.order).toBe(2)
     expect(second.session.currentFollowUp.question.prompt).toBe(
-      getPracticeFollowUpPrompts(second.session.question.questionType)[1],
+      getPracticeFollowUpPlan(second.session.question.templateId)[1]?.prompt,
     )
     expect(second.session.currentFollowUp.question.id).not.toBe(firstInput.followUpQuestionId)
     expect(second.session.version).toBe(first.session.version + 1)
@@ -1186,6 +1266,43 @@ describe("practice stateful mock service", () => {
       1, 2,
     ])
     expect(completed.session.version).toBe(second.session.version + 1)
+  })
+
+  it("preserves the same pre-submission reference supplement in review", async () => {
+    resetPracticeMockState("answeringSingleFollowUp")
+    const initial = await settle(getPracticePage())
+    if (initial.session.status !== "answeringFollowUp") return
+    const input = {
+      sessionId: initial.session.sessionId,
+      version: initial.session.version,
+      questionId: initial.session.question.id,
+      followUpQuestionId: initial.session.currentFollowUp.question.id,
+    }
+    const revealed = await settle(requestPracticeFollowUpReferenceAnswer(input))
+    if (revealed.session.status !== "answeringFollowUp") return
+    const reference = revealed.session.currentFollowUp.question.referenceAnswer
+    if (reference.status !== "revealed") return
+
+    const evaluating = await settle(
+      submitFollowUpAnswer({
+        ...input,
+        version: revealed.session.version,
+        content: "我会提前确认约束，并用共同约定的结果验证调整是否有效。",
+      }),
+    )
+    if (evaluating.session.status !== "evaluating") return
+    const evaluationInput = {
+      sessionId: evaluating.session.sessionId,
+      version: evaluating.session.version,
+      questionId: evaluating.session.question.id,
+    }
+    await settle(getPracticeEvaluationStatus(evaluationInput))
+    const reviewed = await settle(getPracticeEvaluationStatus(evaluationInput))
+    if (reviewed.session.status !== "review") return
+    expect(reviewed.session.followUpExchanges[0]?.question.referenceAnswer).toEqual(reference)
+    expect(
+      reviewed.session.followUpExchanges[0]?.question.referenceAnswer.viewedBeforeSubmission,
+    ).toBe(true)
   })
 
   it("records an unanswered follow-up when the candidate ends early", async () => {
@@ -1230,7 +1347,13 @@ describe("practice stateful mock service", () => {
     if (completed.session.status !== "review") return
     expect(completed.session.version).toBe(initial.session.version + 1)
     expect(completed.session.mainAnswer).toEqual(initial.session.mainAnswer)
-    expect(completed.session.followUpExchanges).toEqual(initial.session.followUpExchanges)
+    expect(completed.session.followUpExchanges).toHaveLength(
+      initial.session.followUpExchanges.length,
+    )
+    for (const exchange of completed.session.followUpExchanges) {
+      expect(exchange.question.referenceAnswer.status).toBe("revealed")
+      expect(exchange.question.referenceAnswer.viewedBeforeSubmission).toBe(false)
+    }
     expect(Date.parse(completed.session.evaluation.evaluatedAt)).toBeGreaterThanOrEqual(
       Date.parse(initial.session.submittedAt),
     )
@@ -1289,6 +1412,21 @@ describe("practice stateful mock service", () => {
 
     expect(complete.followUpCompletion).toEqual({ status: "completed", reason: "allAnswered" })
     expect(endedEarly.followUpCompletion.status).toBe("endedEarly")
+    expect(
+      endedEarly.followUpExchanges.every(
+        ({ question }) =>
+          question.referenceAnswer.status === "revealed" &&
+          !question.referenceAnswer.viewedBeforeSubmission,
+      ),
+    ).toBe(true)
+    if (endedEarly.followUpCompletion.status === "endedEarly") {
+      expect(endedEarly.followUpCompletion.unansweredQuestion.referenceAnswer.status).toBe(
+        "revealed",
+      )
+      expect(
+        endedEarly.followUpCompletion.unansweredQuestion.referenceAnswer.viewedBeforeSubmission,
+      ).toBe(false)
+    }
     expect(endedEarly.evaluation.overallScore).toBeLessThan(complete.evaluation.overallScore)
     expect(endedEarly.review.recommendation.action).toBe("retryCurrent")
     expect(endedEarly.review.overallPerformance).toContain("追问提前结束")

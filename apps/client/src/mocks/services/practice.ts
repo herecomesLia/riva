@@ -2,10 +2,11 @@ import {
   createGeneratedPracticeQuestion,
   createGeneratedPracticeQuestionGuidance,
   createPracticeReferenceAnswer,
+  createPracticeFollowUpReferenceAnswer,
   createPracticeMockEvaluationResult,
   createPracticeFollowUpQuestion,
   createPracticeMockResponse,
-  getPracticeFollowUpPrompts,
+  getPracticeFollowUpPlan,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
 import { getRolesPage } from "@/mocks/services/roles"
@@ -24,6 +25,9 @@ import type {
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
   RequestPracticeReferenceAnswerInput,
+  RequestPracticeFollowUpFrameworkInput,
+  RequestPracticeFollowUpHintInput,
+  RequestPracticeFollowUpReferenceAnswerInput,
   RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
@@ -389,6 +393,102 @@ export async function requestPracticeReferenceAnswer(
   })
 }
 
+export async function requestPracticeFollowUpHint(
+  input: RequestPracticeFollowUpHintInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentFollowUp(input)
+  if (session.currentFollowUp.question.answerHints.status !== "notRequested") {
+    return copy(mockResponse)
+  }
+  const template = getPracticeFollowUpPlan(session.question.templateId).find(
+    ({ id }) => id === session.currentFollowUp.question.templateId,
+  )
+  if (!template) throw new Error("Practice follow-up template was not found.")
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      currentFollowUp: {
+        ...session.currentFollowUp,
+        question: {
+          ...session.currentFollowUp.question,
+          answerHints: { status: "revealed", content: copy([...template.answerHints]) },
+        },
+      },
+    },
+  })
+}
+
+export async function requestPracticeFollowUpFramework(
+  input: RequestPracticeFollowUpFrameworkInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentFollowUp(input)
+  if (session.currentFollowUp.question.answerFramework.status !== "notRequested") {
+    return copy(mockResponse)
+  }
+  const template = getPracticeFollowUpPlan(session.question.templateId).find(
+    ({ id }) => id === session.currentFollowUp.question.templateId,
+  )
+  if (!template) throw new Error("Practice follow-up template was not found.")
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      currentFollowUp: {
+        ...session.currentFollowUp,
+        question: {
+          ...session.currentFollowUp.question,
+          answerFramework: {
+            status: "revealed",
+            content: copy([...template.answerFramework]),
+          },
+        },
+      },
+    },
+  })
+}
+
+export async function requestPracticeFollowUpReferenceAnswer(
+  input: RequestPracticeFollowUpReferenceAnswerInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = requireCurrentFollowUp(input)
+  if (session.currentFollowUp.question.referenceAnswer.status !== "notRequested") {
+    return copy(mockResponse)
+  }
+
+  return setMockResponse({
+    ...mockResponse,
+    session: {
+      ...session,
+      version: session.version + 1,
+      currentFollowUp: {
+        ...session.currentFollowUp,
+        question: {
+          ...session.currentFollowUp.question,
+          referenceAnswer: {
+            status: "revealed",
+            content: createPracticeFollowUpReferenceAnswer({
+              mainQuestion: session.question,
+              mainAnswer: session.mainAnswer,
+              previousFollowUpExchanges: session.followUpExchanges,
+              currentFollowUp: session.currentFollowUp.question,
+              targetRoleTitle: currentTargetRoleTitle(session.selection.targetRoleId),
+            }),
+            viewedBeforeSubmission: true,
+          },
+        },
+      },
+    },
+  })
+}
+
 export async function setQuestionSaved(
   input: SetPracticeQuestionSavedInput,
 ): Promise<PracticePageResponse> {
@@ -438,10 +538,10 @@ export async function submitPrimaryAnswer(
     createdAt: submittedAt,
     order: 1,
   }
-  const followUpPrompts = getPracticeFollowUpPrompts(session.question.questionType)
-  const firstPrompt = followUpPrompts[0]
+  const followUpPlan = getPracticeFollowUpPlan(session.question.templateId)
+  const firstTemplate = followUpPlan[0]
 
-  if (!firstPrompt) {
+  if (!firstTemplate) {
     return setMockResponse({
       ...mockResponse,
       session: {
@@ -496,11 +596,11 @@ export async function submitFollowUpAnswer(
     },
   }
   const followUpExchanges = [...session.followUpExchanges, answeredExchange]
-  const prompts = getPracticeFollowUpPrompts(session.question.questionType)
+  const plan = getPracticeFollowUpPlan(session.question.templateId)
   const nextOrder = session.currentFollowUp.question.order + 1
-  const nextPrompt = prompts[nextOrder - 1]
+  const nextTemplate = plan[nextOrder - 1]
 
-  if (!nextPrompt) {
+  if (!nextTemplate) {
     return setMockResponse({
       ...mockResponse,
       session: {
@@ -655,6 +755,25 @@ export async function getPracticeEvaluationStatus(
   if (pollCount < 2) return copy(mockResponse)
 
   const result = createPracticeMockEvaluationResult(session)
+  const followUpExchanges = session.followUpExchanges.map((exchange, index) => ({
+    ...copy(exchange),
+    question: revealFollowUpReference(
+      session,
+      exchange.question,
+      session.followUpExchanges.slice(0, index),
+    ),
+  }))
+  const followUpCompletion =
+    session.followUpCompletion.status === "endedEarly"
+      ? {
+          status: "endedEarly" as const,
+          unansweredQuestion: revealFollowUpReference(
+            session,
+            session.followUpCompletion.unansweredQuestion,
+            session.followUpExchanges,
+          ),
+        }
+      : copy(session.followUpCompletion)
   const referenceAnswer =
     session.question.referenceAnswer.status === "revealed"
       ? copy(session.question.referenceAnswer)
@@ -682,12 +801,34 @@ export async function getPracticeEvaluationStatus(
       attemptRecords: copy(session.attemptRecords),
       question: { ...copy(session.question), referenceAnswer },
       mainAnswer: copy(session.mainAnswer),
-      followUpExchanges: copy(session.followUpExchanges),
-      followUpCompletion: copy(session.followUpCompletion),
+      followUpExchanges,
+      followUpCompletion,
       evaluation: result.evaluation,
       review: result.review,
     },
   })
+}
+
+function revealFollowUpReference(
+  session: import("@/models/practice").PracticeEvaluatingState,
+  followUp: import("@/models/practice").PracticeFollowUpQuestion,
+  previousFollowUpExchanges: readonly import("@/models/practice").AnsweredPracticeFollowUpExchange[],
+) {
+  if (followUp.referenceAnswer.status === "revealed") return copy(followUp)
+  return {
+    ...copy(followUp),
+    referenceAnswer: {
+      status: "revealed" as const,
+      content: createPracticeFollowUpReferenceAnswer({
+        mainQuestion: session.question,
+        mainAnswer: session.mainAnswer,
+        previousFollowUpExchanges,
+        currentFollowUp: followUp,
+        targetRoleTitle: currentTargetRoleTitle(session.selection.targetRoleId),
+      }),
+      viewedBeforeSubmission: false,
+    },
+  }
 }
 
 export async function retryPracticeEvaluation(

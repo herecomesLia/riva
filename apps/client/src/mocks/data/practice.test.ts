@@ -4,10 +4,11 @@ import {
   createGeneratedPracticeQuestionGuidance,
   createGeneratedPracticeQuestion,
   createPracticeFollowUpQuestion,
+  createPracticeFollowUpReferenceAnswer,
   createPracticeMockEvaluationResult,
   createPracticeMockResponse,
   createPracticeReferenceAnswer,
-  getPracticeFollowUpPrompts,
+  getPracticeFollowUpPlan,
   practiceResponseMock,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
@@ -134,11 +135,23 @@ function expectFollowUpQuestionMatchesPlan(
   question: PracticeQuestionCard,
   followUp: PracticeFollowUpQuestion,
 ) {
-  const prompts = getPracticeFollowUpPrompts(question.questionType)
+  const templates = getPracticeFollowUpPlan(question.templateId)
   expect(followUp.order).toBeGreaterThan(0)
-  expect(followUp.order).toBeLessThanOrEqual(prompts.length)
-  expect(followUp.prompt).toBe(prompts[followUp.order - 1])
+  expect(followUp.order).toBeLessThanOrEqual(templates.length)
+  expect(followUp.prompt).toBe(templates[followUp.order - 1]?.prompt)
+  expect(followUp.templateId).toBe(templates[followUp.order - 1]?.id)
   expect(followUp.id).toBe(`${question.id}_follow_up_${followUp.order}`)
+  expect(followUp.templateId.startsWith(`${question.templateId}.`)).toBe(true)
+  expectConsistentGuidance(followUp.answerHints)
+  expectConsistentGuidance(followUp.answerFramework)
+  const reference = followUp.referenceAnswer
+  if (reference.status === "revealed") {
+    expect(reference.content.answer.trim()).not.toBe("")
+  } else {
+    expect(reference.content).toBeNull()
+    expect(reference.viewedBeforeSubmission).toBe(false)
+  }
+  if (reference.viewedBeforeSubmission) expect(reference.status).toBe("revealed")
 }
 
 function expectCompletedFollowUpsMatchPlan({
@@ -150,7 +163,7 @@ function expectCompletedFollowUpsMatchPlan({
   exchanges: Array<{ question: PracticeFollowUpQuestion; answer: { order: number } }>
   completion: PracticeFollowUpCompletion
 }) {
-  const prompts = getPracticeFollowUpPrompts(question.questionType)
+  const templates = getPracticeFollowUpPlan(question.templateId)
   exchanges.forEach((exchange, index) => {
     expectFollowUpQuestionMatchesPlan(question, exchange.question)
     expect(exchange.question.order).toBe(index + 1)
@@ -164,14 +177,14 @@ function expectCompletedFollowUpsMatchPlan({
   }
 
   if (completion.reason === "noFollowUpRequired") {
-    expect(prompts).toHaveLength(0)
+    expect(templates).toHaveLength(0)
     expect(exchanges).toHaveLength(0)
     return
   }
 
-  expect(exchanges).toHaveLength(prompts.length)
+  expect(exchanges).toHaveLength(templates.length)
   expect(exchanges.map(({ question: followUp }) => followUp.order)).toEqual(
-    prompts.map((_, index) => index + 1),
+    templates.map((_, index) => index + 1),
   )
 }
 
@@ -265,6 +278,19 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.currentFollowUp.answer).toBeNull()
       expect(session.currentFollowUp.question.order).toBe(session.followUpExchanges.length + 1)
       expectFollowUpQuestionMatchesPlan(session.question, session.currentFollowUp.question)
+      expect(session.currentFollowUp.question.answerHints).toEqual({
+        status: "notRequested",
+        content: null,
+      })
+      expect(session.currentFollowUp.question.answerFramework).toEqual({
+        status: "notRequested",
+        content: null,
+      })
+      expect(session.currentFollowUp.question.referenceAnswer).toEqual({
+        status: "notRequested",
+        content: null,
+        viewedBeforeSubmission: false,
+      })
       session.followUpExchanges.forEach((exchange, index) => {
         expectFollowUpQuestionMatchesPlan(session.question, exchange.question)
         expect(exchange.question.order).toBe(index + 1)
@@ -325,6 +351,14 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
         exchanges: session.followUpExchanges,
         completion: session.followUpCompletion,
       })
+      for (const exchange of session.followUpExchanges) {
+        expect(exchange.question.referenceAnswer.status).toBe("revealed")
+      }
+      if (session.followUpCompletion.status === "endedEarly") {
+        expect(session.followUpCompletion.unansweredQuestion.referenceAnswer.status).toBe(
+          "revealed",
+        )
+      }
       return
     }
     case "completed": {
@@ -409,24 +443,22 @@ describe("practice mock scenarios", () => {
       viewedBeforeSubmission: false,
     })
   })
-  it("returns independent deterministic follow-up plans for every question type", () => {
-    const expectedCounts: Record<PracticeQuestionType, number> = {
-      projectDeepDive: 2,
-      behavioral: 1,
-      businessUnderstanding: 1,
-      motivation: 0,
-      technicalFoundation: 2,
-    }
-
-    for (const questionType of questionTypes) {
-      const first = getPracticeFollowUpPrompts(questionType)
-      const second = getPracticeFollowUpPrompts(questionType)
-      expect(first).toHaveLength(expectedCounts[questionType])
-      expect(first).not.toBe(second)
-
-      if (first.length > 0) {
-        first[0] = "Mutated follow-up"
-        expect(second[0]).not.toBe("Mutated follow-up")
+  it("returns deterministic follow-up plans for every concrete main question template", () => {
+    for (const templateId of templateIds) {
+      const plan = getPracticeFollowUpPlan(templateId)
+      expect(plan).toHaveLength(
+        templateId.startsWith("motivation.")
+          ? 0
+          : templateId.includes("projectDeepDive") || templateId.includes("technicalFoundation")
+            ? 2
+            : 1,
+      )
+      for (const template of plan) {
+        expect(template.id.startsWith(`${templateId}.`)).toBe(true)
+        expect(template.prompt.trim()).not.toBe("")
+        expect(template.answerHints.length).toBeGreaterThan(0)
+        expect(template.answerFramework.length).toBeGreaterThan(0)
+        expect(template.referenceAnswer.answer.trim()).not.toBe("")
       }
     }
   })
@@ -443,6 +475,53 @@ describe("practice mock scenarios", () => {
     expectFollowUpQuestionMatchesPlan(response.session.question, followUp)
     expect("followUpPlan" in response.session).toBe(false)
     expect("futureFollowUps" in response.session).toBe(false)
+  })
+
+  it("creates distinct contextual supplements for concrete follow-up templates", () => {
+    const cases = [
+      ["projectDeepDive", 1, 1],
+      ["projectDeepDive", 2, 1],
+      ["behavioral", 2, 1],
+      ["businessUnderstanding", 2, 1],
+      ["technicalFoundation", 1, 1],
+      ["technicalFoundation", 2, 1],
+      ["technicalFoundation", 2, 2],
+    ] as const satisfies readonly (readonly [PracticeQuestionType, number, number])[]
+    const answers = cases.map(([questionType, ordinal, order]) => {
+      const mainQuestion = createGeneratedPracticeQuestion({
+        sessionId: `context_${questionType}_${ordinal}`,
+        ordinal,
+        selection: {
+          targetRoleId: "role_frontend_bytedance",
+          questionType,
+          difficulty: "pressure",
+          source: "personalized",
+          prioritizeWeaknesses: false,
+        },
+      })
+      const currentFollowUp = createPracticeFollowUpQuestion({
+        question: mainQuestion,
+        order,
+        createdAt: "2026-07-20T03:00:00.000Z",
+      })
+      return createPracticeFollowUpReferenceAnswer({
+        mainQuestion,
+        mainAnswer: {
+          id: `answer_${ordinal}_${order}`,
+          content: "这是用户基于真实经历给出的主回答。",
+          createdAt: "2026-07-20T02:59:00.000Z",
+          order: 1,
+        },
+        previousFollowUpExchanges: [],
+        currentFollowUp,
+        targetRoleTitle: "Senior Frontend Engineer",
+      }).answer
+    })
+
+    expect(new Set(answers).size).toBe(answers.length)
+    expect(answers[2]).not.toContain("重新处理这次冲突")
+    expect(`${answers[5]} ${answers[6]}`).toMatch(/缓存|一致性|竞态|降级|恢复/)
+    expect(answers[4]).toMatch(/Profiler|Strict Mode|生产构建/)
   })
 
   it.each(questionTypes)(

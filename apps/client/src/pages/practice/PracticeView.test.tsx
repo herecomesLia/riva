@@ -79,6 +79,9 @@ function createFollowUpActions(
 ): PracticeFollowUpActions {
   return {
     onEndFollowUps: vi.fn(async () => "executed" as const),
+    onRequestFramework: vi.fn(async () => "executed" as const),
+    onRequestHint: vi.fn(async () => "executed" as const),
+    onRequestReferenceAnswer: vi.fn(async () => "executed" as const),
     onSubmitFollowUp: vi.fn(async () => "executed" as const),
     ...overrides,
   }
@@ -86,7 +89,10 @@ function createFollowUpActions(
 
 const followUpPending: PracticeFollowUpPending = {
   end: false,
+  framework: false,
+  hint: false,
   interactionLocked: false,
+  referenceAnswer: false,
   submit: false,
 }
 
@@ -935,6 +941,177 @@ describe("PracticeView", () => {
     })
   })
 
+  it("shows three follow-up assistance entries without preloading hidden content", async () => {
+    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    renderReadyView(data)
+    if (data.session.status !== "answeringFollowUp") return
+
+    expect(
+      await screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewHint"),
+      }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewFramework"),
+      }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    ).toBeVisible()
+    expect(screen.queryByText(/承认具体不足|Profiler 确认更新来源/)).not.toBeInTheDocument()
+  })
+
+  it("requests follow-up hint and framework with the exact versioned input", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const actions = createFollowUpActions()
+    renderReadyView(data, { followUpActions: actions })
+    if (data.session.status !== "answeringFollowUp") return
+    const input = {
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+      followUpQuestionId: data.session.currentFollowUp.question.id,
+    }
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewHint"),
+      }),
+    )
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewFramework"),
+      }),
+    )
+    expect(actions.onRequestHint).toHaveBeenCalledWith(input)
+    expect(actions.onRequestFramework).toHaveBeenCalledWith(input)
+  })
+
+  it("requests a follow-up reference only after confirmation and preserves the draft", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const actions = createFollowUpActions()
+    renderReadyView(data, { followUpActions: actions })
+    if (data.session.status !== "answeringFollowUp") return
+    const textbox = await screen.findByLabelText(i18n.t("practice.followUp.answerLabel"))
+    await user.type(textbox, "先保留这段追问草稿")
+
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    )
+    expect(actions.onRequestReferenceAnswer).not.toHaveBeenCalled()
+    const dialog = screen.getByRole("alertdialog")
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.continueIndependently"),
+      }),
+    )
+    expect(actions.onRequestReferenceAnswer).not.toHaveBeenCalled()
+
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    )
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.confirm"),
+      }),
+    )
+    expect(actions.onRequestReferenceAnswer).toHaveBeenCalledTimes(1)
+    expect(actions.onRequestReferenceAnswer).toHaveBeenCalledWith({
+      sessionId: data.session.sessionId,
+      version: data.session.version,
+      questionId: data.session.question.id,
+      followUpQuestionId: data.session.currentFollowUp.question.id,
+    })
+    expect(textbox).toHaveValue("先保留这段追问草稿")
+  })
+
+  it("deduplicates same-frame follow-up reference confirmation", async () => {
+    const user = userEvent.setup()
+    let resolveRequest!: (result: "executed") => void
+    const request = vi.fn(() => new Promise<"executed">((resolve) => (resolveRequest = resolve)))
+    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+      followUpActions: createFollowUpActions({ onRequestReferenceAnswer: request }),
+    })
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    )
+    const confirm = within(screen.getByRole("alertdialog")).getByRole("button", {
+      name: i18n.t("practice.followUpAssistance.confirm"),
+    })
+    await user.dblClick(confirm)
+    expect(request).toHaveBeenCalledTimes(1)
+    resolveRequest("executed")
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument())
+  })
+
+  it("locks every versioned follow-up action during assistance while keeping the draft editable", async () => {
+    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+      followUpPending: {
+        end: false,
+        framework: false,
+        hint: true,
+        interactionLocked: true,
+        referenceAnswer: false,
+        submit: false,
+      },
+    })
+
+    expect(
+      await screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.hintGenerating"),
+      }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewFramework"),
+      }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: i18n.t("practice.followUp.submit") })).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.followUp.endAnswering") }),
+    ).toBeDisabled()
+    expect(screen.getByLabelText(i18n.t("practice.followUp.answerLabel"))).toBeEnabled()
+  })
+
+  it("shows only safe follow-up assistance errors and keeps the draft", async () => {
+    const user = userEvent.setup()
+    const actions = createFollowUpActions({
+      onRequestHint: vi.fn(async () => {
+        throw new Error("internal sessionId=secret version=77 stack")
+      }),
+    })
+    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+      followUpActions: actions,
+    })
+    const textbox = await screen.findByLabelText(i18n.t("practice.followUp.answerLabel"))
+    await user.type(textbox, "错误后保留草稿")
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("practice.followUpAssistance.viewHint") }),
+    )
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.followUpAssistance.requestErrorDescription"),
+    )
+    expect(screen.queryByText(/sessionId=secret|stack|version=77/)).not.toBeInTheDocument()
+    expect(textbox).toHaveValue("错误后保留草稿")
+  })
+
   it("preserves a follow-up draft after a safe submit error", async () => {
     const user = userEvent.setup()
     const actions = createFollowUpActions({
@@ -958,7 +1135,14 @@ describe("PracticeView", () => {
 
   it("shows real processing state while waiting for the next follow-up", async () => {
     renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
-      followUpPending: { end: false, interactionLocked: true, submit: true },
+      followUpPending: {
+        end: false,
+        framework: false,
+        hint: false,
+        interactionLocked: true,
+        referenceAnswer: false,
+        submit: true,
+      },
     })
 
     expect(await screen.findByText(i18n.t("practice.followUp.processing"))).toBeVisible()
@@ -1158,6 +1342,17 @@ describe("PracticeView", () => {
     }
     expect(timeline).toHaveTextContent(data.session.followUpCompletion.unansweredQuestion.prompt)
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
+    const review = screen.getByTestId("practice-follow-up-review")
+    expect(review).toHaveTextContent(i18n.t("practice.followUpAssistance.unanswered"))
+    const expandButtons = within(review).getAllByRole("button", {
+      name: i18n.t("practice.followUpReview.expandReference"),
+    })
+    await userEvent.click(expandButtons.at(-1)!)
+    expect(review).toHaveTextContent(
+      data.session.followUpCompletion.unansweredQuestion.referenceAnswer.status === "revealed"
+        ? data.session.followUpCompletion.unansweredQuestion.referenceAnswer.content.addressedGap
+        : "",
+    )
   })
 
   it("renders long review content and the no-new-weaknesses state", async () => {
