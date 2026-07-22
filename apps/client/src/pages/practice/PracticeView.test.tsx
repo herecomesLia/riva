@@ -412,6 +412,56 @@ describe("PracticeView", () => {
     ).not.toBeChecked()
   })
 
+  it("keeps the selected option styling after focus moves away", async () => {
+    const user = userEvent.setup()
+    renderReadyView(createPracticeMockResponse("setupReady"))
+    await screen.findByTestId("practice-setup-state")
+
+    const selectedQuestionType = screen.getByRole("button", {
+      name: i18n.t("practice.questionTypes.behavioral"),
+    })
+    await user.click(selectedQuestionType)
+    await user.tab()
+
+    expect(selectedQuestionType).not.toHaveFocus()
+    expect(selectedQuestionType).toHaveAttribute("aria-pressed", "true")
+    expect(selectedQuestionType).toHaveClass(
+      "hover:bg-card",
+      "aria-pressed:border-primary",
+      "aria-pressed:bg-card",
+      "aria-pressed:text-primary",
+    )
+  })
+
+  it("separates the setup sections with responsive theme dividers", async () => {
+    renderReadyView(createPracticeMockResponse("setupReady"))
+    await screen.findByTestId("practice-setup-state")
+
+    const questionTypeFieldSet = screen
+      .getByText(i18n.t("practice.setup.fields.questionType"))
+      .closest('[data-slot="field-set"]')
+    expect(questionTypeFieldSet).not.toHaveClass("border-t")
+    expect(questionTypeFieldSet?.parentElement).toHaveClass("border-t", "border-border", "py-5")
+
+    const sourceFieldSet = screen
+      .getByText(i18n.t("practice.setup.fields.source"))
+      .closest('[data-slot="field-set"]')
+    expect(sourceFieldSet).not.toHaveClass("border-t")
+    expect(sourceFieldSet?.parentElement).toHaveClass(
+      "border-t",
+      "border-border",
+      "pt-5",
+      "md:border-t-0",
+      "md:border-l",
+      "md:pl-6",
+    )
+    expect(
+      screen
+        .getByRole("switch", { name: i18n.t("practice.setup.fields.prioritizeWeaknesses") })
+        .closest('[data-slot="field"]'),
+    ).toHaveClass("border-t", "border-border", "pt-5")
+  })
+
   it("renders the setup selection returned by the service without reapplying a default", async () => {
     const data = createPracticeMockResponse("setupReady")
     if (data.session.status !== "setup") return

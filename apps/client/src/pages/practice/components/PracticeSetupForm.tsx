@@ -1,4 +1,13 @@
 import { useForm } from "@tanstack/react-form"
+import {
+  AlertCircleIcon,
+  BriefcaseBusinessIcon,
+  ClipboardListIcon,
+  DatabaseIcon,
+  GaugeIcon,
+  PlayIcon,
+  TargetIcon,
+} from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
@@ -33,7 +42,6 @@ import type {
   PracticeQuestionType,
   PracticeSetupContext,
 } from "@/models/practice"
-import { AlertCircleIcon } from "lucide-react"
 
 const setupSchema = z.object({
   targetRoleId: z.string().min(1),
@@ -58,6 +66,8 @@ const questionTypes: PracticeQuestionType[] = [
 ]
 const difficulties: PracticeDifficulty[] = ["basic", "pressure"]
 const sources: PracticeQuestionSource[] = ["personalized", "saved", "history"]
+const practiceOptionStateClassName =
+  "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
 
 type PracticeSetupFormProps = {
   context: PracticeSetupContext
@@ -96,7 +106,7 @@ export function PracticeSetupForm({
         void form.handleSubmit()
       }}
     >
-      <FieldGroup>
+      <FieldGroup className="gap-0">
         <form.Field name="targetRoleId">
           {(field) => {
             const selectedRole = context.targetRoles.find((role) => role.id === field.state.value)
@@ -105,8 +115,9 @@ export function PracticeSetupForm({
               : selectedRole?.title
 
             return (
-              <Field>
-                <FieldLabel htmlFor={field.name}>
+              <Field className="pb-5">
+                <FieldLabel className="[&>svg]:size-4 [&>svg]:text-primary" htmlFor={field.name}>
+                  <BriefcaseBusinessIcon aria-hidden="true" />
                   {t("practice.setup.fields.targetRole")}
                 </FieldLabel>
                 <Select
@@ -126,7 +137,7 @@ export function PracticeSetupForm({
                   value={field.state.value}
                 >
                   <SelectTrigger
-                    className="w-full"
+                    className="w-full focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary"
                     data-testid="practice-target-role-trigger"
                     id={field.name}
                     onBlur={field.handleBlur}
@@ -148,47 +159,65 @@ export function PracticeSetupForm({
           }}
         </form.Field>
 
-        <form.Subscribe selector={(state) => state.values.targetRoleId}>
-          {(targetRoleId) => {
-            const selectedRole = context.targetRoles.find((role) => role.id === targetRoleId)
-            const supportedQuestionTypes = selectedRole?.supportedQuestionTypes ?? []
+        <div className="border-t border-border py-5">
+          <form.Subscribe selector={(state) => state.values.targetRoleId}>
+            {(targetRoleId) => {
+              const selectedRole = context.targetRoles.find((role) => role.id === targetRoleId)
+              const supportedQuestionTypes = selectedRole?.supportedQuestionTypes ?? []
 
-            return (
-              <form.Field name="questionType">
-                {(field) => (
-                  <FieldSet>
-                    <FieldLegend>{t("practice.setup.fields.questionType")}</FieldLegend>
-                    <ToggleGroup
-                      aria-label={t("practice.setup.fields.questionType")}
-                      className="flex w-full flex-wrap justify-start"
-                      onValueChange={(values) => {
-                        const value = values[0]
-                        if (value) field.handleChange(value as PracticeQuestionType)
-                      }}
-                      spacing={2}
-                      value={[field.state.value]}
-                      variant="outline"
-                    >
-                      {questionTypes
-                        .filter((type) => supportedQuestionTypes.includes(type))
-                        .map((type) => (
-                          <ToggleGroupItem key={type} value={type}>
-                            {t(`practice.questionTypes.${type}`)}
-                          </ToggleGroupItem>
-                        ))}
-                    </ToggleGroup>
-                  </FieldSet>
-                )}
-              </form.Field>
-            )
-          }}
-        </form.Subscribe>
+              return (
+                <form.Field name="questionType">
+                  {(field) => (
+                    <FieldSet>
+                      <FieldLegend
+                        className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
+                        variant="label"
+                      >
+                        <ClipboardListIcon aria-hidden="true" />
+                        {t("practice.setup.fields.questionType")}
+                      </FieldLegend>
+                      <ToggleGroup
+                        aria-label={t("practice.setup.fields.questionType")}
+                        className="flex w-full flex-wrap justify-start"
+                        onValueChange={(values) => {
+                          const value = values[0]
+                          if (value) field.handleChange(value as PracticeQuestionType)
+                        }}
+                        spacing={2}
+                        value={[field.state.value]}
+                        variant="outline"
+                      >
+                        {questionTypes
+                          .filter((type) => supportedQuestionTypes.includes(type))
+                          .map((type) => (
+                            <ToggleGroupItem
+                              className={practiceOptionStateClassName}
+                              key={type}
+                              value={type}
+                            >
+                              {t(`practice.questionTypes.${type}`)}
+                            </ToggleGroupItem>
+                          ))}
+                      </ToggleGroup>
+                    </FieldSet>
+                  )}
+                </form.Field>
+              )
+            }}
+          </form.Subscribe>
+        </div>
 
-        <div className="grid gap-7 md:grid-cols-2">
+        <div className="grid gap-5 border-t border-border py-5 md:grid-cols-2 md:gap-0">
           <form.Field name="difficulty">
             {(field) => (
-              <FieldSet>
-                <FieldLegend>{t("practice.setup.fields.difficulty")}</FieldLegend>
+              <FieldSet className="md:pr-6">
+                <FieldLegend
+                  className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
+                  variant="label"
+                >
+                  <GaugeIcon aria-hidden="true" />
+                  {t("practice.setup.fields.difficulty")}
+                </FieldLegend>
                 <ToggleGroup
                   aria-label={t("practice.setup.fields.difficulty")}
                   className="flex w-full justify-start"
@@ -201,7 +230,11 @@ export function PracticeSetupForm({
                   variant="outline"
                 >
                   {difficulties.map((difficulty) => (
-                    <ToggleGroupItem key={difficulty} value={difficulty}>
+                    <ToggleGroupItem
+                      className={practiceOptionStateClassName}
+                      key={difficulty}
+                      value={difficulty}
+                    >
                       {t(`practice.difficulty.${difficulty}`)}
                     </ToggleGroupItem>
                   ))}
@@ -210,42 +243,61 @@ export function PracticeSetupForm({
             )}
           </form.Field>
 
-          <form.Field name="source">
-            {(field) => (
-              <FieldSet>
-                <FieldLegend>{t("practice.setup.fields.source")}</FieldLegend>
-                <ToggleGroup
-                  aria-label={t("practice.setup.fields.source")}
-                  className="flex w-full flex-wrap justify-start"
-                  onValueChange={(values) => {
-                    const value = values[0]
-                    if (value) field.handleChange(value as PracticeQuestionSource)
-                  }}
-                  spacing={2}
-                  value={[field.state.value]}
-                  variant="outline"
-                >
-                  {sources.map((source) => (
-                    <ToggleGroupItem key={source} value={source}>
-                      {t(`practice.sources.${source}`)}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              </FieldSet>
-            )}
-          </form.Field>
+          <div className="border-t border-border pt-5 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+            <form.Field name="source">
+              {(field) => (
+                <FieldSet>
+                  <FieldLegend
+                    className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
+                    variant="label"
+                  >
+                    <DatabaseIcon aria-hidden="true" />
+                    {t("practice.setup.fields.source")}
+                  </FieldLegend>
+                  <ToggleGroup
+                    aria-label={t("practice.setup.fields.source")}
+                    className="flex w-full flex-wrap justify-start"
+                    onValueChange={(values) => {
+                      const value = values[0]
+                      if (value) field.handleChange(value as PracticeQuestionSource)
+                    }}
+                    spacing={2}
+                    value={[field.state.value]}
+                    variant="outline"
+                  >
+                    {sources.map((source) => (
+                      <ToggleGroupItem
+                        className={practiceOptionStateClassName}
+                        key={source}
+                        value={source}
+                      >
+                        {t(`practice.sources.${source}`)}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </FieldSet>
+              )}
+            </form.Field>
+          </div>
         </div>
 
         <form.Field name="prioritizeWeaknesses">
           {(field) => (
-            <Field orientation="horizontal">
-              <FieldContent>
-                <FieldTitle>{t("practice.setup.fields.prioritizeWeaknesses")}</FieldTitle>
+            <Field
+              className="w-full items-start gap-3 border-t border-border pt-5"
+              orientation="horizontal"
+            >
+              <FieldContent className="flex-none">
+                <FieldTitle className="[&>svg]:size-4 [&>svg]:text-primary">
+                  <TargetIcon aria-hidden="true" />
+                  {t("practice.setup.fields.prioritizeWeaknesses")}
+                </FieldTitle>
                 <FieldDescription>{t("practice.setup.weaknessDescription")}</FieldDescription>
               </FieldContent>
               <Switch
                 aria-label={t("practice.setup.fields.prioritizeWeaknesses")}
                 checked={field.state.value}
+                className="mt-0.5"
                 onCheckedChange={field.handleChange}
               />
             </Field>
@@ -301,6 +353,7 @@ export function PracticeSetupForm({
               disabled={pending || sourceUnavailable}
               type="submit"
             >
+              {!pending && <PlayIcon aria-hidden="true" data-icon="inline-start" />}
               {pending && <Spinner aria-hidden="true" data-icon="inline-start" />}
               {pending ? t("practice.actions.starting") : t("practice.actions.start")}
             </Button>
