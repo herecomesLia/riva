@@ -85,6 +85,8 @@ export const practice = {
     evaluationDescription: "Your complete conversation is preserved. You can safely retry.",
     evaluationRetryDescription:
       "The evaluation retry did not start. Your complete conversation is still preserved.",
+    prepareNextRoundTitle: "Unable to prepare the next round",
+    prepareNextRoundDescription: "Your session summary is still here. Please try again shortly.",
   },
   generation: {
     title: "Generating your question",
@@ -232,6 +234,9 @@ export const practice = {
     saved: "Saved questions: {{count}}",
     weak: "New weak questions: {{count}}",
     average: "Average performance: {{score}} points",
+    startNextRound: "Start next round",
+    preparingNextRound: "Preparing next round",
+    viewHistory: "View practice history",
   },
   summary: {
     targetRole: "Target role",

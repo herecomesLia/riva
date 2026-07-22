@@ -15,6 +15,7 @@ import {
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   endPracticeSession,
+  prepareNextPracticeSession,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -1226,6 +1227,87 @@ describe("practice stateful mock service", () => {
     expect("question" in ended.session).toBe(false)
     expect("mainAnswer" in ended.session).toBe(false)
     expect("review" in ended.session).toBe(false)
+  })
+
+  it("prepares a completed session for another round without retaining session or attempt state", async () => {
+    resetPracticeMockState("completedSession")
+    const completed = await settle(getPracticePage())
+    if (completed.session.status !== "completed") {
+      throw new Error("A completed practice fixture is required.")
+    }
+
+    const prepared = await settle(
+      prepareNextPracticeSession({
+        sessionId: completed.session.sessionId,
+        version: completed.session.version,
+      }),
+    )
+    if (prepared === "ignored") {
+      throw new Error("The mock prepare-next-round service must return a page snapshot.")
+    }
+
+    expect(prepared.setupContext).toEqual(completed.setupContext)
+    expect(prepared.session).toEqual({
+      status: "setup",
+      selection: completed.session.selection,
+    })
+    for (const field of [
+      "sessionId",
+      "version",
+      "attemptId",
+      "attemptNumber",
+      "attemptRecords",
+      "question",
+      "mainAnswer",
+      "followUpExchanges",
+      "evaluation",
+      "review",
+      "completedAt",
+      "questionsCompleted",
+      "retryCount",
+      "savedQuestionCount",
+      "newWeaknessCount",
+      "averageScore",
+      "nextStepSuggestion",
+    ]) {
+      expect(field in prepared.session).toBe(false)
+    }
+
+    const targetRoleId = prepared.session.selection.targetRoleId
+    if (!targetRoleId) throw new Error("The prepared setup must preserve the target role.")
+    const generating = await settle(
+      startPracticeSession({ ...prepared.session.selection, targetRoleId }),
+    )
+    expect(generating.session.status).toBe("generatingQuestion")
+    if (generating.session.status !== "generatingQuestion") return
+    expect(generating.session.sessionId).not.toBe(completed.session.sessionId)
+    expect(generating.session.attemptNumber).toBe(1)
+    expect(generating.session.attemptRecords).toEqual([])
+  })
+
+  it("rejects prepare-next-round requests with a stale version or different session id", async () => {
+    resetPracticeMockState("completedSession")
+    const completed = await settle(getPracticePage())
+    if (completed.session.status !== "completed") {
+      throw new Error("A completed practice fixture is required.")
+    }
+
+    const staleVersion = prepareNextPracticeSession({
+      sessionId: completed.session.sessionId,
+      version: completed.session.version - 1,
+    })
+    const staleVersionAssertion = expect(staleVersion).rejects.toThrow("version is out of date")
+    await vi.runAllTimersAsync()
+    await staleVersionAssertion
+
+    const differentSession = prepareNextPracticeSession({
+      sessionId: "practice_session_someone_else",
+      version: completed.session.version,
+    })
+    const differentSessionAssertion =
+      expect(differentSession).rejects.toThrow("version is out of date")
+    await vi.runAllTimersAsync()
+    await differentSessionAssertion
   })
 
   it("returns independent deep copies", async () => {

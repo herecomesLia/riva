@@ -5,6 +5,8 @@ import type {
   GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticePageResponse,
+  PrepareNextPracticeSessionInput,
+  PrepareNextPracticeSessionResult,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
@@ -32,6 +34,12 @@ export function startPracticeSession(
   input: StartPracticeSessionInput,
 ): Promise<PracticePageResponse> {
   return env.mock ? practiceMockService.startPracticeSession(input) : realApiUnavailable()
+}
+
+export function prepareNextPracticeSession(
+  input: PrepareNextPracticeSessionInput,
+): Promise<PrepareNextPracticeSessionResult> {
+  return env.mock ? practiceMockService.prepareNextPracticeSession(input) : realApiUnavailable()
 }
 
 export function getQuestionGenerationStatus(

@@ -14,6 +14,7 @@ import type {
   GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticePageResponse,
+  PrepareNextPracticeSessionInput,
   PracticeAttemptRecord,
   PracticeCompletedState,
   PracticeQuestionMutationInput,
@@ -180,6 +181,28 @@ export async function startPracticeSession(
       attemptNumber: 1,
       attemptRecords: [],
       previousAttempt: null,
+    },
+  })
+}
+
+export async function prepareNextPracticeSession(
+  input: PrepareNextPracticeSessionInput,
+): Promise<PracticePageResponse> {
+  await waitForMockDelay()
+  const session = mockResponse.session
+  if (
+    session.status !== "completed" ||
+    session.sessionId !== input.sessionId ||
+    session.version !== input.version
+  ) {
+    throw new Error("Practice session version is out of date.")
+  }
+
+  return setMockResponse({
+    setupContext: copy(mockResponse.setupContext),
+    session: {
+      status: "setup",
+      selection: copy(session.selection),
     },
   })
 }

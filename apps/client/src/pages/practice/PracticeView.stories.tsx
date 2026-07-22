@@ -1,6 +1,6 @@
 import preview from "#storybook/preview"
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test"
-import { useRouter } from "@tanstack/react-router"
+import { useRouter, useRouterState } from "@tanstack/react-router"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
@@ -33,6 +33,10 @@ function readyArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
       onSkip: fn(async () => "executed" as const),
       onSubmitAnswer: fn(async () => "executed" as const),
     },
+    completedActions: {
+      onPrepareNextRound: fn(async () => "executed" as const),
+    },
+    completedPending: false,
     answeringPending: {
       end: false,
       framework: false,
@@ -124,7 +128,66 @@ export const NextQuestionError = meta.story({
   args: { ...readyArgs("generatingNextQuestion"), generationError: true },
 })
 
-export const CompletedSession = meta.story({ args: readyArgs("completedSession") })
+function CompletedSessionStory() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+
+  return (
+    <>
+      <PracticeView {...readyArgs("completedSession")} />
+      <output data-testid="practice-story-location">{pathname}</output>
+    </>
+  )
+}
+
+export const CompletedSession = meta.story({
+  render: () => <CompletedSessionStory />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("practice-completed-state")).toBeVisible()
+    await expect(canvas.getByRole("button", { name: /开始下一轮|start next round/i })).toBeEnabled()
+    const historyButton = canvas.getByRole("button", {
+      name: /查看练习记录|view practice history/i,
+    })
+    await expect(historyButton).toBeEnabled()
+    await userEvent.click(historyButton)
+    await expect(canvas.getByTestId("practice-story-location")).toHaveTextContent("/history")
+  },
+})
+
+export const CompletedStartingNextRound = meta.story({
+  args: {
+    ...readyArgs("completedSession"),
+    completedPending: true,
+  },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: /正在准备下一轮|preparing next round/i }),
+    ).toBeDisabled()
+    await expect(
+      canvas.getByTestId("practice-completed-state").querySelector('[data-slot="spinner"]'),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole("button", { name: /查看练习记录|view practice history/i }),
+    ).toHaveAttribute("aria-disabled", "true")
+  },
+})
+
+const rejectedNextRound = fn(async () => {
+  throw new Error("internal next-round error")
+})
+
+export const CompletedNextRoundError = meta.story({
+  args: {
+    ...readyArgs("completedSession"),
+    completedActions: { onPrepareNextRound: rejectedNextRound },
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /开始下一轮|start next round/i }))
+    await expect(rejectedNextRound).toHaveBeenCalledTimes(1)
+    await expect(canvas.getByRole("alert")).toBeVisible()
+    await expect(canvas.queryByText(/internal next-round error/i)).not.toBeInTheDocument()
+    await expect(canvas.getByTestId("practice-completed-state")).toBeVisible()
+  },
+})
 
 export const CompletedWithRetries = meta.story({ args: readyArgs("completedWithRetries") })
 

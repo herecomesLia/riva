@@ -1,4 +1,4 @@
-import { useBlocker } from "@tanstack/react-router"
+import { Link, useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -12,7 +12,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
 import type {
   ActivePracticeSelection,
   EndPracticeFollowUpsInput,
@@ -112,6 +122,10 @@ export type PracticeReviewPending = {
   weak: boolean
 }
 
+export type PracticeCompletedActions = {
+  onPrepareNextRound: () => Promise<PracticeInteractionResult>
+}
+
 type PracticeViewProps =
   | {
       variant: "error"
@@ -125,6 +139,8 @@ type PracticeViewProps =
   | {
       variant: "default"
       content: { status: "ready"; data: PracticePageResponse }
+      completedActions: PracticeCompletedActions
+      completedPending: boolean
       answeringActions: PracticeAnsweringActions
       answeringPending: PracticeAnsweringPending
       followUpActions: PracticeFollowUpActions
@@ -287,7 +303,13 @@ function PracticeViewContent(props: PracticeViewProps) {
   }
 
   if (session.status === "completed") {
-    return <PracticeCompletedView session={session} />
+    return (
+      <PracticeCompletedView
+        actions={props.completedActions}
+        isPreparingNextRound={props.completedPending}
+        session={session}
+      />
+    )
   }
 
   return (
@@ -458,8 +480,28 @@ function PracticeReviewView({
   )
 }
 
-function PracticeCompletedView({ session }: { session: PracticeCompletedState }) {
+function PracticeCompletedView({
+  actions,
+  isPreparingNextRound,
+  session,
+}: {
+  actions: PracticeCompletedActions
+  isPreparingNextRound: boolean
+  session: PracticeCompletedState
+}) {
   const { t } = useTranslation()
+  const [error, setError] = useState(false)
+
+  async function prepareNextRound() {
+    setError(false)
+    try {
+      const result = await actions.onPrepareNextRound()
+      if (result === "ignored") return
+    } catch {
+      setError(true)
+    }
+  }
+
   return (
     <Card data-testid="practice-completed-state">
       <CardHeader>
@@ -473,7 +515,29 @@ function PracticeCompletedView({ session }: { session: PracticeCompletedState })
         <p>{t("practice.completed.weak", { count: session.newWeaknessCount })}</p>
         <p>{t("practice.completed.average", { score: session.averageScore })}</p>
         <p className="text-muted-foreground">{session.nextStepSuggestion}</p>
+        {error && (
+          <Alert variant="destructive">
+            <AlertTitle>{t("practice.errors.prepareNextRoundTitle")}</AlertTitle>
+            <AlertDescription>{t("practice.errors.prepareNextRoundDescription")}</AlertDescription>
+          </Alert>
+        )}
       </CardContent>
+      <CardFooter className="flex flex-col gap-2 sm:flex-row">
+        <Button disabled={isPreparingNextRound} onClick={() => void prepareNextRound()}>
+          {isPreparingNextRound && <Spinner aria-hidden="true" data-icon="inline-start" />}
+          {isPreparingNextRound
+            ? t("practice.completed.preparingNextRound")
+            : t("practice.completed.startNextRound")}
+        </Button>
+        <Button
+          disabled={isPreparingNextRound}
+          nativeButton={false}
+          render={<Link to="/history" />}
+          variant="outline"
+        >
+          {t("practice.completed.viewHistory")}
+        </Button>
+      </CardFooter>
     </Card>
   )
 }

@@ -300,3 +300,10 @@ export type EndPracticeSessionInput = {
   sessionId: string
   version: number
 }
+
+export type PrepareNextPracticeSessionInput = {
+  sessionId: string
+  version: number
+}
+
+export type PrepareNextPracticeSessionResult = PracticePageResponse | "ignored"

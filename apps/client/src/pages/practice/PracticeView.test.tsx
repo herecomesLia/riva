@@ -12,6 +12,7 @@ import {
   PracticeView,
   type PracticeAnsweringActions,
   type PracticeAnsweringPending,
+  type PracticeCompletedActions,
   type PracticeFollowUpActions,
   type PracticeFollowUpPending,
   type PracticeReviewActions,
@@ -97,6 +98,8 @@ function renderReadyView(
     followUpPending?: PracticeFollowUpPending
     reviewActions?: PracticeReviewActions
     reviewPending?: PracticeReviewPending
+    completedActions?: PracticeCompletedActions
+    completedPending?: boolean
     evaluationError?: boolean
     isEvaluationRetrying?: boolean
     onRetryEvaluation?: () => void
@@ -108,6 +111,10 @@ function renderReadyView(
     <PracticeView
       answeringActions={actions}
       answeringPending={options.answeringPending ?? answeringPending}
+      completedActions={
+        options.completedActions ?? { onPrepareNextRound: vi.fn(async () => "executed" as const) }
+      }
+      completedPending={options.completedPending ?? false}
       followUpActions={options.followUpActions ?? createFollowUpActions()}
       followUpPending={options.followUpPending ?? followUpPending}
       reviewActions={options.reviewActions ?? createReviewActions()}
@@ -133,6 +140,39 @@ function getStartButton() {
 }
 
 describe("PracticeView", () => {
+  it("renders the completed summary with next-round and training-history actions", async () => {
+    const data = createPracticeMockResponse("completedSession")
+    renderReadyView(data)
+
+    const completed = await screen.findByTestId("practice-completed-state")
+    expect(completed).toHaveTextContent(i18n.t("practice.completed.questions", { count: 1 }))
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.completed.startNextRound") }),
+    ).toBeEnabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.completed.viewHistory") }),
+    ).toHaveAttribute("href", "/history")
+  })
+
+  it("keeps the completed summary and actions safe when next-round preparation is ignored", async () => {
+    const user = userEvent.setup()
+    const onPrepareNextRound = vi.fn(async () => "ignored" as const)
+    renderReadyView(createPracticeMockResponse("completedSession"), {
+      completedActions: { onPrepareNextRound },
+    })
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.completed.startNextRound") }),
+    )
+
+    expect(onPrepareNextRound).toHaveBeenCalledOnce()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(screen.getByTestId("practice-completed-state")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.completed.startNextRound") }),
+    ).toBeEnabled()
+  })
+
   it("confirms ending a reviewed session before invoking the action", async () => {
     const user = userEvent.setup()
     const onEndSession = vi.fn(async () => "executed" as const)
@@ -302,6 +342,8 @@ describe("PracticeView", () => {
       <PracticeView
         answeringActions={actions}
         answeringPending={answeringPending}
+        completedActions={{ onPrepareNextRound: vi.fn(async () => "executed" as const) }}
+        completedPending={false}
         content={{ status: "ready", data: answering }}
         evaluationError={false}
         followUpActions={followUpActions}
@@ -326,6 +368,8 @@ describe("PracticeView", () => {
       <PracticeView
         answeringActions={actions}
         answeringPending={answeringPending}
+        completedActions={{ onPrepareNextRound: vi.fn(async () => "executed" as const) }}
+        completedPending={false}
         content={{ status: "ready", data: review }}
         evaluationError={false}
         followUpActions={followUpActions}

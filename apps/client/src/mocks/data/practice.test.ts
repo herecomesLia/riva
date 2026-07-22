@@ -149,9 +149,27 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
   }
 
   if (session.status === "setup") {
-    expect("question" in session).toBe(false)
-    expect("sessionId" in session).toBe(false)
-    expect("version" in session).toBe(false)
+    for (const field of [
+      "sessionId",
+      "version",
+      "attemptId",
+      "attemptNumber",
+      "attemptRecords",
+      "question",
+      "mainAnswer",
+      "followUpExchanges",
+      "evaluation",
+      "review",
+      "completedAt",
+      "questionsCompleted",
+      "retryCount",
+      "savedQuestionCount",
+      "newWeaknessCount",
+      "averageScore",
+      "nextStepSuggestion",
+    ]) {
+      expect(field in session).toBe(false)
+    }
 
     if (session.selection.targetRoleId !== null) {
       const selectedRole = setupContext.targetRoles.find(

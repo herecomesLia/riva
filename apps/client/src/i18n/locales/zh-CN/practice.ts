@@ -79,6 +79,8 @@ export const practice = {
     evaluationTitle: "评分生成失败",
     evaluationDescription: "完整问答记录已保留，可以安全重试评分。",
     evaluationRetryDescription: "评分重试未能启动，完整问答记录仍然保留。",
+    prepareNextRoundTitle: "下一轮准备失败",
+    prepareNextRoundDescription: "本轮总结仍然保留，请稍后重试。",
   },
   generation: {
     title: "正在生成本题",
@@ -218,6 +220,9 @@ export const practice = {
     saved: "收藏题数：{{count}}",
     weak: "新增薄弱题数：{{count}}",
     average: "平均表现：{{score}} 分",
+    startNextRound: "开始下一轮",
+    preparingNextRound: "正在准备下一轮",
+    viewHistory: "查看练习记录",
   },
   summary: {
     targetRole: "目标岗位",

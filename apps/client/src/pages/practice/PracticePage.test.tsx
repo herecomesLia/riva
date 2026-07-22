@@ -20,6 +20,7 @@ import {
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   endPracticeSession,
+  prepareNextPracticeSession,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -42,6 +43,7 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   retryCurrentPracticeQuestion: vi.fn(),
   continueToNextPracticeQuestion: vi.fn(),
   endPracticeSession: vi.fn(),
+  prepareNextPracticeSession: vi.fn(),
   setQuestionSaved: vi.fn(),
   setQuestionWeak: vi.fn(),
   skipPracticeQuestion: vi.fn(),
@@ -94,6 +96,7 @@ describe("PracticePage", () => {
     vi.mocked(retryCurrentPracticeQuestion).mockReset()
     vi.mocked(continueToNextPracticeQuestion).mockReset()
     vi.mocked(endPracticeSession).mockReset()
+    vi.mocked(prepareNextPracticeSession).mockReset()
     vi.mocked(setQuestionSaved).mockReset()
     vi.mocked(setQuestionWeak).mockReset()
     vi.mocked(skipPracticeQuestion).mockReset()
@@ -457,6 +460,153 @@ describe("PracticePage", () => {
       await deferred.promise
     })
     expect(await screen.findByTestId("practice-completed-state")).toBeInTheDocument()
+  })
+
+  it("prepares the next round from the completed snapshot and restores the saved setup", async () => {
+    const user = userEvent.setup()
+    const completed = createPracticeMockResponse("completedSession")
+    const prepared = createPracticeMockResponse("setupReady")
+    if (completed.session.status !== "completed" || prepared.session.status !== "setup") return
+    completed.session.selection = {
+      ...completed.session.selection,
+      difficulty: "pressure",
+      questionType: "behavioral",
+      prioritizeWeaknesses: true,
+      source: "saved",
+    }
+    prepared.setupContext = structuredClone(completed.setupContext)
+    prepared.session.selection = structuredClone(completed.session.selection)
+    vi.mocked(getPracticePage).mockResolvedValue(completed)
+    vi.mocked(prepareNextPracticeSession).mockResolvedValue(prepared)
+    const result = renderPracticePage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.completed.startNextRound") }),
+    )
+
+    expect(vi.mocked(prepareNextPracticeSession).mock.calls[0]?.[0]).toEqual({
+      sessionId: completed.session.sessionId,
+      version: completed.session.version,
+    })
+    expect(result.queryClient.getQueryData(["practice"])).toEqual(prepared)
+    expect(await screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+    expect(screen.getByTestId("practice-target-role-trigger")).toHaveTextContent(
+      completed.setupContext.targetRoles.find(
+        (role) => role.id === completed.session.selection.targetRoleId,
+      )?.title ?? "",
+    )
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t(`practice.questionTypes.${completed.session.selection.questionType}`),
+      }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t(`practice.difficulty.${completed.session.selection.difficulty}`),
+      }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t(`practice.sources.${completed.session.selection.source}`),
+      }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      screen.getByRole("switch", { name: i18n.t("practice.setup.fields.prioritizeWeaknesses") }),
+    ).toBeChecked()
+    expect(screen.queryByTestId("practice-completed-state")).not.toBeInTheDocument()
+  })
+
+  it("synchronously prevents duplicate prepare-next-round requests", async () => {
+    const completed = createPracticeMockResponse("completedSession")
+    const prepared = createPracticeMockResponse("setupReady")
+    if (completed.session.status !== "completed") return
+    const deferred = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(completed)
+    vi.mocked(prepareNextPracticeSession).mockReturnValue(deferred.promise)
+    renderPracticePage()
+
+    const startNextRound = await screen.findByRole("button", {
+      name: i18n.t("practice.completed.startNextRound"),
+    })
+    act(() => {
+      fireEvent.click(startNextRound)
+      fireEvent.click(startNextRound)
+    })
+
+    await waitFor(() => expect(prepareNextPracticeSession).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    await act(async () => {
+      deferred.resolve(prepared)
+      await deferred.promise
+    })
+    expect(await screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+  })
+
+  it("shows a pending next-round action and disables both completed actions", async () => {
+    const completed = createPracticeMockResponse("completedSession")
+    const deferred = createDeferred<PracticePageResponse>()
+    vi.mocked(getPracticePage).mockResolvedValue(completed)
+    vi.mocked(prepareNextPracticeSession).mockReturnValue(deferred.promise)
+    renderPracticePage()
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: i18n.t("practice.completed.startNextRound") }),
+    )
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.completed.preparingNextRound") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByTestId("practice-completed-state").querySelector('[data-slot="spinner"]'),
+    ).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.completed.viewHistory") }),
+    ).toHaveAttribute("aria-disabled", "true")
+    expect(prepareNextPracticeSession).toHaveBeenCalledOnce()
+  })
+
+  it("shows a safe error and allows retrying the next-round preparation", async () => {
+    const user = userEvent.setup()
+    const completed = createPracticeMockResponse("completedSession")
+    const internalError = "internal session practice_session_01 version 99 stack"
+    vi.mocked(getPracticePage).mockResolvedValue(completed)
+    vi.mocked(prepareNextPracticeSession)
+      .mockRejectedValueOnce(new Error(internalError))
+      .mockResolvedValueOnce("ignored")
+    renderPracticePage()
+
+    const startNextRound = await screen.findByRole("button", {
+      name: i18n.t("practice.completed.startNextRound"),
+    })
+    await user.click(startNextRound)
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(i18n.t("practice.errors.prepareNextRoundTitle"))
+    expect(alert).toHaveTextContent(i18n.t("practice.errors.prepareNextRoundDescription"))
+    expect(alert).not.toHaveTextContent(internalError)
+    expect(screen.getByTestId("practice-completed-state")).toBeInTheDocument()
+    expect(startNextRound).toBeEnabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.completed.viewHistory") }),
+    ).not.toHaveAttribute("aria-disabled")
+
+    await user.click(startNextRound)
+    expect(prepareNextPracticeSession).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(screen.getByTestId("practice-completed-state")).toBeInTheDocument()
+  })
+
+  it("navigates to the existing training-history page without preparing another round", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getPracticePage).mockResolvedValue(createPracticeMockResponse("completedSession"))
+    const { router } = renderPracticePage()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("practice.completed.viewHistory") }),
+    )
+
+    await waitFor(() => expect(router?.state.location.pathname).toBe("/history"))
+    expect(prepareNextPracticeSession).not.toHaveBeenCalled()
   })
 
   it("locks every review action while next-question is pending", async () => {

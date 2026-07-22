@@ -6,6 +6,8 @@ import type {
   GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticePageResponse,
+  PrepareNextPracticeSessionInput,
+  PrepareNextPracticeSessionResult,
   PracticeQuestionMutationInput,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
@@ -27,6 +29,7 @@ import {
   getPracticeEvaluationStatus,
   getQuestionGenerationStatus,
   requestAnswerFramework,
+  prepareNextPracticeSession,
   requestEndPracticeSession,
   requestPracticeHint,
   retryPracticeEvaluation,
@@ -56,6 +59,7 @@ export function PracticePage() {
   const queryClient = useQueryClient()
   const questionMutationLock = useRef(false)
   const evaluationRetryLock = useRef(false)
+  const prepareNextRoundLock = useRef(false)
   const practiceQuery = useQuery({
     queryFn: getPracticePage,
     queryKey: PRACTICE_QUERY_KEY,
@@ -64,6 +68,13 @@ export function PracticePage() {
   const startMutation = useMutation({
     mutationFn: startPracticeSession,
     onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
+  })
+  const prepareNextRoundMutation = useMutation({
+    mutationFn: prepareNextPracticeSession,
+    onSuccess: (response) => {
+      if (response === "ignored") return
+      queryClient.setQueryData(PRACTICE_QUERY_KEY, response)
+    },
   })
   const hintMutation = usePracticeMutation(requestPracticeHint)
   const frameworkMutation = usePracticeMutation(requestAnswerFramework)
@@ -187,6 +198,30 @@ export function PracticePage() {
     await startMutation.mutateAsync(input)
   }
 
+  async function prepareNextRound() {
+    const session = practiceQuery.data?.session
+    if (
+      prepareNextRoundLock.current ||
+      session?.status !== "completed" ||
+      prepareNextRoundMutation.isPending
+    ) {
+      return "ignored" as const
+    }
+
+    const input: PrepareNextPracticeSessionInput = {
+      sessionId: session.sessionId,
+      version: session.version,
+    }
+    prepareNextRoundLock.current = true
+    try {
+      const response: PrepareNextPracticeSessionResult =
+        await prepareNextRoundMutation.mutateAsync(input)
+      return response === "ignored" ? "ignored" : "executed"
+    } finally {
+      prepareNextRoundLock.current = false
+    }
+  }
+
   function retryGeneration() {
     if (practiceQuery.data?.session.status !== "generatingQuestion") return
     void generationQuery.refetch()
@@ -308,6 +343,8 @@ export function PracticePage() {
           weak: weakMutation.isPending,
         }}
         content={{ status: "ready", data: practiceQuery.data }}
+        completedActions={{ onPrepareNextRound: prepareNextRound }}
+        completedPending={prepareNextRoundMutation.isPending}
         evaluationError={
           evaluationQuery.isError ||
           evaluationQuery.errorUpdatedAt > evaluationQuery.dataUpdatedAt ||
