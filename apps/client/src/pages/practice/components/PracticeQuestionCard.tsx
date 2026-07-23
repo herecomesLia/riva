@@ -2,7 +2,7 @@ import { BookmarkIcon, BrainIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { PracticeQuestionCard as PracticeQuestionCardModel } from "@/models/practice"
 
 type PracticeQuestionCardProps = {
@@ -15,25 +15,28 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
   return (
     <Card className="min-w-0" data-testid="practice-question-card">
       <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge>{t(`practice.questionTypes.${question.questionType}`)}</Badge>
-          <Badge variant="outline">{t(`practice.difficulty.${question.difficulty}`)}</Badge>
-          {question.isSaved ? (
-            <Badge variant="secondary">
-              <BookmarkIcon aria-hidden="true" />
-              {t("practice.question.saved")}
-            </Badge>
-          ) : null}
-          {question.isMarkedWeak ? (
-            <Badge variant="secondary">
-              <BrainIcon aria-hidden="true" />
-              {t("practice.question.weak")}
-            </Badge>
-          ) : null}
-        </div>
         <CardTitle>
           <h3 className="wrap-break-word text-xl leading-8">{question.prompt}</h3>
         </CardTitle>
+        {question.isSaved || question.isMarkedWeak ? (
+          <CardAction
+            className="flex flex-wrap items-center justify-end gap-2"
+            data-testid="practice-question-statuses"
+          >
+            {question.isSaved ? (
+              <Badge variant="secondary">
+                <BookmarkIcon aria-hidden="true" />
+                {t("practice.question.saved")}
+              </Badge>
+            ) : null}
+            {question.isMarkedWeak ? (
+              <Badge variant="secondary">
+                <BrainIcon aria-hidden="true" />
+                {t("practice.question.weak")}
+              </Badge>
+            ) : null}
+          </CardAction>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <QuestionMetadata

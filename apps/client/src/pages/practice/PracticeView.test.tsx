@@ -644,10 +644,45 @@ describe("PracticeView", () => {
     if (data.session.status !== "answering") return
 
     const card = await screen.findByTestId("practice-question-card")
+    const sessionHeader = screen.getByTestId("practice-session-header")
+    const questionType = i18n.t(`practice.questionTypes.${data.session.selection.questionType}`)
+    const difficulty = i18n.t(`practice.difficulty.${data.session.selection.difficulty}`)
     expect(card).toHaveTextContent(data.session.question.prompt)
     expect(card).toHaveTextContent(data.session.question.assessedCapabilities[0] ?? "")
     expect(card).toHaveTextContent(data.session.question.recommendedMaterials[0] ?? "")
+    expect(within(card).queryByText(questionType)).not.toBeInTheDocument()
+    expect(within(card).queryByText(difficulty)).not.toBeInTheDocument()
+    expect(within(sessionHeader).getByText(questionType)).toHaveClass(
+      "bg-primary",
+      "text-primary-foreground",
+    )
+    expect(within(sessionHeader).getByText(difficulty)).toHaveClass(
+      "border-primary/20",
+      "bg-primary/10",
+      "text-primary",
+    )
+    expect(card.querySelector(".lucide-folder-open")).not.toBeInTheDocument()
+    expect(card.querySelector(".lucide-database-search")).not.toBeInTheDocument()
     expect(screen.queryByText(/完整参考答案|完整评分标准|内部追问策略/)).not.toBeInTheDocument()
+  })
+
+  it("only gives the answering view fixed actions and responsive bottom clearance", async () => {
+    const { rerenderReady } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+
+    const answering = await screen.findByTestId("practice-answering-state")
+    expect(answering).toHaveClass("pb-56", "min-[360px]:pb-40", "sm:pb-28")
+    expect(screen.getByTestId("practice-question-actions-bar")).toBeInTheDocument()
+
+    for (const scenario of [
+      "answeringSingleFollowUp",
+      "reviewBalanced",
+      "completedSession",
+    ] as const) {
+      rerenderReady(createPracticeMockResponse(scenario))
+      await waitFor(() => {
+        expect(screen.queryByTestId("practice-question-actions-bar")).not.toBeInTheDocument()
+      })
+    }
   })
 
   it("keeps an empty answer from being submitted", async () => {

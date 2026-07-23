@@ -26,6 +26,31 @@ function answeringProps(onRequest: () => Promise<"executed" | "ignored">) {
 }
 
 describe("PracticeReferenceAnswer", () => {
+  it("shows SparklesIcon before the request label and replaces it with Spinner while pending", () => {
+    const onRequest = vi.fn(async () => "executed" as const)
+    const { rerender } = renderWithProviders(
+      <PracticeReferenceAnswer {...answeringProps(onRequest)} />,
+      { router: false },
+    )
+
+    const requestButton = screen.getByRole("button", {
+      name: i18n.t("practice.referenceAnswer.request"),
+    })
+    const sparklesIcon = requestButton.querySelector(".lucide-sparkles")
+    expect(sparklesIcon).toHaveAttribute("aria-hidden", "true")
+    expect(sparklesIcon).toHaveAttribute("data-icon", "inline-start")
+    expect(requestButton.querySelector('[data-slot="spinner"]')).not.toBeInTheDocument()
+
+    rerender(<PracticeReferenceAnswer {...answeringProps(onRequest)} isPending />)
+
+    const pendingButton = screen.getByRole("button", {
+      name: i18n.t("practice.referenceAnswer.generating"),
+    })
+    expect(pendingButton).toHaveTextContent(i18n.t("practice.referenceAnswer.generating"))
+    expect(pendingButton.querySelector('[data-slot="spinner"]')).toBeInTheDocument()
+    expect(pendingButton.querySelector(".lucide-sparkles")).not.toBeInTheDocument()
+  })
+
   it("only requests after confirmation and rejects same-frame double confirmation", async () => {
     let resolveRequest: ((value: "executed") => void) | undefined
     const onRequest = vi.fn(() => new Promise<"executed">((resolve) => (resolveRequest = resolve)))

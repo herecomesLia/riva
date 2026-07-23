@@ -28,6 +28,84 @@ describe("PracticeQuestionActions", () => {
     vi.clearAllMocks()
   })
 
+  it("renders all actions in a fixed, responsive action bar", () => {
+    renderWithProviders(<PracticeQuestionActions {...defaultProps} />, { router: false })
+
+    const actionBar = screen.getByTestId("practice-question-actions-bar")
+    expect(actionBar).toHaveClass("fixed", "inset-x-0", "bottom-0", "z-40", "border-t")
+    expect(actionBar).toHaveClass("bg-background/95", "backdrop-blur")
+    expect(actionBar).toHaveClass(
+      "md:left-(--sidebar-width)",
+      "md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)",
+    )
+    const actionGroup = screen.getByTestId("practice-question-actions")
+    expect(actionGroup).toHaveClass("sm:flex", "sm:flex-wrap")
+    for (const name of [
+      i18n.t("practice.questionActions.save"),
+      i18n.t("practice.questionActions.markWeak"),
+      i18n.t("practice.questionActions.skip"),
+      i18n.t("practice.questionActions.end"),
+    ]) {
+      expect(within(actionGroup).getByRole("button", { name })).toBeInTheDocument()
+    }
+  })
+
+  it("fills the saved bookmark red and colors the marked-weak icon amber", () => {
+    const { rerender } = renderWithProviders(<PracticeQuestionActions {...defaultProps} />, {
+      router: false,
+    })
+
+    const unsavedIcon = screen
+      .getByRole("button", { name: i18n.t("practice.questionActions.save") })
+      .querySelector(".lucide-bookmark")
+    const unmarkedWeakIcon = screen
+      .getByRole("button", { name: i18n.t("practice.questionActions.markWeak") })
+      .querySelector(".lucide-brain")
+    expect(unsavedIcon).not.toHaveClass("fill-destructive", "text-destructive")
+    expect(unmarkedWeakIcon).not.toHaveClass("text-amber-500")
+
+    rerender(<PracticeQuestionActions {...defaultProps} isMarkedWeak isSaved />)
+
+    const savedIcon = screen
+      .getByRole("button", { name: i18n.t("practice.questionActions.unsave") })
+      .querySelector(".lucide-bookmark")
+    const markedWeakIcon = screen
+      .getByRole("button", { name: i18n.t("practice.questionActions.unmarkWeak") })
+      .querySelector(".lucide-brain")
+    expect(savedIcon).toHaveClass("fill-destructive", "text-destructive")
+    expect(markedWeakIcon).toHaveClass("text-amber-500")
+    expect(markedWeakIcon).not.toHaveClass("fill-amber-500")
+  })
+
+  it("uses the same outline style for skip and end actions", () => {
+    renderWithProviders(<PracticeQuestionActions {...defaultProps} />, { router: false })
+
+    const skipButton = screen.getByRole("button", {
+      name: i18n.t("practice.questionActions.skip"),
+    })
+    const endButton = screen.getByRole("button", {
+      name: i18n.t("practice.questionActions.end"),
+    })
+    expect(skipButton).toHaveClass("border-border", "bg-background")
+    expect(endButton).toHaveClass("border-border", "bg-background")
+  })
+
+  it("disables all four actions while interactions are locked", () => {
+    renderWithProviders(<PracticeQuestionActions {...defaultProps} interactionLocked />, {
+      router: false,
+    })
+
+    const actionBar = screen.getByTestId("practice-question-actions-bar")
+    for (const name of [
+      i18n.t("practice.questionActions.save"),
+      i18n.t("practice.questionActions.markWeak"),
+      i18n.t("practice.questionActions.skip"),
+      i18n.t("practice.questionActions.end"),
+    ]) {
+      expect(within(actionBar).getByRole("button", { name })).toBeDisabled()
+    }
+  })
+
   it.each([
     {
       action: "skip",

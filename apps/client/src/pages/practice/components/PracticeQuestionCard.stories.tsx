@@ -1,4 +1,5 @@
 import preview from "#storybook/preview"
+import { expect, within } from "storybook/test"
 
 import { createPracticeMockResponse } from "@/mocks/data/practice"
 
@@ -39,4 +40,20 @@ export const SavedQuestion = meta.story({
 
 export const WeakQuestion = meta.story({
   args: { question: getQuestion("answeringWeakQuestion") },
+})
+
+export const SavedAndWeakQuestion = meta.story({
+  args: {
+    question: {
+      ...getQuestion("answeringQuestion"),
+      isMarkedWeak: true,
+      isSaved: true,
+    },
+  },
+  play: async ({ canvas }) => {
+    const statuses = canvas.getByTestId("practice-question-statuses")
+    await expect(statuses).toHaveAttribute("data-slot", "card-action")
+    await expect(within(statuses).getByText(/已收藏|saved/i)).toBeInTheDocument()
+    await expect(within(statuses).getByText(/薄弱题|weak/i)).toBeInTheDocument()
+  },
 })

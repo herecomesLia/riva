@@ -22,8 +22,12 @@ export function PracticeSessionHeader({ context, selection }: PracticeSessionHea
         {role?.company ? <p className="text-sm text-muted-foreground">{role.company}</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Badge variant="secondary">{t(`practice.questionTypes.${selection.questionType}`)}</Badge>
-        <Badge variant="outline">{t(`practice.difficulty.${selection.difficulty}`)}</Badge>
+        <Badge className="bg-primary text-primary-foreground">
+          {t(`practice.questionTypes.${selection.questionType}`)}
+        </Badge>
+        <Badge className="border-primary/20 bg-primary/10 text-primary" variant="outline">
+          {t(`practice.difficulty.${selection.difficulty}`)}
+        </Badge>
       </div>
     </header>
   )

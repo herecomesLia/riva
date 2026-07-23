@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon, SparklesIcon } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -90,7 +90,11 @@ export function PracticeReferenceAnswer(props: Props) {
             onClick={() => setConfirmationOpen(true)}
             type="button"
           >
-            {isPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+            {isPending ? (
+              <Spinner aria-hidden="true" data-icon="inline-start" />
+            ) : (
+              <SparklesIcon aria-hidden="true" data-icon="inline-start" />
+            )}
             {isPending
               ? t("practice.referenceAnswer.generating")
               : t("practice.referenceAnswer.request")}

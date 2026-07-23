@@ -27,6 +27,28 @@ const defaultArgs = {
 
 export const Default = meta.story({ args: defaultArgs })
 
+export const Saved = meta.story({
+  args: { ...defaultArgs, isSaved: true },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas
+        .getByRole("button", { name: /取消收藏|remove from saved/i })
+        .querySelector(".lucide-bookmark"),
+    ).toHaveClass("fill-destructive", "text-destructive")
+  },
+})
+
+export const MarkedWeak = meta.story({
+  args: { ...defaultArgs, isMarkedWeak: true },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas
+        .getByRole("button", { name: /取消薄弱标记|remove weak mark/i })
+        .querySelector(".lucide-brain"),
+    ).toHaveClass("text-amber-500")
+  },
+})
+
 export const Confirmations = meta.story({
   args: defaultArgs,
   play: async ({ canvas }) => {

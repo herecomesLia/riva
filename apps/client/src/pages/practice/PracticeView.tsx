@@ -606,36 +606,41 @@ function PracticeAnsweringView({
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="practice-answering-state">
-      <PracticeSessionHeader context={context} selection={session.selection} />
-      <PracticeQuestionCard question={session.question} />
-      <PracticeAnswerComposer
-        interactionLocked={pending.interactionLocked}
-        isPending={pending.submitAnswer}
-        onDraftChange={setIsDraftDirty}
-        onSubmit={(content) => actions.onSubmitAnswer({ ...mutationInput, content })}
-      />
-      <PracticeQuestionGuidance
-        answerFramework={session.question.answerFramework}
-        answerHints={session.question.answerHints}
-        interactionLocked={pending.interactionLocked}
-        isFrameworkPending={pending.framework}
-        isHintPending={pending.hint}
-        onRequestFramework={() => actions.onRequestFramework(mutationInput)}
-        onRequestHint={() => actions.onRequestHint(mutationInput)}
-      />
-      <PracticeReferenceAnswer
-        assistedRetry={
-          isCurrentPracticeAttemptRetry(session) &&
-          session.question.referenceAnswer.status === "revealed" &&
-          session.question.referenceAnswer.viewedBeforeSubmission
-        }
-        interactionLocked={pending.interactionLocked}
-        isPending={pending.referenceAnswer}
-        mode="answering"
-        onRequest={() => actions.onRequestReferenceAnswer(mutationInput)}
-        state={session.question.referenceAnswer}
-      />
+    <>
+      <div
+        className="flex flex-col gap-5 pb-56 min-[360px]:pb-40 sm:pb-28"
+        data-testid="practice-answering-state"
+      >
+        <PracticeSessionHeader context={context} selection={session.selection} />
+        <PracticeQuestionCard question={session.question} />
+        <PracticeAnswerComposer
+          interactionLocked={pending.interactionLocked}
+          isPending={pending.submitAnswer}
+          onDraftChange={setIsDraftDirty}
+          onSubmit={(content) => actions.onSubmitAnswer({ ...mutationInput, content })}
+        />
+        <PracticeQuestionGuidance
+          answerFramework={session.question.answerFramework}
+          answerHints={session.question.answerHints}
+          interactionLocked={pending.interactionLocked}
+          isFrameworkPending={pending.framework}
+          isHintPending={pending.hint}
+          onRequestFramework={() => actions.onRequestFramework(mutationInput)}
+          onRequestHint={() => actions.onRequestHint(mutationInput)}
+        />
+        <PracticeReferenceAnswer
+          assistedRetry={
+            isCurrentPracticeAttemptRetry(session) &&
+            session.question.referenceAnswer.status === "revealed" &&
+            session.question.referenceAnswer.viewedBeforeSubmission
+          }
+          interactionLocked={pending.interactionLocked}
+          isPending={pending.referenceAnswer}
+          mode="answering"
+          onRequest={() => actions.onRequestReferenceAnswer(mutationInput)}
+          state={session.question.referenceAnswer}
+        />
+      </div>
       <PracticeQuestionActions
         interactionLocked={pending.interactionLocked}
         isEndPending={pending.end}
@@ -666,7 +671,7 @@ function PracticeAnsweringView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }
 
