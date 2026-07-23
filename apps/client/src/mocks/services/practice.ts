@@ -107,11 +107,9 @@ export function reconcilePracticeSetupSelection(
   context: PracticeSetupContext,
   selection: PracticeSetupSelection,
 ): PracticeSetupSelection {
+  const existingRole = context.targetRoles.find((role) => role.id === selection.targetRoleId)
   const defaultRole = context.targetRoles.find((role) => role.id === context.defaultTargetRoleId)
-  const selectedRole = defaultRole
-    ? defaultRole
-    : (context.targetRoles.find((role) => role.id === selection.targetRoleId) ??
-      context.targetRoles[0])
+  const selectedRole = existingRole ?? defaultRole ?? context.targetRoles[0]
 
   if (!selectedRole) return { ...selection, targetRoleId: null }
 
@@ -204,11 +202,12 @@ export async function prepareNextPracticeSession(
     throw new Error("Practice session version is out of date.")
   }
 
+  const setupContext = await getCurrentSetupContext()
   return setMockResponse({
-    setupContext: copy(mockResponse.setupContext),
+    setupContext,
     session: {
       status: "setup",
-      selection: copy(session.selection),
+      selection: reconcilePracticeSetupSelection(setupContext, session.selection),
     },
   })
 }

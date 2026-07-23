@@ -27,7 +27,12 @@ import {
   submitFollowUpAnswer,
   submitPrimaryAnswer,
 } from "@/services/practice"
-import { createTargetRole, getRolesPage, setCurrentTargetRole } from "@/services/roles"
+import {
+  createTargetRole,
+  deleteTargetRole,
+  getRolesPage,
+  setCurrentTargetRole,
+} from "@/services/roles"
 import type {
   PracticeAnsweringState,
   PracticeQuestionType,
@@ -638,7 +643,7 @@ describe("practice stateful mock service", () => {
     })
   })
 
-  it("synchronizes the practice default after the current role changes", async () => {
+  it("keeps an existing practice role after the current role changes", async () => {
     resetPracticeMockState("noEligibleHistoryQuestions")
     const before = await settle(getPracticePage())
     const roles = await settle(getRolesPage())
@@ -652,10 +657,10 @@ describe("practice stateful mock service", () => {
     if (response.session.status !== "setup" || before.session.status !== "setup") return
 
     expect(response.setupContext.defaultTargetRoleId).toBe(productManager.id)
-    expect(response.session.selection.targetRoleId).toBe(productManager.id)
+    expect(response.session.selection.targetRoleId).toBe(before.session.selection.targetRoleId)
     expect(
       response.setupContext.targetRoles
-        .find((role) => role.id === productManager.id)
+        .find((role) => role.id === response.session.selection.targetRoleId)
         ?.supportedQuestionTypes.includes(response.session.selection.questionType),
     ).toBe(true)
     expect(response.session.selection).toMatchObject({
@@ -680,7 +685,7 @@ describe("practice stateful mock service", () => {
     ).toBe(true)
   })
 
-  it("uses the first supported question type when the current role rejects the selection", () => {
+  it("only corrects the question type when the existing role no longer supports it", () => {
     const fixture = createPracticeMockResponse("setupReady")
     if (fixture.session.status !== "setup") return
     const productManager = fixture.setupContext.targetRoles.find(
@@ -688,19 +693,14 @@ describe("practice stateful mock service", () => {
     )
     if (!productManager) throw new Error("Expected the Product Manager role fixture.")
 
-    const selection = reconcilePracticeSetupSelection(
-      {
-        ...fixture.setupContext,
-        defaultTargetRoleId: productManager.id,
-      },
-      {
-        ...fixture.session.selection,
-        questionType: "technicalFoundation",
-        difficulty: "pressure",
-        source: "saved",
-        prioritizeWeaknesses: true,
-      },
-    )
+    const selection = reconcilePracticeSetupSelection(fixture.setupContext, {
+      ...fixture.session.selection,
+      targetRoleId: productManager.id,
+      questionType: "technicalFoundation",
+      difficulty: "pressure",
+      source: "saved",
+      prioritizeWeaknesses: true,
+    })
 
     expect(selection).toEqual({
       targetRoleId: productManager.id,
@@ -1604,6 +1604,109 @@ describe("practice stateful mock service", () => {
     expect(generating.session.sessionId).not.toBe(completed.session.sessionId)
     expect(generating.session.attemptNumber).toBe(1)
     expect(generating.session.attemptRecords).toEqual([])
+  })
+
+  it("keeps a non-default role after preparing the next round and fetching the page again", async () => {
+    resetPracticeMockState("completedSession")
+    const roles = await settle(getRolesPage())
+    const productManager = roles.roles.find((role) => role.id === "role_product_manager_meituan")
+    if (!productManager) throw new Error("Expected the Product Manager role fixture.")
+    await settle(
+      setCurrentTargetRole({ roleId: productManager.id, version: productManager.version }),
+    )
+
+    const completed = await settle(getPracticePage())
+    if (completed.session.status !== "completed") {
+      throw new Error("A completed practice fixture is required.")
+    }
+    expect(completed.session.selection.targetRoleId).not.toBe(
+      completed.setupContext.defaultTargetRoleId,
+    )
+
+    const prepared = await settle(
+      prepareNextPracticeSession({
+        sessionId: completed.session.sessionId,
+        version: completed.session.version,
+      }),
+    )
+    if (prepared === "ignored") {
+      throw new Error("The mock prepare-next-round service must return a page snapshot.")
+    }
+    const refreshed = await settle(getPracticePage())
+    if (prepared.session.status !== "setup" || refreshed.session.status !== "setup") return
+
+    expect(prepared.session.selection).toEqual(completed.session.selection)
+    expect(refreshed.session.selection).toEqual(prepared.session.selection)
+  })
+
+  it("falls back to the default role when the previous role no longer exists", async () => {
+    resetPracticeMockState("completedSession")
+    const roles = await settle(getRolesPage())
+    const frontend = roles.roles.find((role) => role.id === "role_frontend_bytedance")
+    const productManager = roles.roles.find((role) => role.id === "role_product_manager_meituan")
+    if (!frontend || !productManager) throw new Error("Expected both target role fixtures.")
+
+    const rolesWithProductManagerCurrent = await settle(
+      setCurrentTargetRole({ roleId: productManager.id, version: productManager.version }),
+    )
+    const frontendAfterCurrentChange = rolesWithProductManagerCurrent.roles.find(
+      (role) => role.id === frontend.id,
+    )
+    if (!frontendAfterCurrentChange) throw new Error("Expected the Frontend role fixture.")
+    await settle(
+      deleteTargetRole({
+        roleId: frontendAfterCurrentChange.id,
+        version: frontendAfterCurrentChange.version,
+      }),
+    )
+
+    const completed = await settle(getPracticePage())
+    if (completed.session.status !== "completed") {
+      throw new Error("A completed practice fixture is required.")
+    }
+    const prepared = await settle(
+      prepareNextPracticeSession({
+        sessionId: completed.session.sessionId,
+        version: completed.session.version,
+      }),
+    )
+    if (prepared === "ignored") {
+      throw new Error("The mock prepare-next-round service must return a page snapshot.")
+    }
+    const refreshed = await settle(getPracticePage())
+    if (prepared.session.status !== "setup" || refreshed.session.status !== "setup") return
+
+    expect(prepared.setupContext.defaultTargetRoleId).toBe(productManager.id)
+    expect(prepared.session.selection.targetRoleId).toBe(productManager.id)
+    expect(refreshed.session.selection).toEqual(prepared.session.selection)
+  })
+
+  it("keeps the no-role setup when no practice roles are available", async () => {
+    resetPracticeMockState("completedSession")
+    resetRolesMockState("noRoles")
+    const completed = await settle(getPracticePage())
+    if (completed.session.status !== "completed") {
+      throw new Error("A completed practice fixture is required.")
+    }
+
+    const prepared = await settle(
+      prepareNextPracticeSession({
+        sessionId: completed.session.sessionId,
+        version: completed.session.version,
+      }),
+    )
+    if (prepared === "ignored") {
+      throw new Error("The mock prepare-next-round service must return a page snapshot.")
+    }
+    const refreshed = await settle(getPracticePage())
+    if (prepared.session.status !== "setup" || refreshed.session.status !== "setup") return
+
+    expect(prepared.setupContext.targetRoles).toEqual([])
+    expect(prepared.session.selection).toEqual({
+      ...completed.session.selection,
+      targetRoleId: null,
+    })
+    expect(refreshed.session.selection).toEqual(prepared.session.selection)
   })
 
   it("rejects prepare-next-round requests with a stale version or different session id", async () => {
