@@ -379,14 +379,17 @@ function PracticeFollowUpView({
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
-      <PracticeFollowUpAssistance
-        interactionLocked={pending.interactionLocked}
-        onRequestFramework={() => actions.onRequestFramework(mutationInput)}
-        onRequestHint={() => actions.onRequestHint(mutationInput)}
-        onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
-        pending={pending}
-        question={session.currentFollowUp.question}
-      />
+      <>
+        <PracticeFollowUpAssistance
+          key={session.currentFollowUp.question.id}
+          interactionLocked={pending.interactionLocked}
+          onRequestFramework={() => actions.onRequestFramework(mutationInput)}
+          onRequestHint={() => actions.onRequestHint(mutationInput)}
+          onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
+          pending={pending}
+          question={session.currentFollowUp.question}
+        />
+      </>
       <PracticeFollowUpComposer
         key={session.currentFollowUp.question.id}
         interactionLocked={pending.interactionLocked}

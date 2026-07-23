@@ -141,7 +141,8 @@ function renderReadyView(
 ) {
   const onStart = options.onStart ?? vi.fn(async () => undefined)
   const actions = options.answeringActions ?? createAnsweringActions()
-  const renderResult = renderWithProviders(
+  const followUpActions = options.followUpActions ?? createFollowUpActions()
+  const renderView = (viewData: PracticePageResponse) => (
     <PracticeView
       answeringActions={actions}
       answeringPending={options.answeringPending ?? answeringPending}
@@ -149,11 +150,11 @@ function renderReadyView(
         options.completedActions ?? { onPrepareNextRound: vi.fn(async () => "executed" as const) }
       }
       completedPending={options.completedPending ?? false}
-      followUpActions={options.followUpActions ?? createFollowUpActions()}
+      followUpActions={followUpActions}
       followUpPending={options.followUpPending ?? followUpPending}
       reviewActions={options.reviewActions ?? createReviewActions()}
       reviewPending={options.reviewPending ?? reviewPending}
-      content={{ status: "ready", data }}
+      content={{ status: "ready", data: viewData }}
       evaluationError={options.evaluationError ?? false}
       generationError={options.generationError ?? false}
       isEvaluationRetrying={options.isEvaluationRetrying ?? false}
@@ -163,10 +164,17 @@ function renderReadyView(
       onRetryEvaluation={options.onRetryEvaluation ?? vi.fn()}
       onStart={onStart}
       variant="default"
-    />,
-    { router: { initialEntries: ["/practice"] } },
+    />
   )
-  return { actions, onStart, ...renderResult }
+  const renderResult = renderWithProviders(renderView(data), {
+    router: { initialEntries: ["/practice"] },
+  })
+  return {
+    actions,
+    onStart,
+    rerenderReady: (viewData: PracticePageResponse) => renderResult.rerender(renderView(viewData)),
+    ...renderResult,
+  }
 }
 
 function getStartButton() {
@@ -1110,6 +1118,96 @@ describe("PracticeView", () => {
     )
     expect(screen.queryByText(/sessionId=secret|stack|version=77/)).not.toBeInTheDocument()
     expect(textbox).toHaveValue("错误后保留草稿")
+  })
+
+  it("resets follow-up assistance errors when the current follow-up changes", async () => {
+    const user = userEvent.setup()
+    const first = createPracticeMockResponse("answeringFirstFollowUp")
+    const second = createPracticeMockResponse("answeringFollowUp")
+    if (
+      first.session.status !== "answeringFollowUp" ||
+      second.session.status !== "answeringFollowUp"
+    ) {
+      throw new Error("Answering follow-up fixtures required.")
+    }
+    expect(second.session.sessionId).toBe(first.session.sessionId)
+    expect(second.session.currentFollowUp.question.id).not.toBe(
+      first.session.currentFollowUp.question.id,
+    )
+    expect(second.session.currentFollowUp.question.answerHints.status).toBe("notRequested")
+    expect(second.session.currentFollowUp.question.answerFramework.status).toBe("notRequested")
+    expect(second.session.currentFollowUp.question.referenceAnswer.status).toBe("notRequested")
+
+    const actions = createFollowUpActions({
+      onRequestHint: vi.fn(async () => {
+        throw new Error("internal sessionId=secret version=77 stack")
+      }),
+    })
+    const { rerenderReady } = renderReadyView(first, { followUpActions: actions })
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewHint"),
+      }),
+    )
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.followUpAssistance.requestErrorDescription"),
+    )
+    expect(screen.queryByText(/sessionId=secret|stack|version=77/)).not.toBeInTheDocument()
+
+    rerenderReady(second)
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument())
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewHint"),
+      }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewFramework"),
+      }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    ).toBeVisible()
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+    expect(screen.getByLabelText(i18n.t("practice.followUp.answerLabel"))).toBeEnabled()
+  })
+
+  it("resets the reference confirmation dialog when the current follow-up changes", async () => {
+    const user = userEvent.setup()
+    const first = createPracticeMockResponse("answeringFirstFollowUp")
+    const second = createPracticeMockResponse("answeringFollowUp")
+    if (
+      first.session.status !== "answeringFollowUp" ||
+      second.session.status !== "answeringFollowUp"
+    ) {
+      throw new Error("Answering follow-up fixtures required.")
+    }
+    const actions = createFollowUpActions()
+    const { rerenderReady } = renderReadyView(first, { followUpActions: actions })
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    )
+    expect(screen.getByRole("alertdialog")).toBeVisible()
+    expect(actions.onRequestReferenceAnswer).not.toHaveBeenCalled()
+
+    rerenderReady(second)
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument())
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    )
+    expect(screen.getByRole("alertdialog")).toBeVisible()
+    expect(actions.onRequestReferenceAnswer).not.toHaveBeenCalled()
   })
 
   it("preserves a follow-up draft after a safe submit error", async () => {
