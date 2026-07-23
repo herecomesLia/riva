@@ -1,4 +1,4 @@
-import { useForm } from "@tanstack/react-form"
+import { useForm, useStore } from "@tanstack/react-form"
 import {
   AlertCircleIcon,
   BriefcaseBusinessIcon,
@@ -96,6 +96,8 @@ export function PracticeSetupForm({
       }
     },
   })
+  const isSubmitting = useStore(form.store, (state) => state.isSubmitting)
+  const pending = isSubmitting || isPending
 
   return (
     <form
@@ -115,12 +117,13 @@ export function PracticeSetupForm({
               : selectedRole?.title
 
             return (
-              <Field className="pb-5">
+              <Field className="pb-5" data-disabled={pending}>
                 <FieldLabel className="[&>svg]:size-4 [&>svg]:text-primary" htmlFor={field.name}>
                   <BriefcaseBusinessIcon aria-hidden="true" />
                   {t("practice.setup.fields.targetRole")}
                 </FieldLabel>
                 <Select
+                  disabled={pending}
                   onValueChange={(value) => {
                     if (!value) return
                     field.handleChange(value)
@@ -168,7 +171,7 @@ export function PracticeSetupForm({
               return (
                 <form.Field name="questionType">
                   {(field) => (
-                    <FieldSet>
+                    <FieldSet data-disabled={pending}>
                       <FieldLegend
                         className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
                         variant="label"
@@ -179,6 +182,7 @@ export function PracticeSetupForm({
                       <ToggleGroup
                         aria-label={t("practice.setup.fields.questionType")}
                         className="flex w-full flex-wrap justify-start"
+                        disabled={pending}
                         onValueChange={(values) => {
                           const value = values[0]
                           if (value) field.handleChange(value as PracticeQuestionType)
@@ -210,7 +214,7 @@ export function PracticeSetupForm({
         <div className="grid gap-5 border-t border-border py-5 md:grid-cols-2 md:gap-0">
           <form.Field name="difficulty">
             {(field) => (
-              <FieldSet className="md:pr-6">
+              <FieldSet className="md:pr-6" data-disabled={pending}>
                 <FieldLegend
                   className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
                   variant="label"
@@ -221,6 +225,7 @@ export function PracticeSetupForm({
                 <ToggleGroup
                   aria-label={t("practice.setup.fields.difficulty")}
                   className="flex w-full justify-start"
+                  disabled={pending}
                   onValueChange={(values) => {
                     const value = values[0]
                     if (value) field.handleChange(value as PracticeDifficulty)
@@ -246,7 +251,7 @@ export function PracticeSetupForm({
           <div className="border-t border-border pt-5 md:border-t-0 md:border-l md:pt-0 md:pl-6">
             <form.Field name="source">
               {(field) => (
-                <FieldSet>
+                <FieldSet data-disabled={pending}>
                   <FieldLegend
                     className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
                     variant="label"
@@ -257,6 +262,7 @@ export function PracticeSetupForm({
                   <ToggleGroup
                     aria-label={t("practice.setup.fields.source")}
                     className="flex w-full flex-wrap justify-start"
+                    disabled={pending}
                     onValueChange={(values) => {
                       const value = values[0]
                       if (value) field.handleChange(value as PracticeQuestionSource)
@@ -285,6 +291,7 @@ export function PracticeSetupForm({
           {(field) => (
             <Field
               className="w-full items-start gap-3 border-t border-border pt-5"
+              data-disabled={pending}
               orientation="horizontal"
             >
               <FieldContent className="flex-none">
@@ -298,6 +305,7 @@ export function PracticeSetupForm({
                 aria-label={t("practice.setup.fields.prioritizeWeaknesses")}
                 checked={field.state.value}
                 className="mt-0.5"
+                disabled={pending}
                 onCheckedChange={field.handleChange}
               />
             </Field>
@@ -319,6 +327,7 @@ export function PracticeSetupForm({
               <AlertDescription className="flex flex-col items-start gap-3">
                 <span>{t(`practice.availability.${source}.description`)}</span>
                 <Button
+                  disabled={pending}
                   onClick={() => form.setFieldValue("source", "personalized")}
                   size="sm"
                   type="button"
@@ -340,12 +349,11 @@ export function PracticeSetupForm({
         </Alert>
       )}
 
-      <form.Subscribe selector={(state) => [state.isSubmitting, state.values.source] as const}>
-        {([isSubmitting, source]) => {
+      <form.Subscribe selector={(state) => state.values.source}>
+        {(source) => {
           const sourceUnavailable =
             (source === "saved" && context.eligibleQuestionCounts.saved === 0) ||
             (source === "history" && context.eligibleQuestionCounts.history === 0)
-          const pending = isSubmitting || isPending
 
           return (
             <Button

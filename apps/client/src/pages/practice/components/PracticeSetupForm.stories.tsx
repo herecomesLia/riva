@@ -32,6 +32,19 @@ export const Default = meta.story({
 export const Pending = meta.story({
   args: { ...defaultArgs, isPending: true },
   play: async ({ canvas }) => {
+    const controls = [
+      ...canvas.queryAllByRole("button"),
+      ...canvas.queryAllByRole("combobox"),
+      ...canvas.queryAllByRole("switch"),
+    ]
+
+    await expect(controls.length).toBeGreaterThan(0)
+    for (const control of controls) {
+      await expect(
+        control.matches(":disabled") || control.getAttribute("aria-disabled") === "true",
+      ).toBe(true)
+    }
+    await expect(canvas.queryByRole("textbox")).not.toBeInTheDocument()
     await expect(canvas.getByRole("button", { name: /正在开始|starting/i })).toBeDisabled()
   },
 })
@@ -43,5 +56,6 @@ export const StartPractice = meta.story({
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /开始练习|start practice/i }))
     await expect(startPractice).toHaveBeenCalledTimes(1)
+    await expect(startPractice).toHaveBeenCalledWith(defaultArgs.initialSelection)
   },
 })

@@ -181,6 +181,28 @@ function getStartButton() {
   return screen.getByRole("button", { name: i18n.t("practice.actions.start") })
 }
 
+function getSetupSelectionControls() {
+  const setup = screen.getByTestId("practice-setup-state")
+  return [
+    screen.getByTestId("practice-target-role-trigger"),
+    ...setup.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
+    screen.getByRole("switch", {
+      name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
+    }),
+  ]
+}
+
+function expectControlDisabled(control: HTMLElement) {
+  expect(control.matches(":disabled") || control.getAttribute("aria-disabled") === "true").toBe(
+    true,
+  )
+}
+
+function expectControlEnabled(control: HTMLElement) {
+  expect(control.matches(":disabled")).toBe(false)
+  expect(control).not.toHaveAttribute("aria-disabled", "true")
+}
+
 describe("PracticeView", () => {
   it("renders the completed summary with next-round and training-history actions", async () => {
     const data = createPracticeMockResponse("completedSession")
@@ -594,7 +616,7 @@ describe("PracticeView", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("prevents duplicate submissions while the first submission is pending", async () => {
+  it("locks the submitted selection snapshot until the start request settles", async () => {
     const user = userEvent.setup()
     let resolveStart: (() => void) | undefined
     const onStart = vi.fn(
@@ -606,14 +628,75 @@ describe("PracticeView", () => {
     renderReadyView(createPracticeMockResponse("setupReady"), { onStart })
     await screen.findByTestId("practice-setup-state")
 
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("practice.questionTypes.behavioral") }),
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.pressure") }))
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.sources.saved") }))
+    await user.click(
+      screen.getByRole("switch", {
+        name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
+      }),
+    )
     await user.click(getStartButton())
+
+    expect(onStart).toHaveBeenCalledWith({
+      targetRoleId: "role_frontend_bytedance",
+      questionType: "behavioral",
+      difficulty: "pressure",
+      source: "saved",
+      prioritizeWeaknesses: true,
+    })
     const pendingButton = screen.getByRole("button", {
       name: i18n.t("practice.actions.starting"),
     })
     expect(pendingButton).toBeDisabled()
+    expect(pendingButton.querySelector('[data-slot="spinner"]')).toBeInTheDocument()
+    for (const control of getSetupSelectionControls()) expectControlDisabled(control)
+
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("practice.questionTypes.motivation") }),
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.basic") }))
     await user.click(pendingButton)
     expect(onStart).toHaveBeenCalledTimes(1)
-    resolveStart?.()
+
+    await act(async () => resolveStart?.())
+    await waitFor(() => expect(getStartButton()).toBeEnabled())
+    for (const control of getSetupSelectionControls()) expectControlEnabled(control)
+
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("practice.questionTypes.motivation") }),
+    )
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionTypes.motivation") }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(onStart).toHaveBeenCalledWith({
+      targetRoleId: "role_frontend_bytedance",
+      questionType: "behavioral",
+      difficulty: "pressure",
+      source: "saved",
+      prioritizeWeaknesses: true,
+    })
+  })
+
+  it("disables every selection-changing action while external start state is pending", async () => {
+    renderReadyView(createPracticeMockResponse("noEligibleSavedQuestions"), {
+      isStarting: true,
+    })
+    const setup = await screen.findByTestId("practice-setup-state")
+    const interactiveControls = [
+      ...within(setup).queryAllByRole("button"),
+      ...within(setup).queryAllByRole("combobox"),
+      ...within(setup).queryAllByRole("switch"),
+    ]
+
+    expect(interactiveControls.length).toBeGreaterThan(0)
+    for (const control of interactiveControls) expectControlDisabled(control)
+    expect(within(setup).queryByRole("textbox")).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.actions.usePersonalized") }),
+    ).toBeDisabled()
   })
 
   it.each([
