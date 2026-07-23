@@ -280,7 +280,13 @@ async function completeRetriedQuestionWithFinalFlags(
     throw new Error("Finishing the retried question must complete the session.")
   }
 
-  return { completed: completed.session, firstReview, retried: retried.session, secondReview }
+  return {
+    completed: completed.session,
+    firstReview,
+    retried: retried.session,
+    secondAnswering,
+    secondReview,
+  }
 }
 
 describe("practice stateful mock service", () => {
@@ -436,6 +442,8 @@ describe("practice stateful mock service", () => {
     expect(secondReview.question.id).toBe(firstReview.question.id)
     expect(retried.attemptId).not.toBe(firstReview.attemptId)
     expect(secondReview.attemptId).toBe(retried.attemptId)
+    expect(retried.attemptRecords[0]?.question).not.toBe(retried.question)
+    expect(retried.question).toMatchObject({ isSaved: true, isMarkedWeak: true })
     expect(completed).toMatchObject({
       questionsCompleted: 1,
       retryCount: 1,
@@ -443,12 +451,15 @@ describe("practice stateful mock service", () => {
       markedWeakQuestionCount: 1,
     })
     expect(completed.attemptRecords).toHaveLength(2)
-    expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([true, true])
-    expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([true, true])
+    expect(completed.attemptRecords.map((record) => record.question.isSaved)).toEqual([true, true])
+    expect(completed.attemptRecords.map((record) => record.question.isMarkedWeak)).toEqual([
+      true,
+      true,
+    ])
   })
 
   it("uses the final retried attempt when saved and weak status are cancelled", async () => {
-    const { completed, firstReview, retried, secondReview } =
+    const { completed, firstReview, retried, secondAnswering, secondReview } =
       await completeRetriedQuestionWithFinalFlags(
         { isSaved: true, isMarkedWeak: true },
         { isSaved: false, isMarkedWeak: false },
@@ -457,14 +468,26 @@ describe("practice stateful mock service", () => {
     expect(retried.sessionId).toBe(firstReview.sessionId)
     expect(secondReview.question.id).toBe(firstReview.question.id)
     expect(retried.attemptId).not.toBe(firstReview.attemptId)
+    expect(secondAnswering.attemptRecords[0]?.question).not.toBe(secondAnswering.question)
+    expect(secondAnswering.attemptRecords[0]?.question).toMatchObject({
+      isSaved: true,
+      isMarkedWeak: true,
+    })
+    expect(secondAnswering.question).toMatchObject({
+      isSaved: false,
+      isMarkedWeak: false,
+    })
     expect(completed).toMatchObject({
       questionsCompleted: 1,
       retryCount: 1,
       savedQuestionCount: 0,
       markedWeakQuestionCount: 0,
     })
-    expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([true, false])
-    expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([true, false])
+    expect(completed.attemptRecords.map((record) => record.question.isSaved)).toEqual([true, false])
+    expect(completed.attemptRecords.map((record) => record.question.isMarkedWeak)).toEqual([
+      true,
+      false,
+    ])
   })
 
   it("uses the final retried attempt when saved and weak status are newly enabled", async () => {
@@ -483,8 +506,11 @@ describe("practice stateful mock service", () => {
       savedQuestionCount: 1,
       markedWeakQuestionCount: 1,
     })
-    expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([false, true])
-    expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([false, true])
+    expect(completed.attemptRecords.map((record) => record.question.isSaved)).toEqual([false, true])
+    expect(completed.attemptRecords.map((record) => record.question.isMarkedWeak)).toEqual([
+      false,
+      true,
+    ])
   })
 
   it("summarizes one question answered once", async () => {

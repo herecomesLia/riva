@@ -367,10 +367,10 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.questionsCompleted).toBe(latest.size)
       expect(session.retryCount).toBe(records.length - latest.size)
       expect(session.savedQuestionCount).toBe(
-        [...latest.values()].filter((record) => record.isSaved).length,
+        [...latest.values()].filter((record) => record.question.isSaved).length,
       )
       expect(session.markedWeakQuestionCount).toBe(
-        [...latest.values()].filter((record) => record.isMarkedWeak).length,
+        [...latest.values()].filter((record) => record.question.isMarkedWeak).length,
       )
       expect(session.finalAttemptAverageScore).toBe(
         latest.size === 0

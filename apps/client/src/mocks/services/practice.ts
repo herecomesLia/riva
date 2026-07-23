@@ -672,8 +672,6 @@ function toAttemptRecord(
     followUpCompletion: copy(session.followUpCompletion),
     evaluation: copy(session.evaluation),
     review: copy(session.review),
-    isSaved: session.question.isSaved,
-    isMarkedWeak: session.question.isMarkedWeak,
   }
 }
 
@@ -703,8 +701,8 @@ function createCompletedPracticeSession({
     completedAt,
     questionsCompleted: uniqueRecords.length,
     retryCount: records.length - uniqueRecords.length,
-    savedQuestionCount: uniqueRecords.filter((record) => record.isSaved).length,
-    markedWeakQuestionCount: uniqueRecords.filter((record) => record.isMarkedWeak).length,
+    savedQuestionCount: uniqueRecords.filter((record) => record.question.isSaved).length,
+    markedWeakQuestionCount: uniqueRecords.filter((record) => record.question.isMarkedWeak).length,
     finalAttemptAverageScore:
       uniqueRecords.length === 0
         ? 0

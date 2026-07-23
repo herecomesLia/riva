@@ -1374,8 +1374,6 @@ const archivedProjectAttempt = {
   followUpCompletion: { status: "completed", reason: "allAnswered" },
   evaluation,
   review: nextReview,
-  isSaved: false,
-  isMarkedWeak: false,
 } satisfies PracticeAttemptRecord
 
 export type PracticeMockScenario =
@@ -1779,7 +1777,12 @@ const practiceMockScenarios = {
     session: {
       status: "completed",
       ...activeSession,
-      attemptRecords: [{ ...archivedProjectAttempt, isMarkedWeak: true }],
+      attemptRecords: [
+        {
+          ...archivedProjectAttempt,
+          question: { ...archivedProjectAttempt.question, isMarkedWeak: true },
+        },
+      ],
       completedAt: "2026-07-20T01:41:00.000Z",
       questionsCompleted: 1,
       retryCount: 0,

@@ -220,8 +220,6 @@ export type PracticeAttemptRecord = {
   followUpCompletion: PracticeFollowUpCompletion
   evaluation: PracticeEvaluation
   review: PracticeReview
-  isSaved: boolean
-  isMarkedWeak: boolean
 }
 
 type PracticeActiveSessionBase = {
