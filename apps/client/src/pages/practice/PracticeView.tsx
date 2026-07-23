@@ -379,25 +379,23 @@ function PracticeFollowUpView({
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
-      <>
-        <PracticeFollowUpAssistance
-          key={session.currentFollowUp.question.id}
-          interactionLocked={pending.interactionLocked}
-          onRequestFramework={() => actions.onRequestFramework(mutationInput)}
-          onRequestHint={() => actions.onRequestHint(mutationInput)}
-          onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
-          pending={pending}
-          question={session.currentFollowUp.question}
-        />
-      </>
       <PracticeFollowUpComposer
-        key={session.currentFollowUp.question.id}
+        key={`${session.currentFollowUp.question.id}:composer`}
         interactionLocked={pending.interactionLocked}
         isEndPending={pending.end}
         isPending={pending.submit}
         onDraftChange={setIsDraftDirty}
         onEnd={() => actions.onEndFollowUps(mutationInput)}
         onSubmit={(content) => actions.onSubmitFollowUp({ ...mutationInput, content })}
+      />
+      <PracticeFollowUpAssistance
+        key={`${session.currentFollowUp.question.id}:assistance`}
+        interactionLocked={pending.interactionLocked}
+        onRequestFramework={() => actions.onRequestFramework(mutationInput)}
+        onRequestHint={() => actions.onRequestHint(mutationInput)}
+        onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
+        pending={pending}
+        question={session.currentFollowUp.question}
       />
 
       <AlertDialog open={blocker.status === "blocked"}>

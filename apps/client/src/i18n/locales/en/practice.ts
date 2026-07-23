@@ -148,12 +148,16 @@ export const practice = {
     title: "Need help?",
     description: "Reveal assistance matched to this specific follow-up when you need it.",
     hintTitle: "Follow-up hint",
+    hintDescription: "Identify the key information to add without revealing an answer.",
     viewHint: "View follow-up hint",
     hintGenerating: "Generating follow-up hint",
     frameworkTitle: "Answer approach",
+    frameworkDescription: "Organize the sequence and emphasis of your follow-up answer.",
     viewFramework: "View answer approach",
     frameworkGenerating: "Generating answer approach",
     referenceTitle: "RIVA reference supplement",
+    referenceDescription:
+      "After thinking independently, compare with a supplement for this answer.",
     viewReference: "View RIVA reference supplement",
     referenceGenerating: "Generating reference supplement",
     kind: {

@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type { PracticeFollowUpQuestion } from "@/models/practice"
+import type { PracticeFollowUpQuestion, PracticeGuidance } from "@/models/practice"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 
@@ -72,132 +73,100 @@ export function PracticeFollowUpAssistance({
 
   return (
     <section
-      aria-labelledby="practice-follow-up-assistance-title"
-      className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-4"
+      aria-label={t("practice.followUpAssistance.title")}
+      className="flex min-w-0 flex-col gap-4"
       data-testid="practice-follow-up-assistance"
     >
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading font-medium" id="practice-follow-up-assistance-title">
-          {t("practice.followUpAssistance.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {t("practice.followUpAssistance.description")}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {question.answerHints.status === "notRequested" ? (
-          <Button
-            disabled={interactionLocked}
-            onClick={() => void request("hint", onRequestHint)}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {pending.hint ? (
-              <Spinner aria-hidden="true" data-icon="inline-start" />
-            ) : (
-              <LightbulbIcon data-icon="inline-start" />
-            )}
-            {pending.hint
-              ? t("practice.followUpAssistance.hintGenerating")
-              : t("practice.followUpAssistance.viewHint")}
-          </Button>
-        ) : null}
-        {question.answerFramework.status === "notRequested" ? (
-          <Button
-            disabled={interactionLocked}
-            onClick={() => void request("framework", onRequestFramework)}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {pending.framework ? (
-              <Spinner aria-hidden="true" data-icon="inline-start" />
-            ) : (
-              <ListTreeIcon data-icon="inline-start" />
-            )}
-            {pending.framework
-              ? t("practice.followUpAssistance.frameworkGenerating")
-              : t("practice.followUpAssistance.viewFramework")}
-          </Button>
-        ) : null}
-        {question.referenceAnswer.status === "notRequested" ? (
-          <Button
-            disabled={interactionLocked}
-            onClick={() => setConfirmationOpen(true)}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {pending.referenceAnswer ? (
-              <Spinner aria-hidden="true" data-icon="inline-start" />
-            ) : (
-              <SparklesIcon data-icon="inline-start" />
-            )}
-            {pending.referenceAnswer
-              ? t("practice.followUpAssistance.referenceGenerating")
-              : t("practice.followUpAssistance.viewReference")}
-          </Button>
-        ) : null}
-      </div>
-
-      {question.answerHints.status === "revealed" ? (
-        <AssistanceList
-          items={question.answerHints.content}
+      <div className="grid gap-4 md:grid-cols-2">
+        <FollowUpGuidanceCard
+          description={t("practice.followUpAssistance.hintDescription")}
+          error={error === "hint"}
+          icon={LightbulbIcon}
+          isPending={pending.hint}
+          interactionLocked={interactionLocked}
+          onRequest={() => void request("hint", onRequestHint)}
+          pendingLabel={t("practice.followUpAssistance.hintGenerating")}
+          requestLabel={t("practice.followUpAssistance.viewHint")}
+          state={question.answerHints}
           title={t("practice.followUpAssistance.hintTitle")}
         />
-      ) : null}
-      {question.answerFramework.status === "revealed" ? (
-        <AssistanceList
+        <FollowUpGuidanceCard
           arrow
-          items={question.answerFramework.content}
+          description={t("practice.followUpAssistance.frameworkDescription")}
+          error={error === "framework"}
+          icon={ListTreeIcon}
+          isPending={pending.framework}
+          interactionLocked={interactionLocked}
+          onRequest={() => void request("framework", onRequestFramework)}
+          pendingLabel={t("practice.followUpAssistance.frameworkGenerating")}
+          requestLabel={t("practice.followUpAssistance.viewFramework")}
+          state={question.answerFramework}
           title={t("practice.followUpAssistance.frameworkTitle")}
         />
-      ) : null}
-      {question.referenceAnswer.status === "revealed" ? (
-        <div className="flex min-w-0 flex-col gap-4 break-words [overflow-wrap:anywhere]">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">
-              {t(`practice.followUpAssistance.kind.${question.referenceAnswer.content.kind}`)}
-            </Badge>
-            {question.referenceAnswer.viewedBeforeSubmission ? (
-              <Badge variant="outline">
-                {t("practice.followUpAssistance.viewedBeforeSubmission")}
-              </Badge>
-            ) : null}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {question.referenceAnswer.content.addressedGap}
-          </p>
-          <p className="whitespace-pre-wrap text-sm leading-7">
-            {question.referenceAnswer.content.answer}
-          </p>
-          <AssistanceList
-            items={question.referenceAnswer.content.keyPoints}
-            title={t("practice.followUpAssistance.keyPoints")}
-          />
-          <AssistanceList
-            items={question.referenceAnswer.content.commonMistakes}
-            title={t("practice.followUpAssistance.commonMistakes")}
-          />
-        </div>
-      ) : null}
-      {question.answerHints.status === "unavailable" ||
-      question.answerFramework.status === "unavailable" ||
-      question.referenceAnswer.status === "unavailable" ? (
-        <p className="text-sm text-muted-foreground" role="status">
-          {t("practice.followUpAssistance.unavailable")}
-        </p>
-      ) : null}
-      {error ? (
-        <Alert role="alert" variant="destructive">
-          <AlertTitle>{t("practice.followUpAssistance.requestErrorTitle")}</AlertTitle>
-          <AlertDescription>
-            {t("practice.followUpAssistance.requestErrorDescription")}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      </div>
+
+      <Card className="min-w-0" data-testid="practice-follow-up-reference">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <SparklesIcon aria-hidden="true" />
+            {t("practice.followUpAssistance.referenceTitle")}
+          </CardTitle>
+          <CardDescription>{t("practice.followUpAssistance.referenceDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex min-w-0 flex-col gap-4">
+          {question.referenceAnswer.status === "notRequested" ? (
+            <Button
+              className="self-start"
+              disabled={interactionLocked || pending.referenceAnswer}
+              onClick={() => setConfirmationOpen(true)}
+              type="button"
+            >
+              {pending.referenceAnswer ? (
+                <Spinner aria-hidden="true" data-icon="inline-start" />
+              ) : (
+                <SparklesIcon data-icon="inline-start" />
+              )}
+              {pending.referenceAnswer
+                ? t("practice.followUpAssistance.referenceGenerating")
+                : t("practice.followUpAssistance.viewReference")}
+            </Button>
+          ) : null}
+          {question.referenceAnswer.status === "revealed" ? (
+            <div className="flex min-w-0 flex-col gap-4 break-words [overflow-wrap:anywhere]">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">
+                  {t(`practice.followUpAssistance.kind.${question.referenceAnswer.content.kind}`)}
+                </Badge>
+                {question.referenceAnswer.viewedBeforeSubmission ? (
+                  <Badge variant="outline">
+                    {t("practice.followUpAssistance.viewedBeforeSubmission")}
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {question.referenceAnswer.content.addressedGap}
+              </p>
+              <p className="whitespace-pre-wrap text-sm leading-7">
+                {question.referenceAnswer.content.answer}
+              </p>
+              <AssistanceList
+                items={question.referenceAnswer.content.keyPoints}
+                title={t("practice.followUpAssistance.keyPoints")}
+              />
+              <AssistanceList
+                items={question.referenceAnswer.content.commonMistakes}
+                title={t("practice.followUpAssistance.commonMistakes")}
+              />
+            </div>
+          ) : null}
+          {question.referenceAnswer.status === "unavailable" ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              {t("practice.followUpAssistance.unavailable")}
+            </p>
+          ) : null}
+          {error === "referenceAnswer" ? <AssistanceError /> : null}
+        </CardContent>
+      </Card>
 
       <AlertDialog onOpenChange={setConfirmationOpen} open={confirmationOpen}>
         <AlertDialogContent>
@@ -232,26 +201,99 @@ export function PracticeFollowUpAssistance({
   )
 }
 
-function AssistanceList({
+function FollowUpGuidanceCard({
   arrow = false,
-  items,
+  description,
+  error,
+  icon: Icon,
+  interactionLocked,
+  isPending,
+  onRequest,
+  pendingLabel,
+  requestLabel,
+  state,
   title,
 }: {
   arrow?: boolean
-  items: string[]
+  description: string
+  error: boolean
+  icon: typeof LightbulbIcon
+  interactionLocked: boolean
+  isPending: boolean
+  onRequest: () => void
+  pendingLabel: string
+  requestLabel: string
+  state: PracticeGuidance<string[]>
   title: string
 }) {
+  const { t } = useTranslation()
+
+  return (
+    <Card className="min-w-0" data-testid="practice-follow-up-guidance-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Icon aria-hidden="true" />
+          {title}
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex min-w-0 flex-col gap-4">
+        {state.status === "notRequested" ? (
+          <Button
+            disabled={interactionLocked || isPending}
+            onClick={onRequest}
+            type="button"
+            variant="outline"
+          >
+            {isPending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : null}
+            {isPending ? pendingLabel : requestLabel}
+          </Button>
+        ) : null}
+        {state.status === "revealed" ? (
+          <AssistanceItems arrow={arrow} items={state.content} />
+        ) : null}
+        {state.status === "unavailable" ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            {t("practice.followUpAssistance.unavailable")}
+          </p>
+        ) : null}
+        {error ? <AssistanceError /> : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function AssistanceItems({ arrow = false, items }: { arrow?: boolean; items: string[] }) {
+  return (
+    <ol className={arrow ? "flex flex-col gap-1 text-sm" : "list-disc pl-5 text-sm leading-6"}>
+      {items.map((item, index) => (
+        <li className="break-words [overflow-wrap:anywhere]" key={item}>
+          {arrow && index > 0 ? <span aria-hidden="true">→ </span> : null}
+          {item}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function AssistanceError() {
+  const { t } = useTranslation()
+
+  return (
+    <Alert role="alert" variant="destructive">
+      <AlertTitle>{t("practice.followUpAssistance.requestErrorTitle")}</AlertTitle>
+      <AlertDescription>
+        {t("practice.followUpAssistance.requestErrorDescription")}
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function AssistanceList({ items, title }: { items: string[]; title: string }) {
   return (
     <section className="flex min-w-0 flex-col gap-2">
       <h3 className="font-heading text-sm font-medium">{title}</h3>
-      <ol className={arrow ? "flex flex-col gap-1 text-sm" : "list-disc pl-5 text-sm leading-6"}>
-        {items.map((item, index) => (
-          <li className="break-words [overflow-wrap:anywhere]" key={item}>
-            {arrow && index > 0 ? <span aria-hidden="true">→ </span> : null}
-            {item}
-          </li>
-        ))}
-      </ol>
+      <AssistanceItems items={items} />
     </section>
   )
 }

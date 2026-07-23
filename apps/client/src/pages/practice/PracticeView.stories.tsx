@@ -424,6 +424,8 @@ export const FollowUpWithAssistance = meta.story({
   args: readyArgs("answeringSingleFollowUp"),
   play: async ({ canvas }) => {
     await expect(canvas.getByTestId("practice-follow-up-assistance")).toBeVisible()
+    await expect(canvas.getAllByTestId("practice-follow-up-guidance-card")).toHaveLength(2)
+    await expect(canvas.getByTestId("practice-follow-up-reference")).toBeVisible()
     await expect(
       canvas.getAllByRole("button", { name: /查看追问提示|view follow-up hint/i }),
     ).toHaveLength(1)

@@ -959,6 +959,14 @@ describe("PracticeView", () => {
         .getByText(data.session.currentFollowUp.question.prompt)
         .closest("[aria-current='step']"),
     ).toBeInTheDocument()
+    const composer = screen.getByTestId("practice-follow-up-composer")
+    const assistance = screen.getByTestId("practice-follow-up-assistance")
+    expect(
+      timeline.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      composer.compareDocumentPosition(assistance) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
   })
 
@@ -989,22 +997,78 @@ describe("PracticeView", () => {
     renderReadyView(data)
     if (data.session.status !== "answeringFollowUp") return
 
+    const hintButton = await screen.findByRole("button", {
+      name: i18n.t("practice.followUpAssistance.viewHint"),
+    })
+    const frameworkButton = screen.getByRole("button", {
+      name: i18n.t("practice.followUpAssistance.viewFramework"),
+    })
+    const referenceButton = screen.getByRole("button", {
+      name: i18n.t("practice.followUpAssistance.viewReference"),
+    })
+    expect(hintButton).toBeVisible()
+    expect(frameworkButton).toBeVisible()
+    expect(referenceButton).toBeVisible()
+    expect(referenceButton).toHaveClass("self-start")
+    expect(screen.getAllByTestId("practice-follow-up-guidance-card")).toHaveLength(2)
+    expect(screen.getByTestId("practice-follow-up-reference")).toBeVisible()
     expect(
-      await screen.findByRole("button", {
+      new Set(
+        [hintButton, frameworkButton, referenceButton].map((button) =>
+          button.closest("[data-slot='card']"),
+        ),
+      ).size,
+    ).toBe(3)
+    expect(screen.queryByText(/承认具体不足|Profiler 确认更新来源/)).not.toBeInTheDocument()
+  })
+
+  it("reveals each follow-up aid in its own card and removes its request button", async () => {
+    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    if (data.session.status !== "answeringFollowUp") return
+    data.session.currentFollowUp.question.answerHints = {
+      status: "revealed",
+      content: ["追问提示内容"],
+    }
+    data.session.currentFollowUp.question.answerFramework = {
+      status: "revealed",
+      content: ["回答思路内容"],
+    }
+    data.session.currentFollowUp.question.referenceAnswer = {
+      status: "revealed",
+      content: {
+        kind: "personalizedSupplement",
+        addressedGap: "需要补充的缺口",
+        answer: "参考补充内容",
+        keyPoints: ["参考关键点"],
+        commonMistakes: ["参考常见误区"],
+        generatedAt: "2026-07-23T12:00:00.000Z",
+      },
+      viewedBeforeSubmission: true,
+    }
+    renderReadyView(data)
+
+    const [hintCard, frameworkCard] = await screen.findAllByTestId(
+      "practice-follow-up-guidance-card",
+    )
+    const referenceCard = screen.getByTestId("practice-follow-up-reference")
+    expect(hintCard).toHaveTextContent("追问提示内容")
+    expect(frameworkCard).toHaveTextContent("回答思路内容")
+    expect(referenceCard).toHaveTextContent("参考补充内容")
+    expect(
+      screen.queryByRole("button", {
         name: i18n.t("practice.followUpAssistance.viewHint"),
       }),
-    ).toBeVisible()
+    ).not.toBeInTheDocument()
     expect(
-      screen.getByRole("button", {
+      screen.queryByRole("button", {
         name: i18n.t("practice.followUpAssistance.viewFramework"),
       }),
-    ).toBeVisible()
+    ).not.toBeInTheDocument()
     expect(
-      screen.getByRole("button", {
+      screen.queryByRole("button", {
         name: i18n.t("practice.followUpAssistance.viewReference"),
       }),
-    ).toBeVisible()
-    expect(screen.queryByText(/承认具体不足|Profiler 确认更新来源/)).not.toBeInTheDocument()
+    ).not.toBeInTheDocument()
   })
 
   it("requests follow-up hint and framework with the exact versioned input", async () => {
