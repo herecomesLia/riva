@@ -32,6 +32,7 @@ import {
   deleteTargetRole,
   getRolesPage,
   setCurrentTargetRole,
+  updateTargetRole,
 } from "@/services/roles"
 import type {
   PracticeAnsweringState,
@@ -711,7 +712,52 @@ describe("practice stateful mock service", () => {
     })
   })
 
-  it("does not grant technical questions to roles without practice metadata", async () => {
+  it("derives technical questions for a newly created frontend role and recomputes after editing", async () => {
+    const roles = await settle(
+      createTargetRole({
+        title: "Frontend Platform Engineer",
+        company: "Riva",
+        recruitmentType: "experienced",
+        location: null,
+        experienceRange: null,
+        preparationStatus: "preparing",
+      }),
+    )
+    const createdRole = roles.roles.find((role) => role.title === "Frontend Platform Engineer")
+    if (!createdRole) throw new Error("Expected the newly created Frontend role.")
+
+    const beforeEdit = await settle(getPracticePage())
+    expect(
+      beforeEdit.setupContext.targetRoles.find((role) => role.id === createdRole.id)
+        ?.supportedQuestionTypes,
+    ).toContain("technicalFoundation")
+
+    await settle(
+      updateTargetRole({
+        roleId: createdRole.id,
+        version: createdRole.version,
+        title: "Business Operations Manager",
+        company: createdRole.company,
+        recruitmentType: createdRole.recruitmentType,
+        location: createdRole.location,
+        experienceRange: createdRole.experienceRange,
+      }),
+    )
+    const afterEdit = await settle(getPracticePage())
+    const editedPracticeRole = afterEdit.setupContext.targetRoles.find(
+      (role) => role.id === createdRole.id,
+    )
+
+    expect(editedPracticeRole?.title).toBe("Business Operations Manager")
+    expect(editedPracticeRole?.supportedQuestionTypes).toEqual([
+      "projectDeepDive",
+      "behavioral",
+      "businessUnderstanding",
+      "motivation",
+    ])
+  })
+
+  it("does not grant technical questions to a non-technical role", async () => {
     const roles = await settle(
       createTargetRole({
         title: "HR Business Partner",

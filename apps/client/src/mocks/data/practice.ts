@@ -20,36 +20,22 @@ import type {
   PracticeScoreDimension,
   PracticeSetupContext,
 } from "@/models/practice"
+import { derivePracticeSupportedQuestionTypes } from "@/mocks/data/role-fixture-builders"
+import { createRolesMockResponse } from "@/mocks/data/roles"
 
-const targetRoles = [
-  {
-    id: "role_frontend_bytedance",
-    title: "Senior Frontend Engineer",
-    company: "ByteDance",
-    supportedQuestionTypes: [
-      "projectDeepDive",
-      "behavioral",
-      "businessUnderstanding",
-      "motivation",
-      "technicalFoundation",
-    ],
-  },
-  {
-    id: "role_product_manager_meituan",
-    title: "Product Manager",
-    company: "Meituan",
-    supportedQuestionTypes: [
-      "projectDeepDive",
-      "behavioral",
-      "businessUnderstanding",
-      "motivation",
-    ],
-  },
-] satisfies PracticeSetupContext["targetRoles"]
+const rolesFixture = createRolesMockResponse("multipleRoles")
+const targetRoles = rolesFixture.roles
+  .filter((role) => role.preparationStatus !== "archived")
+  .map((role) => ({
+    id: role.id,
+    title: role.title,
+    company: role.company,
+    supportedQuestionTypes: derivePracticeSupportedQuestionTypes(role),
+  })) satisfies PracticeSetupContext["targetRoles"]
 
 const setupContext = {
   targetRoles,
-  defaultTargetRoleId: "role_frontend_bytedance",
+  defaultTargetRoleId: rolesFixture.currentRoleId,
   eligibleQuestionCounts: {
     saved: 3,
     history: 5,

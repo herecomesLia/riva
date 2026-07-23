@@ -9,6 +9,7 @@ import {
   getPracticeFollowUpPlan,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
+import { derivePracticeSupportedQuestionTypes } from "@/mocks/data/role-fixture-builders"
 import { getRolesPage } from "@/mocks/services/roles"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
@@ -20,7 +21,6 @@ import type {
   PracticeAttemptRecord,
   PracticeCompletedState,
   PracticeQuestionMutationInput,
-  PracticeQuestionType,
   RequestAnswerFrameworkInput,
   RequestEndPracticeSessionInput,
   RequestPracticeHintInput,
@@ -43,20 +43,6 @@ import type {
   SubmitPrimaryAnswerInput,
 } from "@/models/practice"
 import type { TargetRole } from "@/models/roles"
-
-const commonQuestionTypes: PracticeQuestionType[] = [
-  "projectDeepDive",
-  "behavioral",
-  "businessUnderstanding",
-  "motivation",
-]
-
-const practiceRoleMetadata = new Map(
-  createPracticeMockResponse().setupContext.targetRoles.map((role) => [
-    role.id,
-    role.supportedQuestionTypes,
-  ]),
-)
 
 let mockResponse = createPracticeMockResponse()
 let sessionSequence = 0
@@ -83,7 +69,7 @@ function toPracticeRoleOption(role: TargetRole): PracticeTargetRoleOption {
     id: role.id,
     title: role.title,
     company: role.company,
-    supportedQuestionTypes: copy(practiceRoleMetadata.get(role.id) ?? commonQuestionTypes),
+    supportedQuestionTypes: derivePracticeSupportedQuestionTypes(role),
   }
 }
 

@@ -1,4 +1,24 @@
-import type { JobDescriptionAnalysis, MatchingAnalysisResult } from "@/models/roles"
+import type { PracticeQuestionType } from "@/models/practice"
+import type { JobDescriptionAnalysis, MatchingAnalysisResult, TargetRole } from "@/models/roles"
+
+const commonPracticeQuestionTypes: PracticeQuestionType[] = [
+  "projectDeepDive",
+  "behavioral",
+  "businessUnderstanding",
+  "motivation",
+]
+
+export function derivePracticeSupportedQuestionTypes(
+  role: Pick<TargetRole, "title">,
+): PracticeQuestionType[] {
+  const normalizedTitle = role.title.trim().toLowerCase()
+  const isFrontendRole =
+    normalizedTitle.includes("前端") || /\bfront[\s-]?end\b/.test(normalizedTitle)
+
+  return isFrontendRole
+    ? [...commonPracticeQuestionTypes, "technicalFoundation"]
+    : [...commonPracticeQuestionTypes]
+}
 
 type CreateJobDescriptionAnalysisFixtureInput = {
   analysisVersion?: number

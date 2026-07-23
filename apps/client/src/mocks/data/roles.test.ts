@@ -8,6 +8,7 @@ import {
 import {
   createJobDescriptionAnalysisFixture,
   createMatchingAnalysisResultFixture,
+  derivePracticeSupportedQuestionTypes,
 } from "@/mocks/data/role-fixture-builders"
 import type { RolesPageResponse, TargetRole } from "@/models/roles"
 
@@ -140,6 +141,18 @@ function expectConsistentRolesResponse(response: RolesPageResponse) {
 }
 
 describe("roles mock scenarios", () => {
+  it.each([
+    ["Senior Frontend Engineer", true],
+    ["前端平台工程师", true],
+    ["Product Manager", false],
+    ["Business Operations Manager", false],
+  ])("derives practice question types from the role title %s", (title, supportsTechnical) => {
+    const questionTypes = derivePracticeSupportedQuestionTypes({ title })
+
+    expect(questionTypes).toContain("projectDeepDive")
+    expect(questionTypes.includes("technicalFoundation")).toBe(supportsTechnical)
+  })
+
   it("keeps generated summaries and removed keywords outside the module update contract", () => {
     const analysis = createRolesMockResponse().roles[0]!.jobDescriptionAnalysis!
     expect(analysis.rivaSummary).toBeTruthy()
