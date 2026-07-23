@@ -470,7 +470,10 @@ function PracticeReviewView({
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="practice-review-state">
+    <div
+      className="flex flex-col gap-5 pb-80 min-[360px]:pb-52 sm:pb-40 lg:pb-28"
+      data-testid="practice-review-state"
+    >
       <PracticeSessionHeader context={context} selection={session.selection} />
       <p className="text-sm text-muted-foreground">
         {t("practice.review.attempt", { count: session.attemptNumber })}

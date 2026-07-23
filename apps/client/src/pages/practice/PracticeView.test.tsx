@@ -215,6 +215,33 @@ describe("PracticeView", () => {
     ).toBeEnabled()
   })
 
+  it("keeps all review actions in a fixed, sidebar-aware bottom bar", async () => {
+    renderReadyView(createPracticeMockResponse("reviewBalanced"))
+
+    const review = await screen.findByTestId("practice-review-state")
+    expect(review).toHaveClass("pb-80", "min-[360px]:pb-52", "sm:pb-40", "lg:pb-28")
+
+    const actionBar = screen.getByTestId("practice-review-actions-bar")
+    expect(actionBar).toHaveClass("fixed", "inset-x-0", "bottom-0", "z-40", "border-t")
+    expect(actionBar).toHaveClass("bg-background/95", "backdrop-blur")
+    expect(actionBar).toHaveClass(
+      "md:left-(--sidebar-width)",
+      "md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)",
+    )
+    expect(actionBar.closest("[data-slot='card']")).not.toBeInTheDocument()
+
+    const actions = within(actionBar)
+    for (const name of [
+      i18n.t("practice.review.retryCurrent"),
+      i18n.t("practice.review.nextQuestion"),
+      i18n.t("practice.review.endSession"),
+      i18n.t("practice.questionActions.save"),
+      i18n.t("practice.questionActions.markWeak"),
+    ]) {
+      expect(actions.getByRole("button", { name })).toBeInTheDocument()
+    }
+  })
+
   it("confirms ending a reviewed session before invoking the action", async () => {
     const user = userEvent.setup()
     const onEndSession = vi.fn(async () => "executed" as const)
