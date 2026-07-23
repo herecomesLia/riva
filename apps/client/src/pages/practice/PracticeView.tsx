@@ -551,8 +551,12 @@ function PracticeCompletedView({
         <p>{t("practice.completed.questions", { count: session.questionsCompleted })}</p>
         <p>{t("practice.completed.retries", { count: session.retryCount })}</p>
         <p>{t("practice.completed.saved", { count: session.savedQuestionCount })}</p>
-        <p>{t("practice.completed.weak", { count: session.newWeaknessCount })}</p>
-        <p>{t("practice.completed.average", { score: session.averageScore })}</p>
+        <p>{t("practice.completed.markedWeak", { count: session.markedWeakQuestionCount })}</p>
+        <p>
+          {t("practice.completed.finalAttemptAverage", {
+            score: session.finalAttemptAverageScore,
+          })}
+        </p>
         <p className="text-muted-foreground">{session.nextStepSuggestion}</p>
         {error && (
           <Alert variant="destructive">

@@ -294,8 +294,8 @@ export type PracticeCompletedState = PracticeActiveSessionBase & {
   questionsCompleted: number
   retryCount: number
   savedQuestionCount: number
-  newWeaknessCount: number
-  averageScore: number
+  markedWeakQuestionCount: number
+  finalAttemptAverageScore: number
   nextStepSuggestion: string
 }
 

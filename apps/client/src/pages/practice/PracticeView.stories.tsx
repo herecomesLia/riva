@@ -154,7 +154,14 @@ function CompletedSessionStory() {
 export const CompletedSession = meta.story({
   render: () => <CompletedSessionStory />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-completed-state")).toBeVisible()
+    const completed = canvas.getByTestId("practice-completed-state")
+    await expect(completed).toBeVisible()
+    await expect(completed).toHaveTextContent(/完成题数：1|Questions completed: 1/i)
+    await expect(completed).toHaveTextContent(/重练次数：0|Retries: 0/i)
+    await expect(completed).toHaveTextContent(/标记薄弱题数：0|Marked weak questions: 0/i)
+    await expect(completed).toHaveTextContent(
+      /最终作答平均分：85 分|Final-attempt average score: 85 points/i,
+    )
     await expect(canvas.getByRole("button", { name: /开始下一轮|start next round/i })).toBeEnabled()
     const historyButton = canvas.getByRole("button", {
       name: /查看练习记录|view practice history/i,
@@ -201,10 +208,25 @@ export const CompletedNextRoundError = meta.story({
   },
 })
 
-export const CompletedWithRetries = meta.story({ args: readyArgs("completedWithRetries") })
+export const CompletedWithRetries = meta.story({
+  args: readyArgs("completedWithRetries"),
+  play: async ({ canvas }) => {
+    const completed = canvas.getByTestId("practice-completed-state")
+    await expect(completed).toHaveTextContent(/完成题数：1|Questions completed: 1/i)
+    await expect(completed).toHaveTextContent(/重练次数：1|Retries: 1/i)
+    await expect(completed).toHaveTextContent(
+      /最终作答平均分：94 分|Final-attempt average score: 94 points/i,
+    )
+  },
+})
 
 export const CompletedWithWeakQuestions = meta.story({
   args: readyArgs("completedWithWeakQuestions"),
+  play: async ({ canvas }) => {
+    const completed = canvas.getByTestId("practice-completed-state")
+    await expect(completed).toHaveTextContent(/完成题数：1|Questions completed: 1/i)
+    await expect(completed).toHaveTextContent(/标记薄弱题数：1|Marked weak questions: 1/i)
+  },
 })
 
 export const AnsweringDefault = meta.story({

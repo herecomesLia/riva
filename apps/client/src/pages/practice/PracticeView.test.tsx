@@ -184,10 +184,19 @@ function getStartButton() {
 describe("PracticeView", () => {
   it("renders the completed summary with next-round and training-history actions", async () => {
     const data = createPracticeMockResponse("completedSession")
+    if (data.session.status !== "completed") throw new Error("Completed fixture required.")
     renderReadyView(data)
 
     const completed = await screen.findByTestId("practice-completed-state")
     expect(completed).toHaveTextContent(i18n.t("practice.completed.questions", { count: 1 }))
+    expect(completed).toHaveTextContent(i18n.t("practice.completed.retries", { count: 0 }))
+    expect(completed).toHaveTextContent(i18n.t("practice.completed.saved", { count: 0 }))
+    expect(completed).toHaveTextContent(i18n.t("practice.completed.markedWeak", { count: 0 }))
+    expect(completed).toHaveTextContent(
+      i18n.t("practice.completed.finalAttemptAverage", {
+        score: data.session.finalAttemptAverageScore,
+      }),
+    )
     expect(
       screen.getByRole("button", { name: i18n.t("practice.completed.startNextRound") }),
     ).toBeEnabled()

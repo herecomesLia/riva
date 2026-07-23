@@ -440,7 +440,7 @@ describe("practice stateful mock service", () => {
       questionsCompleted: 1,
       retryCount: 1,
       savedQuestionCount: 1,
-      newWeaknessCount: 1,
+      markedWeakQuestionCount: 1,
     })
     expect(completed.attemptRecords).toHaveLength(2)
     expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([true, true])
@@ -461,7 +461,7 @@ describe("practice stateful mock service", () => {
       questionsCompleted: 1,
       retryCount: 1,
       savedQuestionCount: 0,
-      newWeaknessCount: 0,
+      markedWeakQuestionCount: 0,
     })
     expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([true, false])
     expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([true, false])
@@ -481,14 +481,31 @@ describe("practice stateful mock service", () => {
       questionsCompleted: 1,
       retryCount: 1,
       savedQuestionCount: 1,
-      newWeaknessCount: 1,
+      markedWeakQuestionCount: 1,
     })
     expect(completed.attemptRecords.map((record) => record.isSaved)).toEqual([false, true])
     expect(completed.attemptRecords.map((record) => record.isMarkedWeak)).toEqual([false, true])
   })
 
+  it("summarizes one question answered once", async () => {
+    const review = await finishCurrentAttempt(await generateQuestion("projectDeepDive"))
+    const completed = await settle(
+      endPracticeSession({ sessionId: review.sessionId, version: review.version }),
+    )
+    if (completed.session.status !== "completed") throw new Error("Expected completed session.")
+
+    expect(completed.session.attemptRecords).toHaveLength(1)
+    expect(completed.session).toMatchObject({
+      questionsCompleted: 1,
+      retryCount: 0,
+      finalAttemptAverageScore: review.evaluation.overallScore,
+    })
+  })
+
   it("retries one question within the same session and archives both scored attempts", async () => {
-    const firstReview = await finishCurrentAttempt(await generateQuestion("behavioral"))
+    const firstReview = await completeQuestionToReview("behavioral", {
+      endFollowUpsEarly: true,
+    })
     const retried = await settle(
       retryCurrentPracticeQuestion({
         sessionId: firstReview.sessionId,
@@ -519,14 +536,8 @@ describe("practice stateful mock service", () => {
     expect(completed.session.attemptRecords).toHaveLength(2)
     expect(completed.session.questionsCompleted).toBe(1)
     expect(completed.session.retryCount).toBe(1)
-    expect(completed.session.averageScore).toBe(
-      Math.round(
-        completed.session.attemptRecords.reduce(
-          (sum, record) => sum + record.evaluation.overallScore,
-          0,
-        ) / 2,
-      ),
-    )
+    expect(firstReview.evaluation.overallScore).not.toBe(secondReview.evaluation.overallScore)
+    expect(completed.session.finalAttemptAverageScore).toBe(secondReview.evaluation.overallScore)
     expect("question" in completed.session).toBe(false)
     expect("review" in completed.session).toBe(false)
   })
@@ -559,6 +570,21 @@ describe("practice stateful mock service", () => {
     expect(next.session.question.difficulty).toBe(
       firstReview.review.recommendation.nextQuestion.difficulty,
     )
+
+    const secondReview = await finishCurrentAttempt(next.session)
+    const completed = await settle(
+      endPracticeSession({ sessionId: secondReview.sessionId, version: secondReview.version }),
+    )
+    if (completed.session.status !== "completed") throw new Error("Expected completed session.")
+
+    expect(new Set(completed.session.attemptRecords.map((record) => record.question.id)).size).toBe(
+      2,
+    )
+    expect(completed.session.questionsCompleted).toBe(2)
+    expect(completed.session.retryCount).toBe(0)
+    expect(completed.session.finalAttemptAverageScore).toBe(
+      Math.round((firstReview.evaluation.overallScore + secondReview.evaluation.overallScore) / 2),
+    )
   })
 
   it("keeps completed history when ending before the generated next question is answered", async () => {
@@ -586,7 +612,7 @@ describe("practice stateful mock service", () => {
     expect(completed.session.attemptRecords).toHaveLength(1)
     expect(completed.session.questionsCompleted).toBe(1)
     expect(completed.session.retryCount).toBe(0)
-    expect(completed.session.averageScore).toBe(firstReview.evaluation.overallScore)
+    expect(completed.session.finalAttemptAverageScore).toBe(firstReview.evaluation.overallScore)
     expect("question" in completed.session).toBe(false)
     expect("mainAnswer" in completed.session).toBe(false)
     expect("review" in completed.session).toBe(false)
@@ -613,7 +639,7 @@ describe("practice stateful mock service", () => {
     expect(completed.session.status).toBe("completed")
     if (completed.session.status !== "completed") return
     expect(completed.session.attemptRecords).toHaveLength(1)
-    expect(completed.session.averageScore).toBeGreaterThan(0)
+    expect(completed.session.finalAttemptAverageScore).toBeGreaterThan(0)
   })
 
   it("moves a reviewed attempt into deterministic next-question generation", async () => {
@@ -1633,8 +1659,8 @@ describe("practice stateful mock service", () => {
       "questionsCompleted",
       "retryCount",
       "savedQuestionCount",
-      "newWeaknessCount",
-      "averageScore",
+      "markedWeakQuestionCount",
+      "finalAttemptAverageScore",
       "nextStepSuggestion",
     ]) {
       expect(field in prepared.session).toBe(false)

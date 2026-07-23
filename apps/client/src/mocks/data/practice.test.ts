@@ -218,8 +218,8 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       "questionsCompleted",
       "retryCount",
       "savedQuestionCount",
-      "newWeaknessCount",
-      "averageScore",
+      "markedWeakQuestionCount",
+      "finalAttemptAverageScore",
       "nextStepSuggestion",
     ]) {
       expect(field in session).toBe(false)
@@ -369,15 +369,17 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
       expect(session.savedQuestionCount).toBe(
         [...latest.values()].filter((record) => record.isSaved).length,
       )
-      expect(session.newWeaknessCount).toBe(
+      expect(session.markedWeakQuestionCount).toBe(
         [...latest.values()].filter((record) => record.isMarkedWeak).length,
       )
-      expect(session.averageScore).toBe(
-        records.length === 0
+      expect(session.finalAttemptAverageScore).toBe(
+        latest.size === 0
           ? 0
           : Math.round(
-              records.reduce((sum, record) => sum + record.evaluation.overallScore, 0) /
-                records.length,
+              [...latest.values()].reduce(
+                (sum, record) => sum + record.evaluation.overallScore,
+                0,
+              ) / latest.size,
             ),
       )
       expect("question" in session).toBe(false)

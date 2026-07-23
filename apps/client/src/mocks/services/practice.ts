@@ -704,13 +704,13 @@ function createCompletedPracticeSession({
     questionsCompleted: uniqueRecords.length,
     retryCount: records.length - uniqueRecords.length,
     savedQuestionCount: uniqueRecords.filter((record) => record.isSaved).length,
-    newWeaknessCount: uniqueRecords.filter((record) => record.isMarkedWeak).length,
-    averageScore:
-      records.length === 0
+    markedWeakQuestionCount: uniqueRecords.filter((record) => record.isMarkedWeak).length,
+    finalAttemptAverageScore:
+      uniqueRecords.length === 0
         ? 0
         : Math.round(
-            records.reduce((total, record) => total + record.evaluation.overallScore, 0) /
-              records.length,
+            uniqueRecords.reduce((total, record) => total + record.evaluation.overallScore, 0) /
+              uniqueRecords.length,
           ),
     nextStepSuggestion,
   }
