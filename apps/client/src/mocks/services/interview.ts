@@ -3,6 +3,7 @@ import {
   createInterviewMockResponse,
   createInterviewQuestionSet,
   createInterviewReview,
+  createInterviewReviewResponseMock,
   projectFollowUpQuestionMock,
   type InterviewMockScenario,
 } from "@/mocks/data/interview"
@@ -563,8 +564,5 @@ export async function getInterviewReview(
   if (session?.status !== "completed" || session.sessionId !== input.sessionId) {
     throw new Error("Interview review is not available.")
   }
-  return copy({
-    sessionId: session.sessionId,
-    review: session.review,
-  })
+  return copy(createInterviewReviewResponseMock(session))
 }

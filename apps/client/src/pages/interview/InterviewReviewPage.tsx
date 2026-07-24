@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate, useParams } from "@tanstack/react-router"
 
+import type { InterviewTrainingSuggestionResponse } from "@/models/interview"
 import { getInterviewReview } from "@/services/interview"
 
 import { InterviewReviewView } from "./InterviewReviewView"
@@ -23,8 +24,22 @@ export function InterviewReviewContainer({ sessionId }: { sessionId: string }) {
     void navigate({ to: "/interview" })
   }
 
+  function startNextTraining(suggestion: InterviewTrainingSuggestionResponse) {
+    void navigate({ to: suggestion.action === "targetedPractice" ? "/practice" : "/interview" })
+  }
+
   if (reviewQuery.data !== undefined) {
-    return <InterviewReviewView onBack={backToSetup} status="ready" />
+    if (reviewQuery.data.questionOverviews.length === 0) {
+      return <InterviewReviewView onBack={backToSetup} status="empty" />
+    }
+    return (
+      <InterviewReviewView
+        data={reviewQuery.data}
+        onBack={backToSetup}
+        onNextTraining={startNextTraining}
+        status="ready"
+      />
+    )
   }
   if (reviewQuery.isError) {
     return (
@@ -36,5 +51,5 @@ export function InterviewReviewContainer({ sessionId }: { sessionId: string }) {
       />
     )
   }
-  return <InterviewReviewView status="generating" />
+  return <InterviewReviewView status="loading" />
 }

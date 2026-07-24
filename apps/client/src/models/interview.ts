@@ -181,6 +181,12 @@ export type InterviewQuestionReviewResponse = {
   issues: string[]
 }
 
+export type InterviewQuestionReviewOverviewResponse = {
+  question: InterviewQuestionResponse
+  followUps: InterviewFollowUpQuestionResponse[]
+  performance: InterviewQuestionReviewResponse
+}
+
 export type InterviewTrainingSuggestionResponse =
   | {
       action: "targetedPractice"
@@ -368,4 +374,5 @@ export type GetInterviewReviewInput = {
 export type GetInterviewReviewResponse = {
   sessionId: string
   review: InterviewReviewResponse
+  questionOverviews: InterviewQuestionReviewOverviewResponse[]
 }

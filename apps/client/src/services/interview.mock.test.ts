@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
 import { resetInterviewMockState } from "@/mocks/services/interview"
 import {
   beginInterviewQuestions,
@@ -153,9 +154,11 @@ describe("interview stateful mock service", () => {
       completedQuestions: 3,
       totalQuestions: 3,
     })
-    expect(review).toEqual({
-      sessionId: completed.sessionId,
-      review: completed.review,
+    expect(review).toEqual(createInterviewReviewResponseMock(completed))
+    expect(review.questionOverviews[1]).toMatchObject({
+      question: { id: "interview-question-project-deep-dive" },
+      followUps: [{ id: "interview-follow-up-project-tradeoff" }],
+      performance: { questionId: "interview-question-project-deep-dive", score: 81 },
     })
     expect(review.review.nextTraining).toMatchObject({
       action: "targetedPractice",
@@ -210,8 +213,10 @@ describe("interview stateful mock service", () => {
     const completed = await completeInterview()
     const firstReview = await settle(getInterviewReview({ sessionId: completed.sessionId }))
     firstReview.review.mainStrengths[0] = "被测试修改的优势"
+    firstReview.questionOverviews[0]!.question.prompt = "被测试修改的问题"
     const secondReview = await settle(getInterviewReview({ sessionId: completed.sessionId }))
     expect(secondReview.review.mainStrengths[0]).toBe("能够把复杂技术问题讲清楚")
+    expect(secondReview.questionOverviews[0]?.question.prompt).toContain("自我介绍")
   })
 
   it("fails answer submission once without consuming the answer", async () => {
@@ -251,9 +256,8 @@ describe("interview stateful mock service", () => {
     const input = { sessionId: completed.sessionId }
 
     await expectMockFailure(getInterviewReview(input), "getInterviewReview")
-    await expect(settle(getInterviewReview(input))).resolves.toEqual({
-      sessionId: completed.sessionId,
-      review: completed.review,
-    })
+    await expect(settle(getInterviewReview(input))).resolves.toEqual(
+      createInterviewReviewResponseMock(completed),
+    )
   })
 })

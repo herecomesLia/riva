@@ -82,7 +82,7 @@ describe("app router auth redirects", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: i18n.t("interview.review.generatingTitle"),
+        name: i18n.t("interview.review.title"),
         level: 1,
       }),
     ).toBeInTheDocument()

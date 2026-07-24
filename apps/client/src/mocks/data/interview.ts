@@ -1,10 +1,12 @@
 import type {
   AnsweredInterviewFollowUpResponse,
   CompletedInterviewQuestionResponse,
+  GetInterviewReviewResponse,
   InterviewCandidateQuestionExchangeResponse,
   InterviewCompletedSessionResponse,
   InterviewFollowUpQuestionResponse,
   InterviewPageResponse,
+  InterviewQuestionReviewResponse,
   InterviewQuestionResponse,
   InterviewReviewResponse,
   InterviewSetupResponse,
@@ -95,6 +97,27 @@ export function createCandidateQuestionExchange(
 export function createInterviewReview(
   questions: readonly InterviewQuestionResponse[] = interviewQuestionSet,
 ): InterviewReviewResponse {
+  const questionReviewsById: Record<string, Omit<InterviewQuestionReviewResponse, "questionId">> = {
+    "interview-question-self-introduction": {
+      score: 84,
+      summary: "自我介绍重点明确，经历与目标岗位关联自然，关键成果还可以进一步量化。",
+      strengths: ["岗位匹配信息集中", "职业主线清晰"],
+      issues: ["关键成果缺少量化证据"],
+    },
+    "interview-question-project-deep-dive": {
+      score: 81,
+      summary: "完整说明了性能优化过程，技术取舍清楚，业务验证仍可加强。",
+      strengths: ["定位过程完整", "方案取舍具体"],
+      issues: ["业务收益缺少对照验证"],
+    },
+    "interview-question-motivation": {
+      score: 80,
+      summary: "求职动机真实并能联系岗位要求，未来能力规划可以再具体一些。",
+      strengths: ["岗位理解准确", "动机表达真实"],
+      issues: ["阶段性成长目标不够具体"],
+    },
+  }
+
   return {
     overallScore: 82,
     overallPerformance:
@@ -141,16 +164,13 @@ export function createInterviewReview(
         explanation: "能够讨论灰度方案，但异常回滚指标可以更具体。",
       },
     ],
-    questionReviews: questions.map((question, index) => ({
-      questionId: question.id,
-      score: [84, 81, 80][index] ?? 80,
-      summary:
-        index === 1
-          ? "完整说明了性能优化过程，技术取舍清楚，业务验证仍可加强。"
-          : "回答与问题相关，结构清晰，并能联系岗位要求。",
-      strengths: index === 1 ? ["定位过程完整", "方案取舍具体"] : ["重点明确", "表达连贯"],
-      issues: index === 1 ? ["业务收益缺少对照验证"] : ["部分结论可以提供更多证据"],
-    })),
+    questionReviews: questions.map((question) => {
+      const review = questionReviewsById[question.id]
+      if (review === undefined) {
+        throw new Error(`Missing interview review fixture for question ${question.id}.`)
+      }
+      return { questionId: question.id, ...review }
+    }),
     mainStrengths: ["能够把复杂技术问题讲清楚", "个人贡献和决策过程较明确", "岗位动机真实具体"],
     frequentIssues: ["业务结果量化不足", "个别回答背景铺垫偏长"],
     exposedWeaknesses: ["技术项目的业务归因", "跨团队影响力表达"],
@@ -223,6 +243,28 @@ function createCompletedSession(): InterviewCompletedSessionResponse {
     completedAt: "2026-07-24T02:18:00.000Z",
     candidateQuestionExchanges,
     review: createInterviewReview(completedQuestions.map(({ question }) => question)),
+  }
+}
+
+export function createInterviewReviewResponseMock(
+  session: InterviewCompletedSessionResponse = createCompletedSession(),
+): GetInterviewReviewResponse {
+  return {
+    sessionId: session.sessionId,
+    review: session.review,
+    questionOverviews: session.completedQuestions.map((completedQuestion) => {
+      const performance = session.review.questionReviews.find(
+        ({ questionId }) => questionId === completedQuestion.question.id,
+      )
+      if (performance === undefined) {
+        throw new Error(`Interview review is missing question ${completedQuestion.question.id}.`)
+      }
+      return {
+        question: completedQuestion.question,
+        followUps: completedQuestion.followUps.map(({ question }) => question),
+        performance,
+      }
+    }),
   }
 }
 

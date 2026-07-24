@@ -146,17 +146,53 @@ export const interview = {
   },
   review: {
     badge: "Interview review",
-    generatingTitle: "Generating your full interview review",
-    generatingDescription:
+    title: "Full interview review",
+    description:
+      "Turn your overall performance, key questions, and capability risks into a focused plan for the real interview.",
+    loadingTitle: "Generating your full interview review",
+    loadingDescription:
       "Riva is organizing the complete conversation, performance summary, and next training steps.",
-    readyTitle: "Your interview review is ready",
-    readyDescription:
-      "The interview data is ready. The complete review content will be presented in the next step.",
     errorTitle: "Unable to generate the review",
     errorDescription: "Your interview record is safe, so you can retry.",
+    emptyTitle: "No answers to review",
+    emptyDescription:
+      "No main questions were completed in this interview. Return to setup to start again.",
+    scoreUnit: "Overall score",
+    score: "{{score}} pts",
+    dimensionDescription: "Every score and explanation comes from this interview review.",
+    questionDescription:
+      "Expand a main question to see its follow-ups and performance summary. Answers stay hidden by default.",
+    mainQuestion: "Main question {{order}}",
+    followUpQuestions: "Dynamic follow-ups",
+    questionStrengths: "Strengths",
+    questionIssues: "Areas to improve",
+    sections: {
+      overall: "Overall performance",
+      dimensions: "Capability dimensions",
+      questions: "Main question overview",
+      strengths: "Key strengths",
+      frequentIssues: "Recurring issues",
+      weaknesses: "Exposed weaknesses",
+      risks: "Interview risks",
+      communication: "Communication improvements",
+      preparation: "Preparation before the real interview",
+      nextTraining: "Recommended next training",
+    },
+    dimensions: {
+      relevance: "Relevance",
+      structure: "Structure",
+      specificity: "Specificity",
+      personalContribution: "Personal contribution",
+      resultsAndEvidence: "Results and evidence",
+      roleAlignment: "Role alignment",
+      communication: "Communication",
+      riskControl: "Risk control",
+    },
     actions: {
       retry: "Generate again",
       backToSetup: "Back to mock interview",
+      startTargetedPractice: "Start targeted practice",
+      startMockInterview: "Run another mock interview",
     },
   },
 } as const
