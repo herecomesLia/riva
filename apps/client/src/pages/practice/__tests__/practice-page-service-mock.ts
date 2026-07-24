@@ -1,0 +1,27 @@
+import { vi } from "vitest"
+
+vi.mock("@/services/practice", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/practice")>()),
+  getPracticePage: vi.fn(),
+  getPracticeEvaluationStatus: vi.fn(),
+  getQuestionGenerationStatus: vi.fn(),
+  endPracticeFollowUps: vi.fn(),
+  requestAnswerFramework: vi.fn(),
+  requestEndPracticeSession: vi.fn(),
+  requestPracticeHint: vi.fn(),
+  requestPracticeReferenceAnswer: vi.fn(),
+  requestPracticeFollowUpFramework: vi.fn(),
+  requestPracticeFollowUpHint: vi.fn(),
+  requestPracticeFollowUpReferenceAnswer: vi.fn(),
+  retryPracticeEvaluation: vi.fn(),
+  retryCurrentPracticeQuestion: vi.fn(),
+  continueToNextPracticeQuestion: vi.fn(),
+  endPracticeSession: vi.fn(),
+  prepareNextPracticeSession: vi.fn(),
+  setQuestionSaved: vi.fn(),
+  setQuestionWeak: vi.fn(),
+  skipPracticeQuestion: vi.fn(),
+  startPracticeSession: vi.fn(),
+  submitFollowUpAnswer: vi.fn(),
+  submitPrimaryAnswer: vi.fn(),
+}))

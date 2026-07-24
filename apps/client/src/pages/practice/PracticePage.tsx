@@ -1,398 +1,44 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useRef } from "react"
-
-import type {
-  GetQuestionGenerationStatusInput,
-  GetPracticeEvaluationStatusInput,
-  EndPracticeFollowUpsInput,
-  PracticePageResponse,
-  PrepareNextPracticeSessionInput,
-  PrepareNextPracticeSessionResult,
-  PracticeQuestionMutationInput,
-  RequestAnswerFrameworkInput,
-  RequestEndPracticeSessionInput,
-  RequestPracticeHintInput,
-  RequestPracticeReferenceAnswerInput,
-  RequestPracticeFollowUpFrameworkInput,
-  RequestPracticeFollowUpHintInput,
-  RequestPracticeFollowUpReferenceAnswerInput,
-  RetryPracticeEvaluationInput,
-  RetryCurrentPracticeQuestionInput,
-  ContinueToNextPracticeQuestionInput,
-  EndPracticeSessionInput,
-  SetPracticeQuestionSavedInput,
-  SetPracticeQuestionWeakInput,
-  SkipPracticeQuestionInput,
-  StartPracticeSessionInput,
-  SubmitFollowUpAnswerInput,
-  SubmitPrimaryAnswerInput,
-} from "@/models/practice"
 import {
-  endPracticeFollowUps,
-  getPracticePage,
-  getPracticeEvaluationStatus,
-  getQuestionGenerationStatus,
-  requestAnswerFramework,
-  prepareNextPracticeSession,
-  requestEndPracticeSession,
-  requestPracticeHint,
-  requestPracticeReferenceAnswer,
-  requestPracticeFollowUpFramework,
-  requestPracticeFollowUpHint,
-  requestPracticeFollowUpReferenceAnswer,
-  retryPracticeEvaluation,
-  retryCurrentPracticeQuestion,
-  continueToNextPracticeQuestion,
-  endPracticeSession,
-  setQuestionSaved,
-  setQuestionWeak,
-  skipPracticeQuestion,
-  startPracticeSession,
-  submitFollowUpAnswer,
-  submitPrimaryAnswer,
-} from "@/services/practice"
-
-import {
-  synchronizePracticeEvaluationResponse,
-  synchronizePracticeMutationResponse,
-  synchronizePracticeSessionMutationResponse,
-  synchronizeQuestionGenerationResponse,
-} from "./practice-cache"
-import type { PracticeInteractionResult } from "./practice-interaction"
+  usePracticeAnsweringActions,
+  usePracticeActionLock,
+} from "./hooks/usePracticeAnsweringActions"
+import { usePracticeEvaluationPolling } from "./hooks/usePracticeEvaluationPolling"
+import { usePracticeFollowUpActions } from "./hooks/usePracticeFollowUpActions"
+import { usePracticeGenerationPolling } from "./hooks/usePracticeGenerationPolling"
+import { usePracticeReviewActions } from "./hooks/usePracticeReviewActions"
+import { usePracticeSession } from "./hooks/usePracticeSession"
 import { PracticeView } from "./PracticeView"
 
-const PRACTICE_QUERY_KEY = ["practice"] as const
-
 export function PracticePage() {
-  const queryClient = useQueryClient()
-  const questionMutationLock = useRef(false)
-  const evaluationRetryLock = useRef(false)
-  const prepareNextRoundLock = useRef(false)
-  const practiceQuery = useQuery({
-    queryFn: getPracticePage,
-    queryKey: PRACTICE_QUERY_KEY,
-    retry: false,
-  })
-  const startMutation = useMutation({
-    mutationFn: startPracticeSession,
-    onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
-  })
-  const prepareNextRoundMutation = useMutation({
-    mutationFn: prepareNextPracticeSession,
-    onSuccess: (response) => {
-      if (response === "ignored") return
-      queryClient.setQueryData(PRACTICE_QUERY_KEY, response)
-    },
-  })
-  const hintMutation = usePracticeMutation(requestPracticeHint)
-  const frameworkMutation = usePracticeMutation(requestAnswerFramework)
-  const referenceAnswerMutation = usePracticeMutation(requestPracticeReferenceAnswer)
-  const followUpHintMutation = usePracticeMutation(requestPracticeFollowUpHint)
-  const followUpFrameworkMutation = usePracticeMutation(requestPracticeFollowUpFramework)
-  const followUpReferenceAnswerMutation = usePracticeMutation(
-    requestPracticeFollowUpReferenceAnswer,
-  )
-  const savedMutation = usePracticeMutation(setQuestionSaved)
-  const weakMutation = usePracticeMutation(setQuestionWeak)
-  const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
-  const submitFollowUpMutation = usePracticeMutation(submitFollowUpAnswer)
-  const endFollowUpMutation = usePracticeMutation(endPracticeFollowUps)
-  const skipMutation = usePracticeMutation(skipPracticeQuestion)
-  const endMutation = usePracticeMutation(requestEndPracticeSession)
-  const retryEvaluationMutation = usePracticeMutation(retryPracticeEvaluation)
-  const retryCurrentMutation = usePracticeMutation(retryCurrentPracticeQuestion)
-  const nextQuestionMutation = usePracticeMutation(continueToNextPracticeQuestion)
-  const completeSessionMutation = usePracticeSessionMutation(endPracticeSession)
-  const isQuestionMutationPending =
-    hintMutation.isPending ||
-    frameworkMutation.isPending ||
-    referenceAnswerMutation.isPending ||
-    followUpHintMutation.isPending ||
-    followUpFrameworkMutation.isPending ||
-    followUpReferenceAnswerMutation.isPending ||
-    savedMutation.isPending ||
-    weakMutation.isPending ||
-    submitAnswerMutation.isPending ||
-    submitFollowUpMutation.isPending ||
-    endFollowUpMutation.isPending ||
-    skipMutation.isPending ||
-    endMutation.isPending
-  const generationSession =
-    practiceQuery.data?.session.status === "generatingQuestion" ? practiceQuery.data.session : null
-  const generationSessionId = generationSession?.sessionId
-  const generationVersion = generationSession?.version
-  const generationQuery = useQuery({
-    enabled: generationSession !== null,
-    queryFn: () => {
-      if (!generationSessionId || generationVersion === undefined) {
-        throw new Error("A generating practice session is required.")
-      }
-      return getQuestionGenerationStatus({
-        sessionId: generationSessionId,
-        version: generationVersion,
-      })
-    },
-    queryKey: [
-      ...PRACTICE_QUERY_KEY,
-      "question-generation",
-      generationSessionId,
-      generationVersion,
-    ],
-    refetchInterval: (query) =>
-      query.state.data?.session.status === "generatingQuestion" ? 500 : false,
-    retry: false,
-  })
-  const evaluationSession =
-    practiceQuery.data?.session.status === "evaluating" ? practiceQuery.data.session : null
-  const evaluationSessionId = evaluationSession?.sessionId
-  const evaluationVersion = evaluationSession?.version
-  const evaluationQuestionId = evaluationSession?.question.id
-  const evaluationQuery = useQuery({
-    enabled: evaluationSession !== null,
-    queryFn: () => {
-      if (!evaluationSessionId || evaluationVersion === undefined || !evaluationQuestionId) {
-        throw new Error("An evaluating practice session is required.")
-      }
-      return getPracticeEvaluationStatus({
-        sessionId: evaluationSessionId,
-        version: evaluationVersion,
-        questionId: evaluationQuestionId,
-      })
-    },
-    queryKey: [
-      ...PRACTICE_QUERY_KEY,
-      "evaluation",
-      evaluationSessionId,
-      evaluationVersion,
-      evaluationQuestionId,
-    ],
-    refetchInterval: (query) => (query.state.data?.session.status === "evaluating" ? 500 : false),
-    retry: false,
-  })
-
-  useEffect(() => {
-    if (!generationQuery.data || !generationSessionId || generationVersion === undefined) {
-      return
-    }
-
-    const response = generationQuery.data
-    const request: GetQuestionGenerationStatusInput = {
-      sessionId: generationSessionId,
-      version: generationVersion,
-    }
-    queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-      synchronizeQuestionGenerationResponse(current, response, request),
-    )
-  }, [generationQuery.data, generationSessionId, generationVersion, queryClient])
-
-  useEffect(() => {
-    if (
-      !evaluationQuery.data ||
-      !evaluationSessionId ||
-      evaluationVersion === undefined ||
-      !evaluationQuestionId
-    ) {
-      return
-    }
-
-    const request: GetPracticeEvaluationStatusInput = {
-      sessionId: evaluationSessionId,
-      version: evaluationVersion,
-      questionId: evaluationQuestionId,
-    }
-    const response = evaluationQuery.data
-    queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-      synchronizePracticeEvaluationResponse(current, response, request),
-    )
-  }, [
-    evaluationQuery.data,
-    evaluationQuestionId,
-    evaluationSessionId,
-    evaluationVersion,
-    queryClient,
-  ])
-
-  async function start(input: StartPracticeSessionInput) {
-    await startMutation.mutateAsync(input)
-  }
-
-  async function prepareNextRound() {
-    const session = practiceQuery.data?.session
-    if (
-      prepareNextRoundLock.current ||
-      session?.status !== "completed" ||
-      prepareNextRoundMutation.isPending
-    ) {
-      return "ignored" as const
-    }
-
-    const input: PrepareNextPracticeSessionInput = {
-      sessionId: session.sessionId,
-      version: session.version,
-    }
-    prepareNextRoundLock.current = true
-    try {
-      const response: PrepareNextPracticeSessionResult =
-        await prepareNextRoundMutation.mutateAsync(input)
-      return response === "ignored" ? "ignored" : "executed"
-    } finally {
-      prepareNextRoundLock.current = false
-    }
-  }
-
-  function retryGeneration() {
-    if (practiceQuery.data?.session.status !== "generatingQuestion") return
-    void generationQuery.refetch()
-  }
-
-  function retryEvaluation() {
-    const session = practiceQuery.data?.session
-    if (
-      session?.status !== "evaluating" ||
-      retryEvaluationMutation.isPending ||
-      evaluationRetryLock.current
-    ) {
-      return
-    }
-    const input: RetryPracticeEvaluationInput = {
-      sessionId: session.sessionId,
-      version: session.version,
-      questionId: session.question.id,
-    }
-    evaluationRetryLock.current = true
-    void retryEvaluationMutation
-      .mutateAsync(input)
-      .catch(() => undefined)
-      .finally(() => {
-        evaluationRetryLock.current = false
-      })
-  }
-
-  async function runQuestionMutation(
-    operation: () => Promise<PracticePageResponse>,
-  ): Promise<PracticeInteractionResult> {
-    if (questionMutationLock.current) return "ignored"
-    questionMutationLock.current = true
-    try {
-      await operation()
-      return "executed"
-    } finally {
-      questionMutationLock.current = false
-    }
-  }
+  const { practiceQuery, start, isStarting, prepareNextRound, isPreparingNextRound } =
+    usePracticeSession()
+  const generation = usePracticeGenerationPolling(practiceQuery.data)
+  const evaluation = usePracticeEvaluationPolling(practiceQuery.data)
+  const runAction = usePracticeActionLock()
+  const answering = usePracticeAnsweringActions(runAction)
+  const followUp = usePracticeFollowUpActions(runAction)
+  const review = usePracticeReviewActions(runAction)
 
   if (practiceQuery.data !== undefined) {
     return (
       <PracticeView
-        answeringActions={{
-          onEnd: async (input: RequestEndPracticeSessionInput) => {
-            return runQuestionMutation(() => endMutation.mutateAsync(input))
-          },
-          onRequestFramework: async (input: RequestAnswerFrameworkInput) => {
-            return runQuestionMutation(() => frameworkMutation.mutateAsync(input))
-          },
-          onRequestHint: async (input: RequestPracticeHintInput) => {
-            return runQuestionMutation(() => hintMutation.mutateAsync(input))
-          },
-          onRequestReferenceAnswer: async (input: RequestPracticeReferenceAnswerInput) => {
-            return runQuestionMutation(() => referenceAnswerMutation.mutateAsync(input))
-          },
-          onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
-            return runQuestionMutation(() => savedMutation.mutateAsync(input))
-          },
-          onSetWeak: async (input: SetPracticeQuestionWeakInput) => {
-            return runQuestionMutation(() => weakMutation.mutateAsync(input))
-          },
-          onSkip: async (input: SkipPracticeQuestionInput) => {
-            return runQuestionMutation(() => skipMutation.mutateAsync(input))
-          },
-          onSubmitAnswer: async (input: SubmitPrimaryAnswerInput) => {
-            return runQuestionMutation(() => submitAnswerMutation.mutateAsync(input))
-          },
-        }}
-        answeringPending={{
-          end: endMutation.isPending,
-          framework: frameworkMutation.isPending,
-          hint: hintMutation.isPending,
-          referenceAnswer: referenceAnswerMutation.isPending,
-          interactionLocked: isQuestionMutationPending,
-          saved: savedMutation.isPending,
-          skip: skipMutation.isPending,
-          submitAnswer: submitAnswerMutation.isPending,
-          weak: weakMutation.isPending,
-        }}
-        followUpActions={{
-          onRequestFramework: async (input: RequestPracticeFollowUpFrameworkInput) => {
-            return runQuestionMutation(() => followUpFrameworkMutation.mutateAsync(input))
-          },
-          onRequestHint: async (input: RequestPracticeFollowUpHintInput) => {
-            return runQuestionMutation(() => followUpHintMutation.mutateAsync(input))
-          },
-          onRequestReferenceAnswer: async (input: RequestPracticeFollowUpReferenceAnswerInput) => {
-            return runQuestionMutation(() => followUpReferenceAnswerMutation.mutateAsync(input))
-          },
-          onEndFollowUps: async (input: EndPracticeFollowUpsInput) => {
-            return runQuestionMutation(() => endFollowUpMutation.mutateAsync(input))
-          },
-          onSubmitFollowUp: async (input: SubmitFollowUpAnswerInput) => {
-            return runQuestionMutation(() => submitFollowUpMutation.mutateAsync(input))
-          },
-        }}
-        followUpPending={{
-          end: endFollowUpMutation.isPending,
-          framework: followUpFrameworkMutation.isPending,
-          hint: followUpHintMutation.isPending,
-          interactionLocked: isQuestionMutationPending,
-          referenceAnswer: followUpReferenceAnswerMutation.isPending,
-          submit: submitFollowUpMutation.isPending,
-        }}
-        reviewActions={{
-          onSetSaved: async (input: SetPracticeQuestionSavedInput) => {
-            return runQuestionMutation(() => savedMutation.mutateAsync(input))
-          },
-          onSetWeak: async (input: SetPracticeQuestionWeakInput) => {
-            return runQuestionMutation(() => weakMutation.mutateAsync(input))
-          },
-          onRetryCurrent: async (input: RetryCurrentPracticeQuestionInput) => {
-            return runQuestionMutation(() => retryCurrentMutation.mutateAsync(input))
-          },
-          onNextQuestion: async (input: ContinueToNextPracticeQuestionInput) => {
-            return runQuestionMutation(() => nextQuestionMutation.mutateAsync(input))
-          },
-          onEndSession: async (input: EndPracticeSessionInput) => {
-            return runQuestionMutation(() => completeSessionMutation.mutateAsync(input))
-          },
-        }}
-        reviewPending={{
-          interactionLocked:
-            savedMutation.isPending ||
-            weakMutation.isPending ||
-            retryCurrentMutation.isPending ||
-            nextQuestionMutation.isPending ||
-            completeSessionMutation.isPending,
-          end: completeSessionMutation.isPending,
-          next: nextQuestionMutation.isPending,
-          retry: retryCurrentMutation.isPending,
-          saved: savedMutation.isPending,
-          weak: weakMutation.isPending,
-        }}
-        content={{ status: "ready", data: practiceQuery.data }}
+        answeringActions={answering.actions}
+        answeringPending={answering.pending}
         completedActions={{ onPrepareNextRound: prepareNextRound }}
-        completedPending={prepareNextRoundMutation.isPending}
-        evaluationError={
-          evaluationQuery.isError ||
-          evaluationQuery.errorUpdatedAt > evaluationQuery.dataUpdatedAt ||
-          retryEvaluationMutation.isError
-        }
-        generationError={
-          generationQuery.isError || generationQuery.errorUpdatedAt > generationQuery.dataUpdatedAt
-        }
-        isGenerationRetrying={generationQuery.isFetching}
-        isEvaluationRetrying={retryEvaluationMutation.isPending}
-        isStarting={startMutation.isPending}
-        onRetryGeneration={retryGeneration}
-        onRetryEvaluation={retryEvaluation}
+        completedPending={isPreparingNextRound}
+        content={{ status: "ready", data: practiceQuery.data }}
+        evaluationError={evaluation.evaluationError}
+        followUpActions={followUp.actions}
+        followUpPending={followUp.pending}
+        generationError={generation.generationError}
+        isEvaluationRetrying={evaluation.isEvaluationRetrying}
+        isGenerationRetrying={generation.isGenerationRetrying}
+        isStarting={isStarting}
+        onRetryEvaluation={evaluation.retryEvaluation}
+        onRetryGeneration={generation.retryGeneration}
         onStart={start}
+        reviewActions={review.actions}
+        reviewPending={review.pending}
         variant="default"
       />
     )
@@ -413,36 +59,4 @@ export function PracticePage() {
   }
 
   return <PracticeView content={{ status: "loading" }} variant="default" />
-}
-
-function usePracticeSessionMutation<TInput>(
-  mutationFn: (input: TInput) => Promise<PracticePageResponse>,
-) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn,
-    onSuccess: (response, input) =>
-      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-        synchronizePracticeSessionMutationResponse(
-          current,
-          response,
-          input as EndPracticeSessionInput,
-        ),
-      ),
-  })
-}
-
-function usePracticeMutation<TInput extends PracticeQuestionMutationInput>(
-  mutationFn: (input: TInput) => Promise<PracticePageResponse>,
-) {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn,
-    onSuccess: (response, input) => {
-      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-        synchronizePracticeMutationResponse(current, response, input),
-      )
-    },
-  })
 }
