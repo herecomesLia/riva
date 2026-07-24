@@ -5,11 +5,16 @@ import type {
   InterviewCompletionReason,
   InterviewCompletedSessionResponse,
   InterviewFollowUpQuestionResponse,
+  InterviewFollowUpReviewResponse,
   InterviewPageResponse,
   InterviewProgressResponse,
+  InterviewQuestionLearningDetailResponse,
+  InterviewQuestionRecordResponse,
   InterviewQuestionReviewResponse,
   InterviewQuestionResponse,
   InterviewPartialReviewResponse,
+  InterviewReferenceAnswerContentResponse,
+  InterviewReferenceAnswerResponse,
   InterviewReviewResponse,
   InterviewSessionReviewResponse,
   InterviewSetupResponse,
@@ -315,6 +320,131 @@ const questionReviewsById: Record<string, InterviewQuestionReviewTemplate> = {
   },
 }
 
+const referenceAnswersByQuestionId: Record<string, InterviewReferenceAnswerContentResponse> = {
+  "interview-question-self-introduction": {
+    recommendedStructure: [
+      "一句话定位当前角色",
+      "选择两段岗位相关经历",
+      "用结果证明能力",
+      "说明求职方向",
+    ],
+    keyPoints: ["控制在两分钟内", "优先呈现高级前端岗位相关经验", "至少提供一个可验证结果"],
+    exampleAnswer:
+      "我有五年前端研发经验，最近两年主要负责交易链路的架构与性能治理。我曾主导核心页面升级，通过监控定位长任务并推进拆包和渲染调度，最终让关键页面的 P75 加载时间下降约 30%。同时我也负责跨团队方案评审和上线风险控制。接下来希望在更复杂的业务中继续提升架构判断和团队影响力。",
+    usageGuidance:
+      "请结合自己的真实经历替换示例中的职责和结果，它用于提供组织思路，并非唯一正确答案。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+  "interview-question-project-deep-dive": {
+    recommendedStructure: [
+      "交代业务背景与目标",
+      "说明定位过程",
+      "解释方案取舍",
+      "给出验证方法与结果",
+    ],
+    keyPoints: ["区分现象和根因", "说明个人决策", "同时覆盖技术指标与业务指标"],
+    exampleAnswer:
+      "项目的核心问题是活动期间首屏变慢并影响转化。我先用真实用户监控按设备和网络分组，确认主要瓶颈来自长任务与资源瀑布；随后比较服务端渲染、拆包和预加载的成本，选择先实施风险可控的拆包与渲染调度。灰度期间同时观察性能和下单漏斗，首屏 P75 下降 32%，转化率提升 1.8%，之后再逐步扩大流量。",
+    usageGuidance: "示例强调从问题到验证的证据链，请只使用自己能够解释和证明的数据。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+  "interview-question-motivation": {
+    recommendedStructure: ["说明岗位吸引点", "连接既有经验", "提出两年成长目标", "说明双方匹配"],
+    keyPoints: ["避免只谈公司光环", "目标应可观察", "体现对岗位职责的理解"],
+    exampleAnswer:
+      "我选择这个岗位，是因为核心链路的复杂度与我过去的性能治理经验高度匹配，同时岗位需要推动跨团队技术项目。未来两年我希望先建立稳定性和性能治理的系统方法，再提升技术规划与协作影响力，能够独立负责一条关键业务链路并带动团队形成可复用机制。",
+    usageGuidance: "把岗位吸引点与自己的真实能力目标连接起来，不必照搬示例表述。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+  "interview-question-collaboration": {
+    recommendedStructure: ["说明分歧背景", "界定个人角色", "描述推进动作", "总结结果与复盘"],
+    keyPoints: ["具体说明冲突点", "突出建立共识的方法", "提供最终业务结果"],
+    exampleAnswer:
+      "在一次结算链路改造中，产品希望快速上线，服务端和前端对风险边界存在分歧。我负责把争议拆成接口稳定性、回滚能力和交付时间三项约束，组织各方用数据确认优先级，并提出分阶段灰度方案。最终项目按期上线且没有产生重大故障，团队随后把这套评审清单固化为跨团队协作模板。",
+    usageGuidance: "选择自己真正参与推动的案例，明确个人贡献与团队共同成果。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+  "interview-question-role-capability": {
+    recommendedStructure: ["诊断现状", "按风险排序", "拆分阶段目标", "定义协作与验收机制"],
+    keyPoints: ["先建立可观测性", "说明前三个月节奏", "包含责任边界和验收指标"],
+    exampleAnswer:
+      "第一个月我会梳理核心链路、补齐监控并建立风险清单；第二个月按业务影响处理最高优先级问题，完成演练与回滚机制；第三个月推动容量、变更和故障复盘制度落地。每个阶段都会明确负责人、交付物和稳定性指标，并与产品和服务端按周同步风险。",
+    usageGuidance: "示例提供规划框架，实际回答应结合目标团队现状调整优先级。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+  "interview-follow-up-project-evidence": {
+    recommendedStructure: ["承认当前证据边界", "设计对照方案", "选择业务指标", "说明观察周期"],
+    keyPoints: ["区分相关性与因果性", "使用灰度或同期对照", "提前定义成功标准"],
+    exampleAnswer:
+      "我会先明确现有监控只能证明性能改善，不能直接证明业务收益。随后按流量或用户群建立灰度对照，保持活动、版本和服务端策略尽量一致，同时观察首屏性能、关键点击率和下单转化。达到预设样本量并持续一个完整业务周期后，再判断性能变化是否带来了稳定收益。",
+    usageGuidance: "该示例直接回应业务验证问题，可根据真实实验条件选择合适的对照方法。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+  "interview-follow-up-project-attribution": {
+    recommendedStructure: ["列出同期变量", "隔离可控因素", "使用分组或分阶段数据", "说明结论限制"],
+    keyPoints: ["记录营销和服务端变更时间", "比较不同流量组", "避免过度归因"],
+    exampleAnswer:
+      "我会建立同期变更时间线，把营销活动、服务端策略和前端版本分别标记；如果条件允许，使用只包含前端改动的灰度组与控制组比较。若无法完全隔离，就按渠道、版本和时间窗口分层分析，并在结论中明确哪些收益可以归因、哪些只能视为相关变化。",
+    usageGuidance: "重点是说明归因方法和证据限制，而不是强行证明所有结果都来自单一改动。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+  "interview-follow-up-motivation-criteria": {
+    recommendedStructure: [
+      "定义观察周期",
+      "列出核心判断标准",
+      "说明沟通与调整动作",
+      "给出退出边界",
+    ],
+    keyPoints: ["同时考虑工作内容和成长反馈", "先主动校准预期", "避免情绪化结论"],
+    exampleAnswer:
+      "我会用前三到六个月观察实际职责、反馈质量和成长机会是否与核心目标一致。如果路径不同但仍能积累关键能力，我会先与直属负责人校准目标并调整计划；如果长期缺少明确职责、有效反馈和改善空间，再判断是否需要改变投入方向。",
+    usageGuidance: "判断标准应体现理性评估与主动沟通，具体周期可结合岗位实际情况调整。",
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  },
+}
+
+const followUpReviewsById: Record<
+  string,
+  Omit<InterviewFollowUpReviewResponse, "followUpQuestionId">
+> = {
+  "interview-follow-up-project-evidence": {
+    score: 80,
+    summary: "能够提出灰度与对照思路，业务指标和观察周期还可以进一步明确。",
+    strengths: ["认识到因果证据边界"],
+    issues: ["实验成功标准需要提前定义"],
+  },
+  "interview-follow-up-project-attribution": {
+    score: 78,
+    summary: "能够识别同期变量并提出分组分析，结论限制需要表达得更审慎。",
+    strengths: ["归因变量识别完整"],
+    issues: ["需要明确无法完全隔离时的结论边界"],
+  },
+  "interview-follow-up-motivation-criteria": {
+    score: 81,
+    summary: "判断标准兼顾成长与岗位实际，沟通和调整步骤比较清楚。",
+    strengths: ["判断标准具体"],
+    issues: ["可以补充明确的观察周期"],
+  },
+}
+
+function createReferenceAnswer(questionId: string): InterviewReferenceAnswerResponse {
+  const content = referenceAnswersByQuestionId[questionId]
+  return content === undefined
+    ? { status: "unavailable", reason: "generationFailed" }
+    : { status: "ready", content: structuredClone(content) }
+}
+
+function createFollowUpPerformance(followUpQuestionId: string): InterviewFollowUpReviewResponse {
+  const template = followUpReviewsById[followUpQuestionId]
+  if (template === undefined) {
+    throw new Error(`Missing interview follow-up review fixture for ${followUpQuestionId}.`)
+  }
+  return {
+    followUpQuestionId,
+    ...structuredClone(template),
+  }
+}
+
 function unique(items: readonly string[]) {
   return [...new Set(items)]
 }
@@ -456,6 +586,30 @@ export function createInterviewSessionReview(
   }
 }
 
+export function createInterviewQuestionDetails(
+  records: readonly InterviewQuestionRecordResponse[],
+  review: InterviewSessionReviewResponse,
+): InterviewQuestionLearningDetailResponse[] {
+  const questionReviews = review.status === "unavailable" ? [] : review.review.questionReviews
+
+  return records.map((record) => ({
+    record: structuredClone(record),
+    performance:
+      record.status === "answered"
+        ? structuredClone(
+            questionReviews.find(({ questionId }) => questionId === record.question.id) ?? null,
+          )
+        : null,
+    referenceAnswer: createReferenceAnswer(record.question.id),
+    followUps: record.followUps.map((followUp) => ({
+      record: structuredClone(followUp),
+      performance:
+        followUp.status === "answered" ? createFollowUpPerformance(followUp.question.id) : null,
+      referenceAnswer: createReferenceAnswer(followUp.question.id),
+    })),
+  }))
+}
+
 const answerByQuestionId: Record<string, string> = {
   "interview-question-self-introduction":
     "我过去五年主要负责复杂业务的前端架构和性能治理，最近两年主导了核心交易链路升级。",
@@ -507,6 +661,15 @@ export function createInterviewCompletedSessionMock(
     0,
     options.completedMainQuestions,
   )
+  const questionRecords: InterviewQuestionRecordResponse[] = completedQuestions.map(
+    ({ answer, followUps, question }) => ({
+      status: "answered",
+      question: structuredClone(question),
+      answer: structuredClone(answer),
+      followUps: structuredClone(followUps),
+    }),
+  )
+  const review = createInterviewSessionReview(completedQuestions, completionReason)
   return {
     status: "completed",
     sessionId: "mock-interview-session-completed",
@@ -530,7 +693,8 @@ export function createInterviewCompletedSessionMock(
       completionReason === "formalQuestionsCompleted"
         ? [createCandidateQuestionExchange("这个岗位入职后的核心目标和主要协作团队分别是什么？", 1)]
         : [],
-    review: createInterviewSessionReview(completedQuestions, completionReason),
+    review,
+    questionDetails: createInterviewQuestionDetails(questionRecords, review),
   }
 }
 
@@ -540,31 +704,17 @@ export function createInterviewReviewResponseMock(
   const base = {
     sessionId: session.sessionId,
     completionReason: session.completionReason,
+    questionDetails: structuredClone(session.questionDetails),
   }
   if (session.review.status === "unavailable") {
     return { ...base, ...session.review }
   }
-  const createQuestionOverviews = (review: InterviewPartialReviewResponse) =>
-    session.completedQuestions.map((completedQuestion) => {
-      const performance = review.questionReviews.find(
-        ({ questionId }) => questionId === completedQuestion.question.id,
-      )
-      if (performance === undefined) {
-        throw new Error(`Interview review is missing question ${completedQuestion.question.id}.`)
-      }
-      return {
-        question: completedQuestion.question,
-        followUps: completedQuestion.followUps.map(({ question }) => question),
-        performance,
-      }
-    })
   if (session.review.status === "partial") {
     const review = session.review.review
     return {
       ...base,
       status: "partial",
       review,
-      questionOverviews: createQuestionOverviews(review),
     }
   }
   const review = session.review.review
@@ -572,7 +722,6 @@ export function createInterviewReviewResponseMock(
     ...base,
     status: "complete",
     review,
-    questionOverviews: createQuestionOverviews(review),
   }
 }
 

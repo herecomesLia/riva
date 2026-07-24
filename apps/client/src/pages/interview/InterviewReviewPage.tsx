@@ -31,11 +31,7 @@ export function InterviewReviewContainer({ sessionId }: { sessionId: string }) {
   if (reviewQuery.data !== undefined) {
     if (reviewQuery.data.status === "unavailable") {
       return (
-        <InterviewReviewView
-          onBack={backToSetup}
-          reason={reviewQuery.data.reason}
-          status="unavailable"
-        />
+        <InterviewReviewView data={reviewQuery.data} onBack={backToSetup} status="unavailable" />
       )
     }
     if (reviewQuery.data.status === "partial") {

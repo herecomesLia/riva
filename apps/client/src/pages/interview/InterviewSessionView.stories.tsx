@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, fn, screen, within } from "storybook/test"
+import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { createInterviewAgentPlanMock } from "@/mocks/data/interview"
 import type { InterviewConversationRecordViewData } from "@/models/interview"
@@ -240,7 +240,7 @@ export const EndConfirmation = meta.story({
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /结束面试|end interview/i }))
     const dialog = await screen.findByRole("alertdialog")
-    await expect(dialog).toBeVisible()
+    await waitFor(() => expect(dialog).toBeVisible())
     await userEvent.click(within(dialog).getByRole("button", { name: /确认结束|confirm end/i }))
     await expect(endInterview).toHaveBeenCalledTimes(1)
   },

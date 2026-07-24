@@ -28,9 +28,15 @@ describe("interview Story fixtures", () => {
     const firstReview = createSparseInterviewReviewStoryFixture()
     if (firstReview.status !== "complete") throw new Error("Expected complete review.")
     firstReview.review.mainStrengths[0] = "被 Story 修改的优势"
+    const firstReference = firstReview.questionDetails[0]?.referenceAnswer
+    if (firstReference?.status !== "ready") throw new Error("Expected ready reference answer.")
+    firstReference.content.exampleAnswer = "被 Story 修改的参考答案"
     const secondReview = createSparseInterviewReviewStoryFixture()
     if (secondReview.status !== "complete") throw new Error("Expected complete review.")
 
     expect(secondReview.review.mainStrengths[0]).toBe("岗位匹配信息集中")
+    const secondReference = secondReview.questionDetails[0]?.referenceAnswer
+    if (secondReference?.status !== "ready") throw new Error("Expected ready reference answer.")
+    expect(secondReference.content.exampleAnswer).not.toBe("被 Story 修改的参考答案")
   })
 })

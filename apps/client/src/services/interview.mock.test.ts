@@ -479,13 +479,14 @@ describe("interview completion and review availability", () => {
       reason: "insufficientAnswers",
       sessionId: response.session.sessionId,
       completionReason: "userEndedEarly",
+      questionDetails: [],
     })
     expect(JSON.stringify(review)).not.toContain("82")
     expect(JSON.stringify(review)).not.toContain("dimensionScores")
     expect(JSON.stringify(review)).not.toContain("mainStrengths")
   })
 
-  it("ends on the first unanswered question without saving it or creating a review", async () => {
+  it("preserves the first unanswered question as learning content without scoring it", async () => {
     const first = await startToFirstQuestion("noFollowUps")
     const endedImmediately = await endInterview({
       sessionId: first.sessionId,
@@ -501,6 +502,13 @@ describe("interview completion and review availability", () => {
     if (endedImmediately.session?.status !== "completed") throw new Error("Expected completion.")
     const review = await getInterviewReview({ sessionId: endedImmediately.session.sessionId })
     expect(review.status).toBe("unavailable")
+    expect(review.questionDetails).toHaveLength(1)
+    expect(review.questionDetails[0]).toMatchObject({
+      record: { status: "unanswered", answer: null },
+      performance: null,
+      referenceAnswer: { status: "ready" },
+    })
+    expect(JSON.stringify(review)).not.toContain("dimensionScores")
   })
 
   it("creates a partial review from exactly one completed main question", async () => {
@@ -521,18 +529,29 @@ describe("interview completion and review availability", () => {
     if (endedOnSecond.session?.status !== "completed") throw new Error("Expected completion.")
     const review = await getInterviewReview({ sessionId: endedOnSecond.session.sessionId })
     if (review.status !== "partial") throw new Error("Expected partial review.")
-    expect(review.questionOverviews).toHaveLength(1)
+    expect(review.questionDetails).toHaveLength(2)
     expect(review.review.questionReviews).toHaveLength(1)
-    expect(review.questionOverviews[0]?.question.id).toBe(
+    expect(review.questionDetails[0]?.record.question.id).toBe(
       createInterviewAgentPlanMock("noFollowUps").questions[0]!.question.id,
     )
-    expect(JSON.stringify(review)).not.toContain("性能优化")
-    expect(JSON.stringify(review)).not.toContain("跨团队")
+    expect(review.questionDetails[0]).toMatchObject({
+      record: { status: "answered", answer: { content: "已完成的第一题回答" } },
+      performance: { score: 84 },
+      referenceAnswer: { status: "ready" },
+    })
+    expect(JSON.stringify(review.review)).not.toContain("性能优化")
+    expect(JSON.stringify(review.review)).not.toContain("跨团队")
+    expect(review.questionDetails[1]).toMatchObject({
+      record: { status: "unanswered", answer: null },
+      performance: null,
+      referenceAnswer: { status: "ready" },
+    })
     expect("overallScore" in review.review).toBe(false)
     expect("dimensionScores" in review.review).toBe(false)
   })
 
-  it("saves the answered main question but never fabricates an unanswered follow-up", async () => {
+  it("preserves an unanswered follow-up without fabricating performance", async () => {
+    const plan = createInterviewAgentPlanMock("singleFollowUp")
     const first = await startToFirstQuestion("singleFollowUp")
     const secondResponse = await answerQuestion(first)
     if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
@@ -559,14 +578,31 @@ describe("interview completion and review availability", () => {
     if (ended.session?.status !== "completed") throw new Error("Expected completion.")
     const review = await getInterviewReview({ sessionId: ended.session.sessionId })
     if (review.status !== "partial") throw new Error("Expected partial review.")
-    expect(review.questionOverviews).toHaveLength(2)
-    expect(review.questionOverviews[1]?.followUps).toEqual([])
+    expect(review.questionDetails).toHaveLength(2)
+    expect(review.questionDetails[1]?.followUps).toHaveLength(1)
+    expect(review.questionDetails[1]).toMatchObject({
+      record: { status: "answered", answer: { content: "已回答的主问题" } },
+      performance: { questionId: plan.questions[1]!.question.id },
+      referenceAnswer: { status: "ready" },
+    })
+    expect(review.questionDetails[1]?.followUps[0]).toMatchObject({
+      record: {
+        status: "unanswered",
+        answer: null,
+        question: { parentQuestionId: plan.questions[1]!.question.id },
+      },
+      performance: null,
+      referenceAnswer: { status: "ready" },
+    })
+    const mainReference = review.questionDetails[1]?.referenceAnswer
+    const followUpReference = review.questionDetails[1]?.followUps[0]?.referenceAnswer
+    expect(mainReference).not.toEqual(followUpReference)
     expect(review.review.questionReviews.map(({ questionId }) => questionId)).toEqual(
       ended.session.completedQuestions.map(({ question }) => question.id),
     )
   })
 
-  it("preserves answered follow-ups in order and omits the current unanswered follow-up", async () => {
+  it("preserves answered and unanswered follow-ups in their original order", async () => {
     const plan = createInterviewAgentPlanMock("multipleFollowUps")
     const first = await startToFirstQuestion("multipleFollowUps")
     const secondResponse = await answerQuestion(first)
@@ -598,9 +634,19 @@ describe("interview completion and review availability", () => {
 
     const review = await getInterviewReview({ sessionId: ended.session.sessionId })
     if (review.status !== "partial") throw new Error("Expected partial review.")
-    expect(review.questionOverviews[1]?.followUps.map(({ id }) => id)).toEqual([
+    expect(review.questionDetails[1]?.followUps.map(({ record }) => record.question.id)).toEqual([
       plan.questions[1]!.followUps[0]!.id,
+      plan.questions[1]!.followUps[1]!.id,
     ])
+    expect(review.questionDetails[1]?.followUps.map(({ record }) => record.status)).toEqual([
+      "answered",
+      "unanswered",
+    ])
+    expect(review.questionDetails[1]?.followUps[0]?.performance).not.toBeNull()
+    expect(review.questionDetails[1]?.followUps[1]?.performance).toBeNull()
+    expect(
+      review.questionDetails[1]?.followUps.map(({ referenceAnswer }) => referenceAnswer.status),
+    ).toEqual(["ready", "ready"])
   })
 
   it("returns a complete review after the formal-question flow finishes", async () => {
@@ -633,7 +679,44 @@ describe("interview completion and review availability", () => {
       expect(explanation.trim()).not.toBe("")
     })
     expect(review.review.nextTraining.focusAreas.length).toBeGreaterThan(0)
-    expect(review.questionOverviews).toHaveLength(completed.completedQuestions.length)
+    expect(review.questionDetails).toHaveLength(completed.completedQuestions.length)
+    for (const detail of review.questionDetails) {
+      expect(detail.record.status).toBe("answered")
+      expect(detail.performance).not.toBeNull()
+      expect(detail.referenceAnswer.status).toBe("ready")
+      for (const followUp of detail.followUps) {
+        expect(followUp.record.status).toBe("answered")
+        expect(followUp.performance).not.toBeNull()
+        expect(followUp.referenceAnswer.status).toBe("ready")
+      }
+    }
+  })
+
+  it("keeps independent main and follow-up references in a normally completed review", async () => {
+    const first = await startToFirstQuestion("lastQuestionFollowUp")
+    const lastQuestionResponse = await answerQuestion(first)
+    if (lastQuestionResponse.session?.status !== "question") {
+      throw new Error("Expected final main question.")
+    }
+    const followUpResponse = await answerQuestion(lastQuestionResponse.session)
+    if (followUpResponse.session?.status !== "followUp") throw new Error("Expected follow-up.")
+    const candidateResponse = await answerFollowUp(followUpResponse.session)
+    if (candidateResponse.session?.status !== "candidateQuestions") {
+      throw new Error("Expected candidate questions.")
+    }
+    const completed = await finishCandidateQuestions(candidateResponse.session)
+    const review = await getInterviewReview({ sessionId: completed.sessionId })
+    if (review.status !== "complete") throw new Error("Expected complete review.")
+
+    const main = review.questionDetails[1]
+    const followUp = main?.followUps[0]
+    expect(main?.record.status).toBe("answered")
+    expect(followUp?.record.status).toBe("answered")
+    expect(main?.performance).not.toBeNull()
+    expect(followUp?.performance).not.toBeNull()
+    expect(main?.referenceAnswer.status).toBe("ready")
+    expect(followUp?.referenceAnswer.status).toBe("ready")
+    expect(main?.referenceAnswer).not.toEqual(followUp?.referenceAnswer)
   })
 
   it("ends during candidate questions with a complete formal review and exchanges intact", async () => {
@@ -659,8 +742,28 @@ describe("interview completion and review availability", () => {
 
     const review = await getInterviewReview({ sessionId: ended.session.sessionId })
     if (review.status !== "complete") throw new Error("Expected complete review.")
-    expect(review.questionOverviews).toHaveLength(2)
+    expect(review.questionDetails).toHaveLength(2)
     expect(review).toEqual(createInterviewReviewResponseMock(ended.session))
+  })
+
+  it("returns an immutable persisted learning snapshot for repeated review reads", async () => {
+    const first = await startToFirstQuestion("singleFollowUp")
+    const endedResponse = await endInterview({
+      sessionId: first.sessionId,
+      version: first.version,
+    })
+    if (endedResponse.session?.status !== "completed") throw new Error("Expected completion.")
+
+    const firstRead = await getInterviewReview({ sessionId: endedResponse.session.sessionId })
+    const original = structuredClone(firstRead)
+    const firstReference = firstRead.questionDetails[0]?.referenceAnswer
+    if (firstReference?.status !== "ready") throw new Error("Expected ready reference answer.")
+    firstReference.content.exampleAnswer = "调用方修改后的内容"
+    await startCurrentOpening()
+
+    const secondRead = await getInterviewReview({ sessionId: endedResponse.session.sessionId })
+    expect(secondRead).toEqual(original)
+    expect(secondRead.questionDetails[0]?.referenceAnswer).not.toEqual(firstReference)
   })
 })
 

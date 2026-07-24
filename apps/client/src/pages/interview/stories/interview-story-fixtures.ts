@@ -80,7 +80,7 @@ export function createSparseInterviewReviewStoryFixture(): GetInterviewReviewRes
   }
   return {
     ...response,
-    questionOverviews: response.questionOverviews.slice(0, 1),
+    questionDetails: response.questionDetails.slice(0, 1),
     review: {
       ...response.review,
       dimensionScores: response.review.dimensionScores.slice(0, 2),
@@ -114,5 +114,78 @@ export function createPartialInterviewReviewStoryFixture() {
       completionReason: "userEndedEarly",
       completedMainQuestions: 1,
     }),
+  )
+}
+
+export function createUnavailableReviewWithLearningStoryFixture(): GetInterviewReviewResponse {
+  const complete = createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({ agentScenario: "noFollowUps" }),
+  )
+  if (complete.status !== "complete") throw new Error("Complete review fixture required.")
+  const detail = structuredClone(complete.questionDetails[0]!)
+  detail.record = {
+    status: "unanswered",
+    question: detail.record.question,
+    answer: null,
+    followUps: [],
+  }
+  detail.performance = null
+  detail.followUps = []
+  return {
+    status: "unavailable",
+    reason: "insufficientAnswers",
+    sessionId: complete.sessionId,
+    completionReason: "userEndedEarly",
+    questionDetails: [detail],
+  }
+}
+
+export function createPartialWithUnansweredQuestionStoryFixture(): GetInterviewReviewResponse {
+  const partial = createPartialInterviewReviewStoryFixture()
+  const complete = createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({ agentScenario: "noFollowUps" }),
+  )
+  if (partial.status !== "partial" || complete.status !== "complete") {
+    throw new Error("Partial and complete review fixtures required.")
+  }
+  const unanswered = structuredClone(complete.questionDetails[1]!)
+  unanswered.record = {
+    status: "unanswered",
+    question: unanswered.record.question,
+    answer: null,
+    followUps: [],
+  }
+  unanswered.performance = null
+  unanswered.followUps = []
+  return {
+    ...partial,
+    questionDetails: [...partial.questionDetails, unanswered],
+  }
+}
+
+export function createPartialWithUnansweredFollowUpStoryFixture(): GetInterviewReviewResponse {
+  const response = createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({
+      agentScenario: "singleFollowUp",
+      completionReason: "userEndedEarly",
+      completedMainQuestions: 2,
+    }),
+  )
+  if (response.status !== "partial") throw new Error("Partial review fixture required.")
+  const copy = structuredClone(response)
+  const followUp = copy.questionDetails[1]?.followUps[0]
+  if (followUp === undefined) throw new Error("Follow-up fixture required.")
+  followUp.record = {
+    status: "unanswered",
+    question: followUp.record.question,
+    answer: null,
+  }
+  followUp.performance = null
+  return copy
+}
+
+export function createMultipleFollowUpsReviewStoryFixture(): GetInterviewReviewResponse {
+  return createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({ agentScenario: "multipleFollowUps" }),
   )
 }

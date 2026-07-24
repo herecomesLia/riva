@@ -186,6 +186,8 @@ export const interview = {
       "These results use only the completed and saved answers. The limited data should be treated as directional.",
     partialOverallDescription:
       "Partial reviews do not include an overall score or complete dimension scores.",
+    unavailableWithLearningDescription:
+      "There is not enough answer data for scoring or performance feedback, but you can still study the Riva reference answers for questions that were actually shown.",
     emptyTitle: "No answers to review",
     emptyDescription:
       "No main questions were completed in this interview. Return to setup to start again.",
@@ -193,11 +195,23 @@ export const interview = {
     score: "{{score}} pts",
     dimensionDescription: "Every score and explanation comes from this interview review.",
     questionDescription:
-      "Expand a main question to see its follow-ups and performance summary. Answers stay hidden by default.",
+      "Expand a question that was actually shown to review your answer, feedback, and layered reference answer.",
     mainQuestion: "Main question {{order}}",
     followUpQuestions: "Dynamic follow-ups",
+    myAnswer: "My answer",
+    answered: "Answered",
+    unanswered: "Not answered",
+    performance: "Performance feedback",
     questionStrengths: "Strengths",
     questionIssues: "Areas to improve",
+    reference: {
+      view: "View Riva example answer",
+      structure: "Recommended structure",
+      keyPoints: "Key points",
+      example: "Riva example answer",
+      generating: "Riva reference answer is being generated",
+      unavailable: "Riva reference answer is unavailable",
+    },
     sections: {
       overall: "Overall performance",
       dimensions: "Capability dimensions",

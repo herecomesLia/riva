@@ -3,6 +3,7 @@ import {
   createCandidateQuestionExchange,
   createInterviewAgentPlanMock,
   createInterviewMockResponse,
+  createInterviewQuestionDetails,
   createInterviewReviewResponseMock,
   createInterviewSessionReview,
   interviewOpeningMessageMock,
@@ -27,6 +28,7 @@ import type {
   InterviewPageResponse,
   InterviewProgressResponse,
   InterviewQuestionSessionResponse,
+  InterviewQuestionRecordResponse,
   InterviewSessionMutationInput,
   StartInterviewInput,
   SubmitCandidateQuestionInput,
@@ -64,6 +66,7 @@ let mutationSequence = 0
 let configuredDefaultDelayMs: number | undefined
 const delayedOperations = new Map<InterviewMockOperation, number>()
 const failingOperations = new Set<InterviewMockOperation>()
+const completedSessionSnapshots = new Map<string, InterviewCompletedSessionResponse>()
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -75,6 +78,9 @@ function getSnapshot(): InterviewPageResponse {
 
 function commit(session: InterviewPageResponse["session"]): InterviewMutationResponse {
   response = { setup: response.setup, session }
+  if (session?.status === "completed") {
+    completedSessionSnapshots.set(session.sessionId, copy(session))
+  }
   return getSnapshot()
 }
 
@@ -209,6 +215,10 @@ export function resetInterviewMockState(
   configuredDefaultDelayMs = controller.defaultDelayMs
   delayedOperations.clear()
   failingOperations.clear()
+  completedSessionSnapshots.clear()
+  if (response.session?.status === "completed") {
+    completedSessionSnapshots.set(response.session.sessionId, copy(response.session))
+  }
 
   for (const operation of controller.failNext ?? []) failingOperations.add(operation)
   for (const [operation, delayMs] of delayedEntries) {
@@ -415,7 +425,16 @@ function toCompletedSession(
   completedQuestions: CompletedInterviewQuestionResponse[],
   candidateQuestionExchanges: InterviewCandidateQuestionsSessionResponse["exchanges"],
   completionReason: InterviewCompletionReason,
+  questionRecords: InterviewQuestionRecordResponse[] = completedQuestions.map(
+    ({ answer, followUps, question }) => ({
+      status: "answered",
+      question,
+      answer,
+      followUps,
+    }),
+  ),
 ): InterviewCompletedSessionResponse {
+  const review = createInterviewSessionReview(completedQuestions, completionReason)
   return {
     status: "completed",
     sessionId: session.sessionId,
@@ -427,7 +446,8 @@ function toCompletedSession(
     completionReason,
     completedAt: nextTimestamp(),
     candidateQuestionExchanges,
-    review: createInterviewSessionReview(completedQuestions, completionReason),
+    review,
+    questionDetails: createInterviewQuestionDetails(questionRecords, review),
   }
 }
 
@@ -435,8 +455,26 @@ export async function endInterview(input: EndInterviewInput): Promise<InterviewM
   await consumeOperation("endInterview")
   const session = requireActiveSession(input)
   let completedQuestions = session.completedQuestions
+  let questionRecords: InterviewQuestionRecordResponse[] = completedQuestions.map(
+    ({ answer, followUps, question }) => ({
+      status: "answered",
+      question,
+      answer,
+      followUps,
+    }),
+  )
 
-  if (session.status === "followUp") {
+  if (session.status === "question") {
+    questionRecords = [
+      ...questionRecords,
+      {
+        status: "unanswered",
+        question: session.currentQuestion.question,
+        answer: null,
+        followUps: [],
+      },
+    ]
+  } else if (session.status === "followUp") {
     completedQuestions = [
       ...completedQuestions,
       {
@@ -446,20 +484,38 @@ export async function endInterview(input: EndInterviewInput): Promise<InterviewM
         completedAt: nextTimestamp(),
       },
     ]
+    questionRecords = [
+      ...questionRecords,
+      {
+        status: "answered",
+        question: session.currentQuestion.question,
+        answer: session.currentQuestion.answer,
+        followUps: [
+          ...session.currentQuestion.answeredFollowUps,
+          {
+            status: "unanswered",
+            question: session.currentFollowUp.question,
+            answer: null,
+          },
+        ],
+      },
+    ]
   }
   const exchanges = session.status === "candidateQuestions" ? session.exchanges : []
   const completionReason =
     session.status === "candidateQuestions" ? "formalQuestionsCompleted" : "userEndedEarly"
   planCursor = null
-  return commit(toCompletedSession(session, completedQuestions, exchanges, completionReason))
+  return commit(
+    toCompletedSession(session, completedQuestions, exchanges, completionReason, questionRecords),
+  )
 }
 
 export async function getInterviewReview(
   input: GetInterviewReviewInput,
 ): Promise<GetInterviewReviewResponse> {
   await consumeOperation("getInterviewReview")
-  const session = response.session
-  if (session?.status !== "completed" || session.sessionId !== input.sessionId) {
+  const session = completedSessionSnapshots.get(input.sessionId)
+  if (session === undefined) {
     throw new Error("Interview review is not available.")
   }
   return copy(createInterviewReviewResponseMock(session))

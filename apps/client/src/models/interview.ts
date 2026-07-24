@@ -83,12 +83,35 @@ export type AnsweredInterviewFollowUpResponse = {
   answer: InterviewAnswerResponse
 }
 
+export type UnansweredInterviewFollowUpResponse = {
+  status: "unanswered"
+  question: InterviewFollowUpQuestionResponse
+  answer: null
+}
+
+export type InterviewFollowUpRecordResponse =
+  AnsweredInterviewFollowUpResponse | UnansweredInterviewFollowUpResponse
+
 export type CompletedInterviewQuestionResponse = {
   question: InterviewQuestionResponse
   answer: InterviewAnswerResponse
   followUps: AnsweredInterviewFollowUpResponse[]
   completedAt: string
 }
+
+export type InterviewQuestionRecordResponse =
+  | {
+      status: "answered"
+      question: InterviewQuestionResponse
+      answer: InterviewAnswerResponse
+      followUps: InterviewFollowUpRecordResponse[]
+    }
+  | {
+      status: "unanswered"
+      question: InterviewQuestionResponse
+      answer: null
+      followUps: []
+    }
 
 export type InterviewCandidateQuestionResponse = {
   id: string
@@ -187,10 +210,47 @@ export type InterviewQuestionReviewResponse = {
   issues: string[]
 }
 
-export type InterviewQuestionReviewOverviewResponse = {
-  question: InterviewQuestionResponse
-  followUps: InterviewFollowUpQuestionResponse[]
-  performance: InterviewQuestionReviewResponse
+export type InterviewReferenceAnswerContentResponse = {
+  recommendedStructure: string[]
+  keyPoints: string[]
+  exampleAnswer: string
+  usageGuidance: string
+  generatedAt: string
+}
+
+export type InterviewReferenceAnswerResponse =
+  | {
+      status: "ready"
+      content: InterviewReferenceAnswerContentResponse
+    }
+  | {
+      status: "generating"
+    }
+  | {
+      status: "unavailable"
+      reason: "generationFailed"
+    }
+
+export type InterviewFollowUpReviewResponse = {
+  followUpQuestionId: string
+  /** Whole-number score from 0 to 100. */
+  score: number
+  summary: string
+  strengths: string[]
+  issues: string[]
+}
+
+export type InterviewFollowUpLearningDetailResponse = {
+  record: InterviewFollowUpRecordResponse
+  performance: InterviewFollowUpReviewResponse | null
+  referenceAnswer: InterviewReferenceAnswerResponse
+}
+
+export type InterviewQuestionLearningDetailResponse = {
+  record: InterviewQuestionRecordResponse
+  performance: InterviewQuestionReviewResponse | null
+  referenceAnswer: InterviewReferenceAnswerResponse
+  followUps: InterviewFollowUpLearningDetailResponse[]
 }
 
 export type InterviewTrainingSuggestionResponse =
@@ -252,6 +312,8 @@ export type InterviewCompletedSessionResponse = InterviewActiveSessionResponseBa
   completedAt: string
   candidateQuestionExchanges: InterviewCandidateQuestionExchangeResponse[]
   review: InterviewSessionReviewResponse
+  /** Persisted learning snapshot for every question actually shown to the user. */
+  questionDetails: InterviewQuestionLearningDetailResponse[]
 }
 
 export type ActiveInterviewSessionResponse =
@@ -390,6 +452,7 @@ export type GetInterviewReviewInput = {
 type GetInterviewReviewResponseBase = {
   sessionId: string
   completionReason: InterviewCompletionReason
+  questionDetails: InterviewQuestionLearningDetailResponse[]
 }
 
 export type GetInterviewReviewResponse = GetInterviewReviewResponseBase &
@@ -401,11 +464,9 @@ export type GetInterviewReviewResponse = GetInterviewReviewResponseBase &
     | {
         status: "partial"
         review: InterviewPartialReviewResponse
-        questionOverviews: InterviewQuestionReviewOverviewResponse[]
       }
     | {
         status: "complete"
         review: InterviewReviewResponse
-        questionOverviews: InterviewQuestionReviewOverviewResponse[]
       }
   )

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import {
   ArrowLeftIcon,
+  BookOpenTextIcon,
   ChartNoAxesCombinedIcon,
   CheckCircle2Icon,
   CircleAlertIcon,
@@ -8,7 +9,6 @@ import {
   ClipboardCheckIcon,
   DumbbellIcon,
   LightbulbIcon,
-  MessageSquareTextIcon,
   RotateCcwIcon,
   ShieldAlertIcon,
   SparklesIcon,
@@ -45,7 +45,10 @@ import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import type {
   GetInterviewReviewResponse,
-  InterviewQuestionReviewOverviewResponse,
+  InterviewFollowUpLearningDetailResponse,
+  InterviewQuestionLearningDetailResponse,
+  InterviewQuestionReviewResponse,
+  InterviewReferenceAnswerResponse,
   InterviewReviewResponse,
   InterviewScoreDimension,
   InterviewTrainingSuggestionResponse,
@@ -71,7 +74,7 @@ export type InterviewReviewViewProps =
     }
   | {
       status: "unavailable"
-      reason: UnavailableReviewData["reason"]
+      data: UnavailableReviewData
       onBack: () => void
     }
   | {
@@ -155,7 +158,7 @@ export function InterviewReviewView(props: InterviewReviewViewProps) {
           onNextTraining={props.status === "complete" ? props.onNextTraining : undefined}
         />
       ) : props.status === "unavailable" ? (
-        <ReviewUnavailable onBack={props.onBack} reason={props.reason} />
+        <ReviewUnavailable data={props.data} onBack={props.onBack} />
       ) : (
         <ReviewError isRetrying={props.isRetrying} onBack={props.onBack} onRetry={props.onRetry} />
       )}
@@ -245,7 +248,7 @@ function ReviewContent({
       </Card>
 
       {isComplete ? <DimensionScores review={data.review} /> : null}
-      <QuestionOverviews overviews={data.questionOverviews} />
+      <QuestionDetails details={data.questionDetails} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <ReviewListCard
@@ -339,11 +342,7 @@ function DimensionScores({ review }: { review: InterviewReviewResponse }) {
   )
 }
 
-function QuestionOverviews({
-  overviews,
-}: {
-  overviews: InterviewQuestionReviewOverviewResponse[]
-}) {
+function QuestionDetails({ details }: { details: InterviewQuestionLearningDetailResponse[] }) {
   const { t } = useTranslation()
 
   return (
@@ -354,50 +353,183 @@ function QuestionOverviews({
       </CardHeader>
       <CardContent>
         <Accordion>
-          {overviews.map((overview) => (
-            <AccordionItem key={overview.question.id} value={overview.question.id}>
+          {details.map((detail) => (
+            <AccordionItem key={detail.record.question.id} value={detail.record.question.id}>
               <AccordionTrigger className="gap-3 no-underline hover:no-underline">
                 <span className="flex min-w-0 flex-1 flex-col gap-1 pr-3">
                   <span className="text-xs font-normal text-muted-foreground">
-                    {t("interview.review.mainQuestion", { order: overview.question.order })}
+                    {t("interview.review.mainQuestion", { order: detail.record.question.order })}
                   </span>
-                  <span className="line-clamp-2 text-sm">{overview.question.prompt}</span>
+                  <span className="line-clamp-2 text-sm">{detail.record.question.prompt}</span>
                 </span>
-                <Badge className="shrink-0" variant="secondary">
-                  {t("interview.review.score", { score: overview.performance.score })}
-                </Badge>
+                {detail.performance ? (
+                  <Badge className="shrink-0" variant="secondary">
+                    {t("interview.review.score", { score: detail.performance.score })}
+                  </Badge>
+                ) : (
+                  <Badge className="shrink-0" variant="outline">
+                    {t("interview.review.unanswered")}
+                  </Badge>
+                )}
               </AccordionTrigger>
-              <AccordionContent className="flex flex-col gap-4">
-                <p className="leading-6 text-muted-foreground">{overview.performance.summary}</p>
-                {overview.followUps.length > 0 ? (
-                  <section className="flex flex-col gap-2 rounded-lg bg-muted/50 p-4">
-                    <h4 className="font-medium">{t("interview.review.followUpQuestions")}</h4>
-                    <ul className="flex flex-col gap-2 text-muted-foreground">
-                      {overview.followUps.map((followUp) => (
-                        <li className="flex gap-2" key={followUp.id}>
-                          <MessageSquareTextIcon aria-hidden="true" className="mt-0.5 shrink-0" />
-                          <span>{followUp.prompt}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
+              <AccordionContent className="flex flex-col gap-5">
+                <AnswerAndPerformance
+                  answer={detail.record.answer?.content ?? null}
+                  performance={detail.performance}
+                />
+                <ReferenceAnswer
+                  id={detail.record.question.id}
+                  referenceAnswer={detail.referenceAnswer}
+                />
+                {detail.followUps.length > 0 ? (
+                  <FollowUpDetails followUps={detail.followUps} />
                 ) : null}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <QuestionReviewList
-                    items={overview.performance.strengths}
-                    title={t("interview.review.questionStrengths")}
-                  />
-                  <QuestionReviewList
-                    items={overview.performance.issues}
-                    title={t("interview.review.questionIssues")}
-                  />
-                </div>
               </AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
       </CardContent>
     </Card>
+  )
+}
+
+function AnswerAndPerformance({
+  answer,
+  performance,
+}: {
+  answer: string | null
+  performance:
+    InterviewQuestionReviewResponse | InterviewFollowUpLearningDetailResponse["performance"]
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col gap-4">
+      <section className="flex flex-col gap-2 rounded-lg bg-muted/50 p-4">
+        <h4 className="font-medium">{t("interview.review.myAnswer")}</h4>
+        <p className="whitespace-pre-wrap leading-6 text-muted-foreground">
+          {answer ?? t("interview.review.unanswered")}
+        </p>
+      </section>
+      {performance ? (
+        <section className="flex flex-col gap-3">
+          <h4 className="font-medium">{t("interview.review.performance")}</h4>
+          <p className="leading-6 text-muted-foreground">{performance.summary}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <QuestionReviewList
+              items={performance.strengths}
+              title={t("interview.review.questionStrengths")}
+            />
+            <QuestionReviewList
+              items={performance.issues}
+              title={t("interview.review.questionIssues")}
+            />
+          </div>
+        </section>
+      ) : null}
+    </div>
+  )
+}
+
+function FollowUpDetails({ followUps }: { followUps: InterviewFollowUpLearningDetailResponse[] }) {
+  const { t } = useTranslation()
+  return (
+    <section className="flex flex-col gap-2">
+      <h4 className="font-medium">{t("interview.review.followUpQuestions")}</h4>
+      <Accordion className="rounded-lg border px-4">
+        {followUps.map((followUp) => (
+          <AccordionItem key={followUp.record.question.id} value={followUp.record.question.id}>
+            <AccordionTrigger className="gap-3 no-underline hover:no-underline">
+              <span className="min-w-0 flex-1 text-left">{followUp.record.question.prompt}</span>
+              <Badge variant={followUp.record.status === "answered" ? "secondary" : "outline"}>
+                {followUp.record.status === "answered"
+                  ? t("interview.review.answered")
+                  : t("interview.review.unanswered")}
+              </Badge>
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-4">
+              <AnswerAndPerformance
+                answer={followUp.record.answer?.content ?? null}
+                performance={followUp.performance}
+              />
+              <ReferenceAnswer
+                id={followUp.record.question.id}
+                referenceAnswer={followUp.referenceAnswer}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </section>
+  )
+}
+
+function ReferenceAnswer({
+  id,
+  referenceAnswer,
+}: {
+  id: string
+  referenceAnswer: InterviewReferenceAnswerResponse
+}) {
+  const { t } = useTranslation()
+  if (referenceAnswer.status !== "ready") {
+    return (
+      <Alert>
+        <BookOpenTextIcon aria-hidden="true" />
+        <AlertTitle>
+          {referenceAnswer.status === "generating"
+            ? t("interview.review.reference.generating")
+            : t("interview.review.reference.unavailable")}
+        </AlertTitle>
+      </Alert>
+    )
+  }
+
+  return (
+    <Accordion className="rounded-lg border border-primary/20 bg-primary/5 px-4">
+      <AccordionItem value={`reference-${id}`}>
+        <AccordionTrigger className="no-underline hover:no-underline">
+          <span className="flex items-center gap-2 text-primary">
+            <BookOpenTextIcon aria-hidden="true" />
+            {t("interview.review.reference.view")}
+          </span>
+        </AccordionTrigger>
+        <AccordionContent className="flex flex-col gap-5">
+          <Alert>
+            <LightbulbIcon aria-hidden="true" />
+            <AlertDescription>{referenceAnswer.content.usageGuidance}</AlertDescription>
+          </Alert>
+          <div className="grid gap-5 md:grid-cols-2">
+            <ReferenceList
+              items={referenceAnswer.content.recommendedStructure}
+              title={t("interview.review.reference.structure")}
+            />
+            <ReferenceList
+              items={referenceAnswer.content.keyPoints}
+              title={t("interview.review.reference.keyPoints")}
+            />
+          </div>
+          <section className="flex max-w-prose flex-col gap-2">
+            <h5 className="font-medium">{t("interview.review.reference.example")}</h5>
+            <p className="whitespace-pre-wrap leading-7 text-muted-foreground">
+              {referenceAnswer.content.exampleAnswer}
+            </p>
+          </section>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  )
+}
+
+function ReferenceList({ items, title }: { items: string[]; title: string }) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h5 className="font-medium">{title}</h5>
+      <ol className="flex list-decimal flex-col gap-1 pl-5 text-muted-foreground">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ol>
+    </section>
   )
 }
 
@@ -457,14 +589,31 @@ function NextTrainingCard({
   )
 }
 
-function ReviewUnavailable({
-  onBack,
-  reason,
-}: {
-  onBack: () => void
-  reason: UnavailableReviewData["reason"]
-}) {
+function ReviewUnavailable({ data, onBack }: { data: UnavailableReviewData; onBack: () => void }) {
   const { t } = useTranslation()
+
+  if (data.questionDetails.length > 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Alert>
+          <CircleOffIcon aria-hidden="true" />
+          <AlertTitle>{t(`interview.review.unavailable.${data.reason}.title`)}</AlertTitle>
+          <AlertDescription>
+            {t("interview.review.unavailableWithLearningDescription")}
+          </AlertDescription>
+        </Alert>
+        <QuestionDetails details={data.questionDetails} />
+        <Card>
+          <CardFooter>
+            <Button onClick={onBack} variant="outline">
+              <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
+              {t("interview.review.actions.backToSetup")}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <Card>
@@ -474,9 +623,9 @@ function ReviewUnavailable({
             <EmptyMedia variant="icon">
               <CircleOffIcon aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle>{t(`interview.review.unavailable.${reason}.title`)}</EmptyTitle>
+            <EmptyTitle>{t(`interview.review.unavailable.${data.reason}.title`)}</EmptyTitle>
             <EmptyDescription>
-              {t(`interview.review.unavailable.${reason}.description`)}
+              {t(`interview.review.unavailable.${data.reason}.description`)}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

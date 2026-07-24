@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -11,6 +11,11 @@ import { getInterviewReview } from "@/services/interview"
 import { renderWithProviders } from "@/test/render"
 
 import { InterviewReviewContainer } from "./InterviewReviewPage"
+import {
+  createPartialWithUnansweredFollowUpStoryFixture,
+  createPartialWithUnansweredQuestionStoryFixture,
+  createUnavailableReviewWithLearningStoryFixture,
+} from "./stories/interview-story-fixtures"
 
 vi.mock("@/services/interview", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/interview")>()),
@@ -72,7 +77,7 @@ describe("InterviewReviewContainer", () => {
     expect(screen.getByText(i18n.t("interview.review.sections.questions"))).toBeVisible()
   })
 
-  it("renders service scores and expands a question summary without showing the answer transcript", async () => {
+  it("renders the saved answer, feedback, and a separately collapsed reference answer", async () => {
     const user = userEvent.setup()
     vi.mocked(getInterviewReview).mockResolvedValue(completedReview())
     renderReview()
@@ -87,10 +92,14 @@ describe("InterviewReviewContainer", () => {
       screen.getByText("如果监控数据只能证明性能改善，却无法直接证明业务收益，你会如何补充验证？"),
     ).toBeVisible()
     expect(
-      screen.queryByText(
+      screen.getByText(
         "我先通过真实用户监控定位长任务和资源瀑布，再分阶段实施拆包、预加载和渲染调度优化。",
       ),
-    ).not.toBeInTheDocument()
+    ).toBeVisible()
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("interview.review.reference.view") }),
+    )
+    expect(screen.getByText(/项目的核心问题是活动期间首屏变慢/)).toBeVisible()
   })
 
   it("retries review generation after a failure", async () => {
@@ -120,6 +129,63 @@ describe("InterviewReviewContainer", () => {
     expect(
       screen.queryByText(i18n.t("interview.review.sections.dimensions")),
     ).not.toBeInTheDocument()
+  })
+
+  it("keeps learning details available when overall scoring is unavailable", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getInterviewReview).mockResolvedValue(
+      createUnavailableReviewWithLearningStoryFixture(),
+    )
+    renderReview()
+
+    const question = await screen.findByRole("button", {
+      name: /请你用两分钟做一下自我介绍/,
+    })
+    await user.click(question)
+    expect(screen.getAllByText(i18n.t("interview.review.unanswered")).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/84 分/)).not.toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("interview.review.questionStrengths"))).not.toBeInTheDocument()
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("interview.review.reference.view") }),
+    )
+    expect(screen.getByText(/我有五年前端研发经验/)).toBeVisible()
+  })
+
+  it("shows an unanswered current question in a partial review without performance", async () => {
+    const user = userEvent.setup()
+    const response = createPartialWithUnansweredQuestionStoryFixture()
+    vi.mocked(getInterviewReview).mockResolvedValue(response)
+    renderReview()
+
+    const question = await screen.findByRole("button", {
+      name: /存在明显分歧的跨团队项目/,
+    })
+    expect(within(question).getByText(i18n.t("interview.review.unanswered"))).toBeVisible()
+    expect(within(question).queryByText(/^\d+ 分$/)).not.toBeInTheDocument()
+    await user.click(question)
+    expect(screen.queryByText(/在一次结算链路改造中/)).not.toBeInTheDocument()
+    await user.click(
+      screen.getAllByRole("button", {
+        name: i18n.t("interview.review.reference.view"),
+      })[0]!,
+    )
+    expect(screen.getByText(/在一次结算链路改造中/)).toBeVisible()
+  })
+
+  it("uses a follow-up-specific reference answer when the follow-up was not answered", async () => {
+    const user = userEvent.setup()
+    const response = createPartialWithUnansweredFollowUpStoryFixture()
+    vi.mocked(getInterviewReview).mockResolvedValue(response)
+    renderReview()
+
+    await user.click(await screen.findByRole("button", { name: /请介绍一次你主导的前端性能优化/ }))
+    await user.click(screen.getByRole("button", { name: /如果监控数据只能证明性能改善/ }))
+    const referenceButtons = screen.getAllByRole("button", {
+      name: i18n.t("interview.review.reference.view"),
+    })
+    await user.click(referenceButtons.at(-1)!)
+    expect(screen.getByText(/我会先明确现有监控只能证明性能改善/)).toBeVisible()
+    expect(screen.queryByText(/项目的核心问题是活动期间首屏变慢/)).not.toBeInTheDocument()
   })
 
   it("shows a limited-data notice and only the completed question for a partial review", async () => {
