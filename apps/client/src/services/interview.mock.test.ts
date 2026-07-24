@@ -456,8 +456,8 @@ describe("interview mock state-machine protection", () => {
   })
 })
 
-describe("interview early completion", () => {
-  it("ends during opening with no completed records or review overviews", async () => {
+describe("interview completion and review availability", () => {
+  it("ends during opening without generating scores or fixed evaluation data", async () => {
     const opening = await startOpening()
     const response = await endInterview({
       sessionId: opening.sessionId,
@@ -467,12 +467,24 @@ describe("interview early completion", () => {
 
     expect(response.session.completedQuestions).toEqual([])
     expect(response.session.progress.completedMainQuestions).toBe(0)
+    expect(response.session.completionReason).toBe("userEndedEarly")
+    expect(response.session.review).toEqual({
+      status: "unavailable",
+      reason: "insufficientAnswers",
+    })
     const review = await getInterviewReview({ sessionId: response.session.sessionId })
-    expect(review.questionOverviews).toEqual([])
-    expect(review.review.questionReviews).toEqual([])
+    expect(review).toEqual({
+      status: "unavailable",
+      reason: "insufficientAnswers",
+      sessionId: response.session.sessionId,
+      completionReason: "userEndedEarly",
+    })
+    expect(JSON.stringify(review)).not.toContain("82")
+    expect(JSON.stringify(review)).not.toContain("dimensionScores")
+    expect(JSON.stringify(review)).not.toContain("mainStrengths")
   })
 
-  it("does not save an unanswered main question and preserves prior completed questions", async () => {
+  it("ends on the first unanswered question without saving it or creating a review", async () => {
     const first = await startToFirstQuestion("noFollowUps")
     const endedImmediately = await endInterview({
       sessionId: first.sessionId,
@@ -482,10 +494,17 @@ describe("interview early completion", () => {
       status: "completed",
       completedQuestions: [],
       progress: { completedMainQuestions: 0 },
+      completionReason: "userEndedEarly",
+      review: { status: "unavailable", reason: "insufficientAnswers" },
     })
+    if (endedImmediately.session?.status !== "completed") throw new Error("Expected completion.")
+    const review = await getInterviewReview({ sessionId: endedImmediately.session.sessionId })
+    expect(review.status).toBe("unavailable")
+  })
 
-    const repeatedFirst = await startToFirstQuestion("noFollowUps")
-    const secondResponse = await answerQuestion(repeatedFirst, "已完成的第一题回答")
+  it("creates a partial review from exactly one completed main question", async () => {
+    const first = await startToFirstQuestion("noFollowUps")
+    const secondResponse = await answerQuestion(first, "已完成的第一题回答")
     if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
     const endedOnSecond = await endInterview({
       sessionId: secondResponse.session.sessionId,
@@ -495,7 +514,21 @@ describe("interview early completion", () => {
       status: "completed",
       completedQuestions: [{ answer: { content: "已完成的第一题回答" } }],
       progress: { completedMainQuestions: 1 },
+      completionReason: "userEndedEarly",
+      review: { status: "partial" },
     })
+    if (endedOnSecond.session?.status !== "completed") throw new Error("Expected completion.")
+    const review = await getInterviewReview({ sessionId: endedOnSecond.session.sessionId })
+    if (review.status !== "partial") throw new Error("Expected partial review.")
+    expect(review.questionOverviews).toHaveLength(1)
+    expect(review.review.questionReviews).toHaveLength(1)
+    expect(review.questionOverviews[0]?.question.id).toBe(
+      createInterviewAgentPlanMock("noFollowUps").questions[0]!.question.id,
+    )
+    expect(JSON.stringify(review)).not.toContain("性能优化")
+    expect(JSON.stringify(review)).not.toContain("跨团队")
+    expect("overallScore" in review.review).toBe(false)
+    expect("dimensionScores" in review.review).toBe(false)
   })
 
   it("saves the answered main question but never fabricates an unanswered follow-up", async () => {
@@ -519,11 +552,17 @@ describe("interview early completion", () => {
         },
       ],
       progress: { completedMainQuestions: 2 },
+      completionReason: "userEndedEarly",
+      review: { status: "partial" },
     })
     if (ended.session?.status !== "completed") throw new Error("Expected completion.")
     const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    if (review.status !== "partial") throw new Error("Expected partial review.")
     expect(review.questionOverviews).toHaveLength(2)
     expect(review.questionOverviews[1]?.followUps).toEqual([])
+    expect(review.review.questionReviews.map(({ questionId }) => questionId)).toEqual(
+      ended.session.completedQuestions.map(({ question }) => question.id),
+    )
   })
 
   it("preserves answered follow-ups in order and omits the current unanswered follow-up", async () => {
@@ -557,12 +596,27 @@ describe("interview early completion", () => {
     expect(ended.session.completedQuestions[1]?.followUps).toHaveLength(1)
 
     const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    if (review.status !== "partial") throw new Error("Expected partial review.")
     expect(review.questionOverviews[1]?.followUps.map(({ id }) => id)).toEqual([
       plan.questions[1]!.followUps[0]!.id,
     ])
   })
 
-  it("ends during candidate questions with completed records and exchanges intact", async () => {
+  it("returns a complete review after the formal-question flow finishes", async () => {
+    const candidate = await reachNoFollowUpsCandidateQuestions()
+    const completed = await finishCandidateQuestions(candidate)
+    expect(completed.completionReason).toBe("formalQuestionsCompleted")
+    expect(completed.review.status).toBe("complete")
+
+    const review = await getInterviewReview({ sessionId: completed.sessionId })
+    if (review.status !== "complete") throw new Error("Expected complete review.")
+    expect(review.review.overallScore).toEqual(expect.any(Number))
+    expect(review.review.dimensionScores.length).toBeGreaterThan(0)
+    expect(review.review.nextTraining.focusAreas.length).toBeGreaterThan(0)
+    expect(review.questionOverviews).toHaveLength(completed.completedQuestions.length)
+  })
+
+  it("ends during candidate questions with a complete formal review and exchanges intact", async () => {
     const candidate = await reachNoFollowUpsCandidateQuestions()
     const withExchangeResponse = await submitCandidateQuestion({
       sessionId: candidate.sessionId,
@@ -580,8 +634,11 @@ describe("interview early completion", () => {
     if (ended.session?.status !== "completed") throw new Error("Expected completion.")
     expect(ended.session.completedQuestions).toHaveLength(2)
     expect(ended.session.candidateQuestionExchanges).toHaveLength(1)
+    expect(ended.session.completionReason).toBe("formalQuestionsCompleted")
+    expect(ended.session.review.status).toBe("complete")
 
     const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    if (review.status !== "complete") throw new Error("Expected complete review.")
     expect(review.questionOverviews).toHaveLength(2)
     expect(review).toEqual(createInterviewReviewResponseMock(ended.session))
   })

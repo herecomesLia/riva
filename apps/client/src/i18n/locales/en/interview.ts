@@ -169,11 +169,23 @@ export const interview = {
     title: "Full interview review",
     description:
       "Turn your overall performance, key questions, and capability risks into a focused plan for the real interview.",
-    loadingTitle: "Generating your full interview review",
+    loadingTitle: "Generating your interview review",
     loadingDescription:
-      "Riva is organizing the complete conversation, performance summary, and next training steps.",
+      "Riva is organizing the answers actually saved in this session and the review data available.",
     errorTitle: "Unable to generate the review",
     errorDescription: "Your interview record is safe, so you can retry.",
+    unavailable: {
+      insufficientAnswers: {
+        title: "Not enough answer data for a review",
+        description:
+          "No main questions were completed, so no scores or evaluations were generated. Start another mock interview when you are ready.",
+      },
+    },
+    partialTitle: "This interview ended early",
+    partialDescription:
+      "These results use only the completed and saved answers. The limited data should be treated as directional.",
+    partialOverallDescription:
+      "Partial reviews do not include an overall score or complete dimension scores.",
     emptyTitle: "No answers to review",
     emptyDescription:
       "No main questions were completed in this interview. Return to setup to start again.",
@@ -211,6 +223,7 @@ export const interview = {
     actions: {
       retry: "Generate again",
       backToSetup: "Back to mock interview",
+      restart: "Start another mock interview",
       startTargetedPractice: "Start targeted practice",
       startMockInterview: "Run another mock interview",
     },

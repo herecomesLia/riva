@@ -29,15 +29,24 @@ export function InterviewReviewContainer({ sessionId }: { sessionId: string }) {
   }
 
   if (reviewQuery.data !== undefined) {
-    if (reviewQuery.data.questionOverviews.length === 0) {
-      return <InterviewReviewView onBack={backToSetup} status="empty" />
+    if (reviewQuery.data.status === "unavailable") {
+      return (
+        <InterviewReviewView
+          onBack={backToSetup}
+          reason={reviewQuery.data.reason}
+          status="unavailable"
+        />
+      )
+    }
+    if (reviewQuery.data.status === "partial") {
+      return <InterviewReviewView data={reviewQuery.data} onBack={backToSetup} status="partial" />
     }
     return (
       <InterviewReviewView
         data={reviewQuery.data}
         onBack={backToSetup}
         onNextTraining={startNextTraining}
-        status="ready"
+        status="complete"
       />
     )
   }

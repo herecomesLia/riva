@@ -1,5 +1,6 @@
 import {
   candidateQuestionsPromptMock,
+  createInterviewCompletedSessionMock,
   createInterviewMockResponse,
   createInterviewReviewResponseMock,
   interviewOpeningMessageMock,
@@ -74,6 +75,9 @@ export function createInterviewSessionStoryFixture() {
 
 export function createSparseInterviewReviewStoryFixture(): GetInterviewReviewResponse {
   const response = createInterviewReviewResponseMock()
+  if (response.status !== "complete") {
+    throw new Error("Complete interview review fixture required.")
+  }
   return {
     ...response,
     questionOverviews: response.questionOverviews.slice(0, 1),
@@ -93,4 +97,22 @@ export function createSparseInterviewReviewStoryFixture(): GetInterviewReviewRes
       },
     },
   }
+}
+
+export function createUnavailableInterviewReviewStoryFixture() {
+  return createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({
+      completionReason: "userEndedEarly",
+      completedMainQuestions: 0,
+    }),
+  )
+}
+
+export function createPartialInterviewReviewStoryFixture() {
+  return createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({
+      completionReason: "userEndedEarly",
+      completedMainQuestions: 1,
+    }),
+  )
 }

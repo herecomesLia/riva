@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
+import {
+  createInterviewCompletedSessionMock,
+  createInterviewReviewResponseMock,
+} from "@/mocks/data/interview"
 import { getInterviewReview } from "@/services/interview"
 import { renderWithProviders } from "@/test/render"
 
@@ -17,7 +20,31 @@ vi.mock("@/services/interview", async (importOriginal) => ({
 const sessionId = "mock-interview-session-completed"
 
 function completedReview() {
-  return createInterviewReviewResponseMock()
+  const response = createInterviewReviewResponseMock()
+  if (response.status !== "complete") throw new Error("Expected complete review.")
+  return response
+}
+
+function unavailableReview() {
+  const response = createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({
+      completionReason: "userEndedEarly",
+      completedMainQuestions: 0,
+    }),
+  )
+  if (response.status !== "unavailable") throw new Error("Expected unavailable review.")
+  return response
+}
+
+function partialReview() {
+  const response = createInterviewReviewResponseMock(
+    createInterviewCompletedSessionMock({
+      completionReason: "userEndedEarly",
+      completedMainQuestions: 1,
+    }),
+  )
+  if (response.status !== "partial") throw new Error("Expected partial review.")
+  return response
 }
 
 function renderReview() {
@@ -82,15 +109,38 @@ describe("InterviewReviewContainer", () => {
     expect(getInterviewReview).toHaveBeenCalledTimes(2)
   })
 
-  it("shows an empty state when the review has no completed main questions", async () => {
-    vi.mocked(getInterviewReview).mockResolvedValue({
-      ...completedReview(),
-      questionOverviews: [],
-    })
+  it("shows the service-provided unavailable state without scores or dimensions", async () => {
+    vi.mocked(getInterviewReview).mockResolvedValue(unavailableReview())
     renderReview()
 
-    expect(await screen.findByText(i18n.t("interview.review.emptyTitle"))).toBeVisible()
+    expect(
+      await screen.findByText(i18n.t("interview.review.unavailable.insufficientAnswers.title")),
+    ).toBeVisible()
     expect(screen.queryByText("82")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(i18n.t("interview.review.sections.dimensions")),
+    ).not.toBeInTheDocument()
+  })
+
+  it("shows a limited-data notice and only the completed question for a partial review", async () => {
+    vi.mocked(getInterviewReview).mockResolvedValue(partialReview())
+    renderReview()
+
+    expect(await screen.findByText(i18n.t("interview.review.partialTitle"))).toBeVisible()
+    expect(
+      screen.getByRole("button", {
+        name: /请你用两分钟做一下自我介绍/,
+      }),
+    ).toBeVisible()
+    expect(
+      screen.queryByRole("button", {
+        name: /前端性能优化/,
+      }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText("82")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(i18n.t("interview.review.sections.nextTraining")),
+    ).not.toBeInTheDocument()
   })
 
   it("navigates to the existing targeted-practice route from the service recommendation", async () => {

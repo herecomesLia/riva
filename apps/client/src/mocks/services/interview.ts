@@ -3,8 +3,8 @@ import {
   createCandidateQuestionExchange,
   createInterviewAgentPlanMock,
   createInterviewMockResponse,
-  createInterviewReview,
   createInterviewReviewResponseMock,
+  createInterviewSessionReview,
   interviewOpeningMessageMock,
   type InterviewAgentMockScenario,
   type InterviewMockScenario,
@@ -20,6 +20,7 @@ import type {
   GetInterviewReviewInput,
   GetInterviewReviewResponse,
   InterviewCandidateQuestionsSessionResponse,
+  InterviewCompletionReason,
   InterviewCompletedSessionResponse,
   InterviewFollowUpSessionResponse,
   InterviewMutationResponse,
@@ -399,13 +400,21 @@ export async function finishInterview(
   if (session.status !== "candidateQuestions") {
     throw new Error("Interview can only finish after entering candidate questions.")
   }
-  return commit(toCompletedSession(session, session.completedQuestions, session.exchanges))
+  return commit(
+    toCompletedSession(
+      session,
+      session.completedQuestions,
+      session.exchanges,
+      "formalQuestionsCompleted",
+    ),
+  )
 }
 
 function toCompletedSession(
   session: ActiveInterviewSessionResponse,
   completedQuestions: CompletedInterviewQuestionResponse[],
   candidateQuestionExchanges: InterviewCandidateQuestionsSessionResponse["exchanges"],
+  completionReason: InterviewCompletionReason,
 ): InterviewCompletedSessionResponse {
   return {
     status: "completed",
@@ -415,9 +424,10 @@ function toCompletedSession(
     startedAt: session.startedAt,
     progress: progressAfter(completedQuestions.length),
     completedQuestions,
+    completionReason,
     completedAt: nextTimestamp(),
     candidateQuestionExchanges,
-    review: createInterviewReview(completedQuestions.map(({ question }) => question)),
+    review: createInterviewSessionReview(completedQuestions, completionReason),
   }
 }
 
@@ -438,8 +448,10 @@ export async function endInterview(input: EndInterviewInput): Promise<InterviewM
     ]
   }
   const exchanges = session.status === "candidateQuestions" ? session.exchanges : []
+  const completionReason =
+    session.status === "candidateQuestions" ? "formalQuestionsCompleted" : "userEndedEarly"
   planCursor = null
-  return commit(toCompletedSession(session, completedQuestions, exchanges))
+  return commit(toCompletedSession(session, completedQuestions, exchanges, completionReason))
 }
 
 export async function getInterviewReview(

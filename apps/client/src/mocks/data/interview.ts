@@ -2,13 +2,16 @@ import type {
   CompletedInterviewQuestionResponse,
   GetInterviewReviewResponse,
   InterviewCandidateQuestionExchangeResponse,
+  InterviewCompletionReason,
   InterviewCompletedSessionResponse,
   InterviewFollowUpQuestionResponse,
   InterviewPageResponse,
   InterviewProgressResponse,
   InterviewQuestionReviewResponse,
   InterviewQuestionResponse,
+  InterviewPartialReviewResponse,
   InterviewReviewResponse,
+  InterviewSessionReviewResponse,
   InterviewSetupResponse,
 } from "@/models/interview"
 
@@ -252,104 +255,184 @@ export function createCandidateQuestionExchange(
   }
 }
 
-const questionReviewsById: Record<string, Omit<InterviewQuestionReviewResponse, "questionId">> = {
+type InterviewQuestionReviewTemplate = Omit<InterviewQuestionReviewResponse, "questionId"> & {
+  weaknesses: string[]
+  risks: string[]
+  communicationSuggestions: string[]
+  preparationSuggestions: string[]
+}
+
+const questionReviewsById: Record<string, InterviewQuestionReviewTemplate> = {
   "interview-question-self-introduction": {
     score: 84,
     summary: "自我介绍重点明确，经历与目标岗位关联自然，关键成果还可以进一步量化。",
     strengths: ["岗位匹配信息集中", "职业主线清晰"],
     issues: ["关键成果缺少量化证据"],
+    weaknesses: ["成果量化表达"],
+    risks: ["自我介绍中的关键成果证据不足"],
+    communicationSuggestions: ["压缩背景信息，优先说明与岗位最相关的经历和结果"],
+    preparationSuggestions: ["补充两项能够证明岗位匹配度的量化成果"],
   },
   "interview-question-project-deep-dive": {
     score: 81,
     summary: "完整说明了性能优化过程，技术取舍清楚，业务验证仍可加强。",
     strengths: ["定位过程完整", "方案取舍具体"],
     issues: ["业务收益缺少对照验证"],
+    weaknesses: ["技术项目的业务归因"],
+    risks: ["如果被持续追问业务价值，目前证据链不够完整"],
+    communicationSuggestions: ["使用对照数据说明改动前后的业务变化"],
+    preparationSuggestions: ["补充性能指标与业务指标的关联材料"],
   },
   "interview-question-motivation": {
     score: 80,
     summary: "求职动机真实并能联系岗位要求，未来能力规划可以再具体一些。",
     strengths: ["岗位理解准确", "动机表达真实"],
     issues: ["阶段性成长目标不够具体"],
+    weaknesses: ["职业目标的阶段拆解"],
+    risks: ["发展预期与岗位实际路径不一致时，判断标准不够明确"],
+    communicationSuggestions: ["用短期目标和长期目标分别说明求职动机"],
+    preparationSuggestions: ["准备未来两年的分阶段成长目标"],
   },
   "interview-question-collaboration": {
     score: 79,
     summary: "能够说明协作过程与推进动作，分歧解决后的业务结果还可以更具体。",
     strengths: ["协作角色清楚", "推进动作完整"],
     issues: ["最终结果量化不足"],
+    weaknesses: ["跨团队结果表达"],
+    risks: ["协作案例缺少可验证的最终结果"],
+    communicationSuggestions: ["先说明核心分歧，再突出个人推动动作和最终结果"],
+    preparationSuggestions: ["补充一个包含冲突处理和结果数据的跨团队案例"],
   },
   "interview-question-role-capability": {
     score: 83,
     summary: "规划覆盖了现状诊断、风险排序和阶段目标，协作机制可以进一步展开。",
     strengths: ["阶段目标明确", "风险意识较强"],
     issues: ["跨团队治理机制不够具体"],
+    weaknesses: ["治理机制设计"],
+    risks: ["稳定性治理计划缺少明确的协作责任边界"],
+    communicationSuggestions: ["按现状、目标、行动和验收标准组织规划回答"],
+    preparationSuggestions: ["补充核心链路治理中的责任分工和验收指标"],
   },
 }
 
-export function createInterviewReview(
-  questions: readonly InterviewQuestionResponse[],
-): InterviewReviewResponse {
+function unique(items: readonly string[]) {
+  return [...new Set(items)]
+}
+
+function getQuestionReviewTemplate(questionId: string) {
+  const template = questionReviewsById[questionId]
+  if (template === undefined) {
+    throw new Error(`Missing interview review fixture for question ${questionId}.`)
+  }
+  return template
+}
+
+function createQuestionReviews(
+  completedQuestions: readonly CompletedInterviewQuestionResponse[],
+): InterviewQuestionReviewResponse[] {
+  return completedQuestions.map(({ question }) => {
+    const template = getQuestionReviewTemplate(question.id)
+    return {
+      questionId: question.id,
+      score: template.score,
+      summary: template.summary,
+      strengths: structuredClone(template.strengths),
+      issues: structuredClone(template.issues),
+    }
+  })
+}
+
+function createReviewNarrative(
+  completedQuestions: readonly CompletedInterviewQuestionResponse[],
+  mode: "partial" | "complete",
+): InterviewPartialReviewResponse {
+  const templates = completedQuestions.map(({ question }) => getQuestionReviewTemplate(question.id))
   return {
-    overallScore: 82,
     overallPerformance:
-      "整体表达清晰，项目经历与岗位要求匹配度较高；技术决策有依据，但业务价值和跨团队影响还可以进一步量化。",
+      mode === "partial"
+        ? `本次面试提前结束，以下结果仅基于已完成的 ${completedQuestions.length} 道正式问题，不能代表完整面试表现。`
+        : `本次复盘基于已完成的 ${completedQuestions.length} 道正式问题，覆盖本场实际出现的问答内容。`,
+    questionReviews: createQuestionReviews(completedQuestions),
+    mainStrengths: unique(templates.flatMap(({ strengths }) => strengths)),
+    frequentIssues: unique(templates.flatMap(({ issues }) => issues)),
+    exposedWeaknesses: unique(templates.flatMap(({ weaknesses }) => weaknesses)),
+    riskPoints: unique(templates.flatMap(({ risks }) => risks)),
+    communicationSuggestions: unique(
+      templates.flatMap(({ communicationSuggestions }) => communicationSuggestions),
+    ),
+    preparationSuggestions: unique(
+      templates.flatMap(({ preparationSuggestions }) => preparationSuggestions),
+    ),
+    generatedAt: "2026-07-24T02:20:00.000Z",
+  }
+}
+
+function createCompleteInterviewReview(
+  completedQuestions: readonly CompletedInterviewQuestionResponse[],
+): InterviewReviewResponse {
+  const narrative = createReviewNarrative(completedQuestions, "complete")
+  const averageScore = Math.round(
+    narrative.questionReviews.reduce((total, { score }) => total + score, 0) /
+      narrative.questionReviews.length,
+  )
+  const lowestQuestion = [...completedQuestions].sort(
+    (left, right) =>
+      getQuestionReviewTemplate(left.question.id).score -
+      getQuestionReviewTemplate(right.question.id).score,
+  )[0]!
+  const lowestReview = getQuestionReviewTemplate(lowestQuestion.question.id)
+
+  return {
+    ...narrative,
+    overallScore: averageScore,
     dimensionScores: [
-      { dimension: "relevance", score: 88, explanation: "大部分回答紧扣问题，并能关联目标岗位。" },
+      {
+        dimension: "relevance",
+        score: Math.min(100, averageScore + 3),
+        explanation: "评分基于本场实际完成问题中的回答相关性。",
+      },
       {
         dimension: "structure",
-        score: 84,
-        explanation: "回答有明确顺序，个别追问中的结论可以更早给出。",
+        score: averageScore,
+        explanation: "评分基于本场实际完成回答的组织与表达结构。",
       },
       {
         dimension: "specificity",
-        score: 78,
-        explanation: "技术细节充分，但部分业务结果缺少对照数据。",
-      },
-      { dimension: "personalContribution", score: 85, explanation: "能够说明个人决策和推动动作。" },
-      {
-        dimension: "resultsAndEvidence",
-        score: 76,
-        explanation: "性能结果可信，业务收益仍需更完整的归因证据。",
-      },
-      {
-        dimension: "roleAlignment",
-        score: 86,
-        explanation: "经历与高级前端工程师的核心职责较为匹配。",
+        score: Math.max(0, averageScore - 3),
+        explanation: "评分基于本场实际回答中事实、行动和结果的具体程度。",
       },
       {
         dimension: "communication",
-        score: 82,
-        explanation: "表达自然稳定，少量背景信息可以压缩。",
+        score: averageScore,
+        explanation: "评分基于本场正式问答中的整体沟通表现。",
       },
-      {
-        dimension: "riskControl",
-        score: 79,
-        explanation: "能够讨论灰度方案，但异常回滚指标可以更具体。",
-      },
-    ],
-    questionReviews: questions.map((question) => {
-      const review = questionReviewsById[question.id]
-      if (review === undefined) {
-        throw new Error(`Missing interview review fixture for question ${question.id}.`)
-      }
-      return { questionId: question.id, ...review }
-    }),
-    mainStrengths: ["能够把复杂技术问题讲清楚", "个人贡献和决策过程较明确", "岗位动机真实具体"],
-    frequentIssues: ["业务结果量化不足", "个别回答背景铺垫偏长"],
-    exposedWeaknesses: ["技术项目的业务归因", "跨团队影响力表达"],
-    riskPoints: ["如果被持续追问业务价值，目前证据链不够完整"],
-    communicationSuggestions: ["先给结论，再补充背景和取舍", "使用对照数据说明改动前后的业务变化"],
-    preparationSuggestions: [
-      "补充性能指标与业务指标的关联材料",
-      "准备一个跨团队推动项目的完整案例",
     ],
     nextTraining: {
       action: "targetedPractice",
-      reason: "下一步应集中训练项目业务价值和量化结果的表达。",
-      focusAreas: ["结果量化", "业务归因", "跨团队协作"],
-      questionType: "projectDeepDive",
+      reason: `下一步建议围绕本场“${lowestQuestion.question.prompt}”中暴露的改进重点继续训练。`,
+      focusAreas: structuredClone(lowestReview.issues),
+      questionType: lowestQuestion.question.type,
       difficulty: "pressure",
     },
-    generatedAt: "2026-07-24T02:20:00.000Z",
+  }
+}
+
+export function createInterviewSessionReview(
+  completedQuestions: readonly CompletedInterviewQuestionResponse[],
+  completionReason: InterviewCompletionReason,
+): InterviewSessionReviewResponse {
+  if (completedQuestions.length === 0) {
+    return { status: "unavailable", reason: "insufficientAnswers" }
+  }
+  if (completionReason === "userEndedEarly") {
+    return {
+      status: "partial",
+      review: createReviewNarrative(completedQuestions, "partial"),
+    }
+  }
+  return {
+    status: "complete",
+    review: createCompleteInterviewReview(completedQuestions),
   }
 }
 
@@ -390,8 +473,20 @@ function createCompletedQuestionRecords(
   }))
 }
 
-function createCompletedSession(): InterviewCompletedSessionResponse {
-  const completedQuestions = createCompletedQuestionRecords()
+export function createInterviewCompletedSessionMock(
+  options: {
+    agentScenario?: InterviewAgentMockScenario
+    completionReason?: InterviewCompletionReason
+    completedMainQuestions?: number
+  } = {},
+): InterviewCompletedSessionResponse {
+  const agentScenario = options.agentScenario ?? "singleFollowUp"
+  const completionReason = options.completionReason ?? "formalQuestionsCompleted"
+  const plan = createInterviewAgentPlanMock(agentScenario)
+  const completedQuestions = createCompletedQuestionRecords(agentScenario).slice(
+    0,
+    options.completedMainQuestions,
+  )
   return {
     status: "completed",
     sessionId: "mock-interview-session-completed",
@@ -405,26 +500,33 @@ function createCompletedSession(): InterviewCompletedSessionResponse {
     startedAt: "2026-07-24T02:00:00.000Z",
     progress: {
       completedMainQuestions: completedQuestions.length,
-      totalMainQuestions: completedQuestions.length,
-      planRevision: 1,
+      totalMainQuestions: plan.initialProgress.totalMainQuestions,
+      planRevision: plan.initialProgress.planRevision,
     },
     completedQuestions,
+    completionReason,
     completedAt: "2026-07-24T02:18:00.000Z",
-    candidateQuestionExchanges: [
-      createCandidateQuestionExchange("这个岗位入职后的核心目标和主要协作团队分别是什么？", 1),
-    ],
-    review: createInterviewReview(completedQuestions.map(({ question }) => question)),
+    candidateQuestionExchanges:
+      completionReason === "formalQuestionsCompleted"
+        ? [createCandidateQuestionExchange("这个岗位入职后的核心目标和主要协作团队分别是什么？", 1)]
+        : [],
+    review: createInterviewSessionReview(completedQuestions, completionReason),
   }
 }
 
 export function createInterviewReviewResponseMock(
-  session: InterviewCompletedSessionResponse = createCompletedSession(),
+  session: InterviewCompletedSessionResponse = createInterviewCompletedSessionMock(),
 ): GetInterviewReviewResponse {
-  return {
+  const base = {
     sessionId: session.sessionId,
-    review: session.review,
-    questionOverviews: session.completedQuestions.map((completedQuestion) => {
-      const performance = session.review.questionReviews.find(
+    completionReason: session.completionReason,
+  }
+  if (session.review.status === "unavailable") {
+    return { ...base, ...session.review }
+  }
+  const createQuestionOverviews = (review: InterviewPartialReviewResponse) =>
+    session.completedQuestions.map((completedQuestion) => {
+      const performance = review.questionReviews.find(
         ({ questionId }) => questionId === completedQuestion.question.id,
       )
       if (performance === undefined) {
@@ -435,7 +537,22 @@ export function createInterviewReviewResponseMock(
         followUps: completedQuestion.followUps.map(({ question }) => question),
         performance,
       }
-    }),
+    })
+  if (session.review.status === "partial") {
+    const review = session.review.review
+    return {
+      ...base,
+      status: "partial",
+      review,
+      questionOverviews: createQuestionOverviews(review),
+    }
+  }
+  const review = session.review.review
+  return {
+    ...base,
+    status: "complete",
+    review,
+    questionOverviews: createQuestionOverviews(review),
   }
 }
 
@@ -463,7 +580,7 @@ export function createInterviewMockResponse(
   if (scenario === "completed") {
     return {
       setup: structuredClone(interviewSetupResponseMock),
-      session: createCompletedSession(),
+      session: createInterviewCompletedSessionMock(),
     }
   }
 

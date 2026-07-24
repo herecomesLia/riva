@@ -3,8 +3,21 @@ import { expect, fn, userEvent } from "storybook/test"
 
 import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
 
-import { createSparseInterviewReviewStoryFixture } from "./stories/interview-story-fixtures"
+import {
+  createPartialInterviewReviewStoryFixture,
+  createSparseInterviewReviewStoryFixture,
+  createUnavailableInterviewReviewStoryFixture,
+} from "./stories/interview-story-fixtures"
 import { InterviewReviewView } from "./InterviewReviewView"
+
+const completeReview = createInterviewReviewResponseMock()
+const partialReview = createPartialInterviewReviewStoryFixture()
+const unavailableReview = createUnavailableInterviewReviewStoryFixture()
+if (completeReview.status !== "complete") throw new Error("Complete review fixture required.")
+if (partialReview.status !== "partial") throw new Error("Partial review fixture required.")
+if (unavailableReview.status !== "unavailable") {
+  throw new Error("Unavailable review fixture required.")
+}
 
 const meta = preview.meta({
   component: InterviewReviewView,
@@ -21,10 +34,10 @@ export const Loading = meta.story({
   },
 })
 
-export const Ready = meta.story({
+export const Complete = meta.story({
   args: {
-    status: "ready",
-    data: createInterviewReviewResponseMock(),
+    status: "complete",
+    data: completeReview,
     onBack: fn(),
     onNextTraining: fn(),
   },
@@ -41,17 +54,42 @@ export const Ready = meta.story({
   },
 })
 
-export const Empty = meta.story({
+export const Unavailable = meta.story({
   args: {
-    status: "empty",
+    status: "unavailable",
+    reason: unavailableReview.reason,
     onBack: fn(),
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.queryByText("82")).not.toBeInTheDocument()
+    await expect(canvas.queryByText(/能力维度|capability dimensions/i)).not.toBeInTheDocument()
+  },
+})
+
+export const Partial = meta.story({
+  args: {
+    status: "partial",
+    data: partialReview,
+    onBack: fn(),
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("alert")).toBeVisible()
+    await expect(
+      canvas.getAllByRole("button", { name: /请你用两分钟做一下自我介绍/ }),
+    ).toHaveLength(1)
+    await expect(canvas.queryByRole("button", { name: /前端性能优化/ })).not.toBeInTheDocument()
+    await expect(canvas.queryByText("82")).not.toBeInTheDocument()
   },
 })
 
 export const SparseData = meta.story({
   args: {
-    status: "ready",
-    data: createSparseInterviewReviewStoryFixture(),
+    status: "complete",
+    data: (() => {
+      const response = createSparseInterviewReviewStoryFixture()
+      if (response.status !== "complete") throw new Error("Complete sparse review required.")
+      return response
+    })(),
     onBack: fn(),
     onNextTraining: fn(),
   },
@@ -59,7 +97,7 @@ export const SparseData = meta.story({
 
 const retryReview = fn()
 
-export const Error = meta.story({
+export const LoadError = meta.story({
   args: {
     status: "error",
     isRetrying: false,

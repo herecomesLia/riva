@@ -26,9 +26,11 @@ describe("interview Story fixtures", () => {
 
   it("creates sparse review variants without mutating the formal review fixture", () => {
     const firstReview = createSparseInterviewReviewStoryFixture()
+    if (firstReview.status !== "complete") throw new Error("Expected complete review.")
     firstReview.review.mainStrengths[0] = "被 Story 修改的优势"
     const secondReview = createSparseInterviewReviewStoryFixture()
+    if (secondReview.status !== "complete") throw new Error("Expected complete review.")
 
-    expect(secondReview.review.mainStrengths[0]).toBe("能够把复杂技术问题讲清楚")
+    expect(secondReview.review.mainStrengths[0]).toBe("岗位匹配信息集中")
   })
 })

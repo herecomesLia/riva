@@ -209,11 +209,8 @@ export type InterviewTrainingSuggestionResponse =
       difficulty: InterviewDifficulty
     }
 
-export type InterviewReviewResponse = {
-  /** Whole-number score from 0 to 100. */
-  overallScore: number
+type InterviewReviewNarrativeResponse = {
   overallPerformance: string
-  dimensionScores: InterviewDimensionScoreResponse[]
   questionReviews: InterviewQuestionReviewResponse[]
   mainStrengths: string[]
   frequentIssues: string[]
@@ -221,15 +218,40 @@ export type InterviewReviewResponse = {
   riskPoints: string[]
   communicationSuggestions: string[]
   preparationSuggestions: string[]
-  nextTraining: InterviewTrainingSuggestionResponse
   generatedAt: string
 }
 
+export type InterviewPartialReviewResponse = InterviewReviewNarrativeResponse
+
+export type InterviewReviewResponse = InterviewReviewNarrativeResponse & {
+  /** Whole-number score from 0 to 100. */
+  overallScore: number
+  dimensionScores: InterviewDimensionScoreResponse[]
+  nextTraining: InterviewTrainingSuggestionResponse
+}
+
+export type InterviewCompletionReason = "formalQuestionsCompleted" | "userEndedEarly"
+
+export type InterviewSessionReviewResponse =
+  | {
+      status: "unavailable"
+      reason: "insufficientAnswers"
+    }
+  | {
+      status: "partial"
+      review: InterviewPartialReviewResponse
+    }
+  | {
+      status: "complete"
+      review: InterviewReviewResponse
+    }
+
 export type InterviewCompletedSessionResponse = InterviewActiveSessionResponseBase & {
   status: "completed"
+  completionReason: InterviewCompletionReason
   completedAt: string
   candidateQuestionExchanges: InterviewCandidateQuestionExchangeResponse[]
-  review: InterviewReviewResponse
+  review: InterviewSessionReviewResponse
 }
 
 export type ActiveInterviewSessionResponse =
@@ -365,8 +387,25 @@ export type GetInterviewReviewInput = {
   sessionId: string
 }
 
-export type GetInterviewReviewResponse = {
+type GetInterviewReviewResponseBase = {
   sessionId: string
-  review: InterviewReviewResponse
-  questionOverviews: InterviewQuestionReviewOverviewResponse[]
+  completionReason: InterviewCompletionReason
 }
+
+export type GetInterviewReviewResponse = GetInterviewReviewResponseBase &
+  (
+    | {
+        status: "unavailable"
+        reason: "insufficientAnswers"
+      }
+    | {
+        status: "partial"
+        review: InterviewPartialReviewResponse
+        questionOverviews: InterviewQuestionReviewOverviewResponse[]
+      }
+    | {
+        status: "complete"
+        review: InterviewReviewResponse
+        questionOverviews: InterviewQuestionReviewOverviewResponse[]
+      }
+  )
