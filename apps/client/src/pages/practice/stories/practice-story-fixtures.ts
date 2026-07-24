@@ -5,6 +5,95 @@ import {
   createPracticeMockResponse,
   createPracticeReferenceAnswer,
 } from "@/mocks/data/practice"
+import type { PracticeReviewState } from "@/models/practice"
+
+export type PracticeReviewStoryVariant =
+  | "balanced"
+  | "boundaryScore"
+  | "emptyDetails"
+  | "fewDimensions"
+  | "highScore"
+  | "longDetails"
+  | "longDimensions"
+  | "longFocusAreas"
+  | "lowScore"
+  | "nextRecommendation"
+  | "retryRecommendation"
+
+export function createPracticeReviewStoryFixture(
+  variant: PracticeReviewStoryVariant = "balanced",
+): PracticeReviewState {
+  const scenario =
+    variant === "highScore"
+      ? "reviewHighScore"
+      : variant === "lowScore"
+        ? "reviewLowScore"
+        : variant === "retryRecommendation"
+          ? "reviewRetryRecommended"
+          : variant === "nextRecommendation" || variant === "longFocusAreas"
+            ? "reviewNextRecommended"
+            : variant === "longDetails"
+              ? "reviewLongContent"
+              : "reviewBalanced"
+  const response = createPracticeMockResponse(scenario)
+  if (response.session.status !== "review") throw new Error("Review fixture required.")
+  const session = response.session
+
+  if (variant === "boundaryScore") session.evaluation.overallScore = 60
+  if (variant === "fewDimensions") {
+    session.evaluation.dimensionScores = session.evaluation.dimensionScores.slice(0, 3)
+  }
+  if (variant === "longDimensions") {
+    session.evaluation.dimensionScores = session.evaluation.dimensionScores.map((score) => ({
+      ...score,
+      explanation: `${score.explanation} 同时需要结合岗位目标、候选人的个人职责边界、方案取舍依据、跨团队协作过程和最终验证周期，才能完整判断这项能力是否稳定可复用。`,
+    }))
+  }
+  if (variant === "longFocusAreas" && session.review.recommendation.action === "nextQuestion") {
+    session.review.recommendation.nextQuestion.focusAreas = [
+      "复杂约束下的技术方案比较与取舍依据",
+      "跨团队分歧处理、共识建立与持续推进",
+      "灰度验证指标、异常告警阈值和回滚条件",
+      "长期维护成本、业务收益与用户体验平衡",
+    ]
+  }
+  if (variant === "emptyDetails") {
+    session.review.highlights = []
+    session.review.mainIssues = []
+    session.review.improvementSuggestions = []
+    session.review.reusableAnswerStructure = []
+    session.review.exposedWeaknesses = []
+  }
+  if (variant === "longDetails") {
+    session.review.highlights = [
+      "能够从业务影响、用户反馈和性能数据三个角度界定问题，并清楚说明候选人在问题定位、方案比较、跨团队推动以及结果验证中的个人贡献。",
+      "通过实验组与对照组、分设备灰度和持续观察周期建立可信归因，同时说明异常指标出现时的告警、止损和回滚机制。",
+    ]
+    session.review.mainIssues = [
+      "背景信息仍然偏长，关键判断出现较晚，面试官需要在较多上下文中寻找候选人真正负责的决策和推动动作。",
+      "虽然提到了风险控制，但仍需进一步说明监控负责人、告警阈值、观察周期以及触发回滚后的协作流程。",
+    ]
+    session.review.improvementSuggestions = [
+      "将回答压缩为目标与约束、个人判断、关键取舍、推动动作、量化验证和复盘沉淀六个连续部分，每一部分优先说明自己的具体贡献。",
+      "补充优化前基线、实验组与对照组差异、持续观察周期、异常告警阈值和回滚条件，使收益归因与风险控制形成完整闭环。",
+    ]
+    session.review.reusableAnswerStructure = [
+      "用业务目标、用户影响和明确约束快速界定问题",
+      "说明个人负责的分析过程、证据来源和关键判断",
+      "比较候选方案并解释收益、成本、风险和长期维护取舍",
+      "描述跨团队分歧、沟通动作、共识形成和推进节奏",
+      "给出实验设计、指标变化、观察周期和可信归因",
+      "补充异常告警、止损条件、回滚方案和复盘沉淀",
+    ]
+    session.review.exposedWeaknesses = [
+      "复杂背景下快速突出个人贡献与关键判断",
+      "灰度发布期间的监控、告警、止损与回滚机制",
+      "技术收益、业务价值和长期维护成本的综合表达",
+    ]
+  }
+
+  return session
+}
 
 export function createPracticeViewArgs(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
   return {
