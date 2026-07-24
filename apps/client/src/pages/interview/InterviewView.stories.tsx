@@ -3,7 +3,7 @@ import { expect, fn } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
 
-import { createInterviewSetupStoryFixture } from "./interview-story-fixtures"
+import { createInterviewSetupStoryFixture } from "./stories/interview-story-fixtures"
 import { InterviewView } from "./InterviewView"
 
 const meta = preview.meta({

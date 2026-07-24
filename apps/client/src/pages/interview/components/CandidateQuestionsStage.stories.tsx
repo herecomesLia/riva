@@ -1,7 +1,7 @@
 import preview from "#storybook/preview"
 import { expect, fn, screen, within } from "storybook/test"
 
-import { createInterviewSessionStoryFixture } from "../interview-story-fixtures"
+import { createInterviewSessionStoryFixture } from "../stories/interview-story-fixtures"
 import { CandidateQuestionsStage } from "./CandidateQuestionsStage"
 
 const fixture = createInterviewSessionStoryFixture()

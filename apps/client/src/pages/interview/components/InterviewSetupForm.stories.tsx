@@ -1,7 +1,7 @@
 import preview from "#storybook/preview"
 import { expect, fn } from "storybook/test"
 
-import { createInterviewSetupStoryFixture } from "../interview-story-fixtures"
+import { createInterviewSetupStoryFixture } from "../stories/interview-story-fixtures"
 import { InterviewSetupForm } from "./InterviewSetupForm"
 
 const meta = preview.meta({

@@ -9,7 +9,7 @@ import type {
   InterviewConversationRecordViewData,
 } from "@/models/interview"
 
-import type { InterviewSessionSummary } from "./InterviewSessionView"
+import type { InterviewSessionSummary } from "../InterviewSessionView"
 
 export function createInterviewSetupStoryFixture(
   scenario: "setupReady" | "prerequisiteNotMet" = "setupReady",

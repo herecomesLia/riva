@@ -3,7 +3,7 @@ import { expect, fn, userEvent } from "storybook/test"
 
 import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
 
-import { createSparseInterviewReviewStoryFixture } from "./interview-story-fixtures"
+import { createSparseInterviewReviewStoryFixture } from "./stories/interview-story-fixtures"
 import { InterviewReviewView } from "./InterviewReviewView"
 
 const meta = preview.meta({

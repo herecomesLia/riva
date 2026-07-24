@@ -15,6 +15,7 @@ import type {
 } from "@/models/interview"
 import {
   beginInterviewQuestions,
+  endInterview,
   finishInterview,
   getInterviewPage,
   getNextInterviewQuestion,
@@ -133,10 +134,39 @@ describe("InterviewSessionContainer", () => {
   beforeEach(() => {
     vi.mocked(getInterviewPage).mockReset()
     vi.mocked(beginInterviewQuestions).mockReset()
+    vi.mocked(endInterview).mockReset()
     vi.mocked(submitInterviewAnswer).mockReset()
     vi.mocked(getNextInterviewQuestion).mockReset()
     vi.mocked(submitCandidateQuestion).mockReset()
     vi.mocked(finishInterview).mockReset()
+  })
+
+  it("maps a pending session query to the structured loading view", async () => {
+    vi.mocked(getInterviewPage).mockReturnValue(new Promise(() => undefined))
+    renderSession()
+
+    expect(await screen.findByTestId("interview-session-loading")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    )
+  })
+
+  it("maps a load error to retry and renders the recovered session", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getInterviewPage)
+      .mockRejectedValueOnce(new Error("session load failed"))
+      .mockResolvedValueOnce(responseWithSession(questionSession(1, 2)))
+    renderSession()
+
+    expect(await screen.findByText(i18n.t("interview.session.errors.loadTitle"))).toBeVisible()
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.actions.retry"),
+      }),
+    )
+
+    expect(await screen.findByText(createInterviewQuestionSet()[0]!.prompt)).toBeVisible()
+    expect(getInterviewPage).toHaveBeenCalledTimes(2)
   })
 
   it("starts the question flow through the service and updates the cached snapshot", async () => {
@@ -158,6 +188,36 @@ describe("InterviewSessionContainer", () => {
     })
     expect(await screen.findByText(createInterviewQuestionSet()[0]!.prompt)).toBeVisible()
     expect(result.queryClient.getQueryData(["interview"])).toEqual(firstQuestion)
+  })
+
+  it("submits an answer only once while its mutation is pending", async () => {
+    const user = userEvent.setup()
+    const answer = "我会先说明背景和目标，再突出个人决策、推动动作和量化结果。"
+    const first = questionSession(1, 2)
+    const second = responseWithSession(questionSession(2, 3))
+    const submitRequest = createDeferred<InterviewPageResponse>()
+    vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(first))
+    vi.mocked(submitInterviewAnswer).mockReturnValue(submitRequest.promise)
+    renderSession()
+
+    await user.type(await screen.findByRole("textbox"), answer)
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.answer.submit"),
+      }),
+    )
+    const pendingButton = await screen.findByRole("button", {
+      name: i18n.t("interview.session.answer.submitting"),
+    })
+    expect(pendingButton).toBeDisabled()
+    await user.click(pendingButton)
+    expect(submitInterviewAnswer).toHaveBeenCalledOnce()
+
+    await act(async () => submitRequest.resolve(second))
+    expect(
+      await screen.findByText(questionSession(2, 3).currentQuestion.question.prompt),
+    ).toBeVisible()
+    expect(submitInterviewAnswer).toHaveBeenCalledOnce()
   })
 
   it("consumes the next session state returned by answer submission", async () => {
