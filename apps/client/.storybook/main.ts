@@ -22,4 +22,12 @@ export default defineMain({
     name: "@storybook/tanstack-react",
     options: {},
   },
+
+  viteFinal: (config) => ({
+    ...config,
+    define: {
+      ...config.define,
+      "import.meta.env.MOCK": JSON.stringify("true"),
+    },
+  }),
 })

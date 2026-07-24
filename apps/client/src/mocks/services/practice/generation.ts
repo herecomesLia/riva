@@ -1,8 +1,8 @@
 import { createGeneratedPracticeQuestion } from "@/mocks/data/practice"
-import { waitForMockDelay } from "@/mocks/utils"
 import type { GetQuestionGenerationStatusInput, PracticePageResponse } from "@/models/practice"
 
 import {
+  consumePracticeMockOperation,
   copyPracticeState,
   getPracticeMockState,
   nextGenerationPoll,
@@ -42,7 +42,7 @@ function completeQuestionGeneration(): PracticePageResponse {
 export async function getQuestionGenerationStatus(
   input: GetQuestionGenerationStatusInput,
 ): Promise<PracticePageResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("getQuestionGenerationStatus")
   const currentSession = getPracticeMockState().session
 
   if (

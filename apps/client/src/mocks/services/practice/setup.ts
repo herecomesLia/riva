@@ -1,6 +1,5 @@
 import { derivePracticeSupportedQuestionTypes } from "@/mocks/data/role-fixture-builders"
 import { getRolesPage } from "@/mocks/services/roles"
-import { waitForMockDelay } from "@/mocks/utils"
 import type {
   PracticeMutationResponse,
   PracticePageResponse,
@@ -13,6 +12,7 @@ import type {
 import type { TargetRole } from "@/models/roles"
 
 import {
+  consumePracticeMockOperation,
   copyPracticeState,
   getPracticeMockState,
   initializeQuestionOrdinal,
@@ -83,6 +83,7 @@ function withSetupContext(setupContext: PracticeSetupContext): PracticePageRespo
 }
 
 export async function getPracticePage(): Promise<PracticePageResponse> {
+  await consumePracticeMockOperation("getPracticePage", 0)
   const setupContext = await getCurrentSetupContext()
   return setPracticeMockState(withSetupContext(setupContext))
 }
@@ -107,6 +108,7 @@ function requireValidSelection(
 export async function startPracticeSession(
   input: StartPracticeSessionInput,
 ): Promise<PracticeMutationResponse> {
+  await consumePracticeMockOperation("startPracticeSession", 0)
   const current = await getPracticePage()
   requireValidSelection(current.setupContext, input)
   const sessionSequence = nextPracticeSessionSequence()
@@ -132,7 +134,7 @@ export async function startPracticeSession(
 export async function prepareNextPracticeSession(
   input: PrepareNextPracticeSessionInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("prepareNextPracticeSession")
   const session = getPracticeMockState().session
   if (
     session.status !== "completed" ||

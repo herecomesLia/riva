@@ -4,7 +4,6 @@ import {
   createPracticeReferenceAnswer,
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
-import { waitForMockDelay } from "@/mocks/utils"
 import type {
   PracticeAnsweringState,
   PracticeMutationResponse,
@@ -21,6 +20,7 @@ import type {
 
 import { requireCurrentQuestion, requireCurrentReviewableQuestion } from "./guards"
 import {
+  consumePracticeMockOperation,
   copyPracticeState,
   ensureQuestionOrdinal,
   getCurrentTargetRoleTitle,
@@ -42,9 +42,22 @@ function commitUnchangedQuestionMutation(
 export async function requestPracticeHint(
   input: RequestPracticeHintInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  const outcome = await consumePracticeMockOperation("requestPracticeHint")
   const session = requireCurrentQuestion(input)
-  if (session.question.answerHints.status !== "notRequested")
+  if (outcome === "unavailable") {
+    return setPracticeMockState({
+      ...getPracticeMockState(),
+      session: {
+        ...session,
+        version: session.version + 1,
+        question: {
+          ...session.question,
+          answerHints: { status: "unavailable", content: null },
+        },
+      },
+    })
+  }
+  if (session.question.answerHints.status === "revealed")
     return commitUnchangedQuestionMutation(session)
   const guidance = createGeneratedPracticeQuestionGuidance(session.question.questionType)
 
@@ -64,9 +77,22 @@ export async function requestPracticeHint(
 export async function requestAnswerFramework(
   input: RequestAnswerFrameworkInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  const outcome = await consumePracticeMockOperation("requestAnswerFramework")
   const session = requireCurrentQuestion(input)
-  if (session.question.answerFramework.status !== "notRequested")
+  if (outcome === "unavailable") {
+    return setPracticeMockState({
+      ...getPracticeMockState(),
+      session: {
+        ...session,
+        version: session.version + 1,
+        question: {
+          ...session.question,
+          answerFramework: { status: "unavailable", content: null },
+        },
+      },
+    })
+  }
+  if (session.question.answerFramework.status === "revealed")
     return commitUnchangedQuestionMutation(session)
   const guidance = createGeneratedPracticeQuestionGuidance(session.question.questionType)
 
@@ -89,9 +115,26 @@ export async function requestAnswerFramework(
 export async function requestPracticeReferenceAnswer(
   input: RequestPracticeReferenceAnswerInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  const outcome = await consumePracticeMockOperation("requestPracticeReferenceAnswer")
   const session = requireCurrentQuestion(input)
-  if (session.question.referenceAnswer.status !== "notRequested")
+  if (outcome === "unavailable") {
+    return setPracticeMockState({
+      ...getPracticeMockState(),
+      session: {
+        ...session,
+        version: session.version + 1,
+        question: {
+          ...session.question,
+          referenceAnswer: {
+            status: "unavailable",
+            content: null,
+            viewedBeforeSubmission: false,
+          },
+        },
+      },
+    })
+  }
+  if (session.question.referenceAnswer.status === "revealed")
     return commitUnchangedQuestionMutation(session)
 
   return setPracticeMockState({
@@ -120,7 +163,7 @@ export async function requestPracticeReferenceAnswer(
 export async function setQuestionSaved(
   input: SetPracticeQuestionSavedInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("setQuestionSaved")
   const session = requireCurrentReviewableQuestion(input)
   if (session.question.isSaved === input.isSaved) return commitUnchangedQuestionMutation(session)
 
@@ -137,7 +180,7 @@ export async function setQuestionSaved(
 export async function setQuestionWeak(
   input: SetPracticeQuestionWeakInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("setQuestionWeak")
   const session = requireCurrentReviewableQuestion(input)
   if (session.question.isMarkedWeak === input.isMarkedWeak)
     return commitUnchangedQuestionMutation(session)
@@ -155,7 +198,7 @@ export async function setQuestionWeak(
 export async function submitPrimaryAnswer(
   input: SubmitPrimaryAnswerInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("submitPrimaryAnswer")
   const session = requireCurrentQuestion(input)
   const content = input.content.trim()
   if (!content) throw new Error("Practice answer cannot be empty.")
@@ -209,7 +252,7 @@ export async function submitPrimaryAnswer(
 export async function skipPracticeQuestion(
   input: SkipPracticeQuestionInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("skipPracticeQuestion")
   const session = requireCurrentQuestion(input)
   ensureQuestionOrdinal(session.sessionId)
   resetGenerationPoll(session.sessionId)

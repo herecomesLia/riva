@@ -1,4 +1,3 @@
-import { waitForMockDelay } from "@/mocks/utils"
 import type {
   ContinueToNextPracticeQuestionInput,
   PracticeMutationResponse,
@@ -8,6 +7,7 @@ import type {
 import { toAttemptRecord } from "./completion"
 import { requireReview } from "./guards"
 import {
+  consumePracticeMockOperation,
   copyPracticeState,
   getPracticeMockState,
   resetGenerationPoll,
@@ -17,7 +17,7 @@ import {
 export async function retryCurrentPracticeQuestion(
   input: RetryCurrentPracticeQuestionInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("retryCurrentPracticeQuestion")
   const session = requireReview(input)
   if (session.question.referenceAnswer.status !== "revealed") {
     throw new Error("Practice review reference answer is missing.")
@@ -51,7 +51,7 @@ export async function retryCurrentPracticeQuestion(
 export async function continueToNextPracticeQuestion(
   input: ContinueToNextPracticeQuestionInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("continueToNextPracticeQuestion")
   const session = requireReview(input)
   const previousAttempt = toAttemptRecord(session)
   const recommendation = session.review.recommendation

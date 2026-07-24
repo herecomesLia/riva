@@ -3,7 +3,6 @@ import {
   createPracticeMockEvaluationResult,
   createPracticeReferenceAnswer,
 } from "@/mocks/data/practice"
-import { waitForMockDelay } from "@/mocks/utils"
 import type {
   GetPracticeEvaluationStatusInput,
   PracticeMutationResponse,
@@ -13,6 +12,7 @@ import type {
 
 import { requireEvaluatingSession } from "./guards"
 import {
+  consumePracticeMockOperation,
   copyPracticeState,
   getCurrentTargetRoleTitle,
   getPracticeMockState,
@@ -28,7 +28,7 @@ function evaluationAttemptKey(sessionId: string, version: number) {
 export async function getPracticeEvaluationStatus(
   input: GetPracticeEvaluationStatusInput,
 ): Promise<PracticePageResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("getPracticeEvaluationStatus")
   const session = requireEvaluatingSession(input)
   const attemptKey = evaluationAttemptKey(session.sessionId, session.version)
   const pollCount = nextEvaluationPoll(attemptKey)
@@ -114,7 +114,7 @@ function revealFollowUpReference(
 export async function retryPracticeEvaluation(
   input: RetryPracticeEvaluationInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("retryPracticeEvaluation")
   const session = requireEvaluatingSession(input)
   const nextVersion = session.version + 1
   resetEvaluationPoll(evaluationAttemptKey(session.sessionId, nextVersion))

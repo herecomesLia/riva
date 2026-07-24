@@ -24,4 +24,9 @@ export {
   reconcilePracticeSetupSelection,
   startPracticeSession,
 } from "./setup"
-export { resetPracticeMockState } from "./state"
+export {
+  resetPracticeMockState,
+  type PracticeMockControllerOptions,
+  type PracticeMockOperation,
+  type PracticeMockUnavailableOperation,
+} from "./state"

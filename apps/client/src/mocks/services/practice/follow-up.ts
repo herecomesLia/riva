@@ -3,7 +3,6 @@ import {
   createPracticeFollowUpReferenceAnswer,
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
-import { waitForMockDelay } from "@/mocks/utils"
 import type {
   EndPracticeFollowUpsInput,
   PracticeAnsweringFollowUpState,
@@ -17,6 +16,7 @@ import type {
 
 import { requireCurrentFollowUp } from "./guards"
 import {
+  consumePracticeMockOperation,
   copyPracticeState,
   getCurrentTargetRoleTitle,
   getPracticeMockState,
@@ -36,9 +36,25 @@ function commitUnchangedFollowUpMutation(
 export async function requestPracticeFollowUpHint(
   input: RequestPracticeFollowUpHintInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  const outcome = await consumePracticeMockOperation("requestPracticeFollowUpHint")
   const session = requireCurrentFollowUp(input)
-  if (session.currentFollowUp.question.answerHints.status !== "notRequested") {
+  if (outcome === "unavailable") {
+    return setPracticeMockState({
+      ...getPracticeMockState(),
+      session: {
+        ...session,
+        version: session.version + 1,
+        currentFollowUp: {
+          ...session.currentFollowUp,
+          question: {
+            ...session.currentFollowUp.question,
+            answerHints: { status: "unavailable", content: null },
+          },
+        },
+      },
+    })
+  }
+  if (session.currentFollowUp.question.answerHints.status === "revealed") {
     return commitUnchangedFollowUpMutation(session)
   }
   const template = getPracticeFollowUpPlan(session.question.templateId).find(
@@ -68,9 +84,25 @@ export async function requestPracticeFollowUpHint(
 export async function requestPracticeFollowUpFramework(
   input: RequestPracticeFollowUpFrameworkInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  const outcome = await consumePracticeMockOperation("requestPracticeFollowUpFramework")
   const session = requireCurrentFollowUp(input)
-  if (session.currentFollowUp.question.answerFramework.status !== "notRequested") {
+  if (outcome === "unavailable") {
+    return setPracticeMockState({
+      ...getPracticeMockState(),
+      session: {
+        ...session,
+        version: session.version + 1,
+        currentFollowUp: {
+          ...session.currentFollowUp,
+          question: {
+            ...session.currentFollowUp.question,
+            answerFramework: { status: "unavailable", content: null },
+          },
+        },
+      },
+    })
+  }
+  if (session.currentFollowUp.question.answerFramework.status === "revealed") {
     return commitUnchangedFollowUpMutation(session)
   }
   const template = getPracticeFollowUpPlan(session.question.templateId).find(
@@ -100,9 +132,29 @@ export async function requestPracticeFollowUpFramework(
 export async function requestPracticeFollowUpReferenceAnswer(
   input: RequestPracticeFollowUpReferenceAnswerInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  const outcome = await consumePracticeMockOperation("requestPracticeFollowUpReferenceAnswer")
   const session = requireCurrentFollowUp(input)
-  if (session.currentFollowUp.question.referenceAnswer.status !== "notRequested") {
+  if (outcome === "unavailable") {
+    return setPracticeMockState({
+      ...getPracticeMockState(),
+      session: {
+        ...session,
+        version: session.version + 1,
+        currentFollowUp: {
+          ...session.currentFollowUp,
+          question: {
+            ...session.currentFollowUp.question,
+            referenceAnswer: {
+              status: "unavailable",
+              content: null,
+              viewedBeforeSubmission: false,
+            },
+          },
+        },
+      },
+    })
+  }
+  if (session.currentFollowUp.question.referenceAnswer.status === "revealed") {
     return commitUnchangedFollowUpMutation(session)
   }
 
@@ -135,7 +187,7 @@ export async function requestPracticeFollowUpReferenceAnswer(
 export async function submitFollowUpAnswer(
   input: SubmitFollowUpAnswerInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("submitFollowUpAnswer")
   const session = requireCurrentFollowUp(input)
   const content = input.content.trim()
   if (!content) throw new Error("Practice follow-up answer cannot be empty.")
@@ -198,7 +250,7 @@ export async function submitFollowUpAnswer(
 export async function endPracticeFollowUps(
   input: EndPracticeFollowUpsInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("endPracticeFollowUps")
   const session = requireCurrentFollowUp(input)
 
   return setPracticeMockState({

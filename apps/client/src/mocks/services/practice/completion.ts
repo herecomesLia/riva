@@ -1,4 +1,3 @@
-import { waitForMockDelay } from "@/mocks/utils"
 import type {
   EndPracticeSessionInput,
   PracticeAttemptRecord,
@@ -9,6 +8,7 @@ import type {
 
 import { requireCurrentQuestion } from "./guards"
 import {
+  consumePracticeMockOperation,
   copyPracticeState,
   getPracticeMockState,
   nextPracticeMutationTimestamp,
@@ -74,7 +74,7 @@ function createCompletedPracticeSession({
 export async function endPracticeSession(
   input: EndPracticeSessionInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("endPracticeSession")
   const session = getPracticeMockState().session
   if (
     session.status !== "review" ||
@@ -107,7 +107,7 @@ export async function endPracticeSession(
 export async function requestEndPracticeSession(
   input: RequestEndPracticeSessionInput,
 ): Promise<PracticeMutationResponse> {
-  await waitForMockDelay()
+  await consumePracticeMockOperation("requestEndPracticeSession")
   const session = requireCurrentQuestion(input)
   const completionBase: PracticeCompletionBase = {
     sessionId: session.sessionId,
