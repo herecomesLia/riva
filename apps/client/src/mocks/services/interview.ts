@@ -9,6 +9,7 @@ import {
   createInterviewSessionReview,
   defaultInterviewConfigurationMock,
   interviewOpeningMessageMock,
+  interviewSetupConfigurationMock,
   type InterviewAgentMockScenario,
   type InterviewMockScenario,
   type MockInterviewAgentPlan,
@@ -264,13 +265,31 @@ export async function startInterview(
   input: StartInterviewInput,
 ): Promise<InterviewMutationResponse> {
   await consumeOperation("startInterview")
-  const setup = createInterviewSetupResponseMock(getRolesMockSnapshot(), getProfileMockSnapshot())
-  if (setup.availability.status === "blocked") {
-    throw new Error(`Interview prerequisite is not met: ${setup.availability.reason}.`)
-  }
-  const targetRole = setup.targetRoles.find(({ id }) => id === input.targetRoleId)
+  const rolesSnapshot = getRolesMockSnapshot()
+  const profileSnapshot = getProfileMockSnapshot()
+  const setup = createInterviewSetupResponseMock(rolesSnapshot, profileSnapshot)
+  const targetRole = rolesSnapshot.roles.find(({ id }) => id === input.targetRoleId)
   if (targetRole === undefined) throw new Error("Interview target role does not exist.")
-  if (!targetRole.supportedRounds.includes(input.round)) {
+  if (targetRole.preparationStatus === "archived") {
+    throw new Error("Interview target role is archived.")
+  }
+  const supportedRounds =
+    interviewSetupConfigurationMock.supportedRoundsByTargetRoleId[
+      input.targetRoleId as keyof typeof interviewSetupConfigurationMock.supportedRoundsByTargetRoleId
+    ]
+  if (supportedRounds === undefined) {
+    throw new Error("Interview target role has no complete question catalog.")
+  }
+  if (targetRole.jobDescription.status !== "ready") {
+    throw new Error("Interview target role job description is not ready.")
+  }
+  const profileComplete =
+    profileSnapshot.profile?.status === "active" &&
+    profileSnapshot.profile.completeness.percentage === 100
+  if (!profileComplete) {
+    throw new Error("Interview prerequisite is not met: profileIncomplete.")
+  }
+  if (!supportedRounds.includes(input.round)) {
     throw new Error("Interview round is not supported by the target role.")
   }
   if (!setup.availableDifficulties.includes(input.difficulty)) {

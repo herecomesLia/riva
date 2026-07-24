@@ -22,13 +22,17 @@ export function createInterviewSetupResponseMock(
   rolesResponse: RolesPageResponse,
   profileSnapshot: JobProfileSnapshot,
 ): InterviewSetupResponse {
-  const activeRoles = rolesResponse.roles.filter(
-    ({ id, preparationStatus }) =>
-      preparationStatus !== "archived" &&
-      id in interviewSetupConfigurationMock.supportedRoundsByTargetRoleId,
+  const domainRoles = rolesResponse.roles.filter(
+    ({ preparationStatus }) => preparationStatus !== "archived",
   )
-  const currentRole = activeRoles.find(({ id }) => id === rolesResponse.currentRoleId)
-  const targetRoles = activeRoles.map(({ company, id, title }) => ({
+  const trainableRoles = domainRoles.filter(
+    ({ id, jobDescription }) =>
+      id in interviewSetupConfigurationMock.supportedRoundsByTargetRoleId &&
+      jobDescription.status === "ready",
+  )
+  const currentTrainableRole = trainableRoles.find(({ id }) => id === rolesResponse.currentRoleId)
+  const defaultRole = currentTrainableRole ?? trainableRoles[0]
+  const targetRoles = trainableRoles.map(({ company, id, title }) => ({
     id,
     title,
     company,
@@ -38,19 +42,19 @@ export function createInterviewSetupResponseMock(
       ],
     ] as InterviewSetupResponse["targetRoles"][number]["supportedRounds"],
   }))
-  const currentInterviewRole = targetRoles.find(({ id }) => id === currentRole?.id)
-  const defaultRound = currentInterviewRole?.supportedRounds.includes(
+  const defaultInterviewRole = targetRoles.find(({ id }) => id === defaultRole?.id)
+  const defaultRound = defaultInterviewRole?.supportedRounds.includes(
     interviewSetupConfigurationMock.defaultRound,
   )
     ? interviewSetupConfigurationMock.defaultRound
-    : (currentInterviewRole?.supportedRounds[0] ?? interviewSetupConfigurationMock.defaultRound)
+    : (defaultInterviewRole?.supportedRounds[0] ?? interviewSetupConfigurationMock.defaultRound)
   const profileComplete =
     profileSnapshot.profile?.status === "active" &&
     profileSnapshot.profile.completeness.percentage === 100
   const availability: InterviewSetupResponse["availability"] =
-    !profileComplete && targetRoles.length > 0
+    !profileComplete && domainRoles.length > 0
       ? { status: "blocked", reason: "profileIncomplete" }
-      : targetRoles.length > 0 && currentRole?.jobDescription.status !== "ready"
+      : domainRoles.length > 0 && targetRoles.length === 0
         ? { status: "blocked", reason: "jobDescriptionMissing" }
         : { status: "available" }
 
@@ -60,7 +64,7 @@ export function createInterviewSetupResponseMock(
     availableDurationMinutes: [...interviewSetupConfigurationMock.availableDurationMinutes],
     targetRoles,
     defaultConfiguration: {
-      targetRoleId: currentRole?.id ?? null,
+      targetRoleId: defaultRole?.id ?? null,
       round: defaultRound,
       difficulty: interviewSetupConfigurationMock.defaultDifficulty,
       durationMinutes: interviewSetupConfigurationMock.defaultDurationMinutes,

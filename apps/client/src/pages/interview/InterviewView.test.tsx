@@ -3,8 +3,13 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { interviewSetupResponseMock } from "@/mocks/data/interview"
-import type { InterviewConfiguration } from "@/models/interview"
+import {
+  createInterviewSetupResponseMock,
+  interviewSetupResponseMock,
+} from "@/mocks/data/interview"
+import { createProfileMockSnapshot } from "@/mocks/data/profile"
+import { createRolesMockResponse } from "@/mocks/data/roles"
+import type { InterviewConfiguration, InterviewSetupResponse } from "@/models/interview"
 import { renderWithProviders } from "@/test/render"
 
 import { InterviewView } from "./InterviewView"
@@ -12,6 +17,7 @@ import { InterviewView } from "./InterviewView"
 function renderReadyView(
   onStart: (input: InterviewConfiguration) => Promise<void> = vi.fn(async () => undefined),
   isStarting = false,
+  setup: InterviewSetupResponse = interviewSetupResponseMock,
 ) {
   return {
     onStart,
@@ -19,7 +25,7 @@ function renderReadyView(
       <InterviewView
         isStarting={isStarting}
         onStart={onStart}
-        setup={structuredClone(interviewSetupResponseMock)}
+        setup={structuredClone(setup)}
         status="ready"
       />,
       { router: { initialEntries: ["/interview"] } },
@@ -77,7 +83,14 @@ describe("InterviewView", () => {
 
   it("updates available rounds when the selected service role changes", async () => {
     const user = userEvent.setup()
-    renderReadyView()
+    renderReadyView(
+      undefined,
+      false,
+      createInterviewSetupResponseMock(
+        createRolesMockResponse("multipleRolesReady"),
+        createProfileMockSnapshot(),
+      ),
+    )
 
     await user.click(await screen.findByTestId("interview-target-role-trigger"))
     await user.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))

@@ -76,6 +76,22 @@ async function saveAndParseCurrentRole(rawText: string) {
 }
 
 describe("roles stateful mock service", () => {
+  it("provides an explicit two-ready-JD scenario without changing multipleRoles", async () => {
+    resetRolesMockState("multipleRolesReady")
+    const ready = await settle(getRolesPage())
+    expect(ready.roles.map(({ jobDescription }) => jobDescription.status)).toEqual([
+      "ready",
+      "ready",
+    ])
+
+    resetRolesMockState("multipleRoles")
+    const defaultMultiple = await settle(getRolesPage())
+    expect(defaultMultiple.roles.map(({ jobDescription }) => jobDescription.status)).toEqual([
+      "ready",
+      "missing",
+    ])
+  })
+
   it("creates the first role as current", async () => {
     resetRolesMockState("noRoles")
 

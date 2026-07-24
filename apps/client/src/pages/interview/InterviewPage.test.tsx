@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { createInterviewMockResponse } from "@/mocks/data/interview"
+import {
+  createInterviewMockResponse,
+  createInterviewSetupResponseMock,
+} from "@/mocks/data/interview"
+import { createProfileMockSnapshot } from "@/mocks/data/profile"
+import { createRolesMockResponse } from "@/mocks/data/roles"
 import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
 import { getInterviewPage, startInterview } from "@/services/interview"
 import { renderWithProviders } from "@/test/render"
@@ -51,6 +56,16 @@ function createStartedResponse(
       completedQuestions: [],
       openingMessage: "欢迎参加本次模拟面试。",
     },
+  }
+}
+
+function createMultipleReadyRolesResponse(): InterviewPageResponse {
+  return {
+    setup: createInterviewSetupResponseMock(
+      createRolesMockResponse("multipleRolesReady"),
+      createProfileMockSnapshot(),
+    ),
+    session: null,
   }
 }
 
@@ -115,6 +130,24 @@ describe("InterviewPage", () => {
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument()
   })
 
+  it("maps roles without ready job descriptions to the existing blocked state", async () => {
+    const response: InterviewPageResponse = {
+      setup: createInterviewSetupResponseMock(
+        createRolesMockResponse("multipleRolesJdMissing"),
+        createProfileMockSnapshot(),
+      ),
+      session: null,
+    }
+    vi.mocked(getInterviewPage).mockResolvedValue(response)
+
+    renderInterviewPage()
+
+    expect(
+      await screen.findByText(i18n.t("interview.prerequisites.jobDescriptionMissing.title")),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: i18n.t("interview.actions.start") })).toBeNull()
+  })
+
   it("shows a safe load error and retries", async () => {
     const user = userEvent.setup()
     vi.mocked(getInterviewPage)
@@ -153,7 +186,7 @@ describe("InterviewPage", () => {
 
   it("submits a non-default product HR/basic configuration", async () => {
     const user = userEvent.setup()
-    const setup = createInterviewMockResponse()
+    const setup = createMultipleReadyRolesResponse()
     vi.mocked(getInterviewPage).mockResolvedValue(setup)
     vi.mocked(startInterview).mockImplementation(async (input) => createStartedResponse(input))
     renderInterviewPage()

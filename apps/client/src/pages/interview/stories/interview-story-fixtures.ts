@@ -4,8 +4,11 @@ import {
   createInterviewCompletedSessionMock,
   createInterviewMockResponse,
   createInterviewReviewResponseMock,
+  createInterviewSetupResponseMock,
   interviewOpeningMessageMock,
 } from "@/mocks/data/interview"
+import { createProfileMockSnapshot } from "@/mocks/data/profile"
+import { createRolesMockResponse } from "@/mocks/data/roles"
 import type {
   GetInterviewReviewResponse,
   InterviewCandidateQuestionExchangeResponse,
@@ -16,8 +19,24 @@ import type {
 import type { InterviewSessionSummary } from "../InterviewSessionView"
 
 export function createInterviewSetupStoryFixture(
-  scenario: "setupReady" | "prerequisiteNotMet" = "setupReady",
+  scenario:
+    | "setupReady"
+    | "prerequisiteNotMet"
+    | "multipleRolesReady"
+    | "jobDescriptionMissing" = "setupReady",
 ): InterviewSetupResponse {
+  if (scenario === "multipleRolesReady") {
+    return createInterviewSetupResponseMock(
+      createRolesMockResponse("multipleRolesReady"),
+      createProfileMockSnapshot(),
+    )
+  }
+  if (scenario === "jobDescriptionMissing") {
+    return createInterviewSetupResponseMock(
+      createRolesMockResponse("multipleRolesJdMissing"),
+      createProfileMockSnapshot(),
+    )
+  }
   return structuredClone(createInterviewMockResponse(scenario).setup)
 }
 

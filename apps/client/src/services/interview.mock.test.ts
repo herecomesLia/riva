@@ -5,7 +5,6 @@ import {
   createInterviewCompletedSessionMock,
   createInterviewReviewResponseMock,
   defaultInterviewConfigurationMock,
-  interviewSetupResponseMock,
   type InterviewAgentMockScenario,
 } from "@/mocks/data/interview"
 import {
@@ -23,8 +22,10 @@ import {
 import {
   createTargetRole,
   deleteTargetRole,
+  getJobDescriptionParsingStatus,
   getRolesMockSnapshot,
   resetRolesMockState,
+  saveJobDescription,
   updateTargetRole,
 } from "@/mocks/services/roles"
 import { getProfileMockSnapshot, resetProfileMockState } from "@/mocks/services/profile"
@@ -982,12 +983,36 @@ describe("interview mock reset boundaries", () => {
       const page = await getInterviewPage()
 
       expect(page.setup.targetRoles.find(({ id }) => id === createdRole.id)).toBeUndefined()
+      await expect(
+        startInterview({
+          targetRoleId: createdRole.id,
+          round: "hr",
+          difficulty: "basic",
+          durationMinutes: 30,
+        }),
+      ).rejects.toThrow("Interview target role has no complete question catalog.")
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it("tracks profile completeness and the current role JD status", async () => {
+  it("rejects an archived target role even when submitted directly", async () => {
+    resetRolesMockState("archivedRoles")
+    const archivedRole = getRolesMockSnapshot().roles.find(
+      ({ preparationStatus }) => preparationStatus === "archived",
+    )!
+
+    await expect(
+      startInterview({
+        targetRoleId: archivedRole.id,
+        round: "hr",
+        difficulty: "basic",
+        durationMinutes: 30,
+      }),
+    ).rejects.toThrow("Interview target role is archived.")
+  })
+
+  it("tracks profile completeness and whether any catalog role has a ready JD", async () => {
     resetRolesMockState("roleWithParsedJobDescription")
     resetProfileMockState("partial")
     expect((await getInterviewPage()).setup.availability).toEqual({
@@ -1009,6 +1034,141 @@ describe("interview mock reset boundaries", () => {
     expect(empty.setup.targetRoles).toEqual([])
     expect(empty.setup.defaultConfiguration.targetRoleId).toBeNull()
     expect(empty.session).toBeNull()
+  })
+
+  it("exposes only the current trainable role and rejects a catalog role with a missing JD", async () => {
+    resetRolesMockState("multipleRoles")
+    const page = await getInterviewPage()
+
+    expect(page.setup.targetRoles.map(({ id }) => id)).toEqual(["role_frontend_bytedance"])
+    await expect(
+      startInterview({
+        targetRoleId: "role_product_manager_meituan",
+        round: "hr",
+        difficulty: "basic",
+        durationMinutes: 30,
+      }),
+    ).rejects.toThrow("Interview target role job description is not ready.")
+  })
+
+  it("uses a trainable alternative when the current role JD is missing", async () => {
+    resetRolesMockState("multipleRolesCurrentMissing")
+    const page = await getInterviewPage()
+
+    expect(page.setup.availability).toEqual({ status: "available" })
+    expect(page.setup.targetRoles.map(({ id }) => id)).toEqual(["role_product_manager_meituan"])
+    expect(page.setup.defaultConfiguration).toMatchObject({
+      targetRoleId: "role_product_manager_meituan",
+      round: "hr",
+    })
+
+    const started = await startInterview({
+      ...page.setup.defaultConfiguration,
+      targetRoleId: "role_product_manager_meituan",
+    })
+    expect(started.session).toMatchObject({
+      status: "opening",
+      configuration: { targetRoleId: "role_product_manager_meituan", round: "hr" },
+    })
+  })
+
+  it("blocks setup when every catalog role lacks a ready JD", async () => {
+    resetRolesMockState("multipleRolesJdMissing")
+    const page = await getInterviewPage()
+
+    expect(page.setup.targetRoles).toEqual([])
+    expect(page.setup.defaultConfiguration.targetRoleId).toBeNull()
+    expect(page.setup.availability).toEqual({
+      status: "blocked",
+      reason: "jobDescriptionMissing",
+    })
+    await expect(
+      startInterview({
+        targetRoleId: "role_frontend_bytedance",
+        round: "technical",
+        difficulty: "pressure",
+        durationMinutes: 30,
+      }),
+    ).rejects.toThrow("Interview target role job description is not ready.")
+  })
+
+  it("rejects a stale configuration after its target role JD stops being ready", async () => {
+    resetRolesMockState("multipleRolesReady")
+    const before = await getInterviewPage()
+    const product = getRolesMockSnapshot().roles.find(
+      ({ id }) => id === "role_product_manager_meituan",
+    )!
+    const staleConfiguration = {
+      targetRoleId: product.id,
+      round: "hr" as const,
+      difficulty: "basic" as const,
+      durationMinutes: 30 as const,
+    }
+    expect(before.setup.targetRoles.map(({ id }) => id)).toContain(product.id)
+
+    vi.useFakeTimers()
+    try {
+      const savePromise = saveJobDescription({
+        roleId: product.id,
+        version: product.version,
+        rawText: "Updated product manager job description",
+      })
+      await vi.runAllTimersAsync()
+      await savePromise
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect((await getInterviewPage()).setup.targetRoles.map(({ id }) => id)).not.toContain(
+      product.id,
+    )
+    await expect(startInterview(staleConfiguration)).rejects.toThrow(
+      "Interview target role job description is not ready.",
+    )
+  })
+
+  it("exposes and starts a catalog role after its missing JD becomes ready", async () => {
+    resetRolesMockState("multipleRoles")
+    const product = getRolesMockSnapshot().roles.find(
+      ({ id }) => id === "role_product_manager_meituan",
+    )!
+    expect((await getInterviewPage()).setup.targetRoles.map(({ id }) => id)).not.toContain(
+      product.id,
+    )
+
+    vi.useFakeTimers()
+    try {
+      const savePromise = saveJobDescription({
+        roleId: product.id,
+        version: product.version,
+        rawText: "Own merchant product strategy, roadmap, collaboration, and measurable outcomes.",
+      })
+      await vi.runAllTimersAsync()
+      const parsing = await savePromise
+      const parsingProduct = parsing.roles.find(({ id }) => id === product.id)!
+      const parsingPromise = getJobDescriptionParsingStatus({
+        roleId: parsingProduct.id,
+        version: parsingProduct.version,
+        jobDescriptionVersion: parsingProduct.jobDescription.version!,
+      })
+      await vi.runAllTimersAsync()
+      await parsingPromise
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const after = await getInterviewPage()
+    expect(after.setup.targetRoles.map(({ id }) => id)).toContain(product.id)
+    const started = await startInterview({
+      targetRoleId: product.id,
+      round: "hr",
+      difficulty: "basic",
+      durationMinutes: 30,
+    })
+    expect(started.session).toMatchObject({
+      status: "opening",
+      configuration: { targetRoleId: product.id },
+    })
   })
 
   it("does not let returned setup mutations contaminate roles, profile, or later responses", async () => {
@@ -1046,7 +1206,7 @@ describe("configuration-driven interview catalogs", () => {
     configuration: typeof defaultInterviewConfigurationMock,
     scenario: InterviewAgentMockScenario = "singleFollowUp",
   ) {
-    resetRolesMockState("multipleRoles")
+    resetRolesMockState("multipleRolesReady")
     resetScenario(scenario)
     const opening = await startInterview(configuration)
     if (opening.session?.status !== "opening") throw new Error("Expected interview opening.")
@@ -1077,10 +1237,12 @@ describe("configuration-driven interview catalogs", () => {
     expect(product.id).not.toBe(frontend.id)
   })
 
-  it("has complete questions, reviews, and references for every exposed role configuration", () => {
-    for (const targetRole of interviewSetupResponseMock.targetRoles) {
+  it("has complete questions, reviews, and references for every exposed role configuration", async () => {
+    resetRolesMockState("multipleRolesReady")
+    const setup = (await getInterviewPage()).setup
+    for (const targetRole of setup.targetRoles) {
       for (const round of targetRole.supportedRounds) {
-        for (const difficulty of interviewSetupResponseMock.availableDifficulties) {
+        for (const difficulty of setup.availableDifficulties) {
           const completed = createInterviewCompletedSessionMock({
             agentScenario: "multipleFollowUps",
             configuration: {
@@ -1161,7 +1323,7 @@ describe("configuration-driven interview catalogs", () => {
   })
 
   it("provides product-specific reviews and reference answers for shown main and follow-up questions", async () => {
-    resetRolesMockState("multipleRoles")
+    resetRolesMockState("multipleRolesReady")
     resetScenario("singleFollowUp")
     const openingResponse = await startInterview({
       ...defaultInterviewConfigurationMock,
@@ -1209,7 +1371,7 @@ describe("configuration-driven interview catalogs", () => {
   })
 
   it("rejects unknown roles, unsupported rounds, difficulties, and durations", async () => {
-    resetRolesMockState("multipleRoles")
+    resetRolesMockState("multipleRolesReady")
     resetScenario()
     const configuration = defaultInterviewConfigurationMock
 

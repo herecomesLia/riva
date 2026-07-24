@@ -109,13 +109,16 @@ const onStartProductHrBasic = fn(async () => undefined)
 export const ProductHrBasic = meta.story({
   args: {
     status: "ready",
-    setup: createInterviewSetupStoryFixture(),
+    setup: createInterviewSetupStoryFixture("multipleRolesReady"),
     isStarting: false,
     onStart: onStartProductHrBasic,
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByTestId("interview-target-role-trigger"))
     await userEvent.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
+    await expect(
+      canvas.queryByRole("button", { name: /技术面|technical/i }),
+    ).not.toBeInTheDocument()
     await userEvent.click(canvas.getByRole("button", { name: /基础|Basic/i }))
     await userEvent.click(
       canvas.getByRole("button", { name: /开始模拟面试|Start mock interview/i }),
@@ -126,6 +129,22 @@ export const ProductHrBasic = meta.story({
       difficulty: "basic",
       durationMinutes: 30,
     })
+  },
+})
+
+const missingJobDescriptionSetup = createInterviewSetupStoryFixture("jobDescriptionMissing")
+if (missingJobDescriptionSetup.availability.status !== "blocked") {
+  throw new Error("Missing job description fixture must be blocked.")
+}
+
+export const JobDescriptionMissing = meta.story({
+  args: {
+    status: "blocked",
+    reason: missingJobDescriptionSetup.availability.reason,
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/补充目标岗位 JD|add a target-role JD/i)).toBeVisible()
+    await expect(canvas.queryByTestId("interview-target-role-trigger")).not.toBeInTheDocument()
   },
 })
 

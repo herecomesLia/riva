@@ -30,6 +30,24 @@ describe("interview Story fixtures", () => {
     expect(secondSession.completedQuestions[0]?.answer.content).not.toBe("被 Story 修改的回答")
   })
 
+  it("derives product-ready and missing-JD Stories from shared Roles scenarios", () => {
+    const allReady = createInterviewSetupStoryFixture("multipleRolesReady")
+    expect(allReady.targetRoles.map(({ id }) => id)).toEqual([
+      "role_frontend_bytedance",
+      "role_product_manager_meituan",
+    ])
+
+    const defaultSetup = createInterviewSetupStoryFixture()
+    expect(defaultSetup.targetRoles.map(({ id }) => id)).toEqual(["role_frontend_bytedance"])
+
+    const missing = createInterviewSetupStoryFixture("jobDescriptionMissing")
+    expect(missing.targetRoles).toEqual([])
+    expect(missing.availability).toEqual({
+      status: "blocked",
+      reason: "jobDescriptionMissing",
+    })
+  })
+
   it("creates sparse review variants without mutating the formal review fixture", () => {
     const firstReview = createSparseInterviewReviewStoryFixture()
     if (firstReview.status !== "complete") throw new Error("Expected complete review.")

@@ -170,6 +170,9 @@ export type RolesMockScenario =
   | "noRoles"
   | "singleRoleWithoutJobDescription"
   | "multipleRoles"
+  | "multipleRolesReady"
+  | "multipleRolesCurrentMissing"
+  | "multipleRolesJdMissing"
   | "rolesWithoutCurrent"
   | "roleWithJobDescriptionParsing"
   | "roleWithJobDescriptionFailed"
@@ -201,6 +204,47 @@ const rolesMockScenarios = {
         4,
         createCurrentMatchingAnalysis(),
       ),
+      createMissingJobDescriptionRole("role_product_manager_meituan", "Product Manager", {
+        company: "Meituan",
+        location: "Beijing",
+        preparationStatus: "paused",
+      }),
+    ],
+    currentRoleId: "role_frontend_bytedance",
+    profileContext: completeProfileContext,
+  },
+  multipleRolesReady: {
+    roles: [
+      createReadyJobDescriptionRole(
+        "role_frontend_bytedance",
+        "Senior Frontend Engineer",
+        4,
+        createCurrentMatchingAnalysis(),
+      ),
+      createReadyJobDescriptionRole("role_product_manager_meituan", "Product Manager", 2, null, {
+        company: "Meituan",
+        location: "Beijing",
+        preparationStatus: "paused",
+      }),
+    ],
+    currentRoleId: "role_frontend_bytedance",
+    profileContext: completeProfileContext,
+  },
+  multipleRolesCurrentMissing: {
+    roles: [
+      createMissingJobDescriptionRole("role_frontend_bytedance", "Senior Frontend Engineer"),
+      createReadyJobDescriptionRole("role_product_manager_meituan", "Product Manager", 2, null, {
+        company: "Meituan",
+        location: "Beijing",
+        preparationStatus: "paused",
+      }),
+    ],
+    currentRoleId: "role_frontend_bytedance",
+    profileContext: completeProfileContext,
+  },
+  multipleRolesJdMissing: {
+    roles: [
+      createMissingJobDescriptionRole("role_frontend_bytedance", "Senior Frontend Engineer"),
       createMissingJobDescriptionRole("role_product_manager_meituan", "Product Manager", {
         company: "Meituan",
         location: "Beijing",
