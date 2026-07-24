@@ -32,6 +32,25 @@ export const BalancedReview = meta.story({
   args: createPracticeViewArgs("reviewBalanced"),
 })
 
+export const ReviewFlaggedQuestion = meta.story({
+  args: createFlaggedReviewArgs(),
+  play: async ({ canvas }) => {
+    const saved = canvas.getByRole("button", {
+      name: /取消收藏|remove from saved/i,
+    })
+    const weak = canvas.getByRole("button", {
+      name: /取消薄弱标记|remove weak mark/i,
+    })
+    await expect(saved).toHaveAttribute("aria-pressed", "true")
+    await expect(weak).toHaveAttribute("aria-pressed", "true")
+    await expect(saved.querySelector(".lucide-bookmark")).toHaveClass(
+      "fill-destructive",
+      "text-destructive",
+    )
+    await expect(weak.querySelector(".lucide-brain")).toHaveClass("text-amber-500")
+  },
+})
+
 export const ReviewWithPersonalizedExample = meta.story({
   args: withReferenceAnswer("reviewBalanced", "projectDeepDive", 1, false),
   play: async ({ canvas }) => {
@@ -157,7 +176,10 @@ export const ReviewNextError = meta.story({
 })
 
 const reviewEndErrorAction = fn(async () => {
-  throw new Error("internal")
+  if (reviewEndErrorAction.mock.calls.length === 1) {
+    throw new Error("sessionId=private version=17")
+  }
+  return "executed" as const
 })
 
 export const ReviewEndError = meta.story({
@@ -178,8 +200,30 @@ export const ReviewEndError = meta.story({
       within(dialog).getByRole("button", { name: /结束本轮练习|end this session/i }),
     )
     await expect(reviewEndErrorAction).toHaveBeenCalledTimes(1)
-    await expect(canvas.getByRole("alert")).toBeVisible()
-    await expect(canvas.getByRole("alert")).not.toHaveTextContent("internal")
+    await expect(dialog).toBeVisible()
+    await expect(within(dialog).getByRole("alert")).toBeVisible()
+    await expect(within(dialog).getByRole("alert")).not.toHaveTextContent(
+      /sessionId|private|version=17/i,
+    )
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: /结束本轮练习|end this session/i }),
+    )
+    await expect(reviewEndErrorAction).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(dialog).not.toBeVisible())
+  },
+})
+
+export const ReviewMobileFixedActions = meta.story({
+  args: createPracticeViewArgs("reviewBalanced"),
+  globals: { viewport: { isRotated: false, value: "mobile1" } },
+  play: async ({ canvas }) => {
+    const actionBar = canvas.getByTestId("practice-review-actions-bar")
+    await expect(actionBar).toBeVisible()
+    await expect(canvas.getByTestId("practice-review-actions")).toHaveClass(
+      "grid-cols-1",
+      "min-[360px]:grid-cols-2",
+      "sm:flex",
+    )
   },
 })
 
@@ -218,6 +262,15 @@ export const EndSessionConfirmation = meta.story({
 export const LongReviewContent = meta.story({
   args: createPracticeViewArgs("reviewLongContent"),
 })
+
+function createFlaggedReviewArgs() {
+  const args = createPracticeViewArgs("reviewBalanced")
+  const response = structuredClone(args.content.data)
+  if (response.session.status !== "review") throw new Error("Review fixture required.")
+  response.session.question.isSaved = true
+  response.session.question.isMarkedWeak = true
+  return { ...args, content: { data: response, status: "ready" as const } }
+}
 
 export const NoNewWeaknesses = meta.story({
   args: createPracticeViewArgs("reviewNoNewWeaknesses"),

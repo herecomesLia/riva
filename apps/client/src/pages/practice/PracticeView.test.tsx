@@ -333,10 +333,12 @@ describe("PracticeView", () => {
   it("shows safe next and end failures while remaining in review", async () => {
     const user = userEvent.setup()
     const internal = "Practice session version 17 is stale"
+    const onEndSession = vi
+      .fn<() => Promise<"executed">>()
+      .mockRejectedValueOnce(new Error(internal))
+      .mockResolvedValueOnce("executed")
     const actions = createReviewActions({
-      onEndSession: vi.fn(async () => {
-        throw new Error(internal)
-      }),
+      onEndSession,
       onNextQuestion: vi.fn(async () => {
         throw new Error(internal)
       }),
@@ -350,13 +352,19 @@ describe("PracticeView", () => {
     expect(screen.queryByText(internal)).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: /继续下一题/i })).toBeEnabled()
     await user.click(screen.getByRole("button", { name: /结束本轮练习/i }))
-    await user.click(screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!)
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    const dialog = screen.getByRole("alertdialog")
+    const confirm = within(dialog).getByRole("button", { name: /结束本轮练习/i })
+    await user.click(confirm)
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
       i18n.t("practice.errors.reviewEndDescription"),
     )
-    expect(screen.queryByText(internal)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(internal)).not.toBeInTheDocument()
     expect(screen.getByTestId("practice-review-state")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /结束本轮练习/i })).toBeEnabled()
+    expect(dialog).toBeVisible()
+
+    await user.click(confirm)
+    expect(onEndSession).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument())
   })
 
   it.each(["retry", "next", "end"] as const)(

@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +15,8 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
+import { PracticeActionErrorAlert, PracticeBottomActionBar } from "./PracticeBottomActionBar"
+import { PracticeFlagActions } from "./PracticeFlagActions"
 
 export function PracticeReviewActions({
   interactionLocked,
@@ -61,7 +62,6 @@ export function PracticeReviewActions({
       if (action === "end") setEndOpen(false)
     } catch {
       setError(action)
-      if (action === "end") setEndOpen(false)
     }
   }
 
@@ -84,88 +84,59 @@ export function PracticeReviewActions({
   }
 
   return (
-    <section
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur transition-[left] duration-200 ease-linear md:left-(--sidebar-width) md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)"
-      aria-label={t("practice.review.actionsTitle")}
-      data-testid="practice-review-actions-bar"
-    >
-      <div className="px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
-          {error && (
-            <Alert variant="destructive">
-              <AlertTitle>{t("practice.errors.actionTitle")}</AlertTitle>
-              <AlertDescription>
-                {t(
-                  error === "end"
-                    ? "practice.errors.reviewEndDescription"
-                    : `practice.errors.${error}Description`,
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
-          <div
-            className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap"
-            data-testid="practice-review-actions"
-          >
-            <Button
-              className="w-full sm:w-auto"
-              disabled={interactionLocked}
-              onClick={() => void run("retry", onRetryCurrent)}
-              type="button"
-              variant="outline"
-            >
-              {isRetryPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
-              {t("practice.review.retryCurrent")}
-            </Button>
-            <Button
-              className="w-full sm:w-auto"
-              disabled={interactionLocked}
-              onClick={() => void run("next", onNextQuestion)}
-              type="button"
-            >
-              {isNextPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
-              {t("practice.review.nextQuestion")}
-            </Button>
-            <Button
-              className="w-full sm:w-auto"
-              disabled={interactionLocked}
-              onClick={() => {
-                if (!interactionLocked) setEndOpen(true)
-              }}
-              type="button"
-              variant="outline"
-            >
-              {isEndPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
-              {t("practice.review.endSession")}
-            </Button>
-            <Button
-              className="w-full sm:w-auto"
-              aria-pressed={isSaved}
-              disabled={interactionLocked}
-              onClick={() => void updateSaved()}
-              type="button"
-              variant="secondary"
-            >
-              {isSavedPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
-              {isSaved ? t("practice.questionActions.unsave") : t("practice.questionActions.save")}
-            </Button>
-            <Button
-              className="w-full sm:w-auto"
-              aria-pressed={isMarkedWeak}
-              disabled={interactionLocked}
-              onClick={() => void updateWeak()}
-              type="button"
-              variant="secondary"
-            >
-              {isWeakPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
-              {isMarkedWeak
-                ? t("practice.questionActions.unmarkWeak")
-                : t("practice.questionActions.markWeak")}
-            </Button>
-          </div>
-        </div>
-      </div>
-
+    <>
+      <PracticeBottomActionBar
+        actionsTestId="practice-review-actions"
+        ariaLabel={t("practice.review.actionsTitle")}
+        error={
+          error && error !== "end" ? (
+            <PracticeActionErrorAlert description={t(`practice.errors.${error}Description`)} />
+          ) : undefined
+        }
+        testId="practice-review-actions-bar"
+      >
+        <Button
+          className="w-full sm:w-auto"
+          disabled={interactionLocked}
+          onClick={() => void run("retry", onRetryCurrent)}
+          type="button"
+          variant="outline"
+        >
+          {isRetryPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+          {t("practice.review.retryCurrent")}
+        </Button>
+        <Button
+          className="w-full sm:w-auto"
+          disabled={interactionLocked}
+          onClick={() => void run("next", onNextQuestion)}
+          type="button"
+        >
+          {isNextPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+          {t("practice.review.nextQuestion")}
+        </Button>
+        <Button
+          className="w-full sm:w-auto"
+          disabled={interactionLocked}
+          onClick={() => {
+            if (!interactionLocked) setEndOpen(true)
+          }}
+          type="button"
+          variant="outline"
+        >
+          {isEndPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+          {t("practice.review.endSession")}
+        </Button>
+        <PracticeFlagActions
+          disabled={interactionLocked}
+          isMarkedWeak={isMarkedWeak}
+          isSaved={isSaved}
+          isSavedPending={isSavedPending}
+          isWeakPending={isWeakPending}
+          onSavedClick={() => void updateSaved()}
+          onWeakClick={() => void updateWeak()}
+          variant="secondary"
+        />
+      </PracticeBottomActionBar>
       <AlertDialog open={endOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -174,6 +145,9 @@ export function PracticeReviewActions({
               {t("practice.review.endConfirmDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {error === "end" ? (
+            <PracticeActionErrorAlert description={t("practice.errors.reviewEndDescription")} />
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={interactionLocked} onClick={() => setEndOpen(false)}>
               {t("practice.dialog.stay")}
@@ -189,6 +163,6 @@ export function PracticeReviewActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </>
   )
 }

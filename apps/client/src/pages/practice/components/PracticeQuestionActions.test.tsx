@@ -134,4 +134,32 @@ describe("PracticeQuestionActions", () => {
     expect(testCase.action === "skip" ? onSkip : onEnd).toHaveBeenCalledTimes(1)
     expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument()
   })
+
+  it("keeps an end failure in the dialog and allows a direct retry", async () => {
+    const user = userEvent.setup()
+    const onEnd = vi
+      .fn<() => Promise<"executed">>()
+      .mockRejectedValueOnce(new Error("sessionId=secret version=42"))
+      .mockResolvedValueOnce("executed")
+    renderWithProviders(<PracticeQuestionActions {...defaultProps} onEnd={onEnd} />, {
+      router: false,
+    })
+
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.questionActions.end") }))
+    const dialog = screen.getByRole("alertdialog")
+    const confirm = within(dialog).getByRole("button", {
+      name: i18n.t("practice.dialog.confirmEnd"),
+    })
+    await user.click(confirm)
+
+    expect(dialog).toBeVisible()
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.endDescription"),
+    )
+    expect(within(dialog).queryByText(/sessionId|version=42|secret/i)).not.toBeInTheDocument()
+
+    await user.click(confirm)
+    expect(onEnd).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+  })
 })
