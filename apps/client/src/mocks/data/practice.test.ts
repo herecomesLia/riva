@@ -802,6 +802,83 @@ describe("practice mock scenarios", () => {
     expect(first.setupContext.targetRoles).not.toBe(second.setupContext.targetRoles)
   })
 
+  it("keeps completed retry attempt snapshots deeply independent", () => {
+    const response = createPracticeMockResponse("completedWithRetries")
+    if (response.session.status !== "completed") {
+      throw new Error("The completedWithRetries fixture must use the completed state.")
+    }
+    const [first, second] = response.session.attemptRecords
+    if (!first || !second) {
+      throw new Error("The completedWithRetries fixture must include two attempts.")
+    }
+    const firstExchange = first.followUpExchanges[0]
+    const secondExchange = second.followUpExchanges[0]
+    if (!firstExchange || !secondExchange) {
+      throw new Error("Both completed attempts must include a follow-up exchange.")
+    }
+
+    expect(first).not.toBe(second)
+    expect(first.selection).not.toBe(second.selection)
+    expect(first.question).not.toBe(second.question)
+    expect(first.mainAnswer).not.toBe(second.mainAnswer)
+    expect(first.followUpExchanges).not.toBe(second.followUpExchanges)
+    expect(first.followUpCompletion).not.toBe(second.followUpCompletion)
+    expect(first.evaluation).not.toBe(second.evaluation)
+    expect(first.review).not.toBe(second.review)
+    expect(first.question.assessedCapabilities).not.toBe(second.question.assessedCapabilities)
+    expect(firstExchange.question).not.toBe(secondExchange.question)
+    expect(firstExchange.answer).not.toBe(secondExchange.answer)
+
+    const originalFirst = structuredClone(first)
+    const originalSecond = structuredClone(second)
+    first.question.isSaved = !first.question.isSaved
+    first.question.isMarkedWeak = !first.question.isMarkedWeak
+    first.question.prompt = "Mutated first-attempt prompt"
+    first.selection.difficulty = first.selection.difficulty === "basic" ? "pressure" : "basic"
+    first.mainAnswer.content = "Mutated first-attempt answer"
+    firstExchange.answer.content = "Mutated first-attempt follow-up answer"
+    first.review.highlights[0] = "Mutated first-attempt review highlight"
+
+    expect(second.question.isSaved).toBe(originalSecond.question.isSaved)
+    expect(second.question.isMarkedWeak).toBe(originalSecond.question.isMarkedWeak)
+    expect(second.question.prompt).toBe(originalSecond.question.prompt)
+    expect(second.selection.difficulty).toBe(originalSecond.selection.difficulty)
+    expect(second.mainAnswer.content).toBe(originalSecond.mainAnswer.content)
+    expect(secondExchange.answer.content).toBe(originalSecond.followUpExchanges[0]?.answer.content)
+    expect(second.review.highlights[0]).toBe(originalSecond.review.highlights[0])
+    expect(second).toEqual(originalSecond)
+
+    const fresh = createPracticeMockResponse("completedWithRetries")
+    if (fresh.session.status !== "completed") {
+      throw new Error("The completedWithRetries fixture must use the completed state.")
+    }
+    expect(fresh.session.attemptRecords[0]).toEqual(originalFirst)
+    expect(fresh.session).toMatchObject({
+      questionsCompleted: 1,
+      retryCount: 1,
+      finalAttemptAverageScore: originalSecond.evaluation.overallScore,
+      savedQuestionCount: Number(originalSecond.question.isSaved),
+      markedWeakQuestionCount: Number(originalSecond.question.isMarkedWeak),
+    })
+  })
+
+  it("keeps generating-next archived attempt projections independent", () => {
+    const response = createPracticeMockResponse("generatingNextQuestion")
+    if (response.session.status !== "generatingQuestion") {
+      throw new Error("The generatingNextQuestion fixture must use the generating state.")
+    }
+    const archived = response.session.attemptRecords[0]
+    const previous = response.session.previousAttempt
+    if (!archived || !previous) {
+      throw new Error("The generatingNextQuestion fixture must include its previous attempt.")
+    }
+
+    expect(archived).not.toBe(previous)
+    expect(archived.selection).not.toBe(previous.selection)
+    expect(archived.question).not.toBe(previous.question)
+    expect(archived.followUpExchanges).not.toBe(previous.followUpExchanges)
+  })
+
   it("does not leak fixture mutations into later requests", () => {
     const first = createPracticeMockResponse("answeringQuestion")
     const firstRole = first.setupContext.targetRoles[0]

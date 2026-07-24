@@ -1363,7 +1363,17 @@ function revealFixtureFollowUpReference(
   }
 }
 
-const archivedProjectAttempt = {
+function createPracticeAttemptFixture(
+  base: PracticeAttemptRecord,
+  overrides: Partial<PracticeAttemptRecord> = {},
+): PracticeAttemptRecord {
+  return {
+    ...structuredClone(base),
+    ...structuredClone(overrides),
+  }
+}
+
+const archivedProjectAttempt = createPracticeAttemptFixture({
   attemptId: activeSession.attemptId,
   attemptNumber: 1,
   completedAt: evaluation.evaluatedAt,
@@ -1374,7 +1384,7 @@ const archivedProjectAttempt = {
   followUpCompletion: { status: "completed", reason: "allAnswered" },
   evaluation,
   review: nextReview,
-} satisfies PracticeAttemptRecord
+})
 
 export type PracticeMockScenario =
   | "setupReady"
@@ -1462,8 +1472,8 @@ const practiceMockScenarios = {
       ...activeSession,
       attemptId: `${activeSession.sessionId}_attempt_2`,
       attemptNumber: 2,
-      attemptRecords: [archivedProjectAttempt],
-      previousAttempt: archivedProjectAttempt,
+      attemptRecords: [createPracticeAttemptFixture(archivedProjectAttempt)],
+      previousAttempt: createPracticeAttemptFixture(archivedProjectAttempt),
     },
   },
   retryingCurrentQuestion: {
@@ -1754,14 +1764,13 @@ const practiceMockScenarios = {
       attemptId: `${activeSession.sessionId}_attempt_2`,
       attemptNumber: 2,
       attemptRecords: [
-        archivedProjectAttempt,
-        {
-          ...archivedProjectAttempt,
+        createPracticeAttemptFixture(archivedProjectAttempt),
+        createPracticeAttemptFixture(archivedProjectAttempt, {
           attemptId: `${activeSession.sessionId}_attempt_2`,
           attemptNumber: 2,
           evaluation: highScoreEvaluation,
           review: highScoreReview,
-        },
+        }),
       ],
       completedAt: "2026-07-20T01:41:00.000Z",
       questionsCompleted: 1,
@@ -1778,10 +1787,9 @@ const practiceMockScenarios = {
       status: "completed",
       ...activeSession,
       attemptRecords: [
-        {
-          ...archivedProjectAttempt,
+        createPracticeAttemptFixture(archivedProjectAttempt, {
           question: { ...archivedProjectAttempt.question, isMarkedWeak: true },
-        },
+        }),
       ],
       completedAt: "2026-07-20T01:41:00.000Z",
       questionsCompleted: 1,

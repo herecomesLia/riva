@@ -764,10 +764,10 @@ describe("practice stateful mock service", () => {
     })
   })
 
-  it("derives technical questions for a newly created frontend role and recomputes after editing", async () => {
+  it("derives technical questions for a newly created backend role and recomputes after editing", async () => {
     const roles = await settle(
       createTargetRole({
-        title: "Frontend Platform Engineer",
+        title: "Backend Engineer",
         company: "Riva",
         recruitmentType: "experienced",
         location: null,
@@ -775,8 +775,8 @@ describe("practice stateful mock service", () => {
         preparationStatus: "preparing",
       }),
     )
-    const createdRole = roles.roles.find((role) => role.title === "Frontend Platform Engineer")
-    if (!createdRole) throw new Error("Expected the newly created Frontend role.")
+    const createdRole = roles.roles.find((role) => role.title === "Backend Engineer")
+    if (!createdRole) throw new Error("Expected the newly created Backend role.")
 
     const beforeEdit = await settle(getPracticePage())
     expect(

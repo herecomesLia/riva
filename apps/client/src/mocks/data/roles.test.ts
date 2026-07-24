@@ -10,7 +10,7 @@ import {
   createMatchingAnalysisResultFixture,
   derivePracticeSupportedQuestionTypes,
 } from "@/mocks/data/role-fixture-builders"
-import type { RolesPageResponse, TargetRole } from "@/models/roles"
+import type { RequiredSkillGroups, RolesPageResponse, TargetRole } from "@/models/roles"
 
 const scenarios: RolesMockScenario[] = [
   "noRoles",
@@ -143,14 +143,87 @@ function expectConsistentRolesResponse(response: RolesPageResponse) {
 describe("roles mock scenarios", () => {
   it.each([
     ["Senior Frontend Engineer", true],
-    ["前端平台工程师", true],
+    ["Backend Engineer", true],
+    ["Full Stack Engineer", true],
+    ["Software Engineer", true],
+    ["Java Engineer", true],
+    ["Go Engineer", true],
+    ["Python Engineer", true],
+    ["C++ Engineer", true],
+    ["Android Engineer", true],
+    ["iOS Engineer", true],
+    ["Data Engineer", true],
+    ["Machine Learning Engineer", true],
+    ["后端开发工程师", true],
+    ["算法工程师", true],
     ["Product Manager", false],
+    ["HR Business Partner", false],
     ["Business Operations Manager", false],
+    ["Sales Engineer", false],
+    ["Solutions Engineer", false],
   ])("derives practice question types from the role title %s", (title, supportsTechnical) => {
     const questionTypes = derivePracticeSupportedQuestionTypes({ title })
 
-    expect(questionTypes).toContain("projectDeepDive")
-    expect(questionTypes.includes("technicalFoundation")).toBe(supportsTechnical)
+    expect(questionTypes).toEqual([
+      "projectDeepDive",
+      "behavioral",
+      "businessUnderstanding",
+      "motivation",
+      ...(supportsTechnical ? (["technicalFoundation"] as const) : []),
+    ])
+    expect(new Set(questionTypes).size).toBe(questionTypes.length)
+  })
+
+  it.each([
+    ["programmingLanguages", "Java"],
+    ["programmingLanguages", "Python"],
+    ["frameworksAndLibraries", "React"],
+    ["databasesAndMiddleware", "PostgreSQL"],
+    ["conceptsAndMethods", "机器学习"],
+  ] satisfies [keyof RequiredSkillGroups, string][])(
+    "uses structured JD skill category %s to classify an ambiguous role",
+    (skillCategory, skill) => {
+      const analysis = createJobDescriptionAnalysisFixture({
+        jobDescriptionVersion: 1,
+        parsedAt: "2026-01-15T08:00:00.000Z",
+      })
+      const emptyRequiredSkills: RequiredSkillGroups = {
+        programmingLanguages: [],
+        frameworksAndLibraries: [],
+        platforms: [],
+        tools: [],
+        conceptsAndMethods: [],
+        databasesAndMiddleware: [],
+        other: [],
+      }
+
+      const questionTypes = derivePracticeSupportedQuestionTypes({
+        title: "Platform Specialist",
+        jobDescriptionAnalysis: {
+          ...analysis,
+          requiredSkills: {
+            ...emptyRequiredSkills,
+            [skillCategory]: [skill],
+          },
+        },
+      })
+
+      expect(questionTypes).toContain("technicalFoundation")
+    },
+  )
+
+  it("keeps an explicitly non-technical Engineer boundary out even with a technical JD skill", () => {
+    const analysis = createJobDescriptionAnalysisFixture({
+      jobDescriptionVersion: 1,
+      parsedAt: "2026-01-15T08:00:00.000Z",
+    })
+
+    expect(
+      derivePracticeSupportedQuestionTypes({
+        title: "Sales Engineer",
+        jobDescriptionAnalysis: analysis,
+      }),
+    ).not.toContain("technicalFoundation")
   })
 
   it("keeps generated summaries and removed keywords outside the module update contract", () => {
