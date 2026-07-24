@@ -70,7 +70,7 @@ export function MobileTargetRoleSelector({
             className="h-auto min-h-11 w-full py-2"
             data-testid="mobile-role-selector-trigger"
           >
-            <SelectValue />
+            <SelectValue>{selectedRole.title}</SelectValue>
           </SelectTrigger>
           <SelectContent align="start" alignItemWithTrigger={false}>
             <SelectGroup>

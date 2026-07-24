@@ -80,9 +80,10 @@ export const CurrentAndSelectedDifferent = meta.story({
   ),
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByTestId("mobile-role-selector-trigger"))
-    await userEvent.click(
+    await expect(
       await screen.findByRole("option", { name: new RegExp(currentRole.title) }),
-    )
+    ).toHaveTextContent(/当前岗位|current role/i)
+    await userEvent.click(screen.getByRole("option", { name: new RegExp(currentRole.title) }))
     await expect(screen.getByTestId("mobile-role-selector-trigger")).toHaveTextContent(
       currentRole.title,
     )

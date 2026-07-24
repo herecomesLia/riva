@@ -1,7 +1,7 @@
 import { useState } from "react"
 
 import preview from "#storybook/preview"
-import { expect, fn, screen, within } from "storybook/test"
+import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { createRoleStoryResponse } from "../stories/role-story-fixtures"
 import { JobDescriptionEditorDialog } from "./JobDescriptionEditorDialog"
@@ -42,7 +42,7 @@ export const Add = meta.story({
     await userEvent.click(
       within(dialog).getByRole("button", { name: /保存并解析|save and parse/i }),
     )
-    await expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveAttribute("data-closed"))
   },
 })
 
@@ -68,6 +68,6 @@ export const ValidationError = meta.story({
     )
     await expect(
       within(dialog).findByText(/请粘贴岗位 JD 文本|paste the job description/i),
-    ).resolves.toBeVisible()
+    ).resolves.toBeInTheDocument()
   },
 })

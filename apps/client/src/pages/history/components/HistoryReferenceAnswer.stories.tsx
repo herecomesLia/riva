@@ -12,15 +12,26 @@ const ready = completedTargetedPracticeHistoryStoryFixture.questions[1].referenc
 const meta = preview.meta({
   component: HistoryReferenceAnswer,
   decorators: [withRouter],
-  title: "History/Components/Reference Answer",
+  title: "History/HistoryReferenceAnswer",
 })
 
-export const Ready = meta.story({ args: { referenceAnswer: ready } })
+const practiceGenerateLink = {
+  to: "/practice",
+  search: { source: "history" },
+} as const
+
+export const Ready = meta.story({
+  args: { generateLink: practiceGenerateLink, referenceAnswer: ready },
+})
 export const Generating = meta.story({
-  args: { referenceAnswer: { status: "generating", content: null } },
+  args: {
+    generateLink: practiceGenerateLink,
+    referenceAnswer: { status: "generating", content: null },
+  },
 })
 export const Unavailable = meta.story({
   args: {
+    generateLink: practiceGenerateLink,
     referenceAnswer: {
       status: "unavailable",
       content: null,
@@ -30,6 +41,7 @@ export const Unavailable = meta.story({
 })
 export const NotRequested = meta.story({
   args: {
+    generateLink: practiceGenerateLink,
     referenceAnswer: {
       status: "notRequested",
       content: null,

@@ -8,21 +8,21 @@ import type {
   TrainingRecordsPageResponse,
 } from "@/models/training-records"
 
-function realApiUnavailable(): never {
+async function realApiUnavailable(): Promise<never> {
   throw new Error("Real training records API is not implemented.")
 }
 
-export function getTrainingRecordsOverview(): Promise<TrainingRecordsOverviewResponse> {
+export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverviewResponse> {
   return env.mock ? trainingRecordsMockService.getTrainingRecordsOverview() : realApiUnavailable()
 }
 
-export function listTrainingRecords(
+export async function listTrainingRecords(
   input: ListTrainingRecordsInput,
 ): Promise<TrainingRecordsPageResponse> {
   return env.mock ? trainingRecordsMockService.listTrainingRecords(input) : realApiUnavailable()
 }
 
-export function getTargetedPracticeRecord(
+export async function getTargetedPracticeRecord(
   recordId: string,
 ): Promise<TargetedPracticeRecordDetailResponse> {
   return env.mock
@@ -30,7 +30,7 @@ export function getTargetedPracticeRecord(
     : realApiUnavailable()
 }
 
-export function getMockInterviewRecord(
+export async function getMockInterviewRecord(
   recordId: string,
 ): Promise<MockInterviewRecordDetailResponse> {
   return env.mock

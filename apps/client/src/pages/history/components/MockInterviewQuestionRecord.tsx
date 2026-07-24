@@ -16,7 +16,7 @@ export function MockInterviewQuestionRecord({
   interviewSearch,
   question,
 }: {
-  interviewSearch?: InterviewEntrySearch
+  interviewSearch: InterviewEntrySearch
   question: TrainingRecordQuestion
 }) {
   const { t } = useTranslation()
@@ -40,8 +40,7 @@ export function MockInterviewQuestionRecord({
           performance={toPerformance(question.id, question.evaluation, question.review)}
         />
         <HistoryReferenceAnswer
-          generateTo="/interview"
-          interviewSearch={interviewSearch}
+          generateLink={{ to: "/interview", search: interviewSearch }}
           referenceAnswer={question.referenceAnswer}
         />
         <section className="flex min-w-0 flex-col gap-3">
@@ -70,7 +69,7 @@ function FollowUpRecord({
   interviewSearch,
 }: {
   followUp: TrainingRecordFollowUp
-  interviewSearch?: InterviewEntrySearch
+  interviewSearch: InterviewEntrySearch
 }) {
   const { t } = useTranslation()
   return (
@@ -92,8 +91,7 @@ function FollowUpRecord({
           performance={toPerformance(followUp.id, followUp.evaluation, followUp.review)}
         />
         <HistoryReferenceAnswer
-          generateTo="/interview"
-          interviewSearch={interviewSearch}
+          generateLink={{ to: "/interview", search: interviewSearch }}
           referenceAnswer={followUp.referenceAnswer}
         />
       </CardContent>

@@ -10,14 +10,12 @@ import type { InterviewEntrySearch, PracticeEntrySearch } from "@/app/training-e
 import type { TrainingRecordReferenceAnswer } from "@/models/training-records"
 
 export function HistoryReferenceAnswer({
-  generateTo = "/practice",
-  interviewSearch,
-  practiceSearch,
+  generateLink,
   referenceAnswer,
 }: {
-  generateTo?: "/practice" | "/interview"
-  interviewSearch?: InterviewEntrySearch
-  practiceSearch?: PracticeEntrySearch
+  generateLink:
+    | { to: "/practice"; search: PracticeEntrySearch }
+    | { to: "/interview"; search: InterviewEntrySearch }
   referenceAnswer: TrainingRecordReferenceAnswer
 }) {
   const { i18n, t } = useTranslation()
@@ -80,9 +78,7 @@ export function HistoryReferenceAnswer({
         {referenceAnswer.status === "unavailable" && (
           <ReferenceUnavailable
             description={t("history.detail.reference.unavailableDescription")}
-            generateTo={generateTo}
-            interviewSearch={interviewSearch}
-            practiceSearch={practiceSearch}
+            generateLink={generateLink}
             title={`${t("history.detail.reference.unavailable")} · ${t(
               `history.detail.reference.reason.${referenceAnswer.reason}`,
             )}`}
@@ -92,9 +88,7 @@ export function HistoryReferenceAnswer({
         {referenceAnswer.status === "notRequested" && (
           <ReferenceUnavailable
             description={t("history.detail.reference.notRequestedDescription")}
-            generateTo={generateTo}
-            interviewSearch={interviewSearch}
-            practiceSearch={practiceSearch}
+            generateLink={generateLink}
             title={t("history.detail.reference.notRequested")}
           />
         )}
@@ -105,15 +99,13 @@ export function HistoryReferenceAnswer({
 
 function ReferenceUnavailable({
   description,
-  generateTo,
-  interviewSearch,
-  practiceSearch,
+  generateLink,
   title,
 }: {
   description: string
-  generateTo: "/practice" | "/interview"
-  interviewSearch?: InterviewEntrySearch
-  practiceSearch?: PracticeEntrySearch
+  generateLink:
+    | { to: "/practice"; search: PracticeEntrySearch }
+    | { to: "/interview"; search: InterviewEntrySearch }
   title: string
 }) {
   const { t } = useTranslation()
@@ -128,10 +120,10 @@ function ReferenceUnavailable({
       <Button
         nativeButton={false}
         render={
-          generateTo === "/practice" ? (
-            <Link search={practiceSearch} to="/practice" />
+          generateLink.to === "/practice" ? (
+            <Link search={generateLink.search} to="/practice" />
           ) : (
-            <Link search={interviewSearch} to="/interview" />
+            <Link search={generateLink.search} to="/interview" />
           )
         }
         variant="outline"

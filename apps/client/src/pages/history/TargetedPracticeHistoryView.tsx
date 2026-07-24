@@ -24,15 +24,15 @@ import type {
 import { PracticeWeaknesses } from "@/pages/practice/components/PracticeReviewDetails"
 
 import { TargetedPracticeQuestionRecord } from "./components/TargetedPracticeQuestionRecord"
-import { defaultHistorySearch, type HistoryRouteSearch } from "./history-navigation"
+import type { HistoryRouteSearch } from "./history-navigation"
 import type { TargetedPracticeHistoryViewState } from "./targeted-practice-history-types"
 
 export function TargetedPracticeHistoryView({
-  historySearch = defaultHistorySearch,
+  historySearch,
   onRetry,
   state,
 }: {
-  historySearch?: HistoryRouteSearch
+  historySearch: HistoryRouteSearch
   onRetry: () => void
   state: TargetedPracticeHistoryViewState
 }) {

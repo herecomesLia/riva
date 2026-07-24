@@ -24,7 +24,7 @@ export function TargetedPracticeQuestionRecord({
   practiceSearch,
   question,
 }: {
-  practiceSearch?: PracticeEntrySearch
+  practiceSearch: PracticeEntrySearch
   question: TrainingRecordQuestion
 }) {
   const { i18n, t } = useTranslation()
@@ -66,7 +66,7 @@ export function TargetedPracticeQuestionRecord({
         <AnswerSection answer={question.answer} />
         <EvaluationSection evaluation={question.evaluation} review={question.review} />
         <HistoryReferenceAnswer
-          practiceSearch={practiceSearch}
+          generateLink={{ to: "/practice", search: practiceSearch }}
           referenceAnswer={question.referenceAnswer}
         />
 
@@ -89,7 +89,7 @@ export function TargetedPracticeQuestionRecord({
                   <AnswerSection answer={followUp.answer} />
                   <EvaluationSection evaluation={followUp.evaluation} review={followUp.review} />
                   <HistoryReferenceAnswer
-                    practiceSearch={practiceSearch}
+                    generateLink={{ to: "/practice", search: practiceSearch }}
                     referenceAnswer={followUp.referenceAnswer}
                   />
                 </CardContent>

@@ -32,7 +32,7 @@ const onRetry = fn()
 export const Error = meta.story({
   args: { onRetry, variant: "error" },
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /重试|retry/i }))
+    await userEvent.click(canvas.getByRole("button", { name: /重新加载|reload/i }))
     await expect(onRetry).toHaveBeenCalledTimes(1)
   },
 })
@@ -41,7 +41,7 @@ export const NoProfile = meta.story({
   render: () => <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="noProfile" />,
   play: async ({ canvas, userEvent }) => {
     await userEvent.type(canvas.getByLabelText(/简历文本|resume text/i), "Frontend engineer resume")
-    await userEvent.click(canvas.getByRole("button", { name: /导入|import/i }))
+    await userEvent.click(canvas.getByRole("button", { name: /上传并识别|upload and recognize/i }))
 
     await waitFor(() =>
       expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
@@ -63,7 +63,9 @@ export const NoResume = meta.story({
     await userEvent.click(canvas.getByRole("button", { name: /上传简历|upload resume/i }))
     const dialog = await screen.findByRole("dialog")
     await userEvent.type(within(dialog).getByLabelText(/简历文本|resume text/i), "Profile resume")
-    await userEvent.click(within(dialog).getByRole("button", { name: /导入|import/i }))
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: /上传并识别|upload and recognize/i }),
+    )
 
     await waitFor(() =>
       expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
@@ -82,7 +84,7 @@ export const RecognitionFailed = meta.story({
     <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="initialResumeRecognitionFailed" />
   ),
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /重试识别|retry recognition/i }))
+    await userEvent.click(canvas.getByRole("button", { name: /重新识别|recognize again/i }))
 
     await waitFor(() =>
       expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
@@ -124,7 +126,9 @@ export const ResumeUpdateFlow = meta.story({
       within(dialog).getByLabelText(/简历文本|resume text/i),
       "Updated frontend resume",
     )
-    await userEvent.click(within(dialog).getByRole("button", { name: /导入|import/i }))
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: /上传并识别|upload and recognize/i }),
+    )
 
     await waitFor(() =>
       expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(

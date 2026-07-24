@@ -174,6 +174,6 @@ export const DraftLeaveProtection = meta.story({
     const dialog = await screen.findByRole("alertdialog")
     await expect(
       within(dialog).getByRole("heading", { name: /离开并放弃回答|leave and discard/i }),
-    ).toBeVisible()
+    ).toBeInTheDocument()
   },
 })

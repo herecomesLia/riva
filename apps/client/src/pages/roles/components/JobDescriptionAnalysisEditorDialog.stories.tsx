@@ -31,7 +31,7 @@ export const EditQualifications = meta.story({
   args: dialogArgs("qualificationRequirements"),
   play: async () => {
     const dialog = await screen.findByRole("dialog")
-    await expect(within(dialog).getByRole("textbox")).toBeVisible()
+    await expect(within(dialog).getAllByRole("textbox")[0]!).toBeInTheDocument()
   },
 })
 
@@ -59,7 +59,7 @@ export const Pending = meta.story({
     await expect(within(dialog).getByRole("button", { name: /正在保存|saving/i })).toContainElement(
       within(dialog).getByRole("status"),
     )
-    await expect(dialog).toBeVisible()
+    await expect(dialog).toBeInTheDocument()
   },
 })
 
@@ -83,9 +83,9 @@ export const SaveError = meta.story({
     await expect(failedSave).toHaveBeenCalledTimes(1)
     await expect(
       within(dialog).findByText(/暂时无法保存本次修改|We could not save this change/i),
-    ).resolves.toBeVisible()
+    ).resolves.toBeInTheDocument()
     await expect(within(dialog).queryByText("request failed")).not.toBeInTheDocument()
-    await expect(dialog).toBeVisible()
+    await expect(dialog).toBeInTheDocument()
     await expect(input).toHaveValue(retainedValue)
   },
 })

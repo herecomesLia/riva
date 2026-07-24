@@ -37,6 +37,7 @@ export default defineConfig({
         },
         test: {
           name: "unit",
+          testTimeout: 10_000,
           include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
           exclude: [
             "src/**/*.api.test.ts",

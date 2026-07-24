@@ -9,7 +9,6 @@ import { Spinner } from "@/components/ui/spinner"
 import { HistoryFilters } from "./components/HistoryFilters"
 import { HistoryOverview } from "./components/HistoryOverview"
 import { HistoryRecordList } from "./components/HistoryRecordList"
-import type { HistoryRouteSearch } from "./history-navigation"
 import type { HistoryFiltersValue, HistoryViewState } from "./history-types"
 
 export function HistoryView({
@@ -18,7 +17,6 @@ export function HistoryView({
   onFiltersChange,
   onPageChange,
   onRetry,
-  search,
   state,
 }: {
   filters: HistoryFiltersValue
@@ -26,7 +24,6 @@ export function HistoryView({
   onFiltersChange: (filters: HistoryFiltersValue) => void
   onPageChange: (page: number) => void
   onRetry: () => void
-  search?: HistoryRouteSearch
   state: HistoryViewState
 }) {
   const { t } = useTranslation()
@@ -78,12 +75,10 @@ export function HistoryView({
               onClearFilters={onClearFilters}
               onPageChange={onPageChange}
               page={state.status === "loading" ? null : state.data.records}
-              search={
-                search ?? {
-                  ...filters,
-                  page: state.status === "loading" ? 1 : state.data.records.pagination.page,
-                }
-              }
+              search={{
+                ...filters,
+                page: state.status === "loading" ? 1 : state.data.records.pagination.page,
+              }}
             />
           </div>
         )}

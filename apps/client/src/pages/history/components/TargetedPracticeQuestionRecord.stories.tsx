@@ -11,13 +11,26 @@ import { TargetedPracticeQuestionRecord } from "./TargetedPracticeQuestionRecord
 const meta = preview.meta({
   component: TargetedPracticeQuestionRecord,
   decorators: [withRouter],
-  title: "History/Components/Targeted Practice Question Record",
+  title: "History/TargetedPracticeQuestionRecord",
 })
 
+const practiceSearch = {
+  targetRoleId: completedTargetedPracticeHistoryStoryFixture.targetRole.id,
+  questionType: "behavioral",
+  difficulty: "pressure",
+  source: "history",
+} as const
+
 export const RetriedWithFollowUp = meta.story({
-  args: { question: completedTargetedPracticeHistoryStoryFixture.questions[1] },
+  args: {
+    practiceSearch,
+    question: completedTargetedPracticeHistoryStoryFixture.questions[1],
+  },
 })
 
 export const PartialWithUnansweredFollowUp = meta.story({
-  args: { question: partialTargetedPracticeHistoryStoryFixture.questions[0] },
+  args: {
+    practiceSearch,
+    question: partialTargetedPracticeHistoryStoryFixture.questions[0],
+  },
 })

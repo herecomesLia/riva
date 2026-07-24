@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { TargetedPracticeHistoryView } from "@/pages/history"
+import { defaultHistorySearch } from "@/pages/history/history-navigation"
 import {
   completedTargetedPracticeHistoryStoryFixture,
   endedTargetedPracticeHistoryStoryFixture,
@@ -15,9 +16,16 @@ function renderView(
   state: React.ComponentProps<typeof TargetedPracticeHistoryView>["state"],
   onRetry = vi.fn(),
 ) {
-  return renderWithProviders(<TargetedPracticeHistoryView onRetry={onRetry} state={state} />, {
-    router: { initialEntries: ["/history/practice/record"] },
-  })
+  return renderWithProviders(
+    <TargetedPracticeHistoryView
+      historySearch={defaultHistorySearch}
+      onRetry={onRetry}
+      state={state}
+    />,
+    {
+      router: { initialEntries: ["/history/practice/record"] },
+    },
+  )
 }
 
 describe("TargetedPracticeHistoryView", () => {
@@ -79,7 +87,13 @@ describe("TargetedPracticeHistoryView", () => {
     )
     expect(onRetry).toHaveBeenCalledOnce()
 
-    rerender(<TargetedPracticeHistoryView onRetry={onRetry} state={{ status: "notFound" }} />)
+    rerender(
+      <TargetedPracticeHistoryView
+        historySearch={defaultHistorySearch}
+        onRetry={onRetry}
+        state={{ status: "notFound" }}
+      />,
+    )
     expect(screen.getByTestId("targeted-history-state-region")).toHaveFocus()
     const link = await screen.findByRole("button", {
       name: i18n.t("history.detail.notFound.action"),

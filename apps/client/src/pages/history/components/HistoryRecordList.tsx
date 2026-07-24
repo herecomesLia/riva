@@ -30,7 +30,6 @@ import type {
 } from "@/models/training-records"
 
 import type { HistoryRouteSearch } from "../history-navigation"
-import { defaultHistorySearch } from "../history-navigation"
 
 export function HistoryRecordList({
   emptyReason,
@@ -38,14 +37,14 @@ export function HistoryRecordList({
   onClearFilters,
   onPageChange,
   page,
-  search = defaultHistorySearch,
+  search,
 }: {
   emptyReason?: "neverTrained" | "noMatches"
   loading: boolean
   onClearFilters: () => void
   onPageChange: (page: number) => void
   page: TrainingRecordsPageResponse | null
-  search?: HistoryRouteSearch
+  search: HistoryRouteSearch
 }) {
   const { t } = useTranslation()
 

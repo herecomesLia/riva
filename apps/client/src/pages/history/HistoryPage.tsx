@@ -76,7 +76,6 @@ export function HistoryPage() {
       onFiltersChange={handleFiltersChange}
       onPageChange={(page) => setSearch({ ...filters, page })}
       onRetry={() => void handleRetry()}
-      search={search}
       state={state}
     />
   )

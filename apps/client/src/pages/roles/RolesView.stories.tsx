@@ -122,15 +122,14 @@ export const MobileLayout = meta.story({
   globals: { viewport: { isRotated: false, value: "mobile1" } },
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByTestId("mobile-role-selector-trigger"))
-    await userEvent.click(
-      await screen.findByRole("option", { name: new RegExp(selectedRole.title) }),
-    )
-    await expect(screen.getByRole("heading", { name: selectedRole.title })).toBeVisible()
     await expect(
-      within(screen.getByRole("button", { name: new RegExp(`^${currentRole.title}`) })).getByText(
-        /当前岗位|current role/i,
-      ),
-    ).toBeInTheDocument()
+      await screen.findByRole("option", { name: new RegExp(currentRole.title) }),
+    ).toHaveTextContent(/当前岗位|current role/i)
+    await userEvent.click(screen.getByRole("option", { name: new RegExp(selectedRole.title) }))
+    await expect(screen.getByRole("heading", { name: selectedRole.title })).toBeVisible()
+    await expect(screen.getByTestId("mobile-role-selector-trigger")).toHaveTextContent(
+      selectedRole.title,
+    )
   },
 })
 

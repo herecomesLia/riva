@@ -38,15 +38,15 @@ import type {
 import { InterviewReviewListCard } from "@/pages/interview/components/InterviewReviewListCard"
 
 import { MockInterviewQuestionRecord } from "./components/MockInterviewQuestionRecord"
-import { defaultHistorySearch, type HistoryRouteSearch } from "./history-navigation"
+import type { HistoryRouteSearch } from "./history-navigation"
 import type { MockInterviewHistoryViewState } from "./mock-interview-history-types"
 
 export function MockInterviewHistoryView({
-  historySearch = defaultHistorySearch,
+  historySearch,
   onRetry,
   state,
 }: {
-  historySearch?: HistoryRouteSearch
+  historySearch: HistoryRouteSearch
   onRetry: () => void
   state: MockInterviewHistoryViewState
 }) {

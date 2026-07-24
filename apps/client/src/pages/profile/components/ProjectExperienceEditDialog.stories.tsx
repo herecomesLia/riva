@@ -1,4 +1,5 @@
 import preview from "#storybook/preview"
+import { screen } from "storybook/test"
 
 import { profileResponseMock } from "@/mocks/data/profile"
 
@@ -28,25 +29,25 @@ export const StructuredContent = meta.story({
 
 export const PasteAndOrganize = meta.story({
   args: createProfileEditDialogArgs("projectExperience", structuredProjectProfile),
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ userEvent }) => {
     await userEvent.click(
-      canvas.getAllByRole("button", { name: /批量粘贴并整理|paste and organize/i })[0]!,
+      screen.getAllByRole("button", { name: /批量粘贴并整理|paste and organize/i })[0]!,
     )
     await userEvent.type(
-      canvas.getByRole("textbox", { name: /粘贴内容|paste content/i }),
+      screen.getByRole("textbox", { name: /粘贴内容|paste content/i }),
       "负责前端架构设计。维护公共组件库和无障碍规范。推动性能优化。",
     )
     await userEvent.click(
-      canvas.getByRole("button", { name: /预览整理结果|preview organized result/i }),
+      screen.getByRole("button", { name: /预览整理结果|preview organized result/i }),
     )
   },
 })
 
 export const ExistingTechnology = meta.story({
   args: createProfileEditDialogArgs("projectExperience", structuredProjectProfile),
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ userEvent }) => {
     await userEvent.type(
-      canvas.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
+      screen.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
       "React",
     )
     await userEvent.keyboard("{Enter}")
@@ -55,9 +56,9 @@ export const ExistingTechnology = meta.story({
 
 export const NewTechnology = meta.story({
   args: createProfileEditDialogArgs("projectExperience", structuredProjectProfile),
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ userEvent }) => {
     await userEvent.type(
-      canvas.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
+      screen.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
       "Accessibility",
     )
     await userEvent.keyboard("{Enter}")
@@ -66,9 +67,9 @@ export const NewTechnology = meta.story({
 
 export const BatchTechnology = meta.story({
   args: createProfileEditDialogArgs("projectExperience", structuredProjectProfile),
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ userEvent }) => {
     await userEvent.type(
-      canvas.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
+      screen.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
       "React, TypeScript；TanStack Query",
     )
     await userEvent.keyboard("{Enter}")

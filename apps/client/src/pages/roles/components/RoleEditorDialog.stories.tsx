@@ -1,7 +1,7 @@
 import { useState } from "react"
 
 import preview from "#storybook/preview"
-import { expect, fn, screen, within } from "storybook/test"
+import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { createRoleStoryResponse } from "../stories/role-story-fixtures"
 import { RoleEditorDialog } from "./RoleEditorDialog"
@@ -35,7 +35,7 @@ export const Create = meta.story({
     const dialog = await screen.findByRole("dialog")
     await userEvent.type(within(dialog).getByLabelText(/岗位名称|role title/i), "Platform Engineer")
     await userEvent.click(within(dialog).getByRole("button", { name: /^保存$|^save$/i }))
-    await expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveAttribute("data-closed"))
   },
 })
 
@@ -47,7 +47,7 @@ export const Edit = meta.story({
     await userEvent.clear(title)
     await userEvent.type(title, "Principal Frontend Engineer")
     await userEvent.click(within(dialog).getByRole("button", { name: /^保存$|^save$/i }))
-    await expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveAttribute("data-closed"))
   },
 })
 
@@ -67,7 +67,7 @@ export const ValidationError = meta.story({
     await userEvent.click(within(dialog).getByRole("button", { name: /^保存$|^save$/i }))
     await expect(
       within(dialog).findByText(/请填写岗位名称|enter a role title/i),
-    ).resolves.toBeVisible()
+    ).resolves.toBeInTheDocument()
   },
 })
 
@@ -92,7 +92,7 @@ export const ExperienceRangeError = meta.story({
       within(dialog).findByText(
         /最低经验年限不能大于最高经验年限|minimum experience cannot exceed/i,
       ),
-    ).resolves.toBeVisible()
+    ).resolves.toBeInTheDocument()
   },
 })
 

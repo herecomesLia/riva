@@ -11,13 +11,26 @@ import { MockInterviewQuestionRecord } from "./MockInterviewQuestionRecord"
 const meta = preview.meta({
   component: MockInterviewQuestionRecord,
   decorators: [withRouter],
-  title: "History/Components/Mock Interview Question Record",
+  title: "History/MockInterviewQuestionRecord",
 })
 
+const interviewSearch = {
+  targetRoleId: completeMockInterviewHistoryStoryFixture.targetRole.id,
+  round: completeMockInterviewHistoryStoryFixture.setup.round,
+  difficulty: completeMockInterviewHistoryStoryFixture.setup.difficulty,
+  durationMinutes: completeMockInterviewHistoryStoryFixture.setup.plannedDurationMinutes,
+} as const
+
 export const AnsweredWithGeneratingFollowUpReference = meta.story({
-  args: { question: completeMockInterviewHistoryStoryFixture.questions[1] },
+  args: {
+    interviewSearch,
+    question: completeMockInterviewHistoryStoryFixture.questions[1],
+  },
 })
 
 export const Unanswered = meta.story({
-  args: { question: partialMockInterviewHistoryStoryFixture.questions[1] },
+  args: {
+    interviewSearch,
+    question: partialMockInterviewHistoryStoryFixture.questions[1],
+  },
 })

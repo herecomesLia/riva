@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { MockInterviewHistoryView } from "@/pages/history"
+import { defaultHistorySearch } from "@/pages/history/history-navigation"
 import {
   completeMockInterviewHistoryStoryFixture,
   partialMockInterviewHistoryStoryFixture,
@@ -15,9 +16,16 @@ function renderView(
   state: React.ComponentProps<typeof MockInterviewHistoryView>["state"],
   onRetry = vi.fn(),
 ) {
-  return renderWithProviders(<MockInterviewHistoryView onRetry={onRetry} state={state} />, {
-    router: { initialEntries: ["/history/interview/record"] },
-  })
+  return renderWithProviders(
+    <MockInterviewHistoryView
+      historySearch={defaultHistorySearch}
+      onRetry={onRetry}
+      state={state}
+    />,
+    {
+      router: { initialEntries: ["/history/interview/record"] },
+    },
+  )
 }
 
 describe("MockInterviewHistoryView", () => {
@@ -98,7 +106,13 @@ describe("MockInterviewHistoryView", () => {
     )
     expect(onRetry).toHaveBeenCalledOnce()
 
-    rerender(<MockInterviewHistoryView onRetry={onRetry} state={{ status: "notFound" }} />)
+    rerender(
+      <MockInterviewHistoryView
+        historySearch={defaultHistorySearch}
+        onRetry={onRetry}
+        state={{ status: "notFound" }}
+      />,
+    )
     expect(screen.getByTestId("mock-history-state-region")).toHaveFocus()
     expect(
       await screen.findByRole("button", { name: i18n.t("history.mockDetail.notFound.action") }),

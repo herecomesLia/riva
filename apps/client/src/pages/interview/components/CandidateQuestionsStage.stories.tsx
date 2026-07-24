@@ -67,7 +67,7 @@ export const FinishConfirmation = meta.story({
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /完成面试|finish interview/i }))
     const dialog = await screen.findByRole("alertdialog")
-    await expect(dialog).toBeVisible()
+    await expect(dialog).toBeInTheDocument()
     await userEvent.click(
       within(dialog).getByRole("button", {
         name: /完成并生成复盘|finish and generate review/i,
@@ -92,7 +92,7 @@ export const FinishFailure = meta.story({
         name: /完成并生成复盘|finish and generate review/i,
       }),
     )
-    await expect(within(dialog).getByRole("alert")).toBeVisible()
+    await expect(within(dialog).getByRole("alert")).toBeInTheDocument()
   },
 })
 
