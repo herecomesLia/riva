@@ -125,7 +125,17 @@ export type InterviewOpeningSessionResponse = InterviewActiveSessionResponseBase
 
 export type InterviewQuestionSessionResponse = InterviewActiveSessionResponseBase & {
   status: "question"
-  currentQuestion: InterviewQuestionResponse
+  currentQuestion:
+    | {
+        status: "awaitingAnswer"
+        question: InterviewQuestionResponse
+        answer: null
+      }
+    | {
+        status: "answered"
+        question: InterviewQuestionResponse
+        answer: InterviewAnswerResponse
+      }
 }
 
 export type InterviewFollowUpSessionResponse = InterviewActiveSessionResponseBase & {
@@ -135,7 +145,7 @@ export type InterviewFollowUpSessionResponse = InterviewActiveSessionResponseBas
     answer: InterviewAnswerResponse
     answeredFollowUps: AnsweredInterviewFollowUpResponse[]
   }
-  currentFollowUp: AwaitingInterviewFollowUpResponse
+  currentFollowUp: InterviewFollowUpResponse
 }
 
 export type InterviewCandidateQuestionsSessionResponse = InterviewActiveSessionResponseBase & {
@@ -305,6 +315,17 @@ export type InterviewSessionMutationInput = {
 
 export type BeginInterviewQuestionsInput = InterviewSessionMutationInput
 
+export type GetNextInterviewQuestionInput =
+  | (InterviewSessionMutationInput & {
+      target: "question"
+      questionId: string
+    })
+  | (InterviewSessionMutationInput & {
+      target: "followUp"
+      questionId: string
+      followUpQuestionId: string
+    })
+
 export type SubmitInterviewAnswerInput =
   | (InterviewSessionMutationInput & {
       target: "question"
@@ -322,4 +343,17 @@ export type SubmitCandidateQuestionInput = InterviewSessionMutationInput & {
   content: string
 }
 
-export type FinishCandidateQuestionsInput = InterviewSessionMutationInput
+export type EnterCandidateQuestionsInput = InterviewSessionMutationInput & {
+  questionId: string
+}
+
+export type FinishInterviewInput = InterviewSessionMutationInput
+
+export type GetInterviewReviewInput = {
+  sessionId: string
+}
+
+export type GetInterviewReviewResponse = {
+  sessionId: string
+  review: InterviewReviewResponse
+}
