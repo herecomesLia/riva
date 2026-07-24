@@ -43,6 +43,10 @@ export const Complete = meta.story({
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByText("82")).toBeVisible()
+    await expect(canvas.getByText("个人贡献")).toBeVisible()
+    await expect(canvas.getByText("结果与证据")).toBeVisible()
+    await expect(canvas.getByText("岗位匹配")).toBeVisible()
+    await expect(canvas.getByText("风险意识")).toBeVisible()
     await userEvent.click(
       canvas.getByRole("button", {
         name: /请介绍一次你主导的前端性能优化/,

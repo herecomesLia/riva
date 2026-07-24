@@ -393,7 +393,7 @@ function createCompleteInterviewReview(
       },
       {
         dimension: "structure",
-        score: averageScore,
+        score: Math.min(100, averageScore + 1),
         explanation: "评分基于本场实际完成回答的组织与表达结构。",
       },
       {
@@ -402,9 +402,29 @@ function createCompleteInterviewReview(
         explanation: "评分基于本场实际回答中事实、行动和结果的具体程度。",
       },
       {
+        dimension: "personalContribution",
+        score: Math.min(100, averageScore + 2),
+        explanation: "评分基于本场实际回答对个人职责、判断和推动动作的呈现。",
+      },
+      {
+        dimension: "resultsAndEvidence",
+        score: Math.max(0, averageScore - 2),
+        explanation: "评分基于本场实际回答对结果、指标和验证证据的说明。",
+      },
+      {
+        dimension: "roleAlignment",
+        score: Math.min(100, averageScore + 1),
+        explanation: "评分基于本场实际问答体现的岗位理解与能力匹配程度。",
+      },
+      {
         dimension: "communication",
         score: averageScore,
         explanation: "评分基于本场正式问答中的整体沟通表现。",
+      },
+      {
+        dimension: "riskControl",
+        score: Math.max(0, averageScore - 1),
+        explanation: "评分基于本场实际回答对约束、风险和应对措施的说明。",
       },
     ],
     nextTraining: {

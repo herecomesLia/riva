@@ -22,6 +22,7 @@ import type {
   InterviewFollowUpSessionResponse,
   InterviewOpeningSessionResponse,
   InterviewQuestionSessionResponse,
+  InterviewScoreDimension,
 } from "@/models/interview"
 
 function resetScenario(
@@ -610,8 +611,27 @@ describe("interview completion and review availability", () => {
 
     const review = await getInterviewReview({ sessionId: completed.sessionId })
     if (review.status !== "complete") throw new Error("Expected complete review.")
+    const expectedDimensions: InterviewScoreDimension[] = [
+      "relevance",
+      "structure",
+      "specificity",
+      "personalContribution",
+      "resultsAndEvidence",
+      "roleAlignment",
+      "communication",
+      "riskControl",
+    ]
     expect(review.review.overallScore).toEqual(expect.any(Number))
-    expect(review.review.dimensionScores.length).toBeGreaterThan(0)
+    expect(review.review.dimensionScores).toHaveLength(8)
+    expect(review.review.dimensionScores.map(({ dimension }) => dimension)).toEqual(
+      expectedDimensions,
+    )
+    expect(new Set(review.review.dimensionScores.map(({ dimension }) => dimension)).size).toBe(8)
+    review.review.dimensionScores.forEach(({ explanation, score }) => {
+      expect(score).toBeGreaterThanOrEqual(0)
+      expect(score).toBeLessThanOrEqual(100)
+      expect(explanation.trim()).not.toBe("")
+    })
     expect(review.review.nextTraining.focusAreas.length).toBeGreaterThan(0)
     expect(review.questionOverviews).toHaveLength(completed.completedQuestions.length)
   })
