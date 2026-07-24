@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
   createInterviewAgentPlanMock,
@@ -17,6 +17,14 @@ import {
   submitInterviewAnswer,
   type InterviewMockControllerOptions,
 } from "@/mocks/services/interview"
+import {
+  createTargetRole,
+  deleteTargetRole,
+  getRolesMockSnapshot,
+  resetRolesMockState,
+  updateTargetRole,
+} from "@/mocks/services/roles"
+import { getProfileMockSnapshot, resetProfileMockState } from "@/mocks/services/profile"
 import type {
   InterviewCandidateQuestionsSessionResponse,
   InterviewFollowUpSessionResponse,
@@ -37,6 +45,8 @@ function resetScenario(
 }
 
 beforeEach(() => {
+  resetRolesMockState()
+  resetProfileMockState()
   resetScenario()
 })
 
@@ -805,13 +815,14 @@ describe("interview mock reset boundaries", () => {
     first.setup.availableDurationMinutes.push(15)
 
     const second = await getInterviewPage()
-    expect(second.setup.targetRoles[0]?.title).toBe("高级前端工程师")
+    expect(second.setup.targetRoles[0]?.title).toBe("Senior Frontend Engineer")
     expect(second.setup.availableDurationMinutes).toEqual([15, 30, 45])
+    expect(getRolesMockSnapshot().roles[0]?.title).toBe("Senior Frontend Engineer")
 
     resetScenario("adjustedPlan")
     const afterReset = await getInterviewPage()
     expect(afterReset.session).toBeNull()
-    expect(afterReset.setup.targetRoles[0]?.title).toBe("高级前端工程师")
+    expect(afterReset.setup.targetRoles[0]?.title).toBe("Senior Frontend Engineer")
   })
 
   it("returns independent Agent plans for tests and Stories", () => {
@@ -854,25 +865,133 @@ describe("interview mock reset boundaries", () => {
     })
   })
 
-  it("keeps empty setup and prerequisite responses authoritative", async () => {
-    resetInterviewMockState("noTargetRoles", { defaultDelayMs: 0 })
-    const empty = await getInterviewPage()
-    expect(empty.setup.targetRoles).toEqual([])
-    expect(empty.session).toBeNull()
+  it("derives the current target role name and company from roles state", async () => {
+    resetRolesMockState("multipleRoles")
+    const roles = getRolesMockSnapshot()
+    const currentRole = roles.roles.find(({ id }) => id === roles.currentRoleId)
+    const page = await getInterviewPage()
 
-    resetInterviewMockState("prerequisiteNotMet", { defaultDelayMs: 0 })
-    const blocked = await getInterviewPage()
-    expect(blocked.setup.availability).toEqual({
+    expect(currentRole).toBeDefined()
+    expect(page.setup.defaultConfiguration.targetRoleId).toBe(currentRole?.id)
+    expect(page.setup.targetRoles.find(({ id }) => id === currentRole?.id)).toMatchObject({
+      title: currentRole?.title,
+      company: currentRole?.company,
+    })
+  })
+
+  it("reflects role updates and deletion without resetting interview state", async () => {
+    const before = getRolesMockSnapshot()
+    const role = before.roles[0]!
+    vi.useFakeTimers()
+    try {
+      const updatePromise = updateTargetRole({
+        roleId: role.id,
+        version: role.version,
+        title: "Principal Frontend Engineer",
+        company: "Riva",
+        recruitmentType: role.recruitmentType,
+        location: role.location,
+        experienceRange: role.experienceRange,
+      })
+      await vi.runAllTimersAsync()
+      const updated = await updatePromise
+      const updatedRole = updated.roles.find(({ id }) => id === role.id)!
+      const afterUpdate = await getInterviewPage()
+      expect(afterUpdate.setup.targetRoles.find(({ id }) => id === role.id)).toMatchObject({
+        title: "Principal Frontend Engineer",
+        company: "Riva",
+      })
+
+      const deletePromise = deleteTargetRole({
+        roleId: updatedRole.id,
+        version: updatedRole.version,
+      })
+      await vi.runAllTimersAsync()
+      await deletePromise
+    } finally {
+      vi.useRealTimers()
+    }
+
+    resetInterviewMockState("setupReady", { defaultDelayMs: 0 })
+    const afterDelete = await getInterviewPage()
+    expect(afterDelete.setup.targetRoles.map(({ id }) => id)).not.toContain(role.id)
+  })
+
+  it("includes newly created roles in subsequent setup responses", async () => {
+    vi.useFakeTimers()
+    try {
+      const createPromise = createTargetRole({
+        title: "AI Product Engineer",
+        company: "Riva",
+        recruitmentType: "experienced",
+        location: "Shanghai",
+        experienceRange: { minYears: 3, maxYears: null },
+        preparationStatus: "preparing",
+      })
+      await vi.runAllTimersAsync()
+      const created = await createPromise
+      const createdRole = created.roles.at(-1)!
+      const page = await getInterviewPage()
+
+      expect(page.setup.targetRoles.find(({ id }) => id === createdRole.id)).toMatchObject({
+        title: "AI Product Engineer",
+        company: "Riva",
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("tracks profile completeness and the current role JD status", async () => {
+    resetRolesMockState("roleWithParsedJobDescription")
+    resetProfileMockState("partial")
+    expect((await getInterviewPage()).setup.availability).toEqual({
       status: "blocked",
       reason: "profileIncomplete",
     })
-    const targetRoleId = blocked.setup.defaultConfiguration.targetRoleId
-    if (targetRoleId === null) throw new Error("Expected blocked target role.")
-    await expect(
-      startInterview({
-        ...blocked.setup.defaultConfiguration,
-        targetRoleId,
-      }),
-    ).rejects.toThrow("Interview prerequisite is not met: profileIncomplete.")
+
+    resetProfileMockState()
+    expect((await getInterviewPage()).setup.availability).toEqual({ status: "available" })
+
+    resetRolesMockState("singleRoleWithoutJobDescription")
+    expect((await getInterviewPage()).setup.availability).toEqual({
+      status: "blocked",
+      reason: "jobDescriptionMissing",
+    })
+
+    resetRolesMockState("noRoles")
+    const empty = await getInterviewPage()
+    expect(empty.setup.targetRoles).toEqual([])
+    expect(empty.setup.defaultConfiguration.targetRoleId).toBeNull()
+    expect(empty.session).toBeNull()
+  })
+
+  it("does not let returned setup mutations contaminate roles, profile, or later responses", async () => {
+    const originalRoles = getRolesMockSnapshot()
+    const originalProfile = getProfileMockSnapshot()
+    const first = await getInterviewPage()
+    first.setup.targetRoles[0]!.title = "污染后的岗位"
+    first.setup.targetRoles.splice(0)
+    first.setup.defaultConfiguration.targetRoleId = null
+    first.setup.availability = {
+      status: "blocked",
+      reason: "profileIncomplete",
+    }
+
+    expect(getRolesMockSnapshot()).toEqual(originalRoles)
+    expect(getProfileMockSnapshot()).toEqual(originalProfile)
+    expect(await getInterviewPage()).toMatchObject({
+      setup: {
+        availability: { status: "available" },
+        defaultConfiguration: { targetRoleId: originalRoles.currentRoleId },
+        targetRoles: [
+          {
+            id: originalRoles.currentRoleId,
+            title: originalRoles.roles[0]!.title,
+            company: originalRoles.roles[0]!.company,
+          },
+        ],
+      },
+    })
   })
 })

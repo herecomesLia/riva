@@ -40,6 +40,10 @@ export function resetRolesMockState(scenario: RolesMockScenario = "matchingAnaly
   parsingAttempts.clear()
 }
 
+export function getRolesMockSnapshot(): RolesPageResponse {
+  return copy(mockResponse)
+}
+
 function nextTimestamp() {
   const timestamp = new Date(Date.UTC(2026, 6, 16, 8, timestampSequence * 5)).toISOString()
   timestampSequence += 1

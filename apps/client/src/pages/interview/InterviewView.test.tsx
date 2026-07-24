@@ -55,7 +55,7 @@ describe("InterviewView", () => {
     expect(setupCard?.parentElement).toHaveClass("w-full")
     expect(setupCard?.parentElement).not.toHaveClass("max-w-4xl")
 
-    expect(await screen.findByText("高级前端工程师 · 字节跳动")).toBeInTheDocument()
+    expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
     for (const round of interviewSetupResponseMock.targetRoles[0].supportedRounds) {
       expect(
         screen.getByRole("button", { name: i18n.t(`interview.rounds.${round}`) }),
@@ -80,7 +80,7 @@ describe("InterviewView", () => {
     renderReadyView()
 
     await user.click(await screen.findByTestId("interview-target-role-trigger"))
-    await user.click(await screen.findByRole("option", { name: "金融科技产品经理 · 蚂蚁集团" }))
+    await user.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
 
     expect(
       screen.queryByRole("button", { name: i18n.t("interview.rounds.technical") }),

@@ -79,7 +79,7 @@ function openingResponse(): InterviewPageResponse {
     sessionId,
     version: 1,
     configuration: {
-      targetRoleId: "role_frontend_engineer_bytedance",
+      targetRoleId: "role_frontend_bytedance",
       round: "technical",
       difficulty: "pressure",
       durationMinutes: 30,
@@ -102,7 +102,7 @@ function questionSession(order: number, version: number): InterviewQuestionSessi
     sessionId,
     version,
     configuration: {
-      targetRoleId: "role_frontend_engineer_bytedance",
+      targetRoleId: "role_frontend_bytedance",
       round: "technical",
       difficulty: "pressure",
       durationMinutes: 30,
@@ -126,7 +126,7 @@ function followUpSession(followUpIndex: number, version: number): InterviewFollo
     sessionId,
     version,
     configuration: {
-      targetRoleId: "role_frontend_engineer_bytedance",
+      targetRoleId: "role_frontend_bytedance",
       round: "technical",
       difficulty: "pressure",
       durationMinutes: 30,

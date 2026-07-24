@@ -1,4 +1,8 @@
-import { profileResponseMock } from "@/mocks/data/profile"
+import {
+  createProfileMockSnapshot,
+  profileResponseMock,
+  type ProfileMockScenario,
+} from "@/mocks/data/profile"
 import { waitForMockDelay } from "@/mocks/utils"
 import { normalizeSkillIds, normalizeSkillName } from "@/models/profile-text"
 import type {
@@ -21,9 +25,13 @@ function copy<T>(value: T): T {
 let mockSnapshot: JobProfileSnapshot = copy(profileResponseMock)
 const retryableRecognitionFailures = new Set<string>()
 
-export function resetProfileMockState() {
-  mockSnapshot = copy(profileResponseMock)
+export function resetProfileMockState(scenario: ProfileMockScenario = "complete") {
+  mockSnapshot = createProfileMockSnapshot(scenario)
   retryableRecognitionFailures.clear()
+}
+
+export function getProfileMockSnapshot(): JobProfileSnapshot {
+  return copy(mockSnapshot)
 }
 
 function standardProfile(): JobProfile {

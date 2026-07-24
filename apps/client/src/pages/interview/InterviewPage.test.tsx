@@ -35,7 +35,7 @@ function createStartedResponse(): InterviewPageResponse {
       sessionId: "mock-interview-session-page",
       version: 1,
       configuration: {
-        targetRoleId: "role_frontend_engineer_bytedance",
+        targetRoleId: "role_frontend_bytedance",
         round: "technical",
         difficulty: "pressure",
         durationMinutes: 30,
@@ -82,7 +82,7 @@ describe("InterviewPage", () => {
 
     renderInterviewPage()
 
-    expect(await screen.findByText("高级前端工程师 · 字节跳动")).toBeInTheDocument()
+    expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: i18n.t("interview.rounds.technical") }),
     ).toBeInTheDocument()
@@ -126,7 +126,7 @@ describe("InterviewPage", () => {
     expect(alert).not.toHaveTextContent("unsafe request details")
 
     await user.click(screen.getByRole("button", { name: i18n.t("interview.actions.retry") }))
-    expect(await screen.findByText("高级前端工程师 · 字节跳动")).toBeInTheDocument()
+    expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
   })
 
   it("starts once, updates the query snapshot, and navigates to the session route", async () => {

@@ -14,8 +14,8 @@ describe("interview Story fixtures", () => {
     firstSetup.targetRoles[0]!.title = "被 Story 修改的岗位"
     const secondSetup = createInterviewSetupStoryFixture()
 
-    expect(secondSetup.targetRoles[0]?.title).toBe("高级前端工程师")
-    expect(interviewSetupResponseMock.targetRoles[0]?.title).toBe("高级前端工程师")
+    expect(secondSetup.targetRoles[0]?.title).toBe("Senior Frontend Engineer")
+    expect(interviewSetupResponseMock.targetRoles[0]?.title).toBe("Senior Frontend Engineer")
 
     const firstSession = createInterviewSessionStoryFixture()
     firstSession.completedQuestions[0]!.answer.content = "被 Story 修改的回答"

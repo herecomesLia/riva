@@ -19,6 +19,11 @@ import type {
   InterviewSessionReviewResponse,
   InterviewSetupResponse,
 } from "@/models/interview"
+import type { JobProfileSnapshot } from "@/models/profile"
+import type { RolesPageResponse } from "@/models/roles"
+
+import { createProfileMockSnapshot, profileResponseMock } from "./profile"
+import { createRolesMockResponse } from "./roles"
 
 export type InterviewMockScenario =
   "setupReady" | "noTargetRoles" | "prerequisiteNotMet" | "completed"
@@ -45,31 +50,87 @@ export type MockInterviewAgentPlan = {
   }>
 }
 
-export const interviewSetupResponseMock = {
-  availability: { status: "available" },
+const allInterviewRounds = [
+  "hr",
+  "firstBusiness",
+  "technical",
+  "manager",
+  "final",
+  "comprehensive",
+] as const
+
+const nonTechnicalInterviewRounds = [
+  "hr",
+  "firstBusiness",
+  "manager",
+  "final",
+  "comprehensive",
+] as const
+
+export const interviewSetupConfigurationMock = {
   availableDifficulties: ["basic", "pressure"],
   availableDurationMinutes: [15, 30, 45],
-  targetRoles: [
-    {
-      id: "role_frontend_engineer_bytedance",
-      title: "高级前端工程师",
-      company: "字节跳动",
-      supportedRounds: ["hr", "firstBusiness", "technical", "manager", "final", "comprehensive"],
-    },
-    {
-      id: "role_product_manager_fintech",
-      title: "金融科技产品经理",
-      company: "蚂蚁集团",
-      supportedRounds: ["hr", "firstBusiness", "manager", "final", "comprehensive"],
-    },
-  ],
-  defaultConfiguration: {
-    targetRoleId: "role_frontend_engineer_bytedance",
-    round: "technical",
-    difficulty: "pressure",
-    durationMinutes: 30,
+  defaultRound: "technical",
+  defaultDifficulty: "pressure",
+  defaultDurationMinutes: 30,
+  defaultSupportedRounds: allInterviewRounds,
+  supportedRoundsByTargetRoleId: {
+    role_product_manager_meituan: nonTechnicalInterviewRounds,
   },
-} satisfies InterviewSetupResponse
+} as const
+
+export function createInterviewSetupResponseMock(
+  rolesResponse: RolesPageResponse,
+  profileSnapshot: JobProfileSnapshot,
+): InterviewSetupResponse {
+  const activeRoles = rolesResponse.roles.filter(
+    ({ preparationStatus }) => preparationStatus !== "archived",
+  )
+  const currentRole = activeRoles.find(({ id }) => id === rolesResponse.currentRoleId)
+  const targetRoles = activeRoles.map(({ company, id, title }) => ({
+    id,
+    title,
+    company,
+    supportedRounds: [
+      ...(interviewSetupConfigurationMock.supportedRoundsByTargetRoleId[
+        id as keyof typeof interviewSetupConfigurationMock.supportedRoundsByTargetRoleId
+      ] ?? interviewSetupConfigurationMock.defaultSupportedRounds),
+    ] as InterviewSetupResponse["targetRoles"][number]["supportedRounds"],
+  }))
+  const currentInterviewRole = targetRoles.find(({ id }) => id === currentRole?.id)
+  const defaultRound = currentInterviewRole?.supportedRounds.includes(
+    interviewSetupConfigurationMock.defaultRound,
+  )
+    ? interviewSetupConfigurationMock.defaultRound
+    : (currentInterviewRole?.supportedRounds[0] ?? interviewSetupConfigurationMock.defaultRound)
+  const profileComplete =
+    profileSnapshot.profile?.status === "active" &&
+    profileSnapshot.profile.completeness.percentage === 100
+  const availability: InterviewSetupResponse["availability"] =
+    !profileComplete && targetRoles.length > 0
+      ? { status: "blocked", reason: "profileIncomplete" }
+      : targetRoles.length > 0 && currentRole?.jobDescription.status !== "ready"
+        ? { status: "blocked", reason: "jobDescriptionMissing" }
+        : { status: "available" }
+
+  return structuredClone({
+    availability,
+    availableDifficulties: [...interviewSetupConfigurationMock.availableDifficulties],
+    availableDurationMinutes: [...interviewSetupConfigurationMock.availableDurationMinutes],
+    targetRoles,
+    defaultConfiguration: {
+      targetRoleId: currentRole?.id ?? null,
+      round: defaultRound,
+      difficulty: interviewSetupConfigurationMock.defaultDifficulty,
+      durationMinutes: interviewSetupConfigurationMock.defaultDurationMinutes,
+    },
+  })
+}
+
+export const interviewSetupResponseMock = createInterviewSetupResponseMock(
+  createRolesMockResponse("multipleRoles"),
+  profileResponseMock,
+)
 
 const questionTemplates = {
   selfIntroduction: {
@@ -675,7 +736,7 @@ export function createInterviewCompletedSessionMock(
     sessionId: "mock-interview-session-completed",
     version: 10,
     configuration: {
-      targetRoleId: "role_frontend_engineer_bytedance",
+      targetRoleId: "role_frontend_bytedance",
       round: "technical",
       difficulty: "pressure",
       durationMinutes: 30,
@@ -730,18 +791,10 @@ export function createInterviewMockResponse(
 ): InterviewPageResponse {
   if (scenario === "noTargetRoles") {
     return {
-      setup: {
-        availability: { status: "available" },
-        availableDifficulties: ["basic", "pressure"],
-        availableDurationMinutes: [15, 30, 45],
-        targetRoles: [],
-        defaultConfiguration: {
-          targetRoleId: null,
-          round: "comprehensive",
-          difficulty: "basic",
-          durationMinutes: 30,
-        },
-      },
+      setup: createInterviewSetupResponseMock(
+        createRolesMockResponse("noRoles"),
+        profileResponseMock,
+      ),
       session: null,
     }
   }
@@ -755,10 +808,10 @@ export function createInterviewMockResponse(
 
   if (scenario === "prerequisiteNotMet") {
     return {
-      setup: {
-        ...structuredClone(interviewSetupResponseMock),
-        availability: { status: "blocked", reason: "profileIncomplete" },
-      },
+      setup: createInterviewSetupResponseMock(
+        createRolesMockResponse("multipleRoles"),
+        createProfileMockSnapshot("partial"),
+      ),
       session: null,
     }
   }

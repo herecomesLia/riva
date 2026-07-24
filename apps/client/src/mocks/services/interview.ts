@@ -5,12 +5,15 @@ import {
   createInterviewMockResponse,
   createInterviewQuestionDetails,
   createInterviewReviewResponseMock,
+  createInterviewSetupResponseMock,
   createInterviewSessionReview,
   interviewOpeningMessageMock,
   type InterviewAgentMockScenario,
   type InterviewMockScenario,
   type MockInterviewAgentPlan,
 } from "@/mocks/data/interview"
+import { getProfileMockSnapshot } from "@/mocks/services/profile"
+import { getRolesMockSnapshot } from "@/mocks/services/roles"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   ActiveInterviewSessionResponse,
@@ -57,7 +60,7 @@ type PlanCursor = {
   followUpIndex: number | null
 }
 
-let response = createInterviewMockResponse()
+let session = createInterviewMockResponse().session
 let selectedAgentScenario: InterviewAgentMockScenario = "singleFollowUp"
 let activePlan: MockInterviewAgentPlan = createInterviewAgentPlanMock(selectedAgentScenario)
 let planCursor: PlanCursor | null = null
@@ -73,13 +76,16 @@ function copy<T>(value: T): T {
 }
 
 function getSnapshot(): InterviewPageResponse {
-  return copy(response)
+  return copy({
+    setup: createInterviewSetupResponseMock(getRolesMockSnapshot(), getProfileMockSnapshot()),
+    session,
+  })
 }
 
-function commit(session: InterviewPageResponse["session"]): InterviewMutationResponse {
-  response = { setup: response.setup, session }
-  if (session?.status === "completed") {
-    completedSessionSnapshots.set(session.sessionId, copy(session))
+function commit(nextSession: InterviewPageResponse["session"]): InterviewMutationResponse {
+  session = nextSession
+  if (nextSession?.status === "completed") {
+    completedSessionSnapshots.set(nextSession.sessionId, copy(nextSession))
   }
   return getSnapshot()
 }
@@ -105,7 +111,6 @@ async function consumeOperation(operation: InterviewMockOperation, fallbackDelay
 function requireActiveSession(
   input: InterviewSessionMutationInput,
 ): ActiveInterviewSessionResponse {
-  const session = response.session
   if (session === null || session.status === "completed") {
     throw new Error("Interview session is not active.")
   }
@@ -206,7 +211,7 @@ export function resetInterviewMockState(
     throw new Error("Interview mock delay must not be negative.")
   }
 
-  response = createInterviewMockResponse(scenario)
+  session = createInterviewMockResponse(scenario).session
   selectedAgentScenario = controller.agentScenario ?? "singleFollowUp"
   activePlan = createInterviewAgentPlanMock(selectedAgentScenario)
   planCursor = null
@@ -216,8 +221,8 @@ export function resetInterviewMockState(
   delayedOperations.clear()
   failingOperations.clear()
   completedSessionSnapshots.clear()
-  if (response.session?.status === "completed") {
-    completedSessionSnapshots.set(response.session.sessionId, copy(response.session))
+  if (session?.status === "completed") {
+    completedSessionSnapshots.set(session.sessionId, copy(session))
   }
 
   for (const operation of controller.failNext ?? []) failingOperations.add(operation)
@@ -237,15 +242,16 @@ export async function startInterview(
   input: StartInterviewInput,
 ): Promise<InterviewMutationResponse> {
   await consumeOperation("startInterview")
-  if (response.setup.availability.status === "blocked") {
-    throw new Error(`Interview prerequisite is not met: ${response.setup.availability.reason}.`)
+  const setup = createInterviewSetupResponseMock(getRolesMockSnapshot(), getProfileMockSnapshot())
+  if (setup.availability.status === "blocked") {
+    throw new Error(`Interview prerequisite is not met: ${setup.availability.reason}.`)
   }
-  const targetRole = response.setup.targetRoles.find(({ id }) => id === input.targetRoleId)
+  const targetRole = setup.targetRoles.find(({ id }) => id === input.targetRoleId)
   if (targetRole === undefined) throw new Error("Interview target role does not exist.")
   if (!targetRole.supportedRounds.includes(input.round)) {
     throw new Error("Interview round is not supported by the target role.")
   }
-  if (!response.setup.availableDurationMinutes.includes(input.durationMinutes)) {
+  if (!setup.availableDurationMinutes.includes(input.durationMinutes)) {
     throw new Error("Interview duration preference is not available.")
   }
 
