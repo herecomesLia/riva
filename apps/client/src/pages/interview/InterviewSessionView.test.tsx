@@ -13,8 +13,9 @@ const summary = {
   company: "字节跳动",
   round: "technical",
   difficulty: "pressure",
-  completedQuestions: 0,
-  totalQuestions: 3,
+  completedMainQuestions: 0,
+  totalMainQuestions: 3,
+  planRevision: 1,
 } as const
 
 function questionProps(
@@ -28,15 +29,12 @@ function questionProps(
       kind: "question",
       content: "请先做一个简短的自我介绍。",
       questionOrder: 1,
-      answer: null,
     },
     history: [],
     isSubmitting: false,
-    advanceStatus: "idle",
     isEnding: false,
     isInteractionLocked: false,
     onSubmit,
-    onRetryAdvance: vi.fn(),
     onEnd: vi.fn(async () => undefined),
   }
 }
@@ -125,6 +123,53 @@ describe("InterviewSessionView", () => {
     expect(screen.queryByRole("button", { name: /收藏|save/i })).not.toBeInTheDocument()
   })
 
+  it("shows non-misleading progress when the Agent has not fixed a total", () => {
+    renderWithProviders(
+      <InterviewSessionView
+        {...questionProps()}
+        summary={{ ...summary, completedMainQuestions: 2, totalMainQuestions: null }}
+      />,
+      { router: false },
+    )
+
+    expect(
+      screen.getByText(
+        i18n.t("interview.session.progressUnknown", {
+          completed: 2,
+        }),
+      ),
+    ).toBeVisible()
+    expect(
+      screen.getByText(i18n.t("interview.session.questionPositionUnknown", { current: 1 })),
+    ).toBeVisible()
+    expect(screen.queryByText(/1\s*\/\s*3/)).not.toBeInTheDocument()
+  })
+
+  it("marks a server-reported plan revision and displays its revised total", () => {
+    renderWithProviders(
+      <InterviewSessionView
+        {...questionProps()}
+        summary={{
+          ...summary,
+          completedMainQuestions: 1,
+          totalMainQuestions: 4,
+          planRevision: 2,
+        }}
+      />,
+      { router: false },
+    )
+
+    expect(screen.getByText(i18n.t("interview.session.planAdjusted"))).toBeVisible()
+    expect(
+      screen.getByText(
+        i18n.t("interview.session.progress", {
+          completed: 1,
+          total: 4,
+        }),
+      ),
+    ).toBeVisible()
+  })
+
   it("distinguishes follow-ups in the unified conversation history", () => {
     renderWithProviders(
       <InterviewSessionView
@@ -172,7 +217,7 @@ describe("InterviewSessionView", () => {
         })}
         prompt="现在请你向面试官提问。"
         status="candidateQuestions"
-        summary={{ ...summary, completedQuestions: 3 }}
+        summary={{ ...summary, completedMainQuestions: 3 }}
       />,
       { router: false },
     )

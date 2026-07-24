@@ -40,10 +40,11 @@ describe("InterviewView", () => {
     expect(screen.getByText(i18n.t("interview.setup.fields.targetRole"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("interview.setup.fields.round"))).toBeInTheDocument()
     expect(screen.getByText(i18n.t("interview.setup.fields.difficulty"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("interview.setup.fields.duration"))).toBeInTheDocument()
     expect(screen.getByTestId("interview-loading-state")).toHaveAttribute("aria-busy", "true")
   })
 
-  it("renders service-provided roles, rounds, and difficulties", async () => {
+  it("renders service-provided roles, rounds, difficulties, and duration preferences", async () => {
     renderReadyView()
 
     expect(await screen.findByText("高级前端工程师 · 字节跳动")).toBeInTheDocument()
@@ -55,6 +56,13 @@ describe("InterviewView", () => {
     for (const difficulty of interviewSetupResponseMock.availableDifficulties) {
       expect(
         screen.getByRole("button", { name: i18n.t(`interview.difficulty.${difficulty}`) }),
+      ).toBeVisible()
+    }
+    for (const durationMinutes of interviewSetupResponseMock.availableDurationMinutes) {
+      expect(
+        screen.getByRole("button", {
+          name: i18n.t("interview.setup.durationMinutes", { minutes: durationMinutes }),
+        }),
       ).toBeVisible()
     }
   })
@@ -83,6 +91,23 @@ describe("InterviewView", () => {
 
     expect(onStart).toHaveBeenCalledTimes(1)
     expect(onStart).toHaveBeenCalledWith(interviewSetupResponseMock.defaultConfiguration)
+  })
+
+  it("submits the duration preference without converting it into a question count", async () => {
+    const user = userEvent.setup()
+    const { onStart } = renderReadyView()
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("interview.setup.durationMinutes", { minutes: 45 }),
+      }),
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("interview.actions.start") }))
+
+    expect(onStart).toHaveBeenCalledWith({
+      ...interviewSetupResponseMock.defaultConfiguration,
+      durationMinutes: 45,
+    })
   })
 
   it("disables all setup controls while starting", async () => {

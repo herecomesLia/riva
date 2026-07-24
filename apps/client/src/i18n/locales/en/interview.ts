@@ -10,7 +10,9 @@ export const interview = {
       targetRole: "Target role",
       round: "Interview round",
       difficulty: "Difficulty",
+      duration: "Expected duration",
     },
+    durationMinutes: "{{minutes}} min",
   },
   rounds: {
     hr: "HR round",
@@ -58,7 +60,11 @@ export const interview = {
     badge: "Mock interview",
     title: "Interview in progress",
     progress: "Overall progress: {{completed}} / {{total}} main questions completed",
+    progressUnknown:
+      "{{completed}} main questions completed; the interviewer will adapt what comes next",
+    planAdjusted: "Interview plan updated",
     questionPosition: "Question {{current}} of {{total}}",
+    questionPositionUnknown: "Main question {{current}}",
     questionDescription:
       "Answer as you would in a real interview. The interviewer will continue after you submit.",
     promptKinds: {

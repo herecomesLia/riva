@@ -1,13 +1,14 @@
 import {
   candidateQuestionsPromptMock,
   createCandidateQuestionExchange,
+  createInterviewAgentPlanMock,
   createInterviewMockResponse,
-  createInterviewQuestionSet,
   createInterviewReview,
   createInterviewReviewResponseMock,
   interviewOpeningMessageMock,
-  projectFollowUpQuestionMock,
+  type InterviewAgentMockScenario,
   type InterviewMockScenario,
+  type MockInterviewAgentPlan,
 } from "@/mocks/data/interview"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
@@ -15,16 +16,15 @@ import type {
   BeginInterviewQuestionsInput,
   CompletedInterviewQuestionResponse,
   EndInterviewInput,
-  EnterCandidateQuestionsInput,
   FinishInterviewInput,
   GetInterviewReviewInput,
   GetInterviewReviewResponse,
-  GetNextInterviewQuestionInput,
   InterviewCandidateQuestionsSessionResponse,
   InterviewCompletedSessionResponse,
   InterviewFollowUpSessionResponse,
   InterviewMutationResponse,
   InterviewPageResponse,
+  InterviewProgressResponse,
   InterviewQuestionSessionResponse,
   InterviewSessionMutationInput,
   StartInterviewInput,
@@ -35,22 +35,29 @@ import type {
 export type InterviewMockOperation =
   | "beginInterviewQuestions"
   | "endInterview"
-  | "enterCandidateQuestions"
   | "finishInterview"
   | "getInterviewPage"
   | "getInterviewReview"
-  | "getNextInterviewQuestion"
   | "startInterview"
   | "submitCandidateQuestion"
   | "submitInterviewAnswer"
 
 export type InterviewMockControllerOptions = {
+  agentScenario?: InterviewAgentMockScenario
   defaultDelayMs?: number
   delayNext?: Partial<Record<InterviewMockOperation, number>>
   failNext?: readonly InterviewMockOperation[]
 }
 
+type PlanCursor = {
+  mainQuestionIndex: number
+  followUpIndex: number | null
+}
+
 let response = createInterviewMockResponse()
+let selectedAgentScenario: InterviewAgentMockScenario = "singleFollowUp"
+let activePlan: MockInterviewAgentPlan = createInterviewAgentPlanMock(selectedAgentScenario)
+let planCursor: PlanCursor | null = null
 let sessionSequence = 0
 let mutationSequence = 0
 let configuredDefaultDelayMs: number | undefined
@@ -66,10 +73,7 @@ function getSnapshot(): InterviewPageResponse {
 }
 
 function commit(session: InterviewPageResponse["session"]): InterviewMutationResponse {
-  response = {
-    setup: response.setup,
-    session,
-  }
+  response = { setup: response.setup, session }
   return getSnapshot()
 }
 
@@ -86,7 +90,6 @@ async function consumeOperation(operation: InterviewMockOperation, fallbackDelay
   const delayMs = delayedOperations.get(operation) ?? configuredDefaultDelayMs ?? fallbackDelayMs
   delayedOperations.delete(operation)
   if (delayMs > 0) await waitForMockDelay(delayMs)
-
   if (failingOperations.delete(operation)) {
     throw new Error(`Interview mock operation failed: ${operation}`)
   }
@@ -108,67 +111,80 @@ function requireActiveSession(
   return session
 }
 
+function requirePlanCursor(): PlanCursor {
+  if (planCursor === null) throw new Error("Interview Agent plan is not active.")
+  return planCursor
+}
+
 function requireContent(content: string) {
   const normalized = content.trim()
   if (!normalized) throw new Error("Interview response content is required.")
   return normalized
 }
 
-function toCompletedQuestion(
-  session: InterviewQuestionSessionResponse,
-): CompletedInterviewQuestionResponse {
-  if (session.currentQuestion.status !== "answered") {
-    throw new Error("Current interview question has not been answered.")
-  }
+function progressAfter(completedMainQuestions: number): InterviewProgressResponse {
+  const latestChange = activePlan.planChanges
+    .filter((change) => change.afterCompletedMainQuestions <= completedMainQuestions)
+    .at(-1)
   return {
-    question: session.currentQuestion.question,
-    answer: session.currentQuestion.answer,
-    followUps: [],
-    completedAt: nextTimestamp(),
+    completedMainQuestions,
+    totalMainQuestions:
+      latestChange?.totalMainQuestions ?? activePlan.initialProgress.totalMainQuestions,
+    planRevision: latestChange?.planRevision ?? activePlan.initialProgress.planRevision,
   }
 }
 
-function toCompletedFollowUpQuestion(
-  session: InterviewFollowUpSessionResponse,
-): CompletedInterviewQuestionResponse {
-  if (session.currentFollowUp.status !== "answered") {
-    throw new Error("Current interview follow-up has not been answered.")
-  }
-  return {
-    question: session.currentQuestion.question,
-    answer: session.currentQuestion.answer,
-    followUps: [...session.currentQuestion.answeredFollowUps, session.currentFollowUp],
-    completedAt: nextTimestamp(),
-  }
-}
-
-function createNextQuestionSession(
+function toQuestionSession(
   session: ActiveInterviewSessionResponse,
   completedQuestions: CompletedInterviewQuestionResponse[],
-  currentOrder: number,
+  mainQuestionIndex: number,
 ): InterviewQuestionSessionResponse {
-  const nextQuestion = createInterviewQuestionSet().find(({ order }) => order === currentOrder + 1)
-  if (nextQuestion === undefined) {
-    throw new Error("No next interview question is available.")
-  }
-
+  const planned = activePlan.questions[mainQuestionIndex]
+  if (planned === undefined) throw new Error("Interview Agent plan has no next main question.")
+  planCursor = { mainQuestionIndex, followUpIndex: null }
   return {
     status: "question",
     sessionId: session.sessionId,
     version: session.version + 1,
     configuration: session.configuration,
     startedAt: session.startedAt,
-    progress: {
-      completedQuestions: completedQuestions.length,
-      totalQuestions: session.progress.totalQuestions,
-    },
+    progress: progressAfter(completedQuestions.length),
     completedQuestions,
     currentQuestion: {
       status: "awaitingAnswer",
-      question: nextQuestion,
+      question: copy(planned.question),
       answer: null,
     },
   }
+}
+
+function toCandidateQuestionsSession(
+  session: ActiveInterviewSessionResponse,
+  completedQuestions: CompletedInterviewQuestionResponse[],
+): InterviewCandidateQuestionsSessionResponse {
+  planCursor = null
+  return {
+    status: "candidateQuestions",
+    sessionId: session.sessionId,
+    version: session.version + 1,
+    configuration: session.configuration,
+    startedAt: session.startedAt,
+    progress: progressAfter(completedQuestions.length),
+    completedQuestions,
+    prompt: candidateQuestionsPromptMock,
+    exchanges: [],
+  }
+}
+
+function afterCompletedMainQuestion(
+  session: ActiveInterviewSessionResponse,
+  completedQuestions: CompletedInterviewQuestionResponse[],
+  currentMainQuestionIndex: number,
+) {
+  const nextMainQuestionIndex = currentMainQuestionIndex + 1
+  return activePlan.questions[nextMainQuestionIndex] === undefined
+    ? toCandidateQuestionsSession(session, completedQuestions)
+    : toQuestionSession(session, completedQuestions, nextMainQuestionIndex)
 }
 
 export function resetInterviewMockState(
@@ -184,6 +200,9 @@ export function resetInterviewMockState(
   }
 
   response = createInterviewMockResponse(scenario)
+  selectedAgentScenario = controller.agentScenario ?? "singleFollowUp"
+  activePlan = createInterviewAgentPlanMock(selectedAgentScenario)
+  planCursor = null
   sessionSequence = 0
   mutationSequence = 0
   configuredDefaultDelayMs = controller.defaultDelayMs
@@ -215,19 +234,20 @@ export async function startInterview(
   if (!targetRole.supportedRounds.includes(input.round)) {
     throw new Error("Interview round is not supported by the target role.")
   }
+  if (!response.setup.availableDurationMinutes.includes(input.durationMinutes)) {
+    throw new Error("Interview duration preference is not available.")
+  }
 
+  activePlan = createInterviewAgentPlanMock(selectedAgentScenario)
+  planCursor = null
   sessionSequence += 1
-  const questions = createInterviewQuestionSet()
   return commit({
     status: "opening",
     sessionId: `mock-interview-session-${sessionSequence}`,
     version: 1,
     configuration: copy(input),
     startedAt: nextTimestamp(),
-    progress: {
-      completedQuestions: 0,
-      totalQuestions: questions.length,
-    },
+    progress: progressAfter(0),
     completedQuestions: [],
     openingMessage: interviewOpeningMessageMock,
   })
@@ -241,23 +261,7 @@ export async function beginInterviewQuestions(
   if (session.status !== "opening") {
     throw new Error("Interview opening has already finished.")
   }
-  const firstQuestion = createInterviewQuestionSet()[0]
-  if (firstQuestion === undefined) throw new Error("Interview question set is empty.")
-
-  return commit({
-    status: "question",
-    sessionId: session.sessionId,
-    version: session.version + 1,
-    configuration: session.configuration,
-    startedAt: session.startedAt,
-    progress: session.progress,
-    completedQuestions: session.completedQuestions,
-    currentQuestion: {
-      status: "awaitingAnswer",
-      question: firstQuestion,
-      answer: null,
-    },
-  })
+  return commit(toQuestionSession(session, [], 0))
 }
 
 export async function submitInterviewAnswer(
@@ -265,134 +269,26 @@ export async function submitInterviewAnswer(
 ): Promise<InterviewMutationResponse> {
   await consumeOperation("submitInterviewAnswer")
   const session = requireActiveSession(input)
+  const cursor = requirePlanCursor()
   const content = requireContent(input.content)
+  const planned = activePlan.questions[cursor.mainQuestionIndex]
+  if (planned === undefined) throw new Error("Interview Agent plan position is invalid.")
 
   if (input.target === "question") {
     if (session.status !== "question") {
       throw new Error("Interview is not awaiting a main answer.")
     }
-    if (session.currentQuestion.question.id !== input.questionId) {
-      throw new Error("Interview question does not match the current question.")
+    if (session.currentQuestion.question.id !== input.questionId || cursor.followUpIndex !== null) {
+      throw new Error("Interview question does not match the authoritative session.")
     }
-    if (session.currentQuestion.status === "answered") {
-      throw new Error("Current interview question has already been answered.")
-    }
-
     const answer = {
       id: nextId("interview-answer"),
       content,
       submittedAt: nextTimestamp(),
     }
-    const answered: InterviewQuestionSessionResponse = {
-      ...session,
-      version: session.version + 1,
-      currentQuestion: {
-        status: "answered",
-        question: session.currentQuestion.question,
-        answer,
-      },
-    }
-
-    if (answered.currentQuestion.question.id === projectFollowUpQuestionMock.parentQuestionId) {
-      return commit({
-        status: "followUp",
-        sessionId: answered.sessionId,
-        version: answered.version,
-        configuration: answered.configuration,
-        startedAt: answered.startedAt,
-        progress: answered.progress,
-        completedQuestions: answered.completedQuestions,
-        currentQuestion: {
-          question: answered.currentQuestion.question,
-          answer,
-          answeredFollowUps: [],
-        },
-        currentFollowUp: {
-          status: "awaitingAnswer",
-          question: copy(projectFollowUpQuestionMock),
-          answer: null,
-        },
-      })
-    }
-
-    const completedQuestions = [...answered.completedQuestions, toCompletedQuestion(answered)]
-    if (answered.currentQuestion.question.order === answered.progress.totalQuestions) {
-      return commit({
-        status: "candidateQuestions",
-        sessionId: answered.sessionId,
-        version: answered.version,
-        configuration: answered.configuration,
-        startedAt: answered.startedAt,
-        progress: {
-          completedQuestions: completedQuestions.length,
-          totalQuestions: answered.progress.totalQuestions,
-        },
-        completedQuestions,
-        prompt: candidateQuestionsPromptMock,
-        exchanges: [],
-      })
-    }
-
-    return commit(
-      createNextQuestionSession(
-        { ...answered, version: session.version },
-        completedQuestions,
-        answered.currentQuestion.question.order,
-      ),
-    )
-  }
-
-  if (session.status !== "followUp") {
-    throw new Error("Interview is not awaiting a follow-up answer.")
-  }
-  if (session.currentQuestion.question.id !== input.questionId) {
-    throw new Error("Interview question does not match the current question.")
-  }
-  if (session.currentFollowUp.question.id !== input.followUpQuestionId) {
-    throw new Error("Interview follow-up does not match the current follow-up.")
-  }
-  if (session.currentFollowUp.status === "answered") {
-    throw new Error("Current interview follow-up has already been answered.")
-  }
-
-  const answered: InterviewFollowUpSessionResponse = {
-    ...session,
-    version: session.version + 1,
-    currentFollowUp: {
-      status: "answered",
-      question: session.currentFollowUp.question,
-      answer: {
-        id: nextId("interview-follow-up-answer"),
-        content,
-        submittedAt: nextTimestamp(),
-      },
-    },
-  }
-  const completedQuestions = [...answered.completedQuestions, toCompletedFollowUpQuestion(answered)]
-  return commit(
-    createNextQuestionSession(
-      { ...answered, version: session.version },
-      completedQuestions,
-      answered.currentQuestion.question.order,
-    ),
-  )
-}
-
-export async function getNextInterviewQuestion(
-  input: GetNextInterviewQuestionInput,
-): Promise<InterviewMutationResponse> {
-  await consumeOperation("getNextInterviewQuestion")
-  const session = requireActiveSession(input)
-
-  if (input.target === "question") {
-    if (session.status !== "question" || session.currentQuestion.status !== "answered") {
-      throw new Error("Interview main answer is not ready to advance.")
-    }
-    if (session.currentQuestion.question.id !== input.questionId) {
-      throw new Error("Interview question does not match the current question.")
-    }
-
-    if (session.currentQuestion.question.id === projectFollowUpQuestionMock.parentQuestionId) {
+    const firstFollowUp = planned.followUps[0]
+    if (firstFollowUp !== undefined) {
+      planCursor = { ...cursor, followUpIndex: 0 }
       return commit({
         status: "followUp",
         sessionId: session.sessionId,
@@ -403,88 +299,77 @@ export async function getNextInterviewQuestion(
         completedQuestions: session.completedQuestions,
         currentQuestion: {
           question: session.currentQuestion.question,
-          answer: session.currentQuestion.answer,
+          answer,
           answeredFollowUps: [],
         },
         currentFollowUp: {
           status: "awaitingAnswer",
-          question: copy(projectFollowUpQuestionMock),
+          question: copy(firstFollowUp),
           answer: null,
         },
       })
     }
 
-    if (session.currentQuestion.question.order === session.progress.totalQuestions) {
-      const completedQuestions = [...session.completedQuestions, toCompletedQuestion(session)]
-      return commit({
-        status: "candidateQuestions",
-        sessionId: session.sessionId,
-        version: session.version + 1,
-        configuration: session.configuration,
-        startedAt: session.startedAt,
-        progress: {
-          completedQuestions: completedQuestions.length,
-          totalQuestions: session.progress.totalQuestions,
-        },
-        completedQuestions,
-        prompt: candidateQuestionsPromptMock,
-        exchanges: [],
-      })
-    }
-    const completedQuestions = [...session.completedQuestions, toCompletedQuestion(session)]
-    return commit(
-      createNextQuestionSession(
-        session,
-        completedQuestions,
-        session.currentQuestion.question.order,
-      ),
-    )
+    const completedQuestions = [
+      ...session.completedQuestions,
+      {
+        question: session.currentQuestion.question,
+        answer,
+        followUps: [],
+        completedAt: nextTimestamp(),
+      },
+    ]
+    return commit(afterCompletedMainQuestion(session, completedQuestions, cursor.mainQuestionIndex))
   }
 
   if (
     session.status !== "followUp" ||
-    session.currentFollowUp.status !== "answered" ||
+    cursor.followUpIndex === null ||
     session.currentQuestion.question.id !== input.questionId ||
     session.currentFollowUp.question.id !== input.followUpQuestionId
   ) {
-    throw new Error("Interview follow-up answer is not ready to advance.")
+    throw new Error("Interview follow-up does not match the authoritative session.")
   }
-  const completedQuestions = [...session.completedQuestions, toCompletedFollowUpQuestion(session)]
-  return commit(
-    createNextQuestionSession(session, completedQuestions, session.currentQuestion.question.order),
-  )
-}
-
-export async function enterCandidateQuestions(
-  input: EnterCandidateQuestionsInput,
-): Promise<InterviewMutationResponse> {
-  await consumeOperation("enterCandidateQuestions")
-  const session = requireActiveSession(input)
-  if (
-    session.status !== "question" ||
-    session.currentQuestion.status !== "answered" ||
-    session.currentQuestion.question.id !== input.questionId ||
-    session.currentQuestion.question.order !== session.progress.totalQuestions
-  ) {
-    throw new Error("Interview is not ready for candidate questions.")
-  }
-
-  const completedQuestions = [...session.completedQuestions, toCompletedQuestion(session)]
-  const next: InterviewCandidateQuestionsSessionResponse = {
-    status: "candidateQuestions",
-    sessionId: session.sessionId,
-    version: session.version + 1,
-    configuration: session.configuration,
-    startedAt: session.startedAt,
-    progress: {
-      completedQuestions: completedQuestions.length,
-      totalQuestions: session.progress.totalQuestions,
+  const answeredFollowUp = {
+    status: "answered" as const,
+    question: session.currentFollowUp.question,
+    answer: {
+      id: nextId("interview-follow-up-answer"),
+      content,
+      submittedAt: nextTimestamp(),
     },
-    completedQuestions,
-    prompt: candidateQuestionsPromptMock,
-    exchanges: [],
   }
-  return commit(next)
+  const answeredFollowUps = [...session.currentQuestion.answeredFollowUps, answeredFollowUp]
+  const nextFollowUpIndex = cursor.followUpIndex + 1
+  const nextFollowUp = planned.followUps[nextFollowUpIndex]
+  if (nextFollowUp !== undefined) {
+    planCursor = { ...cursor, followUpIndex: nextFollowUpIndex }
+    const next: InterviewFollowUpSessionResponse = {
+      ...session,
+      version: session.version + 1,
+      currentQuestion: {
+        ...session.currentQuestion,
+        answeredFollowUps,
+      },
+      currentFollowUp: {
+        status: "awaitingAnswer",
+        question: copy(nextFollowUp),
+        answer: null,
+      },
+    }
+    return commit(next)
+  }
+
+  const completedQuestions = [
+    ...session.completedQuestions,
+    {
+      question: session.currentQuestion.question,
+      answer: session.currentQuestion.answer,
+      followUps: answeredFollowUps,
+      completedAt: nextTimestamp(),
+    },
+  ]
+  return commit(afterCompletedMainQuestion(session, completedQuestions, cursor.mainQuestionIndex))
 }
 
 export async function submitCandidateQuestion(
@@ -496,15 +381,14 @@ export async function submitCandidateQuestion(
     throw new Error("Interview is not in the candidate question stage.")
   }
   const content = requireContent(input.content)
-  const next: InterviewCandidateQuestionsSessionResponse = {
+  return commit({
     ...session,
     version: session.version + 1,
     exchanges: [
       ...session.exchanges,
       createCandidateQuestionExchange(content, session.exchanges.length + 1),
     ],
-  }
-  return commit(next)
+  })
 }
 
 export async function finishInterview(
@@ -515,20 +399,26 @@ export async function finishInterview(
   if (session.status !== "candidateQuestions") {
     throw new Error("Interview can only finish after entering candidate questions.")
   }
+  return commit(toCompletedSession(session, session.completedQuestions, session.exchanges))
+}
 
-  const completed: InterviewCompletedSessionResponse = {
+function toCompletedSession(
+  session: ActiveInterviewSessionResponse,
+  completedQuestions: CompletedInterviewQuestionResponse[],
+  candidateQuestionExchanges: InterviewCandidateQuestionsSessionResponse["exchanges"],
+): InterviewCompletedSessionResponse {
+  return {
     status: "completed",
     sessionId: session.sessionId,
     version: session.version + 1,
     configuration: session.configuration,
     startedAt: session.startedAt,
-    progress: session.progress,
-    completedQuestions: session.completedQuestions,
+    progress: progressAfter(completedQuestions.length),
+    completedQuestions,
     completedAt: nextTimestamp(),
-    candidateQuestionExchanges: session.exchanges,
-    review: createInterviewReview(session.completedQuestions.map(({ question }) => question)),
+    candidateQuestionExchanges,
+    review: createInterviewReview(completedQuestions.map(({ question }) => question)),
   }
-  return commit(completed)
 }
 
 export async function endInterview(input: EndInterviewInput): Promise<InterviewMutationResponse> {
@@ -536,28 +426,20 @@ export async function endInterview(input: EndInterviewInput): Promise<InterviewM
   const session = requireActiveSession(input)
   let completedQuestions = session.completedQuestions
 
-  if (session.status === "question" && session.currentQuestion.status === "answered") {
-    completedQuestions = [...completedQuestions, toCompletedQuestion(session)]
-  } else if (session.status === "followUp" && session.currentFollowUp.status === "answered") {
-    completedQuestions = [...completedQuestions, toCompletedFollowUpQuestion(session)]
+  if (session.status === "followUp") {
+    completedQuestions = [
+      ...completedQuestions,
+      {
+        question: session.currentQuestion.question,
+        answer: session.currentQuestion.answer,
+        followUps: session.currentQuestion.answeredFollowUps,
+        completedAt: nextTimestamp(),
+      },
+    ]
   }
-
-  const completed: InterviewCompletedSessionResponse = {
-    status: "completed",
-    sessionId: session.sessionId,
-    version: session.version + 1,
-    configuration: session.configuration,
-    startedAt: session.startedAt,
-    progress: {
-      completedQuestions: completedQuestions.length,
-      totalQuestions: session.progress.totalQuestions,
-    },
-    completedQuestions,
-    completedAt: nextTimestamp(),
-    candidateQuestionExchanges: session.status === "candidateQuestions" ? session.exchanges : [],
-    review: createInterviewReview(completedQuestions.map(({ question }) => question)),
-  }
-  return commit(completed)
+  const exchanges = session.status === "candidateQuestions" ? session.exchanges : []
+  planCursor = null
+  return commit(toCompletedSession(session, completedQuestions, exchanges))
 }
 
 export async function getInterviewReview(

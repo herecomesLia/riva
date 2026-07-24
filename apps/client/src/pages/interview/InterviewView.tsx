@@ -167,6 +167,14 @@ function InterviewLoadingState() {
               <Skeleton className="h-9 w-20" />
             </div>
           </Field>
+          <Field className="border-t border-border pt-6">
+            <FieldLabel>{t("interview.setup.fields.duration")}</FieldLabel>
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-9 w-20" />
+              <Skeleton className="h-9 w-20" />
+              <Skeleton className="h-9 w-20" />
+            </div>
+          </Field>
         </FieldGroup>
       </CardContent>
       <CardFooter className="mt-7 border-t">

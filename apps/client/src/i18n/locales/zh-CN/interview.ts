@@ -8,7 +8,9 @@ export const interview = {
       targetRole: "目标岗位",
       round: "面试轮次",
       difficulty: "面试难度",
+      duration: "预计面试时长",
     },
+    durationMinutes: "{{minutes}} 分钟",
   },
   rounds: {
     hr: "HR 面",
@@ -54,7 +56,10 @@ export const interview = {
     badge: "模拟面试",
     title: "面试进行中",
     progress: "整体进度：已完成 {{completed}} / {{total}} 道正式问题",
+    progressUnknown: "已完成 {{completed}} 道正式问题，后续题目由面试官动态安排",
+    planAdjusted: "面试计划已更新",
     questionPosition: "第 {{current}} / {{total}} 题",
+    questionPositionUnknown: "第 {{current}} 道主问题",
     questionDescription: "请像正式面试一样完整作答，提交后面试官会继续提问。",
     promptKinds: {
       question: "面试官提问",

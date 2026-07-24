@@ -57,8 +57,9 @@ export function createInterviewSessionStoryFixture() {
     company: targetRole.company,
     round: session.configuration.round,
     difficulty: session.configuration.difficulty,
-    completedQuestions: 1,
-    totalQuestions: session.progress.totalQuestions,
+    completedMainQuestions: session.progress.completedMainQuestions,
+    totalMainQuestions: session.progress.totalMainQuestions,
+    planRevision: session.progress.planRevision,
   }
 
   return {

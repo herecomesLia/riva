@@ -56,8 +56,9 @@ export type InterviewSessionSummary = {
   company: string | null
   round: InterviewRound
   difficulty: InterviewDifficulty
-  completedQuestions: number
-  totalQuestions: number
+  completedMainQuestions: number
+  totalMainQuestions: number | null
+  planRevision: number
 }
 
 export type InterviewPromptViewData = {
@@ -65,7 +66,6 @@ export type InterviewPromptViewData = {
   kind: "question" | "followUp"
   content: string
   questionOrder: number
-  answer: string | null
 }
 
 type ActiveSessionActions = {
@@ -101,9 +101,7 @@ export type InterviewSessionViewProps =
       prompt: InterviewPromptViewData
       history: readonly InterviewConversationRecordViewData[]
       isSubmitting: boolean
-      advanceStatus: "idle" | "ready" | "advancing" | "failed"
       onSubmit: (content: string) => Promise<void>
-      onRetryAdvance: () => void
     } & ActiveSessionActions)
   | {
       status: "candidateQuestions"
@@ -185,12 +183,7 @@ function SessionSummaryHeader({ summary }: { summary: InterviewSessionSummary })
         {summary.targetRole}
       </h1>
       {summary.company ? <p className="text-sm text-muted-foreground">{summary.company}</p> : null}
-      <p className="text-sm text-muted-foreground">
-        {t("interview.session.progress", {
-          completed: summary.completedQuestions,
-          total: summary.totalQuestions,
-        })}
-      </p>
+      <SessionProgress summary={summary} />
     </header>
   )
 }
@@ -234,12 +227,7 @@ function SessionHeader({
           {summary.company ? (
             <p className="text-sm text-muted-foreground">{summary.company}</p>
           ) : null}
-          <p className="text-sm text-muted-foreground">
-            {t("interview.session.progress", {
-              completed: summary.completedQuestions,
-              total: summary.totalQuestions,
-            })}
-          </p>
+          <SessionProgress summary={summary} />
         </div>
         <Button
           className="self-start"
@@ -287,6 +275,28 @@ function SessionHeader({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  )
+}
+
+function SessionProgress({ summary }: { summary: InterviewSessionSummary }) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <span>
+        {summary.totalMainQuestions === null
+          ? t("interview.session.progressUnknown", {
+              completed: summary.completedMainQuestions,
+            })
+          : t("interview.session.progress", {
+              completed: summary.completedMainQuestions,
+              total: summary.totalMainQuestions,
+            })}
+      </span>
+      {summary.planRevision > 1 ? (
+        <Badge variant="outline">{t("interview.session.planAdjusted")}</Badge>
+      ) : null}
+    </div>
   )
 }
 
@@ -350,10 +360,14 @@ function QuestionContent(props: Extract<InterviewSessionViewProps, { status: "qu
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Badge>{t(`interview.session.promptKinds.${props.prompt.kind}`)}</Badge>
             <span className="text-sm text-muted-foreground">
-              {t("interview.session.questionPosition", {
-                current: props.prompt.questionOrder,
-                total: props.summary.totalQuestions,
-              })}
+              {props.summary.totalMainQuestions === null
+                ? t("interview.session.questionPositionUnknown", {
+                    current: props.prompt.questionOrder,
+                  })
+                : t("interview.session.questionPosition", {
+                    current: props.prompt.questionOrder,
+                    total: props.summary.totalMainQuestions,
+                  })}
             </span>
           </div>
           <CardTitle className="pt-3 text-xl leading-8 break-words sm:text-2xl sm:leading-9">
@@ -363,50 +377,11 @@ function QuestionContent(props: Extract<InterviewSessionViewProps, { status: "qu
         </CardHeader>
       </Card>
 
-      {props.prompt.answer === null ? (
-        <InterviewAnswerComposer
-          isPending={props.isSubmitting}
-          key={props.prompt.id}
-          onSubmit={props.onSubmit}
-        />
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("interview.session.answer.submittedTitle")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap break-words text-sm leading-7">
-              {props.prompt.answer}
-            </p>
-          </CardContent>
-          <CardFooter aria-live="polite" className="border-t">
-            {props.advanceStatus === "advancing" ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Spinner aria-hidden="true" />
-                {t("interview.session.advance.loading")}
-              </div>
-            ) : null}
-            {props.advanceStatus === "failed" ? (
-              <Alert variant="destructive">
-                <AlertCircleIcon aria-hidden="true" />
-                <AlertTitle>{t("interview.session.errors.advanceTitle")}</AlertTitle>
-                <AlertDescription>
-                  {t("interview.session.errors.advanceDescription")}
-                </AlertDescription>
-                <Button className="mt-3" onClick={props.onRetryAdvance} size="sm" variant="outline">
-                  <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("interview.session.actions.retryAdvance")}
-                </Button>
-              </Alert>
-            ) : null}
-            {props.advanceStatus === "ready" ? (
-              <Button onClick={props.onRetryAdvance}>
-                {t("interview.session.actions.continueToNext")}
-              </Button>
-            ) : null}
-          </CardFooter>
-        </Card>
-      )}
+      <InterviewAnswerComposer
+        isPending={props.isSubmitting}
+        key={props.prompt.id}
+        onSubmit={props.onSubmit}
+      />
     </main>
   )
 }

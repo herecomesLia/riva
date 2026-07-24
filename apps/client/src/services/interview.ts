@@ -3,11 +3,9 @@ import * as interviewMockService from "@/mocks/services/interview"
 import type {
   BeginInterviewQuestionsInput,
   EndInterviewInput,
-  EnterCandidateQuestionsInput,
   FinishInterviewInput,
   GetInterviewReviewInput,
   GetInterviewReviewResponse,
-  GetNextInterviewQuestionInput,
   InterviewMutationResponse,
   InterviewPageResponse,
   StartInterviewInput,
@@ -37,18 +35,6 @@ export function submitInterviewAnswer(
   input: SubmitInterviewAnswerInput,
 ): Promise<InterviewMutationResponse> {
   return env.mock ? interviewMockService.submitInterviewAnswer(input) : realApiUnavailable()
-}
-
-export function getNextInterviewQuestion(
-  input: GetNextInterviewQuestionInput,
-): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.getNextInterviewQuestion(input) : realApiUnavailable()
-}
-
-export function enterCandidateQuestions(
-  input: EnterCandidateQuestionsInput,
-): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.enterCandidateQuestions(input) : realApiUnavailable()
 }
 
 export function submitCandidateQuestion(

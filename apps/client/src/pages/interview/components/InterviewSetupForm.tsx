@@ -20,6 +20,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type {
   InterviewConfiguration,
   InterviewDifficulty,
+  InterviewDurationMinutes,
   InterviewRound,
   InterviewSetupViewData,
 } from "@/models/interview"
@@ -47,6 +48,11 @@ function getInitialConfiguration(setup: InterviewSetupViewData): InterviewConfig
     difficulty: setup.availableDifficulties.includes(setup.defaultConfiguration.difficulty)
       ? setup.defaultConfiguration.difficulty
       : setup.availableDifficulties[0],
+    durationMinutes: setup.availableDurationMinutes.includes(
+      setup.defaultConfiguration.durationMinutes,
+    )
+      ? setup.defaultConfiguration.durationMinutes
+      : setup.availableDurationMinutes[0],
   }
 }
 
@@ -162,7 +168,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
             </form.Subscribe>
           </div>
 
-          <div className="border-t border-border pt-6">
+          <div className="border-t border-border py-6">
             <form.Field name="difficulty">
               {(field) => (
                 <FieldSet data-disabled={pending}>
@@ -184,6 +190,34 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                     {setup.availableDifficulties.map((difficulty) => (
                       <ToggleGroupItem key={difficulty} value={difficulty}>
                         {t(`interview.difficulty.${difficulty}`)}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </FieldSet>
+              )}
+            </form.Field>
+          </div>
+
+          <div className="border-t border-border pt-6">
+            <form.Field name="durationMinutes">
+              {(field) => (
+                <FieldSet data-disabled={pending}>
+                  <FieldLegend variant="label">{t("interview.setup.fields.duration")}</FieldLegend>
+                  <ToggleGroup
+                    aria-label={t("interview.setup.fields.duration")}
+                    className="flex w-full flex-wrap justify-start"
+                    disabled={pending}
+                    onValueChange={(values) => {
+                      const value = values[0]
+                      if (value) field.handleChange(Number(value) as InterviewDurationMinutes)
+                    }}
+                    spacing={2}
+                    value={[String(field.state.value)]}
+                    variant="outline"
+                  >
+                    {setup.availableDurationMinutes.map((durationMinutes) => (
+                      <ToggleGroupItem key={durationMinutes} value={String(durationMinutes)}>
+                        {t("interview.setup.durationMinutes", { minutes: durationMinutes })}
                       </ToggleGroupItem>
                     ))}
                   </ToggleGroup>

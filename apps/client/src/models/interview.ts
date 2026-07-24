@@ -3,6 +3,8 @@ export type InterviewRound =
 
 export type InterviewDifficulty = "basic" | "pressure"
 
+export type InterviewDurationMinutes = 15 | 30 | 45
+
 export type InterviewQuestionType =
   | "selfIntroduction"
   | "projectDeepDive"
@@ -16,6 +18,8 @@ export type InterviewConfiguration = {
   targetRoleId: string
   round: InterviewRound
   difficulty: InterviewDifficulty
+  /** User preference only. The Agent decides question count and follow-up depth. */
+  durationMinutes: InterviewDurationMinutes
 }
 
 /**
@@ -42,10 +46,12 @@ export type InterviewSetupResponse = {
   availability: InterviewSetupAvailabilityResponse
   targetRoles: InterviewTargetRoleResponse[]
   availableDifficulties: [InterviewDifficulty, ...InterviewDifficulty[]]
+  availableDurationMinutes: [InterviewDurationMinutes, ...InterviewDurationMinutes[]]
   defaultConfiguration: {
     targetRoleId: string | null
     round: InterviewRound
     difficulty: InterviewDifficulty
+    durationMinutes: InterviewDurationMinutes
   }
 }
 
@@ -77,15 +83,6 @@ export type AnsweredInterviewFollowUpResponse = {
   answer: InterviewAnswerResponse
 }
 
-export type AwaitingInterviewFollowUpResponse = {
-  status: "awaitingAnswer"
-  question: InterviewFollowUpQuestionResponse
-  answer: null
-}
-
-export type InterviewFollowUpResponse =
-  AnsweredInterviewFollowUpResponse | AwaitingInterviewFollowUpResponse
-
 export type CompletedInterviewQuestionResponse = {
   question: InterviewQuestionResponse
   answer: InterviewAnswerResponse
@@ -113,8 +110,11 @@ export type InterviewCandidateQuestionExchangeResponse = {
 }
 
 export type InterviewProgressResponse = {
-  completedQuestions: number
-  totalQuestions: number
+  completedMainQuestions: number
+  /** `null` means the Agent has not committed to a stable main-question count. */
+  totalMainQuestions: number | null
+  /** Increments when the Agent changes the active interview plan. */
+  planRevision: number
 }
 
 type InterviewActiveSessionResponseBase = {
@@ -134,17 +134,11 @@ export type InterviewOpeningSessionResponse = InterviewActiveSessionResponseBase
 
 export type InterviewQuestionSessionResponse = InterviewActiveSessionResponseBase & {
   status: "question"
-  currentQuestion:
-    | {
-        status: "awaitingAnswer"
-        question: InterviewQuestionResponse
-        answer: null
-      }
-    | {
-        status: "answered"
-        question: InterviewQuestionResponse
-        answer: InterviewAnswerResponse
-      }
+  currentQuestion: {
+    status: "awaitingAnswer"
+    question: InterviewQuestionResponse
+    answer: null
+  }
 }
 
 export type InterviewFollowUpSessionResponse = InterviewActiveSessionResponseBase & {
@@ -154,7 +148,11 @@ export type InterviewFollowUpSessionResponse = InterviewActiveSessionResponseBas
     answer: InterviewAnswerResponse
     answeredFollowUps: AnsweredInterviewFollowUpResponse[]
   }
-  currentFollowUp: InterviewFollowUpResponse
+  currentFollowUp: {
+    status: "awaitingAnswer"
+    question: InterviewFollowUpQuestionResponse
+    answer: null
+  }
 }
 
 export type InterviewCandidateQuestionsSessionResponse = InterviewActiveSessionResponseBase & {
@@ -259,6 +257,7 @@ export type InterviewSetupViewData = {
   availability: InterviewSetupResponse["availability"]
   targetRoles: InterviewTargetRoleResponse[]
   availableDifficulties: InterviewSetupResponse["availableDifficulties"]
+  availableDurationMinutes: InterviewSetupResponse["availableDurationMinutes"]
   defaultConfiguration: InterviewSetupResponse["defaultConfiguration"]
 }
 
@@ -300,13 +299,14 @@ export type InterviewPageViewState =
  * Form fields intentionally allow incomplete values. Validated mutation inputs
  * below use the stricter business contract.
  */
-export type InterviewSetupField = "targetRoleId" | "round" | "difficulty"
+export type InterviewSetupField = "targetRoleId" | "round" | "difficulty" | "durationMinutes"
 
 export type InterviewSetupFormState = {
   values: {
     targetRoleId: string | null
     round: InterviewRound | null
     difficulty: InterviewDifficulty | null
+    durationMinutes: InterviewDurationMinutes | null
   }
   fieldErrors: Partial<Record<InterviewSetupField, "required">>
   submitStatus: "idle" | "submitting" | "failed"
@@ -340,17 +340,6 @@ export type InterviewSessionMutationInput = {
 
 export type BeginInterviewQuestionsInput = InterviewSessionMutationInput
 
-export type GetNextInterviewQuestionInput =
-  | (InterviewSessionMutationInput & {
-      target: "question"
-      questionId: string
-    })
-  | (InterviewSessionMutationInput & {
-      target: "followUp"
-      questionId: string
-      followUpQuestionId: string
-    })
-
 export type SubmitInterviewAnswerInput =
   | (InterviewSessionMutationInput & {
       target: "question"
@@ -366,10 +355,6 @@ export type SubmitInterviewAnswerInput =
 
 export type SubmitCandidateQuestionInput = InterviewSessionMutationInput & {
   content: string
-}
-
-export type EnterCandidateQuestionsInput = InterviewSessionMutationInput & {
-  questionId: string
 }
 
 export type FinishInterviewInput = InterviewSessionMutationInput

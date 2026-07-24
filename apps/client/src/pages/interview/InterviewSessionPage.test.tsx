@@ -5,11 +5,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n/i18n"
 import {
   createCandidateQuestionExchange,
+  createInterviewAgentPlanMock,
   createInterviewMockResponse,
   createInterviewQuestionSet,
 } from "@/mocks/data/interview"
 import type {
   InterviewCandidateQuestionsSessionResponse,
+  InterviewFollowUpSessionResponse,
   InterviewPageResponse,
   InterviewQuestionSessionResponse,
 } from "@/models/interview"
@@ -18,7 +20,6 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
-  getNextInterviewQuestion,
   submitCandidateQuestion,
   submitInterviewAnswer,
 } from "@/services/interview"
@@ -32,7 +33,6 @@ vi.mock("@/services/interview", async (importOriginal) => ({
   endInterview: vi.fn(),
   finishInterview: vi.fn(),
   getInterviewPage: vi.fn(),
-  getNextInterviewQuestion: vi.fn(),
   submitCandidateQuestion: vi.fn(),
   submitInterviewAnswer: vi.fn(),
 }))
@@ -63,19 +63,20 @@ function openingResponse(): InterviewPageResponse {
       targetRoleId: "role_frontend_engineer_bytedance",
       round: "technical",
       difficulty: "pressure",
+      durationMinutes: 30,
     },
     startedAt: "2026-07-24T02:00:00.000Z",
-    progress: { completedQuestions: 0, totalQuestions: 3 },
+    progress: {
+      completedMainQuestions: 0,
+      totalMainQuestions: 3,
+      planRevision: 1,
+    },
     completedQuestions: [],
     openingMessage: "欢迎参加本次模拟面试。",
   })
 }
 
-function questionSession(
-  order: number,
-  version: number,
-  answer: string | null = null,
-): InterviewQuestionSessionResponse {
+function questionSession(order: number, version: number): InterviewQuestionSessionResponse {
   const question = createInterviewQuestionSet()[order - 1]!
   return {
     status: "question",
@@ -85,22 +86,61 @@ function questionSession(
       targetRoleId: "role_frontend_engineer_bytedance",
       round: "technical",
       difficulty: "pressure",
+      durationMinutes: 30,
     },
     startedAt: "2026-07-24T02:00:00.000Z",
-    progress: { completedQuestions: order - 1, totalQuestions: 3 },
+    progress: {
+      completedMainQuestions: order - 1,
+      totalMainQuestions: 3,
+      planRevision: 1,
+    },
     completedQuestions: [],
-    currentQuestion:
-      answer === null
-        ? { status: "awaitingAnswer", question, answer: null }
-        : {
-            status: "answered",
-            question,
-            answer: {
-              id: `answer-${order}`,
-              content: answer,
-              submittedAt: "2026-07-24T02:02:00.000Z",
-            },
-          },
+    currentQuestion: { status: "awaitingAnswer", question, answer: null },
+  }
+}
+
+function followUpSession(followUpIndex: number, version: number): InterviewFollowUpSessionResponse {
+  const planned = createInterviewAgentPlanMock("multipleFollowUps").questions[1]!
+  const currentFollowUp = planned.followUps[followUpIndex]!
+  return {
+    status: "followUp",
+    sessionId,
+    version,
+    configuration: {
+      targetRoleId: "role_frontend_engineer_bytedance",
+      round: "technical",
+      difficulty: "pressure",
+      durationMinutes: 30,
+    },
+    startedAt: "2026-07-24T02:00:00.000Z",
+    progress: {
+      completedMainQuestions: 1,
+      totalMainQuestions: 3,
+      planRevision: 1,
+    },
+    completedQuestions: [],
+    currentQuestion: {
+      question: planned.question,
+      answer: {
+        id: "main-answer",
+        content: "我通过真实用户监控定位长任务，并分阶段完成治理。",
+        submittedAt: "2026-07-24T02:03:00.000Z",
+      },
+      answeredFollowUps: planned.followUps.slice(0, followUpIndex).map((question, index) => ({
+        status: "answered",
+        question,
+        answer: {
+          id: `follow-up-answer-${index}`,
+          content: "我会通过灰度对照验证业务收益。",
+          submittedAt: "2026-07-24T02:04:00.000Z",
+        },
+      })),
+    },
+    currentFollowUp: {
+      status: "awaitingAnswer",
+      question: currentFollowUp,
+      answer: null,
+    },
   }
 }
 
@@ -136,7 +176,6 @@ describe("InterviewSessionContainer", () => {
     vi.mocked(beginInterviewQuestions).mockReset()
     vi.mocked(endInterview).mockReset()
     vi.mocked(submitInterviewAnswer).mockReset()
-    vi.mocked(getNextInterviewQuestion).mockReset()
     vi.mocked(submitCandidateQuestion).mockReset()
     vi.mocked(finishInterview).mockReset()
   })
@@ -238,7 +277,31 @@ describe("InterviewSessionContainer", () => {
       expect(screen.getByText(second.currentQuestion.question.prompt)).toBeVisible(),
     )
     expect(submitInterviewAnswer).toHaveBeenCalledOnce()
-    expect(getNextInterviewQuestion).not.toHaveBeenCalled()
+  })
+
+  it("consumes a second consecutive follow-up returned by the service", async () => {
+    const user = userEvent.setup()
+    const firstFollowUp = followUpSession(0, 4)
+    const secondFollowUp = followUpSession(1, 5)
+    vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(firstFollowUp))
+    vi.mocked(submitInterviewAnswer).mockResolvedValue(responseWithSession(secondFollowUp))
+    renderSession()
+
+    await user.type(await screen.findByRole("textbox"), "我会使用灰度分组做同期对照。")
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("interview.session.answer.submit") }),
+    )
+
+    expect(await screen.findByText(secondFollowUp.currentFollowUp.question.prompt)).toBeVisible()
+    expect(
+      screen.getByText(secondFollowUp.currentQuestion.answeredFollowUps[0]!.answer.content),
+    ).toBeVisible()
+    expect(vi.mocked(submitInterviewAnswer).mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        target: "followUp",
+        followUpQuestionId: firstFollowUp.currentFollowUp.question.id,
+      }),
+    )
   })
 
   it("submits candidate questions, shows feedback, and finishes only once", async () => {

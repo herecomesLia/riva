@@ -1,11 +1,11 @@
 import type {
-  AnsweredInterviewFollowUpResponse,
   CompletedInterviewQuestionResponse,
   GetInterviewReviewResponse,
   InterviewCandidateQuestionExchangeResponse,
   InterviewCompletedSessionResponse,
   InterviewFollowUpQuestionResponse,
   InterviewPageResponse,
+  InterviewProgressResponse,
   InterviewQuestionReviewResponse,
   InterviewQuestionResponse,
   InterviewReviewResponse,
@@ -15,9 +15,32 @@ import type {
 export type InterviewMockScenario =
   "setupReady" | "noTargetRoles" | "prerequisiteNotMet" | "completed"
 
+export type InterviewAgentMockScenario =
+  | "noFollowUps"
+  | "singleFollowUp"
+  | "multipleFollowUps"
+  | "lastQuestionFollowUp"
+  | "unknownTotal"
+  | "adjustedPlan"
+
+export type MockInterviewAgentPlan = {
+  scenario: InterviewAgentMockScenario
+  initialProgress: Pick<InterviewProgressResponse, "totalMainQuestions" | "planRevision">
+  planChanges: Array<{
+    afterCompletedMainQuestions: number
+    totalMainQuestions: number | null
+    planRevision: number
+  }>
+  questions: Array<{
+    question: InterviewQuestionResponse
+    followUps: InterviewFollowUpQuestionResponse[]
+  }>
+}
+
 export const interviewSetupResponseMock = {
   availability: { status: "available" },
   availableDifficulties: ["basic", "pressure"],
+  availableDurationMinutes: [15, 30, 45],
   targetRoles: [
     {
       id: "role_frontend_engineer_bytedance",
@@ -36,49 +59,181 @@ export const interviewSetupResponseMock = {
     targetRoleId: "role_frontend_engineer_bytedance",
     round: "technical",
     difficulty: "pressure",
+    durationMinutes: 30,
   },
 } satisfies InterviewSetupResponse
 
-const interviewQuestionSet = [
-  {
+const questionTemplates = {
+  selfIntroduction: {
     id: "interview-question-self-introduction",
     prompt: "请你用两分钟做一下自我介绍，并重点说明与高级前端工程师岗位最相关的经历。",
     type: "selfIntroduction",
     assessedCapabilities: ["信息组织", "岗位匹配", "表达重点"],
-    order: 1,
   },
-  {
+  projectDeepDive: {
     id: "interview-question-project-deep-dive",
     prompt: "请介绍一次你主导的前端性能优化，说明你如何定位问题、选择方案并验证结果。",
     type: "projectDeepDive",
     assessedCapabilities: ["问题分析", "技术决策", "结果量化"],
-    order: 2,
   },
-  {
+  motivation: {
     id: "interview-question-motivation",
     prompt: "为什么选择这个岗位？你希望未来两年在哪些能力上形成明显优势？",
     type: "motivation",
     assessedCapabilities: ["求职动机", "职业规划", "岗位理解"],
-    order: 3,
   },
-] satisfies InterviewQuestionResponse[]
+  collaboration: {
+    id: "interview-question-collaboration",
+    prompt: "请举例说明你如何推动一个存在明显分歧的跨团队项目，并最终达成结果。",
+    type: "behavioral",
+    assessedCapabilities: ["跨团队协作", "冲突处理", "结果推进"],
+  },
+  roleCapability: {
+    id: "interview-question-role-capability",
+    prompt: "如果入职后需要你负责核心前端链路的稳定性治理，你会如何制定前三个月的计划？",
+    type: "roleCapability",
+    assessedCapabilities: ["岗位理解", "规划能力", "风险控制"],
+  },
+} as const
+
+type QuestionTemplateName = keyof typeof questionTemplates
+
+function createQuestion(name: QuestionTemplateName, order: number): InterviewQuestionResponse {
+  const template = questionTemplates[name]
+  return {
+    ...structuredClone(template),
+    assessedCapabilities: [...template.assessedCapabilities],
+    order,
+  }
+}
+
+function createFollowUp(
+  id: string,
+  parentQuestionId: string,
+  prompt: string,
+  order: number,
+): InterviewFollowUpQuestionResponse {
+  return {
+    id,
+    parentQuestionId,
+    prompt,
+    order,
+    createdAt: `2026-07-24T02:${String(3 + order).padStart(2, "0")}:00.000Z`,
+  }
+}
+
+export const projectFollowUpQuestionMock = createFollowUp(
+  "interview-follow-up-project-evidence",
+  questionTemplates.projectDeepDive.id,
+  "如果监控数据只能证明性能改善，却无法直接证明业务收益，你会如何补充验证？",
+  1,
+)
+
+const projectAttributionFollowUpMock = createFollowUp(
+  "interview-follow-up-project-attribution",
+  questionTemplates.projectDeepDive.id,
+  "如果同期还有营销活动和服务端改动，你会如何排除这些因素对结果的影响？",
+  2,
+)
+
+const motivationFollowUpMock = createFollowUp(
+  "interview-follow-up-motivation-criteria",
+  questionTemplates.motivation.id,
+  "如果实际岗位的发展路径与预期不同，你会用哪些标准判断是否继续投入？",
+  1,
+)
+
+function planQuestion(
+  name: QuestionTemplateName,
+  order: number,
+  followUps: InterviewFollowUpQuestionResponse[] = [],
+) {
+  return {
+    question: createQuestion(name, order),
+    followUps: structuredClone(followUps),
+  }
+}
+
+export function createInterviewAgentPlanMock(
+  scenario: InterviewAgentMockScenario = "singleFollowUp",
+): MockInterviewAgentPlan {
+  const plans: Record<InterviewAgentMockScenario, MockInterviewAgentPlan> = {
+    noFollowUps: {
+      scenario,
+      initialProgress: { totalMainQuestions: 2, planRevision: 1 },
+      planChanges: [],
+      questions: [planQuestion("selfIntroduction", 1), planQuestion("collaboration", 2)],
+    },
+    singleFollowUp: {
+      scenario,
+      initialProgress: { totalMainQuestions: 3, planRevision: 1 },
+      planChanges: [],
+      questions: [
+        planQuestion("selfIntroduction", 1),
+        planQuestion("projectDeepDive", 2, [projectFollowUpQuestionMock]),
+        planQuestion("motivation", 3),
+      ],
+    },
+    multipleFollowUps: {
+      scenario,
+      initialProgress: { totalMainQuestions: 3, planRevision: 1 },
+      planChanges: [],
+      questions: [
+        planQuestion("selfIntroduction", 1),
+        planQuestion("projectDeepDive", 2, [
+          projectFollowUpQuestionMock,
+          projectAttributionFollowUpMock,
+        ]),
+        planQuestion("roleCapability", 3),
+      ],
+    },
+    lastQuestionFollowUp: {
+      scenario,
+      initialProgress: { totalMainQuestions: 2, planRevision: 1 },
+      planChanges: [],
+      questions: [
+        planQuestion("selfIntroduction", 1),
+        planQuestion("motivation", 2, [motivationFollowUpMock]),
+      ],
+    },
+    unknownTotal: {
+      scenario,
+      initialProgress: { totalMainQuestions: null, planRevision: 1 },
+      planChanges: [],
+      questions: [
+        planQuestion("selfIntroduction", 1),
+        planQuestion("collaboration", 2),
+        planQuestion("roleCapability", 3),
+      ],
+    },
+    adjustedPlan: {
+      scenario,
+      initialProgress: { totalMainQuestions: 2, planRevision: 1 },
+      planChanges: [
+        {
+          afterCompletedMainQuestions: 1,
+          totalMainQuestions: 3,
+          planRevision: 2,
+        },
+      ],
+      questions: [
+        planQuestion("selfIntroduction", 1),
+        planQuestion("projectDeepDive", 2),
+        planQuestion("roleCapability", 3),
+      ],
+    },
+  }
+  return structuredClone(plans[scenario])
+}
 
 export function createInterviewQuestionSet(): InterviewQuestionResponse[] {
-  return structuredClone(interviewQuestionSet)
+  return createInterviewAgentPlanMock("singleFollowUp").questions.map(({ question }) => question)
 }
 
 export const interviewOpeningMessageMock =
   "你好，我是本次模拟面试的面试官。接下来会围绕岗位经历、项目能力和求职动机连续提问，请尽量像正式面试一样作答。"
 
 export const candidateQuestionsPromptMock = "正式提问已经结束。现在请你以候选人身份向面试官提问。"
-
-export const projectFollowUpQuestionMock = {
-  id: "interview-follow-up-project-tradeoff",
-  parentQuestionId: "interview-question-project-deep-dive",
-  prompt: "如果监控数据只能证明性能改善，却无法直接证明业务收益，你会如何补充验证？",
-  order: 1,
-  createdAt: "2026-07-24T02:04:00.000Z",
-} as const satisfies InterviewFollowUpQuestionResponse
 
 export function createCandidateQuestionExchange(
   content: string,
@@ -101,40 +256,48 @@ export function createCandidateQuestionExchange(
   }
 }
 
-export function createInterviewReview(
-  questions: readonly InterviewQuestionResponse[] = interviewQuestionSet,
-): InterviewReviewResponse {
-  const questionReviewsById: Record<string, Omit<InterviewQuestionReviewResponse, "questionId">> = {
-    "interview-question-self-introduction": {
-      score: 84,
-      summary: "自我介绍重点明确，经历与目标岗位关联自然，关键成果还可以进一步量化。",
-      strengths: ["岗位匹配信息集中", "职业主线清晰"],
-      issues: ["关键成果缺少量化证据"],
-    },
-    "interview-question-project-deep-dive": {
-      score: 81,
-      summary: "完整说明了性能优化过程，技术取舍清楚，业务验证仍可加强。",
-      strengths: ["定位过程完整", "方案取舍具体"],
-      issues: ["业务收益缺少对照验证"],
-    },
-    "interview-question-motivation": {
-      score: 80,
-      summary: "求职动机真实并能联系岗位要求，未来能力规划可以再具体一些。",
-      strengths: ["岗位理解准确", "动机表达真实"],
-      issues: ["阶段性成长目标不够具体"],
-    },
-  }
+const questionReviewsById: Record<string, Omit<InterviewQuestionReviewResponse, "questionId">> = {
+  "interview-question-self-introduction": {
+    score: 84,
+    summary: "自我介绍重点明确，经历与目标岗位关联自然，关键成果还可以进一步量化。",
+    strengths: ["岗位匹配信息集中", "职业主线清晰"],
+    issues: ["关键成果缺少量化证据"],
+  },
+  "interview-question-project-deep-dive": {
+    score: 81,
+    summary: "完整说明了性能优化过程，技术取舍清楚，业务验证仍可加强。",
+    strengths: ["定位过程完整", "方案取舍具体"],
+    issues: ["业务收益缺少对照验证"],
+  },
+  "interview-question-motivation": {
+    score: 80,
+    summary: "求职动机真实并能联系岗位要求，未来能力规划可以再具体一些。",
+    strengths: ["岗位理解准确", "动机表达真实"],
+    issues: ["阶段性成长目标不够具体"],
+  },
+  "interview-question-collaboration": {
+    score: 79,
+    summary: "能够说明协作过程与推进动作，分歧解决后的业务结果还可以更具体。",
+    strengths: ["协作角色清楚", "推进动作完整"],
+    issues: ["最终结果量化不足"],
+  },
+  "interview-question-role-capability": {
+    score: 83,
+    summary: "规划覆盖了现状诊断、风险排序和阶段目标，协作机制可以进一步展开。",
+    strengths: ["阶段目标明确", "风险意识较强"],
+    issues: ["跨团队治理机制不够具体"],
+  },
+}
 
+export function createInterviewReview(
+  questions: readonly InterviewQuestionResponse[] = createInterviewQuestionSet(),
+): InterviewReviewResponse {
   return {
     overallScore: 82,
     overallPerformance:
       "整体表达清晰，项目经历与岗位要求匹配度较高；技术决策有依据，但业务价值和跨团队影响还可以进一步量化。",
     dimensionScores: [
-      {
-        dimension: "relevance",
-        score: 88,
-        explanation: "大部分回答紧扣问题，并能关联目标岗位。",
-      },
+      { dimension: "relevance", score: 88, explanation: "大部分回答紧扣问题，并能关联目标岗位。" },
       {
         dimension: "structure",
         score: 84,
@@ -145,11 +308,7 @@ export function createInterviewReview(
         score: 78,
         explanation: "技术细节充分，但部分业务结果缺少对照数据。",
       },
-      {
-        dimension: "personalContribution",
-        score: 85,
-        explanation: "能够说明个人决策和推动动作。",
-      },
+      { dimension: "personalContribution", score: 85, explanation: "能够说明个人决策和推动动作。" },
       {
         dimension: "resultsAndEvidence",
         score: 76,
@@ -198,40 +357,45 @@ export function createInterviewReview(
   }
 }
 
-function createCompletedQuestionRecords(): CompletedInterviewQuestionResponse[] {
-  const questions = createInterviewQuestionSet()
-  const projectFollowUp: AnsweredInterviewFollowUpResponse = {
-    status: "answered",
-    question: structuredClone(projectFollowUpQuestionMock),
-    answer: {
-      id: "interview-answer-follow-up-1",
-      content: "我会补充灰度分组和同期对照，观察核心转化链路并排除营销活动等外部因素。",
-      submittedAt: "2026-07-24T02:08:00.000Z",
-    },
-  }
+const answerByQuestionId: Record<string, string> = {
+  "interview-question-self-introduction":
+    "我过去五年主要负责复杂业务的前端架构和性能治理，最近两年主导了核心交易链路升级。",
+  "interview-question-project-deep-dive":
+    "我先通过真实用户监控定位长任务和资源瀑布，再分阶段实施拆包、预加载和渲染调度优化。",
+  "interview-question-motivation":
+    "这个岗位的业务复杂度和技术挑战与我的经验高度匹配，我希望进一步提升架构和团队影响力。",
+  "interview-question-collaboration":
+    "我先统一各团队对目标和约束的理解，再拆分责任边界并用阶段结果持续建立共识。",
+  "interview-question-role-capability":
+    "我会先补齐可观测性并完成风险分级，再按业务影响制定治理路线和协作机制。",
+}
 
-  return questions.map((question, index) => ({
+function createCompletedQuestionRecords(
+  scenario: InterviewAgentMockScenario = "singleFollowUp",
+): CompletedInterviewQuestionResponse[] {
+  const plan = createInterviewAgentPlanMock(scenario)
+  return plan.questions.map(({ followUps, question }, questionIndex) => ({
     question,
     answer: {
-      id: `interview-answer-${index + 1}`,
-      content: [
-        "我过去五年主要负责复杂业务的前端架构和性能治理，最近两年主导了核心交易链路升级。",
-        "我先通过真实用户监控定位长任务和资源瀑布，再分阶段实施拆包、预加载和渲染调度优化。",
-        "这个岗位的业务复杂度和技术挑战与我的经验高度匹配，我希望进一步提升架构和团队影响力。",
-      ][index]!,
-      submittedAt: `2026-07-24T02:0${index * 3 + 2}:00.000Z`,
+      id: `interview-answer-${questionIndex + 1}`,
+      content: answerByQuestionId[question.id] ?? "我会结合实际约束说明判断、行动和结果。",
+      submittedAt: `2026-07-24T02:${String(questionIndex * 4 + 2).padStart(2, "0")}:00.000Z`,
     },
-    followUps: index === 1 ? [projectFollowUp] : [],
-    completedAt: `2026-07-24T02:0${index * 3 + 3}:00.000Z`,
+    followUps: followUps.map((followUp, followUpIndex) => ({
+      status: "answered",
+      question: followUp,
+      answer: {
+        id: `interview-follow-up-answer-${questionIndex + 1}-${followUpIndex + 1}`,
+        content: "我会补充灰度分组和同期对照，明确归因边界并持续观察核心转化变化。",
+        submittedAt: `2026-07-24T02:${String(questionIndex * 4 + followUpIndex + 3).padStart(2, "0")}:00.000Z`,
+      },
+    })),
+    completedAt: `2026-07-24T02:${String(questionIndex * 4 + followUps.length + 3).padStart(2, "0")}:00.000Z`,
   }))
 }
 
 function createCompletedSession(): InterviewCompletedSessionResponse {
   const completedQuestions = createCompletedQuestionRecords()
-  const candidateQuestionExchanges = [
-    createCandidateQuestionExchange("这个岗位入职后的核心目标和主要协作团队分别是什么？", 1),
-  ]
-
   return {
     status: "completed",
     sessionId: "mock-interview-session-completed",
@@ -240,15 +404,19 @@ function createCompletedSession(): InterviewCompletedSessionResponse {
       targetRoleId: "role_frontend_engineer_bytedance",
       round: "technical",
       difficulty: "pressure",
+      durationMinutes: 30,
     },
     startedAt: "2026-07-24T02:00:00.000Z",
     progress: {
-      completedQuestions: completedQuestions.length,
-      totalQuestions: completedQuestions.length,
+      completedMainQuestions: completedQuestions.length,
+      totalMainQuestions: completedQuestions.length,
+      planRevision: 1,
     },
     completedQuestions,
     completedAt: "2026-07-24T02:18:00.000Z",
-    candidateQuestionExchanges,
+    candidateQuestionExchanges: [
+      createCandidateQuestionExchange("这个岗位入职后的核心目标和主要协作团队分别是什么？", 1),
+    ],
     review: createInterviewReview(completedQuestions.map(({ question }) => question)),
   }
 }
@@ -283,11 +451,13 @@ export function createInterviewMockResponse(
       setup: {
         availability: { status: "available" },
         availableDifficulties: ["basic", "pressure"],
+        availableDurationMinutes: [15, 30, 45],
         targetRoles: [],
         defaultConfiguration: {
           targetRoleId: null,
           round: "comprehensive",
           difficulty: "basic",
+          durationMinutes: 30,
         },
       },
       session: null,
@@ -305,10 +475,7 @@ export function createInterviewMockResponse(
     return {
       setup: {
         ...structuredClone(interviewSetupResponseMock),
-        availability: {
-          status: "blocked",
-          reason: "profileIncomplete",
-        },
+        availability: { status: "blocked", reason: "profileIncomplete" },
       },
       session: null,
     }

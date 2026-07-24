@@ -4,7 +4,6 @@ import { useRef, useState } from "react"
 
 import type {
   ActiveInterviewSessionResponse,
-  GetNextInterviewQuestionInput,
   InterviewConversationRecordViewData,
   InterviewMutationResponse,
   InterviewPageResponse,
@@ -16,7 +15,6 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
-  getNextInterviewQuestion,
   submitCandidateQuestion,
   submitInterviewAnswer,
 } from "@/services/interview"
@@ -27,11 +25,6 @@ import {
   type InterviewSessionSummary,
 } from "./InterviewSessionView"
 import { INTERVIEW_QUERY_KEY } from "./interview-query"
-
-type AdvanceState = {
-  promptId: string
-  status: "advancing" | "failed"
-}
 
 export function InterviewSessionPage() {
   const { sessionId } = useParams({ from: "/app/interview/session/$sessionId" })
@@ -44,12 +37,10 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const queryClient = useQueryClient()
   const beginLock = useRef(false)
   const submitLock = useRef(false)
-  const advanceLock = useRef(false)
   const candidateQuestionLock = useRef(false)
   const finishLock = useRef(false)
   const endLock = useRef(false)
   const [beginFailed, setBeginFailed] = useState(false)
-  const [advanceState, setAdvanceState] = useState<AdvanceState | null>(null)
 
   const interviewQuery = useQuery({
     queryFn: getInterviewPage,
@@ -58,7 +49,6 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   })
   const beginMutation = useMutation({ mutationFn: beginInterviewQuestions })
   const submitMutation = useMutation({ mutationFn: submitInterviewAnswer })
-  const advanceMutation = useMutation({ mutationFn: getNextInterviewQuestion })
   const candidateQuestionMutation = useMutation({ mutationFn: submitCandidateQuestion })
   const finishMutation = useMutation({ mutationFn: finishInterview })
   const endMutation = useMutation({ mutationFn: endInterview })
@@ -103,59 +93,12 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     }
   }
 
-  function toAdvanceInput(session: ActiveInterviewSessionResponse): GetNextInterviewQuestionInput {
-    if (session.status === "question" && session.currentQuestion.status === "answered") {
-      return {
-        target: "question",
-        sessionId: session.sessionId,
-        version: session.version,
-        questionId: session.currentQuestion.question.id,
-      }
-    }
-    if (session.status === "followUp" && session.currentFollowUp.status === "answered") {
-      return {
-        target: "followUp",
-        sessionId: session.sessionId,
-        version: session.version,
-        questionId: session.currentQuestion.question.id,
-        followUpQuestionId: session.currentFollowUp.question.id,
-      }
-    }
-    throw new Error("Interview answer is not ready to advance.")
-  }
-
-  function answeredPromptId(session: ActiveInterviewSessionResponse) {
-    if (session.status === "question" && session.currentQuestion.status === "answered") {
-      return session.currentQuestion.question.id
-    }
-    if (session.status === "followUp" && session.currentFollowUp.status === "answered") {
-      return session.currentFollowUp.question.id
-    }
-    throw new Error("Interview answer is not ready to advance.")
-  }
-
-  async function advance(session: ActiveInterviewSessionResponse) {
-    if (advanceLock.current || advanceMutation.isPending) return
-    const promptId = answeredPromptId(session)
-
-    advanceLock.current = true
-    setAdvanceState({ promptId, status: "advancing" })
-    try {
-      commit(await advanceMutation.mutateAsync(toAdvanceInput(session)))
-      setAdvanceState(null)
-    } catch {
-      setAdvanceState({ promptId, status: "failed" })
-    } finally {
-      advanceLock.current = false
-    }
-  }
-
   async function handleSubmit(content: string) {
     if (submitLock.current || submitMutation.isPending) return
     const session = currentSession()
     let input: SubmitInterviewAnswerInput
 
-    if (session.status === "question" && session.currentQuestion.status === "awaitingAnswer") {
+    if (session.status === "question") {
       input = {
         target: "question",
         sessionId: session.sessionId,
@@ -334,24 +277,13 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   const prompt = toPrompt(session)
-  const advanceStatus =
-    prompt.answer === null
-      ? "idle"
-      : advanceState?.promptId === prompt.id
-        ? advanceState.status
-        : "ready"
-
   return (
     <InterviewSessionView
-      advanceStatus={advanceStatus}
       isEnding={endMutation.isPending}
-      isInteractionLocked={
-        submitMutation.isPending || advanceMutation.isPending || endMutation.isPending
-      }
+      isInteractionLocked={submitMutation.isPending || endMutation.isPending}
       isSubmitting={submitMutation.isPending}
       history={history}
       onEnd={handleEnd}
-      onRetryAdvance={() => void advance(currentSession())}
       onSubmit={handleSubmit}
       prompt={prompt}
       status="question"
@@ -370,8 +302,9 @@ function toSummary(
     company,
     round: session.configuration.round,
     difficulty: session.configuration.difficulty,
-    completedQuestions: session.progress.completedQuestions,
-    totalQuestions: session.progress.totalQuestions,
+    completedMainQuestions: session.progress.completedMainQuestions,
+    totalMainQuestions: session.progress.totalMainQuestions,
+    planRevision: session.progress.planRevision,
   }
 }
 
@@ -384,7 +317,6 @@ function toPrompt(
       kind: "question",
       content: session.currentQuestion.question.prompt,
       questionOrder: session.currentQuestion.question.order,
-      answer: session.currentQuestion.answer?.content ?? null,
     }
   }
   return {
@@ -392,7 +324,6 @@ function toPrompt(
     kind: "followUp",
     content: session.currentFollowUp.question.prompt,
     questionOrder: session.currentQuestion.question.order,
-    answer: session.currentFollowUp.answer?.content ?? null,
   }
 }
 
@@ -424,6 +355,17 @@ function toConversationHistory(
       prompt: session.currentQuestion.question.prompt,
       answer: session.currentQuestion.answer.content,
     })
+    records.push(
+      ...session.currentQuestion.answeredFollowUps.map(
+        ({ answer: followUpAnswer, question: followUp }) => ({
+          id: followUp.id,
+          kind: "followUp" as const,
+          questionOrder: session.currentQuestion.question.order,
+          prompt: followUp.prompt,
+          answer: followUpAnswer.content,
+        }),
+      ),
+    )
   }
 
   return records
