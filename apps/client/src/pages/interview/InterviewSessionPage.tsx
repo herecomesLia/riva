@@ -57,6 +57,17 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, response)
   }
 
+  async function commitAndOpenReview(
+    response: InterviewMutationResponse,
+    completedSessionId: string,
+  ) {
+    commit(response)
+    await navigate({
+      to: "/interview/review/$sessionId",
+      params: { sessionId: completedSessionId },
+    })
+  }
+
   async function backToSetup() {
     await navigate({ to: "/interview" })
   }
@@ -73,7 +84,9 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   async function handleBegin() {
-    if (beginLock.current || beginMutation.isPending) return
+    if (beginLock.current || beginMutation.isPending || endLock.current || endMutation.isPending) {
+      return
+    }
     const session = currentSession()
     if (session.status !== "opening") return
 
@@ -94,7 +107,14 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   async function handleSubmit(content: string) {
-    if (submitLock.current || submitMutation.isPending) return
+    if (
+      submitLock.current ||
+      submitMutation.isPending ||
+      endLock.current ||
+      endMutation.isPending
+    ) {
+      return
+    }
     const session = currentSession()
     let input: SubmitInterviewAnswerInput
 
@@ -160,29 +180,32 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
         sessionId: session.sessionId,
         version: session.version,
       })
-      commit(response)
-      await navigate({
-        to: "/interview/review/$sessionId",
-        params: { sessionId: session.sessionId },
-      })
+      await commitAndOpenReview(response, session.sessionId)
     } finally {
       finishLock.current = false
     }
   }
 
   async function handleEnd() {
-    if (endLock.current || endMutation.isPending) return
+    if (
+      endLock.current ||
+      endMutation.isPending ||
+      beginLock.current ||
+      beginMutation.isPending ||
+      submitLock.current ||
+      submitMutation.isPending
+    ) {
+      return
+    }
     const session = currentSession()
 
     endLock.current = true
     try {
-      commit(
-        await endMutation.mutateAsync({
-          sessionId: session.sessionId,
-          version: session.version,
-        }),
-      )
-      await backToSetup()
+      const response = await endMutation.mutateAsync({
+        sessionId: session.sessionId,
+        version: session.version,
+      })
+      await commitAndOpenReview(response, session.sessionId)
     } finally {
       endLock.current = false
     }

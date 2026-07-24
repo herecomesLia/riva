@@ -241,7 +241,11 @@ export const EndConfirmation = meta.story({
     await userEvent.click(canvas.getByRole("button", { name: /结束面试|end interview/i }))
     const dialog = await screen.findByRole("alertdialog")
     await waitFor(() => expect(dialog).toBeVisible())
-    await userEvent.click(within(dialog).getByRole("button", { name: /确认结束|confirm end/i }))
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: /结束并查看复盘|end and view review/i,
+      }),
+    )
     await expect(endInterview).toHaveBeenCalledTimes(1)
   },
 })

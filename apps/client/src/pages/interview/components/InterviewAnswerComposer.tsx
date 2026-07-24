@@ -10,11 +10,16 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 
 type InterviewAnswerComposerProps = {
+  isDisabled?: boolean
   isPending: boolean
   onSubmit: (content: string) => Promise<void>
 }
 
-export function InterviewAnswerComposer({ isPending, onSubmit }: InterviewAnswerComposerProps) {
+export function InterviewAnswerComposer({
+  isDisabled = false,
+  isPending,
+  onSubmit,
+}: InterviewAnswerComposerProps) {
   const { t } = useTranslation()
   const [content, setContent] = useState("")
   const [error, setError] = useState<"required" | "submit" | null>(null)
@@ -46,7 +51,7 @@ export function InterviewAnswerComposer({ isPending, onSubmit }: InterviewAnswer
           noValidate
           onSubmit={(event) => {
             event.preventDefault()
-            if (!isPending) void submit()
+            if (!isDisabled && !isPending) void submit()
           }}
         >
           <Field invalid={error !== null}>
@@ -57,7 +62,7 @@ export function InterviewAnswerComposer({ isPending, onSubmit }: InterviewAnswer
               aria-describedby="interview-answer-hint"
               aria-invalid={error !== null}
               className="min-h-52 resize-y leading-7"
-              disabled={isPending}
+              disabled={isDisabled || isPending}
               id="interview-answer"
               onChange={(event) => {
                 setContent(event.target.value)
@@ -80,7 +85,10 @@ export function InterviewAnswerComposer({ isPending, onSubmit }: InterviewAnswer
               <FieldDescription id="interview-answer-hint">
                 {t("interview.session.answer.keyboardHint")}
               </FieldDescription>
-              <Button disabled={isPending || content.trim().length === 0} type="submit">
+              <Button
+                disabled={isDisabled || isPending || content.trim().length === 0}
+                type="submit"
+              >
                 {isPending ? (
                   <Spinner aria-hidden="true" data-icon="inline-start" />
                 ) : (

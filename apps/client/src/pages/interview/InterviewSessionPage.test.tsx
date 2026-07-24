@@ -6,6 +6,7 @@ import { i18n } from "@/i18n/i18n"
 import {
   createCandidateQuestionExchange,
   createInterviewAgentPlanMock,
+  createInterviewCompletedSessionMock,
   createInterviewMockResponse,
 } from "@/mocks/data/interview"
 import type {
@@ -52,6 +53,24 @@ function responseWithSession(session: InterviewPageResponse["session"]): Intervi
     setup: createInterviewMockResponse().setup,
     session,
   }
+}
+
+function completedResponse(
+  activeSession: Exclude<InterviewPageResponse["session"], null>,
+): InterviewPageResponse {
+  const completed = createInterviewCompletedSessionMock({
+    completionReason:
+      activeSession.status === "candidateQuestions" ? "formalQuestionsCompleted" : "userEndedEarly",
+    completedMainQuestions: activeSession.progress.completedMainQuestions,
+  })
+  return responseWithSession({
+    ...completed,
+    sessionId: activeSession.sessionId,
+    version: activeSession.version + 1,
+    configuration: activeSession.configuration,
+    startedAt: activeSession.startedAt,
+    progress: activeSession.progress,
+  })
 }
 
 function openingResponse(): InterviewPageResponse {
@@ -304,13 +323,146 @@ describe("InterviewSessionContainer", () => {
     )
   })
 
+  it("ends an unanswered main question once, caches the snapshot, and opens its review", async () => {
+    const user = userEvent.setup()
+    const active = questionSession(1, 2)
+    const completed = completedResponse(active)
+    vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
+    vi.mocked(endInterview).mockResolvedValue(completed)
+    const result = renderSession()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("interview.session.actions.end") }),
+    )
+    expect(screen.getByText(i18n.t("interview.session.endDialog.description"))).toBeVisible()
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.actions.confirmEnd"),
+      }),
+    )
+
+    expect(endInterview).toHaveBeenCalledOnce()
+    expect(vi.mocked(endInterview).mock.calls[0]?.[0]).toEqual({ sessionId, version: 2 })
+    await waitFor(() =>
+      expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
+    )
+    expect(result.router?.state.location.pathname).not.toBe("/interview")
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+  })
+
+  it("ends from the current follow-up version and opens the same review route", async () => {
+    const user = userEvent.setup()
+    const active = followUpSession(1, 5)
+    const completed = completedResponse(active)
+    vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
+    vi.mocked(endInterview).mockResolvedValue(completed)
+    const result = renderSession()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("interview.session.actions.end") }),
+    )
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.actions.confirmEnd"),
+      }),
+    )
+
+    expect(vi.mocked(endInterview).mock.calls[0]?.[0]).toEqual({ sessionId, version: 5 })
+    await waitFor(() =>
+      expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
+    )
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+  })
+
+  it("locks repeated early-end confirmation while the request is pending", async () => {
+    const user = userEvent.setup()
+    const active = questionSession(1, 2)
+    const completed = completedResponse(active)
+    const request = createDeferred<InterviewPageResponse>()
+    vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
+    vi.mocked(endInterview).mockReturnValue(request.promise)
+    const result = renderSession()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("interview.session.actions.end") }),
+    )
+    const confirm = screen.getByRole("button", {
+      name: i18n.t("interview.session.actions.confirmEnd"),
+    })
+    await user.click(confirm)
+    expect(confirm).toBeDisabled()
+    expect(screen.getByRole("textbox", { hidden: true })).toBeDisabled()
+    await user.click(confirm)
+    expect(endInterview).toHaveBeenCalledOnce()
+
+    await act(async () => request.resolve(completed))
+    await waitFor(() =>
+      expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
+    )
+    expect(endInterview).toHaveBeenCalledOnce()
+  })
+
+  it("keeps the active session and route when ending fails", async () => {
+    const user = userEvent.setup()
+    const activeResponse = responseWithSession(questionSession(1, 2))
+    vi.mocked(getInterviewPage).mockResolvedValue(activeResponse)
+    vi.mocked(endInterview).mockRejectedValue(new Error("end failed"))
+    const result = renderSession()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("interview.session.actions.end") }),
+    )
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.actions.confirmEnd"),
+      }),
+    )
+
+    expect(await screen.findByText(i18n.t("interview.session.errors.endTitle"))).toBeVisible()
+    expect(result.router?.state.location.pathname).toBe(`/interview/session/${sessionId}`)
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(activeResponse)
+    expect(
+      result.queryClient.getQueryData<InterviewPageResponse>(["interview"])?.session,
+    ).not.toMatchObject({
+      status: "completed",
+    })
+  })
+
+  it("ends from the opening stage and navigates to its review", async () => {
+    const user = userEvent.setup()
+    const activeResponse = openingResponse()
+    const active = activeResponse.session
+    if (active === null) throw new Error("Expected opening session.")
+    const completed = completedResponse(active)
+    vi.mocked(getInterviewPage).mockResolvedValue(activeResponse)
+    vi.mocked(endInterview).mockResolvedValue(completed)
+    const result = renderSession()
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("interview.session.actions.end") }),
+    )
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.actions.confirmEnd"),
+      }),
+    )
+
+    expect(vi.mocked(endInterview).mock.calls[0]?.[0]).toEqual({ sessionId, version: 1 })
+    await waitFor(() =>
+      expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
+    )
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+  })
+
   it("submits candidate questions, shows feedback, and finishes only once", async () => {
     const user = userEvent.setup()
     const question = "这个岗位入职六个月后的成功标准是什么？"
     const candidate = candidateSession(6)
     const exchange = createCandidateQuestionExchange(question, 1)
     const withExchange = candidateSession(7, [exchange])
-    const completed = createInterviewMockResponse("completed")
+    const completed = completedResponse(withExchange)
+    if (completed.session?.status !== "completed") throw new Error("Expected completed session.")
+    completed.session.candidateQuestionExchanges = [exchange]
     const finishRequest = createDeferred<InterviewPageResponse>()
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(candidate))
     vi.mocked(submitCandidateQuestion).mockResolvedValue(responseWithSession(withExchange))
@@ -355,6 +507,8 @@ describe("InterviewSessionContainer", () => {
     await waitFor(() =>
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+    expect(completed.session.candidateQuestionExchanges).toEqual([exchange])
     expect(finishInterview).toHaveBeenCalledOnce()
   })
 

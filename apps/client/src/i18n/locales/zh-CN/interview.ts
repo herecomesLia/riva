@@ -116,7 +116,7 @@ export const interview = {
       begin: "开始正式问答",
       beginning: "正在进入问答",
       end: "结束面试",
-      confirmEnd: "确认结束",
+      confirmEnd: "结束并查看复盘",
       continue: "继续面试",
       retryAdvance: "重新获取下一问",
       continueToNext: "继续下一问",
@@ -125,7 +125,8 @@ export const interview = {
     },
     endDialog: {
       title: "确认提前结束本次面试？",
-      description: "已提交的回答会保留，尚未回答的内容不会计入本次面试。",
+      description:
+        "当前未提交的回答不会被保存；已经展示的问题仍可在复盘中查看 RIVA 示例回答。结束后将进入本场复盘。",
     },
     errors: {
       loadTitle: "无法恢复面试会话",

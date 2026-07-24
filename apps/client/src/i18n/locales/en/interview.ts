@@ -126,7 +126,7 @@ export const interview = {
       begin: "Start questions",
       beginning: "Starting questions",
       end: "End interview",
-      confirmEnd: "End interview",
+      confirmEnd: "End and view review",
       continue: "Continue interview",
       retryAdvance: "Retry next question",
       continueToNext: "Continue to next question",
@@ -136,7 +136,7 @@ export const interview = {
     endDialog: {
       title: "End this interview early?",
       description:
-        "Submitted answers will be preserved. Unanswered content will not be included in this interview.",
+        "Your current unsubmitted answer will not be saved. Questions already shown will still include Riva example answers in the review, which opens after the interview ends.",
     },
     errors: {
       loadTitle: "Unable to restore the interview",

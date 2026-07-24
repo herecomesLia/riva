@@ -378,6 +378,7 @@ function QuestionContent(props: Extract<InterviewSessionViewProps, { status: "qu
       </Card>
 
       <InterviewAnswerComposer
+        isDisabled={props.isInteractionLocked}
         isPending={props.isSubmitting}
         key={props.prompt.id}
         onSubmit={props.onSubmit}
