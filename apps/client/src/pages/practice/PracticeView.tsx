@@ -2,6 +2,7 @@ import { Link, useBlocker } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
+import { defaultHistorySearch } from "@/pages/history/history-navigation"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -568,7 +569,7 @@ function PracticeCompletedView({
         <Button
           disabled={isPreparingNextRound}
           nativeButton={false}
-          render={<Link to="/history" />}
+          render={<Link search={defaultHistorySearch} to="/history" />}
           variant="outline"
         >
           {t("practice.completed.viewHistory")}

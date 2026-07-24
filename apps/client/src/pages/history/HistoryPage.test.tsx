@@ -26,6 +26,14 @@ function renderHistoryPage() {
   })
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 describe("HistoryPage", () => {
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
@@ -210,5 +218,40 @@ describe("HistoryPage", () => {
     ).toBeInTheDocument()
     expect(getTrainingRecordsOverview).toHaveBeenCalledTimes(2)
     expect(listTrainingRecords).toHaveBeenCalledTimes(2)
+  })
+
+  it("keeps the newest result when filters change faster than requests finish", async () => {
+    const user = userEvent.setup()
+    const interviewRequest = createDeferred<typeof historyRecordsStoryFixture>()
+    const practiceRequest = createDeferred<typeof historyRecordsStoryFixture>()
+    const interviewResult = structuredClone(historyRecordsStoryFixture)
+    const practiceResult = structuredClone(historyRecordsStoryFixture)
+    interviewResult.items[0].reviewSummary = "stale interview response"
+    practiceResult.items[0].reviewSummary = "latest practice response"
+    vi.mocked(getTrainingRecordsOverview).mockResolvedValue(
+      structuredClone(historyOverviewStoryFixture),
+    )
+    vi.mocked(listTrainingRecords).mockImplementation((input) => {
+      if (input.kinds?.[0] === "mockInterview") return interviewRequest.promise
+      if (input.kinds?.[0] === "targetedPractice") return practiceRequest.promise
+      return Promise.resolve(structuredClone(historyRecordsStoryFixture))
+    })
+
+    renderHistoryPage()
+    await screen.findByText(historyRecordsStoryFixture.items[0].reviewSummary!)
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("history.filters.kinds.mockInterview") }),
+    )
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("history.filters.kinds.targetedPractice") }),
+    )
+
+    practiceRequest.resolve(practiceResult)
+    expect(await screen.findByText("latest practice response")).toBeInTheDocument()
+    interviewRequest.resolve(interviewResult)
+    await waitFor(() =>
+      expect(screen.queryByText("stale interview response")).not.toBeInTheDocument(),
+    )
+    expect(screen.getByText("latest practice response")).toBeInTheDocument()
   })
 })

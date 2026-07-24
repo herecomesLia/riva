@@ -1,6 +1,7 @@
 import { BookmarkIcon, FlagIcon, RotateCcwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import type { PracticeEntrySearch } from "@/app/training-entry-search"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
@@ -19,7 +20,13 @@ import {
 
 import { HistoryReferenceAnswer } from "./HistoryReferenceAnswer"
 
-export function TargetedPracticeQuestionRecord({ question }: { question: TrainingRecordQuestion }) {
+export function TargetedPracticeQuestionRecord({
+  practiceSearch,
+  question,
+}: {
+  practiceSearch?: PracticeEntrySearch
+  question: TrainingRecordQuestion
+}) {
   const { i18n, t } = useTranslation()
 
   return (
@@ -58,7 +65,10 @@ export function TargetedPracticeQuestionRecord({ question }: { question: Trainin
       <CardContent className="flex min-w-0 flex-col gap-6">
         <AnswerSection answer={question.answer} />
         <EvaluationSection evaluation={question.evaluation} review={question.review} />
-        <HistoryReferenceAnswer referenceAnswer={question.referenceAnswer} />
+        <HistoryReferenceAnswer
+          practiceSearch={practiceSearch}
+          referenceAnswer={question.referenceAnswer}
+        />
 
         <section aria-labelledby={`${question.id}-follow-ups`} className="flex flex-col gap-3">
           <h3 className="font-heading text-base font-semibold" id={`${question.id}-follow-ups`}>
@@ -78,7 +88,10 @@ export function TargetedPracticeQuestionRecord({ question }: { question: Trainin
                 <CardContent className="flex min-w-0 flex-col gap-5">
                   <AnswerSection answer={followUp.answer} />
                   <EvaluationSection evaluation={followUp.evaluation} review={followUp.review} />
-                  <HistoryReferenceAnswer referenceAnswer={followUp.referenceAnswer} />
+                  <HistoryReferenceAnswer
+                    practiceSearch={practiceSearch}
+                    referenceAnswer={followUp.referenceAnswer}
+                  />
                 </CardContent>
               </Card>
             ))

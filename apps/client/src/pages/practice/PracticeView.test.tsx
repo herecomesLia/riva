@@ -278,7 +278,7 @@ describe("PracticeView", () => {
     ).toBeEnabled()
     expect(
       screen.getByRole("button", { name: i18n.t("practice.completed.viewHistory") }),
-    ).toHaveAttribute("href", "/history")
+    ).toHaveAttribute("href", expect.stringContaining("/history?"))
   })
 
   it("keeps the completed summary and actions safe when next-round preparation is ignored", async () => {

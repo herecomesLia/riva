@@ -8,10 +8,17 @@ import type {
 } from "@/models/training-records"
 import { InterviewAnswerAndPerformance } from "@/pages/interview/components/InterviewAnswerAndPerformance"
 import { useTranslation } from "react-i18next"
+import type { InterviewEntrySearch } from "@/app/training-entry-search"
 
 import { HistoryReferenceAnswer } from "./HistoryReferenceAnswer"
 
-export function MockInterviewQuestionRecord({ question }: { question: TrainingRecordQuestion }) {
+export function MockInterviewQuestionRecord({
+  interviewSearch,
+  question,
+}: {
+  interviewSearch?: InterviewEntrySearch
+  question: TrainingRecordQuestion
+}) {
   const { t } = useTranslation()
 
   return (
@@ -34,6 +41,7 @@ export function MockInterviewQuestionRecord({ question }: { question: TrainingRe
         />
         <HistoryReferenceAnswer
           generateTo="/interview"
+          interviewSearch={interviewSearch}
           referenceAnswer={question.referenceAnswer}
         />
         <section className="flex min-w-0 flex-col gap-3">
@@ -44,7 +52,11 @@ export function MockInterviewQuestionRecord({ question }: { question: TrainingRe
             <p className="text-sm text-muted-foreground">{t("history.mockDetail.noFollowUps")}</p>
           ) : (
             question.followUps.map((followUp) => (
-              <FollowUpRecord followUp={followUp} key={followUp.id} />
+              <FollowUpRecord
+                followUp={followUp}
+                interviewSearch={interviewSearch}
+                key={followUp.id}
+              />
             ))
           )}
         </section>
@@ -53,7 +65,13 @@ export function MockInterviewQuestionRecord({ question }: { question: TrainingRe
   )
 }
 
-function FollowUpRecord({ followUp }: { followUp: TrainingRecordFollowUp }) {
+function FollowUpRecord({
+  followUp,
+  interviewSearch,
+}: {
+  followUp: TrainingRecordFollowUp
+  interviewSearch?: InterviewEntrySearch
+}) {
   const { t } = useTranslation()
   return (
     <Card size="sm">
@@ -75,6 +93,7 @@ function FollowUpRecord({ followUp }: { followUp: TrainingRecordFollowUp }) {
         />
         <HistoryReferenceAnswer
           generateTo="/interview"
+          interviewSearch={interviewSearch}
           referenceAnswer={followUp.referenceAnswer}
         />
       </CardContent>

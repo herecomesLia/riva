@@ -6,13 +6,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
+import type { InterviewEntrySearch, PracticeEntrySearch } from "@/app/training-entry-search"
 import type { TrainingRecordReferenceAnswer } from "@/models/training-records"
 
 export function HistoryReferenceAnswer({
   generateTo = "/practice",
+  interviewSearch,
+  practiceSearch,
   referenceAnswer,
 }: {
   generateTo?: "/practice" | "/interview"
+  interviewSearch?: InterviewEntrySearch
+  practiceSearch?: PracticeEntrySearch
   referenceAnswer: TrainingRecordReferenceAnswer
 }) {
   const { i18n, t } = useTranslation()
@@ -76,6 +81,8 @@ export function HistoryReferenceAnswer({
           <ReferenceUnavailable
             description={t("history.detail.reference.unavailableDescription")}
             generateTo={generateTo}
+            interviewSearch={interviewSearch}
+            practiceSearch={practiceSearch}
             title={`${t("history.detail.reference.unavailable")} · ${t(
               `history.detail.reference.reason.${referenceAnswer.reason}`,
             )}`}
@@ -86,6 +93,8 @@ export function HistoryReferenceAnswer({
           <ReferenceUnavailable
             description={t("history.detail.reference.notRequestedDescription")}
             generateTo={generateTo}
+            interviewSearch={interviewSearch}
+            practiceSearch={practiceSearch}
             title={t("history.detail.reference.notRequested")}
           />
         )}
@@ -97,10 +106,14 @@ export function HistoryReferenceAnswer({
 function ReferenceUnavailable({
   description,
   generateTo,
+  interviewSearch,
+  practiceSearch,
   title,
 }: {
   description: string
   generateTo: "/practice" | "/interview"
+  interviewSearch?: InterviewEntrySearch
+  practiceSearch?: PracticeEntrySearch
   title: string
 }) {
   const { t } = useTranslation()
@@ -112,7 +125,17 @@ function ReferenceUnavailable({
         <AlertTitle>{title}</AlertTitle>
         <AlertDescription>{description}</AlertDescription>
       </Alert>
-      <Button nativeButton={false} render={<Link to={generateTo} />} variant="outline">
+      <Button
+        nativeButton={false}
+        render={
+          generateTo === "/practice" ? (
+            <Link search={practiceSearch} to="/practice" />
+          ) : (
+            <Link search={interviewSearch} to="/interview" />
+          )
+        }
+        variant="outline"
+      >
         <SparklesIcon aria-hidden="true" data-icon="inline-start" />
         {t("history.detail.reference.generate")}
       </Button>

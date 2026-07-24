@@ -65,18 +65,18 @@ describe("HistoryView", () => {
     expect(
       screen.getAllByText(`${record.targetRole.title} · ${record.targetRole.company}`),
     ).not.toHaveLength(0)
-    expect(
-      screen.getByRole("button", {
-        name: i18n.t("history.records.viewDetailsLabel", {
-          date: new Intl.DateTimeFormat(i18n.language, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          }).format(new Date(record.startedAt)),
-          kind: i18n.t(`history.filters.kinds.${record.kind}`),
-          role: record.targetRole.title,
-        }),
+    const detailLink = screen.getByRole("button", {
+      name: i18n.t("history.records.viewDetailsLabel", {
+        date: new Intl.DateTimeFormat(i18n.language, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(record.startedAt)),
+        kind: i18n.t(`history.filters.kinds.${record.kind}`),
+        role: record.targetRole.title,
       }),
-    ).toHaveAttribute("href", `/history/practice/${record.id}`)
+    })
+    expect(detailLink.getAttribute("href")).toContain(`/history/practice/${record.id}`)
+    expect(detailLink.getAttribute("href")).toContain("page=1")
   })
 
   it("links mock interview summaries to the independent history detail route", async () => {
@@ -100,7 +100,8 @@ describe("HistoryView", () => {
         role: record.targetRole.title,
       }),
     })
-    expect(detailButton).toHaveAttribute("href", `/history/interview/${record.id}`)
+    expect(detailButton.getAttribute("href")).toContain(`/history/interview/${record.id}`)
+    expect(detailButton.getAttribute("href")).toContain("page=1")
   })
 
   it("forwards filter and pagination choices without owning query behavior", async () => {
@@ -154,10 +155,18 @@ describe("HistoryView", () => {
   it("renders a contained error and forwards retry", async () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()
-    renderHistoryView({ status: "error" }, { onRetry })
+    renderHistoryView({ status: "error", isRetrying: false }, { onRetry })
 
     expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("history.error.title"))
     await user.click(screen.getByRole("button", { name: i18n.t("common.pageState.error.retry") }))
     expect(onRetry).toHaveBeenCalledOnce()
+  })
+
+  it("disables duplicate retry while a request is in flight", async () => {
+    renderHistoryView({ status: "error", isRetrying: true })
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("common.pageState.error.retry") }),
+    ).toBeDisabled()
   })
 })

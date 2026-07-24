@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router"
 import { AlertCircleIcon, ArrowLeftIcon, RotateCcwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { useEffect, useRef } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
+import type { PracticeQuestionType } from "@/models/practice"
 import type {
   TargetedPracticeRecordDetailResponse,
   TrainingRecordRecommendation,
@@ -21,16 +24,28 @@ import type {
 import { PracticeWeaknesses } from "@/pages/practice/components/PracticeReviewDetails"
 
 import { TargetedPracticeQuestionRecord } from "./components/TargetedPracticeQuestionRecord"
+import { defaultHistorySearch, type HistoryRouteSearch } from "./history-navigation"
 import type { TargetedPracticeHistoryViewState } from "./targeted-practice-history-types"
 
 export function TargetedPracticeHistoryView({
+  historySearch = defaultHistorySearch,
   onRetry,
   state,
 }: {
+  historySearch?: HistoryRouteSearch
   onRetry: () => void
   state: TargetedPracticeHistoryViewState
 }) {
   const { t } = useTranslation()
+  const stateRegionRef = useRef<HTMLDivElement>(null)
+  const stateKey = state.status === "ready" ? `ready:${state.data.id}` : state.status
+  const previousStateKey = useRef(stateKey)
+
+  useEffect(() => {
+    if (previousStateKey.current === stateKey) return
+    previousStateKey.current = stateKey
+    stateRegionRef.current?.focus()
+  }, [stateKey])
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -38,7 +53,7 @@ export function TargetedPracticeHistoryView({
         <Button
           className="w-fit"
           nativeButton={false}
-          render={<Link to="/history" />}
+          render={<Link search={historySearch} to="/history" />}
           variant="ghost"
         >
           <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
@@ -54,7 +69,20 @@ export function TargetedPracticeHistoryView({
             </p>
           </div>
           {state.status === "ready" && (
-            <Button nativeButton={false} render={<Link to="/practice" />}>
+            <Button
+              nativeButton={false}
+              render={
+                <Link
+                  search={{
+                    targetRoleId: state.data.targetRole.id,
+                    questionType: toPracticeQuestionType(state.data.setup.questionType),
+                    difficulty: state.data.setup.difficulty,
+                    source: "history",
+                  }}
+                  to="/practice"
+                />
+              }
+            >
               <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
               {t("history.detail.retry")}
             </Button>
@@ -62,10 +90,19 @@ export function TargetedPracticeHistoryView({
         </div>
       </header>
 
-      {state.status === "loading" && <DetailLoading />}
-      {state.status === "error" && <DetailError onRetry={onRetry} />}
-      {state.status === "notFound" && <DetailNotFound />}
-      {state.status === "ready" && <DetailReady record={state.data} />}
+      <div
+        className="rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        data-testid="targeted-history-state-region"
+        ref={stateRegionRef}
+        tabIndex={-1}
+      >
+        {state.status === "loading" && <DetailLoading />}
+        {state.status === "error" && (
+          <DetailError isRetrying={state.isRetrying} onRetry={onRetry} />
+        )}
+        {state.status === "notFound" && <DetailNotFound historySearch={historySearch} />}
+        {state.status === "ready" && <DetailReady record={state.data} />}
+      </div>
     </div>
   )
 }
@@ -86,7 +123,16 @@ function DetailReady({ record }: { record: TargetedPracticeRecordDetailResponse 
           </p>
         </div>
         {record.questions.map((question) => (
-          <TargetedPracticeQuestionRecord key={question.id} question={question} />
+          <TargetedPracticeQuestionRecord
+            key={question.id}
+            practiceSearch={{
+              targetRoleId: record.targetRole.id,
+              questionType: toPracticeQuestionType(record.setup.questionType),
+              difficulty: record.setup.difficulty,
+              source: "history",
+            }}
+            question={question}
+          />
         ))}
       </section>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -210,7 +256,7 @@ function DetailLoading() {
   )
 }
 
-function DetailError({ onRetry }: { onRetry: () => void }) {
+function DetailError({ isRetrying, onRetry }: { isRetrying: boolean; onRetry: () => void }) {
   const { t } = useTranslation()
   return (
     <Card role="alert">
@@ -222,13 +268,16 @@ function DetailError({ onRetry }: { onRetry: () => void }) {
         <CardDescription>{t("history.detail.error.description")}</CardDescription>
       </CardHeader>
       <CardFooter>
-        <Button onClick={onRetry}>{t("common.pageState.error.retry")}</Button>
+        <Button disabled={isRetrying} onClick={onRetry}>
+          {isRetrying && <Spinner aria-hidden="true" />}
+          {t("common.pageState.error.retry")}
+        </Button>
       </CardFooter>
     </Card>
   )
 }
 
-function DetailNotFound() {
+function DetailNotFound({ historySearch }: { historySearch: HistoryRouteSearch }) {
   const { t } = useTranslation()
   return (
     <Card>
@@ -237,7 +286,7 @@ function DetailNotFound() {
         <CardDescription>{t("history.detail.notFound.description")}</CardDescription>
       </CardHeader>
       <CardFooter>
-        <Button nativeButton={false} render={<Link to="/history" />}>
+        <Button nativeButton={false} render={<Link search={historySearch} to="/history" />}>
           <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
           {t("history.detail.notFound.action")}
         </Button>
@@ -250,6 +299,21 @@ function formatRole(record: TargetedPracticeRecordDetailResponse) {
   return record.targetRole.company
     ? `${record.targetRole.company} · ${record.targetRole.title}`
     : record.targetRole.title
+}
+
+function toPracticeQuestionType(
+  questionType: TargetedPracticeRecordDetailResponse["setup"]["questionType"],
+): PracticeQuestionType | undefined {
+  if (
+    questionType === "projectDeepDive" ||
+    questionType === "behavioral" ||
+    questionType === "businessUnderstanding" ||
+    questionType === "motivation" ||
+    questionType === "technicalFoundation"
+  ) {
+    return questionType
+  }
+  return undefined
 }
 
 function statusVariant(status: TrainingRecordStatus): "default" | "secondary" | "outline" {

@@ -3,5 +3,5 @@ import type { MockInterviewRecordDetailResponse } from "@/models/training-record
 export type MockInterviewHistoryViewState =
   | { status: "loading" }
   | { status: "ready"; data: MockInterviewRecordDetailResponse }
-  | { status: "error" }
+  | { status: "error"; isRetrying: boolean }
   | { status: "notFound" }

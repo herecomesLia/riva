@@ -27,4 +27,4 @@ export type HistoryViewState =
       reason: "neverTrained" | "noMatches"
       data: HistoryReadyData
     }
-  | { status: "error" }
+  | { status: "error"; isRetrying: boolean }

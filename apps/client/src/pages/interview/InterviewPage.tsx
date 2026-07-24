@@ -1,12 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
+import { useNavigate, useSearch } from "@tanstack/react-router"
 import { useRef } from "react"
 
-import type {
-  InterviewConfiguration,
-  InterviewPageResponse,
-  InterviewSetupViewData,
-} from "@/models/interview"
+import { parseInterviewEntrySearch } from "@/app/training-entry-search"
+import { applyInterviewEntrySearch } from "@/app/training-entry-defaults"
+import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
 import { getInterviewPage, startInterview } from "@/services/interview"
 
 import { InterviewView } from "./InterviewView"
@@ -14,6 +12,7 @@ import { INTERVIEW_QUERY_KEY } from "./interview-query"
 
 export function InterviewPage() {
   const navigate = useNavigate()
+  const entrySearch = parseInterviewEntrySearch(useSearch({ strict: false }))
   const queryClient = useQueryClient()
   const startLock = useRef(false)
   const interviewQuery = useQuery({
@@ -55,7 +54,7 @@ export function InterviewPage() {
       return <InterviewView status="empty" />
     }
 
-    const setup: InterviewSetupViewData = interviewQuery.data.setup
+    const setup = applyInterviewEntrySearch(interviewQuery.data.setup, entrySearch)
     return (
       <InterviewView
         isStarting={startMutation.isPending}

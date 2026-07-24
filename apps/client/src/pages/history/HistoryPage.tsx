@@ -1,37 +1,45 @@
-import { useQuery } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { useNavigate, useSearch } from "@tanstack/react-router"
+import { useMemo, useRef } from "react"
 
 import type { ListTrainingRecordsInput } from "@/models/training-records"
 import { getTrainingRecordsOverview, listTrainingRecords } from "@/services/training-records"
 
+import { trainingRecordCacheTime, trainingRecordQueryKeys } from "./history-query-keys"
+import { parseHistorySearch, type HistoryRouteSearch } from "./history-navigation"
 import type { HistoryFiltersValue, HistoryTimeRange, HistoryViewState } from "./history-types"
 import { HistoryView } from "./HistoryView"
-
-const defaultFilters: HistoryFiltersValue = {
-  kind: "all",
-  targetRoleId: "all",
-  timeRange: "all",
-}
 
 const pageSize = 3
 
 export function HistoryPage() {
-  const [filters, setFilters] = useState(defaultFilters)
-  const [page, setPage] = useState(1)
-  const [referenceTime] = useState(() => Date.now())
+  const navigate = useNavigate()
+  const search = parseHistorySearch(useSearch({ strict: false }))
+  const retryLock = useRef(false)
+  const filters = useMemo(
+    () => ({
+      kind: search.kind,
+      targetRoleId: search.targetRoleId,
+      timeRange: search.timeRange,
+    }),
+    [search.kind, search.targetRoleId, search.timeRange],
+  )
   const queryInput = useMemo(
-    () => createListInput(filters, page, referenceTime),
-    [filters, page, referenceTime],
+    () => createListInput(filters, search.page, Date.now()),
+    [filters, search.page],
   )
   const overviewQuery = useQuery({
     queryFn: getTrainingRecordsOverview,
-    queryKey: ["training-records", "overview"],
+    queryKey: trainingRecordQueryKeys.overview(),
     retry: false,
+    staleTime: trainingRecordCacheTime,
   })
   const recordsQuery = useQuery({
+    placeholderData: keepPreviousData,
     queryFn: () => listTrainingRecords(queryInput),
-    queryKey: ["training-records", "list", queryInput],
+    queryKey: trainingRecordQueryKeys.list(search),
     retry: false,
+    staleTime: trainingRecordCacheTime,
   })
 
   const state = resolveViewState(
@@ -41,22 +49,34 @@ export function HistoryPage() {
     overviewQuery.isError || recordsQuery.isError,
   )
 
-  function handleFiltersChange(nextFilters: HistoryFiltersValue) {
-    setFilters(nextFilters)
-    setPage(1)
+  function setSearch(nextSearch: HistoryRouteSearch) {
+    void navigate({ search: nextSearch, to: "/history" })
   }
 
-  function handleRetry() {
-    void Promise.all([overviewQuery.refetch(), recordsQuery.refetch()])
+  function handleFiltersChange(nextFilters: HistoryFiltersValue) {
+    setSearch({ ...nextFilters, page: 1 })
+  }
+
+  async function handleRetry() {
+    if (retryLock.current || overviewQuery.isFetching || recordsQuery.isFetching) return
+    retryLock.current = true
+    try {
+      await Promise.all([overviewQuery.refetch(), recordsQuery.refetch()])
+    } finally {
+      retryLock.current = false
+    }
   }
 
   return (
     <HistoryView
       filters={filters}
-      onClearFilters={() => handleFiltersChange(defaultFilters)}
+      onClearFilters={() =>
+        setSearch({ kind: "all", targetRoleId: "all", timeRange: "all", page: 1 })
+      }
       onFiltersChange={handleFiltersChange}
-      onPageChange={setPage}
-      onRetry={handleRetry}
+      onPageChange={(page) => setSearch({ ...filters, page })}
+      onRetry={() => void handleRetry()}
+      search={search}
       state={state}
     />
   )
@@ -92,6 +112,7 @@ function resolveViewState(
   isFetching: boolean,
   isError: boolean,
 ): HistoryViewState {
+  if (isError) return { status: "error", isRetrying: isFetching }
   if (overview && records) {
     const data = { overview, records }
     if (overview.totalRecordCount === 0) {
@@ -103,6 +124,5 @@ function resolveViewState(
     return { status: "ready", data }
   }
   if (isFetching) return { status: "loading" }
-  if (isError) return { status: "error" }
   return { status: "loading" }
 }

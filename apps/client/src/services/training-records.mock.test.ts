@@ -257,6 +257,8 @@ describe("training records mock service", () => {
     firstOverview.byKind.targetedPractice.recordCount = 999
     const secondOverview = await settle(getTrainingRecordsOverview())
     expect(secondOverview.byKind.targetedPractice.recordCount).toBe(3)
-    expect(trainingRecordDetailsMock).toHaveLength(5)
+    expect(trainingRecordDetailsMock).toHaveLength(
+      targetedPracticeRecordDetailsMock.length + mockInterviewRecordDetailsMock.length,
+    )
   })
 })

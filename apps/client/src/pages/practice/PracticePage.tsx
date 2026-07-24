@@ -1,3 +1,8 @@
+import { useSearch } from "@tanstack/react-router"
+
+import { parsePracticeEntrySearch } from "@/app/training-entry-search"
+import { applyPracticeEntrySearch } from "@/app/training-entry-defaults"
+
 import {
   usePracticeAnsweringActions,
   usePracticeActionLock,
@@ -10,6 +15,7 @@ import { usePracticeSession } from "./hooks/usePracticeSession"
 import { PracticeView } from "./PracticeView"
 
 export function PracticePage() {
+  const entrySearch = parsePracticeEntrySearch(useSearch({ strict: false }))
   const { practiceQuery, start, isStarting, prepareNextRound, isPreparingNextRound } =
     usePracticeSession()
   const generation = usePracticeGenerationPolling(practiceQuery.data)
@@ -26,7 +32,10 @@ export function PracticePage() {
         answeringPending={answering.pending}
         completedActions={{ onPrepareNextRound: prepareNextRound }}
         completedPending={isPreparingNextRound}
-        content={{ status: "ready", data: practiceQuery.data }}
+        content={{
+          status: "ready",
+          data: applyPracticeEntrySearch(practiceQuery.data, entrySearch),
+        }}
         evaluationError={evaluation.evaluationError}
         followUpActions={followUp.actions}
         followUpPending={followUp.pending}

@@ -8,6 +8,7 @@ import {
   SearchXIcon,
   SparklesIcon,
 } from "lucide-react"
+import { Link } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
@@ -28,18 +29,23 @@ import type {
   TrainingRecordSummary,
 } from "@/models/training-records"
 
+import type { HistoryRouteSearch } from "../history-navigation"
+import { defaultHistorySearch } from "../history-navigation"
+
 export function HistoryRecordList({
   emptyReason,
   loading,
   onClearFilters,
   onPageChange,
   page,
+  search = defaultHistorySearch,
 }: {
   emptyReason?: "neverTrained" | "noMatches"
   loading: boolean
   onClearFilters: () => void
   onPageChange: (page: number) => void
   page: TrainingRecordsPageResponse | null
+  search?: HistoryRouteSearch
 }) {
   const { t } = useTranslation()
 
@@ -72,7 +78,7 @@ export function HistoryRecordList({
           <>
             <div className="flex flex-col gap-3">
               {page.items.map((record) => (
-                <HistoryRecordCard key={record.id} record={record} />
+                <HistoryRecordCard key={record.id} record={record} search={search} />
               ))}
             </div>
             {page.pagination.totalPages > 1 && (
@@ -111,7 +117,13 @@ export function HistoryRecordList({
   )
 }
 
-function HistoryRecordCard({ record }: { record: TrainingRecordSummary }) {
+function HistoryRecordCard({
+  record,
+  search,
+}: {
+  record: TrainingRecordSummary
+  search: HistoryRouteSearch
+}) {
   const { i18n, t } = useTranslation()
   const KindIcon = record.kind === "targetedPractice" ? ClipboardListIcon : MessageSquareTextIcon
   const kindLabel = t(`history.filters.kinds.${record.kind}`)
@@ -119,10 +131,12 @@ function HistoryRecordCard({ record }: { record: TrainingRecordSummary }) {
     record.kind === "targetedPractice"
       ? t(`history.questionTypes.${record.questionType}`)
       : t(`history.rounds.${record.round}`)
-  const detailHref =
-    record.kind === "targetedPractice"
-      ? `/history/practice/${record.id}`
-      : `/history/interview/${record.id}`
+  const detailLink =
+    record.kind === "targetedPractice" ? (
+      <Link params={{ recordId: record.id }} search={search} to="/history/practice/$recordId" />
+    ) : (
+      <Link params={{ recordId: record.id }} search={search} to="/history/interview/$recordId" />
+    )
 
   return (
     <Card size="sm">
@@ -192,7 +206,7 @@ function HistoryRecordCard({ record }: { record: TrainingRecordSummary }) {
             role: record.targetRole.title,
           })}
           nativeButton={false}
-          render={<a href={detailHref} />}
+          render={detailLink}
           variant="ghost"
         >
           {t("history.records.viewDetails")}
@@ -234,7 +248,7 @@ function HistoryEmpty({
           </EmptyHeader>
           <EmptyContent>
             {reason === "neverTrained" ? (
-              <Button nativeButton={false} render={<a href="/practice" />}>
+              <Button nativeButton={false} render={<Link to="/practice" />}>
                 {t("history.empty.neverTrained.action")}
               </Button>
             ) : (

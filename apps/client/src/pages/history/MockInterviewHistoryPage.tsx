@@ -1,18 +1,24 @@
 import { useQuery } from "@tanstack/react-query"
-import { useParams } from "@tanstack/react-router"
+import { useParams, useSearch } from "@tanstack/react-router"
+import { useRef } from "react"
 
 import { TrainingRecordNotFoundError } from "@/models/training-records"
 import { getMockInterviewRecord } from "@/services/training-records"
 
+import { trainingRecordCacheTime, trainingRecordQueryKeys } from "./history-query-keys"
+import { parseHistorySearch } from "./history-navigation"
 import type { MockInterviewHistoryViewState } from "./mock-interview-history-types"
 import { MockInterviewHistoryView } from "./MockInterviewHistoryView"
 
 export function MockInterviewHistoryPage() {
   const { recordId } = useParams({ from: "/app/history/interview/$recordId" })
+  const historySearch = parseHistorySearch(useSearch({ strict: false }))
+  const retryLock = useRef(false)
   const query = useQuery({
-    queryKey: ["training-records", "mock-interview", recordId],
+    queryKey: trainingRecordQueryKeys.mockInterviewDetail(recordId),
     queryFn: () => getMockInterviewRecord(recordId),
     retry: false,
+    staleTime: trainingRecordCacheTime,
   })
 
   const state: MockInterviewHistoryViewState = query.data
@@ -21,7 +27,23 @@ export function MockInterviewHistoryPage() {
       ? { status: "loading" }
       : query.error instanceof TrainingRecordNotFoundError
         ? { status: "notFound" }
-        : { status: "error" }
+        : { status: "error", isRetrying: query.isFetching }
 
-  return <MockInterviewHistoryView onRetry={() => void query.refetch()} state={state} />
+  async function handleRetry() {
+    if (retryLock.current || query.isFetching) return
+    retryLock.current = true
+    try {
+      await query.refetch()
+    } finally {
+      retryLock.current = false
+    }
+  }
+
+  return (
+    <MockInterviewHistoryView
+      historySearch={historySearch}
+      onRetry={() => void handleRetry()}
+      state={state}
+    />
+  )
 }

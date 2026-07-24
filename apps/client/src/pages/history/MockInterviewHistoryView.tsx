@@ -14,6 +14,7 @@ import {
   SparklesIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { useEffect, useRef } from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import type {
   MockInterviewOverallReview,
   MockInterviewRecordDetailResponse,
@@ -36,23 +38,35 @@ import type {
 import { InterviewReviewListCard } from "@/pages/interview/components/InterviewReviewListCard"
 
 import { MockInterviewQuestionRecord } from "./components/MockInterviewQuestionRecord"
+import { defaultHistorySearch, type HistoryRouteSearch } from "./history-navigation"
 import type { MockInterviewHistoryViewState } from "./mock-interview-history-types"
 
 export function MockInterviewHistoryView({
+  historySearch = defaultHistorySearch,
   onRetry,
   state,
 }: {
+  historySearch?: HistoryRouteSearch
   onRetry: () => void
   state: MockInterviewHistoryViewState
 }) {
   const { t } = useTranslation()
+  const stateRegionRef = useRef<HTMLDivElement>(null)
+  const stateKey = state.status === "ready" ? `ready:${state.data.id}` : state.status
+  const previousStateKey = useRef(stateKey)
+
+  useEffect(() => {
+    if (previousStateKey.current === stateKey) return
+    previousStateKey.current = stateKey
+    stateRegionRef.current?.focus()
+  }, [stateKey])
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <header className="flex flex-col gap-4">
         <Button
           className="w-fit"
           nativeButton={false}
-          render={<Link to="/history" />}
+          render={<Link search={historySearch} to="/history" />}
           variant="ghost"
         >
           <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
@@ -68,7 +82,20 @@ export function MockInterviewHistoryView({
             </p>
           </div>
           {state.status === "ready" && (
-            <Button nativeButton={false} render={<Link to="/interview" />}>
+            <Button
+              nativeButton={false}
+              render={
+                <Link
+                  search={{
+                    targetRoleId: state.data.targetRole.id,
+                    round: state.data.setup.round,
+                    difficulty: state.data.setup.difficulty,
+                    durationMinutes: state.data.setup.plannedDurationMinutes,
+                  }}
+                  to="/interview"
+                />
+              }
+            >
               <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
               {t("history.mockDetail.retry")}
             </Button>
@@ -76,10 +103,19 @@ export function MockInterviewHistoryView({
         </div>
       </header>
 
-      {state.status === "loading" && <DetailLoading />}
-      {state.status === "error" && <DetailError onRetry={onRetry} />}
-      {state.status === "notFound" && <DetailNotFound />}
-      {state.status === "ready" && <DetailReady record={state.data} />}
+      <div
+        className="rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        data-testid="mock-history-state-region"
+        ref={stateRegionRef}
+        tabIndex={-1}
+      >
+        {state.status === "loading" && <DetailLoading />}
+        {state.status === "error" && (
+          <DetailError isRetrying={state.isRetrying} onRetry={onRetry} />
+        )}
+        {state.status === "notFound" && <DetailNotFound historySearch={historySearch} />}
+        {state.status === "ready" && <DetailReady record={state.data} />}
+      </div>
     </div>
   )
 }
@@ -100,7 +136,16 @@ function DetailReady({ record }: { record: MockInterviewRecordDetailResponse }) 
           </p>
         </div>
         {record.questions.map((question) => (
-          <MockInterviewQuestionRecord key={question.id} question={question} />
+          <MockInterviewQuestionRecord
+            interviewSearch={{
+              targetRoleId: record.targetRole.id,
+              round: record.setup.round,
+              difficulty: record.setup.difficulty,
+              durationMinutes: record.setup.plannedDurationMinutes,
+            }}
+            key={question.id}
+            question={question}
+          />
         ))}
       </section>
       <CandidateQuestions exchanges={record.candidateQuestionExchanges} />
@@ -386,7 +431,7 @@ function DetailLoading() {
   )
 }
 
-function DetailError({ onRetry }: { onRetry: () => void }) {
+function DetailError({ isRetrying, onRetry }: { isRetrying: boolean; onRetry: () => void }) {
   const { t } = useTranslation()
   return (
     <Card role="alert">
@@ -398,13 +443,16 @@ function DetailError({ onRetry }: { onRetry: () => void }) {
         <CardDescription>{t("history.mockDetail.error.description")}</CardDescription>
       </CardHeader>
       <CardFooter>
-        <Button onClick={onRetry}>{t("common.pageState.error.retry")}</Button>
+        <Button disabled={isRetrying} onClick={onRetry}>
+          {isRetrying && <Spinner aria-hidden="true" />}
+          {t("common.pageState.error.retry")}
+        </Button>
       </CardFooter>
     </Card>
   )
 }
 
-function DetailNotFound() {
+function DetailNotFound({ historySearch }: { historySearch: HistoryRouteSearch }) {
   const { t } = useTranslation()
   return (
     <Card>
@@ -413,7 +461,7 @@ function DetailNotFound() {
         <CardDescription>{t("history.mockDetail.notFound.description")}</CardDescription>
       </CardHeader>
       <CardFooter>
-        <Button nativeButton={false} render={<Link to="/history" />}>
+        <Button nativeButton={false} render={<Link search={historySearch} to="/history" />}>
           <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
           {t("history.mockDetail.notFound.action")}
         </Button>

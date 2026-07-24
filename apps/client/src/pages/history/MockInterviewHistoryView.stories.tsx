@@ -54,7 +54,7 @@ export const Loading = meta.story({
 
 const onRetry = fn()
 export const Error = meta.story({
-  args: { onRetry, state: { status: "error" } },
+  args: { onRetry, state: { status: "error", isRetrying: false } },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /重新加载|reload/i }))
     await expect(onRetry).toHaveBeenCalledOnce()

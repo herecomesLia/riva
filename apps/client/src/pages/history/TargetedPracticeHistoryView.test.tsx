@@ -41,6 +41,11 @@ describe("TargetedPracticeHistoryView", () => {
     expect(screen.getByText(record.questions[1].followUps[0].prompt)).toBeInTheDocument()
     expect(screen.getAllByTestId("history-reference-ready").length).toBeGreaterThanOrEqual(2)
     expect(screen.getAllByText(i18n.t("history.detail.saved"))).toHaveLength(2)
+    const retryLink = screen.getByRole("button", { name: i18n.t("history.detail.retry") })
+    expect(retryLink.getAttribute("href")).toContain(
+      `targetRoleId=${encodeURIComponent(record.targetRole.id)}`,
+    )
+    expect(retryLink.getAttribute("href")).not.toContain("recordId=")
   })
 
   it("keeps reference answers visible for unanswered follow-ups and real snapshot states", async () => {
@@ -51,7 +56,7 @@ describe("TargetedPracticeHistoryView", () => {
     expect(screen.getByTestId("history-reference-unavailable")).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: i18n.t("history.detail.reference.generate") }),
-    ).toHaveAttribute("href", "/practice")
+    ).toHaveAttribute("href", expect.stringContaining("/practice?"))
   })
 
   it("offers example-answer navigation for an unanswered early-ended question", async () => {
@@ -61,13 +66,13 @@ describe("TargetedPracticeHistoryView", () => {
     expect(screen.getByTestId("history-reference-notRequested")).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: i18n.t("history.detail.reference.generate") }),
-    ).toHaveAttribute("href", "/practice")
+    ).toHaveAttribute("href", expect.stringContaining("/practice?"))
   })
 
   it("renders distinct not-found and retryable error states", async () => {
     const onRetry = vi.fn()
     const user = userEvent.setup()
-    const { rerender } = renderView({ status: "error" }, onRetry)
+    const { rerender } = renderView({ status: "error", isRetrying: false }, onRetry)
 
     await user.click(
       await screen.findByRole("button", { name: i18n.t("common.pageState.error.retry") }),
@@ -75,9 +80,10 @@ describe("TargetedPracticeHistoryView", () => {
     expect(onRetry).toHaveBeenCalledOnce()
 
     rerender(<TargetedPracticeHistoryView onRetry={onRetry} state={{ status: "notFound" }} />)
+    expect(screen.getByTestId("targeted-history-state-region")).toHaveFocus()
     const link = await screen.findByRole("button", {
       name: i18n.t("history.detail.notFound.action"),
     })
-    expect(link).toHaveAttribute("href", "/history")
+    expect(link).toHaveAttribute("href", expect.stringContaining("/history?"))
   })
 })

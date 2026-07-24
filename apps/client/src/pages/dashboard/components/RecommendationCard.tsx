@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { defaultHistorySearch } from "@/pages/history/history-navigation"
 import {
   Card,
   CardContent,
@@ -60,7 +61,11 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
         ) : recommendation ? (
           <RecommendationDataFooter />
         ) : (
-          <Button nativeButton={false} render={<Link to="/history" />} variant="outline">
+          <Button
+            nativeButton={false}
+            render={<Link search={defaultHistorySearch} to="/history" />}
+            variant="outline"
+          >
             {t("dashboard.actions.viewHistory")}
           </Button>
         )}
@@ -124,7 +129,11 @@ function RecommendationDataFooter() {
         <PlayIcon data-icon="inline-start" />
         {t("dashboard.actions.startPractice")}
       </Button>
-      <Button nativeButton={false} render={<Link to="/history" />} variant="outline">
+      <Button
+        nativeButton={false}
+        render={<Link search={defaultHistorySearch} to="/history" />}
+        variant="outline"
+      >
         {t("dashboard.actions.viewHistory")}
       </Button>
     </>

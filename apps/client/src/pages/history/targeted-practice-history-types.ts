@@ -3,5 +3,5 @@ import type { TargetedPracticeRecordDetailResponse } from "@/models/training-rec
 export type TargetedPracticeHistoryViewState =
   | { status: "loading" }
   | { status: "ready"; data: TargetedPracticeRecordDetailResponse }
-  | { status: "error" }
+  | { status: "error"; isRetrying: boolean }
   | { status: "notFound" }

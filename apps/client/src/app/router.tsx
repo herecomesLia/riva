@@ -17,6 +17,9 @@ import { NotFoundPage } from "@/pages/not-found"
 import { PracticePage } from "@/pages/practice"
 import { ProfilePage } from "@/pages/profile"
 import { RolesPage } from "@/pages/roles"
+import { parseHistorySearch } from "@/pages/history/history-navigation"
+
+import { parseInterviewEntrySearch, parsePracticeEntrySearch } from "./training-entry-search"
 
 function IndexRoute() {
   const { isAuthenticated } = useAuth()
@@ -104,12 +107,14 @@ const practiceRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/practice",
   component: PracticePage,
+  validateSearch: parsePracticeEntrySearch,
 })
 
 const interviewRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/interview",
   component: InterviewPage,
+  validateSearch: parseInterviewEntrySearch,
 })
 
 const interviewSessionRoute = createRoute({
@@ -128,18 +133,21 @@ const historyRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/history",
   component: HistoryPage,
+  validateSearch: parseHistorySearch,
 })
 
 const targetedPracticeHistoryRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/history/practice/$recordId",
   component: TargetedPracticeHistoryPage,
+  validateSearch: parseHistorySearch,
 })
 
 const mockInterviewHistoryRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/history/interview/$recordId",
   component: MockInterviewHistoryPage,
+  validateSearch: parseHistorySearch,
 })
 
 const routeTree = rootRoute.addChildren([

@@ -45,6 +45,11 @@ describe("MockInterviewHistoryView", () => {
     expect(screen.getByText(record.questions[1].followUps[0].prompt)).toBeInTheDocument()
     expect(screen.getByText(record.candidateQuestionExchanges[0].question)).toBeInTheDocument()
     expect(screen.getByText(record.candidateQuestionExchanges[0].feedback)).toBeInTheDocument()
+    const retryLink = screen.getByRole("button", { name: i18n.t("history.mockDetail.retry") })
+    expect(retryLink.getAttribute("href")).toContain(
+      `targetRoleId=${encodeURIComponent(record.targetRole.id)}`,
+    )
+    expect(retryLink.getAttribute("href")).not.toContain("recordId=")
   })
 
   it("keeps unanswered questions and reference actions in a partial early-ended review", async () => {
@@ -59,7 +64,7 @@ describe("MockInterviewHistoryView", () => {
     for (const button of screen.getAllByRole("button", {
       name: i18n.t("history.detail.reference.generate"),
     })) {
-      expect(button).toHaveAttribute("href", "/interview")
+      expect(button).toHaveAttribute("href", expect.stringContaining("/interview?"))
     }
   })
 
@@ -86,7 +91,7 @@ describe("MockInterviewHistoryView", () => {
   it("renders distinct not-found and retryable error states", async () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()
-    const { rerender } = renderView({ status: "error" }, onRetry)
+    const { rerender } = renderView({ status: "error", isRetrying: false }, onRetry)
 
     await user.click(
       await screen.findByRole("button", { name: i18n.t("common.pageState.error.retry") }),
@@ -94,8 +99,9 @@ describe("MockInterviewHistoryView", () => {
     expect(onRetry).toHaveBeenCalledOnce()
 
     rerender(<MockInterviewHistoryView onRetry={onRetry} state={{ status: "notFound" }} />)
+    expect(screen.getByTestId("mock-history-state-region")).toHaveFocus()
     expect(
       await screen.findByRole("button", { name: i18n.t("history.mockDetail.notFound.action") }),
-    ).toHaveAttribute("href", "/history")
+    ).toHaveAttribute("href", expect.stringContaining("/history?"))
   })
 })
