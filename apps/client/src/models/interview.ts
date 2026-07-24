@@ -351,6 +351,8 @@ export type EnterCandidateQuestionsInput = InterviewSessionMutationInput & {
 
 export type FinishInterviewInput = InterviewSessionMutationInput
 
+export type EndInterviewInput = InterviewSessionMutationInput
+
 export type GetInterviewReviewInput = {
   sessionId: string
 }

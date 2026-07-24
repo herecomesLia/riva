@@ -11,6 +11,7 @@ import type {
   ActiveInterviewSessionResponse,
   BeginInterviewQuestionsInput,
   CompletedInterviewQuestionResponse,
+  EndInterviewInput,
   EnterCandidateQuestionsInput,
   FinishInterviewInput,
   GetInterviewReviewInput,
@@ -30,6 +31,7 @@ import type {
 
 export type InterviewMockOperation =
   | "beginInterviewQuestions"
+  | "endInterview"
   | "enterCandidateQuestions"
   | "finishInterview"
   | "getInterviewPage"
@@ -451,6 +453,35 @@ export async function finishInterview(
     completedAt: nextTimestamp(),
     candidateQuestionExchanges: session.exchanges,
     review: createInterviewReview(session.completedQuestions.map(({ question }) => question)),
+  }
+  return commit(completed)
+}
+
+export async function endInterview(input: EndInterviewInput): Promise<InterviewMutationResponse> {
+  await consumeOperation("endInterview")
+  const session = requireActiveSession(input)
+  let completedQuestions = session.completedQuestions
+
+  if (session.status === "question" && session.currentQuestion.status === "answered") {
+    completedQuestions = [...completedQuestions, toCompletedQuestion(session)]
+  } else if (session.status === "followUp" && session.currentFollowUp.status === "answered") {
+    completedQuestions = [...completedQuestions, toCompletedFollowUpQuestion(session)]
+  }
+
+  const completed: InterviewCompletedSessionResponse = {
+    status: "completed",
+    sessionId: session.sessionId,
+    version: session.version + 1,
+    configuration: session.configuration,
+    startedAt: session.startedAt,
+    progress: {
+      completedQuestions: completedQuestions.length,
+      totalQuestions: session.progress.totalQuestions,
+    },
+    completedQuestions,
+    completedAt: nextTimestamp(),
+    candidateQuestionExchanges: session.status === "candidateQuestions" ? session.exchanges : [],
+    review: createInterviewReview(completedQuestions.map(({ question }) => question)),
   }
   return commit(completed)
 }

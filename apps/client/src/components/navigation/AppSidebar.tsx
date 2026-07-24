@@ -109,13 +109,14 @@ function NavigationList() {
         <SidebarMenu>
           {appNavigationItems.map((item) => {
             const Icon = item.icon
-            const isActive = Boolean(matchRoute({ to: item.to }))
+            const matchDescendants = item.to === "/interview"
+            const isActive = Boolean(matchRoute({ to: item.to, fuzzy: matchDescendants }))
 
             return (
               <SidebarMenuItem key={item.to}>
                 <SidebarMenuButton
                   isActive={isActive}
-                  render={<Link activeOptions={{ exact: true }} to={item.to} />}
+                  render={<Link activeOptions={{ exact: !matchDescendants }} to={item.to} />}
                   tooltip={t(item.labelKey)}
                 >
                   <Icon />

@@ -10,8 +10,7 @@ import type {
 import { getInterviewPage, startInterview } from "@/services/interview"
 
 import { InterviewView } from "./InterviewView"
-
-const INTERVIEW_QUERY_KEY = ["interview"] as const
+import { INTERVIEW_QUERY_KEY } from "./interview-query"
 
 export function InterviewPage() {
   const navigate = useNavigate()

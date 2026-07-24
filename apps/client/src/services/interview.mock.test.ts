@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { resetInterviewMockState } from "@/mocks/services/interview"
 import {
   beginInterviewQuestions,
+  endInterview,
   enterCandidateQuestions,
   finishInterview,
   getInterviewPage,
@@ -217,6 +218,25 @@ describe("interview stateful mock service", () => {
         },
       },
       session: null,
+    })
+  })
+
+  it("ends an active interview through the service without counting an unanswered question", async () => {
+    const question = await startToFirstQuestion()
+    const completed = await settle(
+      endInterview({
+        sessionId: question.sessionId,
+        version: question.version,
+      }),
+    )
+
+    expect(completed.session).toMatchObject({
+      status: "completed",
+      progress: {
+        completedQuestions: 0,
+        totalQuestions: 3,
+      },
+      completedQuestions: [],
     })
   })
 

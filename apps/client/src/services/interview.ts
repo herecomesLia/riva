@@ -2,6 +2,7 @@ import { env } from "@/app/env"
 import * as interviewMockService from "@/mocks/services/interview"
 import type {
   BeginInterviewQuestionsInput,
+  EndInterviewInput,
   EnterCandidateQuestionsInput,
   FinishInterviewInput,
   GetInterviewReviewInput,
@@ -58,6 +59,10 @@ export function submitCandidateQuestion(
 
 export function finishInterview(input: FinishInterviewInput): Promise<InterviewMutationResponse> {
   return env.mock ? interviewMockService.finishInterview(input) : realApiUnavailable()
+}
+
+export function endInterview(input: EndInterviewInput): Promise<InterviewMutationResponse> {
+  return env.mock ? interviewMockService.endInterview(input) : realApiUnavailable()
 }
 
 export function getInterviewReview(

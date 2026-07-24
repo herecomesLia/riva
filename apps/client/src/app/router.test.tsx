@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query"
-import { render, waitFor } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import { I18nextProvider } from "react-i18next"
 import { beforeEach, describe, expect, it } from "vitest"
 
@@ -56,5 +56,22 @@ describe("app router auth redirects", () => {
     await waitFor(() => {
       expect(window.location.pathname).toBe("/dashboard")
     })
+  })
+
+  it("renders the authenticated interview session route", async () => {
+    useAuthStore.getState().setCurrentUser(userMock)
+
+    renderRouterAt("/interview/session/mock-session")
+
+    expect(
+      await screen.findByRole("heading", {
+        name: i18n.t("interview.session.title"),
+        level: 1,
+      }),
+    ).toBeInTheDocument()
+    expect(window.location.pathname).toBe("/interview/session/mock-session")
+    expect(screen.getByRole("link", { name: i18n.t("appShell.nav.interview") })).toHaveAttribute(
+      "data-active",
+    )
   })
 })
