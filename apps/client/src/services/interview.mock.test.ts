@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
   createInterviewAgentPlanMock,
+  createInterviewCompletedSessionMock,
   createInterviewReviewResponseMock,
+  defaultInterviewConfigurationMock,
+  interviewSetupResponseMock,
   type InterviewAgentMockScenario,
 } from "@/mocks/data/interview"
 import {
@@ -42,6 +45,13 @@ function resetScenario(
     ...controller,
     agentScenario,
   })
+}
+
+function createPlan(
+  scenario: InterviewAgentMockScenario,
+  configuration = defaultInterviewConfigurationMock,
+) {
+  return createInterviewAgentPlanMock({ ...configuration, scenario })
 }
 
 beforeEach(() => {
@@ -134,7 +144,7 @@ async function finishCandidateQuestions(session: InterviewCandidateQuestionsSess
 
 describe("interview Agent mock scenarios", () => {
   it("noFollowUps advances two main questions directly and then enters candidate questions", async () => {
-    const plan = createInterviewAgentPlanMock("noFollowUps")
+    const plan = createPlan("noFollowUps")
     const first = await startToFirstQuestion("noFollowUps")
 
     expect(plan.questions).toHaveLength(2)
@@ -162,7 +172,7 @@ describe("interview Agent mock scenarios", () => {
   })
 
   it("singleFollowUp keeps main progress unchanged during its one follow-up", async () => {
-    const plan = createInterviewAgentPlanMock("singleFollowUp")
+    const plan = createPlan("singleFollowUp")
     const first = await startToFirstQuestion("singleFollowUp")
     const secondResponse = await answerQuestion(first)
     if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
@@ -190,7 +200,7 @@ describe("interview Agent mock scenarios", () => {
   })
 
   it("multipleFollowUps preserves both answered follow-ups in order before advancing", async () => {
-    const plan = createInterviewAgentPlanMock("multipleFollowUps")
+    const plan = createPlan("multipleFollowUps")
     const first = await startToFirstQuestion("multipleFollowUps")
     const secondResponse = await answerQuestion(first)
     if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
@@ -250,7 +260,7 @@ describe("interview Agent mock scenarios", () => {
   })
 
   it("lastQuestionFollowUp enters candidate questions after the final follow-up", async () => {
-    const plan = createInterviewAgentPlanMock("lastQuestionFollowUp")
+    const plan = createPlan("lastQuestionFollowUp")
     const first = await startToFirstQuestion("lastQuestionFollowUp")
     const lastQuestionResponse = await answerQuestion(first)
     if (lastQuestionResponse.session?.status !== "question") {
@@ -273,7 +283,7 @@ describe("interview Agent mock scenarios", () => {
   })
 
   it("unknownTotal remains null throughout the complete formal-question flow", async () => {
-    const plan = createInterviewAgentPlanMock("unknownTotal")
+    const plan = createPlan("unknownTotal")
     const first = await startToFirstQuestion("unknownTotal")
     expect(first.progress.totalMainQuestions).toBeNull()
 
@@ -310,7 +320,7 @@ describe("interview Agent mock scenarios", () => {
   })
 
   it("adjustedPlan updates total and revision without changing the completed count", async () => {
-    const plan = createInterviewAgentPlanMock("adjustedPlan")
+    const plan = createPlan("adjustedPlan")
     const first = await startToFirstQuestion("adjustedPlan")
     expect(first.progress).toEqual({
       completedMainQuestions: 0,
@@ -542,11 +552,11 @@ describe("interview completion and review availability", () => {
     expect(review.questionDetails).toHaveLength(2)
     expect(review.review.questionReviews).toHaveLength(1)
     expect(review.questionDetails[0]?.record.question.id).toBe(
-      createInterviewAgentPlanMock("noFollowUps").questions[0]!.question.id,
+      createPlan("noFollowUps").questions[0]!.question.id,
     )
     expect(review.questionDetails[0]).toMatchObject({
       record: { status: "answered", answer: { content: "已完成的第一题回答" } },
-      performance: { score: 84 },
+      performance: { score: 85 },
       referenceAnswer: { status: "ready" },
     })
     expect(JSON.stringify(review.review)).not.toContain("性能优化")
@@ -561,7 +571,7 @@ describe("interview completion and review availability", () => {
   })
 
   it("preserves an unanswered follow-up without fabricating performance", async () => {
-    const plan = createInterviewAgentPlanMock("singleFollowUp")
+    const plan = createPlan("singleFollowUp")
     const first = await startToFirstQuestion("singleFollowUp")
     const secondResponse = await answerQuestion(first)
     if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
@@ -613,7 +623,7 @@ describe("interview completion and review availability", () => {
   })
 
   it("preserves answered and unanswered follow-ups in their original order", async () => {
-    const plan = createInterviewAgentPlanMock("multipleFollowUps")
+    const plan = createPlan("multipleFollowUps")
     const first = await startToFirstQuestion("multipleFollowUps")
     const secondResponse = await answerQuestion(first)
     if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
@@ -775,9 +785,47 @@ describe("interview completion and review availability", () => {
     expect(secondRead).toEqual(original)
     expect(secondRead.questionDetails[0]?.referenceAnswer).not.toEqual(firstReference)
   })
+
+  it("restores a completed review after the service lifecycle is reinitialized", async () => {
+    const first = await startToFirstQuestion("singleFollowUp")
+    const ended = await endInterview({
+      sessionId: first.sessionId,
+      version: first.version,
+    })
+    if (ended.session?.status !== "completed") throw new Error("Expected completion.")
+    const expected = await getInterviewReview({ sessionId: ended.session.sessionId })
+
+    resetInterviewMockState("setupReady", {
+      clearPersistedSessions: false,
+      defaultDelayMs: 0,
+    })
+
+    expect(await getInterviewReview({ sessionId: ended.session.sessionId })).toEqual(expected)
+    const next = await startCurrentOpening()
+    expect(next.sessionId).toBe("mock-interview-session-2")
+    expect(await getInterviewReview({ sessionId: ended.session.sessionId })).toEqual(expected)
+  })
+
+  it("rejects a review lookup for an unknown session ID", async () => {
+    await expect(getInterviewReview({ sessionId: "missing-session" })).rejects.toThrow(
+      "Interview review is not available.",
+    )
+  })
 })
 
 describe("interview mock reset boundaries", () => {
+  it("clears persisted reviews by default", async () => {
+    resetInterviewMockState("completed", { defaultDelayMs: 0 })
+    const completed = await getInterviewPage()
+    if (completed.session?.status !== "completed") throw new Error("Expected completion.")
+
+    resetInterviewMockState("setupReady", { defaultDelayMs: 0 })
+
+    await expect(getInterviewReview({ sessionId: completed.session.sessionId })).rejects.toThrow(
+      "Interview review is not available.",
+    )
+  })
+
   it("clears session, plan cursor, failures, delays, version, and sequences when switching scenarios", async () => {
     resetScenario("multipleFollowUps", {
       delayNext: { getInterviewReview: 1_000 },
@@ -805,7 +853,7 @@ describe("interview mock reset boundaries", () => {
     const secondResponse = await answerQuestion(first)
     if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
     expect(secondResponse.session.currentQuestion.question.id).toBe(
-      createInterviewAgentPlanMock("noFollowUps").questions[1]!.question.id,
+      createPlan("noFollowUps").questions[1]!.question.id,
     )
   })
 
@@ -826,11 +874,11 @@ describe("interview mock reset boundaries", () => {
   })
 
   it("returns independent Agent plans for tests and Stories", () => {
-    const first = createInterviewAgentPlanMock("multipleFollowUps")
+    const first = createPlan("multipleFollowUps")
     first.questions[1]!.question.prompt = "被测试修改的主问题"
     first.questions[1]!.followUps[0]!.prompt = "被测试修改的追问"
 
-    const second = createInterviewAgentPlanMock("multipleFollowUps")
+    const second = createPlan("multipleFollowUps")
     expect(second.questions[1]!.question.prompt).not.toBe("被测试修改的主问题")
     expect(second.questions[1]!.followUps[0]!.prompt).not.toBe("被测试修改的追问")
   })
@@ -917,7 +965,7 @@ describe("interview mock reset boundaries", () => {
     expect(afterDelete.setup.targetRoles.map(({ id }) => id)).not.toContain(role.id)
   })
 
-  it("includes newly created roles in subsequent setup responses", async () => {
+  it("does not expose newly created roles without a complete interview catalog", async () => {
     vi.useFakeTimers()
     try {
       const createPromise = createTargetRole({
@@ -933,10 +981,7 @@ describe("interview mock reset boundaries", () => {
       const createdRole = created.roles.at(-1)!
       const page = await getInterviewPage()
 
-      expect(page.setup.targetRoles.find(({ id }) => id === createdRole.id)).toMatchObject({
-        title: "AI Product Engineer",
-        company: "Riva",
-      })
+      expect(page.setup.targetRoles.find(({ id }) => id === createdRole.id)).toBeUndefined()
     } finally {
       vi.useRealTimers()
     }
@@ -993,5 +1038,202 @@ describe("interview mock reset boundaries", () => {
         ],
       },
     })
+  })
+})
+
+describe("configuration-driven interview catalogs", () => {
+  async function firstQuestionFor(
+    configuration: typeof defaultInterviewConfigurationMock,
+    scenario: InterviewAgentMockScenario = "singleFollowUp",
+  ) {
+    resetRolesMockState("multipleRoles")
+    resetScenario(scenario)
+    const opening = await startInterview(configuration)
+    if (opening.session?.status !== "opening") throw new Error("Expected interview opening.")
+    const response = await beginInterviewQuestions({
+      sessionId: opening.session.sessionId,
+      version: opening.session.version,
+    })
+    if (response.session?.status !== "question") throw new Error("Expected interview question.")
+    return response.session.currentQuestion.question
+  }
+
+  it("serves different role-correct questions for frontend and product configurations", async () => {
+    const frontend = await firstQuestionFor({
+      ...defaultInterviewConfigurationMock,
+      round: "firstBusiness",
+      difficulty: "basic",
+    })
+    const product = await firstQuestionFor({
+      ...defaultInterviewConfigurationMock,
+      targetRoleId: "role_product_manager_meituan",
+      round: "firstBusiness",
+      difficulty: "basic",
+    })
+
+    expect(frontend.prompt).toContain("前端")
+    expect(product.prompt).toContain("商家")
+    expect(product.prompt).not.toContain("前端")
+    expect(product.id).not.toBe(frontend.id)
+  })
+
+  it("has complete questions, reviews, and references for every exposed role configuration", () => {
+    for (const targetRole of interviewSetupResponseMock.targetRoles) {
+      for (const round of targetRole.supportedRounds) {
+        for (const difficulty of interviewSetupResponseMock.availableDifficulties) {
+          const completed = createInterviewCompletedSessionMock({
+            agentScenario: "multipleFollowUps",
+            configuration: {
+              targetRoleId: targetRole.id,
+              round,
+              difficulty,
+              durationMinutes: 30,
+            },
+          })
+
+          expect(completed.completedQuestions).toHaveLength(3)
+          expect(completed.questionDetails.every(({ performance }) => performance !== null)).toBe(
+            true,
+          )
+          expect(
+            completed.questionDetails.every(
+              ({ followUps, referenceAnswer }) =>
+                referenceAnswer.status === "ready" &&
+                followUps.every(
+                  (followUp) =>
+                    followUp.performance !== null && followUp.referenceAnswer.status === "ready",
+                ),
+            ),
+          ).toBe(true)
+        }
+      }
+    }
+  })
+
+  it("uses HR question types for HR rounds and professional types for technical rounds", async () => {
+    const hr = await firstQuestionFor({
+      ...defaultInterviewConfigurationMock,
+      round: "hr",
+      difficulty: "basic",
+    })
+    const technical = await firstQuestionFor({
+      ...defaultInterviewConfigurationMock,
+      round: "technical",
+      difficulty: "basic",
+    })
+
+    expect(hr.type).toBe("motivation")
+    expect(technical.type).toBe("technicalOrBusiness")
+    expect(hr.prompt).not.toContain("架构")
+    expect(technical.prompt).toContain("模块边界")
+  })
+
+  it("makes pressure wording and follow-up depth deterministically stronger than basic", () => {
+    const basic = createPlan("multipleFollowUps", {
+      ...defaultInterviewConfigurationMock,
+      difficulty: "basic",
+    })
+    const pressure = createPlan("multipleFollowUps", {
+      ...defaultInterviewConfigurationMock,
+      difficulty: "pressure",
+    })
+
+    expect(basic.questions.map(({ question }) => question.prompt)).not.toEqual(
+      pressure.questions.map(({ question }) => question.prompt),
+    )
+    expect(basic.questions[1]!.followUps).toHaveLength(1)
+    expect(pressure.questions[1]!.followUps).toHaveLength(2)
+    expect(pressure.questions[1]!.followUps[0]!.prompt).not.toBe(
+      basic.questions[1]!.followUps[0]!.prompt,
+    )
+  })
+
+  it("returns the same plan for the same complete configuration and scenario", () => {
+    const configuration = {
+      ...defaultInterviewConfigurationMock,
+      round: "comprehensive" as const,
+      durationMinutes: 45 as const,
+    }
+
+    expect(createPlan("singleFollowUp", configuration)).toEqual(
+      createPlan("singleFollowUp", configuration),
+    )
+  })
+
+  it("provides product-specific reviews and reference answers for shown main and follow-up questions", async () => {
+    resetRolesMockState("multipleRoles")
+    resetScenario("singleFollowUp")
+    const openingResponse = await startInterview({
+      ...defaultInterviewConfigurationMock,
+      targetRoleId: "role_product_manager_meituan",
+      round: "firstBusiness",
+      difficulty: "pressure",
+    })
+    if (openingResponse.session?.status !== "opening") throw new Error("Expected opening.")
+    const first = await beginQuestions(openingResponse.session)
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const followUpResponse = await answerQuestion(secondResponse.session)
+    if (followUpResponse.session?.status !== "followUp") throw new Error("Expected follow-up.")
+    const thirdResponse = await answerFollowUp(followUpResponse.session)
+    if (thirdResponse.session?.status !== "question") throw new Error("Expected third question.")
+    const completed = await endInterview({
+      sessionId: thirdResponse.session.sessionId,
+      version: thirdResponse.session.version,
+    })
+    if (completed.session?.status !== "completed") throw new Error("Expected completion.")
+
+    expect(
+      completed.session.completedQuestions.every(
+        ({ question }) => !question.prompt.includes("前端"),
+      ),
+    ).toBe(true)
+    expect(completed.session.questionDetails[0]?.performance).not.toBeNull()
+    expect(completed.session.questionDetails[0]?.referenceAnswer.status).toBe("ready")
+    expect(completed.session.questionDetails[1]?.followUps[0]?.performance).not.toBeNull()
+    expect(completed.session.questionDetails[1]?.followUps[0]?.referenceAnswer.status).toBe("ready")
+  })
+
+  it("keeps duration as input without converting it into a fixed question count", () => {
+    const short = createPlan("singleFollowUp", {
+      ...defaultInterviewConfigurationMock,
+      durationMinutes: 15,
+    })
+    const long = createPlan("singleFollowUp", {
+      ...defaultInterviewConfigurationMock,
+      durationMinutes: 45,
+    })
+
+    expect(short.questions).toEqual(long.questions)
+    expect(short.initialProgress).toEqual(long.initialProgress)
+  })
+
+  it("rejects unknown roles, unsupported rounds, difficulties, and durations", async () => {
+    resetRolesMockState("multipleRoles")
+    resetScenario()
+    const configuration = defaultInterviewConfigurationMock
+
+    await expect(
+      startInterview({ ...configuration, targetRoleId: "role_unknown" }),
+    ).rejects.toThrow("target role does not exist")
+    await expect(
+      startInterview({
+        ...configuration,
+        targetRoleId: "role_product_manager_meituan",
+        round: "technical",
+      }),
+    ).rejects.toThrow("round is not supported")
+    await expect(
+      startInterview({
+        ...configuration,
+        difficulty: "expert" as typeof configuration.difficulty,
+      }),
+    ).rejects.toThrow("difficulty preference is not available")
+    await expect(
+      startInterview({
+        ...configuration,
+        durationMinutes: 60 as typeof configuration.durationMinutes,
+      }),
+    ).rejects.toThrow("duration preference is not available")
   })
 })

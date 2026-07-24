@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { createInterviewMockResponse } from "@/mocks/data/interview"
-import type { InterviewPageResponse } from "@/models/interview"
+import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
 import { getInterviewPage, startInterview } from "@/services/interview"
 import { renderWithProviders } from "@/test/render"
 
@@ -26,7 +26,14 @@ function createDeferred<T>() {
   return { promise, reject, resolve }
 }
 
-function createStartedResponse(): InterviewPageResponse {
+function createStartedResponse(
+  configuration: InterviewConfiguration = {
+    targetRoleId: "role_frontend_bytedance",
+    round: "technical",
+    difficulty: "pressure",
+    durationMinutes: 30,
+  },
+): InterviewPageResponse {
   const setupResponse = createInterviewMockResponse()
   return {
     setup: setupResponse.setup,
@@ -34,12 +41,7 @@ function createStartedResponse(): InterviewPageResponse {
       status: "opening",
       sessionId: "mock-interview-session-page",
       version: 1,
-      configuration: {
-        targetRoleId: "role_frontend_bytedance",
-        round: "technical",
-        difficulty: "pressure",
-        durationMinutes: 30,
-      },
+      configuration,
       startedAt: "2026-07-24T02:00:00.000Z",
       progress: {
         completedMainQuestions: 0,
@@ -147,6 +149,26 @@ describe("InterviewPage", () => {
     expect(startInterview).toHaveBeenCalledOnce()
     expect(vi.mocked(startInterview).mock.calls[0]?.[0]).toEqual(setup.setup.defaultConfiguration)
     expect(renderResult.queryClient.getQueryData(["interview"])).toEqual(started)
+  })
+
+  it("submits a non-default product HR/basic configuration", async () => {
+    const user = userEvent.setup()
+    const setup = createInterviewMockResponse()
+    vi.mocked(getInterviewPage).mockResolvedValue(setup)
+    vi.mocked(startInterview).mockImplementation(async (input) => createStartedResponse(input))
+    renderInterviewPage()
+
+    await user.click(await screen.findByTestId("interview-target-role-trigger"))
+    await user.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
+    await user.click(screen.getByRole("button", { name: i18n.t("interview.difficulty.basic") }))
+    await user.click(screen.getByRole("button", { name: i18n.t("interview.actions.start") }))
+
+    expect(vi.mocked(startInterview).mock.calls[0]?.[0]).toEqual({
+      targetRoleId: "role_product_manager_meituan",
+      round: "hr",
+      difficulty: "basic",
+      durationMinutes: 30,
+    })
   })
 
   it("prevents a duplicate start while the first mutation is pending", async () => {

@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, fn } from "storybook/test"
+import { expect, fn, screen } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
 
@@ -101,6 +101,53 @@ export const StartInterview = meta.story({
     await expect(onStart).toHaveBeenCalledWith(
       createInterviewSetupStoryFixture().defaultConfiguration,
     )
+  },
+})
+
+const onStartProductHrBasic = fn(async () => undefined)
+
+export const ProductHrBasic = meta.story({
+  args: {
+    status: "ready",
+    setup: createInterviewSetupStoryFixture(),
+    isStarting: false,
+    onStart: onStartProductHrBasic,
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByTestId("interview-target-role-trigger"))
+    await userEvent.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
+    await userEvent.click(canvas.getByRole("button", { name: /基础|Basic/i }))
+    await userEvent.click(
+      canvas.getByRole("button", { name: /开始模拟面试|Start mock interview/i }),
+    )
+    await expect(onStartProductHrBasic).toHaveBeenCalledWith({
+      targetRoleId: "role_product_manager_meituan",
+      round: "hr",
+      difficulty: "basic",
+      durationMinutes: 30,
+    })
+  },
+})
+
+const onStartFrontendTechnicalPressure = fn(async () => undefined)
+
+export const FrontendTechnicalPressure = meta.story({
+  args: {
+    status: "ready",
+    setup: createInterviewSetupStoryFixture(),
+    isStarting: false,
+    onStart: onStartFrontendTechnicalPressure,
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: /开始模拟面试|Start mock interview/i }),
+    )
+    await expect(onStartFrontendTechnicalPressure).toHaveBeenCalledWith({
+      targetRoleId: "role_frontend_bytedance",
+      round: "technical",
+      difficulty: "pressure",
+      durationMinutes: 30,
+    })
   },
 })
 

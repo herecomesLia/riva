@@ -34,7 +34,7 @@ describe("interview Story fixtures", () => {
     const secondReview = createSparseInterviewReviewStoryFixture()
     if (secondReview.status !== "complete") throw new Error("Expected complete review.")
 
-    expect(secondReview.review.mainStrengths[0]).toBe("岗位匹配信息集中")
+    expect(secondReview.review.mainStrengths[0]).toBe("模块边界清楚")
     const secondReference = secondReview.questionDetails[0]?.referenceAnswer
     if (secondReference?.status !== "ready") throw new Error("Expected ready reference answer.")
     expect(secondReference.content.exampleAnswer).not.toBe("被 Story 修改的参考答案")

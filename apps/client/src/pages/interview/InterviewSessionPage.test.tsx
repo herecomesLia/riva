@@ -8,6 +8,7 @@ import {
   createInterviewAgentPlanMock,
   createInterviewCompletedSessionMock,
   createInterviewMockResponse,
+  defaultInterviewConfigurationMock,
 } from "@/mocks/data/interview"
 import type {
   InterviewCandidateQuestionsSessionResponse,
@@ -38,7 +39,10 @@ vi.mock("@/services/interview", async (importOriginal) => ({
 }))
 
 const sessionId = "mock-interview-session-page"
-const singleFollowUpPlan = createInterviewAgentPlanMock("singleFollowUp")
+const singleFollowUpPlan = createInterviewAgentPlanMock({
+  ...defaultInterviewConfigurationMock,
+  scenario: "singleFollowUp",
+})
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -119,7 +123,10 @@ function questionSession(order: number, version: number): InterviewQuestionSessi
 }
 
 function followUpSession(followUpIndex: number, version: number): InterviewFollowUpSessionResponse {
-  const planned = createInterviewAgentPlanMock("multipleFollowUps").questions[1]!
+  const planned = createInterviewAgentPlanMock({
+    ...defaultInterviewConfigurationMock,
+    scenario: "multipleFollowUps",
+  }).questions[1]!
   const currentFollowUp = planned.followUps[followUpIndex]!
   return {
     status: "followUp",

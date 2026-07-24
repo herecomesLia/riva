@@ -7,11 +7,18 @@ import {
   createInterviewReviewResponseMock,
   createInterviewSetupResponseMock,
   createInterviewSessionReview,
+  defaultInterviewConfigurationMock,
   interviewOpeningMessageMock,
   type InterviewAgentMockScenario,
   type InterviewMockScenario,
   type MockInterviewAgentPlan,
 } from "@/mocks/data/interview"
+import {
+  clearCompletedInterviewSessions,
+  getCompletedInterviewSession,
+  listCompletedInterviewSessions,
+  saveCompletedInterviewSession,
+} from "@/mocks/repositories/interview"
 import { getProfileMockSnapshot } from "@/mocks/services/profile"
 import { getRolesMockSnapshot } from "@/mocks/services/roles"
 import { waitForMockDelay } from "@/mocks/utils"
@@ -50,6 +57,7 @@ export type InterviewMockOperation =
 
 export type InterviewMockControllerOptions = {
   agentScenario?: InterviewAgentMockScenario
+  clearPersistedSessions?: boolean
   defaultDelayMs?: number
   delayNext?: Partial<Record<InterviewMockOperation, number>>
   failNext?: readonly InterviewMockOperation[]
@@ -62,17 +70,26 @@ type PlanCursor = {
 
 let session = createInterviewMockResponse().session
 let selectedAgentScenario: InterviewAgentMockScenario = "singleFollowUp"
-let activePlan: MockInterviewAgentPlan = createInterviewAgentPlanMock(selectedAgentScenario)
+let activePlan: MockInterviewAgentPlan = createInterviewAgentPlanMock({
+  ...defaultInterviewConfigurationMock,
+  scenario: selectedAgentScenario,
+})
 let planCursor: PlanCursor | null = null
-let sessionSequence = 0
+let sessionSequence = getPersistedSessionSequence()
 let mutationSequence = 0
 let configuredDefaultDelayMs: number | undefined
 const delayedOperations = new Map<InterviewMockOperation, number>()
 const failingOperations = new Set<InterviewMockOperation>()
-const completedSessionSnapshots = new Map<string, InterviewCompletedSessionResponse>()
 
 function copy<T>(value: T): T {
   return structuredClone(value)
+}
+
+function getPersistedSessionSequence() {
+  return listCompletedInterviewSessions().reduce((highest, { sessionId }) => {
+    const match = /^mock-interview-session-(\d+)$/.exec(sessionId)
+    return match === null ? highest : Math.max(highest, Number(match[1]))
+  }, 0)
 }
 
 function getSnapshot(): InterviewPageResponse {
@@ -83,9 +100,9 @@ function getSnapshot(): InterviewPageResponse {
 }
 
 function commit(nextSession: InterviewPageResponse["session"]): InterviewMutationResponse {
-  session = nextSession
+  session = copy(nextSession)
   if (nextSession?.status === "completed") {
-    completedSessionSnapshots.set(nextSession.sessionId, copy(nextSession))
+    saveCompletedInterviewSession(nextSession)
   }
   return getSnapshot()
 }
@@ -211,18 +228,23 @@ export function resetInterviewMockState(
     throw new Error("Interview mock delay must not be negative.")
   }
 
+  if (controller.clearPersistedSessions ?? true) {
+    clearCompletedInterviewSessions()
+  }
   session = createInterviewMockResponse(scenario).session
   selectedAgentScenario = controller.agentScenario ?? "singleFollowUp"
-  activePlan = createInterviewAgentPlanMock(selectedAgentScenario)
+  activePlan = createInterviewAgentPlanMock({
+    ...defaultInterviewConfigurationMock,
+    scenario: selectedAgentScenario,
+  })
   planCursor = null
-  sessionSequence = 0
+  sessionSequence = getPersistedSessionSequence()
   mutationSequence = 0
   configuredDefaultDelayMs = controller.defaultDelayMs
   delayedOperations.clear()
   failingOperations.clear()
-  completedSessionSnapshots.clear()
   if (session?.status === "completed") {
-    completedSessionSnapshots.set(session.sessionId, copy(session))
+    saveCompletedInterviewSession(session)
   }
 
   for (const operation of controller.failNext ?? []) failingOperations.add(operation)
@@ -251,11 +273,14 @@ export async function startInterview(
   if (!targetRole.supportedRounds.includes(input.round)) {
     throw new Error("Interview round is not supported by the target role.")
   }
+  if (!setup.availableDifficulties.includes(input.difficulty)) {
+    throw new Error("Interview difficulty preference is not available.")
+  }
   if (!setup.availableDurationMinutes.includes(input.durationMinutes)) {
     throw new Error("Interview duration preference is not available.")
   }
 
-  activePlan = createInterviewAgentPlanMock(selectedAgentScenario)
+  activePlan = createInterviewAgentPlanMock({ ...input, scenario: selectedAgentScenario })
   planCursor = null
   sessionSequence += 1
   return commit({
@@ -520,8 +545,8 @@ export async function getInterviewReview(
   input: GetInterviewReviewInput,
 ): Promise<GetInterviewReviewResponse> {
   await consumeOperation("getInterviewReview")
-  const session = completedSessionSnapshots.get(input.sessionId)
-  if (session === undefined) {
+  const session = getCompletedInterviewSession(input.sessionId)
+  if (session === null) {
     throw new Error("Interview review is not available.")
   }
   return copy(createInterviewReviewResponseMock(session))

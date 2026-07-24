@@ -1,19 +1,27 @@
 import preview from "#storybook/preview"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
-import { createInterviewAgentPlanMock } from "@/mocks/data/interview"
+import {
+  createInterviewAgentPlanMock,
+  defaultInterviewConfigurationMock,
+  type InterviewAgentMockScenario,
+} from "@/mocks/data/interview"
 import type { InterviewConversationRecordViewData } from "@/models/interview"
 
 import { createInterviewSessionStoryFixture } from "./stories/interview-story-fixtures"
 import { InterviewSessionView, type InterviewSessionSummary } from "./InterviewSessionView"
 
 const fixture = createInterviewSessionStoryFixture()
-const noFollowUpsPlan = createInterviewAgentPlanMock("noFollowUps")
-const singleFollowUpPlan = createInterviewAgentPlanMock("singleFollowUp")
-const multipleFollowUpsPlan = createInterviewAgentPlanMock("multipleFollowUps")
-const lastQuestionFollowUpPlan = createInterviewAgentPlanMock("lastQuestionFollowUp")
-const unknownTotalPlan = createInterviewAgentPlanMock("unknownTotal")
-const adjustedPlan = createInterviewAgentPlanMock("adjustedPlan")
+function createPlan(scenario: InterviewAgentMockScenario) {
+  return createInterviewAgentPlanMock({ ...defaultInterviewConfigurationMock, scenario })
+}
+
+const noFollowUpsPlan = createPlan("noFollowUps")
+const singleFollowUpPlan = createPlan("singleFollowUp")
+const multipleFollowUpsPlan = createPlan("multipleFollowUps")
+const lastQuestionFollowUpPlan = createPlan("lastQuestionFollowUp")
+const unknownTotalPlan = createPlan("unknownTotal")
+const adjustedPlan = createPlan("adjustedPlan")
 
 const projectQuestion = multipleFollowUpsPlan.questions[1]!
 const firstFollowUp = projectQuestion.followUps[0]!
