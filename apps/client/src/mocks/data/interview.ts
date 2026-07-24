@@ -226,10 +226,6 @@ export function createInterviewAgentPlanMock(
   return structuredClone(plans[scenario])
 }
 
-export function createInterviewQuestionSet(): InterviewQuestionResponse[] {
-  return createInterviewAgentPlanMock("singleFollowUp").questions.map(({ question }) => question)
-}
-
 export const interviewOpeningMessageMock =
   "你好，我是本次模拟面试的面试官。接下来会围绕岗位经历、项目能力和求职动机连续提问，请尽量像正式面试一样作答。"
 
@@ -290,7 +286,7 @@ const questionReviewsById: Record<string, Omit<InterviewQuestionReviewResponse, 
 }
 
 export function createInterviewReview(
-  questions: readonly InterviewQuestionResponse[] = createInterviewQuestionSet(),
+  questions: readonly InterviewQuestionResponse[],
 ): InterviewReviewResponse {
   return {
     overallScore: 82,

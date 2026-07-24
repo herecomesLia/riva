@@ -1,404 +1,698 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 
 import {
+  createInterviewAgentPlanMock,
   createInterviewReviewResponseMock,
   type InterviewAgentMockScenario,
 } from "@/mocks/data/interview"
-import { resetInterviewMockState } from "@/mocks/services/interview"
-import type {
-  InterviewFollowUpSessionResponse,
-  InterviewQuestionSessionResponse,
-} from "@/models/interview"
 import {
   beginInterviewQuestions,
   endInterview,
   finishInterview,
   getInterviewPage,
   getInterviewReview,
+  resetInterviewMockState,
   startInterview,
   submitCandidateQuestion,
   submitInterviewAnswer,
-} from "@/services/interview"
+  type InterviewMockControllerOptions,
+} from "@/mocks/services/interview"
+import type {
+  InterviewCandidateQuestionsSessionResponse,
+  InterviewFollowUpSessionResponse,
+  InterviewOpeningSessionResponse,
+  InterviewQuestionSessionResponse,
+} from "@/models/interview"
+
+function resetScenario(
+  agentScenario: InterviewAgentMockScenario = "singleFollowUp",
+  controller: Omit<InterviewMockControllerOptions, "agentScenario"> = {},
+) {
+  resetInterviewMockState("setupReady", {
+    defaultDelayMs: 0,
+    ...controller,
+    agentScenario,
+  })
+}
 
 beforeEach(() => {
-  vi.useFakeTimers()
-  resetInterviewMockState()
+  resetScenario()
 })
 
-afterEach(() => {
-  vi.clearAllTimers()
-  vi.useRealTimers()
-})
-
-async function settle<T>(promise: Promise<T>) {
-  await vi.runAllTimersAsync()
-  return promise
+async function startOpening(
+  agentScenario: InterviewAgentMockScenario = "singleFollowUp",
+): Promise<InterviewOpeningSessionResponse> {
+  resetScenario(agentScenario)
+  return startCurrentOpening()
 }
 
-async function expectMockFailure<T>(request: Promise<T>, operation: string) {
-  const assertion = expect(request).rejects.toThrow(`Interview mock operation failed: ${operation}`)
-  await vi.runAllTimersAsync()
-  await assertion
-}
-
-async function startToFirstQuestion(agentScenario: InterviewAgentMockScenario = "singleFollowUp") {
-  resetInterviewMockState("setupReady", { agentScenario })
-  const page = await settle(getInterviewPage())
+async function startCurrentOpening(): Promise<InterviewOpeningSessionResponse> {
+  const page = await getInterviewPage()
   const configuration = page.setup.defaultConfiguration
   if (configuration.targetRoleId === null) throw new Error("Expected a default target role.")
 
-  const opening = await settle(
-    startInterview({ ...configuration, targetRoleId: configuration.targetRoleId }),
-  )
-  if (opening.session?.status !== "opening") throw new Error("Expected interview opening.")
+  const response = await startInterview({
+    ...configuration,
+    targetRoleId: configuration.targetRoleId,
+  })
+  if (response.session?.status !== "opening") throw new Error("Expected interview opening.")
+  return response.session
+}
 
-  const firstQuestion = await settle(
-    beginInterviewQuestions({
-      sessionId: opening.session.sessionId,
-      version: opening.session.version,
-    }),
-  )
-  if (firstQuestion.session?.status !== "question") {
-    throw new Error("Expected first interview question.")
-  }
-  return firstQuestion.session
+async function beginQuestions(
+  opening: InterviewOpeningSessionResponse,
+): Promise<InterviewQuestionSessionResponse> {
+  const response = await beginInterviewQuestions({
+    sessionId: opening.sessionId,
+    version: opening.version,
+  })
+  if (response.session?.status !== "question") throw new Error("Expected main question.")
+  return response.session
+}
+
+async function startToFirstQuestion(agentScenario: InterviewAgentMockScenario = "singleFollowUp") {
+  return beginQuestions(await startOpening(agentScenario))
 }
 
 async function answerQuestion(
   session: InterviewQuestionSessionResponse,
   content = "这是由用户提交的主问题回答。",
 ) {
-  return settle(
-    submitInterviewAnswer({
-      target: "question",
-      sessionId: session.sessionId,
-      version: session.version,
-      questionId: session.currentQuestion.question.id,
-      content,
-    }),
-  )
+  return submitInterviewAnswer({
+    target: "question",
+    sessionId: session.sessionId,
+    version: session.version,
+    questionId: session.currentQuestion.question.id,
+    content,
+  })
 }
 
 async function answerFollowUp(
   session: InterviewFollowUpSessionResponse,
   content = "这是由用户提交的追问回答。",
 ) {
-  return settle(
-    submitInterviewAnswer({
-      target: "followUp",
-      sessionId: session.sessionId,
-      version: session.version,
-      questionId: session.currentQuestion.question.id,
-      followUpQuestionId: session.currentFollowUp.question.id,
-      content,
-    }),
-  )
+  return submitInterviewAnswer({
+    target: "followUp",
+    sessionId: session.sessionId,
+    version: session.version,
+    questionId: session.currentQuestion.question.id,
+    followUpQuestionId: session.currentFollowUp.question.id,
+    content,
+  })
 }
 
-async function finishNoFollowUpsInterview() {
+async function reachNoFollowUpsCandidateQuestions() {
   const first = await startToFirstQuestion("noFollowUps")
-  const secondResponse = await answerQuestion(first)
+  const secondResponse = await answerQuestion(first, "第一道主问题回答")
   if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
-  const candidateResponse = await answerQuestion(secondResponse.session)
+  const candidateResponse = await answerQuestion(secondResponse.session, "第二道主问题回答")
   if (candidateResponse.session?.status !== "candidateQuestions") {
     throw new Error("Expected candidate questions.")
   }
-  const completed = await settle(
-    finishInterview({
-      sessionId: candidateResponse.session.sessionId,
-      version: candidateResponse.session.version,
-    }),
-  )
-  if (completed.session?.status !== "completed") throw new Error("Expected completed interview.")
-  return completed.session
+  return candidateResponse.session
 }
 
-describe("interview stateful mock service", () => {
-  it("supports a plan with a different main-question count and no follow-ups", async () => {
+async function finishCandidateQuestions(session: InterviewCandidateQuestionsSessionResponse) {
+  const response = await finishInterview({
+    sessionId: session.sessionId,
+    version: session.version,
+  })
+  if (response.session?.status !== "completed") throw new Error("Expected completed interview.")
+  return response.session
+}
+
+describe("interview Agent mock scenarios", () => {
+  it("noFollowUps advances two main questions directly and then enters candidate questions", async () => {
+    const plan = createInterviewAgentPlanMock("noFollowUps")
     const first = await startToFirstQuestion("noFollowUps")
+
+    expect(plan.questions).toHaveLength(2)
+    expect(first.currentQuestion.question.id).toBe(plan.questions[0]!.question.id)
     expect(first.progress).toEqual({
       completedMainQuestions: 0,
       totalMainQuestions: 2,
       planRevision: 1,
     })
 
-    const second = await answerQuestion(first)
-    expect(second.session).toMatchObject({
+    const secondResponse = await answerQuestion(first)
+    expect(secondResponse.session).toMatchObject({
       status: "question",
+      progress: { completedMainQuestions: 1, totalMainQuestions: 2 },
+      currentQuestion: { question: { id: plan.questions[1]!.question.id } },
+    })
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+
+    const candidateResponse = await answerQuestion(secondResponse.session)
+    expect(candidateResponse.session).toMatchObject({
+      status: "candidateQuestions",
+      progress: { completedMainQuestions: 2, totalMainQuestions: 2 },
+      completedQuestions: [{ followUps: [] }, { followUps: [] }],
+    })
+  })
+
+  it("singleFollowUp keeps main progress unchanged during its one follow-up", async () => {
+    const plan = createInterviewAgentPlanMock("singleFollowUp")
+    const first = await startToFirstQuestion("singleFollowUp")
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+
+    const followUpResponse = await answerQuestion(secondResponse.session)
+    expect(followUpResponse.session).toMatchObject({
+      status: "followUp",
       progress: {
         completedMainQuestions: 1,
-        totalMainQuestions: 2,
+        totalMainQuestions: plan.initialProgress.totalMainQuestions,
       },
-      currentQuestion: { question: { order: 2 } },
+      currentFollowUp: { question: { id: plan.questions[1]!.followUps[0]!.id } },
     })
-    if (second.session?.status !== "question") throw new Error("Expected second question.")
+    if (followUpResponse.session?.status !== "followUp") throw new Error("Expected follow-up.")
 
-    const candidate = await answerQuestion(second.session)
-    expect(candidate.session).toMatchObject({
-      status: "candidateQuestions",
+    const nextQuestionResponse = await answerFollowUp(followUpResponse.session)
+    expect(nextQuestionResponse.session).toMatchObject({
+      status: "question",
       progress: {
         completedMainQuestions: 2,
-        totalMainQuestions: 2,
+        totalMainQuestions: plan.initialProgress.totalMainQuestions,
       },
+      currentQuestion: { question: { id: plan.questions[2]!.question.id } },
     })
   })
 
-  it("supports question → followUp → question without deriving the decision in the client", async () => {
-    const first = await startToFirstQuestion("singleFollowUp")
-    const second = await answerQuestion(first)
-    if (second.session?.status !== "question") throw new Error("Expected second question.")
-
-    const followUp = await answerQuestion(second.session, "任意长度、任意内容的回答。")
-    expect(followUp.session).toMatchObject({
-      status: "followUp",
-      progress: { completedMainQuestions: 1 },
-      currentQuestion: { answeredFollowUps: [] },
-    })
-    if (followUp.session?.status !== "followUp") throw new Error("Expected follow-up.")
-
-    const third = await answerFollowUp(followUp.session)
-    expect(third.session).toMatchObject({
-      status: "question",
-      progress: { completedMainQuestions: 2 },
-      currentQuestion: { question: { order: 3 } },
-    })
-  })
-
-  it("supports two consecutive follow-ups before entering the next main question", async () => {
+  it("multipleFollowUps preserves both answered follow-ups in order before advancing", async () => {
+    const plan = createInterviewAgentPlanMock("multipleFollowUps")
     const first = await startToFirstQuestion("multipleFollowUps")
-    const second = await answerQuestion(first)
-    if (second.session?.status !== "question") throw new Error("Expected second question.")
-    const firstFollowUp = await answerQuestion(second.session)
-    if (firstFollowUp.session?.status !== "followUp") {
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+
+    const firstFollowUpResponse = await answerQuestion(secondResponse.session, "主问题回答")
+    expect(firstFollowUpResponse.session).toMatchObject({
+      status: "followUp",
+      currentFollowUp: { question: { id: plan.questions[1]!.followUps[0]!.id } },
+    })
+    if (firstFollowUpResponse.session?.status !== "followUp") {
       throw new Error("Expected first follow-up.")
     }
 
-    const secondFollowUp = await answerFollowUp(firstFollowUp.session)
-    expect(secondFollowUp.session).toMatchObject({
+    const secondFollowUpResponse = await answerFollowUp(
+      firstFollowUpResponse.session,
+      "第一轮追问回答",
+    )
+    expect(secondFollowUpResponse.session).toMatchObject({
       status: "followUp",
       progress: { completedMainQuestions: 1 },
-      currentQuestion: { answeredFollowUps: [{ status: "answered" }] },
-      currentFollowUp: { question: { order: 2 } },
+      currentQuestion: {
+        answeredFollowUps: [
+          {
+            question: { id: plan.questions[1]!.followUps[0]!.id },
+            answer: { content: "第一轮追问回答" },
+          },
+        ],
+      },
+      currentFollowUp: { question: { id: plan.questions[1]!.followUps[1]!.id } },
     })
-    if (secondFollowUp.session?.status !== "followUp") {
+    if (secondFollowUpResponse.session?.status !== "followUp") {
       throw new Error("Expected second follow-up.")
     }
 
-    const third = await answerFollowUp(secondFollowUp.session)
-    expect(third.session).toMatchObject({
+    const thirdQuestionResponse = await answerFollowUp(
+      secondFollowUpResponse.session,
+      "第二轮追问回答",
+    )
+    expect(thirdQuestionResponse.session).toMatchObject({
       status: "question",
       progress: { completedMainQuestions: 2 },
-      completedQuestions: [{}, { followUps: [{}, {}] }],
-      currentQuestion: { question: { order: 3 } },
+      currentQuestion: { question: { id: plan.questions[2]!.question.id } },
     })
+    if (thirdQuestionResponse.session?.status !== "question") {
+      throw new Error("Expected third question.")
+    }
+    expect(thirdQuestionResponse.session.completedQuestions[1]?.followUps).toMatchObject([
+      {
+        question: { id: plan.questions[1]!.followUps[0]!.id },
+        answer: { content: "第一轮追问回答" },
+      },
+      {
+        question: { id: plan.questions[1]!.followUps[1]!.id },
+        answer: { content: "第二轮追问回答" },
+      },
+    ])
   })
 
-  it("enters candidate questions after a follow-up on the final main question", async () => {
+  it("lastQuestionFollowUp enters candidate questions after the final follow-up", async () => {
+    const plan = createInterviewAgentPlanMock("lastQuestionFollowUp")
     const first = await startToFirstQuestion("lastQuestionFollowUp")
-    const second = await answerQuestion(first)
-    if (second.session?.status !== "question") throw new Error("Expected final question.")
-    const followUp = await answerQuestion(second.session)
-    if (followUp.session?.status !== "followUp") throw new Error("Expected final follow-up.")
+    const lastQuestionResponse = await answerQuestion(first)
+    if (lastQuestionResponse.session?.status !== "question") {
+      throw new Error("Expected final main question.")
+    }
 
-    const candidate = await answerFollowUp(followUp.session)
-    expect(candidate.session).toMatchObject({
+    const followUpResponse = await answerQuestion(lastQuestionResponse.session)
+    expect(followUpResponse.session).toMatchObject({
+      status: "followUp",
+      currentQuestion: { question: { id: plan.questions[1]!.question.id } },
+    })
+    if (followUpResponse.session?.status !== "followUp") throw new Error("Expected follow-up.")
+
+    const candidateResponse = await answerFollowUp(followUpResponse.session)
+    expect(candidateResponse.session).toMatchObject({
       status: "candidateQuestions",
-      progress: {
-        completedMainQuestions: 2,
-        totalMainQuestions: 2,
-      },
+      progress: { completedMainQuestions: 2, totalMainQuestions: 2 },
       completedQuestions: [{ followUps: [] }, { followUps: [{}] }],
     })
   })
 
-  it("keeps progress valid when the total is unknown", async () => {
+  it("unknownTotal remains null throughout the complete formal-question flow", async () => {
+    const plan = createInterviewAgentPlanMock("unknownTotal")
     const first = await startToFirstQuestion("unknownTotal")
     expect(first.progress.totalMainQuestions).toBeNull()
 
-    const second = await answerQuestion(first)
-    expect(second.session).toMatchObject({
-      status: "question",
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    expect(secondResponse.session.progress).toMatchObject({
+      completedMainQuestions: 1,
+      totalMainQuestions: null,
+    })
+
+    const thirdResponse = await answerQuestion(secondResponse.session)
+    if (thirdResponse.session?.status !== "question") throw new Error("Expected third question.")
+    expect(thirdResponse.session.progress).toMatchObject({
+      completedMainQuestions: 2,
+      totalMainQuestions: null,
+    })
+
+    const candidateResponse = await answerQuestion(thirdResponse.session)
+    expect(candidateResponse.session).toMatchObject({
+      status: "candidateQuestions",
       progress: {
-        completedMainQuestions: 1,
+        completedMainQuestions: plan.questions.length,
         totalMainQuestions: null,
-        planRevision: 1,
       },
+    })
+    if (candidateResponse.session?.status !== "candidateQuestions") {
+      throw new Error("Expected candidate questions.")
+    }
+    const completed = await finishCandidateQuestions(candidateResponse.session)
+    expect(completed.progress).toMatchObject({
+      completedMainQuestions: plan.questions.length,
+      totalMainQuestions: null,
     })
   })
 
-  it("returns an explicit plan revision when the Agent adjusts the total", async () => {
+  it("adjustedPlan updates total and revision without changing the completed count", async () => {
+    const plan = createInterviewAgentPlanMock("adjustedPlan")
     const first = await startToFirstQuestion("adjustedPlan")
     expect(first.progress).toEqual({
       completedMainQuestions: 0,
-      totalMainQuestions: 2,
-      planRevision: 1,
+      ...plan.initialProgress,
     })
 
-    const second = await answerQuestion(first)
-    expect(second.session).toMatchObject({
+    const secondResponse = await answerQuestion(first)
+    expect(secondResponse.session).toMatchObject({
       status: "question",
       progress: {
-        completedMainQuestions: 1,
-        totalMainQuestions: 3,
-        planRevision: 2,
+        completedMainQuestions: plan.planChanges[0]!.afterCompletedMainQuestions,
+        totalMainQuestions: plan.planChanges[0]!.totalMainQuestions,
+        planRevision: plan.planChanges[0]!.planRevision,
       },
     })
   })
 
-  it("does not infer transitions from answer keywords or length", async () => {
-    const firstRun = await startToFirstQuestion("singleFollowUp")
-    const secondRunStart = await answerQuestion(firstRun, "短")
-    if (secondRunStart.session?.status !== "question") throw new Error("Expected second question.")
-    const shortAnswerResult = await answerQuestion(secondRunStart.session, "没有任何关键词")
+  it("uses the selected scenario rather than answer keywords, length, or randomness", async () => {
+    const firstShort = await startToFirstQuestion("singleFollowUp")
+    const secondShort = await answerQuestion(firstShort, "短")
+    if (secondShort.session?.status !== "question") throw new Error("Expected second question.")
+    const shortResult = await answerQuestion(secondShort.session, "没有关键词")
 
-    const repeatedFirst = await startToFirstQuestion("singleFollowUp")
-    const repeatedSecond = await answerQuestion(repeatedFirst, "完全不同的开场回答")
-    if (repeatedSecond.session?.status !== "question") throw new Error("Expected second question.")
-    const longAnswerResult = await answerQuestion(
-      repeatedSecond.session,
+    const firstLong = await startToFirstQuestion("singleFollowUp")
+    const secondLong = await answerQuestion(firstLong, "完全不同的开场回答")
+    if (secondLong.session?.status !== "question") throw new Error("Expected second question.")
+    const longResult = await answerQuestion(
+      secondLong.session,
       "性能、业务收益、灰度、归因。".repeat(30),
     )
 
-    expect(shortAnswerResult.session?.status).toBe("followUp")
-    expect(longAnswerResult.session?.status).toBe("followUp")
+    expect(shortResult.session?.status).toBe("followUp")
+    expect(longResult.session?.status).toBe("followUp")
+  })
+})
+
+describe("interview mock state-machine protection", () => {
+  it("rejects an incorrect sessionId", async () => {
+    const question = await startToFirstQuestion()
+
+    await expect(
+      submitInterviewAnswer({
+        target: "question",
+        sessionId: "wrong-session",
+        version: question.version,
+        questionId: question.currentQuestion.question.id,
+        content: "有效回答",
+      }),
+    ).rejects.toThrow("Interview session does not match the current session.")
   })
 
-  it("supports candidate questions and review through public business services", async () => {
-    const first = await startToFirstQuestion("lastQuestionFollowUp")
-    const second = await answerQuestion(first)
-    if (second.session?.status !== "question") throw new Error("Expected second question.")
-    const followUp = await answerQuestion(second.session)
-    if (followUp.session?.status !== "followUp") throw new Error("Expected follow-up.")
-    const candidate = await answerFollowUp(followUp.session)
-    if (candidate.session?.status !== "candidateQuestions") {
-      throw new Error("Expected candidate questions.")
-    }
-
-    const withQuestion = await settle(
-      submitCandidateQuestion({
-        sessionId: candidate.session.sessionId,
-        version: candidate.session.version,
-        content: "这个岗位入职六个月后的成功标准是什么？",
-      }),
-    )
-    if (withQuestion.session?.status !== "candidateQuestions") {
-      throw new Error("Expected candidate exchange.")
-    }
-    const completed = await settle(
-      finishInterview({
-        sessionId: withQuestion.session.sessionId,
-        version: withQuestion.session.version,
-      }),
-    )
-    if (completed.session?.status !== "completed") throw new Error("Expected completion.")
-
-    const review = await settle(getInterviewReview({ sessionId: completed.session.sessionId }))
-    expect(completed.session.candidateQuestionExchanges).toHaveLength(1)
-    expect(review).toEqual(createInterviewReviewResponseMock(completed.session))
-  })
-
-  it("allows an early end from a main question or an active follow-up", async () => {
+  it("rejects a stale version", async () => {
     const question = await startToFirstQuestion("noFollowUps")
-    const endedAtQuestion = await settle(
-      endInterview({ sessionId: question.sessionId, version: question.version }),
-    )
-    expect(endedAtQuestion.session).toMatchObject({
-      status: "completed",
-      progress: { completedMainQuestions: 0 },
-      completedQuestions: [],
-    })
-
-    const first = await startToFirstQuestion("singleFollowUp")
-    const second = await answerQuestion(first)
-    if (second.session?.status !== "question") throw new Error("Expected second question.")
-    const followUp = await answerQuestion(second.session)
-    if (followUp.session?.status !== "followUp") throw new Error("Expected follow-up.")
-    const endedAtFollowUp = await settle(
-      endInterview({ sessionId: followUp.session.sessionId, version: followUp.session.version }),
-    )
-    expect(endedAtFollowUp.session).toMatchObject({
-      status: "completed",
-      progress: { completedMainQuestions: 2 },
-      completedQuestions: [{}, { followUps: [] }],
-    })
-  })
-
-  it("returns independent snapshots across requests and mutations", async () => {
-    const first = await settle(getInterviewPage())
-    first.setup.targetRoles[0]!.title = "被测试修改的岗位"
-    first.setup.availableDurationMinutes.push(15)
-
-    const second = await settle(getInterviewPage())
-    expect(second.setup.targetRoles[0]?.title).toBe("高级前端工程师")
-    expect(second.setup.availableDurationMinutes).toEqual([15, 30, 45])
-    expect(second).not.toBe(first)
-
-    const completed = await finishNoFollowUpsInterview()
-    const firstReview = await settle(getInterviewReview({ sessionId: completed.sessionId }))
-    firstReview.review.mainStrengths[0] = "被测试修改的优势"
-    const secondReview = await settle(getInterviewReview({ sessionId: completed.sessionId }))
-    expect(secondReview.review.mainStrengths[0]).toBe("能够把复杂技术问题讲清楚")
-  })
-
-  it("does not consume state when answer submission fails and permits retry", async () => {
-    resetInterviewMockState("setupReady", {
-      agentScenario: "noFollowUps",
-      failNext: ["submitInterviewAnswer"],
-    })
-    const page = await settle(getInterviewPage())
-    const configuration = page.setup.defaultConfiguration
-    if (configuration.targetRoleId === null) throw new Error("Expected target role.")
-    const opening = await settle(
-      startInterview({ ...configuration, targetRoleId: configuration.targetRoleId }),
-    )
-    if (opening.session?.status !== "opening") throw new Error("Expected opening.")
-    const firstResponse = await settle(
-      beginInterviewQuestions({
-        sessionId: opening.session.sessionId,
-        version: opening.session.version,
+    await expect(
+      submitInterviewAnswer({
+        target: "question",
+        sessionId: question.sessionId,
+        version: question.version - 1,
+        questionId: question.currentQuestion.question.id,
+        content: "使用过期版本的回答",
       }),
-    )
-    if (firstResponse.session?.status !== "question") throw new Error("Expected question.")
+    ).rejects.toThrow("Interview session is out of date.")
+  })
+
+  it("rejects duplicate submission of the same answer", async () => {
+    const question = await startToFirstQuestion("noFollowUps")
     const input = {
       target: "question" as const,
-      sessionId: firstResponse.session.sessionId,
-      version: firstResponse.session.version,
-      questionId: firstResponse.session.currentQuestion.question.id,
-      content: "失败后仍应使用相同版本重试。",
+      sessionId: question.sessionId,
+      version: question.version,
+      questionId: question.currentQuestion.question.id,
+      content: "只能提交一次的回答",
     }
+    await submitInterviewAnswer(input)
 
-    await expectMockFailure(submitInterviewAnswer(input), "submitInterviewAnswer")
-    const retried = await settle(submitInterviewAnswer(input))
-    expect(retried.session).toMatchObject({
-      status: "question",
-      version: firstResponse.session.version + 1,
+    await expect(submitInterviewAnswer(input)).rejects.toThrow("Interview session is out of date.")
+  })
+
+  it("rejects incorrect main-question and follow-up IDs without consuming state", async () => {
+    const first = await startToFirstQuestion("singleFollowUp")
+    await expect(
+      submitInterviewAnswer({
+        target: "question",
+        sessionId: first.sessionId,
+        version: first.version,
+        questionId: "wrong-main-question",
+        content: "有效回答",
+      }),
+    ).rejects.toThrow("Interview question does not match the authoritative session.")
+
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const followUpResponse = await answerQuestion(secondResponse.session)
+    if (followUpResponse.session?.status !== "followUp") throw new Error("Expected follow-up.")
+
+    await expect(
+      submitInterviewAnswer({
+        target: "followUp",
+        sessionId: followUpResponse.session.sessionId,
+        version: followUpResponse.session.version,
+        questionId: followUpResponse.session.currentQuestion.question.id,
+        followUpQuestionId: "wrong-follow-up",
+        content: "有效追问回答",
+      }),
+    ).rejects.toThrow("Interview follow-up does not match the authoritative session.")
+  })
+
+  it("rejects finishing before candidate questions", async () => {
+    const opening = await startOpening()
+    await expect(
+      finishInterview({ sessionId: opening.sessionId, version: opening.version }),
+    ).rejects.toThrow("Interview can only finish after entering candidate questions.")
+  })
+
+  it("rejects submissions after completion", async () => {
+    const candidate = await reachNoFollowUpsCandidateQuestions()
+    const completed = await finishCandidateQuestions(candidate)
+
+    await expect(
+      submitInterviewAnswer({
+        target: "question",
+        sessionId: completed.sessionId,
+        version: completed.version,
+        questionId: "already-completed-question",
+        content: "不应被保存",
+      }),
+    ).rejects.toThrow("Interview session is not active.")
+  })
+
+  it("rejects blank main answers and blank follow-up answers", async () => {
+    const first = await startToFirstQuestion("singleFollowUp")
+    await expect(answerQuestion(first, " \n\t ")).rejects.toThrow(
+      "Interview response content is required.",
+    )
+
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const followUpResponse = await answerQuestion(secondResponse.session)
+    if (followUpResponse.session?.status !== "followUp") throw new Error("Expected follow-up.")
+    await expect(answerFollowUp(followUpResponse.session, "   ")).rejects.toThrow(
+      "Interview response content is required.",
+    )
+  })
+
+  it("rejects blank candidate questions", async () => {
+    const candidate = await reachNoFollowUpsCandidateQuestions()
+    await expect(
+      submitCandidateQuestion({
+        sessionId: candidate.sessionId,
+        version: candidate.version,
+        content: " \n ",
+      }),
+    ).rejects.toThrow("Interview response content is required.")
+  })
+})
+
+describe("interview early completion", () => {
+  it("ends during opening with no completed records or review overviews", async () => {
+    const opening = await startOpening()
+    const response = await endInterview({
+      sessionId: opening.sessionId,
+      version: opening.version,
+    })
+    if (response.session?.status !== "completed") throw new Error("Expected completion.")
+
+    expect(response.session.completedQuestions).toEqual([])
+    expect(response.session.progress.completedMainQuestions).toBe(0)
+    const review = await getInterviewReview({ sessionId: response.session.sessionId })
+    expect(review.questionOverviews).toEqual([])
+    expect(review.review.questionReviews).toEqual([])
+  })
+
+  it("does not save an unanswered main question and preserves prior completed questions", async () => {
+    const first = await startToFirstQuestion("noFollowUps")
+    const endedImmediately = await endInterview({
+      sessionId: first.sessionId,
+      version: first.version,
+    })
+    expect(endedImmediately.session).toMatchObject({
+      status: "completed",
+      completedQuestions: [],
+      progress: { completedMainQuestions: 0 },
+    })
+
+    const repeatedFirst = await startToFirstQuestion("noFollowUps")
+    const secondResponse = await answerQuestion(repeatedFirst, "已完成的第一题回答")
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const endedOnSecond = await endInterview({
+      sessionId: secondResponse.session.sessionId,
+      version: secondResponse.session.version,
+    })
+    expect(endedOnSecond.session).toMatchObject({
+      status: "completed",
+      completedQuestions: [{ answer: { content: "已完成的第一题回答" } }],
       progress: { completedMainQuestions: 1 },
     })
   })
 
-  it("keeps empty setup and prerequisite states authoritative", async () => {
-    resetInterviewMockState("noTargetRoles")
-    const empty = await settle(getInterviewPage())
-    expect(empty.setup.targetRoles).toEqual([])
-    expect(empty.setup.availableDurationMinutes).toEqual([15, 30, 45])
-    expect(empty.setup.defaultConfiguration.durationMinutes).toBe(30)
+  it("saves the answered main question but never fabricates an unanswered follow-up", async () => {
+    const first = await startToFirstQuestion("singleFollowUp")
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const followUpResponse = await answerQuestion(secondResponse.session, "已回答的主问题")
+    if (followUpResponse.session?.status !== "followUp") throw new Error("Expected follow-up.")
 
-    resetInterviewMockState("prerequisiteNotMet")
-    const blocked = await settle(getInterviewPage())
+    const ended = await endInterview({
+      sessionId: followUpResponse.session.sessionId,
+      version: followUpResponse.session.version,
+    })
+    expect(ended.session).toMatchObject({
+      status: "completed",
+      completedQuestions: [
+        {},
+        {
+          answer: { content: "已回答的主问题" },
+          followUps: [],
+        },
+      ],
+      progress: { completedMainQuestions: 2 },
+    })
+    if (ended.session?.status !== "completed") throw new Error("Expected completion.")
+    const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    expect(review.questionOverviews).toHaveLength(2)
+    expect(review.questionOverviews[1]?.followUps).toEqual([])
+  })
+
+  it("preserves answered follow-ups in order and omits the current unanswered follow-up", async () => {
+    const plan = createInterviewAgentPlanMock("multipleFollowUps")
+    const first = await startToFirstQuestion("multipleFollowUps")
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const firstFollowUpResponse = await answerQuestion(secondResponse.session)
+    if (firstFollowUpResponse.session?.status !== "followUp") {
+      throw new Error("Expected first follow-up.")
+    }
+    const secondFollowUpResponse = await answerFollowUp(
+      firstFollowUpResponse.session,
+      "已完成的第一轮追问",
+    )
+    if (secondFollowUpResponse.session?.status !== "followUp") {
+      throw new Error("Expected second follow-up.")
+    }
+
+    const ended = await endInterview({
+      sessionId: secondFollowUpResponse.session.sessionId,
+      version: secondFollowUpResponse.session.version,
+    })
+    if (ended.session?.status !== "completed") throw new Error("Expected completion.")
+    expect(ended.session.completedQuestions[1]?.followUps).toMatchObject([
+      {
+        question: { id: plan.questions[1]!.followUps[0]!.id },
+        answer: { content: "已完成的第一轮追问" },
+      },
+    ])
+    expect(ended.session.completedQuestions[1]?.followUps).toHaveLength(1)
+
+    const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    expect(review.questionOverviews[1]?.followUps.map(({ id }) => id)).toEqual([
+      plan.questions[1]!.followUps[0]!.id,
+    ])
+  })
+
+  it("ends during candidate questions with completed records and exchanges intact", async () => {
+    const candidate = await reachNoFollowUpsCandidateQuestions()
+    const withExchangeResponse = await submitCandidateQuestion({
+      sessionId: candidate.sessionId,
+      version: candidate.version,
+      content: "这个岗位的成功标准是什么？",
+    })
+    if (withExchangeResponse.session?.status !== "candidateQuestions") {
+      throw new Error("Expected candidate questions.")
+    }
+
+    const ended = await endInterview({
+      sessionId: withExchangeResponse.session.sessionId,
+      version: withExchangeResponse.session.version,
+    })
+    if (ended.session?.status !== "completed") throw new Error("Expected completion.")
+    expect(ended.session.completedQuestions).toHaveLength(2)
+    expect(ended.session.candidateQuestionExchanges).toHaveLength(1)
+
+    const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    expect(review.questionOverviews).toHaveLength(2)
+    expect(review).toEqual(createInterviewReviewResponseMock(ended.session))
+  })
+})
+
+describe("interview mock reset boundaries", () => {
+  it("clears session, plan cursor, failures, delays, version, and sequences when switching scenarios", async () => {
+    resetScenario("multipleFollowUps", {
+      delayNext: { getInterviewReview: 1_000 },
+      failNext: ["getInterviewReview"],
+    })
+    const firstMultiple = await beginQuestions(await startCurrentOpening())
+    const secondMultipleResponse = await answerQuestion(firstMultiple)
+    if (secondMultipleResponse.session?.status !== "question") {
+      throw new Error("Expected second multiple-follow-up question.")
+    }
+    const activeFollowUp = await answerQuestion(secondMultipleResponse.session)
+    if (activeFollowUp.session?.status !== "followUp") {
+      throw new Error("Expected active multiple-follow-up cursor.")
+    }
+
+    resetScenario("noFollowUps")
+    const page = await getInterviewPage()
+    expect(page.session).toBeNull()
+
+    const first = await beginQuestions(await startCurrentOpening())
+    expect(first.sessionId).toBe("mock-interview-session-1")
+    expect(first.version).toBe(2)
+    expect(first.progress.totalMainQuestions).toBe(2)
+
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    expect(secondResponse.session.currentQuestion.question.id).toBe(
+      createInterviewAgentPlanMock("noFollowUps").questions[1]!.question.id,
+    )
+  })
+
+  it("returns independent snapshots after every reset and request", async () => {
+    const first = await getInterviewPage()
+    first.setup.targetRoles[0]!.title = "被测试修改的岗位"
+    first.setup.availableDurationMinutes.push(15)
+
+    const second = await getInterviewPage()
+    expect(second.setup.targetRoles[0]?.title).toBe("高级前端工程师")
+    expect(second.setup.availableDurationMinutes).toEqual([15, 30, 45])
+
+    resetScenario("adjustedPlan")
+    const afterReset = await getInterviewPage()
+    expect(afterReset.session).toBeNull()
+    expect(afterReset.setup.targetRoles[0]?.title).toBe("高级前端工程师")
+  })
+
+  it("returns independent Agent plans for tests and Stories", () => {
+    const first = createInterviewAgentPlanMock("multipleFollowUps")
+    first.questions[1]!.question.prompt = "被测试修改的主问题"
+    first.questions[1]!.followUps[0]!.prompt = "被测试修改的追问"
+
+    const second = createInterviewAgentPlanMock("multipleFollowUps")
+    expect(second.questions[1]!.question.prompt).not.toBe("被测试修改的主问题")
+    expect(second.questions[1]!.followUps[0]!.prompt).not.toBe("被测试修改的追问")
+  })
+
+  it("keeps operation failure injection one-shot without consuming session state", async () => {
+    resetScenario("noFollowUps", { failNext: ["submitInterviewAnswer"] })
+    const page = await getInterviewPage()
+    const configuration = page.setup.defaultConfiguration
+    if (configuration.targetRoleId === null) throw new Error("Expected target role.")
+    const openingResponse = await startInterview({
+      ...configuration,
+      targetRoleId: configuration.targetRoleId,
+    })
+    if (openingResponse.session?.status !== "opening") throw new Error("Expected opening.")
+    const first = await beginQuestions(openingResponse.session)
+    const input = {
+      target: "question" as const,
+      sessionId: first.sessionId,
+      version: first.version,
+      questionId: first.currentQuestion.question.id,
+      content: "失败后使用相同版本重试",
+    }
+
+    await expect(submitInterviewAnswer(input)).rejects.toThrow(
+      "Interview mock operation failed: submitInterviewAnswer",
+    )
+    const retried = await submitInterviewAnswer(input)
+    expect(retried.session).toMatchObject({
+      status: "question",
+      version: first.version + 1,
+      progress: { completedMainQuestions: 1 },
+    })
+  })
+
+  it("keeps empty setup and prerequisite responses authoritative", async () => {
+    resetInterviewMockState("noTargetRoles", { defaultDelayMs: 0 })
+    const empty = await getInterviewPage()
+    expect(empty.setup.targetRoles).toEqual([])
+    expect(empty.session).toBeNull()
+
+    resetInterviewMockState("prerequisiteNotMet", { defaultDelayMs: 0 })
+    const blocked = await getInterviewPage()
     expect(blocked.setup.availability).toEqual({
       status: "blocked",
       reason: "profileIncomplete",
     })
     const targetRoleId = blocked.setup.defaultConfiguration.targetRoleId
     if (targetRoleId === null) throw new Error("Expected blocked target role.")
-    const request = startInterview({
-      ...blocked.setup.defaultConfiguration,
-      targetRoleId,
-    })
-    const assertion = expect(request).rejects.toThrow(
-      "Interview prerequisite is not met: profileIncomplete.",
-    )
-    await vi.runAllTimersAsync()
-    await assertion
+    await expect(
+      startInterview({
+        ...blocked.setup.defaultConfiguration,
+        targetRoleId,
+      }),
+    ).rejects.toThrow("Interview prerequisite is not met: profileIncomplete.")
   })
 })

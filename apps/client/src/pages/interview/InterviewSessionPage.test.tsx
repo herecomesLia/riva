@@ -7,7 +7,6 @@ import {
   createCandidateQuestionExchange,
   createInterviewAgentPlanMock,
   createInterviewMockResponse,
-  createInterviewQuestionSet,
 } from "@/mocks/data/interview"
 import type {
   InterviewCandidateQuestionsSessionResponse,
@@ -38,6 +37,7 @@ vi.mock("@/services/interview", async (importOriginal) => ({
 }))
 
 const sessionId = "mock-interview-session-page"
+const singleFollowUpPlan = createInterviewAgentPlanMock("singleFollowUp")
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -77,7 +77,7 @@ function openingResponse(): InterviewPageResponse {
 }
 
 function questionSession(order: number, version: number): InterviewQuestionSessionResponse {
-  const question = createInterviewQuestionSet()[order - 1]!
+  const question = singleFollowUpPlan.questions[order - 1]!.question
   return {
     status: "question",
     sessionId,
@@ -204,7 +204,7 @@ describe("InterviewSessionContainer", () => {
       }),
     )
 
-    expect(await screen.findByText(createInterviewQuestionSet()[0]!.prompt)).toBeVisible()
+    expect(await screen.findByText(singleFollowUpPlan.questions[0]!.question.prompt)).toBeVisible()
     expect(getInterviewPage).toHaveBeenCalledTimes(2)
   })
 
@@ -225,7 +225,7 @@ describe("InterviewSessionContainer", () => {
       sessionId,
       version: 1,
     })
-    expect(await screen.findByText(createInterviewQuestionSet()[0]!.prompt)).toBeVisible()
+    expect(await screen.findByText(singleFollowUpPlan.questions[0]!.question.prompt)).toBeVisible()
     expect(result.queryClient.getQueryData(["interview"])).toEqual(firstQuestion)
   })
 
