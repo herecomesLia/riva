@@ -14,7 +14,7 @@ import { usePracticeMutation, PRACTICE_QUERY_KEY } from "./usePracticeSession"
 export function usePracticeEvaluationPolling(data: PracticePageResponse | undefined) {
   const queryClient = useQueryClient()
   const retryLock = useRef(false)
-  const retryMutation = usePracticeMutation(retryPracticeEvaluation)
+  const retryMutation = usePracticeMutation("retryEvaluation", retryPracticeEvaluation)
   const evaluationSession = data?.session.status === "evaluating" ? data.session : null
   const sessionId = evaluationSession?.sessionId
   const version = evaluationSession?.version

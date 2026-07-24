@@ -2,6 +2,7 @@ import { derivePracticeSupportedQuestionTypes } from "@/mocks/data/role-fixture-
 import { getRolesPage } from "@/mocks/services/roles"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
+  PracticeMutationResponse,
   PracticePageResponse,
   PrepareNextPracticeSessionInput,
   PracticeSetupContext,
@@ -105,7 +106,7 @@ function requireValidSelection(
 
 export async function startPracticeSession(
   input: StartPracticeSessionInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   const current = await getPracticePage()
   requireValidSelection(current.setupContext, input)
   const sessionSequence = nextPracticeSessionSequence()
@@ -130,7 +131,7 @@ export async function startPracticeSession(
 
 export async function prepareNextPracticeSession(
   input: PrepareNextPracticeSessionInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = getPracticeMockState().session
   if (

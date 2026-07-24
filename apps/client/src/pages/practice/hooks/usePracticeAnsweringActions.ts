@@ -38,14 +38,17 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
   actions: PracticeAnsweringActions
   pending: PracticeAnsweringPending
 } {
-  const hintMutation = usePracticeMutation(requestPracticeHint)
-  const frameworkMutation = usePracticeMutation(requestAnswerFramework)
-  const referenceAnswerMutation = usePracticeMutation(requestPracticeReferenceAnswer)
-  const savedMutation = usePracticeMutation(setQuestionSaved)
-  const weakMutation = usePracticeMutation(setQuestionWeak)
-  const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
-  const skipMutation = usePracticeMutation(skipPracticeQuestion)
-  const endMutation = usePracticeMutation(requestEndPracticeSession)
+  const hintMutation = usePracticeMutation("questionUpdate", requestPracticeHint)
+  const frameworkMutation = usePracticeMutation("questionUpdate", requestAnswerFramework)
+  const referenceAnswerMutation = usePracticeMutation(
+    "questionUpdate",
+    requestPracticeReferenceAnswer,
+  )
+  const savedMutation = usePracticeMutation("questionFlagUpdate", setQuestionSaved)
+  const weakMutation = usePracticeMutation("questionFlagUpdate", setQuestionWeak)
+  const submitAnswerMutation = usePracticeMutation("submitPrimaryAnswer", submitPrimaryAnswer)
+  const skipMutation = usePracticeMutation("skipQuestion", skipPracticeQuestion)
+  const endMutation = usePracticeMutation("endQuestionSession", requestEndPracticeSession)
   const interactionLocked =
     hintMutation.isPending ||
     frameworkMutation.isPending ||

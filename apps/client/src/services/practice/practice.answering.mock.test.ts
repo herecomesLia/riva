@@ -366,10 +366,10 @@ describe("practice stateful mock service: answering", () => {
       context.requestPracticeHint({ ...questionInput, version: hinted.session.version }),
     )
     if (duplicateHint.session.status !== "answering") return
-    expect(duplicateHint.session.version).toBe(hinted.session.version)
+    expect(duplicateHint.session.version).toBe(hinted.session.version + 1)
 
     const framed = await context.settle(
-      context.requestAnswerFramework({ ...questionInput, version: hinted.session.version }),
+      context.requestAnswerFramework({ ...questionInput, version: duplicateHint.session.version }),
     )
     if (framed.session.status !== "answering") return
     expect(framed.session.question.answerFramework.status).toBe("revealed")
@@ -393,7 +393,7 @@ describe("practice stateful mock service: answering", () => {
 
     expect(saved.session.question.isSaved).toBe(true)
     expect(weak.session.question).toMatchObject({ isSaved: true, isMarkedWeak: true })
-    expect(weak.session.version).toBe(initial.session.version + 4)
+    expect(weak.session.version).toBe(initial.session.version + 5)
   })
 
   it("reveals behavioral hints without project-performance guidance", async () => {

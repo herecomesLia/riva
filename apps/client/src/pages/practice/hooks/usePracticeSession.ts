@@ -2,9 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRef } from "react"
 
 import type {
-  EndPracticeSessionInput,
+  PracticeMutationResponse,
   PracticePageResponse,
-  PracticeQuestionMutationInput,
   PrepareNextPracticeSessionInput,
   StartPracticeSessionInput,
 } from "@/models/practice"
@@ -15,8 +14,9 @@ import {
 } from "@/services/practice"
 
 import {
+  type PracticeMutationInputFor,
+  type PracticeMutationKind,
   synchronizePracticeMutationResponse,
-  synchronizePracticeSessionMutationResponse,
 } from "../practice-cache"
 
 export const PRACTICE_QUERY_KEY = ["practice"] as const
@@ -31,11 +31,23 @@ export function usePracticeSession() {
   })
   const startMutation = useMutation({
     mutationFn: startPracticeSession,
-    onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
+    onSuccess: (response, input) =>
+      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
+        synchronizePracticeMutationResponse(current, response, {
+          kind: "startSession",
+          input,
+        }),
+      ),
   })
   const prepareNextRoundMutation = useMutation({
     mutationFn: prepareNextPracticeSession,
-    onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
+    onSuccess: (response, input) =>
+      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
+        synchronizePracticeMutationResponse(current, response, {
+          kind: "prepareNextSession",
+          input,
+        }),
+      ),
   })
 
   async function start(input: StartPracticeSessionInput) {
@@ -74,33 +86,17 @@ export function usePracticeSession() {
   }
 }
 
-export function usePracticeSessionMutation<TInput>(
-  mutationFn: (input: TInput) => Promise<PracticePageResponse>,
-) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn,
-    onSuccess: (response, input) =>
-      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-        synchronizePracticeSessionMutationResponse(
-          current,
-          response,
-          input as EndPracticeSessionInput,
-        ),
-      ),
-  })
-}
-
-export function usePracticeMutation<TInput extends PracticeQuestionMutationInput>(
-  mutationFn: (input: TInput) => Promise<PracticePageResponse>,
-) {
+export function usePracticeMutation<
+  TKind extends PracticeMutationKind,
+  TInput extends PracticeMutationInputFor<TKind>,
+>(kind: TKind, mutationFn: (input: TInput) => Promise<PracticeMutationResponse>) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn,
     onSuccess: (response, input) => {
       queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-        synchronizePracticeMutationResponse(current, response, input),
+        synchronizePracticeMutationResponse(current, response, { kind, input }),
       )
     },
   })

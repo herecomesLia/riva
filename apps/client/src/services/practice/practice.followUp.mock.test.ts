@@ -109,7 +109,11 @@ describe("practice stateful mock service: followUp", () => {
         version: referenced.session.version,
       }),
     )
-    expect(repeated).toEqual(referenced)
+    expect(repeated).toEqual({
+      ...referenced,
+      session: { ...referenced.session, version: referenced.session.version + 1 },
+    })
+    if (repeated.session.status !== "answeringFollowUp") return
 
     for (const invalid of [
       { ...baseInput, version: initial.session.version },
@@ -129,7 +133,7 @@ describe("practice stateful mock service: followUp", () => {
     const submitted = await context.settle(
       context.submitFollowUpAnswer({
         ...baseInput,
-        version: referenced.session.version,
+        version: repeated.session.version,
         content: "我补充真实的对照证据和归因边界。",
       }),
     )

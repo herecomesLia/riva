@@ -2,9 +2,9 @@ import * as testing from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
+import "./practice-page-service-mock"
 import { i18n } from "@/i18n/i18n"
 
-import "./practice-page-service-mock"
 import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 

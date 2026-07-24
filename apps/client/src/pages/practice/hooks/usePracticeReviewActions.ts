@@ -8,17 +8,17 @@ import {
 
 import type { PracticeReviewActions, PracticeReviewPending } from "../PracticeView"
 import type { RunPracticeAction } from "./usePracticeAnsweringActions"
-import { usePracticeMutation, usePracticeSessionMutation } from "./usePracticeSession"
+import { usePracticeMutation } from "./usePracticeSession"
 
 export function usePracticeReviewActions(runAction: RunPracticeAction): {
   actions: PracticeReviewActions
   pending: PracticeReviewPending
 } {
-  const savedMutation = usePracticeMutation(setQuestionSaved)
-  const weakMutation = usePracticeMutation(setQuestionWeak)
-  const retryMutation = usePracticeMutation(retryCurrentPracticeQuestion)
-  const nextMutation = usePracticeMutation(continueToNextPracticeQuestion)
-  const endMutation = usePracticeSessionMutation(endPracticeSession)
+  const savedMutation = usePracticeMutation("questionFlagUpdate", setQuestionSaved)
+  const weakMutation = usePracticeMutation("questionFlagUpdate", setQuestionWeak)
+  const retryMutation = usePracticeMutation("retryCurrentQuestion", retryCurrentPracticeQuestion)
+  const nextMutation = usePracticeMutation("continueToNextQuestion", continueToNextPracticeQuestion)
+  const endMutation = usePracticeMutation("endReviewSession", endPracticeSession)
 
   return {
     actions: {

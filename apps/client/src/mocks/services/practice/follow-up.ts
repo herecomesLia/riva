@@ -6,6 +6,8 @@ import {
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   EndPracticeFollowUpsInput,
+  PracticeAnsweringFollowUpState,
+  PracticeMutationResponse,
   PracticePageResponse,
   RequestPracticeFollowUpFrameworkInput,
   RequestPracticeFollowUpHintInput,
@@ -22,13 +24,22 @@ import {
   setPracticeMockState,
 } from "./state"
 
+function commitUnchangedFollowUpMutation(
+  session: PracticeAnsweringFollowUpState,
+): PracticePageResponse {
+  return setPracticeMockState({
+    ...getPracticeMockState(),
+    session: { ...session, version: session.version + 1 },
+  })
+}
+
 export async function requestPracticeFollowUpHint(
   input: RequestPracticeFollowUpHintInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentFollowUp(input)
   if (session.currentFollowUp.question.answerHints.status !== "notRequested") {
-    return copyPracticeState(getPracticeMockState())
+    return commitUnchangedFollowUpMutation(session)
   }
   const template = getPracticeFollowUpPlan(session.question.templateId).find(
     ({ id }) => id === session.currentFollowUp.question.templateId,
@@ -56,11 +67,11 @@ export async function requestPracticeFollowUpHint(
 
 export async function requestPracticeFollowUpFramework(
   input: RequestPracticeFollowUpFrameworkInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentFollowUp(input)
   if (session.currentFollowUp.question.answerFramework.status !== "notRequested") {
-    return copyPracticeState(getPracticeMockState())
+    return commitUnchangedFollowUpMutation(session)
   }
   const template = getPracticeFollowUpPlan(session.question.templateId).find(
     ({ id }) => id === session.currentFollowUp.question.templateId,
@@ -88,11 +99,11 @@ export async function requestPracticeFollowUpFramework(
 
 export async function requestPracticeFollowUpReferenceAnswer(
   input: RequestPracticeFollowUpReferenceAnswerInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentFollowUp(input)
   if (session.currentFollowUp.question.referenceAnswer.status !== "notRequested") {
-    return copyPracticeState(getPracticeMockState())
+    return commitUnchangedFollowUpMutation(session)
   }
 
   return setPracticeMockState({
@@ -123,7 +134,7 @@ export async function requestPracticeFollowUpReferenceAnswer(
 
 export async function submitFollowUpAnswer(
   input: SubmitFollowUpAnswerInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentFollowUp(input)
   const content = input.content.trim()
@@ -186,7 +197,7 @@ export async function submitFollowUpAnswer(
 
 export async function endPracticeFollowUps(
   input: EndPracticeFollowUpsInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentFollowUp(input)
 

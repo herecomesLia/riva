@@ -3,7 +3,7 @@ import type {
   EndPracticeSessionInput,
   PracticeAttemptRecord,
   PracticeCompletedState,
-  PracticePageResponse,
+  PracticeMutationResponse,
   RequestEndPracticeSessionInput,
 } from "@/models/practice"
 
@@ -73,7 +73,7 @@ function createCompletedPracticeSession({
 
 export async function endPracticeSession(
   input: EndPracticeSessionInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = getPracticeMockState().session
   if (
@@ -106,7 +106,7 @@ export async function endPracticeSession(
 
 export async function requestEndPracticeSession(
   input: RequestEndPracticeSessionInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   const completionBase: PracticeCompletionBase = {

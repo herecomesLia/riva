@@ -14,11 +14,14 @@ export function usePracticeFollowUpActions(runAction: RunPracticeAction): {
   actions: PracticeFollowUpActions
   pending: PracticeFollowUpPending
 } {
-  const hintMutation = usePracticeMutation(requestPracticeFollowUpHint)
-  const frameworkMutation = usePracticeMutation(requestPracticeFollowUpFramework)
-  const referenceAnswerMutation = usePracticeMutation(requestPracticeFollowUpReferenceAnswer)
-  const submitMutation = usePracticeMutation(submitFollowUpAnswer)
-  const endMutation = usePracticeMutation(endPracticeFollowUps)
+  const hintMutation = usePracticeMutation("followUpUpdate", requestPracticeFollowUpHint)
+  const frameworkMutation = usePracticeMutation("followUpUpdate", requestPracticeFollowUpFramework)
+  const referenceAnswerMutation = usePracticeMutation(
+    "followUpUpdate",
+    requestPracticeFollowUpReferenceAnswer,
+  )
+  const submitMutation = usePracticeMutation("submitFollowUpAnswer", submitFollowUpAnswer)
+  const endMutation = usePracticeMutation("endFollowUps", endPracticeFollowUps)
   const interactionLocked =
     hintMutation.isPending ||
     frameworkMutation.isPending ||

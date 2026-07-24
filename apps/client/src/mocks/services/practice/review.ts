@@ -1,7 +1,7 @@
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   ContinueToNextPracticeQuestionInput,
-  PracticePageResponse,
+  PracticeMutationResponse,
   RetryCurrentPracticeQuestionInput,
 } from "@/models/practice"
 
@@ -16,7 +16,7 @@ import {
 
 export async function retryCurrentPracticeQuestion(
   input: RetryCurrentPracticeQuestionInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireReview(input)
   if (session.question.referenceAnswer.status !== "revealed") {
@@ -50,7 +50,7 @@ export async function retryCurrentPracticeQuestion(
 
 export async function continueToNextPracticeQuestion(
   input: ContinueToNextPracticeQuestionInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireReview(input)
   const previousAttempt = toAttemptRecord(session)

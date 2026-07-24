@@ -2,10 +2,10 @@ import * as testing from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
+import "./practice-page-service-mock"
 import { i18n } from "@/i18n/i18n"
 
 import { PRACTICE_QUERY_KEY } from "../hooks/usePracticeSession"
-import "./practice-page-service-mock"
 import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 
@@ -13,6 +13,16 @@ describe("PracticePage: generation", () => {
   it("polls question generation into an answering snapshot", async () => {
     const generating = api.createPracticeMockResponse("generatingQuestion")
     const answering = api.createPracticeMockResponse("answeringQuestion")
+    if (
+      generating.session.status !== "generatingQuestion" ||
+      answering.session.status !== "answering"
+    ) {
+      throw new Error("Generating and answering fixtures are required.")
+    }
+    answering.session.sessionId = generating.session.sessionId
+    answering.session.version = generating.session.version + 1
+    answering.session.selection = structuredClone(generating.session.selection)
+    answering.session.startedAt = generating.session.startedAt
     vi.mocked(api.getPracticePage).mockResolvedValue(generating)
     vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(answering)
 

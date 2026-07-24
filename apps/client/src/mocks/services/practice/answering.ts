@@ -6,7 +6,10 @@ import {
 } from "@/mocks/data/practice"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
+  PracticeAnsweringState,
+  PracticeMutationResponse,
   PracticePageResponse,
+  PracticeReviewState,
   RequestAnswerFrameworkInput,
   RequestPracticeHintInput,
   RequestPracticeReferenceAnswerInput,
@@ -27,13 +30,22 @@ import {
   setPracticeMockState,
 } from "./state"
 
+function commitUnchangedQuestionMutation(
+  session: PracticeAnsweringState | PracticeReviewState,
+): PracticePageResponse {
+  return setPracticeMockState({
+    ...getPracticeMockState(),
+    session: { ...session, version: session.version + 1 },
+  })
+}
+
 export async function requestPracticeHint(
   input: RequestPracticeHintInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   if (session.question.answerHints.status !== "notRequested")
-    return copyPracticeState(getPracticeMockState())
+    return commitUnchangedQuestionMutation(session)
   const guidance = createGeneratedPracticeQuestionGuidance(session.question.questionType)
 
   return setPracticeMockState({
@@ -51,11 +63,11 @@ export async function requestPracticeHint(
 
 export async function requestAnswerFramework(
   input: RequestAnswerFrameworkInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   if (session.question.answerFramework.status !== "notRequested")
-    return copyPracticeState(getPracticeMockState())
+    return commitUnchangedQuestionMutation(session)
   const guidance = createGeneratedPracticeQuestionGuidance(session.question.questionType)
 
   return setPracticeMockState({
@@ -76,11 +88,11 @@ export async function requestAnswerFramework(
 
 export async function requestPracticeReferenceAnswer(
   input: RequestPracticeReferenceAnswerInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   if (session.question.referenceAnswer.status !== "notRequested")
-    return copyPracticeState(getPracticeMockState())
+    return commitUnchangedQuestionMutation(session)
 
   return setPracticeMockState({
     ...getPracticeMockState(),
@@ -107,10 +119,10 @@ export async function requestPracticeReferenceAnswer(
 
 export async function setQuestionSaved(
   input: SetPracticeQuestionSavedInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentReviewableQuestion(input)
-  if (session.question.isSaved === input.isSaved) return copyPracticeState(getPracticeMockState())
+  if (session.question.isSaved === input.isSaved) return commitUnchangedQuestionMutation(session)
 
   return setPracticeMockState({
     ...getPracticeMockState(),
@@ -124,11 +136,11 @@ export async function setQuestionSaved(
 
 export async function setQuestionWeak(
   input: SetPracticeQuestionWeakInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentReviewableQuestion(input)
   if (session.question.isMarkedWeak === input.isMarkedWeak)
-    return copyPracticeState(getPracticeMockState())
+    return commitUnchangedQuestionMutation(session)
 
   return setPracticeMockState({
     ...getPracticeMockState(),
@@ -142,7 +154,7 @@ export async function setQuestionWeak(
 
 export async function submitPrimaryAnswer(
   input: SubmitPrimaryAnswerInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   const content = input.content.trim()
@@ -196,7 +208,7 @@ export async function submitPrimaryAnswer(
 
 export async function skipPracticeQuestion(
   input: SkipPracticeQuestionInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireCurrentQuestion(input)
   ensureQuestionOrdinal(session.sessionId)

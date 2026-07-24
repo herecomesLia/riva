@@ -6,6 +6,7 @@ import {
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   GetPracticeEvaluationStatusInput,
+  PracticeMutationResponse,
   PracticePageResponse,
   RetryPracticeEvaluationInput,
 } from "@/models/practice"
@@ -112,7 +113,7 @@ function revealFollowUpReference(
 
 export async function retryPracticeEvaluation(
   input: RetryPracticeEvaluationInput,
-): Promise<PracticePageResponse> {
+): Promise<PracticeMutationResponse> {
   await waitForMockDelay()
   const session = requireEvaluatingSession(input)
   const nextVersion = session.version + 1

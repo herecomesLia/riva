@@ -289,6 +289,12 @@ export type PracticePageResponse = {
   session: PracticeSessionState
 }
 
+/**
+ * Every successful practice write endpoint returns the complete authoritative page snapshot.
+ * Clients must validate its requested identity, exact next version, and state transition.
+ */
+export type PracticeMutationResponse = PracticePageResponse
+
 export type StartPracticeSessionInput = ActivePracticeSelection
 
 export type GetQuestionGenerationStatusInput = {
