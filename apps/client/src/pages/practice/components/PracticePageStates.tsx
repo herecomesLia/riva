@@ -29,7 +29,7 @@ export function PracticeLoadingState() {
 
   return (
     <Card aria-busy="true" data-testid="practice-loading-state">
-      <CardHeader>
+      <CardHeader className="border-b">
         <CardTitle>
           <h2>{t("practice.setup.title")}</h2>
         </CardTitle>
@@ -87,7 +87,7 @@ export function PracticeNoRolesState() {
 
   return (
     <Card data-testid="practice-no-roles-state">
-      <CardHeader>
+      <CardHeader className="border-b">
         <CardTitle>
           <h2>{t("practice.setup.title")}</h2>
         </CardTitle>

@@ -251,7 +251,7 @@ function PracticeViewContent(props: PracticeViewProps) {
 
       return (
         <Card data-testid="practice-setup-state">
-          <CardHeader>
+          <CardHeader className="border-b">
             <CardTitle>
               <h2>{t("practice.setup.title")}</h2>
             </CardTitle>

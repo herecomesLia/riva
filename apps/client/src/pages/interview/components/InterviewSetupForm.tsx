@@ -102,7 +102,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                 : selectedRole?.title
 
               return (
-                <Field className="pb-6" data-disabled={pending}>
+                <Field className="pb-5" data-disabled={pending}>
                   <FieldLabel className="[&>svg]:size-4 [&>svg]:text-primary" htmlFor={field.name}>
                     <BriefcaseBusinessIcon aria-hidden="true" />
                     {t("interview.setup.fields.targetRole")}
@@ -142,7 +142,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
             }}
           </form.Field>
 
-          <div className="border-t border-border py-6">
+          <div className="border-t border-border py-5">
             <form.Subscribe selector={(state) => state.values.targetRoleId}>
               {(targetRoleId) => {
                 const selectedRole = setup.targetRoles.find(({ id }) => id === targetRoleId)
@@ -187,7 +187,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
             </form.Subscribe>
           </div>
 
-          <div className="grid gap-6 border-t border-border py-6 md:grid-cols-2 md:gap-0">
+          <div className="grid gap-5 border-t border-border py-5 md:grid-cols-2 md:gap-0">
             <form.Field name="difficulty">
               {(field) => (
                 <FieldSet className="md:pr-6" data-disabled={pending}>
@@ -224,7 +224,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
               )}
             </form.Field>
 
-            <div className="border-t border-border pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+            <div className="border-t border-border pt-5 md:border-t-0 md:border-l md:pt-0 md:pl-6">
               <form.Field name="durationMinutes">
                 {(field) => (
                   <FieldSet data-disabled={pending}>
@@ -273,7 +273,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
         </FieldGroup>
       </CardContent>
 
-      <CardFooter className="mt-7 border-t">
+      <CardFooter className="mt-7">
         <Button className="w-full sm:w-fit" disabled={pending} size="lg" type="submit">
           {pending ? (
             <Spinner aria-hidden="true" data-icon="inline-start" />

@@ -597,7 +597,8 @@ describe("PracticeView", () => {
 
   it("separates the setup sections with responsive theme dividers", async () => {
     renderReadyView(createPracticeMockResponse("setupReady"))
-    await screen.findByTestId("practice-setup-state")
+    const setupCard = await screen.findByTestId("practice-setup-state")
+    expect(setupCard.querySelector('[data-slot="card-header"]')).toHaveClass("border-b")
 
     const questionTypeFieldSet = screen
       .getByText(i18n.t("practice.setup.fields.questionType"))

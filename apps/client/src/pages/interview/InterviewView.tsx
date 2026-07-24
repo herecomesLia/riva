@@ -60,7 +60,7 @@ export function InterviewView(props: InterviewViewProps) {
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
       <InterviewHeader />
-      <div className="w-full max-w-4xl">
+      <div className="w-full">
         <InterviewViewContent {...props} />
       </div>
     </div>
@@ -148,11 +148,11 @@ function InterviewLoadingState() {
     <InterviewSetupCard>
       <CardContent aria-busy="true" data-testid="interview-loading-state">
         <FieldGroup className="gap-0">
-          <Field className="pb-6">
+          <Field className="pb-5">
             <FieldLabel>{t("interview.setup.fields.targetRole")}</FieldLabel>
             <Skeleton className="h-9 w-full" />
           </Field>
-          <Field className="border-t border-border py-6">
+          <Field className="border-t border-border py-5">
             <FieldLabel>{t("interview.setup.fields.round")}</FieldLabel>
             <div className="flex flex-wrap gap-2">
               <Skeleton className="h-9 w-24" />
@@ -160,14 +160,14 @@ function InterviewLoadingState() {
               <Skeleton className="h-9 w-20" />
             </div>
           </Field>
-          <Field className="border-t border-border pt-6">
+          <Field className="border-t border-border pt-5">
             <FieldLabel>{t("interview.setup.fields.difficulty")}</FieldLabel>
             <div className="flex gap-2">
               <Skeleton className="h-9 w-20" />
               <Skeleton className="h-9 w-20" />
             </div>
           </Field>
-          <Field className="border-t border-border pt-6">
+          <Field className="border-t border-border pt-5">
             <FieldLabel>{t("interview.setup.fields.duration")}</FieldLabel>
             <div className="flex flex-wrap gap-2">
               <Skeleton className="h-9 w-20" />
@@ -177,7 +177,7 @@ function InterviewLoadingState() {
           </Field>
         </FieldGroup>
       </CardContent>
-      <CardFooter className="mt-7 border-t">
+      <CardFooter className="mt-7">
         <Skeleton className="h-10 w-full sm:w-40" />
       </CardFooter>
     </InterviewSetupCard>

@@ -47,6 +47,12 @@ describe("InterviewView", () => {
   it("renders service-provided roles, rounds, difficulties, and duration preferences", async () => {
     renderReadyView()
 
+    const setupCard = (await screen.findByText(i18n.t("interview.setup.title"))).closest(
+      '[data-slot="card"]',
+    )
+    expect(setupCard?.parentElement).toHaveClass("w-full")
+    expect(setupCard?.parentElement).not.toHaveClass("max-w-4xl")
+
     expect(await screen.findByText("高级前端工程师 · 字节跳动")).toBeInTheDocument()
     for (const round of interviewSetupResponseMock.targetRoles[0].supportedRounds) {
       expect(
@@ -83,11 +89,44 @@ describe("InterviewView", () => {
     )
   })
 
+  it("matches the targeted-practice spacing around setup dividers", async () => {
+    renderReadyView()
+
+    const targetRoleField = (
+      await screen.findByText(i18n.t("interview.setup.fields.targetRole"))
+    ).closest('[data-slot="field"]')
+    expect(targetRoleField).toHaveClass("pb-5")
+
+    const roundFieldSet = screen
+      .getByText(i18n.t("interview.setup.fields.round"))
+      .closest('[data-slot="field-set"]')
+    expect(roundFieldSet?.parentElement).toHaveClass("border-t", "border-border", "py-5")
+
+    const difficultyFieldSet = screen
+      .getByText(i18n.t("interview.setup.fields.difficulty"))
+      .closest('[data-slot="field-set"]')
+    expect(difficultyFieldSet?.parentElement).toHaveClass(
+      "border-t",
+      "border-border",
+      "gap-5",
+      "py-5",
+    )
+
+    const durationFieldSet = screen
+      .getByText(i18n.t("interview.setup.fields.duration"))
+      .closest('[data-slot="field-set"]')
+    expect(durationFieldSet?.parentElement).toHaveClass("border-t", "border-border", "pt-5")
+  })
+
   it("submits the selected configuration once", async () => {
     const user = userEvent.setup()
     const { onStart } = renderReadyView()
 
-    await user.click(await screen.findByRole("button", { name: i18n.t("interview.actions.start") }))
+    const startButton = await screen.findByRole("button", {
+      name: i18n.t("interview.actions.start"),
+    })
+    expect(startButton.closest('[data-slot="card-footer"]')).not.toHaveClass("border-t")
+    await user.click(startButton)
 
     expect(onStart).toHaveBeenCalledTimes(1)
     expect(onStart).toHaveBeenCalledWith(interviewSetupResponseMock.defaultConfiguration)
