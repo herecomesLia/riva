@@ -46,6 +46,18 @@ describe("training records mock service", () => {
       totalDurationSeconds: 4020,
       answeredQuestionCount: 5,
       averageScore: 78,
+      targetRoles: [
+        {
+          id: "role_frontend_engineer_bytedance",
+          title: "高级前端工程师",
+          company: "星云科技",
+        },
+        {
+          id: "role_product_manager_fintech",
+          title: "金融科技产品经理",
+          company: "远航金融",
+        },
+      ],
       byKind: {
         targetedPractice: {
           recordCount: 3,
@@ -131,6 +143,7 @@ describe("training records mock service", () => {
       totalDurationSeconds: 0,
       answeredQuestionCount: 0,
       averageScore: null,
+      targetRoles: [],
       byKind: {
         targetedPractice: {
           recordCount: 0,

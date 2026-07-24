@@ -2,6 +2,7 @@ import { app as enApp } from "./locales/en/app"
 import { appShell as enAppShell } from "./locales/en/app-shell"
 import { common as enCommon } from "./locales/en/common"
 import { dashboard as enDashboard } from "./locales/en/dashboard"
+import { history as enHistory } from "./locales/en/history"
 import { interview as enInterview } from "./locales/en/interview"
 import { login as enLogin } from "./locales/en/login"
 import { notFound as enNotFound } from "./locales/en/not-found"
@@ -13,6 +14,7 @@ import { app as zhCNApp } from "./locales/zh-CN/app"
 import { appShell as zhCNAppShell } from "./locales/zh-CN/app-shell"
 import { common as zhCNCommon } from "./locales/zh-CN/common"
 import { dashboard as zhCNDashboard } from "./locales/zh-CN/dashboard"
+import { history as zhCNHistory } from "./locales/zh-CN/history"
 import { interview as zhCNInterview } from "./locales/zh-CN/interview"
 import { login as zhCNLogin } from "./locales/zh-CN/login"
 import { notFound as zhCNNotFound } from "./locales/zh-CN/not-found"
@@ -36,6 +38,7 @@ export const resources = {
       appShell: zhCNAppShell,
       common: zhCNCommon,
       dashboard: zhCNDashboard,
+      history: zhCNHistory,
       interview: zhCNInterview,
       login: zhCNLogin,
       notFound: zhCNNotFound,
@@ -51,6 +54,7 @@ export const resources = {
       appShell: zhCNAppShell,
       common: zhCNCommon,
       dashboard: zhCNDashboard,
+      history: zhCNHistory,
       interview: zhCNInterview,
       login: zhCNLogin,
       notFound: zhCNNotFound,
@@ -66,6 +70,7 @@ export const resources = {
       appShell: enAppShell,
       common: enCommon,
       dashboard: enDashboard,
+      history: enHistory,
       interview: enInterview,
       login: enLogin,
       notFound: enNotFound,

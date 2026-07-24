@@ -134,7 +134,7 @@ export type TrainingRecordRecommendation =
       reason: string
     }
 
-type TrainingRecordSummaryBase = {
+type TrainingRecordBase = {
   id: string
   status: TrainingRecordStatus
   startedAt: string
@@ -144,6 +144,10 @@ type TrainingRecordSummaryBase = {
   answeredQuestionCount: number
   totalQuestionCount: number
   overallScore: number | null
+}
+
+type TrainingRecordSummaryBase = TrainingRecordBase & {
+  reviewSummary: string | null
 }
 
 export type TargetedPracticeRecordSummary = TrainingRecordSummaryBase & {
@@ -166,6 +170,7 @@ export type TrainingRecordsOverviewResponse = {
   totalDurationSeconds: number
   answeredQuestionCount: number
   averageScore: number | null
+  targetRoles: TrainingRecordTargetRole[]
   byKind: Record<
     TrainingRecordKind,
     {
@@ -196,7 +201,7 @@ export type TrainingRecordsPageResponse = {
   }
 }
 
-type TrainingRecordDetailBase = TrainingRecordSummaryBase & {
+type TrainingRecordDetailBase = TrainingRecordBase & {
   questions: TrainingRecordQuestion[]
   exposedWeaknesses: string[]
   recommendation: TrainingRecordRecommendation | null

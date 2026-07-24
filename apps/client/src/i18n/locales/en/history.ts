@@ -1,0 +1,106 @@
+export const history = {
+  title: "Training history",
+  description:
+    "Review every targeted practice and mock interview, then turn feedback into your next action.",
+  overview: {
+    title: "Training overview",
+    description: "Calculated from your complete training history.",
+    metrics: {
+      records: "Total sessions",
+      completed: "Completed",
+      duration: "Training time",
+      averageScore: "Average score",
+    },
+    values: {
+      records: "{{count}} sessions",
+      minutes: "{{count}} min",
+      hours: "{{count}} hr",
+      score: "{{score}} pts",
+      noScore: "No score yet",
+    },
+  },
+  filters: {
+    title: "Filter records",
+    description: "Filters are submitted to the training history service.",
+    kindLabel: "Training type",
+    roleLabel: "Target role",
+    periodLabel: "Time range",
+    allRoles: "All roles",
+    kinds: {
+      all: "All",
+      targetedPractice: "Targeted practice",
+      mockInterview: "Mock interview",
+    },
+    periods: {
+      all: "All time",
+      last7Days: "Last 7 days",
+      last30Days: "Last 30 days",
+      last90Days: "Last 90 days",
+    },
+  },
+  records: {
+    title: "Training records",
+    description: "Sorted from newest to oldest.",
+    resultCount: "{{count}} records",
+    questionLabel: "Questions",
+    questionCount: "{{answered}} / {{total}} answered",
+    score: "{{score}} pts",
+    noScore: "Not scored",
+    duration: "{{minutes}} min",
+    reviewLabel: "Key review",
+    noReview: "No review was generated for this session.",
+    viewDetails: "View details",
+    viewDetailsLabel: "View {{kind}} details for {{role}} from {{date}}",
+  },
+  status: {
+    completed: "Completed",
+    endedEarly: "Ended early",
+    partiallyCompleted: "Partially answered",
+  },
+  questionTypes: {
+    selfIntroduction: "Self introduction",
+    projectDeepDive: "Project deep dive",
+    roleCapability: "Role capability",
+    behavioral: "Behavioral",
+    technicalOrBusiness: "Technical and business",
+    businessUnderstanding: "Business understanding",
+    technicalFoundation: "Technical foundation",
+    resumeRisk: "Resume risk",
+    motivation: "Motivation",
+  },
+  rounds: {
+    hr: "HR",
+    firstBusiness: "First business round",
+    technical: "Technical",
+    manager: "Manager",
+    final: "Final",
+    comprehensive: "Comprehensive",
+  },
+  difficulty: {
+    basic: "Basic",
+    pressure: "Pressure",
+  },
+  pagination: {
+    label: "Training record pagination",
+    previous: "Previous",
+    next: "Next",
+    page: "Page {{page}} of {{total}}",
+  },
+  empty: {
+    neverTrained: {
+      title: "No training records yet",
+      description:
+        "Complete a targeted practice or mock interview to see its record and review here.",
+      action: "Start targeted practice",
+    },
+    noMatches: {
+      title: "No records match these filters",
+      description: "Try changing the training type, target role, or time range.",
+      action: "Clear filters",
+    },
+  },
+  error: {
+    title: "Unable to load training history",
+    description: "The overview and records are temporarily unavailable. Please try again.",
+  },
+} as const

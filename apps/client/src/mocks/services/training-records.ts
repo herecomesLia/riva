@@ -39,6 +39,10 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
     answeredQuestionCount: record.answeredQuestionCount,
     totalQuestionCount: record.totalQuestionCount,
     overallScore: record.overallScore,
+    reviewSummary:
+      record.kind === "targetedPractice"
+        ? (record.questions.find((question) => question.review)?.review?.summary ?? null)
+        : (record.overallReview?.summary ?? null),
   }
 
   return record.kind === "targetedPractice"
@@ -78,6 +82,10 @@ function kindOverview(
 export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverviewResponse> {
   await waitForMockDelay()
 
+  const targetRoles = [
+    ...new Map(records.map((record) => [record.targetRole.id, record.targetRole])).values(),
+  ].toSorted((left, right) => left.id.localeCompare(right.id))
+
   return copy({
     totalRecordCount: records.length,
     completedRecordCount: records.filter((record) => record.status === "completed").length,
@@ -87,6 +95,7 @@ export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverv
       0,
     ),
     averageScore: averageScore(records),
+    targetRoles,
     byKind: {
       targetedPractice: kindOverview("targetedPractice"),
       mockInterview: kindOverview("mockInterview"),
