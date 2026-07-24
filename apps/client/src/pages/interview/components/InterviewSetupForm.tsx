@@ -1,5 +1,12 @@
 import { useForm, useStore } from "@tanstack/react-form"
-import { AlertCircleIcon, PlayIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  BriefcaseBusinessIcon,
+  Clock3Icon,
+  GaugeIcon,
+  PlayIcon,
+  WorkflowIcon,
+} from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -30,6 +37,9 @@ type InterviewSetupFormProps = {
   isPending: boolean
   onStart: (input: InterviewConfiguration) => Promise<void>
 }
+
+const interviewOptionStateClassName =
+  "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
 
 function getInitialConfiguration(setup: InterviewSetupViewData): InterviewConfiguration {
   const selectedRole =
@@ -93,7 +103,8 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
 
               return (
                 <Field className="pb-6" data-disabled={pending}>
-                  <FieldLabel htmlFor={field.name}>
+                  <FieldLabel className="[&>svg]:size-4 [&>svg]:text-primary" htmlFor={field.name}>
+                    <BriefcaseBusinessIcon aria-hidden="true" />
                     {t("interview.setup.fields.targetRole")}
                   </FieldLabel>
                   <Select
@@ -109,7 +120,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                     value={field.state.value}
                   >
                     <SelectTrigger
-                      className="w-full"
+                      className="w-full focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary"
                       data-testid="interview-target-role-trigger"
                       id={field.name}
                       onBlur={field.handleBlur}
@@ -139,7 +150,11 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                   <form.Field name="round">
                     {(field) => (
                       <FieldSet data-disabled={pending}>
-                        <FieldLegend variant="label">
+                        <FieldLegend
+                          className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
+                          variant="label"
+                        >
+                          <WorkflowIcon aria-hidden="true" />
                           {t("interview.setup.fields.round")}
                         </FieldLegend>
                         <ToggleGroup
@@ -155,7 +170,11 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                           variant="outline"
                         >
                           {selectedRole?.supportedRounds.map((round) => (
-                            <ToggleGroupItem key={round} value={round}>
+                            <ToggleGroupItem
+                              className={interviewOptionStateClassName}
+                              key={round}
+                              value={round}
+                            >
                               {t(`interview.rounds.${round}`)}
                             </ToggleGroupItem>
                           ))}
@@ -168,11 +187,15 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
             </form.Subscribe>
           </div>
 
-          <div className="border-t border-border py-6">
+          <div className="grid gap-6 border-t border-border py-6 md:grid-cols-2 md:gap-0">
             <form.Field name="difficulty">
               {(field) => (
-                <FieldSet data-disabled={pending}>
-                  <FieldLegend variant="label">
+                <FieldSet className="md:pr-6" data-disabled={pending}>
+                  <FieldLegend
+                    className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
+                    variant="label"
+                  >
+                    <GaugeIcon aria-hidden="true" />
                     {t("interview.setup.fields.difficulty")}
                   </FieldLegend>
                   <ToggleGroup
@@ -188,7 +211,11 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                     variant="outline"
                   >
                     {setup.availableDifficulties.map((difficulty) => (
-                      <ToggleGroupItem key={difficulty} value={difficulty}>
+                      <ToggleGroupItem
+                        className={interviewOptionStateClassName}
+                        key={difficulty}
+                        value={difficulty}
+                      >
                         {t(`interview.difficulty.${difficulty}`)}
                       </ToggleGroupItem>
                     ))}
@@ -196,34 +223,44 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                 </FieldSet>
               )}
             </form.Field>
-          </div>
 
-          <div className="border-t border-border pt-6">
-            <form.Field name="durationMinutes">
-              {(field) => (
-                <FieldSet data-disabled={pending}>
-                  <FieldLegend variant="label">{t("interview.setup.fields.duration")}</FieldLegend>
-                  <ToggleGroup
-                    aria-label={t("interview.setup.fields.duration")}
-                    className="flex w-full flex-wrap justify-start"
-                    disabled={pending}
-                    onValueChange={(values) => {
-                      const value = values[0]
-                      if (value) field.handleChange(Number(value) as InterviewDurationMinutes)
-                    }}
-                    spacing={2}
-                    value={[String(field.state.value)]}
-                    variant="outline"
-                  >
-                    {setup.availableDurationMinutes.map((durationMinutes) => (
-                      <ToggleGroupItem key={durationMinutes} value={String(durationMinutes)}>
-                        {t("interview.setup.durationMinutes", { minutes: durationMinutes })}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </FieldSet>
-              )}
-            </form.Field>
+            <div className="border-t border-border pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+              <form.Field name="durationMinutes">
+                {(field) => (
+                  <FieldSet data-disabled={pending}>
+                    <FieldLegend
+                      className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
+                      variant="label"
+                    >
+                      <Clock3Icon aria-hidden="true" />
+                      {t("interview.setup.fields.duration")}
+                    </FieldLegend>
+                    <ToggleGroup
+                      aria-label={t("interview.setup.fields.duration")}
+                      className="flex w-full flex-wrap justify-start"
+                      disabled={pending}
+                      onValueChange={(values) => {
+                        const value = values[0]
+                        if (value) field.handleChange(Number(value) as InterviewDurationMinutes)
+                      }}
+                      spacing={2}
+                      value={[String(field.state.value)]}
+                      variant="outline"
+                    >
+                      {setup.availableDurationMinutes.map((durationMinutes) => (
+                        <ToggleGroupItem
+                          className={interviewOptionStateClassName}
+                          key={durationMinutes}
+                          value={String(durationMinutes)}
+                        >
+                          {t("interview.setup.durationMinutes", { minutes: durationMinutes })}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  </FieldSet>
+                )}
+              </form.Field>
+            </div>
           </div>
 
           {submitError && (
