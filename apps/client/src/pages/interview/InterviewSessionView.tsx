@@ -40,9 +40,16 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import type { InterviewDifficulty, InterviewRound } from "@/models/interview"
+import type {
+  InterviewCandidateQuestionExchangeResponse,
+  InterviewConversationRecordViewData,
+  InterviewDifficulty,
+  InterviewRound,
+} from "@/models/interview"
 
+import { CandidateQuestionsStage } from "./components/CandidateQuestionsStage"
 import { InterviewAnswerComposer } from "./components/InterviewAnswerComposer"
+import { InterviewConversationHistory } from "./components/InterviewConversationHistory"
 
 export type InterviewSessionSummary = {
   targetRole: string
@@ -77,7 +84,7 @@ export type InterviewSessionViewProps =
     }
   | {
       status: "unavailable"
-      reason: "missing" | "unsupportedStage"
+      reason: "missing" | "completed"
       onBack: () => void
     }
   | ({
@@ -92,11 +99,24 @@ export type InterviewSessionViewProps =
       status: "question"
       summary: InterviewSessionSummary
       prompt: InterviewPromptViewData
+      history: readonly InterviewConversationRecordViewData[]
       isSubmitting: boolean
-      advanceStatus: "idle" | "ready" | "advancing" | "failed" | "nextStage"
+      advanceStatus: "idle" | "ready" | "advancing" | "failed"
       onSubmit: (content: string) => Promise<void>
       onRetryAdvance: () => void
     } & ActiveSessionActions)
+  | {
+      status: "candidateQuestions"
+      summary: InterviewSessionSummary
+      prompt: string
+      history: readonly InterviewConversationRecordViewData[]
+      exchanges: readonly InterviewCandidateQuestionExchangeResponse[]
+      isSubmittingQuestion: boolean
+      isFinishing: boolean
+      isInteractionLocked: boolean
+      onSubmitQuestion: (content: string) => Promise<void>
+      onFinish: () => Promise<void>
+    }
 
 export function InterviewSessionView(props: InterviewSessionViewProps) {
   if (props.status === "loading") return <InterviewSessionLoading />
@@ -115,12 +135,16 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
-      <SessionHeader
-        isEnding={props.isEnding}
-        isInteractionLocked={props.isInteractionLocked}
-        onEnd={props.onEnd}
-        summary={props.summary}
-      />
+      {props.status === "candidateQuestions" ? (
+        <SessionSummaryHeader summary={props.summary} />
+      ) : (
+        <SessionHeader
+          isEnding={props.isEnding}
+          isInteractionLocked={props.isInteractionLocked}
+          onEnd={props.onEnd}
+          summary={props.summary}
+        />
+      )}
       {props.status === "opening" ? (
         <OpeningContent
           beginFailed={props.beginFailed}
@@ -128,10 +152,46 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
           onBegin={props.onBegin}
           openingMessage={props.openingMessage}
         />
-      ) : (
+      ) : props.status === "question" ? (
         <QuestionContent {...props} />
+      ) : (
+        <>
+          <InterviewConversationHistory records={props.history} />
+          <CandidateQuestionsStage
+            exchanges={props.exchanges}
+            isFinishing={props.isFinishing}
+            isInteractionLocked={props.isInteractionLocked}
+            isSubmittingQuestion={props.isSubmittingQuestion}
+            onFinish={props.onFinish}
+            onSubmitQuestion={props.onSubmitQuestion}
+            prompt={props.prompt}
+          />
+        </>
       )}
     </div>
+  )
+}
+
+function SessionSummaryHeader({ summary }: { summary: InterviewSessionSummary }) {
+  const { t } = useTranslation()
+
+  return (
+    <header className="flex flex-col gap-2 border-b pb-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">{t(`interview.rounds.${summary.round}`)}</Badge>
+        <Badge variant="outline">{t(`interview.difficulty.${summary.difficulty}`)}</Badge>
+      </div>
+      <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
+        {summary.targetRole}
+      </h1>
+      {summary.company ? <p className="text-sm text-muted-foreground">{summary.company}</p> : null}
+      <p className="text-sm text-muted-foreground">
+        {t("interview.session.progress", {
+          completed: summary.completedQuestions,
+          total: summary.totalQuestions,
+        })}
+      </p>
+    </header>
   )
 }
 
@@ -284,6 +344,7 @@ function QuestionContent(props: Extract<InterviewSessionViewProps, { status: "qu
 
   return (
     <main className="grid min-w-0 gap-6">
+      <InterviewConversationHistory records={props.history} />
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -342,11 +403,6 @@ function QuestionContent(props: Extract<InterviewSessionViewProps, { status: "qu
               <Button onClick={props.onRetryAdvance}>
                 {t("interview.session.actions.continueToNext")}
               </Button>
-            ) : null}
-            {props.advanceStatus === "nextStage" ? (
-              <p className="text-sm text-muted-foreground">
-                {t("interview.session.advance.nextStage")}
-              </p>
             ) : null}
           </CardFooter>
         </Card>
@@ -419,7 +475,7 @@ function InterviewSessionUnavailable({
   reason,
 }: {
   onBack: () => void
-  reason: "missing" | "unsupportedStage"
+  reason: "missing" | "completed"
 }) {
   const { t } = useTranslation()
 
@@ -431,7 +487,9 @@ function InterviewSessionUnavailable({
     >
       <Button onClick={onBack}>
         <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
-        {t("interview.session.actions.backToSetup")}
+        {reason === "completed"
+          ? t("interview.session.actions.viewReview")
+          : t("interview.session.actions.backToSetup")}
       </Button>
     </SessionStateCard>
   )

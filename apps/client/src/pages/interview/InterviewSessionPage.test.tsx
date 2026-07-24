@@ -1,0 +1,251 @@
+import { act, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+import { i18n } from "@/i18n/i18n"
+import {
+  createCandidateQuestionExchange,
+  createInterviewMockResponse,
+  createInterviewQuestionSet,
+} from "@/mocks/data/interview"
+import type {
+  InterviewCandidateQuestionsSessionResponse,
+  InterviewPageResponse,
+  InterviewQuestionSessionResponse,
+} from "@/models/interview"
+import {
+  beginInterviewQuestions,
+  finishInterview,
+  getInterviewPage,
+  getNextInterviewQuestion,
+  submitCandidateQuestion,
+  submitInterviewAnswer,
+} from "@/services/interview"
+import { renderWithProviders } from "@/test/render"
+
+import { InterviewSessionContainer } from "./InterviewSessionPage"
+
+vi.mock("@/services/interview", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/interview")>()),
+  beginInterviewQuestions: vi.fn(),
+  endInterview: vi.fn(),
+  finishInterview: vi.fn(),
+  getInterviewPage: vi.fn(),
+  getNextInterviewQuestion: vi.fn(),
+  submitCandidateQuestion: vi.fn(),
+  submitInterviewAnswer: vi.fn(),
+}))
+
+const sessionId = "mock-interview-session-page"
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
+function responseWithSession(session: InterviewPageResponse["session"]): InterviewPageResponse {
+  return {
+    setup: createInterviewMockResponse().setup,
+    session,
+  }
+}
+
+function openingResponse(): InterviewPageResponse {
+  return responseWithSession({
+    status: "opening",
+    sessionId,
+    version: 1,
+    configuration: {
+      targetRoleId: "role_frontend_engineer_bytedance",
+      round: "technical",
+      difficulty: "pressure",
+    },
+    startedAt: "2026-07-24T02:00:00.000Z",
+    progress: { completedQuestions: 0, totalQuestions: 3 },
+    completedQuestions: [],
+    openingMessage: "欢迎参加本次模拟面试。",
+  })
+}
+
+function questionSession(
+  order: number,
+  version: number,
+  answer: string | null = null,
+): InterviewQuestionSessionResponse {
+  const question = createInterviewQuestionSet()[order - 1]!
+  return {
+    status: "question",
+    sessionId,
+    version,
+    configuration: {
+      targetRoleId: "role_frontend_engineer_bytedance",
+      round: "technical",
+      difficulty: "pressure",
+    },
+    startedAt: "2026-07-24T02:00:00.000Z",
+    progress: { completedQuestions: order - 1, totalQuestions: 3 },
+    completedQuestions: [],
+    currentQuestion:
+      answer === null
+        ? { status: "awaitingAnswer", question, answer: null }
+        : {
+            status: "answered",
+            question,
+            answer: {
+              id: `answer-${order}`,
+              content: answer,
+              submittedAt: "2026-07-24T02:02:00.000Z",
+            },
+          },
+  }
+}
+
+function renderSession() {
+  return renderWithProviders(<InterviewSessionContainer sessionId={sessionId} />, {
+    router: { initialEntries: [`/interview/session/${sessionId}`] },
+  })
+}
+
+function candidateSession(
+  version: number,
+  exchanges: InterviewCandidateQuestionsSessionResponse["exchanges"] = [],
+): InterviewCandidateQuestionsSessionResponse {
+  const completed = createInterviewMockResponse("completed").session
+  if (completed?.status !== "completed") throw new Error("Expected completed fixture.")
+
+  return {
+    status: "candidateQuestions",
+    sessionId,
+    version,
+    configuration: completed.configuration,
+    startedAt: completed.startedAt,
+    progress: completed.progress,
+    completedQuestions: completed.completedQuestions,
+    prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+    exchanges,
+  }
+}
+
+describe("InterviewSessionContainer", () => {
+  beforeEach(() => {
+    vi.mocked(getInterviewPage).mockReset()
+    vi.mocked(beginInterviewQuestions).mockReset()
+    vi.mocked(submitInterviewAnswer).mockReset()
+    vi.mocked(getNextInterviewQuestion).mockReset()
+    vi.mocked(submitCandidateQuestion).mockReset()
+    vi.mocked(finishInterview).mockReset()
+  })
+
+  it("starts the question flow through the service and updates the cached snapshot", async () => {
+    const user = userEvent.setup()
+    const firstQuestion = responseWithSession(questionSession(1, 2))
+    vi.mocked(getInterviewPage).mockResolvedValue(openingResponse())
+    vi.mocked(beginInterviewQuestions).mockResolvedValue(firstQuestion)
+    const result = renderSession()
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("interview.session.actions.begin"),
+      }),
+    )
+
+    expect(vi.mocked(beginInterviewQuestions).mock.calls[0]?.[0]).toEqual({
+      sessionId,
+      version: 1,
+    })
+    expect(await screen.findByText(createInterviewQuestionSet()[0]!.prompt)).toBeVisible()
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(firstQuestion)
+  })
+
+  it("consumes the next session state returned by answer submission", async () => {
+    const user = userEvent.setup()
+    const answer = "我有五年前端开发经验，主要负责复杂业务的架构和性能治理。"
+    const first = questionSession(1, 2)
+    const second = questionSession(2, 3)
+    vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(first))
+    vi.mocked(submitInterviewAnswer).mockResolvedValue(responseWithSession(second))
+    renderSession()
+
+    await user.type(await screen.findByRole("textbox"), answer)
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("interview.session.answer.submit") }),
+    )
+
+    await waitFor(() =>
+      expect(screen.getByText(second.currentQuestion.question.prompt)).toBeVisible(),
+    )
+    expect(submitInterviewAnswer).toHaveBeenCalledOnce()
+    expect(getNextInterviewQuestion).not.toHaveBeenCalled()
+  })
+
+  it("submits candidate questions, shows feedback, and finishes only once", async () => {
+    const user = userEvent.setup()
+    const question = "这个岗位入职六个月后的成功标准是什么？"
+    const candidate = candidateSession(6)
+    const exchange = createCandidateQuestionExchange(question, 1)
+    const withExchange = candidateSession(7, [exchange])
+    const completed = createInterviewMockResponse("completed")
+    const finishRequest = createDeferred<InterviewPageResponse>()
+    vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(candidate))
+    vi.mocked(submitCandidateQuestion).mockResolvedValue(responseWithSession(withExchange))
+    vi.mocked(finishInterview).mockReturnValue(finishRequest.promise)
+    const result = renderSession()
+
+    await user.type(
+      await screen.findByRole("textbox", {
+        name: i18n.t("interview.session.candidate.label"),
+      }),
+      question,
+    )
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.candidate.submit"),
+      }),
+    )
+
+    expect(await screen.findByText(exchange.interviewerAnswer)).toBeVisible()
+    expect(screen.getByText(exchange.feedback.summary)).toBeVisible()
+    expect(screen.getByText(exchange.feedback.suggestedAlternatives[0]!)).toBeVisible()
+    expect(screen.queryByText(/总分|overall score|82/i)).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.candidate.finish"),
+      }),
+    )
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.candidate.confirmFinish"),
+      }),
+    )
+    const pendingFinish = screen.getByRole("button", {
+      name: i18n.t("interview.session.candidate.confirmFinish"),
+    })
+    expect(pendingFinish).toBeDisabled()
+    await user.click(pendingFinish)
+    expect(finishInterview).toHaveBeenCalledOnce()
+
+    await act(async () => finishRequest.resolve(completed))
+    await waitFor(() =>
+      expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
+    )
+    expect(finishInterview).toHaveBeenCalledOnce()
+  })
+
+  it("offers a return path when the route does not match an active session", async () => {
+    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse())
+    renderSession()
+
+    expect(
+      await screen.findByText(i18n.t("interview.session.unavailable.missingTitle")),
+    ).toBeVisible()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.actions.backToSetup"),
+      }),
+    ).toBeVisible()
+  })
+})

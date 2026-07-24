@@ -5,6 +5,7 @@ import { useRef, useState } from "react"
 import type {
   ActiveInterviewSessionResponse,
   GetNextInterviewQuestionInput,
+  InterviewConversationRecordViewData,
   InterviewMutationResponse,
   InterviewPageResponse,
   InterviewSessionResponse,
@@ -13,8 +14,10 @@ import type {
 import {
   beginInterviewQuestions,
   endInterview,
+  finishInterview,
   getInterviewPage,
   getNextInterviewQuestion,
+  submitCandidateQuestion,
   submitInterviewAnswer,
 } from "@/services/interview"
 
@@ -42,6 +45,8 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const beginLock = useRef(false)
   const submitLock = useRef(false)
   const advanceLock = useRef(false)
+  const candidateQuestionLock = useRef(false)
+  const finishLock = useRef(false)
   const endLock = useRef(false)
   const [beginFailed, setBeginFailed] = useState(false)
   const [advanceState, setAdvanceState] = useState<AdvanceState | null>(null)
@@ -54,6 +59,8 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const beginMutation = useMutation({ mutationFn: beginInterviewQuestions })
   const submitMutation = useMutation({ mutationFn: submitInterviewAnswer })
   const advanceMutation = useMutation({ mutationFn: getNextInterviewQuestion })
+  const candidateQuestionMutation = useMutation({ mutationFn: submitCandidateQuestion })
+  const finishMutation = useMutation({ mutationFn: finishInterview })
   const endMutation = useMutation({ mutationFn: endInterview })
 
   function commit(response: InterviewMutationResponse) {
@@ -127,16 +134,8 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     throw new Error("Interview answer is not ready to advance.")
   }
 
-  function isFinalMainAnswer(session: ActiveInterviewSessionResponse) {
-    return (
-      session.status === "question" &&
-      session.currentQuestion.status === "answered" &&
-      session.currentQuestion.question.order === session.progress.totalQuestions
-    )
-  }
-
   async function advance(session: ActiveInterviewSessionResponse) {
-    if (advanceLock.current || advanceMutation.isPending || isFinalMainAnswer(session)) return
+    if (advanceLock.current || advanceMutation.isPending) return
     const promptId = answeredPromptId(session)
 
     advanceLock.current = true
@@ -182,18 +181,49 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
 
     submitLock.current = true
     try {
-      const response = await submitMutation.mutateAsync(input)
-      commit(response)
-      const answeredSession = response.session
-      if (
-        answeredSession !== null &&
-        answeredSession.status !== "completed" &&
-        !isFinalMainAnswer(answeredSession)
-      ) {
-        await advance(answeredSession)
-      }
+      commit(await submitMutation.mutateAsync(input))
     } finally {
       submitLock.current = false
+    }
+  }
+
+  async function handleCandidateQuestion(content: string) {
+    if (candidateQuestionLock.current || candidateQuestionMutation.isPending) return
+    const session = currentSession()
+    if (session.status !== "candidateQuestions") return
+
+    candidateQuestionLock.current = true
+    try {
+      commit(
+        await candidateQuestionMutation.mutateAsync({
+          sessionId: session.sessionId,
+          version: session.version,
+          content,
+        }),
+      )
+    } finally {
+      candidateQuestionLock.current = false
+    }
+  }
+
+  async function handleFinish() {
+    if (finishLock.current || finishMutation.isPending) return
+    const session = currentSession()
+    if (session.status !== "candidateQuestions") return
+
+    finishLock.current = true
+    try {
+      const response = await finishMutation.mutateAsync({
+        sessionId: session.sessionId,
+        version: session.version,
+      })
+      commit(response)
+      await navigate({
+        to: "/interview/review/$sessionId",
+        params: { sessionId: session.sessionId },
+      })
+    } finally {
+      finishLock.current = false
     }
   }
 
@@ -240,11 +270,16 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
       />
     )
   }
-  if (session.status === "candidateQuestions" || session.status === "completed") {
+  if (session.status === "completed") {
     return (
       <InterviewSessionView
-        onBack={() => void backToSetup()}
-        reason="unsupportedStage"
+        onBack={() =>
+          void navigate({
+            to: "/interview/review/$sessionId",
+            params: { sessionId },
+          })
+        }
+        reason="completed"
         status="unavailable"
       />
     )
@@ -264,6 +299,7 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   const summary = toSummary(session, targetRole.title, targetRole.company)
+  const history = toConversationHistory(session)
   if (session.status === "opening") {
     return (
       <InterviewSessionView
@@ -280,15 +316,30 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     )
   }
 
+  if (session.status === "candidateQuestions") {
+    return (
+      <InterviewSessionView
+        exchanges={session.exchanges}
+        history={history}
+        isFinishing={finishMutation.isPending}
+        isInteractionLocked={candidateQuestionMutation.isPending || finishMutation.isPending}
+        isSubmittingQuestion={candidateQuestionMutation.isPending}
+        onFinish={handleFinish}
+        onSubmitQuestion={handleCandidateQuestion}
+        prompt={session.prompt}
+        status="candidateQuestions"
+        summary={summary}
+      />
+    )
+  }
+
   const prompt = toPrompt(session)
   const advanceStatus =
     prompt.answer === null
       ? "idle"
-      : isFinalMainAnswer(session)
-        ? "nextStage"
-        : advanceState?.promptId === prompt.id
-          ? advanceState.status
-          : "ready"
+      : advanceState?.promptId === prompt.id
+        ? advanceState.status
+        : "ready"
 
   return (
     <InterviewSessionView
@@ -298,6 +349,7 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
         submitMutation.isPending || advanceMutation.isPending || endMutation.isPending
       }
       isSubmitting={submitMutation.isPending}
+      history={history}
       onEnd={handleEnd}
       onRetryAdvance={() => void advance(currentSession())}
       onSubmit={handleSubmit}
@@ -342,4 +394,37 @@ function toPrompt(
     questionOrder: session.currentQuestion.question.order,
     answer: session.currentFollowUp.answer?.content ?? null,
   }
+}
+
+function toConversationHistory(
+  session: ActiveInterviewSessionResponse,
+): InterviewConversationRecordViewData[] {
+  const records = session.completedQuestions.flatMap(({ answer, followUps, question }) => [
+    {
+      id: question.id,
+      kind: "question" as const,
+      questionOrder: question.order,
+      prompt: question.prompt,
+      answer: answer.content,
+    },
+    ...followUps.map(({ answer: followUpAnswer, question: followUp }) => ({
+      id: followUp.id,
+      kind: "followUp" as const,
+      questionOrder: question.order,
+      prompt: followUp.prompt,
+      answer: followUpAnswer.content,
+    })),
+  ])
+
+  if (session.status === "followUp") {
+    records.push({
+      id: session.currentQuestion.question.id,
+      kind: "question",
+      questionOrder: session.currentQuestion.question.order,
+      prompt: session.currentQuestion.question.prompt,
+      answer: session.currentQuestion.answer.content,
+    })
+  }
+
+  return records
 }

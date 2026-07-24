@@ -11,7 +11,7 @@ import { AppShell } from "@/components/layout/AppShell"
 import { useAuth } from "@/hooks/use-auth"
 import { DashboardPage } from "@/pages/dashboard"
 import { HistoryPage } from "@/pages/history"
-import { InterviewPage, InterviewSessionPage } from "@/pages/interview"
+import { InterviewPage, InterviewReviewPage, InterviewSessionPage } from "@/pages/interview"
 import { LoginPage } from "@/pages/login"
 import { NotFoundPage } from "@/pages/not-found"
 import { PracticePage } from "@/pages/practice"
@@ -118,6 +118,12 @@ const interviewSessionRoute = createRoute({
   component: InterviewSessionPage,
 })
 
+const interviewReviewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/interview/review/$sessionId",
+  component: InterviewReviewPage,
+})
+
 const historyRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/history",
@@ -135,6 +141,7 @@ const routeTree = rootRoute.addChildren([
     practiceRoute,
     interviewRoute,
     interviewSessionRoute,
+    interviewReviewRoute,
     historyRoute,
   ]),
 ])

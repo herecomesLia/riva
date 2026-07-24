@@ -273,20 +273,68 @@ export async function submitInterviewAnswer(
       throw new Error("Current interview question has already been answered.")
     }
 
-    const next: InterviewQuestionSessionResponse = {
+    const answer = {
+      id: nextId("interview-answer"),
+      content,
+      submittedAt: nextTimestamp(),
+    }
+    const answered: InterviewQuestionSessionResponse = {
       ...session,
       version: session.version + 1,
       currentQuestion: {
         status: "answered",
         question: session.currentQuestion.question,
-        answer: {
-          id: nextId("interview-answer"),
-          content,
-          submittedAt: nextTimestamp(),
-        },
+        answer,
       },
     }
-    return commit(next)
+
+    if (answered.currentQuestion.question.id === projectFollowUpQuestionMock.parentQuestionId) {
+      return commit({
+        status: "followUp",
+        sessionId: answered.sessionId,
+        version: answered.version,
+        configuration: answered.configuration,
+        startedAt: answered.startedAt,
+        progress: answered.progress,
+        completedQuestions: answered.completedQuestions,
+        currentQuestion: {
+          question: answered.currentQuestion.question,
+          answer,
+          answeredFollowUps: [],
+        },
+        currentFollowUp: {
+          status: "awaitingAnswer",
+          question: copy(projectFollowUpQuestionMock),
+          answer: null,
+        },
+      })
+    }
+
+    const completedQuestions = [...answered.completedQuestions, toCompletedQuestion(answered)]
+    if (answered.currentQuestion.question.order === answered.progress.totalQuestions) {
+      return commit({
+        status: "candidateQuestions",
+        sessionId: answered.sessionId,
+        version: answered.version,
+        configuration: answered.configuration,
+        startedAt: answered.startedAt,
+        progress: {
+          completedQuestions: completedQuestions.length,
+          totalQuestions: answered.progress.totalQuestions,
+        },
+        completedQuestions,
+        prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+        exchanges: [],
+      })
+    }
+
+    return commit(
+      createNextQuestionSession(
+        { ...answered, version: session.version },
+        completedQuestions,
+        answered.currentQuestion.question.order,
+      ),
+    )
   }
 
   if (session.status !== "followUp") {
@@ -302,7 +350,7 @@ export async function submitInterviewAnswer(
     throw new Error("Current interview follow-up has already been answered.")
   }
 
-  const next: InterviewFollowUpSessionResponse = {
+  const answered: InterviewFollowUpSessionResponse = {
     ...session,
     version: session.version + 1,
     currentFollowUp: {
@@ -315,7 +363,14 @@ export async function submitInterviewAnswer(
       },
     },
   }
-  return commit(next)
+  const completedQuestions = [...answered.completedQuestions, toCompletedFollowUpQuestion(answered)]
+  return commit(
+    createNextQuestionSession(
+      { ...answered, version: session.version },
+      completedQuestions,
+      answered.currentQuestion.question.order,
+    ),
+  )
 }
 
 export async function getNextInterviewQuestion(
@@ -355,7 +410,21 @@ export async function getNextInterviewQuestion(
     }
 
     if (session.currentQuestion.question.order === session.progress.totalQuestions) {
-      throw new Error("Enter candidate questions after the final interview answer.")
+      const completedQuestions = [...session.completedQuestions, toCompletedQuestion(session)]
+      return commit({
+        status: "candidateQuestions",
+        sessionId: session.sessionId,
+        version: session.version + 1,
+        configuration: session.configuration,
+        startedAt: session.startedAt,
+        progress: {
+          completedQuestions: completedQuestions.length,
+          totalQuestions: session.progress.totalQuestions,
+        },
+        completedQuestions,
+        prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+        exchanges: [],
+      })
     }
     const completedQuestions = [...session.completedQuestions, toCompletedQuestion(session)]
     return commit(

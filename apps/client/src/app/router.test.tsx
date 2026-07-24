@@ -74,4 +74,21 @@ describe("app router auth redirects", () => {
       "data-active",
     )
   })
+
+  it("renders the authenticated interview review route", async () => {
+    useAuthStore.getState().setCurrentUser(userMock)
+
+    renderRouterAt("/interview/review/mock-session")
+
+    expect(
+      await screen.findByRole("heading", {
+        name: i18n.t("interview.review.generatingTitle"),
+        level: 1,
+      }),
+    ).toBeInTheDocument()
+    expect(window.location.pathname).toBe("/interview/review/mock-session")
+    expect(screen.getByRole("link", { name: i18n.t("appShell.nav.interview") })).toHaveAttribute(
+      "data-active",
+    )
+  })
 })

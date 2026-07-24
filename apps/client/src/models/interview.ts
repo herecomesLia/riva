@@ -247,6 +247,14 @@ export type InterviewSetupViewData = {
   defaultConfiguration: InterviewSetupResponse["defaultConfiguration"]
 }
 
+export type InterviewConversationRecordViewData = {
+  id: string
+  kind: "question" | "followUp"
+  questionOrder: number
+  prompt: string
+  answer: string
+}
+
 export type InterviewPageViewState =
   | {
       status: "loading"

@@ -1,6 +1,8 @@
 import preview from "#storybook/preview"
 import { expect, fn } from "storybook/test"
 
+import { createCandidateQuestionExchange } from "@/mocks/data/interview"
+
 import { InterviewSessionView } from "./InterviewSessionView"
 
 const summary = {
@@ -30,6 +32,7 @@ const questionArgs = {
     questionOrder: 2,
     answer: null,
   },
+  history: [],
   isSubmitting: false,
   advanceStatus: "idle",
   onSubmit: fn(async () => undefined),
@@ -101,6 +104,53 @@ export const AdvanceFailure = meta.story({
     await expect(
       canvas.getByRole("button", { name: /重新获取下一问|retry next question/i }),
     ).toBeVisible()
+  },
+})
+
+export const DynamicFollowUp = meta.story({
+  args: {
+    ...questionArgs,
+    prompt: {
+      id: "interview-follow-up-project-tradeoff",
+      kind: "followUp",
+      content: "如果监控数据只能证明性能改善，却无法直接证明业务收益，你会如何补充验证？",
+      questionOrder: 2,
+      answer: null,
+    },
+    history: [
+      {
+        id: "interview-question-project-deep-dive",
+        kind: "question",
+        questionOrder: 2,
+        prompt: "请介绍一次你主导的前端性能优化。",
+        answer: "我先通过真实用户监控定位长任务，再分阶段实施拆包和渲染调度优化。",
+      },
+    ],
+  },
+})
+
+export const CandidateQuestions = meta.story({
+  args: {
+    status: "candidateQuestions",
+    summary: { ...summary, completedQuestions: 3 },
+    prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+    history: [
+      {
+        id: "interview-question-motivation",
+        kind: "question",
+        questionOrder: 3,
+        prompt: "为什么选择这个岗位？",
+        answer: "岗位的业务复杂度和技术挑战与我的经验高度匹配。",
+      },
+    ],
+    exchanges: [
+      createCandidateQuestionExchange("这个岗位入职后的核心目标和主要协作团队分别是什么？", 1),
+    ],
+    isSubmittingQuestion: false,
+    isFinishing: false,
+    isInteractionLocked: false,
+    onSubmitQuestion: fn(async () => undefined),
+    onFinish: fn(async () => undefined),
   },
 })
 

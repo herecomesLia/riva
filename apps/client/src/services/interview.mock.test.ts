@@ -4,11 +4,9 @@ import { resetInterviewMockState } from "@/mocks/services/interview"
 import {
   beginInterviewQuestions,
   endInterview,
-  enterCandidateQuestions,
   finishInterview,
   getInterviewPage,
   getInterviewReview,
-  getNextInterviewQuestion,
   startInterview,
   submitCandidateQuestion,
   submitInterviewAnswer,
@@ -61,54 +59,27 @@ async function startToFirstQuestion() {
   return firstQuestion.session
 }
 
-async function submitCurrentQuestion(
-  session: Awaited<ReturnType<typeof startToFirstQuestion>>,
-  content: string,
-) {
-  const answered = await settle(
-    submitInterviewAnswer({
-      target: "question",
-      sessionId: session.sessionId,
-      version: session.version,
-      questionId: session.currentQuestion.question.id,
-      content,
-    }),
-  )
-  if (
-    answered.session?.status !== "question" ||
-    answered.session.currentQuestion.status !== "answered"
-  ) {
-    throw new Error("Expected an answered interview question.")
-  }
-  return answered.session
-}
-
 async function completeInterview() {
   const first = await startToFirstQuestion()
-  const firstAnswered = await submitCurrentQuestion(
-    first,
-    "我有五年前端开发经验，近两年主要负责核心交易链路的架构和性能治理。",
-  )
   const second = await settle(
-    getNextInterviewQuestion({
+    submitInterviewAnswer({
       target: "question",
-      sessionId: firstAnswered.sessionId,
-      version: firstAnswered.version,
-      questionId: firstAnswered.currentQuestion.question.id,
+      sessionId: first.sessionId,
+      version: first.version,
+      questionId: first.currentQuestion.question.id,
+      content: "我有五年前端开发经验，近两年主要负责核心交易链路的架构和性能治理。",
     }),
   )
   if (second.session?.status !== "question") throw new Error("Expected second question.")
+  expect(second.session.progress).toEqual({ completedQuestions: 1, totalQuestions: 3 })
 
-  const secondAnswered = await submitCurrentQuestion(
-    second.session,
-    "我通过真实用户监控定位长任务，再分阶段实施拆包、预加载和渲染调度优化。",
-  )
   const followUp = await settle(
-    getNextInterviewQuestion({
+    submitInterviewAnswer({
       target: "question",
-      sessionId: secondAnswered.sessionId,
-      version: secondAnswered.version,
-      questionId: secondAnswered.currentQuestion.question.id,
+      sessionId: second.session.sessionId,
+      version: second.session.version,
+      questionId: second.session.currentQuestion.question.id,
+      content: "我通过真实用户监控定位长任务，再分阶段实施拆包、预加载和渲染调度优化。",
     }),
   )
   if (
@@ -117,8 +88,9 @@ async function completeInterview() {
   ) {
     throw new Error("Expected dynamic follow-up.")
   }
+  expect(followUp.session.progress).toEqual({ completedQuestions: 1, totalQuestions: 3 })
 
-  const followUpAnswered = await settle(
+  const third = await settle(
     submitInterviewAnswer({
       target: "followUp",
       sessionId: followUp.session.sessionId,
@@ -128,33 +100,16 @@ async function completeInterview() {
       content: "我会使用灰度分组和同期对照，排除活动等外部因素后观察核心转化变化。",
     }),
   )
-  if (
-    followUpAnswered.session?.status !== "followUp" ||
-    followUpAnswered.session.currentFollowUp.status !== "answered"
-  ) {
-    throw new Error("Expected answered follow-up.")
-  }
-
-  const third = await settle(
-    getNextInterviewQuestion({
-      target: "followUp",
-      sessionId: followUpAnswered.session.sessionId,
-      version: followUpAnswered.session.version,
-      questionId: followUpAnswered.session.currentQuestion.question.id,
-      followUpQuestionId: followUpAnswered.session.currentFollowUp.question.id,
-    }),
-  )
   if (third.session?.status !== "question") throw new Error("Expected final question.")
+  expect(third.session.progress).toEqual({ completedQuestions: 2, totalQuestions: 3 })
 
-  const thirdAnswered = await submitCurrentQuestion(
-    third.session,
-    "岗位的业务复杂度与我的经验匹配，我希望继续提升架构能力和跨团队影响力。",
-  )
   const candidateQuestions = await settle(
-    enterCandidateQuestions({
-      sessionId: thirdAnswered.sessionId,
-      version: thirdAnswered.version,
-      questionId: thirdAnswered.currentQuestion.question.id,
+    submitInterviewAnswer({
+      target: "question",
+      sessionId: third.session.sessionId,
+      version: third.session.version,
+      questionId: third.session.currentQuestion.question.id,
+      content: "岗位的业务复杂度与我的经验匹配，我希望继续提升架构能力和跨团队影响力。",
     }),
   )
   if (candidateQuestions.session?.status !== "candidateQuestions") {
@@ -171,6 +126,10 @@ async function completeInterview() {
   if (withCandidateQuestion.session?.status !== "candidateQuestions") {
     throw new Error("Expected candidate question exchange.")
   }
+  expect(withCandidateQuestion.session.exchanges[0]?.feedback).toMatchObject({
+    summary: expect.any(String),
+    suggestedAlternatives: [expect.any(String)],
+  })
 
   const completed = await settle(
     finishInterview({
@@ -255,27 +214,6 @@ describe("interview stateful mock service", () => {
     expect(secondReview.review.mainStrengths[0]).toBe("能够把复杂技术问题讲清楚")
   })
 
-  it("fails question generation once without advancing the session", async () => {
-    resetInterviewMockState("setupReady", {
-      failNext: ["getNextInterviewQuestion"],
-    })
-    const first = await startToFirstQuestion()
-    const answered = await submitCurrentQuestion(first, "这是一次可重试的正式回答。")
-    const input = {
-      target: "question" as const,
-      sessionId: answered.sessionId,
-      version: answered.version,
-      questionId: answered.currentQuestion.question.id,
-    }
-
-    await expectMockFailure(getNextInterviewQuestion(input), "getNextInterviewQuestion")
-    const next = await settle(getNextInterviewQuestion(input))
-    expect(next.session).toMatchObject({
-      status: "question",
-      version: answered.version + 1,
-    })
-  })
-
   it("fails answer submission once without consuming the answer", async () => {
     resetInterviewMockState("setupReady", {
       failNext: ["submitInterviewAnswer"],
@@ -294,9 +232,13 @@ describe("interview stateful mock service", () => {
     expect(answered.session).toMatchObject({
       status: "question",
       version: first.version + 1,
+      progress: {
+        completedQuestions: 1,
+        totalQuestions: 3,
+      },
       currentQuestion: {
-        status: "answered",
-        answer: { content: input.content },
+        status: "awaitingAnswer",
+        question: { order: 2 },
       },
     })
   })

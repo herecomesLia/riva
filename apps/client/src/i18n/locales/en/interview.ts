@@ -63,15 +63,44 @@ export const interview = {
       placeholder: "Type your answer here…",
       keyboardHint: "Press Ctrl + Enter (⌘ + Enter on Mac) to submit",
       submit: "Submit answer",
-      submitting: "Submitting",
+      submitting: "Submitting and preparing the next question",
       requiredTitle: "Enter an answer first",
       requiredDescription: "The answer cannot be empty.",
       submittedTitle: "Your answer was submitted",
     },
     advance: {
       loading: "Your answer is saved. The interviewer is preparing the next question…",
-      nextStage:
-        "The main questions are complete. The candidate-question stage will be connected next.",
+    },
+    history: {
+      title: "Interview record",
+      description:
+        "{{count}} completed exchanges, with main questions and follow-ups clearly marked.",
+      questionNumber: "Main question {{current}}",
+      answer: "Your answer",
+    },
+    candidate: {
+      badge: "Candidate questions",
+      title: "Now it is your turn to ask",
+      composerTitle: "Ask a question",
+      composerDescription:
+        "Continue asking questions, or finish the interview and generate the review.",
+      label: "Candidate question",
+      placeholder: "For example: What does success look like after six months in this role?",
+      submit: "Submit question",
+      submitting: "Getting an answer",
+      requiredTitle: "Enter a question first",
+      requiredDescription: "The candidate question cannot be empty.",
+      exchangesTitle: "Candidate question record",
+      exchangesDescription: "Review the interviewer responses and concise question feedback.",
+      yourQuestion: "Your question {{current}}",
+      interviewerAnswer: "Interviewer answer",
+      feedback: "Quick feedback",
+      betterQuestion: "A stronger way to ask",
+      finish: "Finish interview",
+      confirmFinish: "Finish and generate review",
+      finishDialogTitle: "Finish candidate questions and complete the interview?",
+      finishDialogDescription:
+        "The full review will begin generating, and no more candidate questions can be added.",
     },
     actions: {
       begin: "Start questions",
@@ -82,6 +111,7 @@ export const interview = {
       retryAdvance: "Retry next question",
       continueToNext: "Continue to next question",
       backToSetup: "Back to interview setup",
+      viewReview: "Go to interview review",
     },
     endDialog: {
       title: "End this interview early?",
@@ -100,14 +130,33 @@ export const interview = {
         "Your answer was saved successfully, so you do not need to submit it again.",
       endTitle: "Unable to end the interview",
       endDescription: "The current session is still available. Please try again.",
+      candidateSubmitTitle: "Unable to submit your question",
+      candidateSubmitDescription:
+        "Your question is preserved. Check your connection and try again.",
+      finishTitle: "Unable to finish the interview",
+      finishDescription: "Your candidate-question record is preserved. Please try again.",
     },
     unavailable: {
       missingTitle: "No valid interview session found",
       missingDescription:
         "This session may not have started, may have expired, or may not match this address.",
-      unsupportedStageTitle: "This stage is not available in this step",
-      unsupportedStageDescription:
-        "Candidate questions and the final review will be connected in later steps.",
+      completedTitle: "This interview is complete",
+      completedDescription: "Go to the matching review page to check generation progress.",
+    },
+  },
+  review: {
+    badge: "Interview review",
+    generatingTitle: "Generating your full interview review",
+    generatingDescription:
+      "Riva is organizing the complete conversation, performance summary, and next training steps.",
+    readyTitle: "Your interview review is ready",
+    readyDescription:
+      "The interview data is ready. The complete review content will be presented in the next step.",
+    errorTitle: "Unable to generate the review",
+    errorDescription: "Your interview record is safe, so you can retry.",
+    actions: {
+      retry: "Generate again",
+      backToSetup: "Back to mock interview",
     },
   },
 } as const

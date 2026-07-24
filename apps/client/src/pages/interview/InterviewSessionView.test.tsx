@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
+import { createCandidateQuestionExchange } from "@/mocks/data/interview"
 import { renderWithProviders } from "@/test/render"
 
 import { InterviewSessionView, type InterviewSessionViewProps } from "./InterviewSessionView"
@@ -29,6 +30,7 @@ function questionProps(
       questionOrder: 1,
       answer: null,
     },
+    history: [],
     isSubmitting: false,
     advanceStatus: "idle",
     isEnding: false,
@@ -121,5 +123,73 @@ describe("InterviewSessionView", () => {
       screen.queryByRole("button", { name: /参考答案|sample answer/i }),
     ).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /收藏|save/i })).not.toBeInTheDocument()
+  })
+
+  it("distinguishes follow-ups in the unified conversation history", () => {
+    renderWithProviders(
+      <InterviewSessionView
+        {...questionProps()}
+        history={[
+          {
+            id: "main-question",
+            kind: "question",
+            questionOrder: 2,
+            prompt: "请介绍一次性能优化。",
+            answer: "我先定位长任务，再分阶段完成治理。",
+          },
+          {
+            id: "follow-up",
+            kind: "followUp",
+            questionOrder: 2,
+            prompt: "你如何证明业务收益？",
+            answer: "我使用灰度分组进行同期对照。",
+          },
+        ]}
+      />,
+      { router: false },
+    )
+
+    expect(screen.getAllByText(i18n.t("interview.session.promptKinds.question"))).toHaveLength(2)
+    expect(screen.getByText(i18n.t("interview.session.promptKinds.followUp"))).toBeVisible()
+    expect(
+      screen.getAllByText(i18n.t("interview.session.history.questionNumber", { current: 2 })),
+    ).toHaveLength(2)
+  })
+
+  it("preserves a candidate question when submission fails", async () => {
+    const user = userEvent.setup()
+    const question = "这个岗位入职六个月后的成功标准是什么？"
+    renderWithProviders(
+      <InterviewSessionView
+        exchanges={[createCandidateQuestionExchange("团队目前最大的挑战是什么？", 1)]}
+        history={[]}
+        isFinishing={false}
+        isInteractionLocked={false}
+        isSubmittingQuestion={false}
+        onFinish={vi.fn(async () => undefined)}
+        onSubmitQuestion={vi.fn(async () => {
+          throw new Error("submit failed")
+        })}
+        prompt="现在请你向面试官提问。"
+        status="candidateQuestions"
+        summary={{ ...summary, completedQuestions: 3 }}
+      />,
+      { router: false },
+    )
+
+    const textbox = screen.getByRole("textbox", {
+      name: i18n.t("interview.session.candidate.label"),
+    })
+    await user.type(textbox, question)
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("interview.session.candidate.submit"),
+      }),
+    )
+
+    expect(
+      await screen.findByText(i18n.t("interview.session.errors.candidateSubmitTitle")),
+    ).toBeVisible()
+    expect(textbox).toHaveValue(question)
   })
 })
