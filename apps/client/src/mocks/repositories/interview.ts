@@ -237,6 +237,7 @@ type RepositoryState = {
 }
 
 let volatileState: RepositoryState = { version: repositoryVersion, sessions: [] }
+let volatileStateIsNewer = false
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -257,6 +258,7 @@ function emptyState(): RepositoryState {
 function readState(): RepositoryState {
   const storage = getStorage()
   if (storage === null) return copy(volatileState)
+  if (volatileStateIsNewer) return copy(volatileState)
 
   let serialized: string | null
   try {
@@ -264,33 +266,42 @@ function readState(): RepositoryState {
   } catch {
     return copy(volatileState)
   }
-  if (serialized === null) return emptyState()
+  if (serialized === null) return copy(volatileState)
 
   try {
     const parsed = repositorySchema.safeParse(JSON.parse(serialized))
     if (parsed.success) {
-      return copy(parsed.data as RepositoryState)
+      volatileState = copy(parsed.data as RepositoryState)
+      return copy(volatileState)
     }
   } catch {
     // Invalid Mock storage is discarded below.
   }
 
+  volatileState = emptyState()
   try {
     storage.removeItem(INTERVIEW_MOCK_REPOSITORY_STORAGE_KEY)
+    volatileStateIsNewer = false
   } catch {
+    volatileStateIsNewer = true
     // Storage failures must not make the Mock page unavailable.
   }
-  volatileState = emptyState()
   return emptyState()
 }
 
 function writeState(state: RepositoryState) {
-  volatileState = copy(state)
+  const snapshot = copy(state)
+  volatileState = snapshot
   const storage = getStorage()
-  if (storage === null) return
+  if (storage === null) {
+    volatileStateIsNewer = true
+    return
+  }
   try {
-    storage.setItem(INTERVIEW_MOCK_REPOSITORY_STORAGE_KEY, JSON.stringify(state))
+    storage.setItem(INTERVIEW_MOCK_REPOSITORY_STORAGE_KEY, JSON.stringify(snapshot))
+    volatileStateIsNewer = false
   } catch {
+    volatileStateIsNewer = true
     // The in-memory repository remains usable when browser storage is unavailable.
   }
 }
@@ -320,10 +331,15 @@ export function listCompletedInterviewSessions(): InterviewCompletedSessionRespo
 export function clearCompletedInterviewSessions() {
   volatileState = emptyState()
   const storage = getStorage()
-  if (storage === null) return
+  if (storage === null) {
+    volatileStateIsNewer = true
+    return
+  }
   try {
     storage.removeItem(INTERVIEW_MOCK_REPOSITORY_STORAGE_KEY)
+    volatileStateIsNewer = false
   } catch {
+    volatileStateIsNewer = true
     // Storage failures must not make the Mock page unavailable.
   }
 }

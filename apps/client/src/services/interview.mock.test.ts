@@ -807,6 +807,41 @@ describe("interview completion and review availability", () => {
     expect(await getInterviewReview({ sessionId: ended.session.sessionId })).toEqual(expected)
   })
 
+  it("keeps a completed review in memory when repository storage writes fail", async () => {
+    const first = await startToFirstQuestion("singleFollowUp")
+    const storage = globalThis.sessionStorage
+    vi.stubGlobal("sessionStorage", {
+      get length() {
+        return storage.length
+      },
+      clear: storage.clear.bind(storage),
+      getItem: storage.getItem.bind(storage),
+      key: storage.key.bind(storage),
+      removeItem: storage.removeItem.bind(storage),
+      setItem: vi.fn(() => {
+        throw new Error("Storage is unavailable.")
+      }),
+    })
+
+    try {
+      const ended = await endInterview({
+        sessionId: first.sessionId,
+        version: first.version,
+      })
+      if (ended.session?.status !== "completed") throw new Error("Expected completion.")
+      const expected = await getInterviewReview({ sessionId: ended.session.sessionId })
+
+      resetInterviewMockState("setupReady", {
+        clearPersistedSessions: false,
+        defaultDelayMs: 0,
+      })
+
+      expect(await getInterviewReview({ sessionId: ended.session.sessionId })).toEqual(expected)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("rejects a review lookup for an unknown session ID", async () => {
     await expect(getInterviewReview({ sessionId: "missing-session" })).rejects.toThrow(
       "Interview review is not available.",
