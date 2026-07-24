@@ -37,11 +37,13 @@ describe("InterviewView", () => {
       await screen.findByRole("heading", { name: i18n.t("interview.title") }),
     ).toBeInTheDocument()
     expect(screen.getByText(i18n.t("interview.setup.title"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("interview.setup.fields.targetRole"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("interview.setup.fields.round"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("interview.setup.fields.difficulty"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("interview.setup.fields.duration"))).toBeInTheDocument()
-    expect(screen.getByTestId("interview-loading-state")).toHaveAttribute("aria-busy", "true")
+    const loadingState = screen.getByTestId("interview-loading-state")
+    expect(loadingState).toHaveAttribute("aria-busy", "true")
+    expect(loadingState.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7)
+    expect(screen.queryByText(i18n.t("interview.setup.fields.targetRole"))).not.toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("interview.setup.fields.round"))).not.toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("interview.setup.fields.difficulty"))).not.toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("interview.setup.fields.duration"))).not.toBeInTheDocument()
   })
 
   it("renders service-provided roles, rounds, difficulties, and duration preferences", async () => {

@@ -26,7 +26,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import type { InterviewConfiguration, InterviewSetupViewData } from "@/models/interview"
@@ -142,44 +141,27 @@ function InterviewSetupCard({ children }: { children: React.ReactNode }) {
 }
 
 function InterviewLoadingState() {
-  const { t } = useTranslation()
-
   return (
     <InterviewSetupCard>
-      <CardContent aria-busy="true" data-testid="interview-loading-state">
-        <FieldGroup className="gap-0">
-          <Field className="pb-5">
-            <FieldLabel>{t("interview.setup.fields.targetRole")}</FieldLabel>
-            <Skeleton className="h-9 w-full" />
-          </Field>
-          <Field className="border-t border-border py-5">
-            <FieldLabel>{t("interview.setup.fields.round")}</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              <Skeleton className="h-9 w-24" />
-              <Skeleton className="h-9 w-28" />
-              <Skeleton className="h-9 w-20" />
-            </div>
-          </Field>
-          <Field className="border-t border-border pt-5">
-            <FieldLabel>{t("interview.setup.fields.difficulty")}</FieldLabel>
-            <div className="flex gap-2">
-              <Skeleton className="h-9 w-20" />
-              <Skeleton className="h-9 w-20" />
-            </div>
-          </Field>
-          <Field className="border-t border-border pt-5">
-            <FieldLabel>{t("interview.setup.fields.duration")}</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              <Skeleton className="h-9 w-20" />
-              <Skeleton className="h-9 w-20" />
-              <Skeleton className="h-9 w-20" />
-            </div>
-          </Field>
-        </FieldGroup>
+      <CardContent
+        aria-busy="true"
+        className="flex flex-col gap-7"
+        data-testid="interview-loading-state"
+      >
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-24" />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-28" />
+            <Skeleton className="h-9 w-24" />
+          </div>
+        </div>
+        <Skeleton className="h-9 w-32" />
       </CardContent>
-      <CardFooter className="mt-7">
-        <Skeleton className="h-10 w-full sm:w-40" />
-      </CardFooter>
     </InterviewSetupCard>
   )
 }
