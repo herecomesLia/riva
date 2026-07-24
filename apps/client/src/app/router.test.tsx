@@ -108,4 +108,21 @@ describe("app router auth redirects", () => {
       "data-active",
     )
   })
+
+  it("renders the authenticated mock-interview history detail route", async () => {
+    useAuthStore.getState().setCurrentUser(userMock)
+
+    renderRouterAt("/history/interview/mock-interview-record-001")
+
+    expect(
+      await screen.findByRole("heading", {
+        name: i18n.t("history.mockDetail.title"),
+        level: 1,
+      }),
+    ).toBeInTheDocument()
+    expect(window.location.pathname).toBe("/history/interview/mock-interview-record-001")
+    expect(screen.getByRole("link", { name: i18n.t("appShell.nav.history") })).toHaveAttribute(
+      "data-active",
+    )
+  })
 })

@@ -79,6 +79,30 @@ describe("HistoryView", () => {
     ).toHaveAttribute("href", `/history/practice/${record.id}`)
   })
 
+  it("links mock interview summaries to the independent history detail route", async () => {
+    const record = historyRecordsStoryFixture.items.find((item) => item.kind === "mockInterview")
+    if (!record) throw new Error("Mock interview history fixture is missing.")
+    renderHistoryView({
+      status: "ready",
+      data: {
+        overview: historyOverviewStoryFixture,
+        records: historyRecordsStoryFixture,
+      },
+    })
+
+    const detailButton = await screen.findByRole("button", {
+      name: i18n.t("history.records.viewDetailsLabel", {
+        date: new Intl.DateTimeFormat(i18n.language, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(record.startedAt)),
+        kind: i18n.t("history.filters.kinds.mockInterview"),
+        role: record.targetRole.title,
+      }),
+    })
+    expect(detailButton).toHaveAttribute("href", `/history/interview/${record.id}`)
+  })
+
   it("forwards filter and pagination choices without owning query behavior", async () => {
     const user = userEvent.setup()
     const onFiltersChange = vi.fn()

@@ -23,7 +23,7 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
     reviewSummary:
       record.kind === "targetedPractice"
         ? (record.questions.find((question) => question.review)?.review?.summary ?? null)
-        : (record.overallReview?.summary ?? null),
+        : (record.overallReview.content?.summary ?? null),
   }
 
   return record.kind === "targetedPractice"
@@ -42,9 +42,9 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
 }
 
 export const historyOverviewStoryFixture: TrainingRecordsOverviewResponse = {
-  totalRecordCount: 5,
+  totalRecordCount: 6,
   completedRecordCount: 2,
-  totalDurationSeconds: 4020,
+  totalDurationSeconds: 4110,
   answeredQuestionCount: 6,
   averageScore: 78,
   targetRoles: [
@@ -66,7 +66,7 @@ export const historyOverviewStoryFixture: TrainingRecordsOverviewResponse = {
       averageScore: 77,
     },
     mockInterview: {
-      recordCount: 2,
+      recordCount: 3,
       completedRecordCount: 1,
       averageScore: 80,
     },
@@ -81,7 +81,7 @@ export const historyRecordsStoryFixture: TrainingRecordsPageResponse = {
   pagination: {
     page: 1,
     pageSize: 3,
-    totalItems: 5,
+    totalItems: 6,
     totalPages: 2,
   },
 }

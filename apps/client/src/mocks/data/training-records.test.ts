@@ -64,9 +64,30 @@ describe("training record response fixtures", () => {
       answeredQuestionCount: 1,
       totalQuestionCount: 2,
       overallScore: null,
-      overallReview: expect.objectContaining({
-        summary: expect.stringContaining("提前结束"),
-      }),
+      overallReview: {
+        status: "partial",
+        content: expect.objectContaining({
+          summary: expect.stringContaining("提前结束"),
+        }),
+      },
+    })
+    expect(earlyInterview?.questions[0].followUps[0]).toMatchObject({
+      answer: null,
+      evaluation: null,
+      review: null,
+      referenceAnswer: { status: "notRequested", content: null },
+    })
+
+    const unavailable = mockInterviewRecordDetailsMock.find(
+      (record) => record.overallReview.status === "unavailable",
+    )
+    expect(unavailable).toMatchObject({
+      answeredQuestionCount: 0,
+      overallReview: {
+        status: "unavailable",
+        content: null,
+        reason: "insufficientAnswers",
+      },
     })
   })
 

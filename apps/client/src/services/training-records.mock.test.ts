@@ -41,9 +41,9 @@ describe("training records mock service", () => {
     await vi.advanceTimersByTimeAsync(1)
 
     await expect(responsePromise).resolves.toEqual({
-      totalRecordCount: 5,
+      totalRecordCount: 6,
       completedRecordCount: 2,
-      totalDurationSeconds: 4020,
+      totalDurationSeconds: 4110,
       answeredQuestionCount: 6,
       averageScore: 78,
       targetRoles: [
@@ -65,7 +65,7 @@ describe("training records mock service", () => {
           averageScore: 77,
         },
         mockInterview: {
-          recordCount: 2,
+          recordCount: 3,
           completedRecordCount: 1,
           averageScore: 80,
         },
@@ -114,11 +114,14 @@ describe("training records mock service", () => {
       "mock-interview-record-001",
       "targeted-practice-record-003",
     ])
-    expect(finalPage.items.map((record) => record.id)).toEqual(["mock-interview-record-002"])
+    expect(finalPage.items.map((record) => record.id)).toEqual([
+      "mock-interview-record-002",
+      "mock-interview-record-003",
+    ])
     expect(finalPage.pagination).toEqual({
       page: 3,
       pageSize: 2,
-      totalItems: 5,
+      totalItems: 6,
       totalPages: 3,
     })
   })
@@ -181,7 +184,10 @@ describe("training records mock service", () => {
       ],
     })
     expect(interview).toEqual(mockInterviewRecordDetailsMock[0])
-    expect(interview.overallReview).not.toBeNull()
+    expect(interview.overallReview).toMatchObject({
+      status: "complete",
+      content: expect.objectContaining({ summary: expect.any(String) }),
+    })
   })
 
   it("preserves unanswered follow-ups in partially completed detail", async () => {

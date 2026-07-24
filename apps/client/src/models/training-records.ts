@@ -232,14 +232,26 @@ export type MockInterviewOverallReview = {
   generatedAt: string
 }
 
+export type MockInterviewOverallReviewState =
+  | {
+      status: "complete" | "partial"
+      content: MockInterviewOverallReview
+    }
+  | {
+      status: "unavailable"
+      content: null
+      reason: "insufficientAnswers"
+    }
+
 export type MockInterviewRecordDetailResponse = TrainingRecordDetailBase & {
   kind: "mockInterview"
+  completionReason: InterviewCompletionReason
   setup: {
     round: TrainingRecordInterviewRound
     difficulty: TrainingRecordDifficulty
     plannedDurationMinutes: 15 | 30 | 45
   }
-  overallReview: MockInterviewOverallReview | null
+  overallReview: MockInterviewOverallReviewState
   candidateQuestionExchanges: Array<{
     id: string
     question: string
@@ -261,3 +273,4 @@ export class TrainingRecordNotFoundError extends Error {
     this.recordId = recordId
   }
 }
+import type { InterviewCompletionReason } from "@/models/interview"

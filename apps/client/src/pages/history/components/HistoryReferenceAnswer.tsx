@@ -9,8 +9,10 @@ import { Spinner } from "@/components/ui/spinner"
 import type { TrainingRecordReferenceAnswer } from "@/models/training-records"
 
 export function HistoryReferenceAnswer({
+  generateTo = "/practice",
   referenceAnswer,
 }: {
+  generateTo?: "/practice" | "/interview"
   referenceAnswer: TrainingRecordReferenceAnswer
 }) {
   const { i18n, t } = useTranslation()
@@ -73,6 +75,7 @@ export function HistoryReferenceAnswer({
         {referenceAnswer.status === "unavailable" && (
           <ReferenceUnavailable
             description={t("history.detail.reference.unavailableDescription")}
+            generateTo={generateTo}
             title={`${t("history.detail.reference.unavailable")} · ${t(
               `history.detail.reference.reason.${referenceAnswer.reason}`,
             )}`}
@@ -82,6 +85,7 @@ export function HistoryReferenceAnswer({
         {referenceAnswer.status === "notRequested" && (
           <ReferenceUnavailable
             description={t("history.detail.reference.notRequestedDescription")}
+            generateTo={generateTo}
             title={t("history.detail.reference.notRequested")}
           />
         )}
@@ -90,7 +94,15 @@ export function HistoryReferenceAnswer({
   )
 }
 
-function ReferenceUnavailable({ description, title }: { description: string; title: string }) {
+function ReferenceUnavailable({
+  description,
+  generateTo,
+  title,
+}: {
+  description: string
+  generateTo: "/practice" | "/interview"
+  title: string
+}) {
   const { t } = useTranslation()
 
   return (
@@ -100,7 +112,7 @@ function ReferenceUnavailable({ description, title }: { description: string; tit
         <AlertTitle>{title}</AlertTitle>
         <AlertDescription>{description}</AlertDescription>
       </Alert>
-      <Button nativeButton={false} render={<Link to="/practice" />} variant="outline">
+      <Button nativeButton={false} render={<Link to={generateTo} />} variant="outline">
         <SparklesIcon aria-hidden="true" data-icon="inline-start" />
         {t("history.detail.reference.generate")}
       </Button>

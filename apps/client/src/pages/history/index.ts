@@ -1,4 +1,6 @@
 export { HistoryPage } from "./HistoryPage"
 export { HistoryView } from "./HistoryView"
+export { MockInterviewHistoryPage } from "./MockInterviewHistoryPage"
+export { MockInterviewHistoryView } from "./MockInterviewHistoryView"
 export { TargetedPracticeHistoryPage } from "./TargetedPracticeHistoryPage"
 export { TargetedPracticeHistoryView } from "./TargetedPracticeHistoryView"

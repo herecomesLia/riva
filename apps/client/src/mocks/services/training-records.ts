@@ -42,7 +42,7 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
     reviewSummary:
       record.kind === "targetedPractice"
         ? (record.questions.find((question) => question.review)?.review?.summary ?? null)
-        : (record.overallReview?.summary ?? null),
+        : (record.overallReview.content?.summary ?? null),
   }
 
   return record.kind === "targetedPractice"

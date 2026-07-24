@@ -369,11 +369,35 @@ const unansweredInterviewQuestion: TrainingRecordQuestion = {
   followUps: [],
 }
 
+const unansweredInterviewFollowUp = {
+  id: "history-interview-follow-up-002",
+  prompt: "你如何验证这些用户证据足以支持最终方案？",
+  order: 1,
+  askedAt: "2026-07-10T06:07:00.000Z",
+  answer: null,
+  evaluation: null,
+  review: null,
+  referenceAnswer: { status: "notRequested", content: null },
+} satisfies TrainingRecordQuestion["followUps"][number]
+
+const unavailableReviewInterviewQuestion: TrainingRecordQuestion = {
+  ...unansweredInterviewQuestion,
+  id: "history-interview-question-005",
+  order: 1,
+  prompt: "当你需要快速理解一个陌生业务时，会从哪些信息开始？",
+  assessedCapabilities: ["业务理解", "信息分析"],
+  referenceAnswer: readyReference(
+    "我会先明确业务目标、核心用户和关键流程，再结合指标、用户反馈与一线访谈建立问题地图，最后用小范围验证校准判断。",
+    "2026-07-08T01:04:00.000Z",
+  ),
+}
+
 export const mockInterviewRecordDetailsMock = [
   {
     id: "mock-interview-record-001",
     kind: "mockInterview",
     status: "completed",
+    completionReason: "formalQuestionsCompleted",
     startedAt: "2026-07-16T03:00:00.000Z",
     endedAt: "2026-07-16T03:30:00.000Z",
     durationSeconds: 1800,
@@ -396,13 +420,16 @@ export const mockInterviewRecordDetailsMock = [
       focusAreas: ["里程碑规划", "资源协调"],
     },
     overallReview: {
-      summary: "整体回答稳定，技术判断和风险意识较好，但复杂计划的节奏表达仍需加强。",
-      mainStrengths: ["技术方案有清晰边界", "能够主动说明验证和回滚"],
-      frequentIssues: ["资源安排缺乏具体依据"],
-      riskPoints: ["受追问时容易遗漏升级条件"],
-      communicationSuggestions: ["先给结论，再按里程碑展开"],
-      preparationSuggestions: ["准备一个完整的跨团队架构升级案例"],
-      generatedAt: "2026-07-16T03:29:30.000Z",
+      status: "complete",
+      content: {
+        summary: "整体回答稳定，技术判断和风险意识较好，但复杂计划的节奏表达仍需加强。",
+        mainStrengths: ["技术方案有清晰边界", "能够主动说明验证和回滚"],
+        frequentIssues: ["资源安排缺乏具体依据"],
+        riskPoints: ["受追问时容易遗漏升级条件"],
+        communicationSuggestions: ["先给结论，再按里程碑展开"],
+        preparationSuggestions: ["准备一个完整的跨团队架构升级案例"],
+        generatedAt: "2026-07-16T03:29:30.000Z",
+      },
     },
     candidateQuestionExchanges: [
       {
@@ -418,6 +445,7 @@ export const mockInterviewRecordDetailsMock = [
     id: "mock-interview-record-002",
     kind: "mockInterview",
     status: "endedEarly",
+    completionReason: "userEndedEarly",
     startedAt: "2026-07-10T06:00:00.000Z",
     endedAt: "2026-07-10T06:12:00.000Z",
     durationSeconds: 720,
@@ -446,7 +474,7 @@ export const mockInterviewRecordDetailsMock = [
           "经历相关，但产品决策过程不够具体。",
         ),
         review: review("能够概括相关产品经历。", "用户洞察到方案决策的链路不完整。"),
-        followUps: [],
+        followUps: [unansweredInterviewFollowUp],
       },
       unansweredInterviewQuestion,
     ],
@@ -459,13 +487,49 @@ export const mockInterviewRecordDetailsMock = [
       focusAreas: ["用户洞察", "决策依据"],
     },
     overallReview: {
-      summary: "本次提前结束，仅依据已回答问题生成部分复盘。",
-      mainStrengths: ["相关经历清晰"],
-      frequentIssues: ["决策依据不充分"],
-      riskPoints: [],
-      communicationSuggestions: ["补充数据、访谈和取舍依据"],
-      preparationSuggestions: ["完善开户流程重构案例"],
-      generatedAt: "2026-07-10T06:11:30.000Z",
+      status: "partial",
+      content: {
+        summary: "本次提前结束，仅依据已回答问题生成部分复盘。",
+        mainStrengths: ["相关经历清晰"],
+        frequentIssues: ["决策依据不充分"],
+        riskPoints: ["有效回答较少，复盘结论覆盖面有限"],
+        communicationSuggestions: ["补充数据、访谈和取舍依据"],
+        preparationSuggestions: ["完善开户流程重构案例"],
+        generatedAt: "2026-07-10T06:11:30.000Z",
+      },
+    },
+    candidateQuestionExchanges: [],
+  },
+  {
+    id: "mock-interview-record-003",
+    kind: "mockInterview",
+    status: "endedEarly",
+    completionReason: "userEndedEarly",
+    startedAt: "2026-07-08T01:00:00.000Z",
+    endedAt: "2026-07-08T01:01:30.000Z",
+    durationSeconds: 90,
+    targetRole: frontendRole,
+    answeredQuestionCount: 0,
+    totalQuestionCount: 1,
+    overallScore: null,
+    setup: {
+      round: "hr",
+      difficulty: "basic",
+      plannedDurationMinutes: 15,
+    },
+    questions: [unavailableReviewInterviewQuestion],
+    exposedWeaknesses: [],
+    recommendation: {
+      action: "mockInterview",
+      reason: "有效回答不足，建议重新完成一轮短时模拟面试。",
+      round: "hr",
+      difficulty: "basic",
+      focusAreas: ["完成回答", "业务理解"],
+    },
+    overallReview: {
+      status: "unavailable",
+      content: null,
+      reason: "insufficientAnswers",
     },
     candidateQuestionExchanges: [],
   },
