@@ -48,6 +48,16 @@ const activeActions = {
   onEnd: fn(async () => undefined),
 }
 
+const openingArgs = {
+  ...activeActions,
+  status: "opening",
+  summary: summary(0, singleFollowUpPlan.initialProgress.totalMainQuestions),
+  openingMessage: fixture.openingMessage,
+  isBeginning: false,
+  beginFailed: false,
+  onBegin: fn(async () => undefined),
+} as const
+
 const questionArgs = {
   ...activeActions,
   status: "question",
@@ -73,14 +83,23 @@ export const Loading = meta.story({
 })
 
 export const Opening = meta.story({
+  args: openingArgs,
+})
+
+export const OpeningInteractionLocked = meta.story({
   args: {
-    ...activeActions,
-    status: "opening",
-    summary: summary(0, singleFollowUpPlan.initialProgress.totalMainQuestions),
-    openingMessage: fixture.openingMessage,
-    isBeginning: false,
-    beginFailed: false,
-    onBegin: fn(async () => undefined),
+    ...openingArgs,
+    isEnding: true,
+    isInteractionLocked: true,
+  },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: /开始正式问答|start questions/i }),
+    ).toBeDisabled()
+    await expect(canvas.getByRole("button", { name: /结束面试|end interview/i })).toBeDisabled()
+    await expect(
+      canvas.queryByRole("button", { name: /正在进入问答|starting questions/i }),
+    ).not.toBeInTheDocument()
   },
 })
 

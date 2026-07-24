@@ -147,6 +147,7 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
         <OpeningContent
           beginFailed={props.beginFailed}
           isBeginning={props.isBeginning}
+          isInteractionLocked={props.isInteractionLocked}
           onBegin={props.onBegin}
           openingMessage={props.openingMessage}
         />
@@ -303,11 +304,13 @@ function SessionProgress({ summary }: { summary: InterviewSessionSummary }) {
 function OpeningContent({
   beginFailed,
   isBeginning,
+  isInteractionLocked,
   onBegin,
   openingMessage,
 }: {
   beginFailed: boolean
   isBeginning: boolean
+  isInteractionLocked: boolean
   onBegin: () => Promise<void>
   openingMessage: string
 }) {
@@ -333,7 +336,7 @@ function OpeningContent({
           ) : null}
         </CardContent>
         <CardFooter className="border-t">
-          <Button disabled={isBeginning} onClick={() => void onBegin()}>
+          <Button disabled={isBeginning || isInteractionLocked} onClick={() => void onBegin()}>
             {isBeginning ? (
               <Spinner aria-hidden="true" data-icon="inline-start" />
             ) : (
