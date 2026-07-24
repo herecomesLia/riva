@@ -91,4 +91,21 @@ describe("app router auth redirects", () => {
       "data-active",
     )
   })
+
+  it("renders the authenticated targeted-practice history detail route", async () => {
+    useAuthStore.getState().setCurrentUser(userMock)
+
+    renderRouterAt("/history/practice/targeted-practice-record-001")
+
+    expect(
+      await screen.findByRole("heading", {
+        name: i18n.t("history.detail.title"),
+        level: 1,
+      }),
+    ).toBeInTheDocument()
+    expect(window.location.pathname).toBe("/history/practice/targeted-practice-record-001")
+    expect(screen.getByRole("link", { name: i18n.t("appShell.nav.history") })).toHaveAttribute(
+      "data-active",
+    )
+  })
 })

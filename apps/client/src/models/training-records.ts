@@ -56,6 +56,7 @@ export type TrainingRecordReview = {
   strengths: string[]
   issues: string[]
   improvementSuggestions: string[]
+  reusableAnswerStructure: string[]
 }
 
 export type TrainingRecordReferenceAnswer =
@@ -99,7 +100,11 @@ export type TrainingRecordQuestion = {
   prompt: string
   type: TrainingRecordQuestionType
   order: number
+  attemptNumber: number
+  retryOfQuestionId: string | null
   assessedCapabilities: string[]
+  isSaved: boolean
+  isMarkedWeak: boolean
   answer: TrainingRecordAnswer | null
   evaluation: TrainingRecordEvaluation | null
   review: TrainingRecordReview | null

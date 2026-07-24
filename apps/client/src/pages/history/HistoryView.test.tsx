@@ -76,7 +76,7 @@ describe("HistoryView", () => {
           role: record.targetRole.title,
         }),
       }),
-    ).toHaveAttribute("href", `/history/${record.kind}/${record.id}`)
+    ).toHaveAttribute("href", `/history/practice/${record.id}`)
   })
 
   it("forwards filter and pagination choices without owning query behavior", async () => {

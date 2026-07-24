@@ -44,7 +44,7 @@ describe("training records mock service", () => {
       totalRecordCount: 5,
       completedRecordCount: 2,
       totalDurationSeconds: 4020,
-      answeredQuestionCount: 5,
+      answeredQuestionCount: 6,
       averageScore: 78,
       targetRoles: [
         {
@@ -166,7 +166,7 @@ describe("training records mock service", () => {
     const interview = await settle(getMockInterviewRecord(mockInterviewRecordDetailsMock[0].id))
 
     expect(practice).toEqual(targetedPracticeRecordDetailsMock[0])
-    expect(practice.questions[0]).toMatchObject({
+    expect(practice.questions[1]).toMatchObject({
       answer: expect.objectContaining({ content: expect.any(String) }),
       evaluation: expect.objectContaining({ overallScore: 86 }),
       review: expect.objectContaining({ summary: expect.any(String) }),
@@ -203,7 +203,11 @@ describe("training records mock service", () => {
               answer: null,
               evaluation: null,
               review: null,
-              referenceAnswer: { status: "notRequested", content: null },
+              referenceAnswer: {
+                status: "unavailable",
+                content: null,
+                reason: "insufficientContext",
+              },
             },
           ],
         },

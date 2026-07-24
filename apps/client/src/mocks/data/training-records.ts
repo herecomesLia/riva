@@ -40,6 +40,7 @@ function review(summary: string, issue: string): TrainingRecordReview {
     strengths: ["能够结合真实经历说明采取的行动。"],
     issues: [issue],
     improvementSuggestions: ["按背景、目标、行动和结果组织内容，并补充可验证的数据。"],
+    reusableAnswerStructure: ["先说明背景与目标", "突出个人判断和行动", "用数据结果收束并复盘"],
   }
 }
 
@@ -61,7 +62,11 @@ const completedPracticeQuestion: TrainingRecordQuestion = {
   prompt: "请介绍一次你主导前端性能治理的经历，并说明如何验证治理结果。",
   type: "projectDeepDive",
   order: 1,
+  attemptNumber: 2,
+  retryOfQuestionId: "history-practice-question-001-original",
   assessedCapabilities: ["性能分析", "技术决策", "结果量化"],
+  isSaved: true,
+  isMarkedWeak: false,
   answer: {
     id: "history-practice-answer-001",
     content:
@@ -104,12 +109,40 @@ const completedPracticeQuestion: TrainingRecordQuestion = {
   ],
 }
 
+const completedPracticeOriginalQuestion: TrainingRecordQuestion = {
+  ...completedPracticeQuestion,
+  id: "history-practice-question-001-original",
+  attemptNumber: 1,
+  retryOfQuestionId: null,
+  answer: {
+    id: "history-practice-answer-001-original",
+    content: "我负责过一次前端性能优化，通过拆包和缓存降低了首屏时间，最终页面速度明显改善。",
+    submittedAt: "2026-07-20T02:02:00.000Z",
+  },
+  evaluation: evaluation(
+    64,
+    "2026-07-20T02:03:00.000Z",
+    "说明了行动方向，但缺少问题基线、取舍依据和可验证结果。",
+  ),
+  review: review("能够快速给出优化方向。", "缺少性能基线和量化结果。"),
+  referenceAnswer: {
+    status: "unavailable",
+    content: null,
+    reason: "generationFailed",
+  },
+  followUps: [],
+}
+
 const partiallyAnsweredPracticeQuestion: TrainingRecordQuestion = {
   id: "history-practice-question-002",
   prompt: "讲述一次你处理跨团队技术分歧的经历。",
   type: "behavioral",
   order: 1,
+  attemptNumber: 1,
+  retryOfQuestionId: null,
   assessedCapabilities: ["跨团队协作", "冲突处理"],
+  isSaved: false,
+  isMarkedWeak: true,
   answer: {
     id: "history-practice-answer-002",
     content:
@@ -122,7 +155,7 @@ const partiallyAnsweredPracticeQuestion: TrainingRecordQuestion = {
     "给出了处理方法，但缺少个人推动过程和最终结果。",
   ),
   review: review("能够识别共同约束并提出折中方案。", "没有说明方案落地后的效果。"),
-  referenceAnswer: { status: "notRequested", content: null },
+  referenceAnswer: { status: "generating", content: null },
   followUps: [
     {
       id: "history-practice-follow-up-002",
@@ -132,7 +165,11 @@ const partiallyAnsweredPracticeQuestion: TrainingRecordQuestion = {
       answer: null,
       evaluation: null,
       review: null,
-      referenceAnswer: { status: "notRequested", content: null },
+      referenceAnswer: {
+        status: "unavailable",
+        content: null,
+        reason: "insufficientContext",
+      },
     },
   ],
 }
@@ -142,7 +179,11 @@ const endedPracticeQuestion: TrainingRecordQuestion = {
   prompt: "你如何理解高级前端工程师对业务结果的责任？",
   type: "businessUnderstanding",
   order: 1,
+  attemptNumber: 1,
+  retryOfQuestionId: null,
   assessedCapabilities: ["业务理解", "角色认知"],
+  isSaved: true,
+  isMarkedWeak: true,
   answer: null,
   evaluation: null,
   review: null,
@@ -159,8 +200,8 @@ export const targetedPracticeRecordDetailsMock = [
     endedAt: "2026-07-20T02:15:00.000Z",
     durationSeconds: 900,
     targetRole: frontendRole,
-    answeredQuestionCount: 1,
-    totalQuestionCount: 1,
+    answeredQuestionCount: 2,
+    totalQuestionCount: 2,
     overallScore: 86,
     setup: {
       questionType: "projectDeepDive",
@@ -168,7 +209,7 @@ export const targetedPracticeRecordDetailsMock = [
       source: "personalized",
       prioritizedWeaknesses: true,
     },
-    questions: [completedPracticeQuestion],
+    questions: [completedPracticeOriginalQuestion, completedPracticeQuestion],
     exposedWeaknesses: ["复杂方案的取舍说明不够充分"],
     recommendation: {
       action: "mockInterview",
@@ -233,7 +274,11 @@ const interviewQuestionOne: TrainingRecordQuestion = {
   prompt: "请用三分钟介绍你的经历，以及它与目标岗位的匹配点。",
   type: "selfIntroduction",
   order: 1,
+  attemptNumber: 1,
+  retryOfQuestionId: null,
   assessedCapabilities: ["信息组织", "岗位匹配"],
+  isSaved: false,
+  isMarkedWeak: false,
   answer: {
     id: "history-interview-answer-001",
     content:
@@ -258,7 +303,11 @@ const interviewQuestionTwo: TrainingRecordQuestion = {
   prompt: "如果核心系统需要在一个季度内完成架构升级，你会如何制定计划？",
   type: "technicalOrBusiness",
   order: 2,
+  attemptNumber: 1,
+  retryOfQuestionId: null,
   assessedCapabilities: ["架构规划", "风险控制", "协作推进"],
+  isSaved: true,
+  isMarkedWeak: true,
   answer: {
     id: "history-interview-answer-002",
     content:
@@ -304,7 +353,11 @@ const unansweredInterviewQuestion: TrainingRecordQuestion = {
   prompt: "请说明你如何处理一次上线事故。",
   type: "behavioral",
   order: 2,
+  attemptNumber: 1,
+  retryOfQuestionId: null,
   assessedCapabilities: ["应急处理", "复盘改进"],
+  isSaved: false,
+  isMarkedWeak: true,
   answer: null,
   evaluation: null,
   review: null,

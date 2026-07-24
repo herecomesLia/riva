@@ -45,7 +45,7 @@ export const historyOverviewStoryFixture: TrainingRecordsOverviewResponse = {
   totalRecordCount: 5,
   completedRecordCount: 2,
   totalDurationSeconds: 4020,
-  answeredQuestionCount: 5,
+  answeredQuestionCount: 6,
   averageScore: 78,
   targetRoles: [
     {

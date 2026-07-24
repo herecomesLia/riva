@@ -19,6 +19,12 @@ describe("training record response fixtures", () => {
       expect(record.durationSeconds).toBeGreaterThanOrEqual(0)
 
       for (const question of record.questions) {
+        expect(question.attemptNumber).toBeGreaterThanOrEqual(1)
+        if (question.retryOfQuestionId) {
+          expect(
+            record.questions.some((candidate) => candidate.id === question.retryOfQuestionId),
+          ).toBe(true)
+        }
         expect(question.followUps.map((followUp) => followUp.order)).toEqual(
           question.followUps.map((_, index) => index + 1),
         )
@@ -62,6 +68,25 @@ describe("training record response fixtures", () => {
         summary: expect.stringContaining("提前结束"),
       }),
     })
+  })
+
+  it("preserves retry, flag, and reference-answer snapshots", () => {
+    const complete = targetedPracticeRecordDetailsMock[0]
+    expect(complete.questions).toEqual([
+      expect.objectContaining({
+        attemptNumber: 1,
+        retryOfQuestionId: null,
+        referenceAnswer: expect.objectContaining({ status: "unavailable" }),
+      }),
+      expect.objectContaining({
+        attemptNumber: 2,
+        retryOfQuestionId: complete.questions[0].id,
+        isSaved: true,
+        isMarkedWeak: false,
+        referenceAnswer: expect.objectContaining({ status: "ready" }),
+      }),
+    ])
+    expect(complete.questions[1].review?.reusableAnswerStructure).not.toHaveLength(0)
   })
 
   it("uses business content instead of translation keys", () => {

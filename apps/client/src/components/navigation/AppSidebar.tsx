@@ -109,7 +109,7 @@ function NavigationList() {
         <SidebarMenu>
           {appNavigationItems.map((item) => {
             const Icon = item.icon
-            const matchDescendants = item.to === "/interview"
+            const matchDescendants = item.to === "/interview" || item.to === "/history"
             const isActive = Boolean(matchRoute({ to: item.to, fuzzy: matchDescendants }))
 
             return (

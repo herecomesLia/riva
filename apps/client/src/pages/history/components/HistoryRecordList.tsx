@@ -119,6 +119,10 @@ function HistoryRecordCard({ record }: { record: TrainingRecordSummary }) {
     record.kind === "targetedPractice"
       ? t(`history.questionTypes.${record.questionType}`)
       : t(`history.rounds.${record.round}`)
+  const detailHref =
+    record.kind === "targetedPractice"
+      ? `/history/practice/${record.id}`
+      : `/history/interview/${record.id}`
 
   return (
     <Card size="sm">
@@ -188,7 +192,7 @@ function HistoryRecordCard({ record }: { record: TrainingRecordSummary }) {
             role: record.targetRole.title,
           })}
           nativeButton={false}
-          render={<a href={`/history/${record.kind}/${record.id}`} />}
+          render={<a href={detailHref} />}
           variant="ghost"
         >
           {t("history.records.viewDetails")}
