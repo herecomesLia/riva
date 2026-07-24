@@ -94,13 +94,9 @@ export const practice = {
       "Riva is preparing one focused question from your target role, question type, and difficulty.",
     progress: "This usually takes only a moment. Keep this page open.",
   },
-  ready: {
-    title: "Your question is ready",
-    description: "The answer workspace will be implemented in the next targeted-practice step.",
-  },
   session: {
     eyebrow: "Current targeted practice",
-    unknownRole: "Target role",
+    unknownRole: "Unknown target role",
   },
   question: {
     capabilities: "Assessed capabilities",

@@ -87,13 +87,9 @@ export const practice = {
     description: "Riva 正在结合目标岗位、题型和难度准备一道针对性问题。",
     progress: "通常只需要片刻，请保持此页面打开。",
   },
-  ready: {
-    title: "题目已生成",
-    description: "答题区将在专项练习下一步中实现。",
-  },
   session: {
     eyebrow: "当前专项练习",
-    unknownRole: "目标岗位",
+    unknownRole: "未知目标岗位",
   },
   question: {
     capabilities: "考察能力",

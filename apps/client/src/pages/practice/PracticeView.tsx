@@ -225,6 +225,10 @@ function PracticeHeader() {
   )
 }
 
+function assertNever(value: never): never {
+  throw new Error(`Unhandled practice session state: ${String(value)}`)
+}
+
 function PracticeViewContent(props: PracticeViewProps) {
   const { t } = useTranslation()
 
@@ -238,110 +242,99 @@ function PracticeViewContent(props: PracticeViewProps) {
   const response = props.content.data
   const { session, setupContext } = response
 
-  if (session.status === "setup") {
-    if (setupContext.targetRoles.length === 0) return <PracticeNoRolesState />
+  switch (session.status) {
+    case "setup": {
+      if (setupContext.targetRoles.length === 0) return <PracticeNoRolesState />
 
-    const selection = resolveActiveSelection(session.selection, setupContext)
-    if (!selection) return <PracticeNoRolesState />
+      const selection = resolveActiveSelection(session.selection, setupContext)
+      if (!selection) return <PracticeNoRolesState />
 
-    return (
-      <Card data-testid="practice-setup-state">
-        <CardHeader>
-          <CardTitle>
-            <h2>{t("practice.setup.title")}</h2>
-          </CardTitle>
-          <CardDescription>{t("practice.setup.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PracticeSetupForm
-            context={setupContext}
-            initialSelection={selection}
-            isPending={props.isStarting}
-            onStart={props.onStart}
-          />
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (session.status === "generatingQuestion") {
-    if (props.generationError) {
       return (
-        <PracticeGenerationErrorState
-          context={setupContext}
-          isRetrying={props.isGenerationRetrying}
-          onRetry={props.onRetryGeneration}
-          selection={session.selection}
-        />
+        <Card data-testid="practice-setup-state">
+          <CardHeader>
+            <CardTitle>
+              <h2>{t("practice.setup.title")}</h2>
+            </CardTitle>
+            <CardDescription>{t("practice.setup.description")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PracticeSetupForm
+              context={setupContext}
+              initialSelection={selection}
+              isPending={props.isStarting}
+              onStart={props.onStart}
+            />
+          </CardContent>
+        </Card>
       )
     }
 
-    return <PracticeGeneratingState context={setupContext} selection={session.selection} />
+    case "generatingQuestion":
+      if (props.generationError) {
+        return (
+          <PracticeGenerationErrorState
+            context={setupContext}
+            isRetrying={props.isGenerationRetrying}
+            onRetry={props.onRetryGeneration}
+            selection={session.selection}
+          />
+        )
+      }
+
+      return <PracticeGeneratingState context={setupContext} selection={session.selection} />
+
+    case "answering":
+      return (
+        <PracticeAnsweringView
+          actions={props.answeringActions}
+          context={setupContext}
+          pending={props.answeringPending}
+          session={session}
+        />
+      )
+
+    case "answeringFollowUp":
+      return (
+        <PracticeFollowUpView
+          actions={props.followUpActions}
+          context={setupContext}
+          pending={props.followUpPending}
+          session={session}
+        />
+      )
+
+    case "evaluating":
+      return (
+        <PracticeEvaluatingView
+          context={setupContext}
+          evaluationError={props.evaluationError}
+          isEvaluationRetrying={props.isEvaluationRetrying}
+          onRetryEvaluation={props.onRetryEvaluation}
+          session={session}
+        />
+      )
+
+    case "review":
+      return (
+        <PracticeReviewView
+          actions={props.reviewActions}
+          context={setupContext}
+          pending={props.reviewPending}
+          session={session}
+        />
+      )
+
+    case "completed":
+      return (
+        <PracticeCompletedView
+          actions={props.completedActions}
+          isPreparingNextRound={props.completedPending}
+          session={session}
+        />
+      )
   }
 
-  if (session.status === "answering") {
-    return (
-      <PracticeAnsweringView
-        actions={props.answeringActions}
-        context={setupContext}
-        pending={props.answeringPending}
-        session={session}
-      />
-    )
-  }
-
-  if (session.status === "answeringFollowUp") {
-    return (
-      <PracticeFollowUpView
-        actions={props.followUpActions}
-        context={setupContext}
-        pending={props.followUpPending}
-        session={session}
-      />
-    )
-  }
-
-  if (session.status === "evaluating") {
-    return (
-      <PracticeEvaluatingView
-        context={setupContext}
-        evaluationError={props.evaluationError}
-        isEvaluationRetrying={props.isEvaluationRetrying}
-        onRetryEvaluation={props.onRetryEvaluation}
-        session={session}
-      />
-    )
-  }
-
-  if (session.status === "review") {
-    return (
-      <PracticeReviewView
-        actions={props.reviewActions}
-        context={setupContext}
-        pending={props.reviewPending}
-        session={session}
-      />
-    )
-  }
-
-  if (session.status === "completed") {
-    return (
-      <PracticeCompletedView
-        actions={props.completedActions}
-        isPreparingNextRound={props.completedPending}
-        session={session}
-      />
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("practice.ready.title")}</CardTitle>
-        <CardDescription>{t("practice.ready.description")}</CardDescription>
-      </CardHeader>
-    </Card>
-  )
+  return assertNever(session)
 }
 
 function PracticeFollowUpView({

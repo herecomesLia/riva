@@ -1,14 +1,8 @@
 import { Link } from "@tanstack/react-router"
-import {
-  AlertCircleIcon,
-  BriefcaseBusinessIcon,
-  CircleCheckIcon,
-  LoaderCircleIcon,
-} from "lucide-react"
+import { AlertCircleIcon, BriefcaseBusinessIcon, LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -28,11 +22,7 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import type {
-  ActivePracticeSelection,
-  PracticeQuestionCard,
-  PracticeSetupContext,
-} from "@/models/practice"
+import type { ActivePracticeSelection, PracticeSetupContext } from "@/models/practice"
 
 export function PracticeLoadingState() {
   const { t } = useTranslation()
@@ -190,32 +180,6 @@ export function PracticeGenerationErrorState({
   )
 }
 
-export function PracticeQuestionReadyState({ question }: { question: PracticeQuestionCard }) {
-  const { t } = useTranslation()
-
-  return (
-    <Card data-testid="practice-question-ready-state">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CircleCheckIcon />
-          {t("practice.ready.title")}
-        </CardTitle>
-        <CardDescription>{t("practice.ready.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <p className="text-lg leading-8 font-medium">{question.prompt}</p>
-        <div className="flex flex-wrap gap-2">
-          {question.assessedCapabilities.map((capability) => (
-            <Badge key={capability} variant="secondary">
-              {capability}
-            </Badge>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 export function PracticeSelectionSummary({
   context,
   selection,
@@ -227,7 +191,7 @@ export function PracticeSelectionSummary({
   const role = context.targetRoles.find((candidate) => candidate.id === selection.targetRoleId)
 
   const items = [
-    [t("practice.summary.targetRole"), role?.title ?? selection.targetRoleId],
+    [t("practice.summary.targetRole"), role?.title ?? t("practice.session.unknownRole")],
     [t("practice.summary.questionType"), t(`practice.questionTypes.${selection.questionType}`)],
     [t("practice.summary.difficulty"), t(`practice.difficulty.${selection.difficulty}`)],
     [t("practice.summary.source"), t(`practice.sources.${selection.source}`)],

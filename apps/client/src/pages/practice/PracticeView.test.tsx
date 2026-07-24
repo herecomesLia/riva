@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
-import type { ActivePracticeSelection, PracticePageResponse } from "@/models/practice"
+import type {
+  ActivePracticeSelection,
+  PracticePageResponse,
+  PracticeSessionState,
+} from "@/models/practice"
 import { renderWithProviders } from "@/test/render"
 
 import {
@@ -203,7 +207,57 @@ function expectControlEnabled(control: HTMLElement) {
   expect(control).not.toHaveAttribute("aria-disabled", "true")
 }
 
+const sessionStateCases = {
+  setup: { scenario: "setupReady", testId: "practice-setup-state" },
+  generatingQuestion: {
+    scenario: "generatingQuestion",
+    testId: "practice-generating-state",
+  },
+  answering: { scenario: "answeringQuestion", testId: "practice-answering-state" },
+  answeringFollowUp: {
+    scenario: "answeringFirstFollowUp",
+    testId: "practice-answering-follow-up-state",
+  },
+  evaluating: { scenario: "evaluatingAnswer", testId: "practice-evaluating-state" },
+  review: { scenario: "reviewBalanced", testId: "practice-review-state" },
+  completed: { scenario: "completedSession", testId: "practice-completed-state" },
+} as const satisfies Record<
+  PracticeSessionState["status"],
+  {
+    scenario: Parameters<typeof createPracticeMockResponse>[0]
+    testId: string
+  }
+>
+
 describe("PracticeView", () => {
+  it.each(Object.entries(sessionStateCases))(
+    "renders the explicit %s session branch",
+    async (status, { scenario, testId }) => {
+      const data = createPracticeMockResponse(scenario)
+      expect(data.session.status).toBe(status)
+
+      renderReadyView(data)
+
+      expect(await screen.findByTestId(testId)).toBeInTheDocument()
+      expect(screen.queryByText(/答题区将在下一步中实现/)).not.toBeInTheDocument()
+    },
+  )
+
+  it("shows a safe label instead of an internal role ID when selection metadata is missing", async () => {
+    const data = createPracticeMockResponse("generatingQuestion")
+    if (data.session.status !== "generatingQuestion") {
+      throw new Error("Generating fixture required.")
+    }
+    const internalRoleId = data.session.selection.targetRoleId
+    data.setupContext.targetRoles = []
+
+    renderReadyView(data)
+
+    const generating = await screen.findByTestId("practice-generating-state")
+    expect(generating).toHaveTextContent(i18n.t("practice.session.unknownRole"))
+    expect(generating).not.toHaveTextContent(internalRoleId)
+  })
+
   it("renders the completed summary with next-round and training-history actions", async () => {
     const data = createPracticeMockResponse("completedSession")
     if (data.session.status !== "completed") throw new Error("Completed fixture required.")
