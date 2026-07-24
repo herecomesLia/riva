@@ -13,6 +13,7 @@ import type {
 export type InterviewMockScenario = "setupReady" | "noTargetRoles" | "completed"
 
 export const interviewSetupResponseMock = {
+  availableDifficulties: ["basic", "pressure"],
   targetRoles: [
     {
       id: "role_frontend_engineer_bytedance",
@@ -231,6 +232,7 @@ export function createInterviewMockResponse(
   if (scenario === "noTargetRoles") {
     return {
       setup: {
+        availableDifficulties: ["basic", "pressure"],
         targetRoles: [],
         defaultConfiguration: {
           targetRoleId: null,

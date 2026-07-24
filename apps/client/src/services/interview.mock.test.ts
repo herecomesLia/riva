@@ -208,6 +208,7 @@ describe("interview stateful mock service", () => {
 
     await expect(settle(getInterviewPage())).resolves.toEqual({
       setup: {
+        availableDifficulties: ["basic", "pressure"],
         targetRoles: [],
         defaultConfiguration: {
           targetRoleId: null,

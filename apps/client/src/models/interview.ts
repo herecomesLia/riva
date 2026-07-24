@@ -28,11 +28,12 @@ export type InterviewTargetRoleResponse = {
   id: string
   title: string
   company: string | null
-  supportedRounds: InterviewRound[]
+  supportedRounds: [InterviewRound, ...InterviewRound[]]
 }
 
 export type InterviewSetupResponse = {
   targetRoles: InterviewTargetRoleResponse[]
+  availableDifficulties: [InterviewDifficulty, ...InterviewDifficulty[]]
   defaultConfiguration: {
     targetRoleId: string | null
     round: InterviewRound
@@ -242,6 +243,7 @@ export type InterviewPageResponse = {
  */
 export type InterviewSetupViewData = {
   targetRoles: InterviewTargetRoleResponse[]
+  availableDifficulties: InterviewSetupResponse["availableDifficulties"]
   defaultConfiguration: InterviewSetupResponse["defaultConfiguration"]
 }
 
