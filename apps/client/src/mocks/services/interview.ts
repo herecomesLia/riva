@@ -1,9 +1,11 @@
 import {
+  candidateQuestionsPromptMock,
   createCandidateQuestionExchange,
   createInterviewMockResponse,
   createInterviewQuestionSet,
   createInterviewReview,
   createInterviewReviewResponseMock,
+  interviewOpeningMessageMock,
   projectFollowUpQuestionMock,
   type InterviewMockScenario,
 } from "@/mocks/data/interview"
@@ -205,6 +207,9 @@ export async function startInterview(
   input: StartInterviewInput,
 ): Promise<InterviewMutationResponse> {
   await consumeOperation("startInterview")
+  if (response.setup.availability.status === "blocked") {
+    throw new Error(`Interview prerequisite is not met: ${response.setup.availability.reason}.`)
+  }
   const targetRole = response.setup.targetRoles.find(({ id }) => id === input.targetRoleId)
   if (targetRole === undefined) throw new Error("Interview target role does not exist.")
   if (!targetRole.supportedRounds.includes(input.round)) {
@@ -224,8 +229,7 @@ export async function startInterview(
       totalQuestions: questions.length,
     },
     completedQuestions: [],
-    openingMessage:
-      "你好，我是本次模拟面试的面试官。接下来会围绕岗位经历、项目能力和求职动机连续提问，请尽量像正式面试一样作答。",
+    openingMessage: interviewOpeningMessageMock,
   })
 }
 
@@ -324,7 +328,7 @@ export async function submitInterviewAnswer(
           totalQuestions: answered.progress.totalQuestions,
         },
         completedQuestions,
-        prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+        prompt: candidateQuestionsPromptMock,
         exchanges: [],
       })
     }
@@ -423,7 +427,7 @@ export async function getNextInterviewQuestion(
           totalQuestions: session.progress.totalQuestions,
         },
         completedQuestions,
-        prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+        prompt: candidateQuestionsPromptMock,
         exchanges: [],
       })
     }
@@ -477,7 +481,7 @@ export async function enterCandidateQuestions(
       totalQuestions: session.progress.totalQuestions,
     },
     completedQuestions,
-    prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+    prompt: candidateQuestionsPromptMock,
     exchanges: [],
   }
   return commit(next)

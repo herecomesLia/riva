@@ -2,8 +2,8 @@ import preview from "#storybook/preview"
 import { expect, fn } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
-import { interviewSetupResponseMock } from "@/mocks/data/interview"
 
+import { createInterviewSetupStoryFixture } from "./interview-story-fixtures"
 import { InterviewView } from "./InterviewView"
 
 const meta = preview.meta({
@@ -20,7 +20,7 @@ export const Loading = meta.story({
 export const Ready = meta.story({
   args: {
     status: "ready",
-    setup: structuredClone(interviewSetupResponseMock),
+    setup: createInterviewSetupStoryFixture(),
     isStarting: false,
     onStart: fn(async () => undefined),
   },
@@ -29,7 +29,7 @@ export const Ready = meta.story({
 export const Mobile = meta.story({
   args: {
     status: "ready",
-    setup: structuredClone(interviewSetupResponseMock),
+    setup: createInterviewSetupStoryFixture(),
     isStarting: false,
     onStart: fn(async () => undefined),
   },
@@ -44,7 +44,7 @@ export const Mobile = meta.story({
 export const Starting = meta.story({
   args: {
     status: "ready",
-    setup: structuredClone(interviewSetupResponseMock),
+    setup: createInterviewSetupStoryFixture(),
     isStarting: true,
     onStart: fn(async () => undefined),
   },
@@ -57,6 +57,18 @@ export const Starting = meta.story({
 
 export const Empty = meta.story({
   args: { status: "empty" },
+})
+
+const blockedSetup = createInterviewSetupStoryFixture("prerequisiteNotMet")
+if (blockedSetup.availability.status !== "blocked") {
+  throw new Error("Blocked interview setup fixture required.")
+}
+
+export const PrerequisiteNotMet = meta.story({
+  args: {
+    status: "blocked",
+    reason: blockedSetup.availability.reason,
+  },
 })
 
 const onRetry = fn()
@@ -78,7 +90,7 @@ const onStart = fn(async () => undefined)
 export const StartInterview = meta.story({
   args: {
     status: "ready",
-    setup: structuredClone(interviewSetupResponseMock),
+    setup: createInterviewSetupStoryFixture(),
     isStarting: false,
     onStart,
   },
@@ -86,14 +98,16 @@ export const StartInterview = meta.story({
     await userEvent.click(
       canvas.getByRole("button", { name: /开始模拟面试|start mock interview/i }),
     )
-    await expect(onStart).toHaveBeenCalledWith(interviewSetupResponseMock.defaultConfiguration)
+    await expect(onStart).toHaveBeenCalledWith(
+      createInterviewSetupStoryFixture().defaultConfiguration,
+    )
   },
 })
 
 export const StartFailure = meta.story({
   args: {
     status: "ready",
-    setup: structuredClone(interviewSetupResponseMock),
+    setup: createInterviewSetupStoryFixture(),
     isStarting: false,
     onStart: fn(async () => {
       throw new Error("start failed")

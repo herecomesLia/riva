@@ -44,7 +44,7 @@ export const Error = meta.story({
     variant: "error",
   },
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /重试|retry/i }))
+    await userEvent.click(canvas.getByRole("button", { name: /重新加载|reload/i }))
     await expect(onRetry).toHaveBeenCalledTimes(1)
   },
 })

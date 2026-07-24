@@ -95,6 +95,22 @@ describe("InterviewPage", () => {
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument()
   })
 
+  it("maps a service prerequisite to the matching existing completion route", async () => {
+    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse("prerequisiteNotMet"))
+
+    renderInterviewPage()
+
+    expect(
+      await screen.findByText(i18n.t("interview.prerequisites.profileIncomplete.title")),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("interview.prerequisites.profileIncomplete.action"),
+      }),
+    ).toHaveAttribute("href", "/profile")
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument()
+  })
+
   it("shows a safe load error and retries", async () => {
     const user = userEvent.setup()
     vi.mocked(getInterviewPage)

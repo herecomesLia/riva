@@ -1,7 +1,14 @@
 import { Link } from "@tanstack/react-router"
-import { AlertCircleIcon, BriefcaseBusinessIcon, RotateCcwIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  BriefcaseBusinessIcon,
+  FileTextIcon,
+  RotateCcwIcon,
+  UserRoundPenIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -40,6 +47,10 @@ export type InterviewViewProps =
       status: "empty"
     }
   | {
+      status: "blocked"
+      reason: "profileIncomplete" | "jobDescriptionMissing"
+    }
+  | {
       status: "error"
       isRetrying: boolean
       onRetry: () => void
@@ -72,6 +83,7 @@ function InterviewHeader() {
 function InterviewViewContent(props: InterviewViewProps) {
   if (props.status === "loading") return <InterviewLoadingState />
   if (props.status === "empty") return <InterviewEmptyState />
+  if (props.status === "blocked") return <InterviewBlockedState reason={props.reason} />
   if (props.status === "error") {
     return <InterviewErrorState isRetrying={props.isRetrying} onRetry={props.onRetry} />
   }
@@ -83,6 +95,34 @@ function InterviewViewContent(props: InterviewViewProps) {
         onStart={props.onStart}
         setup={props.setup}
       />
+    </InterviewSetupCard>
+  )
+}
+
+function InterviewBlockedState({
+  reason,
+}: {
+  reason: "profileIncomplete" | "jobDescriptionMissing"
+}) {
+  const { t } = useTranslation()
+  const destination = reason === "profileIncomplete" ? "/profile" : "/roles"
+  const Icon = reason === "profileIncomplete" ? UserRoundPenIcon : FileTextIcon
+
+  return (
+    <InterviewSetupCard>
+      <CardContent>
+        <Alert>
+          <AlertCircleIcon aria-hidden="true" />
+          <AlertTitle>{t(`interview.prerequisites.${reason}.title`)}</AlertTitle>
+          <AlertDescription>{t(`interview.prerequisites.${reason}.description`)}</AlertDescription>
+        </Alert>
+      </CardContent>
+      <CardFooter className="border-t">
+        <Button nativeButton={false} render={<Link to={destination} />}>
+          <Icon aria-hidden="true" data-icon="inline-start" />
+          {t(`interview.prerequisites.${reason}.action`)}
+        </Button>
+      </CardFooter>
     </InterviewSetupCard>
   )
 }

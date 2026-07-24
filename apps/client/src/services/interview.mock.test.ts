@@ -171,6 +171,7 @@ describe("interview stateful mock service", () => {
 
     await expect(settle(getInterviewPage())).resolves.toEqual({
       setup: {
+        availability: { status: "available" },
         availableDifficulties: ["basic", "pressure"],
         targetRoles: [],
         defaultConfiguration: {
@@ -181,6 +182,27 @@ describe("interview stateful mock service", () => {
       },
       session: null,
     })
+  })
+
+  it("keeps prerequisite availability authoritative in the mock service", async () => {
+    resetInterviewMockState("prerequisiteNotMet")
+    const page = await settle(getInterviewPage())
+    expect(page.setup.availability).toEqual({
+      status: "blocked",
+      reason: "profileIncomplete",
+    })
+
+    const targetRoleId = page.setup.defaultConfiguration.targetRoleId
+    if (targetRoleId === null) throw new Error("Blocked setup target role required.")
+    const request = startInterview({
+      ...page.setup.defaultConfiguration,
+      targetRoleId,
+    })
+    const assertion = expect(request).rejects.toThrow(
+      "Interview prerequisite is not met: profileIncomplete.",
+    )
+    await vi.runAllTimersAsync()
+    await assertion
   })
 
   it("ends an active interview through the service without counting an unanswered question", async () => {

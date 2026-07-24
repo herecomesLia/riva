@@ -31,7 +31,15 @@ export type InterviewTargetRoleResponse = {
   supportedRounds: [InterviewRound, ...InterviewRound[]]
 }
 
+export type InterviewSetupAvailabilityResponse =
+  | { status: "available" }
+  | {
+      status: "blocked"
+      reason: "profileIncomplete" | "jobDescriptionMissing"
+    }
+
 export type InterviewSetupResponse = {
+  availability: InterviewSetupAvailabilityResponse
   targetRoles: InterviewTargetRoleResponse[]
   availableDifficulties: [InterviewDifficulty, ...InterviewDifficulty[]]
   defaultConfiguration: {
@@ -248,6 +256,7 @@ export type InterviewPageResponse = {
  * outside the server response contract.
  */
 export type InterviewSetupViewData = {
+  availability: InterviewSetupResponse["availability"]
   targetRoles: InterviewTargetRoleResponse[]
   availableDifficulties: InterviewSetupResponse["availableDifficulties"]
   defaultConfiguration: InterviewSetupResponse["defaultConfiguration"]

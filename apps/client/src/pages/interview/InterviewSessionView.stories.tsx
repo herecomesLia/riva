@@ -1,18 +1,24 @@
 import preview from "#storybook/preview"
-import { expect, fn } from "storybook/test"
+import { expect, fn, screen, within } from "storybook/test"
 
-import { createCandidateQuestionExchange } from "@/mocks/data/interview"
-
+import { createInterviewSessionStoryFixture } from "./interview-story-fixtures"
 import { InterviewSessionView } from "./InterviewSessionView"
 
-const summary = {
-  targetRole: "高级前端工程师",
-  company: "字节跳动",
-  round: "technical",
-  difficulty: "pressure",
-  completedQuestions: 1,
-  totalQuestions: 3,
-} as const
+const fixture = createInterviewSessionStoryFixture()
+const projectQuestion = fixture.completedQuestions.find(
+  ({ question }) => question.id === "interview-question-project-deep-dive",
+)
+const motivationQuestion = fixture.completedQuestions.find(
+  ({ question }) => question.id === "interview-question-motivation",
+)
+const projectFollowUp = projectQuestion?.followUps[0]
+if (
+  projectQuestion === undefined ||
+  projectFollowUp === undefined ||
+  motivationQuestion === undefined
+) {
+  throw new Error("Complete interview question fixtures required.")
+}
 
 const activeActions = {
   isEnding: false,
@@ -23,16 +29,15 @@ const activeActions = {
 const questionArgs = {
   ...activeActions,
   status: "question",
-  summary,
+  summary: fixture.summary,
   prompt: {
-    id: "interview-question-2",
+    id: projectQuestion.question.id,
     kind: "question",
-    content:
-      "请介绍一个你主导解决的复杂性能问题。你当时如何定位根因、协调相关团队，并验证优化确实带来了业务结果？",
-    questionOrder: 2,
+    content: projectQuestion.question.prompt,
+    questionOrder: projectQuestion.question.order,
     answer: null,
   },
-  history: [],
+  history: fixture.history.filter(({ id }) => id === "interview-question-self-introduction"),
   isSubmitting: false,
   advanceStatus: "idle",
   onSubmit: fn(async () => undefined),
@@ -52,9 +57,8 @@ export const Opening = meta.story({
   args: {
     ...activeActions,
     status: "opening",
-    summary: { ...summary, completedQuestions: 0 },
-    openingMessage:
-      "你好，我是本次模拟面试的面试官。接下来会围绕岗位经历、项目能力和求职动机连续提问，请尽量像正式面试一样作答。",
+    summary: { ...fixture.summary, completedQuestions: 0 },
+    openingMessage: fixture.openingMessage,
     isBeginning: false,
     beginFailed: false,
     onBegin: fn(async () => undefined),
@@ -65,17 +69,64 @@ export const Question = meta.story({
   args: questionArgs,
 })
 
-export const LongContent = meta.story({
+export const LongContentNarrow = meta.story({
   args: {
     ...questionArgs,
     prompt: {
       ...questionArgs.prompt,
       id: "long-question",
-      content:
-        "假设你接手了一个历史包袱较重、横跨多个业务团队并且每天承载大量交易的前端系统。在不能中断现有业务迭代的前提下，请完整说明你会如何识别最高风险、建立可观测性、规划迁移边界、协调上下游，并用可验证的数据判断这次治理是否成功。",
+      content: `${projectQuestion.question.prompt} 请进一步说明在不能中断业务迭代、需要协调多个上下游团队且缺少完整历史监控数据的约束下，你会如何识别最高风险、规划迁移边界，并用可验证的数据判断治理是否成功？`,
     },
+    history: questionArgs.history.map((record) => ({
+      ...record,
+      answer: `${record.answer}\n\n在推进过程中，我还负责组织产品、服务端和质量团队统一指标口径，按风险拆分灰度批次，并持续记录异常、决策依据和回滚条件，确保长周期治理不会影响现有业务交付。`,
+    })),
   },
   globals: { viewport: { isRotated: false, value: "mobile1" } },
+})
+
+export const SubmittingAnswer = meta.story({
+  args: {
+    ...questionArgs,
+    isSubmitting: true,
+    isInteractionLocked: true,
+  },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: /正在提交并准备下一问|submitting and preparing/i }),
+    ).toBeDisabled()
+    await expect(canvas.getByRole("textbox")).toBeDisabled()
+  },
+})
+
+const submitAnswer = fn(async () => undefined)
+
+export const SubmitAnswer = meta.story({
+  args: {
+    ...questionArgs,
+    onSubmit: submitAnswer,
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByRole("textbox"), projectQuestion.answer.content)
+    await userEvent.click(canvas.getByRole("button", { name: /提交回答|submit answer/i }))
+    await expect(submitAnswer).toHaveBeenCalledWith(projectQuestion.answer.content)
+  },
+})
+
+export const AnswerSubmissionFailure = meta.story({
+  args: {
+    ...questionArgs,
+    onSubmit: fn(async () => {
+      throw new Error("submit failed")
+    }),
+  },
+  play: async ({ canvas, userEvent }) => {
+    const answer = projectQuestion.answer.content
+    await userEvent.type(canvas.getByRole("textbox"), answer)
+    await userEvent.click(canvas.getByRole("button", { name: /提交回答|submit answer/i }))
+    await expect(canvas.getByRole("alert")).toBeVisible()
+    await expect(canvas.getByRole("textbox")).toHaveValue(answer)
+  },
 })
 
 export const Advancing = meta.story({
@@ -83,27 +134,29 @@ export const Advancing = meta.story({
     ...questionArgs,
     prompt: {
       ...questionArgs.prompt,
-      answer:
-        "我先通过真实用户监控和链路追踪定位长任务，再拆分高风险步骤，最后用灰度分组对比核心转化指标。",
+      answer: projectQuestion.answer.content,
     },
     advanceStatus: "advancing",
   },
 })
+
+const retryAdvance = fn()
 
 export const AdvanceFailure = meta.story({
   args: {
     ...questionArgs,
     prompt: {
       ...questionArgs.prompt,
-      answer:
-        "我先通过真实用户监控和链路追踪定位长任务，再拆分高风险步骤，最后用灰度分组对比核心转化指标。",
+      answer: projectQuestion.answer.content,
     },
     advanceStatus: "failed",
+    onRetryAdvance: retryAdvance,
   },
-  play: async ({ canvas }) => {
-    await expect(
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(
       canvas.getByRole("button", { name: /重新获取下一问|retry next question/i }),
-    ).toBeVisible()
+    )
+    await expect(retryAdvance).toHaveBeenCalledTimes(1)
   },
 })
 
@@ -111,41 +164,50 @@ export const DynamicFollowUp = meta.story({
   args: {
     ...questionArgs,
     prompt: {
-      id: "interview-follow-up-project-tradeoff",
+      id: projectFollowUp.question.id,
       kind: "followUp",
-      content: "如果监控数据只能证明性能改善，却无法直接证明业务收益，你会如何补充验证？",
-      questionOrder: 2,
+      content: projectFollowUp.question.prompt,
+      questionOrder: projectQuestion.question.order,
       answer: null,
     },
     history: [
       {
-        id: "interview-question-project-deep-dive",
+        id: projectQuestion.question.id,
         kind: "question",
-        questionOrder: 2,
-        prompt: "请介绍一次你主导的前端性能优化。",
-        answer: "我先通过真实用户监控定位长任务，再分阶段实施拆包和渲染调度优化。",
+        questionOrder: projectQuestion.question.order,
+        prompt: projectQuestion.question.prompt,
+        answer: projectQuestion.answer.content,
       },
     ],
+  },
+})
+
+const endInterview = fn(async () => undefined)
+
+export const EndConfirmation = meta.story({
+  args: {
+    ...questionArgs,
+    onEnd: endInterview,
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /结束面试|end interview/i }))
+    const dialog = await screen.findByRole("alertdialog")
+    await expect(dialog).toBeVisible()
+    await userEvent.click(within(dialog).getByRole("button", { name: /确认结束|confirm end/i }))
+    await expect(endInterview).toHaveBeenCalledTimes(1)
   },
 })
 
 export const CandidateQuestions = meta.story({
   args: {
     status: "candidateQuestions",
-    summary: { ...summary, completedQuestions: 3 },
-    prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
-    history: [
-      {
-        id: "interview-question-motivation",
-        kind: "question",
-        questionOrder: 3,
-        prompt: "为什么选择这个岗位？",
-        answer: "岗位的业务复杂度和技术挑战与我的经验高度匹配。",
-      },
-    ],
-    exchanges: [
-      createCandidateQuestionExchange("这个岗位入职后的核心目标和主要协作团队分别是什么？", 1),
-    ],
+    summary: {
+      ...fixture.summary,
+      completedQuestions: fixture.summary.totalQuestions,
+    },
+    prompt: fixture.candidatePrompt,
+    history: fixture.history.filter(({ id }) => id === motivationQuestion.question.id),
+    exchanges: [fixture.candidateExchange],
     isSubmittingQuestion: false,
     isFinishing: false,
     isInteractionLocked: false,
@@ -162,11 +224,17 @@ export const MissingSession = meta.story({
   },
 })
 
+const retrySession = fn()
+
 export const LoadError = meta.story({
   args: {
     status: "error",
     isRetrying: false,
-    onRetry: fn(),
+    onRetry: retrySession,
     onBack: fn(),
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /重试|retry/i }))
+    await expect(retrySession).toHaveBeenCalledTimes(1)
   },
 })

@@ -32,6 +32,18 @@ export const interview = {
     title: "暂无可用的目标岗位",
     description: "请先添加一个目标岗位，再回来配置模拟面试。",
   },
+  prerequisites: {
+    profileIncomplete: {
+      title: "请先完善求职档案",
+      description: "模拟面试会结合你的真实经历生成问题，完成求职档案后即可开始。",
+      action: "完善求职档案",
+    },
+    jobDescriptionMissing: {
+      title: "请先补充目标岗位 JD",
+      description: "模拟面试需要根据岗位职责和能力要求生成题组，请先补充当前岗位 JD。",
+      action: "补充岗位 JD",
+    },
+  },
   errors: {
     loadTitle: "无法加载模拟面试配置",
     loadDescription: "配置暂时加载失败，请检查网络后重试。",

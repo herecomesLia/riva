@@ -12,9 +12,11 @@ import type {
   InterviewSetupResponse,
 } from "@/models/interview"
 
-export type InterviewMockScenario = "setupReady" | "noTargetRoles" | "completed"
+export type InterviewMockScenario =
+  "setupReady" | "noTargetRoles" | "prerequisiteNotMet" | "completed"
 
 export const interviewSetupResponseMock = {
+  availability: { status: "available" },
   availableDifficulties: ["basic", "pressure"],
   targetRoles: [
     {
@@ -64,6 +66,11 @@ const interviewQuestionSet = [
 export function createInterviewQuestionSet(): InterviewQuestionResponse[] {
   return structuredClone(interviewQuestionSet)
 }
+
+export const interviewOpeningMessageMock =
+  "你好，我是本次模拟面试的面试官。接下来会围绕岗位经历、项目能力和求职动机连续提问，请尽量像正式面试一样作答。"
+
+export const candidateQuestionsPromptMock = "正式提问已经结束。现在请你以候选人身份向面试官提问。"
 
 export const projectFollowUpQuestionMock = {
   id: "interview-follow-up-project-tradeoff",
@@ -274,6 +281,7 @@ export function createInterviewMockResponse(
   if (scenario === "noTargetRoles") {
     return {
       setup: {
+        availability: { status: "available" },
         availableDifficulties: ["basic", "pressure"],
         targetRoles: [],
         defaultConfiguration: {
@@ -290,6 +298,19 @@ export function createInterviewMockResponse(
     return {
       setup: structuredClone(interviewSetupResponseMock),
       session: createCompletedSession(),
+    }
+  }
+
+  if (scenario === "prerequisiteNotMet") {
+    return {
+      setup: {
+        ...structuredClone(interviewSetupResponseMock),
+        availability: {
+          status: "blocked",
+          reason: "profileIncomplete",
+        },
+      },
+      session: null,
     }
   }
 

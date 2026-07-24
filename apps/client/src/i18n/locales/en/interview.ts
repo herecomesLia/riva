@@ -34,6 +34,20 @@ export const interview = {
     title: "No target roles available",
     description: "Add a target role before configuring a mock interview.",
   },
+  prerequisites: {
+    profileIncomplete: {
+      title: "Complete your job-search profile first",
+      description:
+        "Mock interviews use your real experience to generate questions. Complete your profile to continue.",
+      action: "Complete profile",
+    },
+    jobDescriptionMissing: {
+      title: "Add the target job description first",
+      description:
+        "Mock interviews use role responsibilities and capability requirements to generate a question set.",
+      action: "Add job description",
+    },
+  },
   errors: {
     loadTitle: "Unable to load interview setup",
     loadDescription: "The setup could not be loaded. Check your connection and try again.",

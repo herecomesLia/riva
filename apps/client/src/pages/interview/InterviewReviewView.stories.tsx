@@ -3,6 +3,7 @@ import { expect, fn, userEvent } from "storybook/test"
 
 import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
 
+import { createSparseInterviewReviewStoryFixture } from "./interview-story-fixtures"
 import { InterviewReviewView } from "./InterviewReviewView"
 
 const meta = preview.meta({
@@ -47,11 +48,26 @@ export const Empty = meta.story({
   },
 })
 
+export const SparseData = meta.story({
+  args: {
+    status: "ready",
+    data: createSparseInterviewReviewStoryFixture(),
+    onBack: fn(),
+    onNextTraining: fn(),
+  },
+})
+
+const retryReview = fn()
+
 export const Error = meta.story({
   args: {
     status: "error",
     isRetrying: false,
-    onRetry: fn(),
+    onRetry: retryReview,
     onBack: fn(),
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /重新生成|generate again/i }))
+    await expect(retryReview).toHaveBeenCalledTimes(1)
   },
 })
