@@ -300,6 +300,23 @@ export const MissingSession = meta.story({
   },
 })
 
+const openCompletedReview = fn()
+
+export const CompletedSession = meta.story({
+  args: {
+    status: "unavailable",
+    reason: "completed",
+    onBack: openCompletedReview,
+  },
+  play: async ({ canvas, userEvent }) => {
+    await expect(canvas.getByText(/本次面试已经完成|interview is complete/i)).toBeVisible()
+    await userEvent.click(
+      canvas.getByRole("button", { name: /前往面试复盘|go to interview review/i }),
+    )
+    await expect(openCompletedReview).toHaveBeenCalledTimes(1)
+  },
+})
+
 const retrySession = fn()
 
 export const LoadError = meta.story({

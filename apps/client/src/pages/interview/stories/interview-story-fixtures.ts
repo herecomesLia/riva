@@ -1,5 +1,6 @@
 import {
   candidateQuestionsPromptMock,
+  createCandidateQuestionExchange,
   createInterviewCompletedSessionMock,
   createInterviewMockResponse,
   createInterviewReviewResponseMock,
@@ -7,14 +8,16 @@ import {
 } from "@/mocks/data/interview"
 import type {
   GetInterviewReviewResponse,
+  InterviewCandidateQuestionExchangeResponse,
   InterviewConversationRecordViewData,
+  InterviewSetupResponse,
 } from "@/models/interview"
 
 import type { InterviewSessionSummary } from "../InterviewSessionView"
 
 export function createInterviewSetupStoryFixture(
   scenario: "setupReady" | "prerequisiteNotMet" = "setupReady",
-) {
+): InterviewSetupResponse {
   return structuredClone(createInterviewMockResponse(scenario).setup)
 }
 
@@ -188,4 +191,32 @@ export function createMultipleFollowUpsReviewStoryFixture(): GetInterviewReviewR
   return createInterviewReviewResponseMock(
     createInterviewCompletedSessionMock({ agentScenario: "multipleFollowUps" }),
   )
+}
+
+export function createGeneratingReferenceReviewStoryFixture(): GetInterviewReviewResponse {
+  const response = createInterviewReviewResponseMock()
+  if (response.status !== "complete") throw new Error("Complete review fixture required.")
+  const copy = structuredClone(response)
+  copy.questionDetails[0]!.referenceAnswer = { status: "generating" }
+  return copy
+}
+
+export function createLongCandidateExchangesStoryFixture(): InterviewCandidateQuestionExchangeResponse[] {
+  return [
+    createCandidateQuestionExchange(
+      "这个岗位在入职前三个月最重要的业务目标、衡量标准以及与上下游团队的协作边界分别是什么？",
+      1,
+    ),
+    createCandidateQuestionExchange(
+      "如果核心项目同时受到资源不足、跨团队优先级冲突和历史系统约束，团队通常如何做取舍并确保决策透明？",
+      2,
+    ),
+    createCandidateQuestionExchange(
+      "团队如何定义优秀成员的成长路径，又会通过哪些具体反馈机制帮助成员持续提升专业判断和影响力？",
+      3,
+    ),
+  ].map((exchange) => ({
+    ...exchange,
+    interviewerAnswer: `${exchange.interviewerAnswer}${exchange.interviewerAnswer}`,
+  }))
 }

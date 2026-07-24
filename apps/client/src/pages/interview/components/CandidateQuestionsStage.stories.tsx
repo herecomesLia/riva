@@ -1,7 +1,10 @@
 import preview from "#storybook/preview"
 import { expect, fn, screen, within } from "storybook/test"
 
-import { createInterviewSessionStoryFixture } from "../stories/interview-story-fixtures"
+import {
+  createInterviewSessionStoryFixture,
+  createLongCandidateExchangesStoryFixture,
+} from "../stories/interview-story-fixtures"
 import { CandidateQuestionsStage } from "./CandidateQuestionsStage"
 
 const fixture = createInterviewSessionStoryFixture()
@@ -32,6 +35,28 @@ export const NoQuestionsYet = meta.story({
   },
 })
 
+export const SubmittingQuestion = meta.story({
+  args: {
+    ...defaultArgs,
+    isInteractionLocked: true,
+    isSubmittingQuestion: true,
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("textbox")).toBeDisabled()
+  },
+})
+
+export const Finishing = meta.story({
+  args: {
+    ...defaultArgs,
+    isFinishing: true,
+    isInteractionLocked: true,
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("button", { name: /完成面试|finish interview/i })).toBeDisabled()
+  },
+})
+
 const finishInterview = fn(async () => undefined)
 
 export const FinishConfirmation = meta.story({
@@ -49,5 +74,48 @@ export const FinishConfirmation = meta.story({
       }),
     )
     await expect(finishInterview).toHaveBeenCalledTimes(1)
+  },
+})
+
+export const FinishFailure = meta.story({
+  args: {
+    ...defaultArgs,
+    onFinish: fn(async () => {
+      throw new Error("finish failed")
+    }),
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /完成面试|finish interview/i }))
+    const dialog = await screen.findByRole("alertdialog")
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: /完成并生成复盘|finish and generate review/i,
+      }),
+    )
+    await expect(within(dialog).getByRole("alert")).toBeVisible()
+  },
+})
+
+export const MultipleLongExchanges = meta.story({
+  args: {
+    ...defaultArgs,
+    exchanges: createLongCandidateExchangesStoryFixture(),
+  },
+  play: async ({ canvas }) => {
+    const exchanges = createLongCandidateExchangesStoryFixture()
+    await expect(canvas.getByText(exchanges[0]!.question.content)).toBeVisible()
+    await expect(canvas.getByText(exchanges[2]!.question.content)).toBeVisible()
+  },
+})
+
+export const Mobile = meta.story({
+  args: {
+    ...defaultArgs,
+    exchanges: createLongCandidateExchangesStoryFixture(),
+  },
+  globals: { viewport: { isRotated: false, value: "mobile1" } },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("textbox")).toBeVisible()
+    await expect(canvas.getByRole("button", { name: /完成面试|finish interview/i })).toBeVisible()
   },
 })

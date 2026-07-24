@@ -4,6 +4,7 @@ import { expect, fn, userEvent } from "storybook/test"
 import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
 
 import {
+  createGeneratingReferenceReviewStoryFixture,
   createPartialInterviewReviewStoryFixture,
   createMultipleFollowUpsReviewStoryFixture,
   createPartialWithUnansweredFollowUpStoryFixture,
@@ -237,6 +238,31 @@ export const ReferenceUnavailable = meta.story({
       }),
     )
     await expect(canvas.getByText(/参考答案暂不可用/)).toBeVisible()
+  },
+})
+
+export const ReferenceGenerating = meta.story({
+  args: {
+    status: "complete",
+    data: (() => {
+      const response = createGeneratingReferenceReviewStoryFixture()
+      if (response.status !== "complete") throw new Error("Complete review fixture required.")
+      return response
+    })(),
+    onBack: fn(),
+    onNextTraining: fn(),
+  },
+  play: async ({ canvas }) => {
+    const response = createGeneratingReferenceReviewStoryFixture()
+    const detail = response.questionDetails[0]!
+    await userEvent.click(
+      canvas.getByRole("button", {
+        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+      }),
+    )
+    await expect(
+      canvas.getByText(/RIVA 参考答案正在生成|RIVA reference answer is being generated/i),
+    ).toBeVisible()
   },
 })
 

@@ -1,35 +1,10 @@
 import type {
-  InterviewConfiguration,
-  InterviewFollowUpQuestionResponse,
   InterviewFollowUpReviewResponse,
-  InterviewProgressResponse,
   InterviewQuestionResponse,
   InterviewQuestionReviewResponse,
   InterviewReferenceAnswerContentResponse,
   InterviewRound,
 } from "@/models/interview"
-
-export type InterviewAgentMockScenario =
-  | "noFollowUps"
-  | "singleFollowUp"
-  | "multipleFollowUps"
-  | "lastQuestionFollowUp"
-  | "unknownTotal"
-  | "adjustedPlan"
-
-export type MockInterviewAgentPlan = {
-  scenario: InterviewAgentMockScenario
-  initialProgress: Pick<InterviewProgressResponse, "totalMainQuestions" | "planRevision">
-  planChanges: Array<{
-    afterCompletedMainQuestions: number
-    totalMainQuestions: number | null
-    planRevision: number
-  }>
-  questions: Array<{
-    question: InterviewQuestionResponse
-    followUps: InterviewFollowUpQuestionResponse[]
-  }>
-}
 
 type QuestionReviewTemplate = Omit<InterviewQuestionReviewResponse, "questionId"> & {
   weaknesses: string[]
@@ -688,20 +663,23 @@ const productCatalog: RoleQuestionCatalog = {
   ],
 }
 
-const catalogs = {
+export const interviewQuestionCatalogs = {
   role_frontend_bytedance: frontendCatalog,
   role_product_manager_meituan: productCatalog,
 } satisfies Record<string, RoleQuestionCatalog>
 
 export const supportedInterviewRoundsByTargetRoleId = Object.fromEntries(
-  Object.entries(catalogs).map(([roleId, catalog]) => [roleId, catalog.supportedRounds]),
-) as Record<keyof typeof catalogs, [InterviewRound, ...InterviewRound[]]>
+  Object.entries(interviewQuestionCatalogs).map(([roleId, catalog]) => [
+    roleId,
+    catalog.supportedRounds,
+  ]),
+) as Record<keyof typeof interviewQuestionCatalogs, [InterviewRound, ...InterviewRound[]]>
 
-function getCatalog(targetRoleId: string) {
-  return catalogs[targetRoleId as keyof typeof catalogs]
+export function getInterviewQuestionCatalog(targetRoleId: string) {
+  return interviewQuestionCatalogs[targetRoleId as keyof typeof interviewQuestionCatalogs]
 }
 
-function questionsForRound(catalog: RoleQuestionCatalog, round: InterviewRound) {
+export function getInterviewQuestionsForRound(catalog: RoleQuestionCatalog, round: InterviewRound) {
   if (round === "hr") return catalog.hr
   if (round === "technical") {
     if (catalog.technical === undefined) {
@@ -722,121 +700,29 @@ function questionsForRound(catalog: RoleQuestionCatalog, round: InterviewRound) 
   return catalog.business
 }
 
-function questionId(targetRoleId: string, key: string) {
+export function createInterviewQuestionId(targetRoleId: string, key: string) {
   return `interview-question-${targetRoleId}-${key}`
 }
 
-function followUpId(targetRoleId: string, questionKey: string, followUpKey: string) {
+export function createInterviewFollowUpId(
+  targetRoleId: string,
+  questionKey: string,
+  followUpKey: string,
+) {
   return `interview-follow-up-${targetRoleId}-${questionKey}-${followUpKey}`
 }
 
-function requestedFollowUps(scenario: InterviewAgentMockScenario, questionIndex: number) {
-  if (scenario === "singleFollowUp" && questionIndex === 1) return 1
-  if (scenario === "multipleFollowUps" && questionIndex === 1) return 2
-  if (scenario === "lastQuestionFollowUp" && questionIndex === 1) return 1
-  return 0
-}
-
-export function createInterviewAgentPlanMock(
-  input: InterviewConfiguration & { scenario: InterviewAgentMockScenario },
-): MockInterviewAgentPlan {
-  const catalog = getCatalog(input.targetRoleId)
-  if (catalog === undefined) throw new Error("Interview target role has no question catalog.")
-  if (!catalog.supportedRounds.includes(input.round)) {
-    throw new Error("Interview round is not supported by the target role.")
-  }
-
-  const entries = questionsForRound(catalog, input.round)
-  const questionCount =
-    input.scenario === "noFollowUps" || input.scenario === "lastQuestionFollowUp" ? 2 : 3
-  const questions = entries.slice(0, questionCount).map((entry, questionIndex) => {
-    const id = questionId(input.targetRoleId, entry.key)
-    const followUpCount = Math.min(
-      requestedFollowUps(input.scenario, questionIndex),
-      input.difficulty === "pressure" ? 2 : 1,
-    )
-    return {
-      question: {
-        id,
-        prompt: input.difficulty === "pressure" ? entry.pressurePrompt : entry.basicPrompt,
-        type: entry.type,
-        assessedCapabilities: [...entry.assessedCapabilities],
-        order: questionIndex + 1,
-      },
-      followUps: entry.followUps.slice(0, followUpCount).map((followUpEntry, followUpIndex) => ({
-        id: followUpId(input.targetRoleId, entry.key, followUpEntry.key),
-        parentQuestionId: id,
-        prompt:
-          input.difficulty === "pressure"
-            ? followUpEntry.pressurePrompt
-            : followUpEntry.basicPrompt,
-        order: followUpIndex + 1,
-        createdAt: `2026-07-24T02:${String(4 + followUpIndex).padStart(2, "0")}:00.000Z`,
-      })),
-    }
-  })
-  const adjustedPlan = input.scenario === "adjustedPlan"
-
-  return structuredClone({
-    scenario: input.scenario,
-    initialProgress: {
-      totalMainQuestions:
-        input.scenario === "unknownTotal" ? null : adjustedPlan ? 2 : questionCount,
-      planRevision: 1,
-    },
-    planChanges: adjustedPlan
-      ? [{ afterCompletedMainQuestions: 1, totalMainQuestions: 3, planRevision: 2 }]
-      : [],
-    questions,
-  })
-}
-
-function findQuestion(questionIdToFind: string) {
-  for (const [targetRoleId, catalog] of Object.entries(catalogs)) {
+export function findInterviewQuestion(questionIdToFind: string) {
+  for (const [targetRoleId, catalog] of Object.entries(interviewQuestionCatalogs)) {
     for (const entry of [...catalog.hr, ...catalog.business, ...(catalog.technical ?? [])]) {
-      if (questionId(targetRoleId, entry.key) === questionIdToFind) return entry
+      if (createInterviewQuestionId(targetRoleId, entry.key) === questionIdToFind) return entry
     }
   }
   return undefined
-}
-
-function findFollowUp(followUpIdToFind: string) {
-  for (const [targetRoleId, catalog] of Object.entries(catalogs)) {
-    for (const entry of [...catalog.hr, ...catalog.business, ...(catalog.technical ?? [])]) {
-      for (const followUpEntry of entry.followUps) {
-        if (followUpId(targetRoleId, entry.key, followUpEntry.key) === followUpIdToFind) {
-          return followUpEntry
-        }
-      }
-    }
-  }
-  return undefined
-}
-
-export function getInterviewQuestionReviewTemplate(questionIdToFind: string) {
-  const entry = findQuestion(questionIdToFind)
-  if (entry === undefined) {
-    throw new Error(`Missing interview review fixture for question ${questionIdToFind}.`)
-  }
-  return structuredClone(entry.review)
-}
-
-export function getInterviewQuestionReferenceAnswer(questionIdToFind: string) {
-  return structuredClone(findQuestion(questionIdToFind)?.referenceAnswer)
-}
-
-export function getInterviewFollowUpReviewTemplate(followUpIdToFind: string) {
-  const entry = findFollowUp(followUpIdToFind)
-  if (entry === undefined) {
-    throw new Error(`Missing interview follow-up review fixture for ${followUpIdToFind}.`)
-  }
-  return structuredClone(entry.review)
-}
-
-export function getInterviewFollowUpReferenceAnswer(followUpIdToFind: string) {
-  return structuredClone(findFollowUp(followUpIdToFind)?.referenceAnswer)
 }
 
 export function getInterviewMockAnswer(questionIdToFind: string) {
-  return findQuestion(questionIdToFind)?.mockAnswer ?? "我会结合实际约束说明判断、行动和结果。"
+  return (
+    findInterviewQuestion(questionIdToFind)?.mockAnswer ?? "我会结合实际约束说明判断、行动和结果。"
+  )
 }

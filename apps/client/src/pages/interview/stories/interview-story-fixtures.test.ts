@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest"
 
-import { interviewSetupResponseMock } from "@/mocks/data/interview"
+import {
+  createInterviewAgentPlanMock,
+  defaultInterviewConfigurationMock,
+  interviewSetupResponseMock,
+} from "@/mocks/data/interview"
 
 import {
   createInterviewSessionStoryFixture,
   createInterviewSetupStoryFixture,
+  createGeneratingReferenceReviewStoryFixture,
+  createLongCandidateExchangesStoryFixture,
   createSparseInterviewReviewStoryFixture,
 } from "./interview-story-fixtures"
 
@@ -38,5 +44,36 @@ describe("interview Story fixtures", () => {
     const secondReference = secondReview.questionDetails[0]?.referenceAnswer
     if (secondReference?.status !== "ready") throw new Error("Expected ready reference answer.")
     expect(secondReference.content.exampleAnswer).not.toBe("被 Story 修改的参考答案")
+  })
+
+  it("returns independent generating-reference and candidate-exchange fixtures", () => {
+    const firstReview = createGeneratingReferenceReviewStoryFixture()
+    firstReview.questionDetails[0]!.referenceAnswer = {
+      status: "unavailable",
+      reason: "generationFailed",
+    }
+    const secondReview = createGeneratingReferenceReviewStoryFixture()
+    expect(secondReview.questionDetails[0]!.referenceAnswer.status).toBe("generating")
+
+    const firstExchanges = createLongCandidateExchangesStoryFixture()
+    firstExchanges[0]!.question.content = "被 Story 修改的问题"
+    const secondExchanges = createLongCandidateExchangesStoryFixture()
+    expect(secondExchanges[0]!.question.content).not.toBe("被 Story 修改的问题")
+  })
+
+  it("keeps the public Interview Mock outlet deeply isolated after the directory split", () => {
+    const first = createInterviewAgentPlanMock({
+      ...defaultInterviewConfigurationMock,
+      scenario: "multipleFollowUps",
+    })
+    first.questions[0]!.question.prompt = "被调用方修改的问题"
+    first.questions[1]!.followUps[0]!.prompt = "被调用方修改的追问"
+
+    const second = createInterviewAgentPlanMock({
+      ...defaultInterviewConfigurationMock,
+      scenario: "multipleFollowUps",
+    })
+    expect(second.questions[0]!.question.prompt).not.toBe("被调用方修改的问题")
+    expect(second.questions[1]!.followUps[0]!.prompt).not.toBe("被调用方修改的追问")
   })
 })
