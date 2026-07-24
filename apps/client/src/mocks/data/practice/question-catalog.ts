@@ -74,7 +74,10 @@ export const generatedQuestionTemplates = {
       recommendedMaterials: ["前端基础设施设计经历"],
     },
   ],
-} satisfies Record<PracticeQuestionType, readonly GeneratedQuestionTemplate[]>
+} as const satisfies Record<PracticeQuestionType, readonly GeneratedQuestionTemplate[]>
+
+export type MockPracticeQuestionTemplateId =
+  (typeof generatedQuestionTemplates)[PracticeQuestionType][number]["id"]
 
 export const generatedQuestionGuidanceTemplates = {
   projectDeepDive: {

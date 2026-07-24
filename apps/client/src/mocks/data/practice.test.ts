@@ -465,6 +465,10 @@ describe("practice mock scenarios", () => {
     }
   })
 
+  it("keeps unknown API template IDs outside the mock follow-up catalog", () => {
+    expect(getPracticeFollowUpPlan("backend.new-template-from-api")).toEqual([])
+  })
+
   it("creates follow-up questions from the same plan without exposing future prompts", () => {
     const response = createPracticeMockResponse("answeringQuestion")
     if (response.session.status !== "answering") return

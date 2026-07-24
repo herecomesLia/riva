@@ -1,11 +1,7 @@
-import type {
-  PracticeFollowUpReferenceAnswer,
-  PracticeFollowUpTemplateId,
-  PracticeQuestionTemplateId,
-} from "@/models/practice"
+import type { PracticeFollowUpReferenceAnswer } from "@/models/practice"
 
 export type GeneratedQuestionTemplate = {
-  id: PracticeQuestionTemplateId
+  id: string
   prompt: string
   assessedCapabilities: readonly string[]
   recommendedMaterials: readonly string[]
@@ -17,7 +13,7 @@ export type GeneratedQuestionGuidanceTemplate = {
 }
 
 export type GeneratedPracticeFollowUpTemplate = {
-  id: PracticeFollowUpTemplateId
+  id: string
   prompt: string
   answerHints: readonly string[]
   answerFramework: readonly string[]

@@ -6,7 +6,6 @@ import type {
   PracticePageResponse,
   PracticeQuestionMutationInput,
   PrepareNextPracticeSessionInput,
-  PrepareNextPracticeSessionResult,
   StartPracticeSessionInput,
 } from "@/models/practice"
 import {
@@ -36,10 +35,7 @@ export function usePracticeSession() {
   })
   const prepareNextRoundMutation = useMutation({
     mutationFn: prepareNextPracticeSession,
-    onSuccess: (response) => {
-      if (response === "ignored") return
-      queryClient.setQueryData(PRACTICE_QUERY_KEY, response)
-    },
+    onSuccess: (response) => queryClient.setQueryData(PRACTICE_QUERY_KEY, response),
   })
 
   async function start(input: StartPracticeSessionInput) {
@@ -62,9 +58,8 @@ export function usePracticeSession() {
     }
     prepareNextRoundLock.current = true
     try {
-      const response: PrepareNextPracticeSessionResult =
-        await prepareNextRoundMutation.mutateAsync(input)
-      return response === "ignored" ? "ignored" : "executed"
+      await prepareNextRoundMutation.mutateAsync(input)
+      return "executed" as const
     } finally {
       prepareNextRoundLock.current = false
     }

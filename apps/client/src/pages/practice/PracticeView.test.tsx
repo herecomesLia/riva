@@ -793,6 +793,35 @@ describe("PracticeView", () => {
     expect(screen.queryByText(/完整参考答案|完整评分标准|内部追问策略/)).not.toBeInTheDocument()
   })
 
+  it("renders service-provided question data for an unknown template ID", async () => {
+    const data = createPracticeMockResponse("answeringQuestion")
+    if (data.session.status !== "answering") return
+    data.session.question.templateId = "backend.new-question-template"
+    data.session.question.prompt = "后端新增模板返回的问题正文"
+    data.session.question.assessedCapabilities = ["后端返回的能力"]
+    data.session.question.recommendedMaterials = ["后端返回的材料"]
+    data.session.question.referenceAnswer = {
+      status: "revealed",
+      content: {
+        kind: "personalizedExample",
+        answer: "后端返回的参考答案",
+        keyPoints: ["后端返回的要点"],
+        commonMistakes: ["后端返回的常见问题"],
+        generatedAt: "2026-07-24T00:00:00.000Z",
+      },
+      viewedBeforeSubmission: false,
+    }
+
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("practice-question-card")
+    expect(card).toHaveTextContent("后端新增模板返回的问题正文")
+    expect(card).toHaveTextContent("后端返回的能力")
+    expect(card).toHaveTextContent("后端返回的材料")
+    expect(screen.getByText("后端返回的参考答案")).toBeInTheDocument()
+    expect(screen.queryByText("backend.new-question-template")).not.toBeInTheDocument()
+  })
+
   it("only gives the answering view fixed actions and responsive bottom clearance", async () => {
     const { rerenderReady } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
 
@@ -1095,6 +1124,18 @@ describe("PracticeView", () => {
       composer.compareDocumentPosition(assistance) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
+  })
+
+  it("renders a service-provided follow-up with an unknown template ID", async () => {
+    const data = createPracticeMockResponse("answeringFirstFollowUp")
+    if (data.session.status !== "answeringFollowUp") return
+    data.session.currentFollowUp.question.templateId = "backend.new-follow-up-template"
+    data.session.currentFollowUp.question.prompt = "后端新增追问模板返回的正文"
+
+    renderReadyView(data)
+
+    expect(await screen.findByText("后端新增追问模板返回的正文")).toBeInTheDocument()
+    expect(screen.queryByText("backend.new-follow-up-template")).not.toBeInTheDocument()
   })
 
   it("submits the current follow-up with its exact version and question IDs", async () => {

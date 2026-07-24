@@ -546,9 +546,6 @@ describe("practice stateful mock service: answering", () => {
         version: completed.session.version,
       }),
     )
-    if (prepared === "ignored") {
-      throw new Error("The mock prepare-next-round service must return a page snapshot.")
-    }
     const refreshed = await context.settle(context.getPracticePage())
     if (prepared.session.status !== "setup" || refreshed.session.status !== "setup") return
 

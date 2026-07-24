@@ -85,10 +85,6 @@ describe("practice stateful mock service: setup", () => {
         version: completed.session.version,
       }),
     )
-    if (prepared === "ignored") {
-      throw new Error("The mock prepare-next-round service must return a page snapshot.")
-    }
-
     expect(prepared.setupContext).toEqual(completed.setupContext)
     expect(prepared.session).toEqual({
       status: "setup",
@@ -151,9 +147,6 @@ describe("practice stateful mock service: setup", () => {
         version: completed.session.version,
       }),
     )
-    if (prepared === "ignored") {
-      throw new Error("The mock prepare-next-round service must return a page snapshot.")
-    }
     const refreshed = await context.settle(context.getPracticePage())
     if (prepared.session.status !== "setup" || refreshed.session.status !== "setup") return
 
@@ -175,9 +168,6 @@ describe("practice stateful mock service: setup", () => {
         version: completed.session.version,
       }),
     )
-    if (prepared === "ignored") {
-      throw new Error("The mock prepare-next-round service must return a page snapshot.")
-    }
     const refreshed = await context.settle(context.getPracticePage())
     if (prepared.session.status !== "setup" || refreshed.session.status !== "setup") return
 

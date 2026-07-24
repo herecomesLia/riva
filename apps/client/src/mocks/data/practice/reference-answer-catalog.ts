@@ -1,8 +1,6 @@
-import type {
-  PracticeQuestionTemplateId,
-  PracticeQuestionType,
-  PracticeReferenceAnswer,
-} from "@/models/practice"
+import type { PracticeQuestionType, PracticeReferenceAnswer } from "@/models/practice"
+
+import type { MockPracticeQuestionTemplateId } from "./question-catalog"
 
 const referenceAnswerTemplates = {
   "projectDeepDive.performanceOptimization": {
@@ -128,7 +126,7 @@ const referenceAnswerTemplates = {
     ],
   },
 } as const satisfies Record<
-  PracticeQuestionTemplateId,
+  MockPracticeQuestionTemplateId,
   Omit<PracticeReferenceAnswer, "generatedAt">
 >
 
@@ -139,12 +137,15 @@ export function createPracticeReferenceAnswer({
   questionPrompt,
   recommendedMaterials,
 }: {
-  templateId: PracticeQuestionTemplateId
+  templateId: string
   questionType: PracticeQuestionType
   targetRoleTitle: string
   questionPrompt: string
   recommendedMaterials: string[]
 }): PracticeReferenceAnswer {
+  if (!isMockPracticeQuestionTemplateId(templateId)) {
+    throw new Error("Practice reference answer template is not in the mock catalog.")
+  }
   const template = structuredClone(referenceAnswerTemplates[templateId])
   const expectedPrefix = `${questionType}.`
   if (!templateId.startsWith(expectedPrefix)) {
@@ -157,4 +158,10 @@ export function createPracticeReferenceAnswer({
       template.kind === "personalizedExample" ? `${context}${template.answer}` : template.answer,
     generatedAt: "2026-07-20T03:00:00.000Z",
   }
+}
+
+function isMockPracticeQuestionTemplateId(
+  templateId: string,
+): templateId is MockPracticeQuestionTemplateId {
+  return Object.hasOwn(referenceAnswerTemplates, templateId)
 }

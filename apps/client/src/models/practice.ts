@@ -1,31 +1,9 @@
 export type PracticeQuestionType =
   "projectDeepDive" | "behavioral" | "businessUnderstanding" | "motivation" | "technicalFoundation"
 
-export type PracticeQuestionTemplateId =
-  | "projectDeepDive.performanceOptimization"
-  | "projectDeepDive.complexProjectTradeoff"
-  | "behavioral.stakeholderConflict"
-  | "behavioral.incidentUnderPressure"
-  | "businessUnderstanding.priorityAdjustment"
-  | "businessUnderstanding.experienceVsRevenueTradeoff"
-  | "motivation.roleMotivation"
-  | "motivation.careerDirection"
-  | "technicalFoundation.reactRepeatedRendering"
-  | "technicalFoundation.requestLayerDesign"
+export type PracticeQuestionTemplateId = string
 
-export type PracticeFollowUpTemplateId =
-  | "projectDeepDive.performanceOptimization.resultAttribution"
-  | "projectDeepDive.performanceOptimization.stakeholderDisagreement"
-  | "projectDeepDive.complexProjectTradeoff.decisionCriteria"
-  | "projectDeepDive.complexProjectTradeoff.resistanceHandling"
-  | "behavioral.stakeholderConflict.reflection"
-  | "behavioral.incidentUnderPressure.priorityDecision"
-  | "businessUnderstanding.priorityAdjustment.validation"
-  | "businessUnderstanding.experienceVsRevenueTradeoff.guardrails"
-  | "technicalFoundation.reactRepeatedRendering.firstHypothesis"
-  | "technicalFoundation.reactRepeatedRendering.regressionRisk"
-  | "technicalFoundation.requestLayerDesign.consistencyRisk"
-  | "technicalFoundation.requestLayerDesign.failureRecovery"
+export type PracticeFollowUpTemplateId = string
 
 export type PracticeDifficulty = "basic" | "pressure"
 
@@ -383,5 +361,3 @@ export type PrepareNextPracticeSessionInput = {
   sessionId: string
   version: number
 }
-
-export type PrepareNextPracticeSessionResult = PracticePageResponse | "ignored"

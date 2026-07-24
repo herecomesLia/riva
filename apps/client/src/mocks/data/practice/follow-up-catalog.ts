@@ -4,9 +4,9 @@ import type {
   PracticeFollowUpQuestion,
   PracticeFollowUpReferenceAnswer,
   PracticeQuestionCard,
-  PracticeQuestionTemplateId,
 } from "@/models/practice"
 
+import type { MockPracticeQuestionTemplateId } from "./question-catalog"
 import type { GeneratedPracticeFollowUpTemplate } from "./types"
 
 export const practiceFollowUpTemplates = {
@@ -209,14 +209,23 @@ export const practiceFollowUpTemplates = {
     },
   ],
 } as const satisfies Record<
-  PracticeQuestionTemplateId,
+  MockPracticeQuestionTemplateId,
   readonly GeneratedPracticeFollowUpTemplate[]
 >
 
+export type MockPracticeFollowUpTemplateId =
+  (typeof practiceFollowUpTemplates)[MockPracticeQuestionTemplateId][number]["id"]
+
 export function getPracticeFollowUpPlan(
-  templateId: PracticeQuestionTemplateId,
+  templateId: string,
 ): readonly GeneratedPracticeFollowUpTemplate[] {
-  return practiceFollowUpTemplates[templateId]
+  return isMockPracticeQuestionTemplateId(templateId) ? practiceFollowUpTemplates[templateId] : []
+}
+
+function isMockPracticeQuestionTemplateId(
+  templateId: string,
+): templateId is MockPracticeQuestionTemplateId {
+  return Object.hasOwn(practiceFollowUpTemplates, templateId)
 }
 
 export function createPracticeFollowUpQuestion({

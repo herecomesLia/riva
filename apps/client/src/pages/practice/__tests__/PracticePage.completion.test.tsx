@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 
-import { PRACTICE_QUERY_KEY } from "../hooks/usePracticeSession"
 import "./practice-page-service-mock"
+import { PRACTICE_QUERY_KEY } from "../hooks/usePracticeSession"
 import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 
@@ -199,11 +199,12 @@ describe("PracticePage: completion", () => {
   it("shows a safe error and allows retrying the next-round preparation", async () => {
     const user = userEvent.setup()
     const completed = api.createPracticeMockResponse("completedSession")
+    const prepared = api.createPracticeMockResponse("setupReady")
     const internalError = "internal session practice_session_01 version 99 stack"
     vi.mocked(api.getPracticePage).mockResolvedValue(completed)
     vi.mocked(api.prepareNextPracticeSession)
       .mockRejectedValueOnce(new Error(internalError))
-      .mockResolvedValueOnce("ignored")
+      .mockResolvedValueOnce(prepared)
     context.renderPracticePage()
 
     const startNextRound = await testing.screen.findByRole("button", {
@@ -224,7 +225,7 @@ describe("PracticePage: completion", () => {
     await user.click(startNextRound)
     expect(api.prepareNextPracticeSession).toHaveBeenCalledTimes(2)
     expect(testing.screen.queryByRole("alert")).not.toBeInTheDocument()
-    expect(testing.screen.getByTestId("practice-completed-state")).toBeInTheDocument()
+    expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
   })
 
   it("locks every review action while next-question is pending", async () => {
