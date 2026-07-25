@@ -55,7 +55,7 @@ export function HistoryFilters({
               <FieldLegend variant="label">{t("history.filters.kindLabel")}</FieldLegend>
               <ToggleGroup
                 aria-label={t("history.filters.kindLabel")}
-                className="flex w-full flex-wrap justify-start"
+                className="flex-wrap justify-start"
                 onValueChange={(values) => {
                   const kind = values[0] as HistoryKindFilter | undefined
                   if (kind) onChange({ ...filters, kind })

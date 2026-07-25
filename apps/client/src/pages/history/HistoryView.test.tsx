@@ -85,6 +85,24 @@ describe("HistoryView", () => {
     expect(detailLink.getAttribute("href")).toContain("page=1")
   })
 
+  it("keeps the training type control fitted to its buttons", async () => {
+    renderHistoryView({
+      status: "ready",
+      data: {
+        overview: historyOverviewStoryFixture,
+        records: historyRecordsStoryFixture,
+      },
+    })
+
+    const allKindsButton = await screen.findByRole("button", {
+      name: i18n.t("history.filters.kinds.all"),
+    })
+    const kindGroup = allKindsButton.closest('[data-slot="toggle-group"]')
+
+    expect(kindGroup).toHaveClass("w-fit")
+    expect(kindGroup).not.toHaveClass("w-full")
+  })
+
   it("moves focus after loading without scrolling past the page heading", async () => {
     const focusSpy = vi.spyOn(HTMLElement.prototype, "focus")
     const props = {

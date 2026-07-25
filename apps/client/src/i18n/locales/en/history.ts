@@ -137,6 +137,7 @@ export const history = {
     unansweredDescription:
       "No answer was saved. A reference answer is still available or can be generated in a new practice.",
     evaluation: "Score and review",
+    evaluationDetails: "Score details",
     followUps: "Follow-ups",
     followUp: "Follow-up {{order}}",
     noFollowUps: "No follow-ups were asked.",

@@ -134,6 +134,7 @@ export const history = {
     unanswered: "本题未作答",
     unansweredDescription: "本次记录没有保存用户回答，参考答案仍可查看或在新训练中生成。",
     evaluation: "评分与复盘",
+    evaluationDetails: "评分明细",
     followUps: "追问",
     followUp: "追问 {{order}}",
     noFollowUps: "本题没有追问。",

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react"
+import { screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
@@ -47,8 +47,17 @@ describe("TargetedPracticeHistoryView", () => {
     expect(await screen.findAllByText(record.questions[0].prompt)).toHaveLength(2)
     expect(screen.getByText(i18n.t("history.detail.retryAttempt"))).toBeInTheDocument()
     expect(screen.getByText(record.questions[1].followUps[0].prompt)).toBeInTheDocument()
-    expect(screen.getAllByTestId("history-reference-ready").length).toBeGreaterThanOrEqual(2)
-    expect(screen.getAllByText(i18n.t("history.detail.saved"))).toHaveLength(2)
+    expect(
+      screen.getAllByRole("button", {
+        name: i18n.t("history.detail.reference.title"),
+      }).length,
+    ).toBeGreaterThanOrEqual(2)
+    const savedBadges = screen.getAllByText(i18n.t("history.detail.saved"))
+    expect(savedBadges).toHaveLength(2)
+    expect(savedBadges[0].querySelector(".lucide-bookmark")).toHaveClass(
+      "fill-destructive",
+      "text-destructive",
+    )
     const retryLink = screen.getByRole("button", { name: i18n.t("history.detail.retry") })
     expect(retryLink.getAttribute("href")).toContain(
       `targetRoleId=${encodeURIComponent(record.targetRole.id)}`,
@@ -56,10 +65,55 @@ describe("TargetedPracticeHistoryView", () => {
     expect(retryLink.getAttribute("href")).not.toContain("recordId=")
   })
 
-  it("keeps reference answers visible for unanswered follow-ups and real snapshot states", async () => {
+  it("collapses score details and reference answers independently by default", async () => {
+    const user = userEvent.setup()
+    const record = completedTargetedPracticeHistoryStoryFixture
+    const question = record.questions[0]
+    renderView({ status: "ready", data: record })
+
+    const questionCard = await screen.findByTestId(`history-question-${question.id}`)
+    const scoreButton = within(questionCard).getByRole("button", {
+      name: i18n.t("history.detail.evaluationDetails"),
+    })
+    const referenceButton = within(questionCard).getByRole("button", {
+      name: i18n.t("history.detail.reference.title"),
+    })
+
+    expect(scoreButton).toHaveAttribute("aria-expanded", "false")
+    expect(referenceButton).toHaveAttribute("aria-expanded", "false")
+    expect(scoreButton).not.toHaveClass("aria-expanded:bg-muted")
+    expect(referenceButton).not.toHaveClass("aria-expanded:bg-muted")
+
+    await user.click(scoreButton)
+
+    expect(scoreButton).toHaveAttribute("aria-expanded", "true")
+    expect(referenceButton).toHaveAttribute("aria-expanded", "false")
+    expect(
+      within(questionCard).getByRole("heading", {
+        name: i18n.t("history.detail.evaluation"),
+      }),
+    ).toBeVisible()
+
+    await user.click(referenceButton)
+
+    expect(scoreButton).toHaveAttribute("aria-expanded", "true")
+    expect(referenceButton).toHaveAttribute("aria-expanded", "true")
+    expect(within(questionCard).getByTestId("history-reference-unavailable")).toBeVisible()
+  })
+
+  it("reveals reference snapshots for unanswered follow-ups and real snapshot states", async () => {
+    const user = userEvent.setup()
     renderView({ status: "ready", data: partialTargetedPracticeHistoryStoryFixture })
 
     expect(await screen.findByText(i18n.t("history.detail.unanswered"))).toBeInTheDocument()
+    expect(
+      screen.getByText(i18n.t("history.detail.weak")).querySelector(".lucide-flag"),
+    ).toHaveClass("fill-orange-500", "text-orange-500")
+    for (const button of screen.getAllByRole("button", {
+      name: i18n.t("history.detail.reference.title"),
+    })) {
+      await user.click(button)
+    }
     expect(screen.getByTestId("history-reference-generating")).toBeInTheDocument()
     expect(screen.getByTestId("history-reference-unavailable")).toBeInTheDocument()
     expect(
@@ -68,9 +122,11 @@ describe("TargetedPracticeHistoryView", () => {
   })
 
   it("offers example-answer navigation for an unanswered early-ended question", async () => {
+    const user = userEvent.setup()
     renderView({ status: "ready", data: endedTargetedPracticeHistoryStoryFixture })
 
     expect(await screen.findByText(i18n.t("history.detail.unanswered"))).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: i18n.t("history.detail.reference.title") }))
     expect(screen.getByTestId("history-reference-notRequested")).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: i18n.t("history.detail.reference.generate") }),

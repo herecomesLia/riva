@@ -1,9 +1,11 @@
-import { BookmarkIcon, FlagIcon, RotateCcwIcon } from "lucide-react"
+import { BookmarkIcon, ChevronDownIcon, FlagIcon, RotateCcwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import type { PracticeEntrySearch } from "@/app/training-entry-search"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type {
   TrainingRecordAnswer,
   TrainingRecordEvaluation,
@@ -11,6 +13,7 @@ import type {
   TrainingRecordReview,
 } from "@/models/training-records"
 import { PracticeDimensionScores } from "@/pages/practice/components/PracticeDimensionScores"
+import { cn } from "@/lib/utils"
 import {
   PracticeAnswerHighlights,
   PracticeAnswerIssues,
@@ -46,11 +49,19 @@ export function TargetedPracticeQuestionRecord({
                 </Badge>
               )}
               <Badge variant="outline">
-                <BookmarkIcon aria-hidden="true" data-icon="inline-start" />
+                <BookmarkIcon
+                  aria-hidden="true"
+                  className={cn(question.isSaved && "fill-destructive text-destructive")}
+                  data-icon="inline-start"
+                />
                 {t(question.isSaved ? "history.detail.saved" : "history.detail.unsaved")}
               </Badge>
-              <Badge variant={question.isMarkedWeak ? "destructive" : "outline"}>
-                <FlagIcon aria-hidden="true" data-icon="inline-start" />
+              <Badge variant="outline">
+                <FlagIcon
+                  aria-hidden="true"
+                  className={cn(question.isMarkedWeak && "fill-orange-500 text-orange-500")}
+                  data-icon="inline-start"
+                />
                 {t(question.isMarkedWeak ? "history.detail.weak" : "history.detail.notWeak")}
               </Badge>
             </div>
@@ -64,10 +75,11 @@ export function TargetedPracticeQuestionRecord({
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-6">
         <AnswerSection answer={question.answer} />
-        <EvaluationSection evaluation={question.evaluation} review={question.review} />
-        <HistoryReferenceAnswer
-          generateLink={{ to: "/practice", search: practiceSearch }}
+        <QuestionDetails
+          evaluation={question.evaluation}
+          practiceSearch={practiceSearch}
           referenceAnswer={question.referenceAnswer}
+          review={question.review}
         />
 
         <section aria-labelledby={`${question.id}-follow-ups`} className="flex flex-col gap-3">
@@ -87,10 +99,11 @@ export function TargetedPracticeQuestionRecord({
                 </CardHeader>
                 <CardContent className="flex min-w-0 flex-col gap-5">
                   <AnswerSection answer={followUp.answer} />
-                  <EvaluationSection evaluation={followUp.evaluation} review={followUp.review} />
-                  <HistoryReferenceAnswer
-                    generateLink={{ to: "/practice", search: practiceSearch }}
+                  <QuestionDetails
+                    evaluation={followUp.evaluation}
+                    practiceSearch={practiceSearch}
                     referenceAnswer={followUp.referenceAnswer}
+                    review={followUp.review}
                   />
                 </CardContent>
               </Card>
@@ -99,6 +112,54 @@ export function TargetedPracticeQuestionRecord({
         </section>
       </CardContent>
     </Card>
+  )
+}
+
+function QuestionDetails({
+  evaluation,
+  practiceSearch,
+  referenceAnswer,
+  review,
+}: {
+  evaluation: TrainingRecordEvaluation | null
+  practiceSearch: PracticeEntrySearch
+  referenceAnswer: TrainingRecordQuestion["referenceAnswer"]
+  review: TrainingRecordReview | null
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {(evaluation || review) && (
+        <DetailCollapsible label={t("history.detail.evaluationDetails")}>
+          <EvaluationSection evaluation={evaluation} review={review} />
+        </DetailCollapsible>
+      )}
+      <DetailCollapsible label={t("history.detail.reference.title")}>
+        <HistoryReferenceAnswer
+          generateLink={{ to: "/practice", search: practiceSearch }}
+          referenceAnswer={referenceAnswer}
+        />
+      </DetailCollapsible>
+    </div>
+  )
+}
+
+function DetailCollapsible({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <Collapsible className="flex min-w-0 flex-col gap-3">
+      <CollapsibleTrigger
+        render={<Button className="w-full justify-between" variant="outline-static" />}
+      >
+        {label}
+        <ChevronDownIcon
+          aria-hidden="true"
+          className="transition-transform group-aria-expanded/button:rotate-180"
+          data-icon="inline-end"
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>{children}</CollapsibleContent>
+    </Collapsible>
   )
 }
 
