@@ -20,13 +20,7 @@ export function HistoryOverview({ state }: { state: Loadable<TrainingRecordsOver
   const { t } = useTranslation()
 
   return (
-    <section aria-labelledby="history-overview-title" className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-lg font-semibold" id="history-overview-title">
-          {t("history.overview.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground">{t("history.overview.description")}</p>
-      </div>
+    <section aria-label={t("history.overview.title")}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(({ icon: Icon, key }) => (
           <Card key={key} size="sm">

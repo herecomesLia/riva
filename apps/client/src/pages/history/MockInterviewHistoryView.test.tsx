@@ -99,6 +99,7 @@ describe("MockInterviewHistoryView", () => {
   it("renders distinct not-found and retryable error states", async () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus")
     const { rerender } = renderView({ status: "error", isRetrying: false }, onRetry)
 
     await user.click(
@@ -114,6 +115,8 @@ describe("MockInterviewHistoryView", () => {
       />,
     )
     expect(screen.getByTestId("mock-history-state-region")).toHaveFocus()
+    expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
+    focusSpy.mockRestore()
     expect(
       await screen.findByRole("button", { name: i18n.t("history.mockDetail.notFound.action") }),
     ).toHaveAttribute("href", expect.stringContaining("/history?"))

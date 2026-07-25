@@ -172,6 +172,7 @@ function createAppRouter() {
   return createRouter({
     routeTree,
     defaultNotFoundComponent: NotFoundPage,
+    scrollRestoration: true,
   })
 }
 

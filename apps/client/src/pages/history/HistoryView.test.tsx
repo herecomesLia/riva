@@ -37,13 +37,19 @@ function renderHistoryView(
 }
 
 describe("HistoryView", () => {
-  it("keeps every module heading visible while dynamic content loads", async () => {
+  it("keeps the page, filters, and records headings visible while dynamic content loads", async () => {
     renderHistoryView({ status: "loading" })
 
     expect(
       await screen.findByRole("heading", { level: 1, name: i18n.t("history.title") }),
     ).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("history.overview.title"))).toBeInTheDocument()
+    expect(
+      screen.queryByRole("heading", { name: i18n.t("history.overview.title") }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("history.overview.description"))).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("region", { name: i18n.t("history.overview.title") }),
+    ).toBeInTheDocument()
     expect(screen.getByText(i18n.t("history.filters.title"))).toBeInTheDocument()
     expect(
       screen.getByRole("heading", { level: 2, name: i18n.t("history.records.title") }),
@@ -77,6 +83,28 @@ describe("HistoryView", () => {
     })
     expect(detailLink.getAttribute("href")).toContain(`/history/practice/${record.id}`)
     expect(detailLink.getAttribute("href")).toContain("page=1")
+  })
+
+  it("moves focus after loading without scrolling past the page heading", async () => {
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus")
+    const props = {
+      filters,
+      onClearFilters: vi.fn(),
+      onFiltersChange: vi.fn(),
+      onPageChange: vi.fn(),
+      onRetry: vi.fn(),
+    }
+    const { rerender } = renderWithProviders(
+      <HistoryView {...props} state={{ status: "loading" }} />,
+      { router: false },
+    )
+
+    rerender(<HistoryView {...props} state={{ status: "error", isRetrying: false }} />)
+
+    await vi.waitFor(() => {
+      expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
+    })
+    focusSpy.mockRestore()
   })
 
   it("links mock interview summaries to the independent history detail route", async () => {

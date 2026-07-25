@@ -34,7 +34,7 @@ export function HistoryView({
   useEffect(() => {
     if (previousStateKey.current === stateKey) return
     previousStateKey.current = stateKey
-    stateRegionRef.current?.focus()
+    stateRegionRef.current?.focus({ preventScroll: true })
   }, [stateKey])
 
   return (

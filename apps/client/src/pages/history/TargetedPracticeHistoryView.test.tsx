@@ -80,6 +80,7 @@ describe("TargetedPracticeHistoryView", () => {
   it("renders distinct not-found and retryable error states", async () => {
     const onRetry = vi.fn()
     const user = userEvent.setup()
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus")
     const { rerender } = renderView({ status: "error", isRetrying: false }, onRetry)
 
     await user.click(
@@ -95,6 +96,8 @@ describe("TargetedPracticeHistoryView", () => {
       />,
     )
     expect(screen.getByTestId("targeted-history-state-region")).toHaveFocus()
+    expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
+    focusSpy.mockRestore()
     const link = await screen.findByRole("button", {
       name: i18n.t("history.detail.notFound.action"),
     })

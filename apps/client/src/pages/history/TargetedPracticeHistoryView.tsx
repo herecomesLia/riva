@@ -44,7 +44,7 @@ export function TargetedPracticeHistoryView({
   useEffect(() => {
     if (previousStateKey.current === stateKey) return
     previousStateKey.current = stateKey
-    stateRegionRef.current?.focus()
+    stateRegionRef.current?.focus({ preventScroll: true })
   }, [stateKey])
 
   return (
@@ -111,7 +111,7 @@ function DetailReady({ record }: { record: TargetedPracticeRecordDetailResponse 
   const { t } = useTranslation()
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <Summary record={record} />
       <section className="flex flex-col gap-3" aria-labelledby="history-detail-questions">
         <div className="flex flex-col gap-1">
@@ -139,7 +139,7 @@ function DetailReady({ record }: { record: TargetedPracticeRecordDetailResponse 
         <PracticeWeaknesses items={record.exposedWeaknesses} />
         <Recommendation recommendation={record.recommendation} />
       </div>
-    </>
+    </div>
   )
 }
 

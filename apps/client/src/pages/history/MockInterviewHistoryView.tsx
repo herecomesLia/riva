@@ -58,7 +58,7 @@ export function MockInterviewHistoryView({
   useEffect(() => {
     if (previousStateKey.current === stateKey) return
     previousStateKey.current = stateKey
-    stateRegionRef.current?.focus()
+    stateRegionRef.current?.focus({ preventScroll: true })
   }, [stateKey])
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -123,7 +123,7 @@ export function MockInterviewHistoryView({
 function DetailReady({ record }: { record: MockInterviewRecordDetailResponse }) {
   const { t } = useTranslation()
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <Summary record={record} />
       <OverallReview record={record} />
       <section className="flex flex-col gap-3" aria-labelledby="mock-history-questions">
@@ -150,7 +150,7 @@ function DetailReady({ record }: { record: MockInterviewRecordDetailResponse }) 
       </section>
       <CandidateQuestions exchanges={record.candidateQuestionExchanges} />
       <Recommendation recommendation={record.recommendation} />
-    </>
+    </div>
   )
 }
 
