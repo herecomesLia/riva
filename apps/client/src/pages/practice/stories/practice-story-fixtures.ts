@@ -1,4 +1,4 @@
-import { fn, screen, waitFor, within } from "storybook/test"
+import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import {
   createGeneratedPracticeQuestion,
@@ -172,7 +172,13 @@ export async function getVisiblePracticeEndDialog() {
         name: /结束本轮专项练习|end this targeted-practice/i,
       }),
     )
-    if (!dialog) throw new Error("Expected an open confirmation dialog.")
+
+    if (!dialog) {
+      throw new Error("Expected an open confirmation dialog.")
+    }
+
+    expect(dialog).toBeVisible()
+
     return dialog
   })
 }

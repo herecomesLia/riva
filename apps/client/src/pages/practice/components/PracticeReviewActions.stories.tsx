@@ -129,21 +129,52 @@ export const EndFailureRetry = meta.story({
     onEndSession: endFailureThenSuccess,
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /结束本轮练习|end this session/i }))
-    const dialog = await getVisiblePracticeEndDialog()
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: /结束本轮练习|end this session/i }),
-    )
-    await expect(endFailureThenSuccess).toHaveBeenCalledTimes(1)
-    await expect(dialog).toBeVisible()
-    await expect(within(dialog).getByRole("alert")).toBeVisible()
-    await expect(within(dialog).getByRole("alert")).not.toHaveTextContent(/version=17|end stack/i)
+    endFailureThenSuccess.mockClear()
 
     await userEvent.click(
-      within(dialog).getByRole("button", { name: /结束本轮练习|end this session/i }),
+      canvas.getByRole("button", {
+        name: /结束本轮练习|end this session/i,
+      }),
     )
-    await expect(endFailureThenSuccess).toHaveBeenCalledTimes(2)
-    await waitFor(() => expect(dialog).not.toBeVisible())
+
+    const dialog = await getVisiblePracticeEndDialog()
+    const confirmButton = within(dialog).getByRole("button", {
+      name: /结束本轮练习|end this session/i,
+    })
+
+    await waitFor(() => {
+      expect(confirmButton).toBeVisible()
+      expect(confirmButton).toBeEnabled()
+    })
+
+    await userEvent.click(confirmButton)
+
+    await waitFor(() => {
+      expect(endFailureThenSuccess).toHaveBeenCalledTimes(1)
+      expect(dialog).toBeVisible()
+    })
+
+    const errorAlert = await within(dialog).findByRole("alert")
+
+    await waitFor(() => {
+      expect(errorAlert).toBeVisible()
+    })
+
+    await expect(errorAlert).not.toHaveTextContent(/version=17|end stack/i)
+
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: /结束本轮练习|end this session/i,
+      }),
+    )
+
+    await waitFor(() => {
+      expect(endFailureThenSuccess).toHaveBeenCalledTimes(2)
+    })
+
+    await waitFor(() => {
+      expect(dialog).not.toBeVisible()
+    })
   },
 })
 

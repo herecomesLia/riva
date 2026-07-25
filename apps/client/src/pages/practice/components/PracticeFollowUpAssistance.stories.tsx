@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, fn, within } from "storybook/test"
+import { expect, fn, waitFor, within } from "storybook/test"
 
 import {
   createGeneratedPracticeQuestion,
@@ -112,15 +112,32 @@ export const FollowUpReferenceConfirmation = meta.story({
   args: baseArgs,
   play: async ({ canvas, userEvent }) => {
     baseArgs.onRequestReferenceAnswer.mockClear()
+
     await userEvent.click(
-      canvas.getByRole("button", { name: /查看 RIVA 参考补充|view RIVA reference supplement/i }),
+      canvas.getByRole("button", {
+        name: /查看 RIVA 参考补充|view RIVA reference supplement/i,
+      }),
     )
+
     await expect(baseArgs.onRequestReferenceAnswer).not.toHaveBeenCalled()
-    const dialog = within(document.body).getByRole("alertdialog")
-    await expect(dialog).toBeVisible()
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: /查看参考补充|view reference supplement/i }),
-    )
+
+    const dialog = await within(document.body).findByRole("alertdialog")
+
+    await waitFor(() => {
+      expect(dialog).toBeVisible()
+    })
+
+    const confirmButton = within(dialog).getByRole("button", {
+      name: /查看参考补充|view reference supplement/i,
+    })
+
+    await waitFor(() => {
+      expect(confirmButton).toBeVisible()
+      expect(confirmButton).toBeEnabled()
+    })
+
+    await userEvent.click(confirmButton)
+
     await expect(baseArgs.onRequestReferenceAnswer).toHaveBeenCalledTimes(1)
   },
 })
