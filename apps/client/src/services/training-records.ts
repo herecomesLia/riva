@@ -6,6 +6,8 @@ import type {
   TargetedPracticeRecordDetailResponse,
   TrainingRecordsOverviewResponse,
   TrainingRecordsPageResponse,
+  TrainingRecordReferenceAnswerGenerationResponse,
+  TrainingRecordReferenceAnswerTarget,
 } from "@/models/training-records"
 
 async function realApiUnavailable(): Promise<never> {
@@ -35,5 +37,21 @@ export async function getMockInterviewRecord(
 ): Promise<MockInterviewRecordDetailResponse> {
   return env.mock
     ? trainingRecordsMockService.getMockInterviewRecord(recordId)
+    : realApiUnavailable()
+}
+
+export async function requestTrainingRecordReferenceAnswer(
+  target: TrainingRecordReferenceAnswerTarget,
+): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
+  return env.mock
+    ? trainingRecordsMockService.requestTrainingRecordReferenceAnswer(target)
+    : realApiUnavailable()
+}
+
+export async function getTrainingRecordReferenceAnswerGenerationStatus(
+  target: TrainingRecordReferenceAnswerTarget,
+): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
+  return env.mock
+    ? trainingRecordsMockService.getTrainingRecordReferenceAnswerGenerationStatus(target)
     : realApiUnavailable()
 }

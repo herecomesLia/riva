@@ -20,12 +20,10 @@ import {
   listCompletedInterviewSessions,
   saveCompletedInterviewSession,
 } from "@/mocks/repositories/interview"
-import {
-  resetTrainingRecordsRepository,
-  saveTrainingRecordSnapshot,
-} from "@/mocks/repositories/training-records"
+import { saveTrainingRecordSnapshot } from "@/mocks/repositories/training-records"
 import { getProfileMockSnapshot } from "@/mocks/services/profile"
 import { getRolesMockSnapshot } from "@/mocks/services/roles"
+import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
 import { createMockInterviewRecordSnapshot } from "@/mocks/training-record-snapshots"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
@@ -267,7 +265,7 @@ export function resetInterviewMockState(
   if (controller.clearPersistedSessions ?? true) {
     clearCompletedInterviewSessions()
   }
-  resetTrainingRecordsRepository()
+  resetTrainingRecordsMockState()
   session = createInterviewMockResponse(scenario).session
   preparedConfiguration = null
   selectedAgentScenario = controller.agentScenario ?? "singleFollowUp"

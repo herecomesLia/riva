@@ -25,14 +25,19 @@ import { PracticeWeaknesses } from "@/pages/practice/components/PracticeReviewDe
 
 import { TargetedPracticeQuestionRecord } from "./components/TargetedPracticeQuestionRecord"
 import type { HistoryRouteSearch } from "./history-navigation"
+import type { HistoryReferenceAnswerSubject } from "./hooks/useHistoryReferenceAnswerGeneration"
 import type { TargetedPracticeHistoryViewState } from "./targeted-practice-history-types"
 
 export function TargetedPracticeHistoryView({
   historySearch,
+  isReferenceAnswerRequesting = () => false,
+  onGenerateReferenceAnswer = () => {},
   onRetry,
   state,
 }: {
   historySearch: HistoryRouteSearch
+  isReferenceAnswerRequesting?: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer?: (subject: HistoryReferenceAnswerSubject) => void
   onRetry: () => void
   state: TargetedPracticeHistoryViewState
 }) {
@@ -103,13 +108,27 @@ export function TargetedPracticeHistoryView({
           <DetailError isRetrying={state.isRetrying} onRetry={onRetry} />
         )}
         {state.status === "notFound" && <DetailNotFound historySearch={historySearch} />}
-        {state.status === "ready" && <DetailReady record={state.data} />}
+        {state.status === "ready" && (
+          <DetailReady
+            isReferenceAnswerRequesting={isReferenceAnswerRequesting}
+            onGenerateReferenceAnswer={onGenerateReferenceAnswer}
+            record={state.data}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-function DetailReady({ record }: { record: TargetedPracticeRecordDetailResponse }) {
+function DetailReady({
+  isReferenceAnswerRequesting,
+  onGenerateReferenceAnswer,
+  record,
+}: {
+  isReferenceAnswerRequesting: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer: (subject: HistoryReferenceAnswerSubject) => void
+  record: TargetedPracticeRecordDetailResponse
+}) {
   const { t } = useTranslation()
 
   return (
@@ -126,15 +145,9 @@ function DetailReady({ record }: { record: TargetedPracticeRecordDetailResponse 
         </div>
         {record.questions.map((question) => (
           <TargetedPracticeQuestionRecord
+            isReferenceAnswerRequesting={isReferenceAnswerRequesting}
             key={question.id}
-            practiceSearch={{
-              entry: "history",
-              targetRoleId: record.targetRole.id,
-              questionType: toPracticeQuestionType(record.setup.questionType),
-              difficulty: record.setup.difficulty,
-              source: record.setup.source,
-              prioritizeWeaknesses: record.setup.prioritizedWeaknesses,
-            }}
+            onGenerateReferenceAnswer={onGenerateReferenceAnswer}
             question={question}
           />
         ))}

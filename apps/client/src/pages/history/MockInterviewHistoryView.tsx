@@ -39,14 +39,19 @@ import { InterviewReviewListCard } from "@/pages/interview/components/InterviewR
 
 import { MockInterviewQuestionRecord } from "./components/MockInterviewQuestionRecord"
 import type { HistoryRouteSearch } from "./history-navigation"
+import type { HistoryReferenceAnswerSubject } from "./hooks/useHistoryReferenceAnswerGeneration"
 import type { MockInterviewHistoryViewState } from "./mock-interview-history-types"
 
 export function MockInterviewHistoryView({
   historySearch,
+  isReferenceAnswerRequesting = () => false,
+  onGenerateReferenceAnswer = () => {},
   onRetry,
   state,
 }: {
   historySearch: HistoryRouteSearch
+  isReferenceAnswerRequesting?: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer?: (subject: HistoryReferenceAnswerSubject) => void
   onRetry: () => void
   state: MockInterviewHistoryViewState
 }) {
@@ -115,13 +120,27 @@ export function MockInterviewHistoryView({
           <DetailError isRetrying={state.isRetrying} onRetry={onRetry} />
         )}
         {state.status === "notFound" && <DetailNotFound historySearch={historySearch} />}
-        {state.status === "ready" && <DetailReady record={state.data} />}
+        {state.status === "ready" && (
+          <DetailReady
+            isReferenceAnswerRequesting={isReferenceAnswerRequesting}
+            onGenerateReferenceAnswer={onGenerateReferenceAnswer}
+            record={state.data}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-function DetailReady({ record }: { record: MockInterviewRecordDetailResponse }) {
+function DetailReady({
+  isReferenceAnswerRequesting,
+  onGenerateReferenceAnswer,
+  record,
+}: {
+  isReferenceAnswerRequesting: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer: (subject: HistoryReferenceAnswerSubject) => void
+  record: MockInterviewRecordDetailResponse
+}) {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-6">
@@ -138,14 +157,9 @@ function DetailReady({ record }: { record: MockInterviewRecordDetailResponse }) 
         </div>
         {record.questions.map((question) => (
           <MockInterviewQuestionRecord
-            interviewSearch={{
-              entry: "history",
-              targetRoleId: record.targetRole.id,
-              round: record.setup.round,
-              difficulty: record.setup.difficulty,
-              durationMinutes: record.setup.plannedDurationMinutes,
-            }}
+            isReferenceAnswerRequesting={isReferenceAnswerRequesting}
             key={question.id}
+            onGenerateReferenceAnswer={onGenerateReferenceAnswer}
             question={question}
           />
         ))}

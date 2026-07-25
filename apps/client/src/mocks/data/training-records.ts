@@ -165,11 +165,7 @@ const partiallyAnsweredPracticeQuestion: TrainingRecordQuestion = {
       answer: null,
       evaluation: null,
       review: null,
-      referenceAnswer: {
-        status: "unavailable",
-        content: null,
-        reason: "insufficientContext",
-      },
+      referenceAnswer: { status: "notRequested", content: null },
     },
   ],
 }

@@ -107,7 +107,7 @@ export const history = {
     back: "Back to training history",
     title: "Practice record details",
     description: "Review every answer, score, and review snapshot from this practice.",
-    retry: "Practice again",
+    retry: "Start new practice",
     summaryTitle: "Practice overview",
     role: "Target role",
     questionType: "Question type",
@@ -135,7 +135,7 @@ export const history = {
     answer: "Your answer",
     unanswered: "Not answered",
     unansweredDescription:
-      "No answer was saved. A reference answer is still available or can be generated in a new practice.",
+      "No answer was saved, but a reference answer can still be generated for this historical question.",
     evaluation: "Score and review",
     evaluationDetails: "Score details",
     followUps: "Follow-ups",
@@ -148,7 +148,8 @@ export const history = {
     weaknesses: "Exposed weaknesses",
     reference: {
       title: "Reference answer",
-      description: "This read-only snapshot will not change the original record.",
+      description:
+        "Generation updates only this question's reference answer, never its answer, score, or review.",
       structure: "Recommended structure",
       keyPoints: "Key points",
       example: "Example answer",
@@ -156,14 +157,15 @@ export const history = {
       generatedAt: "Generated {{date}}",
       generating: "Generating reference answer",
       generatingDescription:
-        "The server is still generating this answer. Reopen the record later to check it.",
+        "A reference answer is being generated for this historical question and will update automatically.",
       unavailable: "Reference answer unavailable",
       unavailableDescription:
-        "This snapshot could not generate an answer. Start a new practice to try again.",
+        "Generation failed and can be retried. Insufficient context requires a new training session.",
       notRequested: "No reference answer was generated",
       notRequestedDescription:
-        "Even without an answer, start a new practice to generate an example.",
-      generate: "Generate in new practice",
+        "A reference answer can be generated for this historical question whether or not it was answered.",
+      generate: "Generate reference answer",
+      requesting: "Submitting",
       reason: {
         generationFailed: "Generation failed",
         insufficientContext: "Insufficient context",
@@ -184,7 +186,7 @@ export const history = {
     back: "Back to training history",
     title: "Mock interview details",
     description: "Review the full interview, reference answers, and review snapshot.",
-    retry: "Start another mock interview",
+    retry: "Start new mock interview",
     summaryTitle: "Interview overview",
     role: "Interview role",
     round: "Round",

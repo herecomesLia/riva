@@ -7,6 +7,7 @@ import { getMockInterviewRecord } from "@/services/training-records"
 
 import { trainingRecordCacheTime, trainingRecordQueryKeys } from "./history-query-keys"
 import { parseHistorySearch } from "./history-navigation"
+import { useHistoryReferenceAnswerGeneration } from "./hooks/useHistoryReferenceAnswerGeneration"
 import type { MockInterviewHistoryViewState } from "./mock-interview-history-types"
 import { MockInterviewHistoryView } from "./MockInterviewHistoryView"
 
@@ -19,6 +20,12 @@ export function MockInterviewHistoryPage() {
     queryFn: () => getMockInterviewRecord(recordId),
     retry: false,
     staleTime: trainingRecordCacheTime,
+  })
+  const referenceAnswerGeneration = useHistoryReferenceAnswerGeneration({
+    detailQueryKey: trainingRecordQueryKeys.mockInterviewDetail(recordId),
+    kind: "mockInterview",
+    record: query.data,
+    recordId,
   })
 
   const state: MockInterviewHistoryViewState = query.data
@@ -42,6 +49,8 @@ export function MockInterviewHistoryPage() {
   return (
     <MockInterviewHistoryView
       historySearch={historySearch}
+      isReferenceAnswerRequesting={referenceAnswerGeneration.isRequesting}
+      onGenerateReferenceAnswer={referenceAnswerGeneration.generate}
       onRetry={() => void handleRetry()}
       state={state}
     />

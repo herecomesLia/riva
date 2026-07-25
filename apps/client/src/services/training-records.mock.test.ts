@@ -6,12 +6,19 @@ import {
   trainingRecordDetailsMock,
 } from "@/mocks/data/training-records"
 import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
-import { TrainingRecordNotFoundError } from "@/models/training-records"
 import {
+  TrainingRecordNotFoundError,
+  type MockInterviewRecordDetailResponse,
+  type TargetedPracticeRecordDetailResponse,
+  type TrainingRecordReferenceAnswerTarget,
+} from "@/models/training-records"
+import {
+  getTrainingRecordReferenceAnswerGenerationStatus,
   getMockInterviewRecord,
   getTargetedPracticeRecord,
   getTrainingRecordsOverview,
   listTrainingRecords,
+  requestTrainingRecordReferenceAnswer,
 } from "@/services/training-records"
 
 beforeEach(() => {
@@ -210,9 +217,8 @@ describe("training records mock service", () => {
               evaluation: null,
               review: null,
               referenceAnswer: {
-                status: "unavailable",
+                status: "notRequested",
                 content: null,
-                reason: "insufficientContext",
               },
             },
           ],
@@ -261,4 +267,143 @@ describe("training records mock service", () => {
       targetedPracticeRecordDetailsMock.length + mockInterviewRecordDetailsMock.length,
     )
   })
+
+  it.each<{
+    label: string
+    target: TrainingRecordReferenceAnswerTarget
+  }>([
+    {
+      label: "targeted-practice main question",
+      target: {
+        kind: "targetedPractice",
+        subject: "mainQuestion",
+        recordId: "targeted-practice-record-003",
+        questionId: "history-practice-question-003",
+      },
+    },
+    {
+      label: "targeted-practice follow-up",
+      target: {
+        kind: "targetedPractice",
+        subject: "followUp",
+        recordId: "targeted-practice-record-002",
+        questionId: "history-practice-question-002",
+        followUpId: "history-practice-follow-up-002",
+      },
+    },
+    {
+      label: "mock-interview main question",
+      target: {
+        kind: "mockInterview",
+        subject: "mainQuestion",
+        recordId: "mock-interview-record-001",
+        questionId: "history-interview-question-002",
+      },
+    },
+    {
+      label: "mock-interview follow-up",
+      target: {
+        kind: "mockInterview",
+        subject: "followUp",
+        recordId: "mock-interview-record-002",
+        questionId: "history-interview-question-004",
+        followUpId: "history-interview-follow-up-002",
+      },
+    },
+  ])("generates and persists a reference for $label", async ({ target }) => {
+    resetTrainingRecordsMockState("default", {
+      referenceAnswerOutcome: "ready",
+      referenceAnswerPollsBeforeCompletion: 1,
+    })
+    const before =
+      target.kind === "targetedPractice"
+        ? await settle(getTargetedPracticeRecord(target.recordId))
+        : await settle(getMockInterviewRecord(target.recordId))
+
+    await expect(settle(requestTrainingRecordReferenceAnswer(target))).resolves.toMatchObject({
+      target,
+      referenceAnswer: { status: "generating" },
+    })
+    await expect(
+      settle(getTrainingRecordReferenceAnswerGenerationStatus(target)),
+    ).resolves.toMatchObject({ referenceAnswer: { status: "generating" } })
+    await expect(
+      settle(getTrainingRecordReferenceAnswerGenerationStatus(target)),
+    ).resolves.toMatchObject({ referenceAnswer: { status: "ready" } })
+
+    const after =
+      target.kind === "targetedPractice"
+        ? await settle(getTargetedPracticeRecord(target.recordId))
+        : await settle(getMockInterviewRecord(target.recordId))
+    const expected = structuredClone(before)
+    replaceExpectedReferenceAnswer(expected, after, target)
+    expect(after).toEqual(expected)
+  })
+
+  it("protects a generating target from duplicate concurrent requests", async () => {
+    const target = {
+      kind: "targetedPractice",
+      subject: "mainQuestion",
+      recordId: "targeted-practice-record-003",
+      questionId: "history-practice-question-003",
+    } as const
+    const first = requestTrainingRecordReferenceAnswer(target)
+    const duplicate = requestTrainingRecordReferenceAnswer(target)
+    const duplicateAssertion = expect(duplicate).rejects.toMatchObject({
+      code: "alreadyGenerating",
+    })
+    await vi.runAllTimersAsync()
+
+    await expect(first).resolves.toMatchObject({ referenceAnswer: { status: "generating" } })
+    await duplicateAssertion
+  })
+
+  it("allows generationFailed retries but rejects insufficientContext retries", async () => {
+    resetTrainingRecordsMockState("default", {
+      referenceAnswerOutcome: "generationFailed",
+      referenceAnswerPollsBeforeCompletion: 0,
+    })
+    const retryable = {
+      kind: "mockInterview",
+      subject: "mainQuestion",
+      recordId: "mock-interview-record-001",
+      questionId: "history-interview-question-002",
+    } as const
+    await settle(requestTrainingRecordReferenceAnswer(retryable))
+    await expect(
+      settle(getTrainingRecordReferenceAnswerGenerationStatus(retryable)),
+    ).resolves.toMatchObject({
+      referenceAnswer: { status: "unavailable", reason: "generationFailed" },
+    })
+    await expect(settle(requestTrainingRecordReferenceAnswer(retryable))).resolves.toMatchObject({
+      referenceAnswer: { status: "generating" },
+    })
+
+    const insufficient = {
+      kind: "mockInterview",
+      subject: "mainQuestion",
+      recordId: "mock-interview-record-002",
+      questionId: "history-interview-question-003",
+    } as const
+    const request = requestTrainingRecordReferenceAnswer(insufficient)
+    const assertion = expect(request).rejects.toMatchObject({ code: "insufficientContext" })
+    await vi.runAllTimersAsync()
+    await assertion
+  })
 })
+
+function replaceExpectedReferenceAnswer(
+  expected: TargetedPracticeRecordDetailResponse | MockInterviewRecordDetailResponse,
+  actual: TargetedPracticeRecordDetailResponse | MockInterviewRecordDetailResponse,
+  target: TrainingRecordReferenceAnswerTarget,
+) {
+  const expectedQuestion = expected.questions.find(({ id }) => id === target.questionId)!
+  const actualQuestion = actual.questions.find(({ id }) => id === target.questionId)!
+  if (target.subject === "mainQuestion") {
+    expectedQuestion.referenceAnswer = actualQuestion.referenceAnswer
+    return
+  }
+  const expectedFollowUp = expectedQuestion.followUps.find(({ id }) => id === target.followUpId)!
+  const actualFollowUp = actualQuestion.followUps.find(({ id }) => id === target.followUpId)!
+  expectedFollowUp.referenceAnswer = actualFollowUp.referenceAnswer
+}

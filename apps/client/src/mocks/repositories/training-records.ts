@@ -30,6 +30,22 @@ export function saveTrainingRecordSnapshot(record: TrainingRecordDetail): void {
   records = [...records, snapshot]
 }
 
+export function updateTrainingRecordSnapshot(
+  recordId: string,
+  update: (record: TrainingRecordDetail) => TrainingRecordDetail,
+): TrainingRecordDetail | null {
+  const index = records.findIndex((candidate) => candidate.id === recordId)
+  if (index === -1) return null
+
+  const current = copy(records[index]!)
+  const updated = copy(update(current))
+  if (updated.id !== current.id || updated.kind !== current.kind) {
+    throw new Error("Training-record identity cannot change during an update.")
+  }
+  records = records.with(index, updated)
+  return copy(updated)
+}
+
 export function resetTrainingRecordsRepository(
   scenario: TrainingRecordsRepositoryScenario = "default",
 ): void {

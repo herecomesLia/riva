@@ -15,10 +15,12 @@ import { renderWithProviders } from "@/test/render"
 function renderView(
   state: React.ComponentProps<typeof TargetedPracticeHistoryView>["state"],
   onRetry = vi.fn(),
+  onGenerateReferenceAnswer = vi.fn(),
 ) {
   return renderWithProviders(
     <TargetedPracticeHistoryView
       historySearch={defaultHistorySearch}
+      onGenerateReferenceAnswer={onGenerateReferenceAnswer}
       onRetry={onRetry}
       state={state}
     />,
@@ -108,7 +110,12 @@ describe("TargetedPracticeHistoryView", () => {
 
   it("reveals reference snapshots for unanswered follow-ups and real snapshot states", async () => {
     const user = userEvent.setup()
-    renderView({ status: "ready", data: partialTargetedPracticeHistoryStoryFixture })
+    const onGenerate = vi.fn()
+    renderView(
+      { status: "ready", data: partialTargetedPracticeHistoryStoryFixture },
+      vi.fn(),
+      onGenerate,
+    )
 
     expect(await screen.findByText(i18n.t("history.detail.unanswered"))).toBeInTheDocument()
     expect(
@@ -120,22 +127,34 @@ describe("TargetedPracticeHistoryView", () => {
       await user.click(button)
     }
     expect(screen.getByTestId("history-reference-generating")).toBeInTheDocument()
-    expect(screen.getByTestId("history-reference-unavailable")).toBeInTheDocument()
-    expect(
-      screen.getByRole("button", { name: i18n.t("history.detail.reference.generate") }),
-    ).toHaveAttribute("href", expect.stringContaining("/practice?"))
+    expect(screen.getByTestId("history-reference-notRequested")).toBeInTheDocument()
+    const generateButton = screen
+      .getAllByRole("button", { name: i18n.t("history.detail.reference.generate") })
+      .find((button) => !button.hasAttribute("disabled"))
+    if (!generateButton) throw new Error("Expected an enabled reference generation action.")
+    await user.click(generateButton)
+    expect(onGenerate).toHaveBeenCalledOnce()
   })
 
   it("offers example-answer navigation for an unanswered early-ended question", async () => {
     const user = userEvent.setup()
-    renderView({ status: "ready", data: endedTargetedPracticeHistoryStoryFixture })
+    const onGenerate = vi.fn()
+    renderView(
+      { status: "ready", data: endedTargetedPracticeHistoryStoryFixture },
+      vi.fn(),
+      onGenerate,
+    )
 
     expect(await screen.findByText(i18n.t("history.detail.unanswered"))).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: i18n.t("history.detail.reference.title") }))
     expect(screen.getByTestId("history-reference-notRequested")).toBeInTheDocument()
-    expect(
+    await user.click(
       screen.getByRole("button", { name: i18n.t("history.detail.reference.generate") }),
-    ).toHaveAttribute("href", expect.stringContaining("/practice?"))
+    )
+    expect(onGenerate).toHaveBeenCalledWith({
+      subject: "mainQuestion",
+      questionId: endedTargetedPracticeHistoryStoryFixture.questions[0].id,
+    })
   })
 
   it("renders distinct not-found and retryable error states", async () => {

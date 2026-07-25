@@ -15,10 +15,12 @@ import { renderWithProviders } from "@/test/render"
 function renderView(
   state: React.ComponentProps<typeof MockInterviewHistoryView>["state"],
   onRetry = vi.fn(),
+  onGenerateReferenceAnswer = vi.fn(),
 ) {
   return renderWithProviders(
     <MockInterviewHistoryView
       historySearch={defaultHistorySearch}
+      onGenerateReferenceAnswer={onGenerateReferenceAnswer}
       onRetry={onRetry}
       state={state}
     />,
@@ -65,7 +67,9 @@ describe("MockInterviewHistoryView", () => {
 
   it("keeps unanswered questions and reference actions in a partial early-ended review", async () => {
     const record = partialMockInterviewHistoryStoryFixture
-    renderView({ status: "ready", data: record })
+    const onGenerate = vi.fn()
+    const user = userEvent.setup()
+    renderView({ status: "ready", data: record }, vi.fn(), onGenerate)
 
     expect(await screen.findAllByText(i18n.t("history.mockDetail.partialReview"))).toHaveLength(2)
     expect(screen.getByText(record.questions[1].prompt)).toBeInTheDocument()
@@ -75,8 +79,10 @@ describe("MockInterviewHistoryView", () => {
     for (const button of screen.getAllByRole("button", {
       name: i18n.t("history.detail.reference.generate"),
     })) {
-      expect(button).toHaveAttribute("href", expect.stringContaining("/interview?"))
+      expect(button).not.toHaveAttribute("href")
+      await user.click(button)
     }
+    expect(onGenerate).toHaveBeenCalled()
   })
 
   it("shows existing questions and ready references when the overall review is unavailable", async () => {

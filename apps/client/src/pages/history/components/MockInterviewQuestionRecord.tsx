@@ -8,15 +8,17 @@ import type {
 } from "@/models/training-records"
 import { InterviewAnswerAndPerformance } from "@/pages/interview/components/InterviewAnswerAndPerformance"
 import { useTranslation } from "react-i18next"
-import type { InterviewEntrySearch } from "@/app/training-entry-search"
 
 import { HistoryReferenceAnswer } from "./HistoryReferenceAnswer"
+import type { HistoryReferenceAnswerSubject } from "../hooks/useHistoryReferenceAnswerGeneration"
 
 export function MockInterviewQuestionRecord({
-  interviewSearch,
+  isReferenceAnswerRequesting,
+  onGenerateReferenceAnswer,
   question,
 }: {
-  interviewSearch: InterviewEntrySearch
+  isReferenceAnswerRequesting: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer: (subject: HistoryReferenceAnswerSubject) => void
   question: TrainingRecordQuestion
 }) {
   const { t } = useTranslation()
@@ -40,7 +42,16 @@ export function MockInterviewQuestionRecord({
           performance={toPerformance(question.id, question.evaluation, question.review)}
         />
         <HistoryReferenceAnswer
-          generateLink={{ to: "/interview", search: interviewSearch }}
+          isRequesting={isReferenceAnswerRequesting({
+            subject: "mainQuestion",
+            questionId: question.id,
+          })}
+          onGenerate={() =>
+            onGenerateReferenceAnswer({
+              subject: "mainQuestion",
+              questionId: question.id,
+            })
+          }
           referenceAnswer={question.referenceAnswer}
         />
         <section className="flex min-w-0 flex-col gap-3">
@@ -53,8 +64,10 @@ export function MockInterviewQuestionRecord({
             question.followUps.map((followUp) => (
               <FollowUpRecord
                 followUp={followUp}
-                interviewSearch={interviewSearch}
                 key={followUp.id}
+                isReferenceAnswerRequesting={isReferenceAnswerRequesting}
+                onGenerateReferenceAnswer={onGenerateReferenceAnswer}
+                questionId={question.id}
               />
             ))
           )}
@@ -66,10 +79,14 @@ export function MockInterviewQuestionRecord({
 
 function FollowUpRecord({
   followUp,
-  interviewSearch,
+  isReferenceAnswerRequesting,
+  onGenerateReferenceAnswer,
+  questionId,
 }: {
   followUp: TrainingRecordFollowUp
-  interviewSearch: InterviewEntrySearch
+  isReferenceAnswerRequesting: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer: (subject: HistoryReferenceAnswerSubject) => void
+  questionId: string
 }) {
   const { t } = useTranslation()
   return (
@@ -91,7 +108,18 @@ function FollowUpRecord({
           performance={toPerformance(followUp.id, followUp.evaluation, followUp.review)}
         />
         <HistoryReferenceAnswer
-          generateLink={{ to: "/interview", search: interviewSearch }}
+          isRequesting={isReferenceAnswerRequesting({
+            subject: "followUp",
+            questionId,
+            followUpId: followUp.id,
+          })}
+          onGenerate={() =>
+            onGenerateReferenceAnswer({
+              subject: "followUp",
+              questionId,
+              followUpId: followUp.id,
+            })
+          }
           referenceAnswer={followUp.referenceAnswer}
         />
       </CardContent>

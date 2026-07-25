@@ -7,6 +7,7 @@ import { getTargetedPracticeRecord } from "@/services/training-records"
 
 import { trainingRecordCacheTime, trainingRecordQueryKeys } from "./history-query-keys"
 import { parseHistorySearch } from "./history-navigation"
+import { useHistoryReferenceAnswerGeneration } from "./hooks/useHistoryReferenceAnswerGeneration"
 import type { TargetedPracticeHistoryViewState } from "./targeted-practice-history-types"
 import { TargetedPracticeHistoryView } from "./TargetedPracticeHistoryView"
 
@@ -19,6 +20,12 @@ export function TargetedPracticeHistoryPage() {
     queryFn: () => getTargetedPracticeRecord(recordId),
     retry: false,
     staleTime: trainingRecordCacheTime,
+  })
+  const referenceAnswerGeneration = useHistoryReferenceAnswerGeneration({
+    detailQueryKey: trainingRecordQueryKeys.targetedPracticeDetail(recordId),
+    kind: "targetedPractice",
+    record: query.data,
+    recordId,
   })
 
   const state: TargetedPracticeHistoryViewState = query.data
@@ -42,6 +49,8 @@ export function TargetedPracticeHistoryPage() {
   return (
     <TargetedPracticeHistoryView
       historySearch={historySearch}
+      isReferenceAnswerRequesting={referenceAnswerGeneration.isRequesting}
+      onGenerateReferenceAnswer={referenceAnswerGeneration.generate}
       onRetry={() => void handleRetry()}
       state={state}
     />

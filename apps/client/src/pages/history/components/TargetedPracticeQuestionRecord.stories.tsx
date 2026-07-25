@@ -1,4 +1,5 @@
 import preview from "#storybook/preview"
+import { fn } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
 
@@ -14,23 +15,34 @@ const meta = preview.meta({
   title: "History/TargetedPracticeQuestionRecord",
 })
 
-const practiceSearch = {
-  targetRoleId: completedTargetedPracticeHistoryStoryFixture.targetRole.id,
-  questionType: "behavioral",
-  difficulty: "pressure",
-  source: "history",
-} as const
-
 export const RetriedWithFollowUp = meta.story({
   args: {
-    practiceSearch,
+    isReferenceAnswerRequesting: () => false,
+    onGenerateReferenceAnswer: fn(),
     question: completedTargetedPracticeHistoryStoryFixture.questions[1],
   },
 })
 
 export const PartialWithUnansweredFollowUp = meta.story({
   args: {
-    practiceSearch,
+    isReferenceAnswerRequesting: () => false,
+    onGenerateReferenceAnswer: fn(),
     question: partialTargetedPracticeHistoryStoryFixture.questions[0],
+  },
+})
+
+const unansweredMainQuestion = structuredClone(
+  partialTargetedPracticeHistoryStoryFixture.questions[0],
+)
+unansweredMainQuestion.answer = null
+unansweredMainQuestion.evaluation = null
+unansweredMainQuestion.review = null
+unansweredMainQuestion.referenceAnswer = { status: "notRequested", content: null }
+
+export const UnansweredMainQuestion = meta.story({
+  args: {
+    isReferenceAnswerRequesting: () => false,
+    onGenerateReferenceAnswer: fn(),
+    question: unansweredMainQuestion,
   },
 })

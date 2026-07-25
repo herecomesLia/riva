@@ -1,6 +1,5 @@
 import preview from "#storybook/preview"
-
-import { withRouter } from "#storybook/decorators/with-router"
+import { expect, fn } from "storybook/test"
 
 import type { TrainingRecordReferenceAnswer } from "@/models/training-records"
 
@@ -11,27 +10,21 @@ const ready = completedTargetedPracticeHistoryStoryFixture.questions[1].referenc
 
 const meta = preview.meta({
   component: HistoryReferenceAnswer,
-  decorators: [withRouter],
   title: "History/HistoryReferenceAnswer",
 })
 
-const practiceGenerateLink = {
-  to: "/practice",
-  search: { source: "history" },
-} as const
-
 export const Ready = meta.story({
-  args: { generateLink: practiceGenerateLink, referenceAnswer: ready },
+  args: { onGenerate: fn(), referenceAnswer: ready },
 })
 export const Generating = meta.story({
   args: {
-    generateLink: practiceGenerateLink,
+    onGenerate: fn(),
     referenceAnswer: { status: "generating", content: null },
   },
 })
-export const Unavailable = meta.story({
+export const GenerationFailed = meta.story({
   args: {
-    generateLink: practiceGenerateLink,
+    onGenerate: fn(),
     referenceAnswer: {
       status: "unavailable",
       content: null,
@@ -41,10 +34,23 @@ export const Unavailable = meta.story({
 })
 export const NotRequested = meta.story({
   args: {
-    generateLink: practiceGenerateLink,
+    onGenerate: fn(),
     referenceAnswer: {
       status: "notRequested",
       content: null,
     } satisfies TrainingRecordReferenceAnswer,
+  },
+})
+
+const lockedGenerate = fn()
+export const DuplicateClickLocked = meta.story({
+  args: {
+    onGenerate: lockedGenerate,
+    referenceAnswer: { status: "generating", content: null },
+  },
+  play: async ({ canvas }) => {
+    const button = canvas.getByRole("button", { name: /生成参考答案|generate reference answer/i })
+    await expect(button).toBeDisabled()
+    await expect(lockedGenerate).not.toHaveBeenCalled()
   },
 })

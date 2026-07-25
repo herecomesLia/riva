@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router"
 import { SparklesIcon, TriangleAlertIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
@@ -6,16 +5,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type { InterviewEntrySearch, PracticeEntrySearch } from "@/app/training-entry-search"
 import type { TrainingRecordReferenceAnswer } from "@/models/training-records"
 
 export function HistoryReferenceAnswer({
-  generateLink,
+  isRequesting = false,
+  onGenerate,
   referenceAnswer,
 }: {
-  generateLink:
-    | { to: "/practice"; search: PracticeEntrySearch }
-    | { to: "/interview"; search: InterviewEntrySearch }
+  isRequesting?: boolean
+  onGenerate: () => void
   referenceAnswer: TrainingRecordReferenceAnswer
 }) {
   const { i18n, t } = useTranslation()
@@ -66,19 +64,23 @@ export function HistoryReferenceAnswer({
         )}
 
         {referenceAnswer.status === "generating" && (
-          <Alert role="status">
-            <Spinner aria-hidden="true" />
-            <AlertTitle>{t("history.detail.reference.generating")}</AlertTitle>
-            <AlertDescription>
-              {t("history.detail.reference.generatingDescription")}
-            </AlertDescription>
-          </Alert>
+          <div className="flex flex-col items-start gap-4">
+            <Alert role="status">
+              <Spinner aria-hidden="true" />
+              <AlertTitle>{t("history.detail.reference.generating")}</AlertTitle>
+              <AlertDescription>
+                {t("history.detail.reference.generatingDescription")}
+              </AlertDescription>
+            </Alert>
+            <GenerateButton disabled onGenerate={onGenerate} />
+          </div>
         )}
 
         {referenceAnswer.status === "unavailable" && (
           <ReferenceUnavailable
             description={t("history.detail.reference.unavailableDescription")}
-            generateLink={generateLink}
+            onGenerate={referenceAnswer.reason === "generationFailed" ? onGenerate : undefined}
+            isRequesting={isRequesting}
             title={`${t("history.detail.reference.unavailable")} · ${t(
               `history.detail.reference.reason.${referenceAnswer.reason}`,
             )}`}
@@ -88,7 +90,8 @@ export function HistoryReferenceAnswer({
         {referenceAnswer.status === "notRequested" && (
           <ReferenceUnavailable
             description={t("history.detail.reference.notRequestedDescription")}
-            generateLink={generateLink}
+            isRequesting={isRequesting}
+            onGenerate={onGenerate}
             title={t("history.detail.reference.notRequested")}
           />
         )}
@@ -99,17 +102,15 @@ export function HistoryReferenceAnswer({
 
 function ReferenceUnavailable({
   description,
-  generateLink,
+  isRequesting,
+  onGenerate,
   title,
 }: {
   description: string
-  generateLink:
-    | { to: "/practice"; search: PracticeEntrySearch }
-    | { to: "/interview"; search: InterviewEntrySearch }
+  isRequesting: boolean
+  onGenerate?: () => void
   title: string
 }) {
-  const { t } = useTranslation()
-
   return (
     <div className="flex flex-col items-start gap-4">
       <Alert>
@@ -117,21 +118,36 @@ function ReferenceUnavailable({
         <AlertTitle>{title}</AlertTitle>
         <AlertDescription>{description}</AlertDescription>
       </Alert>
-      <Button
-        nativeButton={false}
-        render={
-          generateLink.to === "/practice" ? (
-            <Link search={generateLink.search} to="/practice" />
-          ) : (
-            <Link search={generateLink.search} to="/interview" />
-          )
-        }
-        variant="outline"
-      >
-        <SparklesIcon aria-hidden="true" data-icon="inline-start" />
-        {t("history.detail.reference.generate")}
-      </Button>
+      {onGenerate && (
+        <GenerateButton
+          disabled={isRequesting}
+          onGenerate={onGenerate}
+          showSpinner={isRequesting}
+        />
+      )}
     </div>
+  )
+}
+
+function GenerateButton({
+  disabled,
+  onGenerate,
+  showSpinner = false,
+}: {
+  disabled: boolean
+  onGenerate: () => void
+  showSpinner?: boolean
+}) {
+  const { t } = useTranslation()
+  return (
+    <Button disabled={disabled} onClick={onGenerate} variant="outline">
+      {showSpinner ? (
+        <Spinner aria-hidden="true" data-icon="inline-start" />
+      ) : (
+        <SparklesIcon aria-hidden="true" data-icon="inline-start" />
+      )}
+      {t(showSpinner ? "history.detail.reference.requesting" : "history.detail.reference.generate")}
+    </Button>
   )
 }
 

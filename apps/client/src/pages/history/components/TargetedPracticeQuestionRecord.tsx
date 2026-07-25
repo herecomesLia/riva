@@ -1,7 +1,6 @@
 import { BookmarkIcon, ChevronDownIcon, FlagIcon, RotateCcwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import type { PracticeEntrySearch } from "@/app/training-entry-search"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,12 +21,15 @@ import {
 } from "@/pages/practice/components/PracticeReviewDetails"
 
 import { HistoryReferenceAnswer } from "./HistoryReferenceAnswer"
+import type { HistoryReferenceAnswerSubject } from "../hooks/useHistoryReferenceAnswerGeneration"
 
 export function TargetedPracticeQuestionRecord({
-  practiceSearch,
+  isReferenceAnswerRequesting,
+  onGenerateReferenceAnswer,
   question,
 }: {
-  practiceSearch: PracticeEntrySearch
+  isReferenceAnswerRequesting: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer: (subject: HistoryReferenceAnswerSubject) => void
   question: TrainingRecordQuestion
 }) {
   const { i18n, t } = useTranslation()
@@ -77,7 +79,16 @@ export function TargetedPracticeQuestionRecord({
         <AnswerSection answer={question.answer} />
         <QuestionDetails
           evaluation={question.evaluation}
-          practiceSearch={practiceSearch}
+          isRequesting={isReferenceAnswerRequesting({
+            subject: "mainQuestion",
+            questionId: question.id,
+          })}
+          onGenerate={() =>
+            onGenerateReferenceAnswer({
+              subject: "mainQuestion",
+              questionId: question.id,
+            })
+          }
           referenceAnswer={question.referenceAnswer}
           review={question.review}
         />
@@ -101,7 +112,18 @@ export function TargetedPracticeQuestionRecord({
                   <AnswerSection answer={followUp.answer} />
                   <QuestionDetails
                     evaluation={followUp.evaluation}
-                    practiceSearch={practiceSearch}
+                    isRequesting={isReferenceAnswerRequesting({
+                      subject: "followUp",
+                      questionId: question.id,
+                      followUpId: followUp.id,
+                    })}
+                    onGenerate={() =>
+                      onGenerateReferenceAnswer({
+                        subject: "followUp",
+                        questionId: question.id,
+                        followUpId: followUp.id,
+                      })
+                    }
                     referenceAnswer={followUp.referenceAnswer}
                     review={followUp.review}
                   />
@@ -117,12 +139,14 @@ export function TargetedPracticeQuestionRecord({
 
 function QuestionDetails({
   evaluation,
-  practiceSearch,
+  isRequesting,
+  onGenerate,
   referenceAnswer,
   review,
 }: {
   evaluation: TrainingRecordEvaluation | null
-  practiceSearch: PracticeEntrySearch
+  isRequesting: boolean
+  onGenerate: () => void
   referenceAnswer: TrainingRecordQuestion["referenceAnswer"]
   review: TrainingRecordReview | null
 }) {
@@ -137,7 +161,8 @@ function QuestionDetails({
       )}
       <DetailCollapsible label={t("history.detail.reference.title")}>
         <HistoryReferenceAnswer
-          generateLink={{ to: "/practice", search: practiceSearch }}
+          isRequesting={isRequesting}
+          onGenerate={onGenerate}
           referenceAnswer={referenceAnswer}
         />
       </DetailCollapsible>
