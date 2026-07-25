@@ -12,6 +12,7 @@ import type {
   SubmitCandidateQuestionInput,
   SubmitInterviewAnswerInput,
 } from "@/models/interview"
+import type { InterviewTrainingEntryParameters } from "@/models/training-entry"
 
 function realApiUnavailable(): never {
   throw new Error("Real interview API is not implemented.")
@@ -23,6 +24,12 @@ export function getInterviewPage(): Promise<InterviewPageResponse> {
 
 export function startInterview(input: StartInterviewInput): Promise<InterviewMutationResponse> {
   return env.mock ? interviewMockService.startInterview(input) : realApiUnavailable()
+}
+
+export function prepareInterviewTrainingEntry(
+  input: InterviewTrainingEntryParameters,
+): Promise<InterviewMutationResponse> {
+  return env.mock ? interviewMockService.prepareInterviewTrainingEntry(input) : realApiUnavailable()
 }
 
 export function beginInterviewQuestions(

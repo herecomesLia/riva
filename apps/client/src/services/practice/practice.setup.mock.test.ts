@@ -204,6 +204,52 @@ describe("practice stateful mock service: setup", () => {
     await differentSessionAssertion
   })
 
+  it.each(["answeringQuestion", "completedSession"] as const)(
+    "prepares a history entry as a fresh setup from a %s session",
+    async (scenario) => {
+      context.resetPracticeMockState(scenario)
+
+      const prepared = await context.settle(
+        context.preparePracticeTrainingEntry({
+          targetRoleId: "role_product_manager_meituan",
+          questionType: "technicalFoundation",
+          difficulty: "pressure",
+          source: "history",
+          prioritizeWeaknesses: true,
+        }),
+      )
+
+      expect(prepared.session).toEqual({
+        status: "setup",
+        selection: {
+          targetRoleId: "role_product_manager_meituan",
+          questionType: "projectDeepDive",
+          difficulty: "pressure",
+          source: "history",
+          prioritizeWeaknesses: true,
+        },
+      })
+      expect(await context.settle(context.getPracticePage())).toEqual(prepared)
+    },
+  )
+
+  it("falls back from an unavailable history role to the current Roles domain role", async () => {
+    const prepared = await context.settle(
+      context.preparePracticeTrainingEntry({
+        targetRoleId: "role_missing_or_archived",
+        questionType: "businessUnderstanding",
+      }),
+    )
+
+    expect(prepared.session).toMatchObject({
+      status: "setup",
+      selection: {
+        targetRoleId: prepared.setupContext.defaultTargetRoleId,
+        questionType: "businessUnderstanding",
+      },
+    })
+  })
+
   it("returns independent deep copies", async () => {
     const first = await context.settle(context.getPracticePage())
     const second = await context.settle(context.getPracticePage())

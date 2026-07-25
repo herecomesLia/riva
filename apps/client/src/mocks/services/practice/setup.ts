@@ -10,6 +10,10 @@ import type {
   StartPracticeSessionInput,
 } from "@/models/practice"
 import type { TargetRole } from "@/models/roles"
+import {
+  resolvePracticeTrainingEntry,
+  type PracticeTrainingEntryParameters,
+} from "@/models/training-entry"
 
 import {
   consumePracticeMockOperation,
@@ -150,6 +154,21 @@ export async function prepareNextPracticeSession(
     session: {
       status: "setup",
       selection: reconcilePracticeSetupSelection(setupContext, session.selection),
+    },
+  })
+}
+
+export async function preparePracticeTrainingEntry(
+  input: PracticeTrainingEntryParameters,
+): Promise<PracticeMutationResponse> {
+  await consumePracticeMockOperation("preparePracticeTrainingEntry", 0)
+  const current = getPracticeMockState()
+  const setupContext = await getCurrentSetupContext()
+  return setPracticeMockState({
+    setupContext,
+    session: {
+      status: "setup",
+      selection: resolvePracticeTrainingEntry(setupContext, current.session.selection, input),
     },
   })
 }

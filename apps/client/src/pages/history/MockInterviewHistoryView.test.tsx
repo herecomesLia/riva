@@ -54,10 +54,13 @@ describe("MockInterviewHistoryView", () => {
     expect(screen.getByText(record.candidateQuestionExchanges[0].question)).toBeInTheDocument()
     expect(screen.getByText(record.candidateQuestionExchanges[0].feedback)).toBeInTheDocument()
     const retryLink = screen.getByRole("button", { name: i18n.t("history.mockDetail.retry") })
-    expect(retryLink.getAttribute("href")).toContain(
-      `targetRoleId=${encodeURIComponent(record.targetRole.id)}`,
-    )
-    expect(retryLink.getAttribute("href")).not.toContain("recordId=")
+    const retryHref = retryLink.getAttribute("href") ?? ""
+    expect(retryHref).toContain("entry=history")
+    expect(retryHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(retryHref).toContain(`round=${record.setup.round}`)
+    expect(retryHref).toContain(`difficulty=${record.setup.difficulty}`)
+    expect(retryHref).toContain(`durationMinutes=${record.setup.plannedDurationMinutes}`)
+    expect(retryHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })
 
   it("keeps unanswered questions and reference actions in a partial early-ended review", async () => {

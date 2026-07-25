@@ -2,7 +2,7 @@ import type { DashboardResponse } from "@/models/dashboard"
 
 export const dashboardResponseMock: DashboardResponse = {
   currentRole: {
-    id: "role_frontend_engineer_bytedance",
+    id: "role_frontend_bytedance",
     title: "Frontend Engineer",
     company: "ByteDance",
     recruitmentType: "experienced",

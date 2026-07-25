@@ -48,14 +48,14 @@ describe("training records mock service", () => {
       averageScore: 78,
       targetRoles: [
         {
-          id: "role_frontend_engineer_bytedance",
-          title: "高级前端工程师",
-          company: "星云科技",
+          id: "role_frontend_bytedance",
+          title: "Senior Frontend Engineer",
+          company: "ByteDance",
         },
         {
-          id: "role_product_manager_fintech",
-          title: "金融科技产品经理",
-          company: "远航金融",
+          id: "role_product_manager_meituan",
+          title: "Product Manager",
+          company: "Meituan",
         },
       ],
       byKind: {
@@ -78,7 +78,7 @@ describe("training records mock service", () => {
       listTrainingRecords({
         kinds: ["targetedPractice"],
         statuses: ["partiallyCompleted"],
-        targetRoleId: "role_frontend_engineer_bytedance",
+        targetRoleId: "role_frontend_bytedance",
         startedAtFrom: "2026-07-18T00:00:00.000Z",
         startedAtTo: "2026-07-19T00:00:00.000Z",
         page: 1,

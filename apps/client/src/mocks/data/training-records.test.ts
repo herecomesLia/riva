@@ -5,6 +5,7 @@ import {
   targetedPracticeRecordDetailsMock,
   trainingRecordDetailsMock,
 } from "@/mocks/data/training-records"
+import { createRolesMockResponse } from "@/mocks/data/roles"
 
 describe("training record response fixtures", () => {
   it("keeps summary counts and detail snapshots internally consistent", () => {
@@ -121,5 +122,25 @@ describe("training record response fixtures", () => {
     expect(serialized).not.toContain('"version"')
     expect(serialized).not.toContain("mock-interview-session")
     expect(serialized).not.toContain("mock-practice-session")
+  })
+
+  it("uses stable Roles domain identities while keeping role content as a snapshot", () => {
+    const roles = createRolesMockResponse("multipleRolesReady").roles
+    const roleById = new Map(roles.map((role) => [role.id, role]))
+
+    for (const record of trainingRecordDetailsMock) {
+      expect(roleById.has(record.targetRole.id)).toBe(true)
+      expect(record.targetRole).toEqual(
+        expect.objectContaining({
+          id: record.targetRole.id,
+          title: roleById.get(record.targetRole.id)?.title,
+          company: roleById.get(record.targetRole.id)?.company,
+        }),
+      )
+      expect(record.targetRole).not.toBe(roleById.get(record.targetRole.id))
+    }
+
+    roles[0]!.title = "Edited after training"
+    expect(trainingRecordDetailsMock[0]!.targetRole.title).not.toBe("Edited after training")
   })
 })

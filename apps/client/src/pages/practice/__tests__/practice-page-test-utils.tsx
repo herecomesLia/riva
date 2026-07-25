@@ -25,6 +25,7 @@ import {
   continueToNextPracticeQuestion,
   endPracticeSession,
   prepareNextPracticeSession,
+  preparePracticeTrainingEntry,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -44,9 +45,9 @@ export function createDeferred<T>() {
   return { promise, reject, resolve }
 }
 
-export function renderPracticePage() {
+export function renderPracticePage(initialEntry = "/practice") {
   return renderWithProviders(<PracticePage />, {
-    router: { initialEntries: ["/practice"] },
+    router: { initialEntries: [initialEntry] },
   })
 }
 
@@ -68,6 +69,7 @@ beforeEach(async () => {
   vi.mocked(continueToNextPracticeQuestion).mockReset()
   vi.mocked(endPracticeSession).mockReset()
   vi.mocked(prepareNextPracticeSession).mockReset()
+  vi.mocked(preparePracticeTrainingEntry).mockReset()
   vi.mocked(setQuestionSaved).mockReset()
   vi.mocked(setQuestionWeak).mockReset()
   vi.mocked(skipPracticeQuestion).mockReset()
@@ -96,6 +98,7 @@ export {
   continueToNextPracticeQuestion,
   endPracticeSession,
   prepareNextPracticeSession,
+  preparePracticeTrainingEntry,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,

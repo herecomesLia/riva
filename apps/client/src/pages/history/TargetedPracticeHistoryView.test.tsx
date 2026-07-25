@@ -59,10 +59,15 @@ describe("TargetedPracticeHistoryView", () => {
       "text-destructive",
     )
     const retryLink = screen.getByRole("button", { name: i18n.t("history.detail.retry") })
-    expect(retryLink.getAttribute("href")).toContain(
-      `targetRoleId=${encodeURIComponent(record.targetRole.id)}`,
+    const retryHref = retryLink.getAttribute("href") ?? ""
+    expect(retryHref).toContain("entry=history")
+    expect(retryHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(retryHref).toContain(`difficulty=${record.setup.difficulty}`)
+    expect(retryHref).toContain(`source=${record.setup.source}`)
+    expect(retryHref).toContain(
+      `prioritizeWeaknesses=${String(record.setup.prioritizedWeaknesses)}`,
     )
-    expect(retryLink.getAttribute("href")).not.toContain("recordId=")
+    expect(retryHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })
 
   it("collapses score details and reference answers independently by default", async () => {

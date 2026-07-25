@@ -126,14 +126,14 @@ describe("HistoryPage", () => {
     await user.click(screen.getByRole("combobox", { name: i18n.t("history.filters.roleLabel") }))
     await user.click(
       await screen.findByRole("option", {
-        name: /金融科技产品经理/,
+        name: /Product Manager.*Meituan/,
       }),
     )
 
     await waitFor(() =>
       expect(listTrainingRecords).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          targetRoleId: "role_product_manager_fintech",
+          targetRoleId: "role_product_manager_meituan",
           page: 1,
         }),
       ),
@@ -149,7 +149,7 @@ describe("HistoryPage", () => {
     await waitFor(() =>
       expect(listTrainingRecords).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          targetRoleId: "role_product_manager_fintech",
+          targetRoleId: "role_product_manager_meituan",
           startedAtFrom: expect.any(String),
           page: 1,
         }),

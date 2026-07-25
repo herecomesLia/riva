@@ -50,6 +50,10 @@ import type {
   SubmitCandidateQuestionInput,
   SubmitInterviewAnswerInput,
 } from "@/models/interview"
+import {
+  resolveInterviewTrainingEntry,
+  type InterviewTrainingEntryParameters,
+} from "@/models/training-entry"
 
 export type InterviewMockOperation =
   | "beginInterviewQuestions"
@@ -57,6 +61,7 @@ export type InterviewMockOperation =
   | "finishInterview"
   | "getInterviewPage"
   | "getInterviewReview"
+  | "prepareInterviewTrainingEntry"
   | "startInterview"
   | "submitCandidateQuestion"
   | "submitInterviewAnswer"
@@ -75,6 +80,7 @@ type PlanCursor = {
 }
 
 let session = createInterviewMockResponse().session
+let preparedConfiguration: InterviewPageResponse["setup"]["defaultConfiguration"] | null = null
 let selectedAgentScenario: InterviewAgentMockScenario = "singleFollowUp"
 let activePlan: MockInterviewAgentPlan = createInterviewAgentPlanMock({
   ...defaultInterviewConfigurationMock,
@@ -99,8 +105,26 @@ function getPersistedSessionSequence() {
 }
 
 function getSnapshot(): InterviewPageResponse {
+  const rolesSnapshot = getRolesMockSnapshot()
+  const setup = createInterviewSetupResponseMock(rolesSnapshot, getProfileMockSnapshot())
+  const currentTargetRoleId = setup.targetRoles.some(({ id }) => id === rolesSnapshot.currentRoleId)
+    ? rolesSnapshot.currentRoleId
+    : null
   return copy({
-    setup: createInterviewSetupResponseMock(getRolesMockSnapshot(), getProfileMockSnapshot()),
+    setup:
+      preparedConfiguration === null
+        ? setup
+        : {
+            ...setup,
+            defaultConfiguration: resolveInterviewTrainingEntry(
+              setup,
+              {
+                ...preparedConfiguration,
+                targetRoleId: preparedConfiguration.targetRoleId ?? undefined,
+              },
+              currentTargetRoleId,
+            ),
+          },
     session,
   })
 }
@@ -245,6 +269,7 @@ export function resetInterviewMockState(
   }
   resetTrainingRecordsRepository()
   session = createInterviewMockResponse(scenario).session
+  preparedConfiguration = null
   selectedAgentScenario = controller.agentScenario ?? "singleFollowUp"
   activePlan = createInterviewAgentPlanMock({
     ...defaultInterviewConfigurationMock,
@@ -276,6 +301,23 @@ export function resetInterviewMockState(
 
 export async function getInterviewPage(): Promise<InterviewPageResponse> {
   await consumeOperation("getInterviewPage")
+  return getSnapshot()
+}
+
+export async function prepareInterviewTrainingEntry(
+  input: InterviewTrainingEntryParameters,
+): Promise<InterviewMutationResponse> {
+  await consumeOperation("prepareInterviewTrainingEntry", 0)
+  const rolesSnapshot = getRolesMockSnapshot()
+  const snapshot = getSnapshot()
+  const currentTargetRoleId = snapshot.setup.targetRoles.some(
+    ({ id }) => id === rolesSnapshot.currentRoleId,
+  )
+    ? rolesSnapshot.currentRoleId
+    : null
+  preparedConfiguration = resolveInterviewTrainingEntry(snapshot.setup, input, currentTargetRoleId)
+  session = null
+  planCursor = null
   return getSnapshot()
 }
 
@@ -317,6 +359,7 @@ export async function startInterview(
     throw new Error("Interview duration preference is not available.")
   }
 
+  preparedConfiguration = copy(input)
   activePlan = createInterviewAgentPlanMock({ ...input, scenario: selectedAgentScenario })
   planCursor = null
   sessionSequence += 1

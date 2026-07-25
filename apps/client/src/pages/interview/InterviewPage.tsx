@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearch } from "@tanstack/react-router"
-import { useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { parseInterviewEntrySearch } from "@/app/training-entry-search"
 import { applyInterviewEntrySearch } from "@/app/training-entry-defaults"
+import { parseInterviewEntrySearch, toInterviewEntryParameters } from "@/app/training-entry-search"
 import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
-import { getInterviewPage, startInterview } from "@/services/interview"
+import {
+  getInterviewPage,
+  prepareInterviewTrainingEntry,
+  startInterview,
+} from "@/services/interview"
 
 import { InterviewView } from "./InterviewView"
 import { INTERVIEW_QUERY_KEY } from "./interview-query"
@@ -15,6 +19,12 @@ export function InterviewPage() {
   const entrySearch = parseInterviewEntrySearch(useSearch({ strict: false }))
   const queryClient = useQueryClient()
   const startLock = useRef(false)
+  const preparingEntryKey = useRef<string | null>(null)
+  const entryKey = entrySearch.entry === "history" ? JSON.stringify(entrySearch) : null
+  const [entryPreparation, setEntryPreparation] = useState<{
+    key: string | null
+    status: "idle" | "pending" | "success" | "error"
+  }>({ key: null, status: "idle" })
   const interviewQuery = useQuery({
     queryFn: getInterviewPage,
     queryKey: INTERVIEW_QUERY_KEY,
@@ -26,6 +36,30 @@ export function InterviewPage() {
       queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, response)
     },
   })
+  const prepareEntryMutation = useMutation({
+    mutationFn: prepareInterviewTrainingEntry,
+    onSuccess: (response) => {
+      queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, response)
+    },
+  })
+
+  useEffect(() => {
+    if (
+      entryKey === null ||
+      interviewQuery.data === undefined ||
+      preparingEntryKey.current === entryKey ||
+      (entryPreparation.key === entryKey && entryPreparation.status === "success")
+    ) {
+      return
+    }
+
+    preparingEntryKey.current = entryKey
+    setEntryPreparation({ key: entryKey, status: "pending" })
+    void prepareEntryMutation
+      .mutateAsync(toInterviewEntryParameters(entrySearch))
+      .then(() => setEntryPreparation({ key: entryKey, status: "success" }))
+      .catch(() => setEntryPreparation({ key: entryKey, status: "error" }))
+  }, [entryKey, entryPreparation, entrySearch, interviewQuery.data, prepareEntryMutation])
 
   async function handleStart(input: InterviewConfiguration) {
     if (startLock.current || startMutation.isPending) return
@@ -42,6 +76,30 @@ export function InterviewPage() {
     } finally {
       startLock.current = false
     }
+  }
+
+  const historyEntryStatus =
+    entryKey === null
+      ? "inactive"
+      : entryPreparation.key === entryKey
+        ? entryPreparation.status
+        : "pending"
+
+  if (historyEntryStatus === "pending") {
+    return <InterviewView status="loading" />
+  }
+
+  if (historyEntryStatus === "error") {
+    return (
+      <InterviewView
+        isRetrying={false}
+        onRetry={() => {
+          preparingEntryKey.current = null
+          setEntryPreparation({ key: null, status: "idle" })
+        }}
+        status="error"
+      />
+    )
   }
 
   if (interviewQuery.data !== undefined) {

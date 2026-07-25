@@ -18,6 +18,7 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   continueToNextPracticeQuestion: vi.fn(),
   endPracticeSession: vi.fn(),
   prepareNextPracticeSession: vi.fn(),
+  preparePracticeTrainingEntry: vi.fn(),
   setQuestionSaved: vi.fn(),
   setQuestionWeak: vi.fn(),
   skipPracticeQuestion: vi.fn(),

@@ -16,14 +16,29 @@ import { PracticeView } from "./PracticeView"
 
 export function PracticePage() {
   const entrySearch = parsePracticeEntrySearch(useSearch({ strict: false }))
-  const { practiceQuery, start, isStarting, prepareNextRound, isPreparingNextRound } =
-    usePracticeSession()
+  const {
+    practiceQuery,
+    start,
+    isStarting,
+    prepareNextRound,
+    isPreparingNextRound,
+    historyEntryStatus,
+    retryHistoryEntry,
+  } = usePracticeSession(entrySearch)
   const generation = usePracticeGenerationPolling(practiceQuery.data)
   const evaluation = usePracticeEvaluationPolling(practiceQuery.data)
   const runAction = usePracticeActionLock()
   const answering = usePracticeAnsweringActions(runAction)
   const followUp = usePracticeFollowUpActions(runAction)
   const review = usePracticeReviewActions(runAction)
+
+  if (historyEntryStatus === "pending") {
+    return <PracticeView content={{ status: "loading" }} variant="default" />
+  }
+
+  if (historyEntryStatus === "error") {
+    return <PracticeView isRetrying={false} onRetry={retryHistoryEntry} variant="error" />
+  }
 
   if (practiceQuery.data !== undefined) {
     return (

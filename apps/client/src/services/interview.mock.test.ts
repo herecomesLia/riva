@@ -13,6 +13,7 @@ import {
   finishInterview,
   getInterviewPage,
   getInterviewReview,
+  prepareInterviewTrainingEntry,
   resetInterviewMockState,
   startInterview,
   submitCandidateQuestion,
@@ -1232,6 +1233,47 @@ describe("interview mock reset boundaries", () => {
           },
         ],
       },
+    })
+  })
+})
+
+describe("interview history training entry", () => {
+  it.each(["active", "completed"] as const)(
+    "prepares a fresh setup from an existing %s session",
+    async (scenario) => {
+      resetRolesMockState("multipleRolesReady")
+      resetInterviewMockState(scenario === "completed" ? "completed" : "setupReady", {
+        defaultDelayMs: 0,
+      })
+      if (scenario === "active") await startCurrentOpening()
+
+      const prepared = await prepareInterviewTrainingEntry({
+        targetRoleId: "role_product_manager_meituan",
+        round: "technical",
+        difficulty: "pressure",
+        durationMinutes: 45,
+      })
+
+      expect(prepared.session).toBeNull()
+      expect(prepared.setup.defaultConfiguration).toEqual({
+        targetRoleId: "role_product_manager_meituan",
+        round: "hr",
+        difficulty: "pressure",
+        durationMinutes: 45,
+      })
+      expect(await getInterviewPage()).toEqual(prepared)
+    },
+  )
+
+  it("falls back from an unavailable history role to the current Roles domain role", async () => {
+    const prepared = await prepareInterviewTrainingEntry({
+      targetRoleId: "role_missing_or_archived",
+      round: "hr",
+    })
+
+    expect(prepared.setup.defaultConfiguration).toMatchObject({
+      targetRoleId: getRolesMockSnapshot().currentRoleId,
+      round: prepared.setup.targetRoles[0]!.supportedRounds[0],
     })
   })
 })

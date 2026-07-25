@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import type { PracticeQuestionType } from "@/models/practice"
+import { toPracticeQuestionType } from "@/models/training-entry"
 import type {
   TargetedPracticeRecordDetailResponse,
   TrainingRecordRecommendation,
@@ -74,10 +74,12 @@ export function TargetedPracticeHistoryView({
               render={
                 <Link
                   search={{
+                    entry: "history",
                     targetRoleId: state.data.targetRole.id,
                     questionType: toPracticeQuestionType(state.data.setup.questionType),
                     difficulty: state.data.setup.difficulty,
-                    source: "history",
+                    source: state.data.setup.source,
+                    prioritizeWeaknesses: state.data.setup.prioritizedWeaknesses,
                   }}
                   to="/practice"
                 />
@@ -126,10 +128,12 @@ function DetailReady({ record }: { record: TargetedPracticeRecordDetailResponse 
           <TargetedPracticeQuestionRecord
             key={question.id}
             practiceSearch={{
+              entry: "history",
               targetRoleId: record.targetRole.id,
               questionType: toPracticeQuestionType(record.setup.questionType),
               difficulty: record.setup.difficulty,
-              source: "history",
+              source: record.setup.source,
+              prioritizeWeaknesses: record.setup.prioritizedWeaknesses,
             }}
             question={question}
           />
@@ -299,21 +303,6 @@ function formatRole(record: TargetedPracticeRecordDetailResponse) {
   return record.targetRole.company
     ? `${record.targetRole.company} · ${record.targetRole.title}`
     : record.targetRole.title
-}
-
-function toPracticeQuestionType(
-  questionType: TargetedPracticeRecordDetailResponse["setup"]["questionType"],
-): PracticeQuestionType | undefined {
-  if (
-    questionType === "projectDeepDive" ||
-    questionType === "behavioral" ||
-    questionType === "businessUnderstanding" ||
-    questionType === "motivation" ||
-    questionType === "technicalFoundation"
-  ) {
-    return questionType
-  }
-  return undefined
 }
 
 function statusVariant(status: TrainingRecordStatus): "default" | "secondary" | "outline" {

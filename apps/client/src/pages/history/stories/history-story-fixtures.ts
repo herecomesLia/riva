@@ -48,17 +48,10 @@ export const historyOverviewStoryFixture: TrainingRecordsOverviewResponse = {
   answeredQuestionCount: 6,
   averageScore: 78,
   targetRoles: [
-    {
-      id: "role_frontend_engineer_bytedance",
-      title: "高级前端工程师",
-      company: "星云科技",
-    },
-    {
-      id: "role_product_manager_fintech",
-      title: "金融科技产品经理",
-      company: "远航金融",
-    },
-  ],
+    ...new Map(
+      trainingRecordDetailsMock.map((record) => [record.targetRole.id, record.targetRole]),
+    ).values(),
+  ].toSorted((left, right) => left.id.localeCompare(right.id)),
   byKind: {
     targetedPractice: {
       recordCount: 3,

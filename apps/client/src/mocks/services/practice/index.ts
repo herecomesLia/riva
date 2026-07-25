@@ -21,6 +21,7 @@ export { continueToNextPracticeQuestion, retryCurrentPracticeQuestion } from "./
 export {
   getPracticePage,
   prepareNextPracticeSession,
+  preparePracticeTrainingEntry,
   reconcilePracticeSetupSelection,
   startPracticeSession,
 } from "./setup"

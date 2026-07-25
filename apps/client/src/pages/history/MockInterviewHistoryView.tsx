@@ -87,6 +87,7 @@ export function MockInterviewHistoryView({
               render={
                 <Link
                   search={{
+                    entry: "history",
                     targetRoleId: state.data.targetRole.id,
                     round: state.data.setup.round,
                     difficulty: state.data.setup.difficulty,
@@ -138,6 +139,7 @@ function DetailReady({ record }: { record: MockInterviewRecordDetailResponse }) 
         {record.questions.map((question) => (
           <MockInterviewQuestionRecord
             interviewSearch={{
+              entry: "history",
               targetRoleId: record.targetRole.id,
               round: record.setup.round,
               difficulty: record.setup.difficulty,

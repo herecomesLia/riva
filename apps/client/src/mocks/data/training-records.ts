@@ -6,18 +6,18 @@ import type {
   TrainingRecordReferenceAnswer,
   TrainingRecordReview,
 } from "@/models/training-records"
+import { createRolesMockResponse } from "@/mocks/data/roles"
 
-const frontendRole = {
-  id: "role_frontend_engineer_bytedance",
-  title: "高级前端工程师",
-  company: "星云科技",
+const historyRoles = createRolesMockResponse("multipleRolesReady").roles
+
+function roleSnapshot(roleId: string) {
+  const role = historyRoles.find(({ id }) => id === roleId)
+  if (role === undefined) throw new Error(`History fixture role "${roleId}" is missing.`)
+  return { id: role.id, title: role.title, company: role.company }
 }
 
-const productRole = {
-  id: "role_product_manager_fintech",
-  title: "金融科技产品经理",
-  company: "远航金融",
-}
+const frontendRole = roleSnapshot("role_frontend_bytedance")
+const productRole = roleSnapshot("role_product_manager_meituan")
 
 function evaluation(
   overallScore: number,

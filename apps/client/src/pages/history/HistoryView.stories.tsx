@@ -73,7 +73,7 @@ export const FilteredEmpty = meta.story({
     ...Default.input.args,
     filters: {
       kind: "mockInterview",
-      targetRoleId: "role_product_manager_fintech",
+      targetRoleId: "role_product_manager_meituan",
       timeRange: "last7Days",
     },
     onClearFilters,

@@ -11,6 +11,7 @@ export {
   getPracticePage,
   getQuestionGenerationStatus,
   prepareNextPracticeSession,
+  preparePracticeTrainingEntry,
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeFollowUpFramework,

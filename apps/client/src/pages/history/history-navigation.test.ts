@@ -43,14 +43,19 @@ describe("training history navigation contracts", () => {
   it("only accepts stable business parameters at the existing training entries", () => {
     expect(
       parsePracticeEntrySearch({
+        entry: "history",
         targetRoleId: "role-1",
         questionType: "behavioral",
         difficulty: "pressure",
         source: "history",
         prioritizeWeaknesses: "true",
         record: { id: "must-not-pass" },
+        sessionId: "must-not-pass",
+        version: 9,
+        viewData: { status: "ready" },
       }),
     ).toEqual({
+      entry: "history",
       targetRoleId: "role-1",
       questionType: "behavioral",
       difficulty: "pressure",
@@ -59,13 +64,18 @@ describe("training history navigation contracts", () => {
     })
     expect(
       parseInterviewEntrySearch({
+        entry: "history",
         targetRoleId: "role-1",
         round: "technical",
         difficulty: "pressure",
         durationMinutes: "30",
         recordId: "must-not-pass",
+        session: { status: "completed" },
+        version: 3,
+        view: "detail",
       }),
     ).toEqual({
+      entry: "history",
       targetRoleId: "role-1",
       round: "technical",
       difficulty: "pressure",

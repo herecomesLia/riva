@@ -14,6 +14,7 @@ import {
   submitInterviewAnswer,
 } from "@/services/interview"
 import { endPracticeSession, getPracticePage, requestEndPracticeSession } from "@/services/practice"
+import { getRolesPage, updateTargetRole } from "@/services/roles"
 import {
   getMockInterviewRecord,
   getTargetedPracticeRecord,
@@ -255,6 +256,33 @@ describe("training completion to history mock integration", () => {
     expect(detail.questions[0]?.prompt).not.toBe("后来修改的运行态问题")
     expect(detail.questions[0]?.answer?.content).not.toBe("后来修改的运行态回答")
     expect(detail.questions[0]?.review?.summary).not.toBe("后来修改的运行态复盘")
+  })
+
+  it("keeps the role title and company snapshot after the linked Roles entity is edited", async () => {
+    const completed = await completePractice()
+    const recordId = `targeted-practice-record-${completed.session.sessionId}`
+    const before = await settle(getTargetedPracticeRecord(recordId))
+    const roles = await settle(getRolesPage())
+    const role = roles.roles.find(({ id }) => id === before.targetRole.id)
+    if (!role) throw new Error("Expected the history role in the Roles domain.")
+
+    await settle(
+      updateTargetRole({
+        roleId: role.id,
+        version: role.version,
+        title: "Edited after training",
+        company: "Edited Company",
+        recruitmentType: role.recruitmentType,
+        location: role.location,
+        experienceRange: role.experienceRange,
+      }),
+    )
+
+    const after = await settle(getTargetedPracticeRecord(recordId))
+    expect(after.targetRole).toEqual(before.targetRole)
+    expect(after.targetRole.id).toBe(role.id)
+    expect(after.targetRole.title).not.toBe("Edited after training")
+    expect(after.targetRole.company).not.toBe("Edited Company")
   })
 
   it("creates semantic partial and zero-answer practice snapshots", async () => {

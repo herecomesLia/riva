@@ -11,6 +11,60 @@ import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 
 describe("PracticePage: completion", () => {
+  it.each(["answeringQuestion", "completedSession"] as const)(
+    "prepares a fresh history setup from an existing %s session",
+    async (scenario) => {
+      const current = api.createPracticeMockResponse(scenario)
+      const prepared = api.createPracticeMockResponse("setupReady")
+      if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
+      const productRole = prepared.setupContext.targetRoles.find(
+        ({ id }) => id === "role_product_manager_meituan",
+      )
+      if (productRole === undefined) throw new Error("Expected product role.")
+      prepared.session.selection = {
+        targetRoleId: productRole.id,
+        questionType: "behavioral",
+        difficulty: "pressure",
+        source: "history",
+        prioritizeWeaknesses: true,
+      }
+      vi.mocked(api.getPracticePage).mockResolvedValue(current)
+      vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue(prepared)
+
+      context.renderPracticePage(
+        "/practice?entry=history&targetRoleId=role_product_manager_meituan&questionType=behavioral&difficulty=pressure&source=history&prioritizeWeaknesses=true",
+      )
+
+      expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+      expect(vi.mocked(api.preparePracticeTrainingEntry).mock.calls[0]?.[0]).toEqual({
+        targetRoleId: "role_product_manager_meituan",
+        questionType: "behavioral",
+        difficulty: "pressure",
+        source: "history",
+        prioritizeWeaknesses: true,
+      })
+      expect(testing.screen.getByTestId("practice-target-role-trigger")).toHaveTextContent(
+        "Product Manager",
+      )
+      expect(
+        testing.screen.getByRole("button", {
+          name: i18n.t("practice.questionTypes.behavioral"),
+        }),
+      ).toHaveAttribute("aria-pressed", "true")
+      expect(
+        testing.screen.getByRole("button", { name: i18n.t("practice.difficulty.pressure") }),
+      ).toHaveAttribute("aria-pressed", "true")
+      expect(
+        testing.screen.getByRole("button", { name: i18n.t("practice.sources.history") }),
+      ).toHaveAttribute("aria-pressed", "true")
+      expect(
+        testing.screen.getByRole("switch", {
+          name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
+        }),
+      ).toBeChecked()
+    },
+  )
+
   it("synchronously locks duplicate retry-current clicks", async () => {
     const review = api.createPracticeMockResponse("reviewBalanced")
     const retrying = api.createPracticeMockResponse("retryingCurrentQuestion")

@@ -15,6 +15,7 @@ export type PracticeMockOperation =
   | "getPracticePage"
   | "getQuestionGenerationStatus"
   | "prepareNextPracticeSession"
+  | "preparePracticeTrainingEntry"
   | "requestAnswerFramework"
   | "requestEndPracticeSession"
   | "requestPracticeFollowUpFramework"

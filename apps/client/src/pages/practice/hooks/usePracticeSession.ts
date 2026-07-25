@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { trainingRecordQueryKeys } from "@/app/training-record-query"
+import { toPracticeEntryParameters, type PracticeEntrySearch } from "@/app/training-entry-search"
 import type {
   PracticeMutationResponse,
   PracticePageResponse,
@@ -11,6 +12,7 @@ import type {
 import {
   getPracticePage,
   prepareNextPracticeSession,
+  preparePracticeTrainingEntry,
   startPracticeSession,
 } from "@/services/practice"
 
@@ -22,9 +24,15 @@ import {
 
 export const PRACTICE_QUERY_KEY = ["practice"] as const
 
-export function usePracticeSession() {
+export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   const queryClient = useQueryClient()
   const prepareNextRoundLock = useRef(false)
+  const preparingEntryKey = useRef<string | null>(null)
+  const entryKey = entrySearch.entry === "history" ? JSON.stringify(entrySearch) : null
+  const [entryPreparation, setEntryPreparation] = useState<{
+    key: string | null
+    status: "idle" | "pending" | "success" | "error"
+  }>({ key: null, status: "idle" })
   const practiceQuery = useQuery({
     queryFn: getPracticePage,
     queryKey: PRACTICE_QUERY_KEY,
@@ -50,6 +58,30 @@ export function usePracticeSession() {
         }),
       ),
   })
+  const prepareEntryMutation = useMutation({
+    mutationFn: preparePracticeTrainingEntry,
+    onSuccess: (response) => {
+      queryClient.setQueryData(PRACTICE_QUERY_KEY, response)
+    },
+  })
+
+  useEffect(() => {
+    if (
+      entryKey === null ||
+      practiceQuery.data === undefined ||
+      preparingEntryKey.current === entryKey ||
+      (entryPreparation.key === entryKey && entryPreparation.status === "success")
+    ) {
+      return
+    }
+
+    preparingEntryKey.current = entryKey
+    setEntryPreparation({ key: entryKey, status: "pending" })
+    void prepareEntryMutation
+      .mutateAsync(toPracticeEntryParameters(entrySearch))
+      .then(() => setEntryPreparation({ key: entryKey, status: "success" }))
+      .catch(() => setEntryPreparation({ key: entryKey, status: "error" }))
+  }, [entryKey, entryPreparation, entrySearch, practiceQuery.data, prepareEntryMutation])
 
   async function start(input: StartPracticeSessionInput) {
     await startMutation.mutateAsync(input)
@@ -84,6 +116,16 @@ export function usePracticeSession() {
     isStarting: startMutation.isPending,
     prepareNextRound,
     isPreparingNextRound: prepareNextRoundMutation.isPending,
+    historyEntryStatus:
+      entryKey === null
+        ? "inactive"
+        : entryPreparation.key === entryKey
+          ? entryPreparation.status
+          : "pending",
+    retryHistoryEntry: () => {
+      preparingEntryKey.current = null
+      setEntryPreparation({ key: null, status: "idle" })
+    },
   }
 }
 

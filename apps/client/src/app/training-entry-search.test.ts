@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import { createInterviewMockResponse } from "@/mocks/data/interview"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
+import {
+  resolveInterviewTrainingEntry,
+  resolvePracticeTrainingEntry,
+  toPracticeQuestionType,
+} from "@/models/training-entry"
 
 import { applyInterviewEntrySearch, applyPracticeEntrySearch } from "./training-entry-defaults"
 
@@ -51,5 +56,49 @@ describe("training entry search application", () => {
       durationMinutes: response.setup.availableDurationMinutes[0],
     })
     expect(result).not.toBe(response.setup)
+  })
+
+  it("centralizes cross-mode history question-type mapping", () => {
+    expect(toPracticeQuestionType("selfIntroduction")).toBe("motivation")
+    expect(toPracticeQuestionType("roleCapability")).toBe("businessUnderstanding")
+    expect(toPracticeQuestionType("technicalOrBusiness")).toBe("technicalFoundation")
+    expect(toPracticeQuestionType("resumeRisk")).toBe("behavioral")
+  })
+
+  it("falls back to the current role and its first supported practice type", () => {
+    const response = createPracticeMockResponse("setupReady")
+    const currentRole = response.setupContext.targetRoles.find(
+      ({ id }) => id === response.setupContext.defaultTargetRoleId,
+    )
+    if (!currentRole) throw new Error("Expected the current practice role.")
+
+    expect(
+      resolvePracticeTrainingEntry(response.setupContext, response.session.selection, {
+        targetRoleId: "role_missing",
+        questionType: "businessUnderstanding",
+      }),
+    ).toMatchObject({
+      targetRoleId: currentRole.id,
+      questionType: "businessUnderstanding",
+    })
+  })
+
+  it("falls back to the current role and its first supported interview round", () => {
+    const response = createInterviewMockResponse()
+    const currentRole = response.setup.targetRoles.find(
+      ({ id }) => id === response.setup.defaultConfiguration.targetRoleId,
+    )
+    if (!currentRole) throw new Error("Expected the current interview role.")
+
+    expect(
+      resolveInterviewTrainingEntry(
+        response.setup,
+        { targetRoleId: "role_archived", round: "hr" },
+        currentRole.id,
+      ),
+    ).toMatchObject({
+      targetRoleId: currentRole.id,
+      round: currentRole.supportedRounds.includes("hr") ? "hr" : currentRole.supportedRounds[0],
+    })
   })
 })

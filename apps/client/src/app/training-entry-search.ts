@@ -8,6 +8,11 @@ import type {
   PracticeQuestionSource,
   PracticeQuestionType,
 } from "@/models/practice"
+import type {
+  InterviewTrainingEntryParameters,
+  PracticeTrainingEntryParameters,
+  TrainingEntryOrigin,
+} from "@/models/training-entry"
 
 const practiceQuestionTypes: PracticeQuestionType[] = [
   "projectDeepDive",
@@ -29,23 +34,17 @@ const interviewRounds: InterviewRound[] = [
 const interviewDifficulties: InterviewDifficulty[] = ["basic", "pressure"]
 const interviewDurations: InterviewDurationMinutes[] = [15, 30, 45]
 
-export type PracticeEntrySearch = {
-  targetRoleId?: string
-  questionType?: PracticeQuestionType
-  difficulty?: PracticeDifficulty
-  source?: PracticeQuestionSource
-  prioritizeWeaknesses?: boolean
+export type PracticeEntrySearch = PracticeTrainingEntryParameters & {
+  entry?: TrainingEntryOrigin
 }
 
-export type InterviewEntrySearch = {
-  targetRoleId?: string
-  round?: InterviewRound
-  difficulty?: InterviewDifficulty
-  durationMinutes?: InterviewDurationMinutes
+export type InterviewEntrySearch = InterviewTrainingEntryParameters & {
+  entry?: TrainingEntryOrigin
 }
 
 export function parsePracticeEntrySearch(search: Record<string, unknown>): PracticeEntrySearch {
   return compact({
+    entry: search.entry === "history" ? "history" : undefined,
     targetRoleId: nonEmptyString(search.targetRoleId),
     questionType: includes(practiceQuestionTypes, search.questionType)
       ? search.questionType
@@ -59,6 +58,7 @@ export function parsePracticeEntrySearch(search: Record<string, unknown>): Pract
 export function parseInterviewEntrySearch(search: Record<string, unknown>): InterviewEntrySearch {
   const duration = positiveInteger(search.durationMinutes)
   return compact({
+    entry: search.entry === "history" ? "history" : undefined,
     targetRoleId: nonEmptyString(search.targetRoleId),
     round: includes(interviewRounds, search.round) ? search.round : undefined,
     difficulty: includes(interviewDifficulties, search.difficulty) ? search.difficulty : undefined,
@@ -67,6 +67,20 @@ export function parseInterviewEntrySearch(search: Record<string, unknown>): Inte
         ? (duration as InterviewDurationMinutes)
         : undefined,
   })
+}
+
+export function toPracticeEntryParameters(
+  search: PracticeEntrySearch,
+): PracticeTrainingEntryParameters {
+  const { entry: _, ...parameters } = search
+  return parameters
+}
+
+export function toInterviewEntryParameters(
+  search: InterviewEntrySearch,
+): InterviewTrainingEntryParameters {
+  const { entry: _, ...parameters } = search
+  return parameters
 }
 
 function includes<T extends string>(values: readonly T[], value: unknown): value is T {
