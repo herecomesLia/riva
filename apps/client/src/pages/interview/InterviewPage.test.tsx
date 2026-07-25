@@ -102,7 +102,14 @@ describe("InterviewPage", () => {
         durationMinutes: 45,
       }
       vi.mocked(getInterviewPage).mockResolvedValue(current)
-      vi.mocked(prepareInterviewTrainingEntry).mockResolvedValue(prepared)
+      vi.mocked(prepareInterviewTrainingEntry).mockResolvedValue({
+        page: prepared,
+        resolution: {
+          status: "available",
+          configuration: prepared.setup.defaultConfiguration,
+          adjustments: [],
+        },
+      })
 
       renderInterviewPage(
         "/interview?entry=history&targetRoleId=role_product_manager_meituan&round=hr&difficulty=basic&durationMinutes=45",
@@ -133,6 +140,116 @@ describe("InterviewPage", () => {
     },
   )
 
+  it("requires confirmation and explains adjusted round, difficulty, and duration", async () => {
+    const user = userEvent.setup()
+    const current = createStartedResponse()
+    const prepared = createMultipleReadyRolesResponse()
+    prepared.setup.defaultConfiguration = {
+      targetRoleId: "role_product_manager_meituan",
+      round: "hr",
+      difficulty: "basic",
+      durationMinutes: 15,
+    }
+    vi.mocked(getInterviewPage).mockResolvedValue(current)
+    vi.mocked(prepareInterviewTrainingEntry).mockResolvedValue({
+      page: prepared,
+      resolution: {
+        status: "adjusted",
+        configuration: prepared.setup.defaultConfiguration,
+        adjustments: ["interviewRoundUnsupported", "difficultyUnavailable", "durationUnavailable"],
+      },
+    })
+    vi.mocked(startInterview).mockImplementation(async (input) => createStartedResponse(input))
+
+    renderInterviewPage(
+      "/interview?entry=history&targetRoleId=role_product_manager_meituan&round=technical&difficulty=pressure&durationMinutes=45",
+    )
+
+    const alert = await screen.findByTestId("history-entry-adjusted")
+    expect(alert).toHaveTextContent(
+      i18n.t("common.trainingEntry.adjustments.interviewRoundUnsupported"),
+    )
+    expect(alert).toHaveTextContent(
+      i18n.t("common.trainingEntry.adjustments.difficultyUnavailable"),
+    )
+    expect(alert).toHaveTextContent(i18n.t("common.trainingEntry.adjustments.durationUnavailable"))
+    const start = screen.getByRole("button", { name: i18n.t("interview.actions.start") })
+    expect(start).toBeDisabled()
+    await user.click(
+      screen.getByRole("button", {
+        name: i18n.t("common.trainingEntry.adjusted.confirm"),
+      }),
+    )
+    expect(start).toBeEnabled()
+    await user.click(start)
+    expect(vi.mocked(startInterview).mock.calls[0]?.[0]).toEqual(
+      prepared.setup.defaultConfiguration,
+    )
+  })
+
+  it("requires an explicit role choice when the historical interview role is unavailable", async () => {
+    const user = userEvent.setup()
+    const current = createInterviewMockResponse("completed")
+    const prepared = createMultipleReadyRolesResponse()
+    prepared.setup.defaultConfiguration.targetRoleId = null
+    vi.mocked(getInterviewPage).mockResolvedValue(current)
+    vi.mocked(prepareInterviewTrainingEntry).mockResolvedValue({
+      page: prepared,
+      resolution: {
+        status: "roleUnavailable",
+        reason: "targetRoleArchived",
+        configuration: prepared.setup.defaultConfiguration,
+      },
+    })
+    vi.mocked(startInterview).mockImplementation(async (input) => createStartedResponse(input))
+
+    renderInterviewPage(
+      "/interview?entry=history&targetRoleId=role_archived&round=technical&difficulty=basic&durationMinutes=30",
+    )
+
+    expect(await screen.findByTestId("history-entry-role-unavailable")).toHaveTextContent(
+      i18n.t("common.trainingEntry.roleUnavailable.reasons.targetRoleArchived"),
+    )
+    const start = screen.getByRole("button", { name: i18n.t("interview.actions.start") })
+    expect(start).toBeDisabled()
+    expect(screen.getByTestId("interview-target-role-trigger")).toHaveTextContent(
+      i18n.t("common.trainingEntry.selectRole"),
+    )
+    await user.click(screen.getByTestId("interview-target-role-trigger"))
+    await user.click(await screen.findByRole("option", { name: /ByteDance/ }))
+    expect(start).toBeEnabled()
+    await user.click(start)
+    expect(vi.mocked(startInterview).mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ targetRoleId: "role_frontend_bytedance" }),
+    )
+  })
+
+  it("shows a dedicated history-entry preparation failure and retries", async () => {
+    const user = userEvent.setup()
+    const current = createInterviewMockResponse("completed")
+    const prepared = createMultipleReadyRolesResponse()
+    vi.mocked(getInterviewPage).mockResolvedValue(current)
+    vi.mocked(prepareInterviewTrainingEntry)
+      .mockRejectedValueOnce(new Error("prepare failed"))
+      .mockResolvedValueOnce({
+        page: prepared,
+        resolution: {
+          status: "available",
+          configuration: prepared.setup.defaultConfiguration,
+          adjustments: [],
+        },
+      })
+
+    renderInterviewPage(
+      "/interview?entry=history&targetRoleId=role_frontend_bytedance&round=technical",
+    )
+    expect(await screen.findByTestId("history-entry-failed")).toBeInTheDocument()
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("common.trainingEntry.failed.retry") }),
+    )
+    expect(await screen.findByTestId("history-entry-available")).toBeInTheDocument()
+  })
+
   it("maps an initial request to the structured loading view", async () => {
     vi.mocked(getInterviewPage).mockReturnValue(new Promise(() => undefined))
 
@@ -155,6 +272,7 @@ describe("InterviewPage", () => {
     expect(
       screen.getByRole("button", { name: i18n.t("interview.rounds.technical") }),
     ).toBeInTheDocument()
+    expect(prepareInterviewTrainingEntry).not.toHaveBeenCalled()
   })
 
   it("maps an empty target-role response to the empty view", async () => {

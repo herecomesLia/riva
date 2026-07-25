@@ -31,6 +31,7 @@ export const targetRoles = rolesFixture.roles
 export const setupContext = {
   targetRoles,
   defaultTargetRoleId: rolesFixture.currentRoleId,
+  availableDifficulties: ["basic", "pressure"],
   eligibleQuestionCounts: {
     saved: 3,
     history: 5,

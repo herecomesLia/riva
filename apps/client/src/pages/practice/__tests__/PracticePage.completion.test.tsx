@@ -30,7 +30,14 @@ describe("PracticePage: completion", () => {
         prioritizeWeaknesses: true,
       }
       vi.mocked(api.getPracticePage).mockResolvedValue(current)
-      vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue(prepared)
+      vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue({
+        page: prepared,
+        resolution: {
+          status: "available",
+          configuration: prepared.session.selection,
+          adjustments: [],
+        },
+      })
 
       context.renderPracticePage(
         "/practice?entry=history&targetRoleId=role_product_manager_meituan&questionType=behavioral&difficulty=pressure&source=history&prioritizeWeaknesses=true",
@@ -65,6 +72,139 @@ describe("PracticePage: completion", () => {
       ).toBeChecked()
     },
   )
+
+  it("requires confirmation when a historical question type is adjusted", async () => {
+    const user = userEvent.setup()
+    const current = api.createPracticeMockResponse("answeringQuestion")
+    const prepared = api.createPracticeMockResponse("setupReady")
+    if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
+    const productRole = prepared.setupContext.targetRoles.find(
+      ({ id }) => id === "role_product_manager_meituan",
+    )!
+    prepared.session.selection = {
+      ...prepared.session.selection,
+      targetRoleId: productRole.id,
+      questionType: productRole.supportedQuestionTypes[0],
+      source: "history",
+    }
+    const generating = api.createPracticeMockResponse("generatingQuestion")
+    if (generating.session.status !== "generatingQuestion") {
+      throw new Error("Expected generating state.")
+    }
+    generating.session.selection = {
+      ...prepared.session.selection,
+      targetRoleId: productRole.id,
+    }
+    vi.mocked(api.getPracticePage).mockResolvedValue(current)
+    vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue({
+      page: prepared,
+      resolution: {
+        status: "adjusted",
+        configuration: prepared.session.selection,
+        adjustments: ["practiceQuestionTypeUnsupported"],
+      },
+    })
+    vi.mocked(api.startPracticeSession).mockResolvedValue(generating)
+
+    context.renderPracticePage(
+      "/practice?entry=history&targetRoleId=role_product_manager_meituan&questionType=technicalFoundation&difficulty=basic&source=history",
+    )
+
+    expect(await testing.screen.findByTestId("history-entry-adjusted")).toHaveTextContent(
+      i18n.t("common.trainingEntry.adjustments.practiceQuestionTypeUnsupported"),
+    )
+    const start = testing.screen.getByRole("button", { name: i18n.t("practice.actions.start") })
+    expect(start).toBeDisabled()
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("common.trainingEntry.adjusted.confirm"),
+      }),
+    )
+    expect(start).toBeEnabled()
+    await user.click(start)
+    expect(api.startPracticeSession).toHaveBeenCalledOnce()
+  })
+
+  it("keeps an unavailable historical role unselected until the user chooses one", async () => {
+    const user = userEvent.setup()
+    const current = api.createPracticeMockResponse("answeringQuestion")
+    const prepared = api.createPracticeMockResponse("setupReady")
+    if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
+    prepared.session.selection = {
+      ...prepared.session.selection,
+      targetRoleId: null,
+      source: "history",
+    }
+    const generating = api.createPracticeMockResponse("generatingQuestion")
+    vi.mocked(api.getPracticePage).mockResolvedValue(current)
+    vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue({
+      page: prepared,
+      resolution: {
+        status: "roleUnavailable",
+        reason: "targetRoleDeleted",
+        configuration: prepared.session.selection,
+      },
+    })
+    vi.mocked(api.startPracticeSession).mockResolvedValue(generating)
+
+    context.renderPracticePage(
+      "/practice?entry=history&targetRoleId=role_deleted&questionType=projectDeepDive&difficulty=basic&source=history",
+    )
+
+    expect(await testing.screen.findByTestId("history-entry-role-unavailable")).toHaveTextContent(
+      i18n.t("common.trainingEntry.roleUnavailable.reasons.targetRoleDeleted"),
+    )
+    const start = testing.screen.getByRole("button", { name: i18n.t("practice.actions.start") })
+    expect(start).toBeDisabled()
+    expect(testing.screen.getByTestId("practice-target-role-trigger")).toHaveTextContent(
+      i18n.t("common.trainingEntry.selectRole"),
+    )
+
+    await user.click(testing.screen.getByTestId("practice-target-role-trigger"))
+    await user.click(await testing.screen.findByRole("option", { name: /ByteDance/ }))
+    expect(start).toBeEnabled()
+    await user.click(start)
+    expect(vi.mocked(api.startPracticeSession).mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ targetRoleId: "role_frontend_bytedance" }),
+    )
+  })
+
+  it("shows a dedicated preparation failure and retries the entry", async () => {
+    const user = userEvent.setup()
+    const current = api.createPracticeMockResponse("completedSession")
+    const prepared = api.createPracticeMockResponse("setupReady")
+    if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
+    vi.mocked(api.getPracticePage).mockResolvedValue(current)
+    vi.mocked(api.preparePracticeTrainingEntry)
+      .mockRejectedValueOnce(new Error("prepare failed"))
+      .mockResolvedValueOnce({
+        page: prepared,
+        resolution: {
+          status: "available",
+          configuration: prepared.session.selection,
+          adjustments: [],
+        },
+      })
+
+    context.renderPracticePage(
+      "/practice?entry=history&targetRoleId=role_frontend_bytedance&questionType=projectDeepDive",
+    )
+    expect(await testing.screen.findByTestId("history-entry-failed")).toBeInTheDocument()
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("common.trainingEntry.failed.retry"),
+      }),
+    )
+    expect(await testing.screen.findByTestId("history-entry-available")).toBeInTheDocument()
+  })
+
+  it("does not prepare a historical entry during ordinary practice access", async () => {
+    const prepared = api.createPracticeMockResponse("setupReady")
+    vi.mocked(api.getPracticePage).mockResolvedValue(prepared)
+    context.renderPracticePage("/practice")
+    expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+    expect(api.preparePracticeTrainingEntry).not.toHaveBeenCalled()
+  })
 
   it("synchronously locks duplicate retry-current clicks", async () => {
     const review = api.createPracticeMockResponse("reviewBalanced")

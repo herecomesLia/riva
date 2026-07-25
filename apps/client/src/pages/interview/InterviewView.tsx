@@ -9,6 +9,7 @@ import {
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { TrainingEntryPreparationFailure } from "@/components/training-entry-preparation-alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -29,6 +30,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import type { InterviewConfiguration, InterviewSetupViewData } from "@/models/interview"
+import type { InterviewTrainingEntryResolution } from "@/models/training-entry"
 
 import { InterviewSetupForm } from "./components/InterviewSetupForm"
 
@@ -39,6 +41,7 @@ export type InterviewViewProps =
   | {
       status: "ready"
       setup: InterviewSetupViewData
+      historyEntryResolution?: InterviewTrainingEntryResolution
       isStarting: boolean
       onStart: (input: InterviewConfiguration) => Promise<void>
     }
@@ -51,6 +54,11 @@ export type InterviewViewProps =
     }
   | {
       status: "error"
+      isRetrying: boolean
+      onRetry: () => void
+    }
+  | {
+      status: "historyEntryError"
       isRetrying: boolean
       onRetry: () => void
     }
@@ -86,10 +94,20 @@ function InterviewViewContent(props: InterviewViewProps) {
   if (props.status === "error") {
     return <InterviewErrorState isRetrying={props.isRetrying} onRetry={props.onRetry} />
   }
+  if (props.status === "historyEntryError") {
+    return (
+      <InterviewSetupCard>
+        <CardContent>
+          <TrainingEntryPreparationFailure isRetrying={props.isRetrying} onRetry={props.onRetry} />
+        </CardContent>
+      </InterviewSetupCard>
+    )
+  }
 
   return (
     <InterviewSetupCard>
       <InterviewSetupForm
+        historyEntryResolution={props.historyEntryResolution}
         isPending={props.isStarting}
         onStart={props.onStart}
         setup={props.setup}

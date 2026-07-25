@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { defaultHistorySearch } from "@/pages/history/history-navigation"
+import { TrainingEntryPreparationFailure } from "@/components/training-entry-preparation-alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +51,7 @@ import type {
   SubmitFollowUpAnswerInput,
   SubmitPrimaryAnswerInput,
 } from "@/models/practice"
+import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 import {
   PracticeGeneratingState,
@@ -156,6 +158,11 @@ type PracticeViewProps =
       onRetry: () => void
     }
   | {
+      variant: "historyEntryError"
+      isRetrying: boolean
+      onRetry: () => void
+    }
+  | {
       variant: "default"
       content: { status: "loading" }
     }
@@ -178,6 +185,7 @@ type PracticeViewProps =
       onRetryGeneration: () => void
       onRetryEvaluation: () => void
       onStart: (input: ActivePracticeSelection) => Promise<void>
+      historyEntryResolution?: PracticeTrainingEntryResolution
     }
 
 export function PracticeView(props: PracticeViewProps) {
@@ -209,6 +217,7 @@ export function PracticeView(props: PracticeViewProps) {
 
 function getPracticeStateKey(props: PracticeViewProps) {
   if (props.variant === "error") return "load-error"
+  if (props.variant === "historyEntryError") return "history-entry-error"
   if (props.content.status === "loading") return "loading"
   return `session:${props.content.data.session.status}`
 }
@@ -236,6 +245,15 @@ function PracticeViewContent(props: PracticeViewProps) {
   if (props.variant === "error") {
     return <PracticeLoadErrorState isRetrying={props.isRetrying} onRetry={props.onRetry} />
   }
+  if (props.variant === "historyEntryError") {
+    return (
+      <Card>
+        <CardContent>
+          <TrainingEntryPreparationFailure isRetrying={props.isRetrying} onRetry={props.onRetry} />
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (props.content.status === "loading") return <PracticeLoadingState />
   if (!("generationError" in props)) return <PracticeLoadingState />
@@ -247,7 +265,10 @@ function PracticeViewContent(props: PracticeViewProps) {
     case "setup": {
       if (setupContext.targetRoles.length === 0) return <PracticeNoRolesState />
 
-      const selection = resolveActiveSelection(session.selection, setupContext)
+      const selection =
+        props.historyEntryResolution?.status === "roleUnavailable"
+          ? session.selection
+          : resolveActiveSelection(session.selection, setupContext)
       if (!selection) return <PracticeNoRolesState />
 
       return (
@@ -258,9 +279,10 @@ function PracticeViewContent(props: PracticeViewProps) {
             </CardTitle>
             <CardDescription>{t("practice.setup.description")}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-6">
             <PracticeSetupForm
               context={setupContext}
+              historyEntryResolution={props.historyEntryResolution}
               initialSelection={selection}
               isPending={props.isStarting}
               onStart={props.onStart}

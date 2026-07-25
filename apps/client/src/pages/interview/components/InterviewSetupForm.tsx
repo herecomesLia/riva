@@ -11,6 +11,7 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { TrainingEntryPreparationAlert } from "@/components/training-entry-preparation-alert"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardFooter } from "@/components/ui/card"
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
@@ -30,10 +31,13 @@ import type {
   InterviewDurationMinutes,
   InterviewRound,
   InterviewSetupViewData,
+  InterviewSetupFormState,
 } from "@/models/interview"
+import type { InterviewTrainingEntryResolution } from "@/models/training-entry"
 
 type InterviewSetupFormProps = {
   setup: InterviewSetupViewData
+  historyEntryResolution?: InterviewTrainingEntryResolution
   isPending: boolean
   onStart: (input: InterviewConfiguration) => Promise<void>
 }
@@ -41,7 +45,13 @@ type InterviewSetupFormProps = {
 const interviewOptionStateClassName =
   "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
 
-function getInitialConfiguration(setup: InterviewSetupViewData): InterviewConfiguration {
+function getInitialConfiguration(
+  setup: InterviewSetupViewData,
+  historyEntryResolution?: InterviewTrainingEntryResolution,
+): InterviewSetupFormState["values"] {
+  if (historyEntryResolution?.status === "roleUnavailable") {
+    return { ...setup.defaultConfiguration, targetRoleId: null }
+  }
   const selectedRole =
     setup.targetRoles.find(({ id }) => id === setup.defaultConfiguration.targetRoleId) ??
     setup.targetRoles[0]
@@ -66,15 +76,31 @@ function getInitialConfiguration(setup: InterviewSetupViewData): InterviewConfig
   }
 }
 
-export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetupFormProps) {
+export function InterviewSetupForm({
+  setup,
+  historyEntryResolution,
+  isPending,
+  onStart,
+}: InterviewSetupFormProps) {
   const { t } = useTranslation()
   const [submitError, setSubmitError] = useState(false)
+  const [adjustmentConfirmed, setAdjustmentConfirmed] = useState(
+    historyEntryResolution?.status !== "adjusted",
+  )
   const form = useForm({
-    defaultValues: getInitialConfiguration(setup),
+    defaultValues: getInitialConfiguration(setup, historyEntryResolution),
     onSubmit: async ({ value }) => {
+      if (!value.targetRoleId || !value.round || !value.difficulty || !value.durationMinutes) {
+        return
+      }
       setSubmitError(false)
       try {
-        await onStart(value)
+        await onStart({
+          targetRoleId: value.targetRoleId,
+          round: value.round,
+          difficulty: value.difficulty,
+          durationMinutes: value.durationMinutes,
+        })
       } catch {
         setSubmitError(true)
       }
@@ -92,7 +118,14 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
         void form.handleSubmit()
       }}
     >
-      <CardContent>
+      <CardContent className="flex flex-col gap-6">
+        {historyEntryResolution && (
+          <TrainingEntryPreparationAlert
+            confirmed={adjustmentConfirmed}
+            onConfirm={() => setAdjustmentConfirmed(true)}
+            resolution={historyEntryResolution}
+          />
+        )}
         <FieldGroup className="gap-0">
           <form.Field name="targetRoleId">
             {(field) => {
@@ -113,7 +146,8 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                       if (!value) return
                       field.handleChange(value)
                       const role = setup.targetRoles.find(({ id }) => id === value)
-                      if (role && !role.supportedRounds.includes(form.getFieldValue("round"))) {
+                      const currentRound = form.getFieldValue("round")
+                      if (role && (!currentRound || !role.supportedRounds.includes(currentRound))) {
                         form.setFieldValue("round", role.supportedRounds[0])
                       }
                     }}
@@ -125,7 +159,9 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                       id={field.name}
                       onBlur={field.handleBlur}
                     >
-                      <SelectValue>{selectedRoleLabel}</SelectValue>
+                      <SelectValue placeholder={t("common.trainingEntry.selectRole")}>
+                        {selectedRoleLabel}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -166,7 +202,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                             if (value) field.handleChange(value as InterviewRound)
                           }}
                           spacing={2}
-                          value={[field.state.value]}
+                          value={field.state.value ? [field.state.value] : []}
                           variant="outline"
                         >
                           {selectedRole?.supportedRounds.map((round) => (
@@ -207,7 +243,7 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
                       if (value) field.handleChange(value as InterviewDifficulty)
                     }}
                     spacing={2}
-                    value={[field.state.value]}
+                    value={field.state.value ? [field.state.value] : []}
                     variant="outline"
                   >
                     {setup.availableDifficulties.map((difficulty) => (
@@ -274,14 +310,23 @@ export function InterviewSetupForm({ setup, isPending, onStart }: InterviewSetup
       </CardContent>
 
       <CardFooter className="mt-7">
-        <Button className="w-full sm:w-fit" disabled={pending} size="lg" type="submit">
-          {pending ? (
-            <Spinner aria-hidden="true" data-icon="inline-start" />
-          ) : (
-            <PlayIcon aria-hidden="true" data-icon="inline-start" />
+        <form.Subscribe selector={(state) => state.values.targetRoleId}>
+          {(targetRoleId) => (
+            <Button
+              className="w-full sm:w-fit"
+              disabled={pending || !targetRoleId || !adjustmentConfirmed}
+              size="lg"
+              type="submit"
+            >
+              {pending ? (
+                <Spinner aria-hidden="true" data-icon="inline-start" />
+              ) : (
+                <PlayIcon aria-hidden="true" data-icon="inline-start" />
+              )}
+              {pending ? t("interview.actions.starting") : t("interview.actions.start")}
+            </Button>
           )}
-          {pending ? t("interview.actions.starting") : t("interview.actions.start")}
-        </Button>
+        </form.Subscribe>
       </CardFooter>
     </form>
   )

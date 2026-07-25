@@ -49,6 +49,7 @@ let response = createPracticeMockResponse()
 let sessionSequence = 0
 let mutationSequence = 0
 let configuredDefaultDelayMs: number | undefined
+let historyEntryRoleSelectionRequired = false
 const generationPollCounts = new Map<string, number>()
 const evaluationPollCounts = new Map<string, number>()
 const questionOrdinals = new Map<string, number>()
@@ -67,6 +68,14 @@ export function getPracticeMockState(): PracticePageResponse {
 export function setPracticeMockState(next: PracticePageResponse): PracticePageResponse {
   response = copyPracticeState(next)
   return copyPracticeState(response)
+}
+
+export function getHistoryEntryRoleSelectionRequired(): boolean {
+  return historyEntryRoleSelectionRequired
+}
+
+export function setHistoryEntryRoleSelectionRequired(required: boolean): void {
+  historyEntryRoleSelectionRequired = required
 }
 
 export function resetPracticeMockState(
@@ -92,6 +101,7 @@ export function resetPracticeMockState(
   sessionSequence = 0
   mutationSequence = 0
   configuredDefaultDelayMs = nextDefaultDelayMs
+  historyEntryRoleSelectionRequired = false
   generationPollCounts.clear()
   evaluationPollCounts.clear()
   questionOrdinals.clear()

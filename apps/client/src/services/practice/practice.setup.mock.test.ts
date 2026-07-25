@@ -219,7 +219,7 @@ describe("practice stateful mock service: setup", () => {
         }),
       )
 
-      expect(prepared.session).toEqual({
+      expect(prepared.page.session).toEqual({
         status: "setup",
         selection: {
           targetRoleId: "role_product_manager_meituan",
@@ -229,11 +229,15 @@ describe("practice stateful mock service: setup", () => {
           prioritizeWeaknesses: true,
         },
       })
-      expect(await context.settle(context.getPracticePage())).toEqual(prepared)
+      expect(prepared.resolution).toMatchObject({
+        status: "adjusted",
+        adjustments: ["practiceQuestionTypeUnsupported"],
+      })
+      expect(await context.settle(context.getPracticePage())).toEqual(prepared.page)
     },
   )
 
-  it("falls back from an unavailable history role to the current Roles domain role", async () => {
+  it("keeps a deleted history role unselected instead of falling back", async () => {
     const prepared = await context.settle(
       context.preparePracticeTrainingEntry({
         targetRoleId: "role_missing_or_archived",
@@ -241,12 +245,42 @@ describe("practice stateful mock service: setup", () => {
       }),
     )
 
-    expect(prepared.session).toMatchObject({
+    expect(prepared.page.session).toMatchObject({
       status: "setup",
       selection: {
-        targetRoleId: prepared.setupContext.defaultTargetRoleId,
+        targetRoleId: null,
         questionType: "businessUnderstanding",
       },
+    })
+    expect(prepared.resolution).toEqual({
+      status: "roleUnavailable",
+      reason: "targetRoleDeleted",
+      configuration: expect.objectContaining({ targetRoleId: null }),
+    })
+  })
+
+  it("keeps an archived history role unselected with an explicit reason", async () => {
+    context.resetRolesMockState("archivedRoles")
+    context.resetPracticeMockState("answeringQuestion", { defaultDelayMs: 0 })
+
+    const prepared = await context.settle(
+      context.preparePracticeTrainingEntry({
+        targetRoleId: "role_frontend_meituan",
+        questionType: "projectDeepDive",
+      }),
+    )
+
+    expect(prepared.page.session).toMatchObject({
+      status: "setup",
+      selection: { targetRoleId: null },
+    })
+    expect(prepared.resolution).toMatchObject({
+      status: "roleUnavailable",
+      reason: "targetRoleArchived",
+    })
+    expect((await context.settle(context.getPracticePage())).session).toMatchObject({
+      status: "setup",
+      selection: { targetRoleId: null },
     })
   })
 

@@ -1,7 +1,6 @@
 import { useSearch } from "@tanstack/react-router"
 
 import { parsePracticeEntrySearch } from "@/app/training-entry-search"
-import { applyPracticeEntrySearch } from "@/app/training-entry-defaults"
 
 import {
   usePracticeAnsweringActions,
@@ -23,6 +22,7 @@ export function PracticePage() {
     prepareNextRound,
     isPreparingNextRound,
     historyEntryStatus,
+    historyEntryResolution,
     retryHistoryEntry,
   } = usePracticeSession(entrySearch)
   const generation = usePracticeGenerationPolling(practiceQuery.data)
@@ -37,7 +37,9 @@ export function PracticePage() {
   }
 
   if (historyEntryStatus === "error") {
-    return <PracticeView isRetrying={false} onRetry={retryHistoryEntry} variant="error" />
+    return (
+      <PracticeView isRetrying={false} onRetry={retryHistoryEntry} variant="historyEntryError" />
+    )
   }
 
   if (practiceQuery.data !== undefined) {
@@ -49,7 +51,7 @@ export function PracticePage() {
         completedPending={isPreparingNextRound}
         content={{
           status: "ready",
-          data: applyPracticeEntrySearch(practiceQuery.data, entrySearch),
+          data: practiceQuery.data,
         }}
         evaluationError={evaluation.evaluationError}
         followUpActions={followUp.actions}
@@ -58,6 +60,7 @@ export function PracticePage() {
         isEvaluationRetrying={evaluation.isEvaluationRetrying}
         isGenerationRetrying={generation.isGenerationRetrying}
         isStarting={isStarting}
+        historyEntryResolution={historyEntryResolution}
         onRetryEvaluation={evaluation.retryEvaluation}
         onRetryGeneration={generation.retryGeneration}
         onStart={start}

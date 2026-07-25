@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { TrainingEntryPreparationAlert } from "@/components/training-entry-preparation-alert"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -41,7 +42,9 @@ import type {
   PracticeQuestionSource,
   PracticeQuestionType,
   PracticeSetupContext,
+  PracticeSetupSelection,
 } from "@/models/practice"
+import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 const setupSchema = z.object({
   targetRoleId: z.string().min(1),
@@ -64,33 +67,38 @@ const questionTypes: PracticeQuestionType[] = [
   "motivation",
   "technicalFoundation",
 ]
-const difficulties: PracticeDifficulty[] = ["basic", "pressure"]
 const sources: PracticeQuestionSource[] = ["personalized", "saved", "history"]
 const practiceOptionStateClassName =
   "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
 
 type PracticeSetupFormProps = {
   context: PracticeSetupContext
-  initialSelection: ActivePracticeSelection
+  historyEntryResolution?: PracticeTrainingEntryResolution
+  initialSelection: PracticeSetupSelection
   isPending: boolean
   onStart: (input: ActivePracticeSelection) => Promise<void>
 }
 
 export function PracticeSetupForm({
   context,
+  historyEntryResolution,
   initialSelection,
   isPending,
   onStart,
 }: PracticeSetupFormProps) {
   const { t } = useTranslation()
   const [submitError, setSubmitError] = useState(false)
+  const [adjustmentConfirmed, setAdjustmentConfirmed] = useState(
+    historyEntryResolution?.status !== "adjusted",
+  )
   const form = useForm({
     defaultValues: initialSelection,
     validators: { onSubmit: setupSchema },
     onSubmit: async ({ value }) => {
+      if (!value.targetRoleId) return
       setSubmitError(false)
       try {
-        await onStart(value)
+        await onStart({ ...value, targetRoleId: value.targetRoleId })
       } catch {
         setSubmitError(true)
       }
@@ -108,6 +116,13 @@ export function PracticeSetupForm({
         void form.handleSubmit()
       }}
     >
+      {historyEntryResolution && (
+        <TrainingEntryPreparationAlert
+          confirmed={adjustmentConfirmed}
+          onConfirm={() => setAdjustmentConfirmed(true)}
+          resolution={historyEntryResolution}
+        />
+      )}
       <FieldGroup className="gap-0">
         <form.Field name="targetRoleId">
           {(field) => {
@@ -145,7 +160,9 @@ export function PracticeSetupForm({
                     id={field.name}
                     onBlur={field.handleBlur}
                   >
-                    <SelectValue>{selectedRoleLabel}</SelectValue>
+                    <SelectValue placeholder={t("common.trainingEntry.selectRole")}>
+                      {selectedRoleLabel}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -234,7 +251,7 @@ export function PracticeSetupForm({
                   value={[field.state.value]}
                   variant="outline"
                 >
-                  {difficulties.map((difficulty) => (
+                  {context.availableDifficulties.map((difficulty) => (
                     <ToggleGroupItem
                       className={practiceOptionStateClassName}
                       key={difficulty}
@@ -349,8 +366,10 @@ export function PracticeSetupForm({
         </Alert>
       )}
 
-      <form.Subscribe selector={(state) => state.values.source}>
-        {(source) => {
+      <form.Subscribe
+        selector={(state) => [state.values.source, state.values.targetRoleId] as const}
+      >
+        {([source, targetRoleId]) => {
           const sourceUnavailable =
             (source === "saved" && context.eligibleQuestionCounts.saved === 0) ||
             (source === "history" && context.eligibleQuestionCounts.history === 0)
@@ -358,7 +377,7 @@ export function PracticeSetupForm({
           return (
             <Button
               className="w-full sm:w-fit"
-              disabled={pending || sourceUnavailable}
+              disabled={pending || sourceUnavailable || !targetRoleId || !adjustmentConfirmed}
               type="submit"
             >
               {!pending && <PlayIcon aria-hidden="true" data-icon="inline-start" />}

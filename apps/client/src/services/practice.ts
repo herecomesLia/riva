@@ -25,7 +25,10 @@ import type {
   SubmitFollowUpAnswerInput,
   SubmitPrimaryAnswerInput,
 } from "@/models/practice"
-import type { PracticeTrainingEntryParameters } from "@/models/training-entry"
+import type {
+  PracticeTrainingEntryParameters,
+  PracticeTrainingEntryPreparationResponse,
+} from "@/models/training-entry"
 
 function realApiUnavailable(): never {
   throw new Error("Real practice API is not implemented.")
@@ -49,7 +52,7 @@ export function prepareNextPracticeSession(
 
 export function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
-): Promise<PracticeMutationResponse> {
+): Promise<PracticeTrainingEntryPreparationResponse> {
   return env.mock ? practiceMockService.preparePracticeTrainingEntry(input) : realApiUnavailable()
 }
 

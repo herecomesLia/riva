@@ -10,6 +10,7 @@ import type {
   PrepareNextPracticeSessionInput,
   StartPracticeSessionInput,
 } from "@/models/practice"
+import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 import {
   getPracticePage,
   prepareNextPracticeSession,
@@ -33,6 +34,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   const [entryPreparation, setEntryPreparation] = useState<{
     key: string | null
     status: "idle" | "pending" | "success" | "error"
+    resolution?: PracticeTrainingEntryResolution
   }>({ key: null, status: "idle" })
   const practiceQuery = useQuery({
     queryFn: getPracticePage,
@@ -59,12 +61,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
         }),
       ),
   })
-  const prepareEntryMutation = useMutation({
-    mutationFn: preparePracticeTrainingEntry,
-    onSuccess: (response) => {
-      queryClient.setQueryData(PRACTICE_QUERY_KEY, response)
-    },
-  })
+  const prepareEntryMutation = useMutation({ mutationFn: preparePracticeTrainingEntry })
 
   useEffect(() => {
     if (
@@ -80,9 +77,19 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     setEntryPreparation({ key: entryKey, status: "pending" })
     void prepareEntryMutation
       .mutateAsync(toPracticeEntryParameters(entrySearch))
-      .then(() => setEntryPreparation({ key: entryKey, status: "success" }))
+      .then(({ page, resolution }) => {
+        queryClient.setQueryData(PRACTICE_QUERY_KEY, page)
+        setEntryPreparation({ key: entryKey, status: "success", resolution })
+      })
       .catch(() => setEntryPreparation({ key: entryKey, status: "error" }))
-  }, [entryKey, entryPreparation, entrySearch, practiceQuery.data, prepareEntryMutation])
+  }, [
+    entryKey,
+    entryPreparation,
+    entrySearch,
+    practiceQuery.data,
+    prepareEntryMutation,
+    queryClient,
+  ])
 
   async function start(input: StartPracticeSessionInput) {
     await startMutation.mutateAsync(input)
@@ -123,6 +130,10 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
         : entryPreparation.key === entryKey
           ? entryPreparation.status
           : "pending",
+    historyEntryResolution:
+      entryPreparation.key === entryKey && entryPreparation.status === "success"
+        ? entryPreparation.resolution
+        : undefined,
     retryHistoryEntry: () => {
       preparingEntryKey.current = null
       setEntryPreparation({ key: null, status: "idle" })

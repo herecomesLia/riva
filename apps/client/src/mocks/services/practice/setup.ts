@@ -9,19 +9,23 @@ import type {
   PracticeTargetRoleOption,
   StartPracticeSessionInput,
 } from "@/models/practice"
-import type { TargetRole } from "@/models/roles"
+import type { RolesPageResponse, TargetRole } from "@/models/roles"
 import {
   resolvePracticeTrainingEntry,
+  resolveTrainingEntryRoleAvailability,
+  type PracticeTrainingEntryPreparationResponse,
   type PracticeTrainingEntryParameters,
 } from "@/models/training-entry"
 
 import {
   consumePracticeMockOperation,
   copyPracticeState,
+  getHistoryEntryRoleSelectionRequired,
   getPracticeMockState,
   initializeQuestionOrdinal,
   nextPracticeSessionSequence,
   setPracticeMockState,
+  setHistoryEntryRoleSelectionRequired,
 } from "./state"
 
 function toPracticeRoleOption(role: TargetRole): PracticeTargetRoleOption {
@@ -33,18 +37,21 @@ function toPracticeRoleOption(role: TargetRole): PracticeTargetRoleOption {
   }
 }
 
-async function getCurrentSetupContext(): Promise<PracticeSetupContext> {
-  const rolesResponse = await getRolesPage()
-  const targetRoles = rolesResponse.roles
+async function getCurrentSetupContext(
+  rolesResponse?: RolesPageResponse,
+): Promise<PracticeSetupContext> {
+  const currentRoles = rolesResponse ?? (await getRolesPage())
+  const targetRoles = currentRoles.roles
     .filter((role) => role.preparationStatus !== "archived")
     .map(toPracticeRoleOption)
-  const defaultTargetRoleId = targetRoles.some((role) => role.id === rolesResponse.currentRoleId)
-    ? rolesResponse.currentRoleId
+  const defaultTargetRoleId = targetRoles.some((role) => role.id === currentRoles.currentRoleId)
+    ? currentRoles.currentRoleId
     : null
 
   return {
     targetRoles,
     defaultTargetRoleId,
+    availableDifficulties: ["basic", "pressure"],
     eligibleQuestionCounts: copyPracticeState(
       getPracticeMockState().setupContext.eligibleQuestionCounts,
     ),
@@ -73,6 +80,9 @@ export function reconcilePracticeSetupSelection(
 function withSetupContext(setupContext: PracticeSetupContext): PracticePageResponse {
   const current = getPracticeMockState()
   if (current.session.status !== "setup") {
+    return { ...current, setupContext }
+  }
+  if (getHistoryEntryRoleSelectionRequired()) {
     return { ...current, setupContext }
   }
 
@@ -115,6 +125,7 @@ export async function startPracticeSession(
   await consumePracticeMockOperation("startPracticeSession", 0)
   const current = await getPracticePage()
   requireValidSelection(current.setupContext, input)
+  setHistoryEntryRoleSelectionRequired(false)
   const sessionSequence = nextPracticeSessionSequence()
   const sessionId = `practice_session_generated_${sessionSequence}`
   initializeQuestionOrdinal(sessionId)
@@ -149,6 +160,7 @@ export async function prepareNextPracticeSession(
   }
 
   const setupContext = await getCurrentSetupContext()
+  setHistoryEntryRoleSelectionRequired(false)
   return setPracticeMockState({
     setupContext,
     session: {
@@ -160,15 +172,29 @@ export async function prepareNextPracticeSession(
 
 export async function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
-): Promise<PracticeMutationResponse> {
+): Promise<PracticeTrainingEntryPreparationResponse> {
   await consumePracticeMockOperation("preparePracticeTrainingEntry", 0)
   const current = getPracticeMockState()
-  const setupContext = await getCurrentSetupContext()
-  return setPracticeMockState({
+  const rolesResponse = await getRolesPage()
+  const setupContext = await getCurrentSetupContext(rolesResponse)
+  const roleAvailability = resolveTrainingEntryRoleAvailability(
+    rolesResponse.roles,
+    setupContext.targetRoles.map(({ id }) => id),
+    input.targetRoleId,
+  )
+  const resolution = resolvePracticeTrainingEntry(
+    setupContext,
+    current.session.selection,
+    input,
+    roleAvailability,
+  )
+  setHistoryEntryRoleSelectionRequired(resolution.status === "roleUnavailable")
+  const page = setPracticeMockState({
     setupContext,
     session: {
       status: "setup",
-      selection: resolvePracticeTrainingEntry(setupContext, current.session.selection, input),
+      selection: resolution.configuration,
     },
   })
+  return { page, resolution }
 }

@@ -193,6 +193,7 @@ const practiceMockScenarios = {
     setupContext: {
       targetRoles: [],
       defaultTargetRoleId: null,
+      availableDifficulties: ["basic", "pressure"],
       eligibleQuestionCounts: { saved: 0, history: 0 },
     },
     session: {

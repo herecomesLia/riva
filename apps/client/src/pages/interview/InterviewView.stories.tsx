@@ -26,6 +26,79 @@ export const Ready = meta.story({
   },
 })
 
+export const HistoricalConfigurationAvailable = meta.story({
+  args: {
+    status: "ready",
+    setup: createInterviewSetupStoryFixture(),
+    historyEntryResolution: {
+      status: "available",
+      configuration: createInterviewSetupStoryFixture().defaultConfiguration,
+      adjustments: [],
+    },
+    isStarting: false,
+    onStart: fn(async () => undefined),
+  },
+})
+
+const unavailableRoleSetup = createInterviewSetupStoryFixture("multipleRolesReady")
+unavailableRoleSetup.defaultConfiguration.targetRoleId = null
+
+export const HistoricalRoleUnavailable = meta.story({
+  args: {
+    status: "ready",
+    setup: unavailableRoleSetup,
+    historyEntryResolution: {
+      status: "roleUnavailable",
+      reason: "targetRolePrerequisiteUnavailable",
+      configuration: unavailableRoleSetup.defaultConfiguration,
+    },
+    isStarting: false,
+    onStart: fn(async () => undefined),
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("history-entry-role-unavailable")).toBeVisible()
+    await expect(
+      canvas.getByRole("button", { name: /开始模拟面试|start mock interview/i }),
+    ).toBeDisabled()
+  },
+})
+
+export const HistoricalRoundAdjusted = meta.story({
+  args: {
+    status: "ready",
+    setup: createInterviewSetupStoryFixture(),
+    historyEntryResolution: {
+      status: "adjusted",
+      configuration: createInterviewSetupStoryFixture().defaultConfiguration,
+      adjustments: ["interviewRoundUnsupported"],
+    },
+    isStarting: false,
+    onStart: fn(async () => undefined),
+  },
+})
+
+export const HistoricalDifficultyAndDurationAdjusted = meta.story({
+  args: {
+    status: "ready",
+    setup: createInterviewSetupStoryFixture(),
+    historyEntryResolution: {
+      status: "adjusted",
+      configuration: createInterviewSetupStoryFixture().defaultConfiguration,
+      adjustments: ["difficultyUnavailable", "durationUnavailable"],
+    },
+    isStarting: false,
+    onStart: fn(async () => undefined),
+  },
+})
+
+export const HistoricalEntryFailure = meta.story({
+  args: {
+    status: "historyEntryError",
+    isRetrying: false,
+    onRetry: fn(),
+  },
+})
+
 export const Mobile = meta.story({
   args: {
     status: "ready",

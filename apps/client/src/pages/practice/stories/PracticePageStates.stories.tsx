@@ -24,6 +24,72 @@ export const NoRoles = meta.story({ args: createPracticeViewArgs("noRoles") })
 
 export const DefaultSetup = meta.story({ args: createPracticeViewArgs("setupReady") })
 
+export const HistoricalConfigurationAvailable = meta.story({
+  args: {
+    ...createPracticeViewArgs("setupReady"),
+    historyEntryResolution: {
+      status: "available",
+      configuration: createPracticeViewArgs("setupReady").content.data.session.selection,
+      adjustments: [],
+    },
+  },
+})
+
+const unavailableRoleArgs = createPracticeViewArgs("setupReady")
+if (unavailableRoleArgs.content.data.session.status !== "setup") {
+  throw new Error("Practice setup fixture required.")
+}
+unavailableRoleArgs.content.data.session.selection.targetRoleId = null
+
+export const HistoricalRoleUnavailable = meta.story({
+  args: {
+    ...unavailableRoleArgs,
+    historyEntryResolution: {
+      status: "roleUnavailable",
+      reason: "targetRoleArchived",
+      configuration: unavailableRoleArgs.content.data.session.selection,
+    },
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("history-entry-role-unavailable")).toBeVisible()
+    await expect(canvas.getByRole("button", { name: /开始练习|start practice/i })).toBeDisabled()
+  },
+})
+
+const adjustedPracticeArgs = createPracticeViewArgs("setupReady")
+if (adjustedPracticeArgs.content.data.session.status !== "setup") {
+  throw new Error("Practice setup fixture required.")
+}
+
+export const HistoricalQuestionTypeAdjusted = meta.story({
+  args: {
+    ...adjustedPracticeArgs,
+    historyEntryResolution: {
+      status: "adjusted",
+      configuration: adjustedPracticeArgs.content.data.session.selection,
+      adjustments: ["practiceQuestionTypeUnsupported"],
+    },
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("history-entry-adjusted")).toBeVisible()
+  },
+})
+
+export const HistoricalDifficultyAdjusted = meta.story({
+  args: {
+    ...adjustedPracticeArgs,
+    historyEntryResolution: {
+      status: "adjusted",
+      configuration: adjustedPracticeArgs.content.data.session.selection,
+      adjustments: ["difficultyUnavailable"],
+    },
+  },
+})
+
+export const HistoricalEntryFailure = meta.story({
+  args: { isRetrying: false, onRetry: fn(), variant: "historyEntryError" },
+})
+
 export const NoSavedQuestions = meta.story({
   args: createPracticeViewArgs("noEligibleSavedQuestions"),
   play: async ({ canvas }) => {

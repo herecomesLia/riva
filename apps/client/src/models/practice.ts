@@ -50,6 +50,7 @@ export type PracticeReferenceAnswerState =
 export type PracticeSetupContext = {
   targetRoles: PracticeTargetRoleOption[]
   defaultTargetRoleId: string | null
+  availableDifficulties: PracticeDifficulty[]
   eligibleQuestionCounts: {
     saved: number
     history: number

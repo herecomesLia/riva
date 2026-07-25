@@ -5,59 +5,11 @@ import { createPracticeMockResponse } from "@/mocks/data/practice"
 import {
   resolveInterviewTrainingEntry,
   resolvePracticeTrainingEntry,
+  resolveTrainingEntryRoleAvailability,
   toPracticeQuestionType,
 } from "@/models/training-entry"
 
-import { applyInterviewEntrySearch, applyPracticeEntrySearch } from "./training-entry-defaults"
-
 describe("training entry search application", () => {
-  it("prefills practice setup without changing the service snapshot or active sessions", () => {
-    const setup = createPracticeMockResponse("setupReady")
-    const original = structuredClone(setup)
-    const targetRole = setup.setupContext.targetRoles[0]
-    const questionType = targetRole.supportedQuestionTypes[0]
-
-    const result = applyPracticeEntrySearch(setup, {
-      targetRoleId: targetRole.id,
-      questionType,
-      difficulty: "pressure",
-      source: "history",
-    })
-
-    expect(result.session).toMatchObject({
-      status: "setup",
-      selection: {
-        targetRoleId: targetRole.id,
-        questionType,
-        difficulty: "pressure",
-        source: "history",
-      },
-    })
-    expect(setup).toEqual(original)
-
-    const active = createPracticeMockResponse("generatingQuestion")
-    expect(applyPracticeEntrySearch(active, { source: "history" })).toBe(active)
-  })
-
-  it("prefills only interview options supported by the current setup", () => {
-    const response = createInterviewMockResponse()
-    const role = response.setup.targetRoles[0]
-    const result = applyInterviewEntrySearch(response.setup, {
-      targetRoleId: role.id,
-      round: role.supportedRounds[0],
-      difficulty: response.setup.availableDifficulties[0],
-      durationMinutes: response.setup.availableDurationMinutes[0],
-    })
-
-    expect(result.defaultConfiguration).toEqual({
-      targetRoleId: role.id,
-      round: role.supportedRounds[0],
-      difficulty: response.setup.availableDifficulties[0],
-      durationMinutes: response.setup.availableDurationMinutes[0],
-    })
-    expect(result).not.toBe(response.setup)
-  })
-
   it("centralizes cross-mode history question-type mapping", () => {
     expect(toPracticeQuestionType("selfIntroduction")).toBe("motivation")
     expect(toPracticeQuestionType("roleCapability")).toBe("businessUnderstanding")
@@ -65,40 +17,108 @@ describe("training entry search application", () => {
     expect(toPracticeQuestionType("resumeRisk")).toBe("behavioral")
   })
 
-  it("falls back to the current role and its first supported practice type", () => {
+  it("does not replace a deleted practice role with the current role", () => {
     const response = createPracticeMockResponse("setupReady")
-    const currentRole = response.setupContext.targetRoles.find(
-      ({ id }) => id === response.setupContext.defaultTargetRoleId,
-    )
-    if (!currentRole) throw new Error("Expected the current practice role.")
 
     expect(
-      resolvePracticeTrainingEntry(response.setupContext, response.session.selection, {
-        targetRoleId: "role_missing",
+      resolvePracticeTrainingEntry(
+        response.setupContext,
+        response.session.selection,
+        {
+          targetRoleId: "role_missing",
+          questionType: "businessUnderstanding",
+        },
+        { status: "unavailable", reason: "targetRoleDeleted" },
+      ),
+    ).toEqual({
+      status: "roleUnavailable",
+      reason: "targetRoleDeleted",
+      configuration: {
+        ...response.session.selection,
+        targetRoleId: null,
         questionType: "businessUnderstanding",
-      }),
-    ).toMatchObject({
-      targetRoleId: currentRole.id,
-      questionType: "businessUnderstanding",
+      },
     })
   })
 
-  it("falls back to the current role and its first supported interview round", () => {
+  it("reports every adjusted interview field with stable reasons", () => {
     const response = createInterviewMockResponse()
-    const currentRole = response.setup.targetRoles.find(
-      ({ id }) => id === response.setup.defaultConfiguration.targetRoleId,
-    )
-    if (!currentRole) throw new Error("Expected the current interview role.")
+    const role = response.setup.targetRoles[0]
+    const setup = structuredClone(response.setup)
+    setup.targetRoles[0]!.supportedRounds = ["technical"]
+    setup.availableDifficulties = ["basic"]
+    setup.availableDurationMinutes = [15]
 
     expect(
       resolveInterviewTrainingEntry(
-        response.setup,
-        { targetRoleId: "role_archived", round: "hr" },
-        currentRole.id,
+        setup,
+        {
+          targetRoleId: role.id,
+          round: "hr",
+          difficulty: "pressure",
+          durationMinutes: 45,
+        },
+        { status: "available" },
       ),
-    ).toMatchObject({
-      targetRoleId: currentRole.id,
-      round: currentRole.supportedRounds.includes("hr") ? "hr" : currentRole.supportedRounds[0],
+    ).toEqual({
+      status: "adjusted",
+      adjustments: ["interviewRoundUnsupported", "difficultyUnavailable", "durationUnavailable"],
+      configuration: {
+        targetRoleId: role.id,
+        round: "technical",
+        difficulty: "basic",
+        durationMinutes: 15,
+      },
+    })
+  })
+
+  it("reports unsupported practice question types and difficulties with stable reasons", () => {
+    const response = createPracticeMockResponse("setupReady")
+    const role = response.setupContext.targetRoles[0]
+    const context = structuredClone(response.setupContext)
+    context.targetRoles[0]!.supportedQuestionTypes = ["behavioral"]
+    context.availableDifficulties = ["basic"]
+
+    expect(
+      resolvePracticeTrainingEntry(
+        context,
+        response.session.selection,
+        {
+          targetRoleId: role.id,
+          questionType: "technicalFoundation",
+          difficulty: "pressure",
+        },
+        { status: "available" },
+      ),
+    ).toEqual({
+      status: "adjusted",
+      adjustments: ["practiceQuestionTypeUnsupported", "difficultyUnavailable"],
+      configuration: {
+        ...response.session.selection,
+        targetRoleId: role.id,
+        questionType: "behavioral",
+        difficulty: "basic",
+      },
+    })
+  })
+
+  it("distinguishes deleted, archived, and prerequisite-unavailable roles", () => {
+    const roles = [
+      { id: "active", preparationStatus: "preparing" as const },
+      { id: "archived", preparationStatus: "archived" as const },
+    ]
+
+    expect(resolveTrainingEntryRoleAvailability(roles, ["active"], "missing")).toEqual({
+      status: "unavailable",
+      reason: "targetRoleDeleted",
+    })
+    expect(resolveTrainingEntryRoleAvailability(roles, ["active"], "archived")).toEqual({
+      status: "unavailable",
+      reason: "targetRoleArchived",
+    })
+    expect(resolveTrainingEntryRoleAvailability(roles, [], "active")).toEqual({
+      status: "unavailable",
+      reason: "targetRolePrerequisiteUnavailable",
     })
   })
 })

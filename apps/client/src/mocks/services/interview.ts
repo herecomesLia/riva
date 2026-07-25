@@ -50,6 +50,8 @@ import type {
 } from "@/models/interview"
 import {
   resolveInterviewTrainingEntry,
+  resolveTrainingEntryRoleAvailability,
+  type InterviewTrainingEntryPreparationResponse,
   type InterviewTrainingEntryParameters,
 } from "@/models/training-entry"
 
@@ -105,23 +107,13 @@ function getPersistedSessionSequence() {
 function getSnapshot(): InterviewPageResponse {
   const rolesSnapshot = getRolesMockSnapshot()
   const setup = createInterviewSetupResponseMock(rolesSnapshot, getProfileMockSnapshot())
-  const currentTargetRoleId = setup.targetRoles.some(({ id }) => id === rolesSnapshot.currentRoleId)
-    ? rolesSnapshot.currentRoleId
-    : null
   return copy({
     setup:
       preparedConfiguration === null
         ? setup
         : {
             ...setup,
-            defaultConfiguration: resolveInterviewTrainingEntry(
-              setup,
-              {
-                ...preparedConfiguration,
-                targetRoleId: preparedConfiguration.targetRoleId ?? undefined,
-              },
-              currentTargetRoleId,
-            ),
+            defaultConfiguration: copy(preparedConfiguration),
           },
     session,
   })
@@ -304,19 +296,21 @@ export async function getInterviewPage(): Promise<InterviewPageResponse> {
 
 export async function prepareInterviewTrainingEntry(
   input: InterviewTrainingEntryParameters,
-): Promise<InterviewMutationResponse> {
+): Promise<InterviewTrainingEntryPreparationResponse> {
   await consumeOperation("prepareInterviewTrainingEntry", 0)
   const rolesSnapshot = getRolesMockSnapshot()
   const snapshot = getSnapshot()
-  const currentTargetRoleId = snapshot.setup.targetRoles.some(
-    ({ id }) => id === rolesSnapshot.currentRoleId,
+  const roleAvailability = resolveTrainingEntryRoleAvailability(
+    rolesSnapshot.roles,
+    snapshot.setup.targetRoles.map(({ id }) => id),
+    input.targetRoleId,
+    snapshot.setup.availability.status === "available",
   )
-    ? rolesSnapshot.currentRoleId
-    : null
-  preparedConfiguration = resolveInterviewTrainingEntry(snapshot.setup, input, currentTargetRoleId)
+  const resolution = resolveInterviewTrainingEntry(snapshot.setup, input, roleAvailability)
+  preparedConfiguration = resolution.configuration
   session = null
   planCursor = null
-  return getSnapshot()
+  return { page: getSnapshot(), resolution }
 }
 
 export async function startInterview(

@@ -1254,26 +1254,60 @@ describe("interview history training entry", () => {
         durationMinutes: 45,
       })
 
-      expect(prepared.session).toBeNull()
-      expect(prepared.setup.defaultConfiguration).toEqual({
+      expect(prepared.page.session).toBeNull()
+      expect(prepared.page.setup.defaultConfiguration).toEqual({
         targetRoleId: "role_product_manager_meituan",
         round: "hr",
         difficulty: "pressure",
         durationMinutes: 45,
       })
-      expect(await getInterviewPage()).toEqual(prepared)
+      expect(prepared.resolution).toMatchObject({
+        status: "adjusted",
+        adjustments: ["interviewRoundUnsupported"],
+      })
+      expect(await getInterviewPage()).toEqual(prepared.page)
     },
   )
 
-  it("falls back from an unavailable history role to the current Roles domain role", async () => {
+  it("keeps a deleted history role unselected instead of falling back", async () => {
     const prepared = await prepareInterviewTrainingEntry({
       targetRoleId: "role_missing_or_archived",
       round: "hr",
     })
 
-    expect(prepared.setup.defaultConfiguration).toMatchObject({
-      targetRoleId: getRolesMockSnapshot().currentRoleId,
-      round: prepared.setup.targetRoles[0]!.supportedRounds[0],
+    expect(prepared.page.setup.defaultConfiguration).toMatchObject({
+      targetRoleId: null,
+      round: "hr",
+    })
+    expect(prepared.resolution).toMatchObject({
+      status: "roleUnavailable",
+      reason: "targetRoleDeleted",
+    })
+  })
+
+  it("distinguishes archived roles and unmet interview prerequisites", async () => {
+    resetRolesMockState("archivedRoles")
+    const archived = await prepareInterviewTrainingEntry({
+      targetRoleId: "role_frontend_meituan",
+      round: "technical",
+    })
+    expect(archived.page.session).toBeNull()
+    expect(archived.page.setup.defaultConfiguration.targetRoleId).toBeNull()
+    expect(archived.resolution).toMatchObject({
+      status: "roleUnavailable",
+      reason: "targetRoleArchived",
+    })
+
+    resetRolesMockState("multipleRolesReady")
+    resetProfileMockState("partial")
+    resetScenario()
+    const blocked = await prepareInterviewTrainingEntry({
+      targetRoleId: "role_frontend_bytedance",
+      round: "technical",
+    })
+    expect(blocked.resolution).toMatchObject({
+      status: "roleUnavailable",
+      reason: "targetRolePrerequisiteUnavailable",
     })
   })
 })
