@@ -1,4 +1,9 @@
 import { createPracticeMockResponse, type PracticeMockScenario } from "@/mocks/data/practice"
+import {
+  resetTrainingRecordsRepository,
+  saveTrainingRecordSnapshot,
+} from "@/mocks/repositories/training-records"
+import { createTargetedPracticeRecordSnapshot } from "@/mocks/training-record-snapshots"
 import { waitForMockDelay } from "@/mocks/utils"
 import type { PracticePageResponse } from "@/models/practice"
 
@@ -79,6 +84,12 @@ export function resetPracticeMockState(
   }
 
   response = createPracticeMockResponse(scenario)
+  resetTrainingRecordsRepository()
+  if (response.session.status === "completed") {
+    saveTrainingRecordSnapshot(
+      createTargetedPracticeRecordSnapshot({ ...response, session: response.session }),
+    )
+  }
   sessionSequence = 0
   mutationSequence = 0
   configuredDefaultDelayMs = nextDefaultDelayMs

@@ -509,6 +509,8 @@ const practiceMockScenarios = {
     session: {
       status: "completed",
       ...activeSession,
+      completionReason: "reviewCompleted",
+      unfinishedAttempt: null,
       attemptRecords: [archivedProjectAttempt],
       completedAt: "2026-07-20T01:40:00.000Z",
       questionsCompleted: 1,
@@ -524,6 +526,8 @@ const practiceMockScenarios = {
     session: {
       status: "completed",
       ...activeSession,
+      completionReason: "reviewCompleted",
+      unfinishedAttempt: null,
       attemptId: `${activeSession.sessionId}_attempt_2`,
       attemptNumber: 2,
       attemptRecords: [
@@ -549,6 +553,8 @@ const practiceMockScenarios = {
     session: {
       status: "completed",
       ...activeSession,
+      completionReason: "reviewCompleted",
+      unfinishedAttempt: null,
       attemptRecords: [
         createPracticeAttemptFixture(archivedProjectAttempt, {
           question: { ...archivedProjectAttempt.question, isMarkedWeak: true },

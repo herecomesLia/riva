@@ -50,8 +50,12 @@ describe("HistoryPage", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: i18n.t("history.title") }),
     ).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("history.overview.title"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("history.filters.title"))).toBeInTheDocument()
+    expect(
+      screen.getByRole("region", { name: i18n.t("history.overview.title") }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { level: 2, name: i18n.t("history.filters.title") }),
+    ).toBeInTheDocument()
     expect(
       screen.getByRole("heading", { level: 2, name: i18n.t("history.records.title") }),
     ).toBeInTheDocument()

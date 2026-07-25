@@ -20,8 +20,13 @@ import {
   listCompletedInterviewSessions,
   saveCompletedInterviewSession,
 } from "@/mocks/repositories/interview"
+import {
+  resetTrainingRecordsRepository,
+  saveTrainingRecordSnapshot,
+} from "@/mocks/repositories/training-records"
 import { getProfileMockSnapshot } from "@/mocks/services/profile"
 import { getRolesMockSnapshot } from "@/mocks/services/roles"
+import { createMockInterviewRecordSnapshot } from "@/mocks/training-record-snapshots"
 import { waitForMockDelay } from "@/mocks/utils"
 import type {
   ActiveInterviewSessionResponse,
@@ -105,7 +110,13 @@ function commit(nextSession: InterviewPageResponse["session"]): InterviewMutatio
   if (nextSession?.status === "completed") {
     saveCompletedInterviewSession(nextSession)
   }
-  return getSnapshot()
+  const snapshot = getSnapshot()
+  if (snapshot.session?.status === "completed") {
+    saveTrainingRecordSnapshot(
+      createMockInterviewRecordSnapshot({ ...snapshot, session: snapshot.session }),
+    )
+  }
+  return snapshot
 }
 
 function nextTimestamp() {
@@ -232,6 +243,7 @@ export function resetInterviewMockState(
   if (controller.clearPersistedSessions ?? true) {
     clearCompletedInterviewSessions()
   }
+  resetTrainingRecordsRepository()
   session = createInterviewMockResponse(scenario).session
   selectedAgentScenario = controller.agentScenario ?? "singleFollowUp"
   activePlan = createInterviewAgentPlanMock({
@@ -246,6 +258,12 @@ export function resetInterviewMockState(
   failingOperations.clear()
   if (session?.status === "completed") {
     saveCompletedInterviewSession(session)
+    const snapshot = getSnapshot()
+    if (snapshot.session?.status === "completed") {
+      saveTrainingRecordSnapshot(
+        createMockInterviewRecordSnapshot({ ...snapshot, session: snapshot.session }),
+      )
+    }
   }
 
   for (const operation of controller.failNext ?? []) failingOperations.add(operation)

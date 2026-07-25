@@ -1,4 +1,9 @@
-import { trainingRecordDetailsMock } from "@/mocks/data/training-records"
+import {
+  getTrainingRecordSnapshot,
+  listTrainingRecordSnapshots,
+  resetTrainingRecordsRepository,
+  type TrainingRecordsRepositoryScenario,
+} from "@/mocks/repositories/training-records"
 import { waitForMockDelay } from "@/mocks/utils"
 import {
   TrainingRecordNotFoundError,
@@ -14,18 +19,14 @@ import {
 
 type TrainingRecordDetail = TargetedPracticeRecordDetailResponse | MockInterviewRecordDetailResponse
 
-export type TrainingRecordsMockScenario = "default" | "empty"
-
 function copy<T>(value: T): T {
   return structuredClone(value)
 }
 
-let records: TrainingRecordDetail[] = copy(trainingRecordDetailsMock)
-
 export function resetTrainingRecordsMockState(
-  scenario: TrainingRecordsMockScenario = "default",
+  scenario: TrainingRecordsRepositoryScenario = "default",
 ): void {
-  records = scenario === "empty" ? [] : copy(trainingRecordDetailsMock)
+  resetTrainingRecordsRepository(scenario)
 }
 
 function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
@@ -69,6 +70,7 @@ function averageScore(items: TrainingRecordDetail[]): number | null {
 }
 
 function kindOverview(
+  records: TrainingRecordDetail[],
   kind: TrainingRecordKind,
 ): TrainingRecordsOverviewResponse["byKind"][TrainingRecordKind] {
   const matching = records.filter((record) => record.kind === kind)
@@ -81,6 +83,7 @@ function kindOverview(
 
 export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverviewResponse> {
   await waitForMockDelay()
+  const records = listTrainingRecordSnapshots()
 
   const targetRoles = [
     ...new Map(records.map((record) => [record.targetRole.id, record.targetRole])).values(),
@@ -97,8 +100,8 @@ export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverv
     averageScore: averageScore(records),
     targetRoles,
     byKind: {
-      targetedPractice: kindOverview("targetedPractice"),
-      mockInterview: kindOverview("mockInterview"),
+      targetedPractice: kindOverview(records, "targetedPractice"),
+      mockInterview: kindOverview(records, "mockInterview"),
     },
   })
 }
@@ -128,6 +131,7 @@ export async function listTrainingRecords(
 ): Promise<TrainingRecordsPageResponse> {
   assertPagination(input)
   await waitForMockDelay()
+  const records = listTrainingRecordSnapshots()
 
   const filtered = records
     .filter((record) => includesKind(input.kinds, record.kind))
@@ -155,9 +159,7 @@ export async function getTargetedPracticeRecord(
   recordId: string,
 ): Promise<TargetedPracticeRecordDetailResponse> {
   await waitForMockDelay()
-  const record = records.find(
-    (candidate) => candidate.kind === "targetedPractice" && candidate.id === recordId,
-  )
+  const record = getTrainingRecordSnapshot(recordId)
   if (!record || record.kind !== "targetedPractice") {
     throw new TrainingRecordNotFoundError("targetedPractice", recordId)
   }
@@ -168,9 +170,7 @@ export async function getMockInterviewRecord(
   recordId: string,
 ): Promise<MockInterviewRecordDetailResponse> {
   await waitForMockDelay()
-  const record = records.find(
-    (candidate) => candidate.kind === "mockInterview" && candidate.id === recordId,
-  )
+  const record = getTrainingRecordSnapshot(recordId)
   if (!record || record.kind !== "mockInterview") {
     throw new TrainingRecordNotFoundError("mockInterview", recordId)
   }

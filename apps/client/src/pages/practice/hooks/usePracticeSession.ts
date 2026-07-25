@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRef } from "react"
 
+import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import type {
   PracticeMutationResponse,
   PracticePageResponse,
@@ -98,6 +99,9 @@ export function usePracticeMutation<
       queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
         synchronizePracticeMutationResponse(current, response, { kind, input }),
       )
+      if (response.session.status === "completed") {
+        void queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all })
+      }
     },
   })
 }

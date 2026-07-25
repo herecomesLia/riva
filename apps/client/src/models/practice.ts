@@ -200,6 +200,13 @@ export type PracticeAttemptRecord = {
   review: PracticeReview
 }
 
+export type UnfinishedPracticeAttempt = {
+  attemptId: string
+  attemptNumber: number
+  selection: ActivePracticeSelection
+  question: PracticeQuestionCard
+}
+
 type PracticeActiveSessionBase = {
   sessionId: string
   /** Positive integer incremented by persisted session state changes. */
@@ -266,6 +273,8 @@ export type PracticeReviewState = PracticeSubmittedAnswerRecord & {
 
 export type PracticeCompletedState = PracticeActiveSessionBase & {
   status: "completed"
+  completionReason: "reviewCompleted" | "userEndedEarly"
+  unfinishedAttempt: UnfinishedPracticeAttempt | null
   completedAt: string
   questionsCompleted: number
   retryCount: number

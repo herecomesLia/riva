@@ -5,6 +5,8 @@ import type {
   PracticeMutationResponse,
   RequestEndPracticeSessionInput,
 } from "@/models/practice"
+import { saveTrainingRecordSnapshot } from "@/mocks/repositories/training-records"
+import { createTargetedPracticeRecordSnapshot } from "@/mocks/training-record-snapshots"
 
 import { requireCurrentQuestion } from "./guards"
 import {
@@ -41,12 +43,16 @@ function createCompletedPracticeSession({
   session,
   records,
   completedAt,
+  completionReason,
   nextStepSuggestion,
+  unfinishedAttempt,
 }: {
   session: PracticeCompletionBase
   records: PracticeAttemptRecord[]
   completedAt: string
+  completionReason: PracticeCompletedState["completionReason"]
   nextStepSuggestion: string
+  unfinishedAttempt: PracticeCompletedState["unfinishedAttempt"]
 }): PracticeCompletedState {
   const latestByQuestion = new Map<string, PracticeAttemptRecord>()
   for (const record of records) latestByQuestion.set(record.question.id, record)
@@ -54,6 +60,8 @@ function createCompletedPracticeSession({
   return {
     ...session,
     status: "completed",
+    completionReason,
+    unfinishedAttempt: copyPracticeState(unfinishedAttempt),
     attemptRecords: copyPracticeState(records),
     completedAt,
     questionsCompleted: uniqueRecords.length,
@@ -69,6 +77,17 @@ function createCompletedPracticeSession({
           ),
     nextStepSuggestion,
   }
+}
+
+function commitCompletedPracticeSession(session: PracticeCompletedState): PracticeMutationResponse {
+  const response = setPracticeMockState({ ...getPracticeMockState(), session })
+  if (response.session.status !== "completed") {
+    throw new Error("Completed practice session snapshot is invalid.")
+  }
+  saveTrainingRecordSnapshot(
+    createTargetedPracticeRecordSnapshot({ ...response, session: response.session }),
+  )
+  return response
 }
 
 export async function endPracticeSession(
@@ -93,15 +112,16 @@ export async function endPracticeSession(
     attemptNumber: session.attemptNumber,
   }
 
-  return setPracticeMockState({
-    ...getPracticeMockState(),
-    session: createCompletedPracticeSession({
+  return commitCompletedPracticeSession(
+    createCompletedPracticeSession({
       session: completionBase,
       records,
       completedAt: nextPracticeMutationTimestamp(),
+      completionReason: "reviewCompleted",
       nextStepSuggestion: "根据本轮复盘优先补足薄弱项，再开始下一轮专项练习。",
+      unfinishedAttempt: null,
     }),
-  })
+  )
 }
 
 export async function requestEndPracticeSession(
@@ -118,13 +138,19 @@ export async function requestEndPracticeSession(
     attemptNumber: session.attemptNumber,
   }
 
-  return setPracticeMockState({
-    ...getPracticeMockState(),
-    session: createCompletedPracticeSession({
+  return commitCompletedPracticeSession(
+    createCompletedPracticeSession({
       session: completionBase,
       records: copyPracticeState(session.attemptRecords),
       completedAt: nextPracticeMutationTimestamp(),
+      completionReason: "userEndedEarly",
       nextStepSuggestion: "本轮在提交回答前结束。可重新开始专项练习。",
+      unfinishedAttempt: {
+        attemptId: session.attemptId,
+        attemptNumber: session.attemptNumber,
+        selection: copyPracticeState(session.selection),
+        question: copyPracticeState(session.question),
+      },
     }),
-  })
+  )
 }

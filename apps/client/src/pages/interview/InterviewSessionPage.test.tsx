@@ -2,6 +2,7 @@ import { act, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import { i18n } from "@/i18n/i18n"
 import {
   createCandidateQuestionExchange,
@@ -337,6 +338,7 @@ describe("InterviewSessionContainer", () => {
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
     vi.mocked(endInterview).mockResolvedValue(completed)
     const result = renderSession()
+    result.queryClient.setQueryData(trainingRecordQueryKeys.overview(), { stale: true })
 
     await user.click(
       await screen.findByRole("button", { name: i18n.t("interview.session.actions.end") }),
@@ -355,6 +357,9 @@ describe("InterviewSessionContainer", () => {
     )
     expect(result.router?.state.location.pathname).not.toBe("/interview")
     expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+    expect(
+      result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
+    ).toBe(true)
   })
 
   it("ends from the current follow-up version and opens the same review route", async () => {
