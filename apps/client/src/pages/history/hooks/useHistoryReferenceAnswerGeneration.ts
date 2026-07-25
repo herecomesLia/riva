@@ -19,7 +19,10 @@ export type HistoryReferenceAnswerSubject =
   | { subject: "mainQuestion"; questionId: string }
   | { subject: "followUp"; questionId: string; followUpId: string }
 
-const pollIntervalMs = 500
+export const HISTORY_REFERENCE_POLL_INTERVAL_MS = 500
+export const HISTORY_REFERENCE_POLL_RETRY_DELAY_MS = 250
+export const HISTORY_REFERENCE_POLL_RETRY_LIMIT = 2
+export const HISTORY_REFERENCE_POLL_TIMEOUT_MS = 30_000
 
 function targetKey(target: TrainingRecordReferenceAnswerTarget): string {
   return [
@@ -29,6 +32,10 @@ function targetKey(target: TrainingRecordReferenceAnswerTarget): string {
     target.subject,
     target.subject === "followUp" ? target.followUpId : "",
   ].join(":")
+}
+
+function pollQueryKey(detailQueryKey: QueryKey, target: TrainingRecordReferenceAnswerTarget) {
+  return [...detailQueryKey, "reference-answer-generation", targetKey(target)] as const
 }
 
 function toTarget(
@@ -86,7 +93,7 @@ export function applyReferenceAnswerGeneration<TRecord extends TrainingRecordDet
 
 function generatingTargets(record: TrainingRecordDetail): TrainingRecordReferenceAnswerTarget[] {
   return record.questions.flatMap((question) => [
-    ...(question.referenceAnswer.status === "generating"
+    ...(["generating", "pollingRetrying"].includes(question.referenceAnswer.status)
       ? [
           toTarget(record.kind, record.id, {
             subject: "mainQuestion",
@@ -95,7 +102,7 @@ function generatingTargets(record: TrainingRecordDetail): TrainingRecordReferenc
         ]
       : []),
     ...question.followUps.flatMap((followUp) =>
-      followUp.referenceAnswer.status === "generating"
+      ["generating", "pollingRetrying"].includes(followUp.referenceAnswer.status)
         ? [
             toTarget(record.kind, record.id, {
               subject: "followUp",
@@ -106,6 +113,17 @@ function generatingTargets(record: TrainingRecordDetail): TrainingRecordReferenc
         : [],
     ),
   ])
+}
+
+function referenceAnswerForTarget(
+  record: TrainingRecordDetail,
+  target: TrainingRecordReferenceAnswerTarget,
+) {
+  const question = record.questions.find(({ id }) => id === target.questionId)
+  if (!question) return undefined
+  return target.subject === "mainQuestion"
+    ? question.referenceAnswer
+    : question.followUps.find(({ id }) => id === target.followUpId)?.referenceAnswer
 }
 
 export function useHistoryReferenceAnswerGeneration({
@@ -121,7 +139,11 @@ export function useHistoryReferenceAnswerGeneration({
 }) {
   const queryClient = useQueryClient()
   const requestLocks = useRef(new Set<string>())
+  const activeTargetKeys = useRef(new Set<string>())
+  const activeTargetsByKey = useRef(new Map<string, TrainingRecordReferenceAnswerTarget>())
+  const pollingStartedAt = useRef(new Map<string, number>())
   const processedPolls = useRef(new Map<string, number>())
+  const processedRetryCounts = useRef(new Map<string, number>())
   const [requestingKeys, setRequestingKeys] = useState<Set<string>>(() => new Set())
   const [activeTargets, setActiveTargets] = useState<TrainingRecordReferenceAnswerTarget[]>([])
 
@@ -134,27 +156,47 @@ export function useHistoryReferenceAnswerGeneration({
     [detailQueryKey, queryClient],
   )
 
+  const deactivateTarget = useCallback((target: TrainingRecordReferenceAnswerTarget) => {
+    const key = targetKey(target)
+    activeTargetKeys.current.delete(key)
+    activeTargetsByKey.current.delete(key)
+    pollingStartedAt.current.delete(key)
+    processedPolls.current.delete(key)
+    processedRetryCounts.current.delete(key)
+    setActiveTargets((current) => current.filter((candidate) => targetKey(candidate) !== key))
+  }, [])
+
+  const activateTarget = useCallback((target: TrainingRecordReferenceAnswerTarget) => {
+    const key = targetKey(target)
+    if (activeTargetKeys.current.has(key)) return
+    activeTargetKeys.current.add(key)
+    activeTargetsByKey.current.set(key, target)
+    pollingStartedAt.current.set(key, Date.now())
+    setActiveTargets((current) => [...current, target])
+  }, [])
+
+  const failPolling = useCallback(
+    (target: TrainingRecordReferenceAnswerTarget, reason: "consecutiveFailures" | "timeout") => {
+      updateDetail({
+        target,
+        referenceAnswer: { status: "pollingFailed", content: null, reason },
+      })
+      deactivateTarget(target)
+    },
+    [deactivateTarget, updateDetail],
+  )
+
   useEffect(() => {
     if (!record) return
-    const generating = generatingTargets(record)
-    if (generating.length === 0) return
-    setActiveTargets((current) => {
-      const existing = new Set(current.map(targetKey))
-      const additions = generating.filter((target) => !existing.has(targetKey(target)))
-      return additions.length === 0 ? current : [...current, ...additions]
-    })
-  }, [record])
+    generatingTargets(record).forEach(activateTarget)
+  }, [activateTarget, record])
 
   const requestMutation = useMutation({
     mutationFn: requestTrainingRecordReferenceAnswer,
     onSuccess: (response) => {
       updateDetail(response)
       if (response.referenceAnswer.status === "generating") {
-        setActiveTargets((current) =>
-          current.some((target) => targetKey(target) === targetKey(response.target))
-            ? current
-            : [...current, response.target],
-        )
+        activateTarget(response.target)
       }
     },
     onSettled: (_data, _error, target) => {
@@ -171,42 +213,92 @@ export function useHistoryReferenceAnswerGeneration({
   const polls = useQueries({
     queries: activeTargets.map((target) => ({
       queryFn: () => getTrainingRecordReferenceAnswerGenerationStatus(target),
-      queryKey: [...detailQueryKey, "reference-answer-generation", targetKey(target)],
+      queryKey: pollQueryKey(detailQueryKey, target),
       refetchInterval: (query: {
         state: { data?: TrainingRecordReferenceAnswerGenerationResponse }
       }) =>
         query.state.data === undefined || query.state.data.referenceAnswer.status === "generating"
-          ? pollIntervalMs
+          ? HISTORY_REFERENCE_POLL_INTERVAL_MS
           : false,
-      retry: false,
+      retry: HISTORY_REFERENCE_POLL_RETRY_LIMIT,
+      retryDelay: HISTORY_REFERENCE_POLL_RETRY_DELAY_MS,
     })),
   })
 
   useEffect(() => {
-    const terminalKeys: string[] = []
     polls.forEach((poll, index) => {
       const target = activeTargets[index]
       if (!target) return
       const key = targetKey(target)
       if (poll.isError) {
-        terminalKeys.push(key)
+        failPolling(target, "consecutiveFailures")
         return
+      }
+      if (poll.failureCount > 0 && processedRetryCounts.current.get(key) !== poll.failureCount) {
+        processedRetryCounts.current.set(key, poll.failureCount)
+        updateDetail({
+          target,
+          referenceAnswer: { status: "pollingRetrying", content: null },
+        })
       }
       if (!poll.data || processedPolls.current.get(key) === poll.dataUpdatedAt) return
 
       processedPolls.current.set(key, poll.dataUpdatedAt)
+      processedRetryCounts.current.delete(key)
       updateDetail(poll.data)
-      if (poll.data.referenceAnswer.status !== "generating") terminalKeys.push(key)
+      if (poll.data.referenceAnswer.status !== "generating") deactivateTarget(target)
     })
-    if (terminalKeys.length === 0) return
-    const terminal = new Set(terminalKeys)
-    setActiveTargets((current) => current.filter((target) => !terminal.has(targetKey(target))))
-  }, [activeTargets, polls, updateDetail])
+  }, [activeTargets, deactivateTarget, failPolling, polls, updateDetail])
+
+  useEffect(() => {
+    const timers = activeTargets.map((target) => {
+      const key = targetKey(target)
+      const startedAt = pollingStartedAt.current.get(key) ?? Date.now()
+      const remaining = Math.max(0, HISTORY_REFERENCE_POLL_TIMEOUT_MS - (Date.now() - startedAt))
+      return setTimeout(() => failPolling(target, "timeout"), remaining)
+    })
+    return () => timers.forEach(clearTimeout)
+  }, [activeTargets, failPolling])
+
+  useEffect(
+    () => () => {
+      activeTargetsByKey.current.forEach((target) => {
+        queryClient.removeQueries({
+          exact: true,
+          queryKey: pollQueryKey(detailQueryKey, target),
+        })
+      })
+      activeTargetKeys.current.clear()
+      activeTargetsByKey.current.clear()
+      pollingStartedAt.current.clear()
+      processedPolls.current.clear()
+      processedRetryCounts.current.clear()
+    },
+    [detailQueryKey, queryClient],
+  )
 
   function generate(subject: HistoryReferenceAnswerSubject) {
     const target = toTarget(kind, recordId, subject)
     const key = targetKey(target)
-    if (requestLocks.current.has(key)) return
+    if (requestLocks.current.has(key) || activeTargetKeys.current.has(key)) return
+
+    const currentReferenceAnswer = record ? referenceAnswerForTarget(record, target) : undefined
+    if (currentReferenceAnswer?.status === "pollingFailed") {
+      queryClient.removeQueries({ exact: true, queryKey: pollQueryKey(detailQueryKey, target) })
+      updateDetail({
+        target,
+        referenceAnswer: { status: "generating", content: null },
+      })
+      activateTarget(target)
+      return
+    }
+    if (
+      currentReferenceAnswer?.status === "generating" ||
+      currentReferenceAnswer?.status === "pollingRetrying"
+    ) {
+      activateTarget(target)
+      return
+    }
 
     requestLocks.current.add(key)
     setRequestingKeys((current) => new Set(current).add(key))

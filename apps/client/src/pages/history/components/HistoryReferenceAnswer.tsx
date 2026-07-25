@@ -76,6 +76,31 @@ export function HistoryReferenceAnswer({
           </div>
         )}
 
+        {referenceAnswer.status === "pollingRetrying" && (
+          <div className="flex flex-col items-start gap-4">
+            <Alert role="status">
+              <Spinner aria-hidden="true" />
+              <AlertTitle>{t("history.detail.reference.pollingRetrying")}</AlertTitle>
+              <AlertDescription>
+                {t("history.detail.reference.pollingRetryingDescription")}
+              </AlertDescription>
+            </Alert>
+            <GenerateButton disabled onGenerate={onGenerate} />
+          </div>
+        )}
+
+        {referenceAnswer.status === "pollingFailed" && (
+          <ReferenceUnavailable
+            actionLabel={t("history.detail.reference.recheck")}
+            description={t(
+              `history.detail.reference.pollingFailedDescription.${referenceAnswer.reason}`,
+            )}
+            isRequesting={isRequesting}
+            onGenerate={onGenerate}
+            title={t("history.detail.reference.pollingFailed")}
+          />
+        )}
+
         {referenceAnswer.status === "unavailable" && (
           <ReferenceUnavailable
             description={t("history.detail.reference.unavailableDescription")}
@@ -101,11 +126,13 @@ export function HistoryReferenceAnswer({
 }
 
 function ReferenceUnavailable({
+  actionLabel,
   description,
   isRequesting,
   onGenerate,
   title,
 }: {
+  actionLabel?: string
   description: string
   isRequesting: boolean
   onGenerate?: () => void
@@ -120,6 +147,7 @@ function ReferenceUnavailable({
       </Alert>
       {onGenerate && (
         <GenerateButton
+          label={actionLabel}
           disabled={isRequesting}
           onGenerate={onGenerate}
           showSpinner={isRequesting}
@@ -131,10 +159,12 @@ function ReferenceUnavailable({
 
 function GenerateButton({
   disabled,
+  label,
   onGenerate,
   showSpinner = false,
 }: {
   disabled: boolean
+  label?: string
   onGenerate: () => void
   showSpinner?: boolean
 }) {
@@ -146,7 +176,9 @@ function GenerateButton({
       ) : (
         <SparklesIcon aria-hidden="true" data-icon="inline-start" />
       )}
-      {t(showSpinner ? "history.detail.reference.requesting" : "history.detail.reference.generate")}
+      {showSpinner
+        ? t("history.detail.reference.requesting")
+        : (label ?? t("history.detail.reference.generate"))}
     </Button>
   )
 }

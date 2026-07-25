@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useParams, useSearch } from "@tanstack/react-router"
-import { useRef } from "react"
+import { useMemo, useRef } from "react"
 
 import { TrainingRecordNotFoundError } from "@/models/training-records"
 import { getMockInterviewRecord } from "@/services/training-records"
@@ -15,14 +15,19 @@ export function MockInterviewHistoryPage() {
   const { recordId } = useParams({ from: "/app/history/interview/$recordId" })
   const historySearch = parseHistorySearch(useSearch({ strict: false }))
   const retryLock = useRef(false)
+  const detailQueryKey = useMemo(
+    () => trainingRecordQueryKeys.mockInterviewDetail(recordId),
+    [recordId],
+  )
   const query = useQuery({
-    queryKey: trainingRecordQueryKeys.mockInterviewDetail(recordId),
+    queryKey: detailQueryKey,
     queryFn: () => getMockInterviewRecord(recordId),
+    refetchOnMount: "always",
     retry: false,
     staleTime: trainingRecordCacheTime,
   })
   const referenceAnswerGeneration = useHistoryReferenceAnswerGeneration({
-    detailQueryKey: trainingRecordQueryKeys.mockInterviewDetail(recordId),
+    detailQueryKey,
     kind: "mockInterview",
     record: query.data,
     recordId,

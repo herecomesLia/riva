@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useParams, useSearch } from "@tanstack/react-router"
-import { useRef } from "react"
+import { useMemo, useRef } from "react"
 
 import { TrainingRecordNotFoundError } from "@/models/training-records"
 import { getTargetedPracticeRecord } from "@/services/training-records"
@@ -15,14 +15,19 @@ export function TargetedPracticeHistoryPage() {
   const { recordId } = useParams({ from: "/app/history/practice/$recordId" })
   const historySearch = parseHistorySearch(useSearch({ strict: false }))
   const retryLock = useRef(false)
+  const detailQueryKey = useMemo(
+    () => trainingRecordQueryKeys.targetedPracticeDetail(recordId),
+    [recordId],
+  )
   const query = useQuery({
-    queryKey: trainingRecordQueryKeys.targetedPracticeDetail(recordId),
+    queryKey: detailQueryKey,
     queryFn: () => getTargetedPracticeRecord(recordId),
+    refetchOnMount: "always",
     retry: false,
     staleTime: trainingRecordCacheTime,
   })
   const referenceAnswerGeneration = useHistoryReferenceAnswerGeneration({
-    detailQueryKey: trainingRecordQueryKeys.targetedPracticeDetail(recordId),
+    detailQueryKey,
     kind: "targetedPractice",
     record: query.data,
     recordId,

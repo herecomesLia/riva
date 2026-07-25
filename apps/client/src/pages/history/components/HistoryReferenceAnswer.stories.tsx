@@ -22,6 +22,25 @@ export const Generating = meta.story({
     referenceAnswer: { status: "generating", content: null },
   },
 })
+export const PollingAfterSingleFailure = meta.story({
+  args: {
+    onGenerate: fn(),
+    referenceAnswer: { status: "pollingRetrying", content: null },
+  },
+})
+export const PollingEventuallySucceeded = meta.story({
+  args: { onGenerate: fn(), referenceAnswer: ready },
+})
+export const PollingRetryLimitReached = meta.story({
+  args: {
+    onGenerate: fn(),
+    referenceAnswer: {
+      status: "pollingFailed",
+      content: null,
+      reason: "consecutiveFailures",
+    },
+  },
+})
 export const GenerationFailed = meta.story({
   args: {
     onGenerate: fn(),
@@ -30,6 +49,21 @@ export const GenerationFailed = meta.story({
       content: null,
       reason: "generationFailed",
     },
+  },
+})
+export const InsufficientContext = meta.story({
+  args: {
+    onGenerate: fn(),
+    referenceAnswer: {
+      status: "unavailable",
+      content: null,
+      reason: "insufficientContext",
+    },
+  },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.queryByRole("button", { name: /生成参考答案|generate reference answer/i }),
+    ).not.toBeInTheDocument()
   },
 })
 export const NotRequested = meta.story({

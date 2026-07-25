@@ -85,4 +85,38 @@ describe("HistoryReferenceAnswer", () => {
       screen.queryByRole("button", { name: i18n.t("history.detail.reference.generate") }),
     ).not.toBeInTheDocument()
   })
+
+  it("distinguishes a transient polling retry from a terminal polling failure", async () => {
+    const user = userEvent.setup()
+    const onGenerate = vi.fn()
+    const { rerender } = renderWithProviders(
+      <HistoryReferenceAnswer
+        onGenerate={onGenerate}
+        referenceAnswer={{ status: "pollingRetrying", content: null }}
+      />,
+      { router: false },
+    )
+
+    expect(screen.getByTestId("history-reference-pollingRetrying")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: i18n.t("history.detail.reference.generate") }),
+    ).toBeDisabled()
+
+    rerender(
+      <HistoryReferenceAnswer
+        onGenerate={onGenerate}
+        referenceAnswer={{
+          status: "pollingFailed",
+          content: null,
+          reason: "consecutiveFailures",
+        }}
+      />,
+    )
+    const recheck = screen.getByRole("button", {
+      name: i18n.t("history.detail.reference.recheck"),
+    })
+    expect(recheck).toBeEnabled()
+    await user.click(recheck)
+    expect(onGenerate).toHaveBeenCalledOnce()
+  })
 })

@@ -79,6 +79,15 @@ export type TrainingRecordReferenceAnswer =
       content: null
     }
   | {
+      status: "pollingRetrying"
+      content: null
+    }
+  | {
+      status: "pollingFailed"
+      content: null
+      reason: "consecutiveFailures" | "timeout"
+    }
+  | {
       status: "unavailable"
       content: null
       reason: "generationFailed" | "insufficientContext"
