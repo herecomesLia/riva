@@ -11,7 +11,6 @@ import {
   MessageCircleQuestionIcon,
   RotateCcwIcon,
   ShieldAlertIcon,
-  SparklesIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useEffect, useRef } from "react"
@@ -32,12 +31,12 @@ import { Spinner } from "@/components/ui/spinner"
 import type {
   MockInterviewOverallReview,
   MockInterviewRecordDetailResponse,
-  TrainingRecordRecommendation,
   TrainingRecordStatus,
 } from "@/models/training-records"
 import { InterviewReviewListCard } from "@/pages/interview/components/InterviewReviewListCard"
 
 import { MockInterviewQuestionRecord } from "./components/MockInterviewQuestionRecord"
+import { TrainingRecommendationCard } from "./components/TrainingRecommendationCard"
 import type { HistoryRouteSearch } from "./history-navigation"
 import type { HistoryReferenceAnswerSubject } from "./hooks/useHistoryReferenceAnswerGeneration"
 import type { MockInterviewHistoryViewState } from "./mock-interview-history-types"
@@ -165,7 +164,7 @@ function DetailReady({
         ))}
       </section>
       <CandidateQuestions exchanges={record.candidateQuestionExchanges} />
-      <Recommendation recommendation={record.recommendation} />
+      <Recommendation recommendation={record.recommendation} targetRoleId={record.targetRole.id} />
     </div>
   )
 }
@@ -389,31 +388,16 @@ function CandidateQuestions({
 
 function Recommendation({
   recommendation,
-}: {
-  recommendation: TrainingRecordRecommendation | null
-}) {
+  targetRoleId,
+}: Pick<MockInterviewRecordDetailResponse, "recommendation"> & { targetRoleId: string }) {
   const { t } = useTranslation()
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <SparklesIcon aria-hidden="true" />
-          {t("history.mockDetail.sections.nextTraining")}
-        </CardTitle>
-        <CardDescription>
-          {recommendation?.reason ?? t("history.detail.recommendationNone")}
-        </CardDescription>
-      </CardHeader>
-      {recommendation && recommendation.action !== "none" && (
-        <CardContent className="flex flex-wrap gap-2">
-          {recommendation.focusAreas.map((area) => (
-            <Badge key={area} variant="secondary">
-              {area}
-            </Badge>
-          ))}
-        </CardContent>
-      )}
-    </Card>
+    <TrainingRecommendationCard
+      recommendation={recommendation}
+      showIcon
+      targetRoleId={targetRoleId}
+      title={t("history.mockDetail.sections.nextTraining")}
+    />
   )
 }
 

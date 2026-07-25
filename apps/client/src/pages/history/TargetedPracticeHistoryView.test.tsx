@@ -70,6 +70,14 @@ describe("TargetedPracticeHistoryView", () => {
       `prioritizeWeaknesses=${String(record.setup.prioritizedWeaknesses)}`,
     )
     expect(retryHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
+    const recommendationLink = screen.getByRole("link", {
+      name: i18n.t("history.detail.recommendationActions.mockInterview"),
+    })
+    const recommendationHref = recommendationLink.getAttribute("href") ?? ""
+    expect(recommendationHref).toContain("/interview?")
+    expect(recommendationHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(recommendationHref).toContain(`round=${record.recommendation!.round}`)
+    expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })
 
   it("collapses score details and reference answers independently by default", async () => {
@@ -121,6 +129,11 @@ describe("TargetedPracticeHistoryView", () => {
     expect(
       screen.getByText(i18n.t("history.detail.weak")).querySelector(".lucide-flag"),
     ).toHaveClass("fill-orange-500", "text-orange-500")
+    expect(
+      screen.getByRole("link", {
+        name: i18n.t("history.detail.recommendationActions.retryQuestion"),
+      }),
+    ).toHaveAttribute("href", expect.stringContaining("questionType=behavioral"))
     for (const button of screen.getAllByRole("button", {
       name: i18n.t("history.detail.reference.title"),
     })) {
@@ -146,6 +159,14 @@ describe("TargetedPracticeHistoryView", () => {
     )
 
     expect(await screen.findByText(i18n.t("history.detail.unanswered"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("history.detail.recommendationNone"))).toBeInTheDocument()
+    for (const action of ["retryQuestion", "targetedPractice", "mockInterview"] as const) {
+      expect(
+        screen.queryByRole("link", {
+          name: i18n.t(`history.detail.recommendationActions.${action}`),
+        }),
+      ).not.toBeInTheDocument()
+    }
     await user.click(screen.getByRole("button", { name: i18n.t("history.detail.reference.title") }))
     expect(screen.getByTestId("history-reference-notRequested")).toBeInTheDocument()
     await user.click(

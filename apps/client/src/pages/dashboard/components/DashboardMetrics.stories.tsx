@@ -14,10 +14,10 @@ const emptyMetrics = {
 
 const mixedMetrics = {
   ...dashboardResponseMock.metrics,
-  mockInterviewScore: { currentValue: 7.4, previousValue: null },
+  mockInterviewScore: { currentValue: 74, previousValue: null },
   practiceTimeMinutes: { currentValue: 45, previousValue: 49 },
   roleFit: { currentValue: 76, previousValue: 65.8 },
-  targetedPracticeScore: { currentValue: 7.5, previousValue: 7.5 },
+  targetedPracticeScore: { currentValue: 75, previousValue: 75 },
 } satisfies DashboardResponse["metrics"]
 
 const meta = preview.meta({

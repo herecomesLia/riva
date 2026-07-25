@@ -1,3 +1,5 @@
+import type { TrainingRecordRecommendation } from "./training-records"
+
 export type DashboardMetricSnapshot = {
   currentValue: number | null
   previousValue: number | null
@@ -6,10 +8,9 @@ export type DashboardMetricSnapshot = {
 export type DashboardPerformanceRecord = {
   id: string
   occurredAt: string
+  /** Business score on the same 0–100 scale as training history. */
   score: number
 }
-
-export type DashboardQuestionType = "projectExperience"
 
 export type DashboardRecruitmentType = "campus" | "experienced"
 
@@ -32,15 +33,17 @@ export type DashboardResponse = {
   } | null
   recommendation: {
     id: string
-    title: string
-    description: string
-    questionType: DashboardQuestionType
+    sourceRecordId: string
+    targetRoleId: string
+    recommendation: TrainingRecordRecommendation
     estimatedMinutes: number
   } | null
   metrics: {
     roleFit: DashboardMetricSnapshot
     practiceTimeMinutes: DashboardMetricSnapshot
+    /** Latest and previous scored targeted-practice records, on a 0–100 scale. */
     targetedPracticeScore: DashboardMetricSnapshot
+    /** Latest and previous scored mock-interview records, on a 0–100 scale. */
     mockInterviewScore: DashboardMetricSnapshot
   }
   performanceTrend: {

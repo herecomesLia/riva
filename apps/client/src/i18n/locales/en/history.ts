@@ -144,6 +144,11 @@ export const history = {
     reviewSummary: "Overall feedback",
     recommendation: "Next recommendation",
     recommendationNone: "No next recommendation was generated.",
+    recommendationActions: {
+      retryQuestion: "Retry this type of question",
+      targetedPractice: "Start recommended practice",
+      mockInterview: "Start recommended mock interview",
+    },
     focusAreas: "Focus areas",
     weaknesses: "Exposed weaknesses",
     reference: {

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import { trainingRecordQueryKeys } from "@/app/training-record-query"
+import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { i18n } from "@/i18n/i18n"
 
 import "./practice-page-service-mock"
@@ -127,6 +128,7 @@ describe("PracticePage: completion", () => {
     vi.mocked(api.endPracticeSession).mockReturnValue(deferred.promise)
     const result = context.renderPracticePage()
     result.queryClient.setQueryData(trainingRecordQueryKeys.overview(), { stale: true })
+    result.queryClient.setQueryData(dashboardQueryKeys.all, { stale: true })
     await user.click(await testing.screen.findByRole("button", { name: /结束本轮练习/i }))
     const confirm = testing.screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!
     testing.act(() => {
@@ -142,6 +144,7 @@ describe("PracticePage: completion", () => {
     expect(
       result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
     ).toBe(true)
+    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(true)
   })
 
   it("prepares the next round from the completed snapshot and restores the saved setup", async () => {

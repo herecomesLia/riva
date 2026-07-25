@@ -141,6 +141,11 @@ export const history = {
     reviewSummary: "整体评价",
     recommendation: "下一步建议",
     recommendationNone: "本轮没有生成下一步建议。",
+    recommendationActions: {
+      retryQuestion: "重试当前或同类问题",
+      targetedPractice: "开始建议的专项训练",
+      mockInterview: "开始建议的模拟面试",
+    },
     focusAreas: "建议聚焦",
     weaknesses: "暴露弱项",
     reference: {

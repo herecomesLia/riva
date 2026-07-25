@@ -59,8 +59,8 @@ export const dashboard = {
       comparison: "较上次岗位分析 {{value}}",
     },
     practiceTime: {
-      title: "今日练习时间",
-      comparison: "较昨日 {{value}}",
+      title: "本统计周期训练时长",
+      comparison: "较前 7 天 {{value}}",
     },
     targetedPractice: {
       title: "专项练习表现",
@@ -97,8 +97,11 @@ export const dashboard = {
   recommendation: {
     eyebrow: "今日训练建议",
     duration: "预计 {{minutes}} 分钟",
-    questionTypes: {
-      projectExperience: "项目经历题",
+    actions: {
+      retryQuestion: { title: "重试当前或同类问题" },
+      targetedPractice: { title: "专项补强薄弱能力" },
+      mockInterview: { title: "通过模拟面试检验能力" },
+      none: { title: "本轮无需后续操作" },
     },
     empty: {
       title: "暂无训练建议",

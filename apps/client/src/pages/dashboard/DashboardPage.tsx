@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 
+import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { useAuth } from "@/hooks/use-auth"
 import { getDashboardData } from "@/services/dashboard"
 
@@ -9,7 +10,7 @@ export function DashboardPage() {
   const { currentUser } = useAuth()
   const dashboardQuery = useQuery({
     queryFn: getDashboardData,
-    queryKey: ["dashboard"],
+    queryKey: dashboardQueryKeys.all,
     retry: false,
   })
 

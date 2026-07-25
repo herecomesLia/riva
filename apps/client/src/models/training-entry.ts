@@ -42,6 +42,13 @@ const practiceTypeByTrainingRecordType = {
   motivation: "motivation",
 } satisfies Record<TrainingRecordQuestionType, PracticeQuestionType>
 
+export function tryToPracticeQuestionType(questionType: unknown): PracticeQuestionType | undefined {
+  return typeof questionType === "string" &&
+    Object.hasOwn(practiceTypeByTrainingRecordType, questionType)
+    ? practiceTypeByTrainingRecordType[questionType as TrainingRecordQuestionType]
+    : undefined
+}
+
 export function toPracticeQuestionType(
   questionType: TrainingRecordQuestionType,
 ): PracticeQuestionType {

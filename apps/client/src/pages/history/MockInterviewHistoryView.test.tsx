@@ -63,6 +63,14 @@ describe("MockInterviewHistoryView", () => {
     expect(retryHref).toContain(`difficulty=${record.setup.difficulty}`)
     expect(retryHref).toContain(`durationMinutes=${record.setup.plannedDurationMinutes}`)
     expect(retryHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
+    const recommendationLink = screen.getByRole("link", {
+      name: i18n.t("history.detail.recommendationActions.targetedPractice"),
+    })
+    const recommendationHref = recommendationLink.getAttribute("href") ?? ""
+    expect(recommendationHref).toContain("/practice?")
+    expect(recommendationHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(recommendationHref).toContain("questionType=technicalFoundation")
+    expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })
 
   it("keeps unanswered questions and reference actions in a partial early-ended review", async () => {

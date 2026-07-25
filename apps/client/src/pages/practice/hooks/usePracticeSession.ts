@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
 import { trainingRecordQueryKeys } from "@/app/training-record-query"
+import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { toPracticeEntryParameters, type PracticeEntrySearch } from "@/app/training-entry-search"
 import type {
   PracticeMutationResponse,
@@ -143,6 +144,7 @@ export function usePracticeMutation<
       )
       if (response.session.status === "completed") {
         void queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all })
+        void queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all })
       }
     },
   })

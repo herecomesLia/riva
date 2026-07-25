@@ -50,7 +50,7 @@ const partialDashboardResponse = {
   performanceTrend: {
     mockInterview: [],
     targetedPractice: [
-      { id: "partial-targeted-practice-001", occurredAt: "2026-07-09T10:00:00.000Z", score: 7.1 },
+      { id: "partial-targeted-practice-001", occurredAt: "2026-07-09T10:00:00.000Z", score: 71 },
     ],
   },
   weaknesses: [
@@ -95,15 +95,25 @@ describe("DashboardView", () => {
     renderDashboardView({ status: "ready", data: structuredClone(dashboardResponseMock) })
 
     expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
-    expect(screen.getByText(dashboardResponseMock.recommendation!.title)).toBeInTheDocument()
+    expect(
+      screen.getByText(dashboardResponseMock.recommendation!.recommendation.reason),
+    ).toBeInTheDocument()
     expect(screen.getByText("76%")).toBeInTheDocument()
+    expect(screen.getAllByText("8.6 / 10").length).toBeGreaterThan(0)
     expect(screen.getByText(dashboardResponseMock.weaknesses[0].description)).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.weaknesses.description"))).toBeInTheDocument()
+    const recommendationLink = screen.getByRole("link", {
+      name: i18n.t("history.detail.recommendationActions.mockInterview"),
+    })
+    expect(recommendationLink).toHaveAttribute("href", expect.stringContaining("/interview?"))
+    expect(recommendationLink.getAttribute("href")).toContain(
+      `targetRoleId=${dashboardResponseMock.recommendation!.targetRoleId}`,
+    )
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
     fireEvent.focus(chart)
 
-    expect(await screen.findByText("专项练习 第10次")).toBeInTheDocument()
+    expect(await screen.findByText("专项练习 第2次")).toBeInTheDocument()
   })
 
   it("renders local empty states for null, empty arrays, and empty metrics", async () => {

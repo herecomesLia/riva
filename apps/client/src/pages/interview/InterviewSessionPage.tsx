@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 
 import { trainingRecordQueryKeys } from "@/app/training-record-query"
+import { dashboardQueryKeys } from "@/app/dashboard-query"
 import type {
   ActiveInterviewSessionResponse,
   InterviewConversationRecordViewData,
@@ -63,7 +64,10 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     completedSessionId: string,
   ) {
     commit(response)
-    await queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all }),
+    ])
     await navigate({
       to: "/interview/review/$sessionId",
       params: { sessionId: completedSessionId },

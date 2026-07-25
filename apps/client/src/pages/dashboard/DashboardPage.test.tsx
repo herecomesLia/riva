@@ -56,7 +56,9 @@ describe("DashboardPage", () => {
     renderDashboardPage()
 
     expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
-    expect(screen.getByText(dashboardResponseMock.recommendation!.title)).toBeInTheDocument()
+    expect(
+      screen.getByText(dashboardResponseMock.recommendation!.recommendation.reason),
+    ).toBeInTheDocument()
     expect(screen.queryByTestId("dashboard-loading-state")).not.toBeInTheDocument()
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })

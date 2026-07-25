@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils"
 import type { DashboardPerformanceRecord, DashboardResponse } from "@/models/dashboard"
 import type { Loadable } from "@/types"
 
+import { toDashboardScoreOutOfTen } from "../dashboard-display"
+
 const performanceChart = {
   height: 184,
   padding: { bottom: 28, left: 28, right: 12, top: 12 },
@@ -71,7 +73,9 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
       }
     : null
   const formatScore = (score: number) =>
-    new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(score)
+    new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(
+      toDashboardScoreOutOfTen(score),
+    )
   const formatDate = (occurredAt: string) =>
     new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short" }).format(
       new Date(occurredAt),
@@ -393,7 +397,7 @@ function getPerformanceChartPoints(points: DashboardPerformanceRecord[]): Perfor
   return points.map((point, index) => ({
     ...point,
     x: padding.left + (chartWidth * index) / Math.max(points.length - 1, 1),
-    y: padding.top + chartHeight * (1 - point.score / 10),
+    y: padding.top + chartHeight * (1 - point.score / 100),
   }))
 }
 

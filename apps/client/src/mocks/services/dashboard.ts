@@ -1,11 +1,8 @@
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { deriveDashboardTrainingData } from "@/mocks/derivations/dashboard-training"
+import { listTrainingRecordSnapshots } from "@/mocks/repositories/training-records"
 import { getRolesPage } from "@/mocks/services/roles"
 import type { DashboardResponse } from "@/models/dashboard"
 import type { TargetRole, TargetRoleExperienceRange } from "@/models/roles"
-
-function copy<T>(value: T): T {
-  return structuredClone(value)
-}
 
 function toDashboardExperienceYears(
   experienceRange: TargetRoleExperienceRange | null,
@@ -53,14 +50,16 @@ export async function getDashboardData(): Promise<DashboardResponse> {
     : null
   const profileCompleted =
     rolesResponse.profileContext.exists && rolesResponse.profileContext.completed
-  const dashboard = copy(dashboardResponseMock)
+  const training = deriveDashboardTrainingData(listTrainingRecordSnapshots())
 
   return {
-    ...dashboard,
     currentRole: toCurrentRoleSummary(currentRole, profileCompleted),
+    recommendation: training.recommendation,
     metrics: {
-      ...dashboard.metrics,
       roleFit: toRoleFit(currentRole),
+      ...training.metrics,
     },
+    performanceTrend: training.performanceTrend,
+    weaknesses: training.weaknesses,
   }
 }

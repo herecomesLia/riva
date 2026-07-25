@@ -2,8 +2,9 @@ import { Link } from "@tanstack/react-router"
 import { Clock3Icon, PlayIcon, SparklesIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import { mapTrainingRecommendationToEntry } from "@/app/training-recommendation-entry"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { defaultHistorySearch } from "@/pages/history/history-navigation"
 import {
   Card,
@@ -14,12 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { DashboardQuestionType, DashboardResponse } from "@/models/dashboard"
+import type { DashboardResponse } from "@/models/dashboard"
 import type { Loadable } from "@/types"
-
-const recommendationQuestionTypeKeys: Record<DashboardQuestionType, string> = {
-  projectExperience: "dashboard.recommendation.questionTypes.projectExperience",
-}
 
 type RecommendationCardProps = {
   state: Loadable<DashboardResponse["recommendation"]>
@@ -39,7 +36,7 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
         {state.status === "loading" ? (
           <Skeleton className="h-4 w-4/5" />
         ) : recommendation ? (
-          <CardDescription>{recommendation.description}</CardDescription>
+          <CardDescription>{recommendation.recommendation.reason}</CardDescription>
         ) : (
           <CardDescription>{t("dashboard.recommendation.empty.description")}</CardDescription>
         )}
@@ -59,15 +56,15 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
         {state.status === "loading" ? (
           <RecommendationLoadingFooter />
         ) : recommendation ? (
-          <RecommendationDataFooter />
+          <RecommendationDataFooter recommendation={recommendation} />
         ) : (
-          <Button
-            nativeButton={false}
-            render={<Link search={defaultHistorySearch} to="/history" />}
-            variant="outline"
+          <Link
+            className={buttonVariants({ variant: "outline" })}
+            search={defaultHistorySearch}
+            to="/history"
           >
             {t("dashboard.actions.viewHistory")}
-          </Button>
+          </Link>
         )}
       </CardFooter>
     </Card>
@@ -92,14 +89,20 @@ function RecommendationDataContent({
   recommendation: NonNullable<DashboardResponse["recommendation"]>
 }) {
   const { t } = useTranslation()
+  const content = recommendation.recommendation
 
   return (
     <>
-      <p className="font-heading text-xl font-medium">{recommendation.title}</p>
+      <p className="font-heading text-xl font-medium">
+        {t(`dashboard.recommendation.actions.${content.action}.title`)}
+      </p>
       <div className="flex flex-wrap gap-2">
-        <Badge variant="outline">
-          {t(recommendationQuestionTypeKeys[recommendation.questionType])}
-        </Badge>
+        {"questionType" in content && (
+          <Badge variant="outline">{t(`history.questionTypes.${content.questionType}`)}</Badge>
+        )}
+        {"round" in content && (
+          <Badge variant="outline">{t(`history.rounds.${content.round}`)}</Badge>
+        )}
         <Badge variant="outline">
           <Clock3Icon />
           {t("dashboard.recommendation.duration", {
@@ -120,22 +123,32 @@ function RecommendationLoadingFooter() {
   )
 }
 
-function RecommendationDataFooter() {
+function RecommendationDataFooter({
+  recommendation,
+}: {
+  recommendation: NonNullable<DashboardResponse["recommendation"]>
+}) {
   const { t } = useTranslation()
+  const entry = mapTrainingRecommendationToEntry(
+    recommendation.recommendation,
+    recommendation.targetRoleId,
+  )
 
   return (
     <>
-      <Button nativeButton={false} render={<Link to="/practice" />}>
-        <PlayIcon data-icon="inline-start" />
-        {t("dashboard.actions.startPractice")}
-      </Button>
-      <Button
-        nativeButton={false}
-        render={<Link search={defaultHistorySearch} to="/history" />}
-        variant="outline"
+      {entry && (
+        <Link className={buttonVariants()} search={entry.search} to={entry.to}>
+          <PlayIcon data-icon="inline-start" />
+          {t(`history.detail.recommendationActions.${entry.action}`)}
+        </Link>
+      )}
+      <Link
+        className={buttonVariants({ variant: "outline" })}
+        search={defaultHistorySearch}
+        to="/history"
       >
         {t("dashboard.actions.viewHistory")}
-      </Button>
+      </Link>
     </>
   )
 }

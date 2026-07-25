@@ -18,12 +18,12 @@ import { Spinner } from "@/components/ui/spinner"
 import { toPracticeQuestionType } from "@/models/training-entry"
 import type {
   TargetedPracticeRecordDetailResponse,
-  TrainingRecordRecommendation,
   TrainingRecordStatus,
 } from "@/models/training-records"
 import { PracticeWeaknesses } from "@/pages/practice/components/PracticeReviewDetails"
 
 import { TargetedPracticeQuestionRecord } from "./components/TargetedPracticeQuestionRecord"
+import { TrainingRecommendationCard } from "./components/TrainingRecommendationCard"
 import type { HistoryRouteSearch } from "./history-navigation"
 import type { HistoryReferenceAnswerSubject } from "./hooks/useHistoryReferenceAnswerGeneration"
 import type { TargetedPracticeHistoryViewState } from "./targeted-practice-history-types"
@@ -154,7 +154,10 @@ function DetailReady({
       </section>
       <div className="grid gap-4 lg:grid-cols-2">
         <PracticeWeaknesses items={record.exposedWeaknesses} />
-        <Recommendation recommendation={record.recommendation} />
+        <Recommendation
+          recommendation={record.recommendation}
+          targetRoleId={record.targetRole.id}
+        />
       </div>
     </div>
   )
@@ -225,29 +228,17 @@ function Summary({ record }: { record: TargetedPracticeRecordDetailResponse }) {
 
 function Recommendation({
   recommendation,
-}: {
-  recommendation: TrainingRecordRecommendation | null
-}) {
+  targetRoleId,
+}: Pick<TargetedPracticeRecordDetailResponse, "recommendation"> & { targetRoleId: string }) {
   const { t } = useTranslation()
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{t("history.detail.recommendation")}</CardTitle>
-        <CardDescription>
-          {recommendation?.reason ?? t("history.detail.recommendationNone")}
-        </CardDescription>
-      </CardHeader>
-      {recommendation && recommendation.action !== "none" && (
-        <CardContent className="flex flex-wrap gap-2">
-          {recommendation.focusAreas.map((area) => (
-            <Badge key={area} variant="secondary">
-              {area}
-            </Badge>
-          ))}
-        </CardContent>
-      )}
-    </Card>
+    <TrainingRecommendationCard
+      recommendation={recommendation}
+      size="sm"
+      targetRoleId={targetRoleId}
+      title={t("history.detail.recommendation")}
+    />
   )
 }
 

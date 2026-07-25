@@ -15,6 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { DashboardResponse } from "@/models/dashboard"
 import type { Loadable } from "@/types"
 
+import { toDashboardScoreOutOfTen } from "../dashboard-display"
+
 type DashboardMetricKey = keyof DashboardResponse["metrics"]
 type DashboardMetricFormat = "percentage" | "duration" | "score"
 type DashboardMetricTrend = "up" | "down" | "unchanged"
@@ -204,6 +206,8 @@ function MetricDataContent({
   metric: DashboardResponse["metrics"][DashboardMetricKey]
 }) {
   const { t } = useTranslation()
+  const displayValue = (value: number) =>
+    definition.valueFormat === "score" ? toDashboardScoreOutOfTen(value) : value
   const formatMetricNumber = (value: number) =>
     new Intl.NumberFormat(i18nLanguage, { maximumFractionDigits: 1 }).format(value)
 
@@ -221,7 +225,7 @@ function MetricDataContent({
               </span>
             </>
           ) : (
-            formatMetricValue(definition.valueKey, metric.currentValue)
+            formatMetricValue(definition.valueKey, displayValue(metric.currentValue))
           )}
         </p>
         {change && <MetricChangeBadge change={change} language={i18nLanguage} />}
@@ -232,7 +236,7 @@ function MetricDataContent({
           : comparisonValue === null || change === null
             ? t("dashboard.metrics.noComparison")
             : t(definition.comparisonKey, {
-                value: formatMetricValue(definition.valueKey, comparisonValue),
+                value: formatMetricValue(definition.valueKey, displayValue(comparisonValue)),
               })}
       </CardDescription>
     </>

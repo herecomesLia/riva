@@ -60,8 +60,8 @@ export const dashboard = {
       comparison: "vs. {{value}} last role analysis",
     },
     practiceTime: {
-      title: "Today's practice time",
-      comparison: "vs. {{value}} yesterday",
+      title: "Practice time · current 7 days",
+      comparison: "vs. {{value}} in the previous 7 days",
     },
     targetedPractice: {
       title: "Targeted practice performance",
@@ -98,8 +98,11 @@ export const dashboard = {
   recommendation: {
     eyebrow: "Today's recommendation",
     duration: "About {{minutes}} min",
-    questionTypes: {
-      projectExperience: "Project experience",
+    actions: {
+      retryQuestion: { title: "Retry the current question type" },
+      targetedPractice: { title: "Strengthen a focused skill" },
+      mockInterview: { title: "Validate your skills in a mock interview" },
+      none: { title: "No further action needed" },
     },
     empty: {
       title: "No recommendation yet",

@@ -13,6 +13,7 @@ import {
   startInterview,
   submitInterviewAnswer,
 } from "@/services/interview"
+import { getDashboardData } from "@/services/dashboard"
 import { endPracticeSession, getPracticePage, requestEndPracticeSession } from "@/services/practice"
 import { getRolesPage, updateTargetRole } from "@/services/roles"
 import {
@@ -73,6 +74,7 @@ async function startInterviewAtFirstQuestion() {
 
 describe("training completion to history mock integration", () => {
   it("adds a completed practice record to history list, overview, and detail", async () => {
+    const dashboardBefore = await settle(getDashboardData())
     const completed = await completePractice()
     const recordId = `targeted-practice-record-${completed.session.sessionId}`
 
@@ -81,6 +83,7 @@ describe("training completion to history mock integration", () => {
       listTrainingRecords({ kinds: ["targetedPractice"], page: 1, pageSize: 20 }),
     )
     const detail = await settle(getTargetedPracticeRecord(recordId))
+    const dashboard = await settle(getDashboardData())
 
     expect(overview).toMatchObject({
       totalRecordCount: 7,
@@ -109,6 +112,20 @@ describe("training completion to history mock integration", () => {
         },
       ],
     })
+    expect(dashboard.performanceTrend.targetedPractice).toContainEqual({
+      id: detail.id,
+      occurredAt: detail.endedAt,
+      score: detail.overallScore,
+    })
+    expect(dashboard.metrics.practiceTimeMinutes.currentValue).toBe(
+      Math.round((900 + detail.durationSeconds) / 60),
+    )
+    expect(dashboard.performanceTrend.targetedPractice).toHaveLength(
+      dashboardBefore.performanceTrend.targetedPractice.length + 1,
+    )
+    expect(dashboard.metrics.practiceTimeMinutes.currentValue).toBeGreaterThan(
+      dashboardBefore.metrics.practiceTimeMinutes.currentValue ?? 0,
+    )
   })
 
   it("keeps the unanswered question when an interview ends early", async () => {
