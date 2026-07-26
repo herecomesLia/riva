@@ -28,12 +28,16 @@ apps/client/
 ├── src/
 │   ├── app/
 │   ├── i18n/
+│   ├── models/
+│   ├── mocks/
 │   ├── pages/
-│   ├── widgets/
+│   ├── components/
+│   ├── hooks/
 │   ├── services/
 │   ├── routes/
 │   ├── stores/
 │   ├── styles/
+│   ├── types/
 │   └── assets/
 ├── package.json
 ├── vite.config.ts
@@ -44,12 +48,16 @@ apps/client/
 
 - `app/`：应用初始化、全局 Provider 和全局配置。
 - `i18n/`：多语言资源、本地化配置、语言切换逻辑和日期、数字等国际化格式处理。
+- `models/`：业务相关数据模型和应用级类型定义。
+- `mocks/`：页面状态 mock 以及早期前端开发使用的 mock 数据。
 - `pages/`：对应应用路由的页面。
-- `widgets/`：可复用 UI 区块和组合组件。
+- `components/`：可复用 UI 区块和组合组件。
+- `hooks/`：组合客户端状态、服务调用和界面交互流程的 React Hooks。
 - `services/`：API 客户端、Server-Sent Events 流式连接、WebSocket 连接和上传客户端。
 - `routes/`：路由定义。
 - `stores/`：UI、会话和缓存状态。
 - `styles/`：全局样式、主题和设计变量。
+- `types/`：跨模块共享的全局类型、环境类型和第三方补充声明；领域内类型声明应就近放在对应模块中。
 - `assets/`：静态资源。
 
 ## 后端架构

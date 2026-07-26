@@ -42,3 +42,6 @@ web_modules/
 !.yarn/versions
 .yarn-integrity
 .pnp.*
+
+# Storybook build outputs
+storybook-static/

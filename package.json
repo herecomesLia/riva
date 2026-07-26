@@ -1,7 +1,36 @@
 {
   "name": "riva",
   "private": true,
-  "scripts": {},
+  "scripts": {
+    "client:dev": "pnpm --filter @riva/client --fail-if-no-match dev",
+    "client:dev:mock": "pnpm --filter @riva/client --fail-if-no-match dev:mock",
+    "client:build": "pnpm --filter @riva/client --fail-if-no-match build",
+    "client:build:mock": "pnpm --filter @riva/client --fail-if-no-match build:mock",
+    "client:lint": "pnpm --filter @riva/client --fail-if-no-match lint",
+    "client:preview": "pnpm --filter @riva/client --fail-if-no-match preview",
+    "client:test": "pnpm --filter @riva/client --fail-if-no-match test",
+    "client:test:api": "pnpm --filter @riva/client --fail-if-no-match test:api",
+    "client:test:mock": "pnpm --filter @riva/client --fail-if-no-match test:mock",
+    "client:test:storybook": "pnpm --filter @riva/client --fail-if-no-match test:storybook",
+    "client:test:all": "pnpm --filter @riva/client --fail-if-no-match test:all",
+    "client:test:watch": "pnpm --filter @riva/client --fail-if-no-match test:watch",
+    "client:test:watch:api": "pnpm --filter @riva/client --fail-if-no-match test:watch:api",
+    "client:test:watch:mock": "pnpm --filter @riva/client --fail-if-no-match test:watch:mock",
+    "client:test:watch:storybook": "pnpm --filter @riva/client --fail-if-no-match test:watch:storybook",
+    "client:storybook": "pnpm --filter @riva/client --fail-if-no-match storybook",
+    "client:storybook:build": "pnpm --filter @riva/client --fail-if-no-match build-storybook",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.9.4"
+  },
   "devEngines": {
     "packageManager": {
       "name": "pnpm",

@@ -29,12 +29,16 @@ apps/client/
 ├── src/
 │   ├── app/
 │   ├── i18n/
+│   ├── models/
+│   ├── mocks/
 │   ├── pages/
-│   ├── widgets/
+│   ├── components/
+│   ├── hooks/
 │   ├── services/
 │   ├── routes/
 │   ├── stores/
 │   ├── styles/
+│   ├── types/
 │   └── assets/
 ├── package.json
 ├── vite.config.ts
@@ -45,13 +49,17 @@ Layer responsibilities:
 
 - `app/`: application bootstrap, providers, and app-wide configuration.
 - `i18n/`: multilingual resources, localization configuration, language switching logic, and internationalized formatting for dates, numbers, and similar values.
+- `models/`: frontend domain models, shared UI data shapes, and app-level type definitions.
+- `mocks/`: page-state mocks and other frontend-only mock data used during early-stage UI development.
 - `pages/`: screens mapped to application routes.
-- `widgets/`: reusable UI sections and composed components.
+- `components/`: reusable UI sections and composed components.
+- `hooks/`: React hooks that compose client state, service calls, and UI interaction flows.
 - `services/`: API clients, Server-Sent Events streams, WebSocket connections,
   and upload clients.
 - `routes/`: routing definitions.
 - `stores/`: UI, session, and cache state.
 - `styles/`: global styles, themes, and design tokens.
+- `types/`: shared global types, environment types, and third-party declaration patches; domain-specific type declarations should stay beside their owning module.
 - `assets/`: static assets imported by the app.
 
 ## Backend Architecture
