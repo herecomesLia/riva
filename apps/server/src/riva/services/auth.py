@@ -46,6 +46,7 @@ class AuthService:
             username=username,
             normalized_username=normalized_username,
             password_hash=hash_password(password),
+            display_name=username,
             created_at=now,
             updated_at=now,
         )

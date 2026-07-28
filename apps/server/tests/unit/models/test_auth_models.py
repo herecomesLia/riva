@@ -12,4 +12,6 @@ def test_auth_models_are_registered_in_metadata() -> None:
     assert "auth_sessions" in Base.metadata.tables
     assert Base.metadata.tables["users"].c.username.unique is None
     assert Base.metadata.tables["users"].c.normalized_username.unique is True
+    assert Base.metadata.tables["users"].c.display_name.nullable is False
+    assert Base.metadata.tables["users"].c.avatar_url.nullable is True
     assert Base.metadata.tables["auth_sessions"].c.token_digest.unique is True
