@@ -11,6 +11,7 @@ from riva.utils import utc_now
 
 if TYPE_CHECKING:
     from riva.models.auth import AuthSession
+    from riva.models.profile import Profile
 
 
 class User(Base):
@@ -44,4 +45,9 @@ class User(Base):
     sessions: Mapped[list[AuthSession]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    profile: Mapped[Profile | None] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
     )

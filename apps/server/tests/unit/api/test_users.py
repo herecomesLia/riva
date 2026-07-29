@@ -13,10 +13,10 @@ class FakeUsersService:
     def __init__(self) -> None:
         self.changes: list[dict[str, str | None]] = []
 
-    def get_profile(self, user: User) -> User:
+    def get_account(self, user: User) -> User:
         return user
 
-    async def update_profile(
+    async def update_account(
         self,
         user: User,
         changes: dict[str, str | None],
@@ -46,7 +46,7 @@ def create_users_client(app) -> tuple[TestClient, FakeUsersService, User]:
     return TestClient(app), users_service, user
 
 
-def test_get_current_user_profile_requires_authentication(app) -> None:
+def test_get_current_user_account_requires_authentication(app) -> None:
     app.dependency_overrides[get_auth_service] = lambda: object()
 
     with TestClient(app) as client:
@@ -56,7 +56,7 @@ def test_get_current_user_profile_requires_authentication(app) -> None:
     assert response.json() == {"error": "not_authenticated"}
 
 
-def test_get_current_user_profile(app) -> None:
+def test_get_current_user_account(app) -> None:
     client, _users_service, user = create_users_client(app)
 
     with client:
@@ -71,7 +71,7 @@ def test_get_current_user_profile(app) -> None:
     }
 
 
-def test_patch_current_user_profile(app) -> None:
+def test_patch_current_user_account(app) -> None:
     client, users_service, _user = create_users_client(app)
 
     with client:
@@ -95,7 +95,7 @@ def test_patch_current_user_profile(app) -> None:
     ]
 
 
-def test_patch_current_user_profile_preserves_omitted_fields(app) -> None:
+def test_patch_current_user_account_preserves_omitted_fields(app) -> None:
     client, users_service, _user = create_users_client(app)
 
     with client:
@@ -110,7 +110,7 @@ def test_patch_current_user_profile_preserves_omitted_fields(app) -> None:
     assert users_service.changes == [{"avatar_url": None}]
 
 
-def test_patch_current_user_profile_requires_trusted_origin(app) -> None:
+def test_patch_current_user_account_requires_trusted_origin(app) -> None:
     client, users_service, _user = create_users_client(app)
 
     with client:

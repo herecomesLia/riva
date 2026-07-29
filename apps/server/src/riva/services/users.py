@@ -9,10 +9,10 @@ class UsersService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    def get_profile(self, user: User) -> User:
+    def get_account(self, user: User) -> User:
         return user
 
-    async def update_profile(
+    async def update_account(
         self,
         user: User,
         changes: Mapping[str, str | None],

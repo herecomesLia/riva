@@ -11,14 +11,14 @@ DisplayName = Annotated[
 ]
 
 
-class UserProfileResponse(APIModel):
+class UserAccountResponse(APIModel):
     id: UUID
     username: str
     display_name: str
     avatar_url: str | None
 
 
-class UserProfileUpdate(APIModel):
+class UserAccountUpdate(APIModel):
     model_config = ConfigDict(extra="forbid")
 
     display_name: DisplayName | None = None

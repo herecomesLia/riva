@@ -28,13 +28,13 @@ def create_user() -> User:
     )
 
 
-def test_update_profile_persists_only_supplied_fields() -> None:
+def test_update_account_persists_only_supplied_fields() -> None:
     session = FakeSession()
     service = UsersService(session)  # type: ignore[arg-type]
     user = create_user()
 
     result = asyncio.run(
-        service.update_profile(user, {"display_name": "Lia Chen"})
+        service.update_account(user, {"display_name": "Lia Chen"})
     )
 
     assert result is user
@@ -44,22 +44,22 @@ def test_update_profile_persists_only_supplied_fields() -> None:
     assert session.refreshed == [user]
 
 
-def test_update_profile_can_clear_avatar() -> None:
+def test_update_account_can_clear_avatar() -> None:
     session = FakeSession()
     service = UsersService(session)  # type: ignore[arg-type]
     user = create_user()
 
-    asyncio.run(service.update_profile(user, {"avatar_url": None}))
+    asyncio.run(service.update_account(user, {"avatar_url": None}))
 
     assert user.avatar_url is None
 
 
-def test_empty_update_does_not_write() -> None:
+def test_empty_account_update_does_not_write() -> None:
     session = FakeSession()
     service = UsersService(session)  # type: ignore[arg-type]
     user = create_user()
 
-    asyncio.run(service.update_profile(user, {}))
+    asyncio.run(service.update_account(user, {}))
 
     assert session.commit_count == 0
     assert session.refreshed == []
