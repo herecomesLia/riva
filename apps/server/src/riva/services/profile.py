@@ -7,14 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.errors import APIError
-from riva.models import Profile, User
+from riva.models import CareerProfile, User
 
 
 class ProfileService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_profile(self, user: User) -> Profile:
+    async def get_profile(self, user: User) -> CareerProfile:
         profile = await self._find_by_user_id(user.id)
         if profile is None:
             raise APIError(status.HTTP_404_NOT_FOUND, "profile_not_found")
@@ -24,10 +24,10 @@ class ProfileService:
         self,
         user: User,
         content: Mapping[str, Any],
-    ) -> Profile:
+    ) -> CareerProfile:
         profile = await self._find_by_user_id(user.id)
         if profile is None:
-            profile = Profile(user_id=user.id, **content)
+            profile = CareerProfile(user_id=user.id, **content)
             self.session.add(profile)
         else:
             for field, value in content.items():
@@ -38,8 +38,8 @@ class ProfileService:
         await self.session.refresh(profile)
         return profile
 
-    async def _find_by_user_id(self, user_id: UUID) -> Profile | None:
+    async def _find_by_user_id(self, user_id: UUID) -> CareerProfile | None:
         result = await self.session.execute(
-            select(Profile).where(Profile.user_id == user_id)
+            select(CareerProfile).where(CareerProfile.user_id == user_id)
         )
         return result.scalar_one_or_none()
