@@ -1,0 +1,326 @@
+from datetime import UTC, datetime
+from uuid import UUID
+
+from pydantic import TypeAdapter, ValidationError
+import pytest
+
+from riva.schemas.roles import (
+    MAX_RAW_JOB_DESCRIPTION_LENGTH,
+    ArchiveTargetRoleRequest,
+    CreateTargetRoleRequest,
+    DeleteTargetRoleVersion,
+    JobDescriptionResponse,
+    RolesPageResponse,
+    SaveJobDescriptionRequest,
+    SetCurrentTargetRoleRequest,
+    TargetRoleResponse,
+    UpdatePreparationStatusRequest,
+    UpdateTargetRoleRequest,
+)
+
+ROLE_ID = "11111111-1111-4111-8111-111111111111"
+
+
+def valid_role_details() -> dict[str, object]:
+    return {
+        "title": "  Backend Engineer  ",
+        "company": "  Riva  ",
+        "recruitmentType": "experienced",
+        "location": "",
+        "experienceRange": {"minYears": 2, "maxYears": 5},
+    }
+
+
+def valid_role_response() -> dict[str, object]:
+    return {
+        "id": ROLE_ID,
+        **valid_role_details(),
+        "preparationStatus": "preparing",
+        "createdAt": "2026-07-29T08:00:00Z",
+        "updatedAt": "2026-07-29T08:30:00Z",
+        "version": 1,
+        "jobDescription": {
+            "status": "missing",
+            "rawText": None,
+            "version": None,
+            "parsingFailureReason": None,
+        },
+        "jobDescriptionAnalysis": None,
+        "matchingAnalysis": None,
+    }
+
+
+def test_create_request_uses_camel_case_and_normalizes_text() -> None:
+    request = CreateTargetRoleRequest.model_validate(
+        {**valid_role_details(), "preparationStatus": "paused"}
+    )
+
+    assert request.title == "Backend Engineer"
+    assert request.company == "Riva"
+    assert request.location is None
+    assert request.experience_range is not None
+    assert request.model_dump()["experienceRange"] == {
+        "minYears": 2,
+        "maxYears": 5,
+    }
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda payload: payload.update({"title": "   "}),
+        lambda payload: payload.update({"preparationStatus": "archived"}),
+        lambda payload: payload.update({"preparationStatus": "ready"}),
+        lambda payload: payload.update(
+            {"experienceRange": {"minYears": None, "maxYears": None}}
+        ),
+        lambda payload: payload.update(
+            {"experienceRange": {"minYears": -1, "maxYears": 2}}
+        ),
+        lambda payload: payload.update(
+            {"experienceRange": {"minYears": 4, "maxYears": 2}}
+        ),
+        lambda payload: payload.update({"userId": ROLE_ID}),
+        lambda payload: payload.update({"jobDescriptionAnalysis": None}),
+        lambda payload: payload.update({"matchingAnalysis": None}),
+    ],
+)
+def test_create_request_rejects_invalid_or_out_of_scope_fields(mutate) -> None:
+    payload = {**valid_role_details(), "preparationStatus": "preparing"}
+    mutate(payload)
+
+    with pytest.raises(ValidationError):
+        CreateTargetRoleRequest.model_validate(payload)
+
+
+def test_create_request_allows_null_experience_range() -> None:
+    request = CreateTargetRoleRequest.model_validate(
+        {
+            **valid_role_details(),
+            "experienceRange": None,
+            "preparationStatus": "preparing",
+        }
+    )
+
+    assert request.experience_range is None
+
+
+@pytest.mark.parametrize(
+    "schema,payload",
+    [
+        (
+            UpdateTargetRoleRequest,
+            {**valid_role_details(), "version": 1},
+        ),
+        (
+            SetCurrentTargetRoleRequest,
+            {"roleId": ROLE_ID, "version": 1},
+        ),
+        (
+            UpdatePreparationStatusRequest,
+            {
+                "version": 1,
+                "preparationStatus": "paused",
+            },
+        ),
+        (
+            ArchiveTargetRoleRequest,
+            {"version": 1},
+        ),
+    ],
+)
+def test_mutation_requests_require_positive_versions(schema, payload) -> None:
+    assert schema.model_validate(payload).version == 1
+
+    payload["version"] = 0
+    with pytest.raises(ValidationError):
+        schema.model_validate(payload)
+
+
+def test_preparation_status_request_cannot_archive() -> None:
+    with pytest.raises(ValidationError):
+        UpdatePreparationStatusRequest.model_validate(
+            {
+                "version": 1,
+                "preparationStatus": "archived",
+            }
+        )
+
+
+def test_delete_version_query_constraint_is_positive() -> None:
+    adapter = TypeAdapter(DeleteTargetRoleVersion)
+
+    assert adapter.validate_python(1) == 1
+    with pytest.raises(ValidationError):
+        adapter.validate_python(0)
+
+
+def test_save_job_description_trims_and_limits_raw_text() -> None:
+    request = SaveJobDescriptionRequest.model_validate(
+        {"version": 2, "rawText": "  Build APIs.  "}
+    )
+
+    assert request.raw_text == "Build APIs."
+
+    for raw_text in ("   ", "x" * (MAX_RAW_JOB_DESCRIPTION_LENGTH + 1)):
+        with pytest.raises(ValidationError):
+            SaveJobDescriptionRequest.model_validate(
+                {"version": 2, "rawText": raw_text}
+            )
+
+
+@pytest.mark.parametrize(
+    "schema,payload",
+    [
+        (
+            UpdateTargetRoleRequest,
+            {**valid_role_details(), "version": 1, "roleId": ROLE_ID},
+        ),
+        (
+            UpdatePreparationStatusRequest,
+            {
+                "version": 1,
+                "preparationStatus": "paused",
+                "roleId": ROLE_ID,
+            },
+        ),
+        (ArchiveTargetRoleRequest, {"version": 1, "roleId": ROLE_ID}),
+        (
+            SaveJobDescriptionRequest,
+            {"version": 1, "rawText": "Build APIs.", "roleId": ROLE_ID},
+        ),
+    ],
+)
+def test_resource_request_bodies_reject_path_role_id(schema, payload) -> None:
+    with pytest.raises(ValidationError):
+        schema.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "status": "missing",
+            "rawText": None,
+            "version": None,
+            "parsingFailureReason": None,
+        },
+        {
+            "status": "saved",
+            "rawText": "Build APIs.",
+            "version": 1,
+            "parsingFailureReason": None,
+        },
+    ],
+)
+def test_job_description_response_supports_only_missing_and_saved(payload) -> None:
+    parsed = TypeAdapter(JobDescriptionResponse).validate_python(payload)
+
+    assert parsed.model_dump() == payload
+
+
+@pytest.mark.parametrize("status", ["parsing", "ready", "failed"])
+def test_job_description_response_rejects_ai_flow_statuses(status: str) -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(JobDescriptionResponse).validate_python(
+            {
+                "status": status,
+                "rawText": "Build APIs.",
+                "version": 1,
+                "parsingFailureReason": None,
+            }
+        )
+
+
+def test_target_role_response_has_null_analysis_fields() -> None:
+    response = TargetRoleResponse.model_validate(valid_role_response())
+
+    assert response.id == UUID(ROLE_ID)
+    assert response.created_at == datetime(2026, 7, 29, 8, tzinfo=UTC)
+    assert response.job_description_analysis is None
+    assert response.matching_analysis is None
+
+    payload = valid_role_response()
+    payload["jobDescriptionAnalysis"] = {}
+    with pytest.raises(ValidationError):
+        TargetRoleResponse.model_validate(payload)
+
+
+def test_roles_page_response_supports_missing_and_existing_profile_contexts() -> None:
+    missing = RolesPageResponse.model_validate(
+        {
+            "roles": [],
+            "currentRoleId": None,
+            "profileContext": {
+                "exists": False,
+                "version": None,
+                "completed": False,
+            },
+        }
+    )
+    assert missing.model_dump() == {
+        "roles": [],
+        "currentRoleId": None,
+        "profileContext": {
+            "exists": False,
+            "version": None,
+            "completed": False,
+        },
+    }
+
+    existing = RolesPageResponse.model_validate(
+        {
+            "roles": [valid_role_response()],
+            "currentRoleId": ROLE_ID,
+            "profileContext": {
+                "exists": True,
+                "version": 3,
+                "completed": True,
+            },
+        }
+    )
+    assert existing.current_role_id == UUID(ROLE_ID)
+
+
+@pytest.mark.parametrize("missing_role", [True, False])
+def test_roles_page_response_requires_current_role_to_be_present_and_active(
+    missing_role: bool,
+) -> None:
+    role = valid_role_response()
+    if not missing_role:
+        role["preparationStatus"] = "archived"
+
+    with pytest.raises(ValidationError):
+        RolesPageResponse.model_validate(
+            {
+                "roles": [] if missing_role else [role],
+                "currentRoleId": ROLE_ID,
+                "profileContext": {
+                    "exists": False,
+                    "version": None,
+                    "completed": False,
+                },
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "profile_context",
+    [
+        {"exists": False, "version": 1, "completed": False},
+        {"exists": False, "version": None, "completed": True},
+        {"exists": True, "version": None, "completed": False},
+        {"exists": True, "version": 0, "completed": False},
+    ],
+)
+def test_profile_context_enforces_consistent_discriminated_states(
+    profile_context,
+) -> None:
+    with pytest.raises(ValidationError):
+        RolesPageResponse.model_validate(
+            {
+                "roles": [],
+                "currentRoleId": None,
+                "profileContext": profile_context,
+            }
+        )

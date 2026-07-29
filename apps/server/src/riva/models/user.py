@@ -12,6 +12,7 @@ from riva.utils import utc_now
 if TYPE_CHECKING:
     from riva.models.auth import AuthSession
     from riva.models.profile import CareerProfile
+    from riva.models.roles import CurrentTargetRole, TargetRole
 
 
 class User(Base):
@@ -49,5 +50,19 @@ class User(Base):
     career_profile: Mapped[CareerProfile | None] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+        uselist=False,
+    )
+    target_roles: Mapped[list[TargetRole]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="TargetRole.user_id",
+        passive_deletes=True,
+    )
+    current_target_role: Mapped[CurrentTargetRole | None] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="CurrentTargetRole.user_id",
+        overlaps="current_target_role,role",
+        passive_deletes=True,
         uselist=False,
     )

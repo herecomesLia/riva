@@ -8,6 +8,7 @@ from riva.models.profile import (
     CareerProfileWorkExperience,
     CareerProfileWorkSkill,
 )
+from riva.models.roles import CurrentTargetRole, TargetRole
 from riva.models.user import User
 
 __all__ = [
@@ -19,5 +20,7 @@ __all__ = [
     "CareerProfileSkill",
     "CareerProfileWorkExperience",
     "CareerProfileWorkSkill",
+    "CurrentTargetRole",
+    "TargetRole",
     "User",
 ]
