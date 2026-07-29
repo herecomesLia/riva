@@ -86,7 +86,12 @@ class CareerProfileEducation(TimestampMixin, Base):
     __tablename__ = "career_profile_educations"
     __table_args__ = (
         CheckConstraint("position >= 0"),
-        UniqueConstraint("career_profile_id", "position"),
+        UniqueConstraint(
+            "career_profile_id",
+            "position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -116,7 +121,12 @@ class CareerProfileWorkExperience(TimestampMixin, Base):
     __tablename__ = "career_profile_work_experiences"
     __table_args__ = (
         CheckConstraint("position >= 0"),
-        UniqueConstraint("career_profile_id", "position"),
+        UniqueConstraint(
+            "career_profile_id",
+            "position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -161,7 +171,12 @@ class CareerProfileProjectExperience(TimestampMixin, Base):
     __tablename__ = "career_profile_project_experiences"
     __table_args__ = (
         CheckConstraint("position >= 0"),
-        UniqueConstraint("career_profile_id", "position"),
+        UniqueConstraint(
+            "career_profile_id",
+            "position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -204,8 +219,18 @@ class CareerProfileSkill(TimestampMixin, Base):
     __tablename__ = "career_profile_skills"
     __table_args__ = (
         CheckConstraint("position >= 0"),
-        UniqueConstraint("career_profile_id", "position"),
-        UniqueConstraint("career_profile_id", "normalized_name"),
+        UniqueConstraint(
+            "career_profile_id",
+            "position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        UniqueConstraint(
+            "career_profile_id",
+            "normalized_name",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -240,7 +265,12 @@ class CareerProfileWorkSkill(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("position >= 0"),
         UniqueConstraint("work_experience_id", "skill_id"),
-        UniqueConstraint("work_experience_id", "position"),
+        UniqueConstraint(
+            "work_experience_id",
+            "position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -279,7 +309,12 @@ class CareerProfileProjectSkill(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("position >= 0"),
         UniqueConstraint("project_experience_id", "skill_id"),
-        UniqueConstraint("project_experience_id", "position"),
+        UniqueConstraint(
+            "project_experience_id",
+            "position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(

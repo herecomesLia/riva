@@ -1,58 +1,121 @@
-from datetime import UTC, datetime
+from copy import deepcopy
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import status
 from fastapi.testclient import TestClient
 
 from riva.core.auth import get_auth_service, require_current_user
 from riva.core.errors import APIError
-from riva.core.profile import get_profile_service
-from riva.models import Profile, User
+from riva.core.profile import get_career_profile_service
+from riva.models import User
+from riva.schemas.profile import (
+    CareerProfilePutRequest,
+    CareerProfileResponse,
+)
 
 TRUSTED_ORIGIN = "http://localhost:5173"
+EDUCATION_ID = "11111111-1111-4111-8111-111111111111"
+WORK_ID = "22222222-2222-4222-8222-222222222222"
+PROJECT_ID = "33333333-3333-4333-8333-333333333333"
+SKILL_ID = "44444444-4444-4444-8444-444444444444"
+PROFILE_ID = "55555555-5555-4555-8555-555555555555"
 
 
-def profile_content() -> dict[str, Any]:
+def put_payload(*, version: int | None = None) -> dict[str, Any]:
     return {
-        "summary": "Backend engineer",
+        "version": version,
+        "summary": "  Backend engineer  ",
         "education": [
             {
-                "id": "education_1",
-                "source": "userAdded",
+                "id": EDUCATION_ID,
                 "school": "Tongji University",
                 "degree": "Master",
                 "major": "Software Engineering",
-                "start_date": "2018-09",
-                "end_date": "2021-06",
-                "is_current": False,
+                "startDate": "2018-09",
+                "endDate": "2021-06",
+                "isCurrent": False,
             }
         ],
-        "work_experiences": [
+        "workExperiences": [
             {
-                "id": "work_1",
-                "source": "userAdded",
+                "id": WORK_ID,
                 "company": "Riva",
                 "title": "Backend Engineer",
-                "employment_type": "fullTime",
+                "employmentType": "fullTime",
                 "location": "Shanghai",
-                "start_date": "2021-07",
-                "end_date": None,
-                "is_current": True,
+                "startDate": "2021-07",
+                "endDate": None,
+                "isCurrent": True,
                 "responsibilities": ["Build APIs"],
                 "achievements": [],
-                "skill_ids": ["skill_python"],
+                "skillIds": [SKILL_ID],
             }
         ],
-        "project_experiences": [],
-        "skills": [
+        "projectExperiences": [
             {
-                "id": "skill_python",
-                "source": "userAdded",
-                "name": "Python",
+                "id": PROJECT_ID,
+                "name": "Career Profile",
+                "role": "Developer",
+                "startDate": "2026-07",
+                "endDate": None,
+                "responsibilities": ["Designed the API"],
+                "achievements": [],
+                "skillIds": [SKILL_ID],
+                "projectUrl": "https://example.com/profile",
             }
         ],
+        "skills": [{"id": SKILL_ID, "name": "Python"}],
     }
+
+
+def response_profile(*, version: int = 1) -> CareerProfileResponse:
+    payload = CareerProfilePutRequest.model_validate(put_payload(version=None))
+    content = payload.model_dump(mode="json", by_alias=True, exclude={"version"})
+    for section in (
+        content["education"],
+        content["workExperiences"],
+        content["projectExperiences"],
+        content["skills"],
+    ):
+        for item in section:
+            item["source"] = "userAdded"
+    return CareerProfileResponse.model_validate(
+        {
+            "profileId": PROFILE_ID,
+            "version": version,
+            "updatedAt": "2026-07-29T08:30:00Z",
+            **content,
+        }
+    )
+
+
+class FakeCareerProfileService:
+    def __init__(
+        self,
+        profile: CareerProfileResponse | None = None,
+        *,
+        replace_error: APIError | None = None,
+    ) -> None:
+        self.profile = profile
+        self.replace_error = replace_error
+        self.replacements: list[CareerProfilePutRequest] = []
+
+    async def get_profile(self, user: User) -> CareerProfileResponse | None:
+        return self.profile
+
+    async def replace_profile(
+        self,
+        user: User,
+        payload: CareerProfilePutRequest,
+    ) -> CareerProfileResponse:
+        self.replacements.append(payload)
+        if self.replace_error is not None:
+            raise self.replace_error
+        self.profile = response_profile(
+            version=1 if payload.version is None else payload.version + 1
+        )
+        return self.profile
 
 
 def create_user() -> User:
@@ -65,90 +128,17 @@ def create_user() -> User:
     )
 
 
-def create_profile(user: User) -> Profile:
-    now = datetime(2026, 7, 28, tzinfo=UTC)
-    return Profile(
-        profile_id=uuid4(),
-        user_id=user.id,
-        version=1,
-        created_at=now,
-        updated_at=now,
-        **profile_content(),
-    )
-
-
-class FakeProfileService:
-    def __init__(self, profile: Profile | None = None) -> None:
-        self.profile = profile
-        self.replacements: list[dict[str, Any]] = []
-
-    async def get_profile(self, user: User) -> Profile:
-        if self.profile is None:
-            raise APIError(status.HTTP_404_NOT_FOUND, "profile_not_found")
-        return self.profile
-
-    async def replace_profile(
-        self,
-        user: User,
-        content: dict[str, Any],
-    ) -> Profile:
-        self.replacements.append(content)
-        if self.profile is None:
-            self.profile = create_profile(user)
-        for field, value in content.items():
-            setattr(self.profile, field, value)
-        return self.profile
-
-
 def create_profile_client(
     app,
-    *,
-    with_profile: bool,
-) -> tuple[TestClient, FakeProfileService, User]:
+    profile_service: FakeCareerProfileService,
+) -> tuple[TestClient, User]:
     user = create_user()
-    profile_service = FakeProfileService(
-        create_profile(user) if with_profile else None
-    )
     app.dependency_overrides[require_current_user] = lambda: user
-    app.dependency_overrides[get_profile_service] = lambda: profile_service
-    return TestClient(app), profile_service, user
+    app.dependency_overrides[get_career_profile_service] = lambda: profile_service
+    return TestClient(app), user
 
 
-def put_payload() -> dict[str, Any]:
-    return {
-        "summary": "  Backend engineer  ",
-        "education": [
-            {
-                "id": "education_1",
-                "school": "Tongji University",
-                "degree": "Master",
-                "major": "Software Engineering",
-                "startDate": "2018-09",
-                "endDate": "2021-06",
-                "isCurrent": False,
-            }
-        ],
-        "workExperiences": [
-            {
-                "id": "work_1",
-                "company": "Riva",
-                "title": "Backend Engineer",
-                "employmentType": "fullTime",
-                "location": "Shanghai",
-                "startDate": "2021-07",
-                "endDate": None,
-                "isCurrent": True,
-                "responsibilities": ["Build APIs"],
-                "achievements": [],
-                "skillIds": ["skill_python"],
-            }
-        ],
-        "projectExperiences": [],
-        "skills": [{"id": "skill_python", "name": "Python"}],
-    }
-
-
-def test_profile_requires_authentication(app) -> None:
+def test_get_profile_requires_authentication(app) -> None:
     app.dependency_overrides[get_auth_service] = lambda: object()
 
     with TestClient(app) as client:
@@ -158,41 +148,51 @@ def test_profile_requires_authentication(app) -> None:
     assert response.json() == {"error": "not_authenticated"}
 
 
-def test_get_profile_returns_current_users_profile(app) -> None:
-    client, _profile_service, _user = create_profile_client(
-        app,
-        with_profile=True,
-    )
+def test_put_profile_requires_authentication(app) -> None:
+    app.dependency_overrides[get_auth_service] = lambda: object()
+
+    with TestClient(app) as client:
+        response = client.put(
+            "/api/profile",
+            json=put_payload(),
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"error": "not_authenticated"}
+
+
+def test_get_profile_returns_null_envelope_when_missing(app) -> None:
+    service = FakeCareerProfileService()
+    client, _user = create_profile_client(app, service)
 
     with client:
         response = client.get("/api/profile")
 
     assert response.status_code == 200
-    assert response.json()["summary"] == "Backend engineer"
-    assert response.json()["education"][0]["school"] == "Tongji University"
-    assert response.json()["workExperiences"][0]["skillIds"] == ["skill_python"]
-    assert response.json()["skills"][0]["source"] == "userAdded"
-    assert response.json()["version"] == 1
+    assert response.json() == {"profile": None}
 
 
-def test_get_profile_returns_not_found_when_profile_does_not_exist(app) -> None:
-    client, _profile_service, _user = create_profile_client(
-        app,
-        with_profile=False,
-    )
+def test_get_profile_returns_complete_envelope_without_account_fields(app) -> None:
+    service = FakeCareerProfileService(response_profile())
+    client, _user = create_profile_client(app, service)
 
     with client:
         response = client.get("/api/profile")
 
-    assert response.status_code == 404
-    assert response.json() == {"error": "profile_not_found"}
+    assert response.status_code == 200
+    profile = response.json()["profile"]
+    assert profile["profileId"] == PROFILE_ID
+    assert profile["workExperiences"][0]["skillIds"] == [SKILL_ID]
+    assert profile["projectExperiences"][0]["source"] == "userAdded"
+    assert "username" not in profile
+    assert "displayName" not in profile
+    assert "avatarUrl" not in profile
 
 
-def test_put_profile_replaces_all_profile_content(app) -> None:
-    client, profile_service, _user = create_profile_client(
-        app,
-        with_profile=False,
-    )
+def test_put_profile_creates_and_normalizes_payload(app) -> None:
+    service = FakeCareerProfileService()
+    client, _user = create_profile_client(app, service)
 
     with client:
         response = client.put(
@@ -202,24 +202,72 @@ def test_put_profile_replaces_all_profile_content(app) -> None:
         )
 
     assert response.status_code == 200
-    assert response.json()["summary"] == "Backend engineer"
-    assert response.json()["workExperiences"][0]["employmentType"] == "fullTime"
-    assert response.json()["profileId"]
-    assert profile_service.replacements[0]["summary"] == "Backend engineer"
-    assert profile_service.replacements[0]["work_experiences"][0]["skill_ids"] == [
-        "skill_python"
-    ]
+    assert response.json()["profile"]["version"] == 1
+    assert service.replacements[0].summary == "Backend engineer"
+    assert service.replacements[0].skills[0].id == UUID(SKILL_ID)
+
+
+def test_put_profile_updates_and_increments_version(app) -> None:
+    service = FakeCareerProfileService(response_profile())
+    client, _user = create_profile_client(app, service)
+
+    with client:
+        response = client.put(
+            "/api/profile",
+            json=put_payload(version=1),
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["profile"]["version"] == 2
+    assert service.replacements[0].version == 1
+
+
+def test_put_profile_returns_version_conflict(app) -> None:
+    service = FakeCareerProfileService(
+        response_profile(),
+        replace_error=APIError(
+            status.HTTP_409_CONFLICT,
+            "profile_version_conflict",
+        ),
+    )
+    client, _user = create_profile_client(app, service)
+
+    with client:
+        response = client.put(
+            "/api/profile",
+            json=put_payload(version=99),
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 409
+    assert response.json() == {"error": "profile_version_conflict"}
 
 
 def test_put_profile_requires_trusted_origin(app) -> None:
-    client, profile_service, _user = create_profile_client(
-        app,
-        with_profile=True,
-    )
+    service = FakeCareerProfileService(response_profile())
+    client, _user = create_profile_client(app, service)
 
     with client:
-        response = client.put("/api/profile", json=put_payload())
+        response = client.put("/api/profile", json=put_payload(version=1))
 
     assert response.status_code == 403
     assert response.json() == {"error": "csrf_failed"}
-    assert profile_service.replacements == []
+    assert service.replacements == []
+
+
+def test_put_profile_rejects_invalid_input(app) -> None:
+    service = FakeCareerProfileService()
+    client, _user = create_profile_client(app, service)
+    payload = deepcopy(put_payload())
+    payload["workExperiences"][0]["skillIds"] = [str(uuid4())]
+
+    with client:
+        response = client.put(
+            "/api/profile",
+            json=payload,
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 422
+    assert service.replacements == []

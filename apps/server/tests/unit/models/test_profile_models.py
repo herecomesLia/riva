@@ -1,3 +1,4 @@
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db import Base
@@ -26,6 +27,15 @@ PROFILE_TABLES = {
 
 def foreign_key(column):
     return next(iter(column.foreign_keys))
+
+
+def unique_constraint(table, columns: set[str]) -> UniqueConstraint:
+    return next(
+        constraint
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+        and {column.name for column in constraint.columns} == columns
+    )
 
 
 def test_career_profile_tables_are_registered() -> None:
@@ -65,6 +75,21 @@ def test_profile_children_use_uuid_ids_positions_and_cascading_foreign_keys() ->
         ).target_fullname == "career_profiles.id"
         assert foreign_key(table.c.career_profile_id).ondelete == "CASCADE"
         assert table.c.position.nullable is False
+        position_owner = (
+            "work_experience_id"
+            if model is CareerProfileWorkSkill
+            else (
+                "project_experience_id"
+                if model is CareerProfileProjectSkill
+                else "career_profile_id"
+            )
+        )
+        constraint = unique_constraint(
+            table,
+            {position_owner, "position"},
+        )
+        assert constraint.deferrable is True
+        assert constraint.initially == "DEFERRED"
 
 
 def test_profile_skill_associations_reference_experiences_and_skills() -> None:
