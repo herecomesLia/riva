@@ -173,7 +173,6 @@ class UpdateTargetRoleRequest(TargetRoleDetailsRequest):
 
 
 class SetCurrentTargetRoleRequest(RoleAPIModel):
-    role_id: UUID
     version: TargetRoleVersion
 
 

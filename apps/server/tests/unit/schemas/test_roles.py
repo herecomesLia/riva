@@ -114,7 +114,7 @@ def test_create_request_allows_null_experience_range() -> None:
         ),
         (
             SetCurrentTargetRoleRequest,
-            {"roleId": ROLE_ID, "version": 1},
+            {"version": 1},
         ),
         (
             UpdatePreparationStatusRequest,
