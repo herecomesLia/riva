@@ -108,25 +108,47 @@ class TargetRoleService:
         try:
             role = await self._locked_role(user.id, role_id)
             self._require_version(role, payload.version)
-            role.title = payload.title
-            role.company = payload.company
-            role.recruitment_type = (
+            recruitment_type = (
                 payload.recruitment_type.value
                 if payload.recruitment_type is not None
                 else None
             )
-            role.location = payload.location
-            role.min_experience_years = (
+            min_experience_years = (
                 payload.experience_range.min_years
                 if payload.experience_range is not None
                 else None
             )
-            role.max_experience_years = (
+            max_experience_years = (
                 payload.experience_range.max_years
                 if payload.experience_range is not None
                 else None
             )
-            role.version += 1
+            current_values = (
+                role.title,
+                role.company,
+                role.recruitment_type,
+                role.location,
+                role.min_experience_years,
+                role.max_experience_years,
+            )
+            requested_values = (
+                payload.title,
+                payload.company,
+                recruitment_type,
+                payload.location,
+                min_experience_years,
+                max_experience_years,
+            )
+            if current_values != requested_values:
+                (
+                    role.title,
+                    role.company,
+                    role.recruitment_type,
+                    role.location,
+                    role.min_experience_years,
+                    role.max_experience_years,
+                ) = requested_values
+                role.version += 1
             return await self._commit_page(user.id)
         except Exception:
             await self.session.rollback()

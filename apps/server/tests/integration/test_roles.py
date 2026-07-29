@@ -146,6 +146,34 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     assert updated.preparation_status == "preparing"
                     assert updated.job_description.status == "missing"
 
+                updated_at = updated.updated_at
+                async with database.sessionmaker() as session:
+                    update_no_op_page = await TargetRoleService(
+                        session
+                    ).update_role(
+                        owner,
+                        first.id,
+                        update_request(2, "Platform Engineer"),
+                    )
+                    update_no_op = next(
+                        role
+                        for role in update_no_op_page.roles
+                        if role.id == first.id
+                    )
+                    assert update_no_op.version == 2
+                    assert update_no_op.updated_at == updated_at
+                async with database.sessionmaker() as session:
+                    with pytest.raises(APIError) as stale_update_no_op:
+                        await TargetRoleService(session).update_role(
+                            owner,
+                            first.id,
+                            update_request(1, "Platform Engineer"),
+                        )
+                    assert (
+                        stale_update_no_op.value.error
+                        == "target_role_version_conflict"
+                    )
+
                 async with database.sessionmaker() as session:
                     current_no_op = await TargetRoleService(
                         session
