@@ -1,0 +1,370 @@
+from collections.abc import Callable, Mapping
+from datetime import datetime, timedelta
+import re
+from typing import TypeVar, cast
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from riva.agents import AgentResult
+from riva.models import AgentRun, AgentRunStatus
+from riva.models.agent_runs import AgentRunPayload, AgentRunResult
+from riva.utils import utc_now
+
+
+AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
+PayloadValue = UUID | str | int
+_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+class AgentRunLeaseError(RuntimeError):
+    code = "agent_run_lease_invalid"
+
+    def __init__(self) -> None:
+        super().__init__("The agent run lease is invalid or expired.")
+
+
+class AgentRunResultMismatchError(RuntimeError):
+    code = "agent_run_result_mismatch"
+
+    def __init__(self) -> None:
+        super().__init__("The agent result does not match the claimed run.")
+
+
+class AgentRunService:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        clock: Callable[[], datetime] = utc_now,
+        lease_token_factory: Callable[[], UUID] = uuid4,
+    ) -> None:
+        self.session = session
+        self.clock = clock
+        self.lease_token_factory = lease_token_factory
+
+    async def enqueue(
+        self,
+        *,
+        user_id: UUID,
+        agent_id: str,
+        prompt_id: str,
+        prompt_version: str,
+        output_schema_id: str,
+        model: str,
+        payload: Mapping[str, PayloadValue],
+        idempotency_key: str,
+        max_attempts: int,
+        available_at: datetime | None = None,
+    ) -> AgentRun:
+        try:
+            agent_id = _required_text("agent_id", agent_id, 128)
+            prompt_id = _required_text("prompt_id", prompt_id, 128)
+            prompt_version = _required_text(
+                "prompt_version",
+                prompt_version,
+                64,
+            )
+            output_schema_id = _required_text(
+                "output_schema_id",
+                output_schema_id,
+                128,
+            )
+            model = _required_text("model", model, 255)
+            idempotency_key = _required_text(
+                "idempotency_key",
+                idempotency_key,
+                255,
+            )
+            if max_attempts < 1:
+                raise ValueError("max_attempts must be at least 1")
+            serialized_payload = _serialize_payload(payload)
+            scheduled_at = available_at or self.clock()
+            _require_aware_datetime("available_at", scheduled_at)
+
+            run = AgentRun(
+                user_id=user_id,
+                agent_id=agent_id,
+                prompt_id=prompt_id,
+                prompt_version=prompt_version,
+                output_schema_id=output_schema_id,
+                status=AgentRunStatus.QUEUED,
+                payload=serialized_payload,
+                idempotency_key=idempotency_key,
+                attempt_count=0,
+                max_attempts=max_attempts,
+                available_at=scheduled_at,
+                model=model,
+            )
+
+            try:
+                async with self.session.begin_nested():
+                    self.session.add(run)
+                    await self.session.flush()
+            except IntegrityError:
+                existing = await self._idempotent_run(
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    prompt_id=prompt_id,
+                    prompt_version=prompt_version,
+                    idempotency_key=idempotency_key,
+                )
+                if existing is None:
+                    raise
+                await self.session.commit()
+                return existing
+
+            await self.session.commit()
+            return run
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def claim_next(
+        self,
+        *,
+        lease_owner: str,
+        lease_duration: timedelta,
+    ) -> AgentRun | None:
+        try:
+            lease_owner = _required_text("lease_owner", lease_owner, 255)
+            if lease_duration <= timedelta(0):
+                raise ValueError("lease_duration must be positive")
+            now = self.clock()
+            _require_aware_datetime("clock", now)
+            run = await self.session.scalar(
+                select(AgentRun)
+                .where(
+                    AgentRun.status == AgentRunStatus.QUEUED,
+                    AgentRun.available_at <= now,
+                    AgentRun.attempt_count < AgentRun.max_attempts,
+                )
+                .order_by(
+                    AgentRun.available_at.asc(),
+                    AgentRun.created_at.asc(),
+                    AgentRun.id.asc(),
+                )
+                .with_for_update(skip_locked=True)
+                .limit(1)
+            )
+            if run is None:
+                await self.session.commit()
+                return None
+
+            run.status = AgentRunStatus.RUNNING
+            run.attempt_count += 1
+            run.lease_owner = lease_owner
+            run.lease_token = self.lease_token_factory()
+            run.lease_expires_at = now + lease_duration
+            if run.started_at is None:
+                run.started_at = now
+
+            await self.session.commit()
+            return run
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def mark_succeeded(
+        self,
+        *,
+        run_id: UUID,
+        lease_token: UUID,
+        result: AgentResult[AgentOutputT],
+    ) -> AgentRun:
+        try:
+            now = self.clock()
+            run = await self._leased_run(run_id, lease_token, now)
+            if (
+                result.agent_id != run.agent_id
+                or result.prompt_id != run.prompt_id
+                or result.prompt_version != run.prompt_version
+            ):
+                raise AgentRunResultMismatchError
+            provider = _required_text("provider", result.provider, 128)
+            model = _required_text("model", result.model, 255)
+
+            run.status = AgentRunStatus.SUCCEEDED
+            run.result = cast(
+                AgentRunResult,
+                result.output.model_dump(mode="json"),
+            )
+            run.provider = provider
+            run.model = model
+            run.input_tokens = result.usage.input_tokens
+            run.output_tokens = result.usage.output_tokens
+            run.finished_at = now
+            run.error_code = None
+            _clear_lease(run)
+
+            await self.session.commit()
+            return run
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def mark_failed(
+        self,
+        *,
+        run_id: UUID,
+        lease_token: UUID,
+        error_code: str,
+        retryable: bool,
+        retry_delay: timedelta,
+    ) -> AgentRun:
+        try:
+            error_code = _safe_error_code(error_code)
+            if retry_delay < timedelta(0):
+                raise ValueError("retry_delay must not be negative")
+            now = self.clock()
+            run = await self._leased_run(run_id, lease_token, now)
+
+            run.error_code = error_code
+            _clear_lease(run)
+            if retryable and run.attempt_count < run.max_attempts:
+                run.status = AgentRunStatus.QUEUED
+                run.available_at = now + retry_delay
+                run.finished_at = None
+            else:
+                run.status = AgentRunStatus.FAILED
+                run.finished_at = now
+
+            await self.session.commit()
+            return run
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def requeue_expired(self) -> int:
+        try:
+            now = self.clock()
+            _require_aware_datetime("clock", now)
+            runs = list(
+                (
+                    await self.session.scalars(
+                        select(AgentRun)
+                        .where(
+                            AgentRun.status == AgentRunStatus.RUNNING,
+                            AgentRun.lease_expires_at <= now,
+                        )
+                        .order_by(
+                            AgentRun.lease_expires_at.asc(),
+                            AgentRun.id.asc(),
+                        )
+                        .with_for_update(skip_locked=True)
+                    )
+                ).all()
+            )
+            for run in runs:
+                run.error_code = "lease_expired"
+                _clear_lease(run)
+                if run.attempt_count < run.max_attempts:
+                    run.status = AgentRunStatus.QUEUED
+                    run.available_at = now
+                    run.finished_at = None
+                else:
+                    run.status = AgentRunStatus.FAILED
+                    run.finished_at = now
+
+            await self.session.commit()
+            return len(runs)
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def _idempotent_run(
+        self,
+        *,
+        user_id: UUID,
+        agent_id: str,
+        prompt_id: str,
+        prompt_version: str,
+        idempotency_key: str,
+    ) -> AgentRun | None:
+        return await self.session.scalar(
+            select(AgentRun)
+            .where(
+                AgentRun.user_id == user_id,
+                AgentRun.agent_id == agent_id,
+                AgentRun.prompt_id == prompt_id,
+                AgentRun.prompt_version == prompt_version,
+                AgentRun.idempotency_key == idempotency_key,
+            )
+            .execution_options(populate_existing=True)
+        )
+
+    async def _leased_run(
+        self,
+        run_id: UUID,
+        lease_token: UUID,
+        now: datetime,
+    ) -> AgentRun:
+        _require_aware_datetime("clock", now)
+        run = await self.session.scalar(
+            select(AgentRun)
+            .where(
+                AgentRun.id == run_id,
+                AgentRun.status == AgentRunStatus.RUNNING,
+                AgentRun.lease_token == lease_token,
+                AgentRun.lease_expires_at > now,
+            )
+            .with_for_update()
+        )
+        if run is None:
+            raise AgentRunLeaseError
+        return run
+
+
+def _serialize_payload(
+    payload: Mapping[str, PayloadValue],
+) -> AgentRunPayload:
+    if not payload:
+        raise ValueError("payload must contain resource identifiers or versions")
+
+    serialized: AgentRunPayload = {}
+    for key, value in payload.items():
+        normalized_key = key.replace("_", "").lower()
+        if not key or not normalized_key.endswith(("id", "version")):
+            raise ValueError(
+                "payload keys must identify a business resource or version"
+            )
+        if isinstance(value, UUID):
+            serialized[key] = str(value)
+        elif isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise ValueError("payload values must be resource identifiers or versions")
+        elif isinstance(value, int):
+            if value < 1:
+                raise ValueError("payload numeric versions must be at least 1")
+            serialized[key] = value
+        else:
+            serialized[key] = _required_text(f"payload.{key}", value, 255)
+    return serialized
+
+
+def _safe_error_code(error_code: str) -> str:
+    if not _ERROR_CODE_PATTERN.fullmatch(error_code):
+        raise ValueError("error_code must be a safe stable identifier")
+    return error_code
+
+
+def _required_text(name: str, value: str, max_length: int) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{name} must not be empty")
+    if len(normalized) > max_length:
+        raise ValueError(f"{name} must not exceed {max_length} characters")
+    return normalized
+
+
+def _require_aware_datetime(name: str, value: datetime) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{name} must be timezone-aware")
+
+
+def _clear_lease(run: AgentRun) -> None:
+    run.lease_owner = None
+    run.lease_token = None
+    run.lease_expires_at = None

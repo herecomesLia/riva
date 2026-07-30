@@ -1,3 +1,4 @@
+from riva.models.agent_runs import AgentRun, AgentRunStatus
 from riva.models.auth import AuthSession
 from riva.models.profile import (
     CareerProfile,
@@ -12,6 +13,8 @@ from riva.models.roles import CurrentTargetRole, TargetRole
 from riva.models.user import User
 
 __all__ = [
+    "AgentRun",
+    "AgentRunStatus",
     "AuthSession",
     "CareerProfile",
     "CareerProfileEducation",
