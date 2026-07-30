@@ -58,7 +58,7 @@ export function JobDescriptionCard({
             <CardTitle>
               <h3>{t("roles.details.sections.jobDescription")}</h3>
             </CardTitle>
-            {jobDescription.status === "ready" && onEdit && (
+            {(jobDescription.status === "ready" || jobDescription.status === "saved") && onEdit && (
               <Button
                 className="h-9 gap-2 border-primary px-3 text-sm text-primary translate-y-3 hover:bg-primary/10 hover:text-primary"
                 disabled={pending}
@@ -87,6 +87,7 @@ export function JobDescriptionCard({
             synchronizationError={synchronizationError}
           />
         )}
+        {jobDescription.status === "saved" && <SavedState rawText={jobDescription.rawText} />}
         {jobDescription.status === "failed" && (
           <FailedState
             failureReason={jobDescription.parsingFailureReason}
@@ -104,6 +105,21 @@ export function JobDescriptionCard({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function SavedState({ rawText }: { rawText: string }) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col gap-4" data-testid="saved-job-description">
+      <Alert>
+        <AlertTitle>{t("roles.jd.saved.title")}</AlertTitle>
+        <AlertDescription>{t("roles.jd.saved.description")}</AlertDescription>
+      </Alert>
+      <div className="rounded-xl border bg-muted/30 p-4">
+        <p className="whitespace-pre-wrap text-sm leading-6">{rawText}</p>
+      </div>
+    </div>
   )
 }
 

@@ -11,5 +11,10 @@ export class RolesActionError extends Error {
 }
 
 export function getRolesActionErrorCode(error: unknown): RolesActionErrorCode {
-  return error instanceof RolesActionError ? error.code : "requestFailed"
+  if (error instanceof RolesActionError) return error.code
+  if (error instanceof ApiError && error.code === "target_role_version_conflict") {
+    return "versionConflict"
+  }
+  return "requestFailed"
 }
+import { ApiError } from "@/services/api"

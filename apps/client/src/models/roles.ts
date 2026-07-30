@@ -9,7 +9,7 @@ export type TargetRoleExperienceRange = {
   maxYears: number | null
 }
 
-export type JobDescriptionParsingStatus = "missing" | "parsing" | "ready" | "failed"
+export type JobDescriptionParsingStatus = "missing" | "saved" | "parsing" | "ready" | "failed"
 
 export type MissingJobDescription = {
   status: "missing"
@@ -20,6 +20,14 @@ export type MissingJobDescription = {
 
 export type ParsingJobDescription = {
   status: "parsing"
+  rawText: string
+  /** Increments only when the saved JD text changes. */
+  version: number
+  parsingFailureReason: null
+}
+
+export type SavedJobDescription = {
+  status: "saved"
   rawText: string
   /** Increments only when the saved JD text changes. */
   version: number
@@ -43,7 +51,11 @@ export type FailedJobDescription = {
 }
 
 export type JobDescription =
-  MissingJobDescription | ParsingJobDescription | ReadyJobDescription | FailedJobDescription
+  | MissingJobDescription
+  | SavedJobDescription
+  | ParsingJobDescription
+  | ReadyJobDescription
+  | FailedJobDescription
 
 export type QualificationRequirements = {
   education: string[]
@@ -181,6 +193,10 @@ export type TargetRoleWithoutReadyJobDescription = TargetRoleBase &
         jobDescriptionAnalysis: null
       }
     | {
+        jobDescription: SavedJobDescription
+        jobDescriptionAnalysis: null
+      }
+    | {
         jobDescription: FailedJobDescription
         jobDescriptionAnalysis: null
       }
@@ -210,6 +226,28 @@ export type RolesPageResponse = {
    * A non-null ID must identify an unarchived role in `roles`. The current role may be
    * either preparing or paused.
    */
+  currentRoleId: string | null
+  profileContext: ProfileContext
+}
+
+export type TargetRoleApiDto = {
+  id: string
+  title: string
+  company: string | null
+  recruitmentType: TargetRoleRecruitmentType | null
+  location: string | null
+  experienceRange: TargetRoleExperienceRange | null
+  preparationStatus: TargetRolePreparationStatus
+  createdAt: string
+  updatedAt: string
+  version: number
+  jobDescription: MissingJobDescription | SavedJobDescription
+  jobDescriptionAnalysis: null
+  matchingAnalysis: null
+}
+
+export type RolesPageResponseDto = {
+  roles: TargetRoleApiDto[]
   currentRoleId: string | null
   profileContext: ProfileContext
 }

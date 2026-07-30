@@ -78,11 +78,19 @@ export const roles = {
       addTitle: "Paste job description",
       replaceTitle: "Edit or replace job description",
       description: "The first version supports pasted text only. Saving starts structured parsing.",
+      saveOnlyDescription:
+        "Save the original job-description text. Structured parsing is not available yet.",
       fieldLabel: "Job description text",
       placeholder: "Paste the full responsibilities, requirements, and preferred qualifications…",
       required: "Paste the job description text.",
       save: "Save and parse",
+      saveOnly: "Save JD",
       saving: "Saving",
+    },
+    saved: {
+      title: "JD saved",
+      description:
+        "The original text is saved and waiting for structured parsing in a later release.",
     },
     failed: {
       title: "JD parsing did not complete",
@@ -170,6 +178,11 @@ export const roles = {
         missing: {
           title: "Add the job description first",
           description: "Save and parse the JD before comparing it with your profile.",
+        },
+        saved: {
+          title: "JD saved but not parsed",
+          description:
+            "Structured parsing is not available from the current service, so match analysis is unavailable.",
         },
         parsing: {
           title: "Waiting for JD parsing",
@@ -274,6 +287,10 @@ export const roles = {
     missing: {
       label: "Not added",
       description: "No job description has been saved yet.",
+    },
+    saved: {
+      label: "Saved",
+      description: "The original JD is saved and waiting for parsing.",
     },
     parsing: {
       label: "Parsing",

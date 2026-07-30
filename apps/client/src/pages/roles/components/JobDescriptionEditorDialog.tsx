@@ -28,6 +28,7 @@ export function JobDescriptionEditorDialog({
   onSave,
   onSaved,
   open,
+  parsingSupported = true,
   role,
 }: {
   onDirtyChange: (isDirty: boolean) => void
@@ -35,6 +36,7 @@ export function JobDescriptionEditorDialog({
   onSave: (input: SaveTargetRoleJobDescriptionInput) => Promise<void>
   onSaved: () => void
   open: boolean
+  parsingSupported?: boolean
   role: TargetRole | null
 }) {
   const { t } = useTranslation()
@@ -50,7 +52,13 @@ export function JobDescriptionEditorDialog({
                 : "roles.jd.editor.replaceTitle",
             )}
           </DialogTitle>
-          <DialogDescription>{t("roles.jd.editor.description")}</DialogDescription>
+          <DialogDescription>
+            {t(
+              parsingSupported
+                ? "roles.jd.editor.description"
+                : "roles.jd.editor.saveOnlyDescription",
+            )}
+          </DialogDescription>
         </DialogHeader>
         {role && (
           <JobDescriptionEditorForm
@@ -59,6 +67,7 @@ export function JobDescriptionEditorDialog({
             onOpenChange={onOpenChange}
             onSave={onSave}
             onSaved={onSaved}
+            parsingSupported={parsingSupported}
             role={role}
           />
         )}
@@ -72,12 +81,14 @@ function JobDescriptionEditorForm({
   onOpenChange,
   onSave,
   onSaved,
+  parsingSupported,
   role,
 }: {
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
   onSave: (input: SaveTargetRoleJobDescriptionInput) => Promise<void>
   onSaved: () => void
+  parsingSupported: boolean
   role: TargetRole
 }) {
   const { t } = useTranslation()
@@ -150,7 +161,9 @@ function JobDescriptionEditorForm({
           {(isSubmitting) => (
             <Button disabled={isSubmitting} type="submit">
               {isSubmitting && <Spinner data-icon="inline-start" />}
-              {isSubmitting ? t("roles.jd.editor.saving") : t("roles.jd.editor.save")}
+              {isSubmitting
+                ? t("roles.jd.editor.saving")
+                : t(parsingSupported ? "roles.jd.editor.save" : "roles.jd.editor.saveOnly")}
             </Button>
           )}
         </form.Subscribe>

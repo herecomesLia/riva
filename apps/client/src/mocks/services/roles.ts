@@ -23,6 +23,7 @@ import type {
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
+import { ApiError } from "@/services/api"
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -62,7 +63,10 @@ function requireRole(roleId: string) {
 }
 
 function requireCurrentVersion(role: TargetRole, version: number) {
-  if (role.version !== version) throw new Error("Target role version is out of date.")
+  if (role.version !== version) {
+    const body = { error: "target_role_version_conflict" }
+    throw new ApiError(409, body.error, body)
+  }
 }
 
 function replaceRole(role: TargetRole) {

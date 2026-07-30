@@ -28,6 +28,32 @@ export const Parsing = meta.story({
   args: { role: roleFor("roleWithJobDescriptionParsing"), synchronizationError: false },
 })
 
+const savedRole: TargetRole = {
+  ...roleFor("singleRoleWithoutJobDescription"),
+  jobDescription: {
+    parsingFailureReason: null,
+    rawText: "Design and build reliable APIs.",
+    status: "saved",
+    version: 1,
+  },
+  jobDescriptionAnalysis: null,
+  matchingAnalysis: null,
+}
+
+export const Saved = meta.story({
+  args: {
+    onEdit: fn(),
+    role: savedRole,
+    synchronizationError: false,
+  },
+  play: async () => {
+    await expect(screen.getByTestId("saved-job-description")).toHaveTextContent(
+      "Design and build reliable APIs.",
+    )
+    await expect(screen.queryByRole("status")).not.toBeInTheDocument()
+  },
+})
+
 export const SynchronizationError = meta.story({
   args: {
     onRetrySynchronization: fn(),

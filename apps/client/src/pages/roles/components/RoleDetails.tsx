@@ -18,11 +18,11 @@ export type RoleDetailsActions = {
   setCurrent: () => void
   togglePreparationStatus: () => void
   editJobDescription: () => void
-  editJobDescriptionAnalysisModule: (field: JobDescriptionAnalysisModuleField) => void
-  retryJobDescriptionParsing: () => void
-  retryJobDescriptionSynchronization: () => void
-  generateMatchingAnalysis: () => void
-  retryMatchingAnalysisSynchronization: () => void
+  editJobDescriptionAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
+  retryJobDescriptionParsing?: () => void
+  retryJobDescriptionSynchronization?: () => void
+  generateMatchingAnalysis?: () => void
+  retryMatchingAnalysisSynchronization?: () => void
 }
 
 export function RoleDetails({
@@ -35,12 +35,14 @@ export function RoleDetails({
   role,
   jobDescriptionSynchronizationError = false,
   matchingAnalysisSynchronizationError = false,
+  matchingAnalysisAvailable = true,
 }: {
   actions?: RoleDetailsActions
   activeTab: TargetRoleTab
   currentRoleId: string | null
   jobDescriptionSynchronizationError?: boolean
   matchingAnalysisSynchronizationError?: boolean
+  matchingAnalysisAvailable?: boolean
   onTabChange: (tab: TargetRoleTab) => void
   pending?: boolean
   profileContext: ProfileContext
@@ -89,12 +91,14 @@ export function RoleDetails({
               >
                 {t("roles.tabs.jobDescription")}
               </TabsTrigger>
-              <TabsTrigger
-                className="data-active:text-primary data-active:after:bg-primary"
-                value="matching-analysis"
-              >
-                {t("roles.tabs.matchingAnalysis")}
-              </TabsTrigger>
+              {matchingAnalysisAvailable && (
+                <TabsTrigger
+                  className="data-active:text-primary data-active:after:bg-primary"
+                  value="matching-analysis"
+                >
+                  {t("roles.tabs.matchingAnalysis")}
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -111,7 +115,9 @@ export function RoleDetails({
           <TabsContent value="job-description">
             {activeTab === "job-description" && (
               <JobDescriptionCard
-                onEdit={actions?.editJobDescription}
+                onEdit={
+                  role.preparationStatus === "archived" ? undefined : actions?.editJobDescription
+                }
                 onEditAnalysisModule={actions?.editJobDescriptionAnalysisModule}
                 onRetry={actions?.retryJobDescriptionParsing}
                 onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
@@ -121,18 +127,20 @@ export function RoleDetails({
               />
             )}
           </TabsContent>
-          <TabsContent value="matching-analysis">
-            {activeTab === "matching-analysis" && (
-              <MatchingAnalysisCard
-                onGenerate={actions?.generateMatchingAnalysis}
-                onRetrySynchronization={actions?.retryMatchingAnalysisSynchronization}
-                pending={pending}
-                profileContext={profileContext}
-                role={role}
-                synchronizationError={matchingAnalysisSynchronizationError}
-              />
-            )}
-          </TabsContent>
+          {matchingAnalysisAvailable && (
+            <TabsContent value="matching-analysis">
+              {activeTab === "matching-analysis" && (
+                <MatchingAnalysisCard
+                  onGenerate={actions?.generateMatchingAnalysis}
+                  onRetrySynchronization={actions?.retryMatchingAnalysisSynchronization}
+                  pending={pending}
+                  profileContext={profileContext}
+                  role={role}
+                  synchronizationError={matchingAnalysisSynchronizationError}
+                />
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </CardContent>
     </Card>

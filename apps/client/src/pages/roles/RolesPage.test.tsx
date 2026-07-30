@@ -23,10 +23,15 @@ import {
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
+import { ApiError } from "@/services/api"
 import { renderWithProviders } from "@/test/render"
 
 vi.mock("@/services/roles", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/roles")>()),
+  rolesCapabilities: {
+    jobDescriptionAnalysis: true,
+    matchingAnalysis: true,
+  },
   getRolesPage: vi.fn(),
   archiveTargetRole: vi.fn(),
   createTargetRole: vi.fn(),
@@ -224,6 +229,26 @@ describe("RolesPage", () => {
     expect(await screen.findByText(i18n.t("roles.errors.requestFailed"))).toBeInTheDocument()
     expect(queryClient.getQueryData(["roles"])).toEqual(initial)
     expect(screen.queryByText("unsafe internal failure")).not.toBeInTheDocument()
+  })
+
+  it("refetches the complete page after a structured version conflict", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("multipleRoles")
+    const latest = structuredClone(initial)
+    latest.roles[0] = { ...latest.roles[0]!, title: "Updated elsewhere", version: 9 }
+    const otherRole = initial.roles.find((role) => role.id !== initial.currentRoleId)!
+    vi.mocked(getRolesPage).mockResolvedValueOnce(initial).mockResolvedValueOnce(latest)
+    vi.mocked(setCurrentTargetRole).mockRejectedValue(
+      new ApiError(409, "target_role_version_conflict", { error: "target_role_version_conflict" }),
+    )
+    const { queryClient } = renderRolesPage()
+
+    await user.click(await screen.findByRole("button", { name: new RegExp(`^${otherRole.title}`) }))
+    await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.setCurrent") }))
+
+    expect(await screen.findByText(i18n.t("roles.errors.versionConflict"))).toBeInTheDocument()
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(latest))
+    expect(getRolesPage).toHaveBeenCalledTimes(2)
   })
 
   it("automatically synchronizes a parsing JD returned by the initial page request", async () => {

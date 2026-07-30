@@ -53,16 +53,16 @@ export type RolesViewActions = {
   archiveTargetRole: (input: ArchiveTargetRoleInput) => Promise<RolesPageResponse>
   createTargetRole: (input: CreateTargetRoleInput) => Promise<RolesPageResponse>
   deleteTargetRole: (input: DeleteTargetRoleInput) => Promise<RolesPageResponse>
-  generateMatchingAnalysis: (
+  generateMatchingAnalysis?: (
     input: GenerateOrRegenerateMatchingAnalysisInput,
   ) => Promise<RolesPageResponse>
-  retryJobDescriptionParsing: (
+  retryJobDescriptionParsing?: (
     input: StartOrRetryJobDescriptionParsingInput,
   ) => Promise<RolesPageResponse>
-  retryJobDescriptionSynchronization: (
+  retryJobDescriptionSynchronization?: (
     input: GetJobDescriptionParsingStatusInput,
   ) => Promise<RolesPageResponse>
-  retryMatchingAnalysisSynchronization: (
+  retryMatchingAnalysisSynchronization?: (
     input: GetMatchingAnalysisStatusInput,
   ) => Promise<RolesPageResponse>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
@@ -70,7 +70,7 @@ export type RolesViewActions = {
   updateRolePreparationStatus: (
     input: UpdateTargetRolePreparationStatusInput,
   ) => Promise<RolesPageResponse>
-  updateJobDescriptionAnalysisModule: (
+  updateJobDescriptionAnalysisModule?: (
     input: UpdateJobDescriptionAnalysisModuleInput,
   ) => Promise<RolesPageResponse>
   updateTargetRole: (input: UpdateTargetRoleInput) => Promise<RolesPageResponse>
@@ -85,6 +85,7 @@ export type RolesViewProps =
       initialSelectedRoleId?: string
       jobDescriptionSynchronizationErrorRoleIds?: string[]
       matchingAnalysisSynchronizationErrorRoleIds?: string[]
+      matchingAnalysisAvailable?: boolean
     }
   | {
       variant: "error"
@@ -116,6 +117,7 @@ export function RolesView(props: RolesViewProps) {
           matchingAnalysisSynchronizationErrorRoleIds={
             props.matchingAnalysisSynchronizationErrorRoleIds ?? []
           }
+          matchingAnalysisAvailable={props.matchingAnalysisAvailable ?? true}
         />
       )}
     </div>
@@ -129,6 +131,7 @@ function RolesReadyView({
   initialSelectedRoleId,
   jobDescriptionSynchronizationErrorRoleIds,
   matchingAnalysisSynchronizationErrorRoleIds,
+  matchingAnalysisAvailable,
 }: {
   actions?: RolesViewActions
   data: RolesPageResponse
@@ -136,6 +139,7 @@ function RolesReadyView({
   initialSelectedRoleId?: string
   jobDescriptionSynchronizationErrorRoleIds: string[]
   matchingAnalysisSynchronizationErrorRoleIds: string[]
+  matchingAnalysisAvailable: boolean
 }) {
   const { t } = useTranslation()
   const defaultSelectedRoleId =
@@ -145,7 +149,11 @@ function RolesReadyView({
   const [roleCategory, setRoleCategory] = useState<TargetRoleListCategory>(
     initiallySelectedRole?.preparationStatus === "archived" ? "archived" : "saved",
   )
-  const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
+  const [activeTab, setActiveTab] = useState<TargetRoleTab>(
+    initialActiveTab === "matching-analysis" && !matchingAnalysisAvailable
+      ? "overview"
+      : (initialActiveTab ?? "overview"),
+  )
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
   const [jobDescriptionAnalysisEditorField, setJobDescriptionAnalysisEditorField] =
@@ -275,56 +283,79 @@ function RolesReadyView({
                           delete: () => setConfirmation("delete"),
                           edit: () => setEditorMode("edit"),
                           editJobDescription: () => setIsJobDescriptionEditorOpen(true),
-                          editJobDescriptionAnalysisModule: (field) =>
-                            setJobDescriptionAnalysisEditorField(field),
-                          generateMatchingAnalysis: () => {
-                            if (
-                              !data.profileContext.exists ||
-                              !data.profileContext.completed ||
-                              selectedRole.jobDescription.status !== "ready" ||
-                              selectedRole.matchingAnalysis?.status === "generating" ||
-                              selectedRole.matchingAnalysis?.status === "current"
-                            ) {
-                              return
-                            }
-                            void runAction(() =>
-                              actions.generateMatchingAnalysis({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                              }),
-                            )
-                          },
-                          retryJobDescriptionParsing: () => {
-                            if (selectedRole.jobDescription.status !== "failed") return
-                            const jobDescriptionVersion = selectedRole.jobDescription.version
-                            void runAction(() =>
-                              actions.retryJobDescriptionParsing({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                                jobDescriptionVersion,
-                              }),
-                            )
-                          },
-                          retryJobDescriptionSynchronization: () => {
-                            if (selectedRole.jobDescription.status !== "parsing") return
-                            const jobDescriptionVersion = selectedRole.jobDescription.version
-                            void runAction(() =>
-                              actions.retryJobDescriptionSynchronization({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                                jobDescriptionVersion,
-                              }),
-                            )
-                          },
-                          retryMatchingAnalysisSynchronization: () => {
-                            if (selectedRole.matchingAnalysis?.status !== "generating") return
-                            void runAction(() =>
-                              actions.retryMatchingAnalysisSynchronization({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                              }),
-                            )
-                          },
+                          editJobDescriptionAnalysisModule:
+                            actions.updateJobDescriptionAnalysisModule
+                              ? (field) => setJobDescriptionAnalysisEditorField(field)
+                              : undefined,
+                          generateMatchingAnalysis: actions.generateMatchingAnalysis
+                            ? () => {
+                                const generateMatchingAnalysis = actions.generateMatchingAnalysis
+                                if (!generateMatchingAnalysis) return
+                                if (
+                                  !data.profileContext.exists ||
+                                  !data.profileContext.completed ||
+                                  selectedRole.jobDescription.status !== "ready" ||
+                                  selectedRole.matchingAnalysis?.status === "generating" ||
+                                  selectedRole.matchingAnalysis?.status === "current"
+                                ) {
+                                  return
+                                }
+                                void runAction(() =>
+                                  generateMatchingAnalysis({
+                                    roleId: selectedRole.id,
+                                    version: selectedRole.version,
+                                  }),
+                                )
+                              }
+                            : undefined,
+                          retryJobDescriptionParsing: actions.retryJobDescriptionParsing
+                            ? () => {
+                                const retryJobDescriptionParsing =
+                                  actions.retryJobDescriptionParsing
+                                if (!retryJobDescriptionParsing) return
+                                if (selectedRole.jobDescription.status !== "failed") return
+                                const jobDescriptionVersion = selectedRole.jobDescription.version
+                                void runAction(() =>
+                                  retryJobDescriptionParsing({
+                                    roleId: selectedRole.id,
+                                    version: selectedRole.version,
+                                    jobDescriptionVersion,
+                                  }),
+                                )
+                              }
+                            : undefined,
+                          retryJobDescriptionSynchronization:
+                            actions.retryJobDescriptionSynchronization
+                              ? () => {
+                                  const retryJobDescriptionSynchronization =
+                                    actions.retryJobDescriptionSynchronization
+                                  if (!retryJobDescriptionSynchronization) return
+                                  if (selectedRole.jobDescription.status !== "parsing") return
+                                  const jobDescriptionVersion = selectedRole.jobDescription.version
+                                  void runAction(() =>
+                                    retryJobDescriptionSynchronization({
+                                      roleId: selectedRole.id,
+                                      version: selectedRole.version,
+                                      jobDescriptionVersion,
+                                    }),
+                                  )
+                                }
+                              : undefined,
+                          retryMatchingAnalysisSynchronization:
+                            actions.retryMatchingAnalysisSynchronization
+                              ? () => {
+                                  const retryMatchingAnalysisSynchronization =
+                                    actions.retryMatchingAnalysisSynchronization
+                                  if (!retryMatchingAnalysisSynchronization) return
+                                  if (selectedRole.matchingAnalysis?.status !== "generating") return
+                                  void runAction(() =>
+                                    retryMatchingAnalysisSynchronization({
+                                      roleId: selectedRole.id,
+                                      version: selectedRole.version,
+                                    }),
+                                  )
+                                }
+                              : undefined,
                           setCurrent: () =>
                             void runAction(() =>
                               actions.setCurrentTargetRole({
@@ -357,6 +388,7 @@ function RolesReadyView({
                   matchingAnalysisSynchronizationError={matchingAnalysisSynchronizationErrorRoleIds.includes(
                     selectedRole.id,
                   )}
+                  matchingAnalysisAvailable={matchingAnalysisAvailable}
                 />
               ) : (
                 <RolesNoSelectionState />
@@ -390,18 +422,21 @@ function RolesReadyView({
             }}
             onSaved={closeEditor}
             open={isJobDescriptionEditorOpen}
+            parsingSupported={actions.retryJobDescriptionParsing !== undefined}
             role={selectedRole}
           />
-          <JobDescriptionAnalysisEditorDialog
-            field={jobDescriptionAnalysisEditorField}
-            onDirtyChange={handleDirtyChange}
-            onOpenChange={(open) => !open && requestCloseEditor()}
-            onSave={async (input) => {
-              await actions.updateJobDescriptionAnalysisModule(input)
-            }}
-            onSaved={closeEditor}
-            role={selectedRole}
-          />
+          {actions.updateJobDescriptionAnalysisModule && (
+            <JobDescriptionAnalysisEditorDialog
+              field={jobDescriptionAnalysisEditorField}
+              onDirtyChange={handleDirtyChange}
+              onOpenChange={(open) => !open && requestCloseEditor()}
+              onSave={async (input) => {
+                await actions.updateJobDescriptionAnalysisModule?.(input)
+              }}
+              onSaved={closeEditor}
+              role={selectedRole}
+            />
+          )}
         </>
       )}
 

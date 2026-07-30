@@ -452,7 +452,10 @@ describe("roles stateful mock service", () => {
       location: before.location,
       experienceRange: before.experienceRange,
     })
-    const assertion = expect(promise).rejects.toThrow("version is out of date")
+    const assertion = expect(promise).rejects.toMatchObject({
+      code: "target_role_version_conflict",
+      status: 409,
+    })
     await vi.runAllTimersAsync()
     await assertion
 

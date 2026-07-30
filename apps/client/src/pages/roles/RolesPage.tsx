@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect } from "react"
 
 import type { RolesPageResponse } from "@/models/roles"
 import {
@@ -8,12 +9,15 @@ import {
   generateMatchingAnalysis,
   getRolesPage,
   saveJobDescription,
+  rolesCapabilities,
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
   updateRolePreparationStatus,
   updateTargetRole,
 } from "@/services/roles"
+import { ApiError } from "@/services/api"
+import { useAuthStore } from "@/stores/auth"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
 import {
@@ -25,6 +29,7 @@ import { RolesActionError } from "./roles-errors"
 
 export function RolesPage() {
   const queryClient = useQueryClient()
+  const clearCurrentUser = useAuthStore((state) => state.clearCurrentUser)
   const rolesQuery = useQuery({
     queryFn: getRolesPage,
     queryKey: ROLES_QUERY_KEY,
@@ -66,6 +71,14 @@ export function RolesPage() {
   const updateJobDescriptionAnalysisModuleMutation = useMutation({
     mutationFn: updateJobDescriptionAnalysisModule,
   })
+
+  useEffect(() => {
+    if (rolesQuery.error instanceof ApiError && rolesQuery.error.status === 401) {
+      queryClient.clear()
+      clearCurrentUser()
+    }
+  }, [clearCurrentUser, queryClient, rolesQuery.error])
+
   async function runMutation<Input>(
     mutate: (input: Input) => Promise<RolesPageResponse>,
     input: Input,
@@ -73,8 +86,19 @@ export function RolesPage() {
     try {
       return await mutate(input)
     } catch (error) {
+      if (
+        error instanceof ApiError &&
+        (error.code === "target_role_version_conflict" || error.code === "target_role_not_found")
+      ) {
+        await queryClient.refetchQueries({ exact: true, queryKey: ROLES_QUERY_KEY })
+      }
+      if (error instanceof ApiError && error.status === 401) {
+        queryClient.clear()
+        clearCurrentUser()
+        throw error
+      }
       throw new RolesActionError(
-        error instanceof Error && error.message.endsWith("version is out of date.")
+        error instanceof ApiError && error.code === "target_role_version_conflict"
           ? "versionConflict"
           : "requestFailed",
       )
@@ -85,28 +109,34 @@ export function RolesPage() {
     archiveTargetRole: (input) => runMutation(archiveMutation.mutateAsync, input),
     createTargetRole: (input) => runMutation(createMutation.mutateAsync, input),
     deleteTargetRole: (input) => runMutation(deleteMutation.mutateAsync, input),
-    generateMatchingAnalysis: async (input) => {
-      const response = await runMutation(generateMatchingAnalysisMutation.mutateAsync, input)
-      setRolesResponse(response)
-      clearMatchingAnalysisSynchronizationError(input.roleId)
-      return response
-    },
-    retryJobDescriptionParsing: async (input) => {
-      const response = await runMutation(retryJobDescriptionParsingMutation.mutateAsync, input)
-      setRolesResponse(response)
-      clearSynchronizationError(input.roleId)
-      return response
-    },
-    retryJobDescriptionSynchronization: async (input) => {
-      const response = restartSynchronization(input)
-      if (!response) throw new RolesActionError("requestFailed")
-      return response
-    },
-    retryMatchingAnalysisSynchronization: async (input) => {
-      const response = restartMatchingAnalysisSynchronization(input)
-      if (!response) throw new RolesActionError("requestFailed")
-      return response
-    },
+    ...(rolesCapabilities.matchingAnalysis && {
+      generateMatchingAnalysis: async (input) => {
+        const response = await runMutation(generateMatchingAnalysisMutation.mutateAsync, input)
+        setRolesResponse(response)
+        clearMatchingAnalysisSynchronizationError(input.roleId)
+        return response
+      },
+    }),
+    ...(rolesCapabilities.jobDescriptionAnalysis && {
+      retryJobDescriptionParsing: async (input) => {
+        const response = await runMutation(retryJobDescriptionParsingMutation.mutateAsync, input)
+        setRolesResponse(response)
+        clearSynchronizationError(input.roleId)
+        return response
+      },
+      retryJobDescriptionSynchronization: async (input) => {
+        const response = restartSynchronization(input)
+        if (!response) throw new RolesActionError("requestFailed")
+        return response
+      },
+    }),
+    ...(rolesCapabilities.matchingAnalysis && {
+      retryMatchingAnalysisSynchronization: async (input) => {
+        const response = restartMatchingAnalysisSynchronization(input)
+        if (!response) throw new RolesActionError("requestFailed")
+        return response
+      },
+    }),
     saveJobDescription: async (input) => {
       const response = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
       setRolesResponse(response)
@@ -114,15 +144,17 @@ export function RolesPage() {
       return response
     },
     setCurrentTargetRole: (input) => runMutation(setCurrentMutation.mutateAsync, input),
-    updateJobDescriptionAnalysisModule: async (input) => {
-      const response = await runMutation(
-        updateJobDescriptionAnalysisModuleMutation.mutateAsync,
-        input,
-      )
-      setRolesResponse(response)
-      clearMatchingAnalysisSynchronizationError(input.roleId)
-      return response
-    },
+    ...(rolesCapabilities.jobDescriptionAnalysis && {
+      updateJobDescriptionAnalysisModule: async (input) => {
+        const response = await runMutation(
+          updateJobDescriptionAnalysisModuleMutation.mutateAsync,
+          input,
+        )
+        setRolesResponse(response)
+        clearMatchingAnalysisSynchronizationError(input.roleId)
+        return response
+      },
+    }),
     updateRolePreparationStatus: (input) => runMutation(preparationMutation.mutateAsync, input),
     updateTargetRole: (input) => runMutation(updateMutation.mutateAsync, input),
   }
@@ -134,6 +166,7 @@ export function RolesPage() {
         content={{ status: "ready", data: rolesQuery.data }}
         jobDescriptionSynchronizationErrorRoleIds={synchronizationErrorRoleIds}
         matchingAnalysisSynchronizationErrorRoleIds={matchingAnalysisSynchronizationErrorRoleIds}
+        matchingAnalysisAvailable={rolesCapabilities.matchingAnalysis}
         variant="default"
       />
     )
