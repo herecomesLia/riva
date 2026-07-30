@@ -13,6 +13,8 @@ RIVA_ENV_KEYS = [
     "RIVA_LOG_LEVEL",
     "RIVA_LOG_FORMAT",
     "RIVA_DATABASE_URL",
+    "RIVA_LLM_PROVIDER",
+    "RIVA_LLM_MODEL",
     "RIVA_CORS_ALLOWED_ORIGINS",
     "RIVA_CORS_ALLOW_CREDENTIALS",
     "RIVA_SESSION_DIGEST_KEY",
@@ -43,6 +45,8 @@ def test_settings_defaults_with_explicit_database_url(monkeypatch) -> None:
     assert settings.log_level == LogLevel.INFO
     assert settings.log_format == LogFormat.CONSOLE
     assert settings.database_url == "postgresql+asyncpg://user:pass@localhost/db"
+    assert settings.llm_provider is None
+    assert settings.llm_model is None
     assert settings.cors_allowed_origins == []
     assert settings.cors_allow_credentials is True
     assert settings.session_digest_key == "test-session-digest-key"
@@ -71,6 +75,8 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
         "RIVA_DATABASE_URL",
         "postgresql+asyncpg://env_user:env_pass@localhost/env_db",
     )
+    monkeypatch.setenv("RIVA_LLM_PROVIDER", "future-provider")
+    monkeypatch.setenv("RIVA_LLM_MODEL", "future-model")
     monkeypatch.setenv("RIVA_CORS_ALLOWED_ORIGINS", "http://localhost:5173")
     monkeypatch.setenv("RIVA_CORS_ALLOW_CREDENTIALS", "false")
     monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "env-session-digest-key")
@@ -90,6 +96,8 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
     assert settings.database_url == (
         "postgresql+asyncpg://env_user:env_pass@localhost/env_db"
     )
+    assert settings.llm_provider == "future-provider"
+    assert settings.llm_model == "future-model"
     assert settings.cors_allowed_origins == ["http://localhost:5173"]
     assert settings.cors_allow_credentials is False
     assert settings.session_digest_key == "env-session-digest-key"
@@ -148,6 +156,8 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
         log_level=LogLevel.WARNING,
         log_format=LogFormat.JSON,
         database_url="postgresql+asyncpg://write_user:write_pass@localhost/write_db",
+        llm_provider="future-provider",
+        llm_model="future-model",
         cors_allowed_origins=[
             "http://localhost:5173",
             "http://127.0.0.1:5173",
@@ -171,6 +181,8 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
     assert os.environ["RIVA_DATABASE_URL"] == (
         "postgresql+asyncpg://write_user:write_pass@localhost/write_db"
     )
+    assert os.environ["RIVA_LLM_PROVIDER"] == "future-provider"
+    assert os.environ["RIVA_LLM_MODEL"] == "future-model"
     assert os.environ["RIVA_CORS_ALLOWED_ORIGINS"] == (
         "http://localhost:5173,http://127.0.0.1:5173"
     )
@@ -196,6 +208,8 @@ def test_write_environ_round_trips_empty_cors_allowed_origins(monkeypatch) -> No
 
     assert os.environ["RIVA_CORS_ALLOWED_ORIGINS"] == ""
     assert reloaded_settings.cors_allowed_origins == []
+    assert reloaded_settings.llm_provider is None
+    assert reloaded_settings.llm_model is None
     assert reloaded_settings.cors_allow_credentials is True
     assert reloaded_settings.session_digest_key == "test-session-digest-key"
     assert reloaded_settings.session_cookie_name == "riva_session"
