@@ -69,6 +69,7 @@ export const profile = {
   empty: {
     title: "还没有求职档案",
     description: "上传简历后，Riva 会提取初始信息并建立可长期维护的结构化档案。",
+    manualDescription: "手动创建档案后，你可以逐项维护教育、工作、项目经历和技能。",
   },
   sections: {
     education: "教育经历",

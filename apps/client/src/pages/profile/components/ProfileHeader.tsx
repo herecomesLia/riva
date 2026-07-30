@@ -12,7 +12,7 @@ export function ProfileHeader({
   onOpenResume,
   profile,
 }: {
-  onOpenResume: () => void
+  onOpenResume?: () => void
   profile: JobProfile
 }) {
   const { i18n, t } = useTranslation()
@@ -31,14 +31,16 @@ export function ProfileHeader({
         <ProfileCompletenessRing value={profile.completeness.percentage} />
       </div>
 
-      <Button
-        className="max-w-full justify-self-start lg:justify-self-end"
-        onClick={onOpenResume}
-        size="lg"
-      >
-        <UploadIcon data-icon="inline-start" />
-        {profile.resume ? t("profile.actions.updateResume") : t("profile.actions.uploadResume")}
-      </Button>
+      {onOpenResume && (
+        <Button
+          className="max-w-full justify-self-start lg:justify-self-end"
+          onClick={onOpenResume}
+          size="lg"
+        >
+          <UploadIcon data-icon="inline-start" />
+          {profile.resume ? t("profile.actions.updateResume") : t("profile.actions.uploadResume")}
+        </Button>
+      )}
     </header>
   )
 }

@@ -13,11 +13,14 @@ import {
   startUpdatedResumeRecognition,
   uploadInitialResume,
   uploadUpdatedResume,
+  profileCapabilities,
 } from "@/services/profile"
+import { ApiError } from "@/services/api"
 
 import { ProfileView, type ProfileViewActions } from "./ProfileView"
 
 const profileQueryKey = ["profile"] as const
+const rolesQueryKey = ["roles"] as const
 
 type ProfileSynchronizationError = "initialRecognition" | "resumeUpdate"
 
@@ -91,8 +94,20 @@ export function ProfilePage() {
     mutationFn: saveProfileSection,
     onSuccess: async (snapshot) => {
       setSnapshot(snapshot)
-      const cachedSnapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
-      if (cachedSnapshot) await refreshSnapshotBestEffort(cachedSnapshot)
+      if (profileCapabilities.resumeRecognition) {
+        const cachedSnapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
+        if (cachedSnapshot) await refreshSnapshotBestEffort(cachedSnapshot)
+      }
+      await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
+    },
+    onError: async (error) => {
+      if (
+        error instanceof ApiError &&
+        error.status === 409 &&
+        error.code === "profile_version_conflict"
+      ) {
+        await queryClient.invalidateQueries({ queryKey: profileQueryKey })
+      }
     },
   })
   const recognitionMutation = useMutation({
@@ -125,7 +140,10 @@ export function ProfilePage() {
   const manualProfileMutation = useMutation({
     mutationFn: createManualJobProfile,
     onMutate: () => setSynchronizationError(null),
-    onSuccess: setSnapshot,
+    onSuccess: async (snapshot) => {
+      setSnapshot(snapshot)
+      await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
+    },
   })
   const resetInitialImportMutation = useMutation({
     mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) =>
@@ -168,6 +186,7 @@ export function ProfilePage() {
     return (
       <ProfileView
         actions={actions}
+        capabilities={profileCapabilities}
         content={{ status: "ready", data: profileQuery.data, synchronizationError }}
         variant="default"
       />

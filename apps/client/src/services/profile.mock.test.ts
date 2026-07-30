@@ -7,6 +7,7 @@ import {
   getJobProfile,
   getResumeRecognitionStatus,
   getResumeUpdateStatus,
+  profileCapabilities,
   regenerateMatchingAnalysis,
   resetInitialResumeImport,
   saveProfileSection,
@@ -47,6 +48,17 @@ describe("profile mock service", () => {
     expect(settled).toBe(false)
     await vi.advanceTimersByTimeAsync(1)
     await expect(promise).resolves.toEqual(profileResponseMock)
+  })
+
+  it("keeps all existing mock-only profile capabilities enabled", () => {
+    expect(profileCapabilities).toEqual({
+      credentials: true,
+      matchingAnalysis: true,
+      resumeImport: true,
+      resumeRecognition: true,
+      resumeUpdate: true,
+      targetRoles: true,
+    })
   })
 
   it("returns an independent snapshot for every request", async () => {

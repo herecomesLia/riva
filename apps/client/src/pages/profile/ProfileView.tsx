@@ -15,8 +15,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import type {
   JobProfileSnapshot,
+  ProfileCapabilities,
   ResumeUploadInput,
   SaveProfileSectionInput,
 } from "@/models/profile"
@@ -52,6 +54,7 @@ export type ProfileViewProps =
   | { variant: "default"; content: { status: "loading" } }
   | {
       variant: "default"
+      capabilities?: ProfileCapabilities
       content: {
         status: "ready"
         data: JobProfileSnapshot
@@ -59,6 +62,15 @@ export type ProfileViewProps =
       }
       actions: ProfileViewActions
     }
+
+const defaultProfileCapabilities: ProfileCapabilities = {
+  credentials: true,
+  matchingAnalysis: true,
+  resumeImport: true,
+  resumeRecognition: true,
+  resumeUpdate: true,
+  targetRoles: true,
+}
 
 export function ProfileView(props: ProfileViewProps) {
   if (props.variant === "error") {
@@ -72,6 +84,7 @@ export function ProfileView(props: ProfileViewProps) {
   return (
     <ProfileReadyView
       actions={props.actions}
+      capabilities={props.capabilities ?? defaultProfileCapabilities}
       snapshot={props.content.data}
       synchronizationError={props.content.synchronizationError ?? null}
     />
@@ -80,10 +93,12 @@ export function ProfileView(props: ProfileViewProps) {
 
 function ProfileReadyView({
   actions,
+  capabilities,
   snapshot,
   synchronizationError,
 }: {
   actions: ProfileViewActions
+  capabilities: ProfileCapabilities
   snapshot: JobProfileSnapshot
   synchronizationError: "initialRecognition" | "resumeUpdate" | null
 }) {
@@ -180,6 +195,23 @@ function ProfileReadyView({
   }
 
   if (!snapshot.profile) {
+    if (!capabilities.resumeImport) {
+      return (
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <ProfileEmptyState manualOnly />
+          <div>
+            <Button
+              disabled={pendingLifecycleAction}
+              onClick={() => void runLifecycleAction(actions.createManualProfile)}
+            >
+              {t("profile.actions.manualEntry")}
+            </Button>
+          </div>
+          {lifecycleActionError && <ImportError message={lifecycleActionError} />}
+        </div>
+      )
+    }
+
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <ProfileEmptyState />
@@ -237,21 +269,28 @@ function ProfileReadyView({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <ProfileHeader onOpenResume={() => handleResumeDialogOpenChange(true)} profile={profile} />
-      <ProfileResumeDialog
-        importError={resumeImportError}
-        isSubmitting={isImportSubmitting}
-        mode={resumeDialogMode}
-        onModeChange={(mode) => {
-          setResumeDialogMode(mode)
-          setResumeImportError(null)
-        }}
-        onOpenChange={handleResumeDialogOpenChange}
-        onSubmit={submitResumeImport}
-        open={isResumeDialogOpen}
+      <ProfileHeader
+        onOpenResume={
+          capabilities.resumeUpdate ? () => handleResumeDialogOpenChange(true) : undefined
+        }
         profile={profile}
-        resumeUpdate={snapshot.resumeUpdate}
       />
+      {capabilities.resumeUpdate && (
+        <ProfileResumeDialog
+          importError={resumeImportError}
+          isSubmitting={isImportSubmitting}
+          mode={resumeDialogMode}
+          onModeChange={(mode) => {
+            setResumeDialogMode(mode)
+            setResumeImportError(null)
+          }}
+          onOpenChange={handleResumeDialogOpenChange}
+          onSubmit={submitResumeImport}
+          open={isResumeDialogOpen}
+          profile={profile}
+          resumeUpdate={snapshot.resumeUpdate}
+        />
+      )}
 
       {showsInitialImportFeedback && (
         <Alert data-testid="profile-import-success">

@@ -84,7 +84,7 @@ function ProfileSkeletonCard({
   )
 }
 
-export function ProfileEmptyState() {
+export function ProfileEmptyState({ manualOnly = false }: { manualOnly?: boolean }) {
   const { t } = useTranslation()
 
   return (
@@ -94,7 +94,9 @@ export function ProfileEmptyState() {
           <FileUpIcon />
         </EmptyMedia>
         <EmptyTitle>{t("profile.empty.title")}</EmptyTitle>
-        <EmptyDescription>{t("profile.empty.description")}</EmptyDescription>
+        <EmptyDescription>
+          {t(manualOnly ? "profile.empty.manualDescription" : "profile.empty.description")}
+        </EmptyDescription>
       </EmptyHeader>
     </Empty>
   )

@@ -117,6 +117,57 @@ describe("ProfileView", () => {
     ).not.toBeInTheDocument()
   })
 
+  it("offers manual creation and hides resume import when the API lacks resume capabilities", async () => {
+    const user = userEvent.setup()
+    const actions = createActions()
+    renderWithProviders(
+      <ProfileView
+        actions={actions}
+        capabilities={{
+          credentials: false,
+          matchingAnalysis: false,
+          resumeImport: false,
+          resumeRecognition: false,
+          resumeUpdate: false,
+          targetRoles: false,
+        }}
+        content={{ status: "ready", data: createProfileMockSnapshot("noProfile") }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(await screen.findByTestId("profile-empty-state")).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-resume-import-form")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.actions.manualEntry") }))
+    expect(actions.createManualProfile).toHaveBeenCalledOnce()
+  })
+
+  it("hides resume update controls when the API lacks resume capabilities", async () => {
+    const actions = createActions()
+    renderWithProviders(
+      <ProfileView
+        actions={actions}
+        capabilities={{
+          credentials: false,
+          matchingAnalysis: false,
+          resumeImport: false,
+          resumeRecognition: false,
+          resumeUpdate: false,
+          targetRoles: false,
+        }}
+        content={{ status: "ready", data: structuredClone(profileResponseMock) }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    ).not.toBeInTheDocument()
+  })
+
   it("uses the initial-resume action only when no profile exists", async () => {
     const actions = createActions()
     const user = userEvent.setup()

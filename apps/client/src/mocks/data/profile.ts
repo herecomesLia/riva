@@ -32,6 +32,7 @@ function createRecognition(resume: ResumeFile, overrides: Partial<ResumeRecognit
 function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile {
   return {
     profileId: "profile_lin_chen",
+    summary: "Frontend engineer focused on accessible product experiences.",
     status: "active",
     completeness: {
       percentage: 100,
@@ -232,6 +233,7 @@ function createEmptyManualProfileSnapshot(): JobProfileSnapshot {
     resume: null,
     skills: [],
     status: "active",
+    summary: null,
     targetRoles: [],
     updatedAt: "2026-07-11T09:00:00.000Z",
     version: 1,
@@ -274,6 +276,7 @@ function createInitialResumeSnapshot(
     resume,
     skills: [],
     status,
+    summary: null,
     targetRoles: [],
     updatedAt: "2026-07-13T08:00:00.000Z",
     version: 1,

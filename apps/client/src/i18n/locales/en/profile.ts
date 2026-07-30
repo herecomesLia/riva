@@ -78,6 +78,8 @@ export const profile = {
     title: "You do not have a job profile yet",
     description:
       "After you upload a resume, Riva extracts initial information and creates a structured profile you can maintain over time.",
+    manualDescription:
+      "Create a profile manually, then maintain your education, work, projects, and skills.",
   },
   sections: {
     education: "Education",

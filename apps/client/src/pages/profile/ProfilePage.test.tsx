@@ -6,6 +6,7 @@ import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/profile"
 import { ProfilePage } from "@/pages/profile"
+import { ApiError } from "@/services/api"
 import * as profileService from "@/services/profile"
 import { renderWithProviders } from "@/test/render"
 
@@ -15,6 +16,14 @@ vi.mock("@/services/profile", async (importOriginal) => ({
   getJobProfile: vi.fn(),
   getResumeRecognitionStatus: vi.fn(),
   getResumeUpdateStatus: vi.fn(),
+  profileCapabilities: {
+    credentials: true,
+    matchingAnalysis: true,
+    resumeImport: true,
+    resumeRecognition: true,
+    resumeUpdate: true,
+    targetRoles: true,
+  },
   resetInitialResumeImport: vi.fn(),
   saveProfileSection: vi.fn(),
   startInitialResumeRecognition: vi.fn(),
@@ -41,6 +50,14 @@ describe("ProfilePage orchestration", () => {
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
     vi.clearAllMocks()
+    Object.assign(profileService.profileCapabilities, {
+      credentials: true,
+      matchingAnalysis: true,
+      resumeImport: true,
+      resumeRecognition: true,
+      resumeUpdate: true,
+      targetRoles: true,
+    })
   })
 
   it("maps the initial request to loading", async () => {
@@ -55,6 +72,32 @@ describe("ProfilePage orchestration", () => {
     expect(
       await screen.findByText(profileResponseMock.profile!.projectExperiences[0]!.name),
     ).toBeInTheDocument()
+  })
+
+  it("creates a manual profile, updates profile cache, and invalidates roles", async () => {
+    const user = userEvent.setup()
+    const noProfile = createProfileMockSnapshot("noProfile")
+    const manual = createProfileMockSnapshot("emptyManualProfile")
+    Object.assign(profileService.profileCapabilities, {
+      credentials: false,
+      matchingAnalysis: false,
+      resumeImport: false,
+      resumeRecognition: false,
+      resumeUpdate: false,
+      targetRoles: false,
+    })
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(noProfile)
+    vi.mocked(profileService.createManualJobProfile).mockResolvedValue(manual)
+
+    const result = renderPage()
+    const invalidateQueries = vi.spyOn(result.queryClient, "invalidateQueries")
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.manualEntry") }),
+    )
+
+    await waitFor(() => expect(result.queryClient.getQueryData(["profile"])).toEqual(manual))
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["roles"] })
+    expect(screen.queryByTestId("profile-resume-import-form")).not.toBeInTheDocument()
   })
 
   it("moves error through retry loading to ready", async () => {
@@ -450,6 +493,7 @@ describe("ProfilePage orchestration", () => {
     vi.mocked(profileService.saveProfileSection).mockResolvedValue(savedSnapshot)
 
     const result = renderPage()
+    const invalidateQueries = vi.spyOn(result.queryClient, "invalidateQueries")
     const educationCard = await screen.findByTestId("profile-section-education")
     await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
     const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
@@ -463,6 +507,7 @@ describe("ProfilePage orchestration", () => {
       matchingAnalysis: { profileVersion: 7, status: "stale" },
       profile: { matchingAnalysisStale: true, version: 8 },
     })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["roles"] })
   })
 
   it("keeps a successful save successful when its background refresh fails", async () => {
@@ -512,6 +557,42 @@ describe("ProfilePage orchestration", () => {
     await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
     expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
     expect(school).toHaveValue("Unsaved University")
+  })
+
+  it("refetches the latest profile after a structured version conflict", async () => {
+    const user = userEvent.setup()
+    const initial = structuredClone(profileResponseMock)
+    const latest = structuredClone(profileResponseMock)
+    latest.profile!.version += 1
+    latest.profile!.education[0]!.school = "Server Updated University"
+    vi.mocked(profileService.getJobProfile)
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(latest)
+    vi.mocked(profileService.saveProfileSection).mockRejectedValue(
+      new ApiError(409, "profile_version_conflict", {
+        error: "profile_version_conflict",
+      }),
+    )
+
+    const result = renderPage()
+    const educationCard = await screen.findByTestId("profile-section-education")
+    await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
+    const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
+    await user.clear(school)
+    await user.type(school, "Conflicting University")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
+    await waitFor(() => expect(profileService.getJobProfile).toHaveBeenCalledTimes(2))
+    expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
+      profile: {
+        education: expect.arrayContaining([
+          expect.objectContaining({ school: "Server Updated University" }),
+        ]),
+        version: latest.profile!.version,
+      },
+    })
+    expect(school).toHaveValue("Conflicting University")
   })
 
   it("removes an experience after the section mutation succeeds", async () => {

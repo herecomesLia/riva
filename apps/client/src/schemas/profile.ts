@@ -1,6 +1,15 @@
 import { z } from "zod"
 
 import { normalizeBulletItems, normalizeSkillIds } from "@/models/profile-text"
+import type {
+  CareerProfileDto,
+  CareerProfileEducationDto,
+  CareerProfileGetResponseDto,
+  CareerProfileProjectExperienceDto,
+  CareerProfilePutResponseDto,
+  CareerProfileSkillDto,
+  CareerProfileWorkExperienceDto,
+} from "@/models/profile"
 
 export const profileEmploymentTypes = [
   "fullTime",
@@ -95,3 +104,86 @@ export const credentialsSchema = z.object({
     )
     .default([]),
 })
+
+const careerProfileSourceSchema = z.enum(["resumeExtracted", "userEdited", "userAdded"])
+const careerProfileUuidSchema = z.uuid()
+const careerProfileMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+const careerProfileNullableTextSchema = z.string().nullable()
+
+const careerProfileEducationResponseSchema: z.ZodType<CareerProfileEducationDto> = z
+  .object({
+    degree: careerProfileNullableTextSchema,
+    endDate: careerProfileMonthSchema.nullable(),
+    id: careerProfileUuidSchema,
+    isCurrent: z.boolean(),
+    major: careerProfileNullableTextSchema,
+    school: z.string(),
+    source: careerProfileSourceSchema,
+    startDate: careerProfileMonthSchema,
+  })
+  .strict()
+
+const careerProfileWorkExperienceResponseSchema: z.ZodType<CareerProfileWorkExperienceDto> = z
+  .object({
+    achievements: z.array(z.string()),
+    company: z.string(),
+    employmentType: z.enum(profileEmploymentTypes),
+    endDate: careerProfileMonthSchema.nullable(),
+    id: careerProfileUuidSchema,
+    isCurrent: z.boolean(),
+    location: careerProfileNullableTextSchema,
+    responsibilities: z.array(z.string()),
+    skillIds: z.array(careerProfileUuidSchema),
+    source: careerProfileSourceSchema,
+    startDate: careerProfileMonthSchema,
+    title: z.string(),
+  })
+  .strict()
+
+const careerProfileProjectExperienceResponseSchema: z.ZodType<CareerProfileProjectExperienceDto> = z
+  .object({
+    achievements: z.array(z.string()),
+    endDate: careerProfileMonthSchema.nullable(),
+    id: careerProfileUuidSchema,
+    name: z.string(),
+    projectUrl: z.url().nullable(),
+    responsibilities: z.array(z.string()),
+    role: careerProfileNullableTextSchema,
+    skillIds: z.array(careerProfileUuidSchema),
+    source: careerProfileSourceSchema,
+    startDate: careerProfileMonthSchema,
+  })
+  .strict()
+
+const careerProfileSkillResponseSchema: z.ZodType<CareerProfileSkillDto> = z
+  .object({
+    id: careerProfileUuidSchema,
+    name: z.string(),
+    source: careerProfileSourceSchema,
+  })
+  .strict()
+
+const careerProfileResponseSchema: z.ZodType<CareerProfileDto> = z
+  .object({
+    education: z.array(careerProfileEducationResponseSchema),
+    profileId: careerProfileUuidSchema,
+    projectExperiences: z.array(careerProfileProjectExperienceResponseSchema),
+    skills: z.array(careerProfileSkillResponseSchema),
+    summary: careerProfileNullableTextSchema,
+    updatedAt: z.iso.datetime({ offset: true }),
+    version: z.number().int().positive(),
+    workExperiences: z.array(careerProfileWorkExperienceResponseSchema),
+  })
+  .strict()
+
+export const careerProfileGetResponseSchema: z.ZodType<CareerProfileGetResponseDto> = z
+  .object({
+    profile: careerProfileResponseSchema.nullable(),
+  })
+  .strict()
+
+export const careerProfilePutResponseSchema: z.ZodType<CareerProfilePutResponseDto> = z
+  .object({
+    profile: careerProfileResponseSchema,
+  })
+  .strict()

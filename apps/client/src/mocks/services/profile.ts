@@ -91,6 +91,7 @@ function createEmptyProfile(resume: ResumeFile | null, status: JobProfile["statu
     resume,
     skills: [],
     status,
+    summary: null,
     targetRoles: [],
     updatedAt: resume?.uploadedAt ?? "2026-07-13T08:00:00.000Z",
     version: 1,

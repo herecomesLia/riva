@@ -94,6 +94,7 @@ export type TargetRoleSummary = {
 
 export type JobProfile = {
   profileId: string
+  summary: string | null
   status: ProfileStatus
   completeness: ProfileCompleteness
   updatedAt: string
@@ -144,6 +145,100 @@ export type JobProfileSnapshot = {
   recognition: ResumeRecognition | null
   resumeUpdate: ResumeUpdate | null
   matchingAnalysis: MatchingAnalysis | null
+}
+
+export type ProfileCapabilities = {
+  credentials: boolean
+  matchingAnalysis: boolean
+  resumeImport: boolean
+  resumeRecognition: boolean
+  resumeUpdate: boolean
+  targetRoles: boolean
+}
+
+export type CareerProfileEducationInputDto = {
+  id: string
+  school: string
+  degree: string | null
+  major: string | null
+  startDate: string
+  endDate: string | null
+  isCurrent: boolean
+}
+
+export type CareerProfileEducationDto = CareerProfileEducationInputDto & {
+  source: ProfileSource
+}
+
+export type CareerProfileWorkExperienceInputDto = {
+  id: string
+  company: string
+  title: string
+  employmentType: EmploymentType
+  location: string | null
+  startDate: string
+  endDate: string | null
+  isCurrent: boolean
+  responsibilities: string[]
+  achievements: string[]
+  skillIds: string[]
+}
+
+export type CareerProfileWorkExperienceDto = CareerProfileWorkExperienceInputDto & {
+  source: ProfileSource
+}
+
+export type CareerProfileProjectExperienceInputDto = {
+  id: string
+  name: string
+  role: string | null
+  startDate: string
+  endDate: string | null
+  responsibilities: string[]
+  achievements: string[]
+  skillIds: string[]
+  projectUrl: string | null
+}
+
+export type CareerProfileProjectExperienceDto = CareerProfileProjectExperienceInputDto & {
+  source: ProfileSource
+}
+
+export type CareerProfileSkillInputDto = {
+  id: string
+  name: string
+}
+
+export type CareerProfileSkillDto = CareerProfileSkillInputDto & {
+  source: ProfileSource
+}
+
+export type CareerProfileDto = {
+  profileId: string
+  summary: string | null
+  version: number
+  updatedAt: string
+  education: CareerProfileEducationDto[]
+  workExperiences: CareerProfileWorkExperienceDto[]
+  projectExperiences: CareerProfileProjectExperienceDto[]
+  skills: CareerProfileSkillDto[]
+}
+
+export type CareerProfileGetResponseDto = {
+  profile: CareerProfileDto | null
+}
+
+export type CareerProfilePutRequestDto = {
+  version: number | null
+  summary: string | null
+  education: CareerProfileEducationInputDto[]
+  workExperiences: CareerProfileWorkExperienceInputDto[]
+  projectExperiences: CareerProfileProjectExperienceInputDto[]
+  skills: CareerProfileSkillInputDto[]
+}
+
+export type CareerProfilePutResponseDto = {
+  profile: CareerProfileDto
 }
 
 export type ProfileSectionValueMap = {
