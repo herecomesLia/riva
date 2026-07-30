@@ -7,6 +7,7 @@ export const mockLoginCredentials = {
 
 export const userMock: User = {
   avatarFallback: "R",
+  avatarUrl: null,
   displayName: "Riva User",
   id: "local:rivauser",
   username: "rivauser",
