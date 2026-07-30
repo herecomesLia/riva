@@ -4,6 +4,7 @@ import { I18nextProvider } from "react-i18next"
 import { Toaster } from "sonner"
 
 import { applyThemePreference, readThemePreference } from "@/app/theme"
+import { AuthSessionBootstrap } from "@/app/AuthSessionBootstrap"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { i18n } from "@/i18n/i18n"
 import { normalizeLanguagePreference, usePreferencesStore } from "@/stores/preferences"
@@ -60,7 +61,7 @@ export function AppProviders({ children }: AppProvidersProps) {
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          {children}
+          <AuthSessionBootstrap>{children}</AuthSessionBootstrap>
           <Toaster position="top-center" richColors />
         </TooltipProvider>
       </QueryClientProvider>

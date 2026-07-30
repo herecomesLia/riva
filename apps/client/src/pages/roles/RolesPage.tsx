@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
 
+import { useAuthenticationInvalidation } from "@/hooks/use-authentication-invalidation"
 import type { RolesPageResponse } from "@/models/roles"
 import {
   archiveTargetRole,
@@ -17,7 +18,6 @@ import {
   updateTargetRole,
 } from "@/services/roles"
 import { ApiError } from "@/services/api"
-import { useAuthStore } from "@/stores/auth"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
 import {
@@ -29,7 +29,7 @@ import { RolesActionError } from "./roles-errors"
 
 export function RolesPage() {
   const queryClient = useQueryClient()
-  const clearCurrentUser = useAuthStore((state) => state.clearCurrentUser)
+  const invalidateAuthentication = useAuthenticationInvalidation()
   const rolesQuery = useQuery({
     queryFn: getRolesPage,
     queryKey: ROLES_QUERY_KEY,
@@ -73,11 +73,8 @@ export function RolesPage() {
   })
 
   useEffect(() => {
-    if (rolesQuery.error instanceof ApiError && rolesQuery.error.status === 401) {
-      queryClient.clear()
-      clearCurrentUser()
-    }
-  }, [clearCurrentUser, queryClient, rolesQuery.error])
+    invalidateAuthentication(rolesQuery.error)
+  }, [invalidateAuthentication, rolesQuery.error])
 
   async function runMutation<Input>(
     mutate: (input: Input) => Promise<RolesPageResponse>,
@@ -92,11 +89,7 @@ export function RolesPage() {
       ) {
         await queryClient.refetchQueries({ exact: true, queryKey: ROLES_QUERY_KEY })
       }
-      if (error instanceof ApiError && error.status === 401) {
-        queryClient.clear()
-        clearCurrentUser()
-        throw error
-      }
+      if (invalidateAuthentication(error)) throw error
       throw new RolesActionError(
         error instanceof ApiError && error.code === "target_role_version_conflict"
           ? "versionConflict"

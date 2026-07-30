@@ -8,6 +8,7 @@ import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/pro
 import { ProfilePage } from "@/pages/profile"
 import { ApiError } from "@/services/api"
 import * as profileService from "@/services/profile"
+import { useAuthStore } from "@/stores/auth"
 import { renderWithProviders } from "@/test/render"
 
 vi.mock("@/services/profile", async (importOriginal) => ({
@@ -48,6 +49,7 @@ function renderPage() {
 
 describe("ProfilePage orchestration", () => {
   beforeEach(async () => {
+    useAuthStore.getState().clearCurrentUser()
     await i18n.changeLanguage(defaultLanguage)
     vi.clearAllMocks()
     Object.assign(profileService.profileCapabilities, {
@@ -58,6 +60,26 @@ describe("ProfilePage orchestration", () => {
       resumeUpdate: true,
       targetRoles: true,
     })
+  })
+
+  it("clears authentication and user query data after a 401", async () => {
+    useAuthStore.getState().setCurrentUser({
+      avatarFallback: "L",
+      avatarUrl: null,
+      displayName: "Lia",
+      id: "user-1",
+      username: "lia",
+    })
+    vi.mocked(profileService.getJobProfile).mockRejectedValue(
+      new ApiError(401, "not_authenticated", { error: "not_authenticated" }),
+    )
+
+    const result = renderPage()
+    result.queryClient.setQueryData(["roles"], { user: "previous" })
+
+    await waitFor(() => expect(useAuthStore.getState().currentUser).toBeNull())
+    expect(result.queryClient.getQueryData(["roles"])).toBeUndefined()
+    expect(result.queryClient.getQueryData(["profile"])).toBeUndefined()
   })
 
   it("maps the initial request to loading", async () => {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
+import { useAuthenticationInvalidation } from "@/hooks/use-authentication-invalidation"
 import type { JobProfileSnapshot, ResumeUploadInput } from "@/models/profile"
 import {
   createManualJobProfile,
@@ -26,6 +27,7 @@ type ProfileSynchronizationError = "initialRecognition" | "resumeUpdate"
 
 export function ProfilePage() {
   const queryClient = useQueryClient()
+  const invalidateAuthentication = useAuthenticationInvalidation()
   const [synchronizationError, setSynchronizationError] =
     useState<ProfileSynchronizationError | null>(null)
   const profileQuery = useQuery({
@@ -33,6 +35,10 @@ export function ProfilePage() {
     queryKey: profileQueryKey,
     retry: false,
   })
+
+  useEffect(() => {
+    invalidateAuthentication(profileQuery.error)
+  }, [invalidateAuthentication, profileQuery.error])
 
   function setSnapshot(snapshot: JobProfileSnapshot) {
     queryClient.setQueryData(profileQueryKey, snapshot)
@@ -101,6 +107,7 @@ export function ProfilePage() {
       await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
     },
     onError: async (error) => {
+      if (invalidateAuthentication(error)) return
       if (
         error instanceof ApiError &&
         error.status === 409 &&
@@ -144,6 +151,7 @@ export function ProfilePage() {
       setSnapshot(snapshot)
       await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
     },
+    onError: invalidateAuthentication,
   })
   const resetInitialImportMutation = useMutation({
     mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) =>

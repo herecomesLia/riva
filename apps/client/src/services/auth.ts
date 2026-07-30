@@ -1,20 +1,20 @@
 import { env } from "@/app/env"
 import { mockLoginCredentials, userMock } from "@/mocks/data/auth"
 import { waitForMockDelay } from "@/mocks/utils"
-import { LoginError, type AuthenticatedUser, type LoginCredentials, type User } from "@/models/auth"
+import {
+  LoginError,
+  type AuthenticatedUser,
+  type LoginCredentials,
+  type User,
+  type UserAccountDto,
+} from "@/models/auth"
+import { authenticatedUserSchema, userAccountSchema } from "@/schemas/auth"
 import { apiRequest, ApiError } from "@/services/api"
 
 export type { AuthenticatedUser, LoginCredentials, LoginErrorCode } from "@/models/auth"
 export { LoginError, isLoginError } from "@/models/auth"
 
 const authDelayMs = 500
-
-type UserAccountResponse = {
-  avatarUrl: string | null
-  displayName: string
-  id: string
-  username: string
-}
 
 function createUserMockCopy(): User {
   return { ...userMock }
@@ -30,7 +30,7 @@ function deriveAvatarFallback(displayName: string, username: string): string {
   return initials?.toUpperCase() ?? ""
 }
 
-function createUser(account: UserAccountResponse): User {
+function createUser(account: UserAccountDto): User {
   return {
     ...account,
     avatarFallback: deriveAvatarFallback(account.displayName, account.username),
@@ -65,11 +65,16 @@ export async function login(credentials: LoginCredentials): Promise<User> {
   }
 
   try {
-    await apiRequest<AuthenticatedUser>("/auth/login", {
-      json: credentials,
-      method: "POST",
-    })
-    const account = await apiRequest<UserAccountResponse>("/users/me")
+    const identity = authenticatedUserSchema.parse(
+      await apiRequest<unknown>("/auth/login", {
+        json: credentials,
+        method: "POST",
+      }),
+    )
+    const account = userAccountSchema.parse(await apiRequest<unknown>("/users/me"))
+    if (account.id !== identity.id || account.username !== identity.username) {
+      throw new Error("Authenticated identity does not match the current user account.")
+    }
 
     return createUser(account)
   } catch (error) {
@@ -95,7 +100,7 @@ export async function restoreCurrentUser(): Promise<User | null> {
   }
 
   try {
-    const account = await apiRequest<UserAccountResponse>("/users/me")
+    const account = userAccountSchema.parse(await apiRequest<unknown>("/users/me"))
 
     return createUser(account)
   } catch (error) {
@@ -115,5 +120,5 @@ export async function getCurrentAuthUser(): Promise<AuthenticatedUser> {
     return { id, username }
   }
 
-  return apiRequest<AuthenticatedUser>("/auth/me")
+  return authenticatedUserSchema.parse(await apiRequest<unknown>("/auth/me"))
 }

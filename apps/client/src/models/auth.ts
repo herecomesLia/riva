@@ -8,6 +8,8 @@ export type User = {
 
 export type AuthenticatedUser = Pick<User, "id" | "username">
 
+export type UserAccountDto = Pick<User, "id" | "username" | "displayName" | "avatarUrl">
+
 export type LoginCredentials = {
   username: string
   password: string

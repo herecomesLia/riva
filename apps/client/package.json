@@ -13,7 +13,7 @@
     "test": "vitest run --project unit --passWithNoTests",
     "test:api": "vitest run --project api --passWithNoTests",
     "test:mock": "vitest run --project mock --passWithNoTests",
-    "test:storybook": "vitest run --project storybook --passWithNoTests",
+    "test:storybook": "vitest run --project storybook --shard=1/2 --passWithNoTests && vitest run --project storybook --shard=2/2 --passWithNoTests",
     "test:all": "pnpm test && pnpm test:api && pnpm test:mock && pnpm test:storybook",
     "test:watch": "vitest --project unit",
     "test:watch:api": "vitest --project api",

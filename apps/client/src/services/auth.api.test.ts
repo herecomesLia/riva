@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { ZodError } from "zod"
 
 import { getCurrentAuthUser, login, logout, restoreCurrentUser } from "@/services/auth"
 
@@ -13,6 +14,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 describe("auth service API", () => {
   const fetchMock = vi.fn<typeof fetch>()
+  const userId = "11111111-1111-4111-8111-111111111111"
+  const otherUserId = "22222222-2222-4222-8222-222222222222"
 
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock)
@@ -26,7 +29,7 @@ describe("auth service API", () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse({
-          id: "user-1",
+          id: userId,
           username: "lia",
         }),
       )
@@ -34,7 +37,7 @@ describe("auth service API", () => {
         jsonResponse({
           avatarUrl: null,
           displayName: "Lia Chen",
-          id: "user-1",
+          id: userId,
           username: "lia",
         }),
       )
@@ -43,7 +46,7 @@ describe("auth service API", () => {
       avatarFallback: "LC",
       avatarUrl: null,
       displayName: "Lia Chen",
-      id: "user-1",
+      id: userId,
       username: "lia",
     })
 
@@ -100,7 +103,7 @@ describe("auth service API", () => {
       jsonResponse({
         avatarUrl: "https://example.com/avatar.png",
         displayName: "林 雅",
-        id: "user-2",
+        id: otherUserId,
         username: "linya",
       }),
     )
@@ -109,7 +112,7 @@ describe("auth service API", () => {
       avatarFallback: "林雅",
       avatarUrl: "https://example.com/avatar.png",
       displayName: "林 雅",
-      id: "user-2",
+      id: otherUserId,
       username: "linya",
     })
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/users/me")
@@ -125,13 +128,43 @@ describe("auth service API", () => {
   })
 
   it("calls auth/me for the current authentication identity", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "user-1", username: "lia" }))
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: userId, username: "lia" }))
 
     await expect(getCurrentAuthUser()).resolves.toEqual({
-      id: "user-1",
+      id: userId,
       username: "lia",
     })
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/auth/me")
+  })
+
+  it("rejects a users/me account that does not match the login identity", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ id: userId, username: "lia" }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          avatarUrl: null,
+          displayName: "Another User",
+          id: otherUserId,
+          username: "other",
+        }),
+      )
+
+    await expect(login({ password: "correct-password", username: "lia" })).rejects.toMatchObject({
+      code: "unknown",
+    })
+  })
+
+  it("rejects malformed account responses", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        avatarUrl: null,
+        displayName: "",
+        id: "not-a-uuid",
+        username: "lia",
+      }),
+    )
+
+    await expect(restoreCurrentUser()).rejects.toBeInstanceOf(ZodError)
   })
 
   it("handles a successful 204 logout", async () => {
