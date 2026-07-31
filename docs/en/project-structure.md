@@ -82,6 +82,7 @@ apps/server/
 │       ├── schemas/
 │       ├── services/
 │       ├── agents/
+│       ├── workers/
 │       ├── prompts/
 │       └── integrations/
 ├── tests/
@@ -100,5 +101,6 @@ Layer responsibilities:
 - `services/`: business services for resumes, jobs, matching analysis, questions,
   interviews, and review scoring.
 - `agents/`: agents and workflows.
+- `workers/`: AgentRun handlers, registry, lease heartbeats, and queue execution.
 - `prompts/`: prompt templates, scoring rubrics, and output formats.
 - `integrations/`: adapters for LLM providers, object storage, email, and third-party APIs.

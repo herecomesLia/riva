@@ -238,8 +238,29 @@ class AgentRunService:
             await self.session.rollback()
             raise
 
-    async def requeue_expired(self) -> int:
+    async def renew_lease(
+        self,
+        *,
+        run_id: UUID,
+        lease_token: UUID,
+        lease_duration: timedelta,
+    ) -> AgentRun:
         try:
+            if lease_duration <= timedelta(0):
+                raise ValueError("lease_duration must be positive")
+            now = self.clock()
+            run = await self._leased_run(run_id, lease_token, now)
+            run.lease_expires_at = now + lease_duration
+            await self.session.commit()
+            return run
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def requeue_expired(self, *, batch_size: int = 100) -> int:
+        try:
+            if batch_size <= 0:
+                raise ValueError("batch_size must be positive")
             now = self.clock()
             _require_aware_datetime("clock", now)
             runs = list(
@@ -255,6 +276,7 @@ class AgentRunService:
                             AgentRun.id.asc(),
                         )
                         .with_for_update(skip_locked=True)
+                        .limit(batch_size)
                     )
                 ).all()
             )

@@ -67,3 +67,13 @@ def test_mark_failed_rejects_exception_messages_as_error_codes() -> None:
         )
 
     assert session.rollback_count == 1
+
+
+def test_requeue_expired_rejects_invalid_batch_size() -> None:
+    session = ValidationSession()
+    service = AgentRunService(session)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="batch_size must be positive"):
+        asyncio.run(service.requeue_expired(batch_size=0))
+
+    assert session.rollback_count == 1

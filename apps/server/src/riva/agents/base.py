@@ -18,11 +18,12 @@ from riva.prompts import PromptDefinition
 
 AgentInputT = TypeVar("AgentInputT")
 AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
+AgentResultT = TypeVar("AgentResultT", bound=BaseModel, covariant=True)
 
 
 @dataclass(frozen=True)
-class AgentResult(Generic[AgentOutputT]):
-    output: AgentOutputT
+class AgentResult(Generic[AgentResultT]):
+    output: AgentResultT
     agent_id: str
     prompt_id: str
     prompt_version: str
