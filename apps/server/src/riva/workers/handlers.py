@@ -34,3 +34,10 @@ class AgentHandlerRegistry:
             return self._handlers[agent_id]
         except KeyError:
             raise AgentHandlerNotFoundError from None
+
+    def __len__(self) -> int:
+        return len(self._handlers)
+
+    @property
+    def agent_ids(self) -> tuple[str, ...]:
+        return tuple(sorted(self._handlers))

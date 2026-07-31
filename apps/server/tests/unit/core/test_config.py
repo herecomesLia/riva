@@ -15,6 +15,14 @@ RIVA_ENV_KEYS = [
     "RIVA_DATABASE_URL",
     "RIVA_LLM_PROVIDER",
     "RIVA_LLM_MODEL",
+    "RIVA_WORKER_ID",
+    "RIVA_WORKER_LEASE_SECONDS",
+    "RIVA_WORKER_HEARTBEAT_SECONDS",
+    "RIVA_WORKER_POLL_SECONDS",
+    "RIVA_WORKER_REQUEUE_SECONDS",
+    "RIVA_WORKER_RETRY_BASE_SECONDS",
+    "RIVA_WORKER_RETRY_MAX_SECONDS",
+    "RIVA_WORKER_REQUEUE_BATCH_SIZE",
     "RIVA_CORS_ALLOWED_ORIGINS",
     "RIVA_CORS_ALLOW_CREDENTIALS",
     "RIVA_SESSION_DIGEST_KEY",
@@ -47,6 +55,14 @@ def test_settings_defaults_with_explicit_database_url(monkeypatch) -> None:
     assert settings.database_url == "postgresql+asyncpg://user:pass@localhost/db"
     assert settings.llm_provider is None
     assert settings.llm_model is None
+    assert settings.worker_id is None
+    assert settings.worker_lease_seconds == 300
+    assert settings.worker_heartbeat_seconds == 60
+    assert settings.worker_poll_seconds == 1
+    assert settings.worker_requeue_seconds == 60
+    assert settings.worker_retry_base_seconds == 10
+    assert settings.worker_retry_max_seconds == 300
+    assert settings.worker_requeue_batch_size == 100
     assert settings.cors_allowed_origins == []
     assert settings.cors_allow_credentials is True
     assert settings.session_digest_key == "test-session-digest-key"
@@ -77,6 +93,14 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
     )
     monkeypatch.setenv("RIVA_LLM_PROVIDER", "future-provider")
     monkeypatch.setenv("RIVA_LLM_MODEL", "future-model")
+    monkeypatch.setenv("RIVA_WORKER_ID", "env-worker")
+    monkeypatch.setenv("RIVA_WORKER_LEASE_SECONDS", "420")
+    monkeypatch.setenv("RIVA_WORKER_HEARTBEAT_SECONDS", "70")
+    monkeypatch.setenv("RIVA_WORKER_POLL_SECONDS", "2.5")
+    monkeypatch.setenv("RIVA_WORKER_REQUEUE_SECONDS", "80")
+    monkeypatch.setenv("RIVA_WORKER_RETRY_BASE_SECONDS", "15")
+    monkeypatch.setenv("RIVA_WORKER_RETRY_MAX_SECONDS", "240")
+    monkeypatch.setenv("RIVA_WORKER_REQUEUE_BATCH_SIZE", "50")
     monkeypatch.setenv("RIVA_CORS_ALLOWED_ORIGINS", "http://localhost:5173")
     monkeypatch.setenv("RIVA_CORS_ALLOW_CREDENTIALS", "false")
     monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "env-session-digest-key")
@@ -98,6 +122,14 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
     )
     assert settings.llm_provider == "future-provider"
     assert settings.llm_model == "future-model"
+    assert settings.worker_id == "env-worker"
+    assert settings.worker_lease_seconds == 420
+    assert settings.worker_heartbeat_seconds == 70
+    assert settings.worker_poll_seconds == 2.5
+    assert settings.worker_requeue_seconds == 80
+    assert settings.worker_retry_base_seconds == 15
+    assert settings.worker_retry_max_seconds == 240
+    assert settings.worker_requeue_batch_size == 50
     assert settings.cors_allowed_origins == ["http://localhost:5173"]
     assert settings.cors_allow_credentials is False
     assert settings.session_digest_key == "env-session-digest-key"
@@ -158,6 +190,14 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
         database_url="postgresql+asyncpg://write_user:write_pass@localhost/write_db",
         llm_provider="future-provider",
         llm_model="future-model",
+        worker_id="write-worker",
+        worker_lease_seconds=420,
+        worker_heartbeat_seconds=70,
+        worker_poll_seconds=2.5,
+        worker_requeue_seconds=80,
+        worker_retry_base_seconds=15,
+        worker_retry_max_seconds=240,
+        worker_requeue_batch_size=50,
         cors_allowed_origins=[
             "http://localhost:5173",
             "http://127.0.0.1:5173",
@@ -183,6 +223,14 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
     )
     assert os.environ["RIVA_LLM_PROVIDER"] == "future-provider"
     assert os.environ["RIVA_LLM_MODEL"] == "future-model"
+    assert os.environ["RIVA_WORKER_ID"] == "write-worker"
+    assert os.environ["RIVA_WORKER_LEASE_SECONDS"] == "420.0"
+    assert os.environ["RIVA_WORKER_HEARTBEAT_SECONDS"] == "70.0"
+    assert os.environ["RIVA_WORKER_POLL_SECONDS"] == "2.5"
+    assert os.environ["RIVA_WORKER_REQUEUE_SECONDS"] == "80.0"
+    assert os.environ["RIVA_WORKER_RETRY_BASE_SECONDS"] == "15.0"
+    assert os.environ["RIVA_WORKER_RETRY_MAX_SECONDS"] == "240.0"
+    assert os.environ["RIVA_WORKER_REQUEUE_BATCH_SIZE"] == "50"
     assert os.environ["RIVA_CORS_ALLOWED_ORIGINS"] == (
         "http://localhost:5173,http://127.0.0.1:5173"
     )
@@ -210,6 +258,10 @@ def test_write_environ_round_trips_empty_cors_allowed_origins(monkeypatch) -> No
     assert reloaded_settings.cors_allowed_origins == []
     assert reloaded_settings.llm_provider is None
     assert reloaded_settings.llm_model is None
+    assert reloaded_settings.worker_id is None
+    assert reloaded_settings.worker_lease_seconds == 300
+    assert reloaded_settings.worker_heartbeat_seconds == 60
+    assert reloaded_settings.worker_requeue_batch_size == 100
     assert reloaded_settings.cors_allow_credentials is True
     assert reloaded_settings.session_digest_key == "test-session-digest-key"
     assert reloaded_settings.session_cookie_name == "riva_session"
@@ -218,3 +270,67 @@ def test_write_environ_round_trips_empty_cors_allowed_origins(monkeypatch) -> No
     assert reloaded_settings.session_cookie_path == "/"
     assert reloaded_settings.session_idle_timeout_seconds == 604800
     assert reloaded_settings.session_refresh_interval_seconds == 300
+
+
+def test_settings_allows_empty_worker_id_for_cli_generation(monkeypatch) -> None:
+    clear_riva_env(monkeypatch)
+
+    settings = Settings(
+        database_url="postgresql+asyncpg://user:pass@localhost/db",
+        session_digest_key="test-session-digest-key",
+        worker_id="",
+    )
+
+    assert settings.worker_id == ""
+
+
+def test_settings_rejects_heartbeat_not_shorter_than_lease(
+    monkeypatch,
+) -> None:
+    clear_riva_env(monkeypatch)
+
+    with pytest.raises(ValidationError, match="HEARTBEAT_SECONDS"):
+        Settings(
+            database_url="postgresql+asyncpg://user:pass@localhost/db",
+            session_digest_key="test-session-digest-key",
+            worker_lease_seconds=60,
+            worker_heartbeat_seconds=60,
+        )
+
+
+def test_settings_rejects_retry_max_shorter_than_base(monkeypatch) -> None:
+    clear_riva_env(monkeypatch)
+
+    with pytest.raises(ValidationError, match="RETRY_MAX_SECONDS"):
+        Settings(
+            database_url="postgresql+asyncpg://user:pass@localhost/db",
+            session_digest_key="test-session-digest-key",
+            worker_retry_base_seconds=20,
+            worker_retry_max_seconds=10,
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "worker_lease_seconds",
+        "worker_heartbeat_seconds",
+        "worker_poll_seconds",
+        "worker_requeue_seconds",
+        "worker_retry_base_seconds",
+        "worker_retry_max_seconds",
+        "worker_requeue_batch_size",
+    ],
+)
+def test_settings_rejects_non_positive_worker_values(
+    monkeypatch,
+    field: str,
+) -> None:
+    clear_riva_env(monkeypatch)
+
+    with pytest.raises(ValidationError, match=field):
+        Settings(
+            database_url="postgresql+asyncpg://user:pass@localhost/db",
+            session_digest_key="test-session-digest-key",
+            **{field: 0},
+        )

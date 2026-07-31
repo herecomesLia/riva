@@ -35,3 +35,17 @@ docs      文档
 日常改动使用任务分支，并通过正常评审流程合入。
 
 JavaScript/TypeScript 包使用 `pnpm` 管理，Python 服务使用 `uv` 管理。
+
+### 本地 API 与 Worker
+
+先启动 PostgreSQL 并初始化数据库表，再在两个独立终端中运行 API 和 Worker：
+
+```bash
+docker compose -f infra/local/docker-compose.yml up -d postgres
+uv run --directory apps/server riva db setup --env-file "$PWD/.env"
+uv run --directory apps/server riva start --env-file "$PWD/.env"
+uv run --directory apps/server riva worker --env-file "$PWD/.env"
+```
+
+当前 Worker 尚未注册业务 Agent Handler，因此只会轮询数据库队列。JD、匹配和简历
+Handler 将在后续阶段接入。

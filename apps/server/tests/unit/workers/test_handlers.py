@@ -56,3 +56,17 @@ def test_registry_raises_safe_error_for_missing_handler() -> None:
 
     assert exc_info.value.code == "agent_handler_not_found"
     assert exc_info.value.retryable is False
+
+
+def test_registry_observability_is_sorted_and_read_only() -> None:
+    registry = AgentHandlerRegistry()
+    registry.register(Handler("z-agent"))
+    registry.register(Handler("a-agent"))
+
+    agent_ids = registry.agent_ids
+
+    assert len(registry) == 2
+    assert agent_ids == ("a-agent", "z-agent")
+    assert isinstance(agent_ids, tuple)
+    agent_ids += ("external-agent",)
+    assert registry.agent_ids == ("a-agent", "z-agent")

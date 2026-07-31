@@ -80,6 +80,7 @@ apps/server/
 │       ├── schemas/
 │       ├── services/
 │       ├── agents/
+│       ├── workers/
 │       ├── prompts/
 │       └── integrations/
 ├── tests/
@@ -96,5 +97,6 @@ apps/server/
 - `schemas/`：Pydantic 请求和响应结构。
 - `services/`：业务服务，承载简历、岗位、匹配分析、题卡、面试和评分复盘等主要逻辑。
 - `agents/`：Agent 和工作流。
+- `workers/`：AgentRun Handler、注册表、租约心跳和队列执行。
 - `prompts/`：Prompt 模板、评分标准和输出格式要求。
 - `integrations/`：LLM Provider、对象存储、邮件和第三方 API 等外部服务适配。

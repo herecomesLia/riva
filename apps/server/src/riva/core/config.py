@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     database_url: str
     llm_provider: str | None = None
     llm_model: str | None = None
+    worker_id: str | None = None
+    worker_lease_seconds: float = Field(default=300, gt=0)
+    worker_heartbeat_seconds: float = Field(default=60, gt=0)
+    worker_poll_seconds: float = Field(default=1, gt=0)
+    worker_requeue_seconds: float = Field(default=60, gt=0)
+    worker_retry_base_seconds: float = Field(default=10, gt=0)
+    worker_retry_max_seconds: float = Field(default=300, gt=0)
+    worker_requeue_batch_size: int = Field(default=100, gt=0)
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     cors_allow_credentials: bool = True
     session_digest_key: str
@@ -45,7 +53,7 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def validate_cors_credentials(self) -> "Settings":
+    def validate_settings(self) -> "Settings":
         if self.cors_allow_credentials and "*" in self.cors_allowed_origins:
             raise ValueError(
                 "RIVA_CORS_ALLOWED_ORIGINS cannot contain '*' when "
@@ -63,6 +71,18 @@ class Settings(BaseSettings):
             and not self.session_cookie_secure
         ):
             raise ValueError("SameSite=None cookies require RIVA_SESSION_COOKIE_SECURE.")
+        if self.worker_heartbeat_seconds >= self.worker_lease_seconds:
+            raise ValueError(
+                "RIVA_WORKER_HEARTBEAT_SECONDS must be less than "
+                "RIVA_WORKER_LEASE_SECONDS."
+            )
+        if self.worker_retry_max_seconds < self.worker_retry_base_seconds:
+            raise ValueError(
+                "RIVA_WORKER_RETRY_MAX_SECONDS must be greater than or equal to "
+                "RIVA_WORKER_RETRY_BASE_SECONDS."
+            )
+        if self.worker_id and len(self.worker_id.strip()) > 255:
+            raise ValueError("RIVA_WORKER_ID must not exceed 255 characters.")
         return self
 
     def write_environ(self) -> None:
@@ -73,6 +93,24 @@ class Settings(BaseSettings):
         os.environ["RIVA_DATABASE_URL"] = self.database_url
         _write_optional_environ("RIVA_LLM_PROVIDER", self.llm_provider)
         _write_optional_environ("RIVA_LLM_MODEL", self.llm_model)
+        _write_optional_environ("RIVA_WORKER_ID", self.worker_id)
+        os.environ["RIVA_WORKER_LEASE_SECONDS"] = str(self.worker_lease_seconds)
+        os.environ["RIVA_WORKER_HEARTBEAT_SECONDS"] = str(
+            self.worker_heartbeat_seconds
+        )
+        os.environ["RIVA_WORKER_POLL_SECONDS"] = str(self.worker_poll_seconds)
+        os.environ["RIVA_WORKER_REQUEUE_SECONDS"] = str(
+            self.worker_requeue_seconds
+        )
+        os.environ["RIVA_WORKER_RETRY_BASE_SECONDS"] = str(
+            self.worker_retry_base_seconds
+        )
+        os.environ["RIVA_WORKER_RETRY_MAX_SECONDS"] = str(
+            self.worker_retry_max_seconds
+        )
+        os.environ["RIVA_WORKER_REQUEUE_BATCH_SIZE"] = str(
+            self.worker_requeue_batch_size
+        )
         os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(
             self.cors_allowed_origins
         )

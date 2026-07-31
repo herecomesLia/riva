@@ -45,3 +45,18 @@ Daily changes should happen on task branches and merge back through the normal
 review path.
 
 Use `pnpm` for JavaScript and TypeScript packages, and `uv` for Python services.
+
+### Local API and Worker
+
+Start PostgreSQL, initialize the schema, then run the API and Worker in
+separate terminals:
+
+```bash
+docker compose -f infra/local/docker-compose.yml up -d postgres
+uv run --directory apps/server riva db setup --env-file "$PWD/.env"
+uv run --directory apps/server riva start --env-file "$PWD/.env"
+uv run --directory apps/server riva worker --env-file "$PWD/.env"
+```
+
+The Worker currently has no business Agent handlers, so it only polls the
+database queue. JD, matching, and resume handlers will be registered later.
