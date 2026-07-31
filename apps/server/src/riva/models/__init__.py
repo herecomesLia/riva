@@ -1,5 +1,6 @@
 from riva.models.agent_runs import AgentRun, AgentRunStatus
 from riva.models.auth import AuthSession
+from riva.models.job_description_analyses import JobDescriptionAnalysis
 from riva.models.profile import (
     CareerProfile,
     CareerProfileEducation,
@@ -24,6 +25,7 @@ __all__ = [
     "CareerProfileWorkExperience",
     "CareerProfileWorkSkill",
     "CurrentTargetRole",
+    "JobDescriptionAnalysis",
     "TargetRole",
     "User",
 ]

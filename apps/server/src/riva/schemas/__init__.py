@@ -4,6 +4,7 @@ from riva.schemas.health import DependencyHealthStatus, ServiceHealthStatus
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
+    JobDescriptionParsingRunPayload,
     QualificationRequirements,
     RequiredSkillGroups,
 )
@@ -47,6 +48,7 @@ __all__ = [
     "CareerProfileResponse",
     "JobDescriptionParsingInput",
     "JobDescriptionParsingOutput",
+    "JobDescriptionParsingRunPayload",
     "QualificationRequirements",
     "RequiredSkillGroups",
     "ActiveTargetRolePreparationStatus",

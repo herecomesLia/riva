@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -9,6 +9,7 @@ from riva.core.errors import APIError
 from riva.models import (
     CareerProfile,
     CurrentTargetRole,
+    JobDescriptionAnalysis,
     TargetRole,
     User,
 )
@@ -255,6 +256,12 @@ class TargetRoleService:
                 role.raw_job_description = payload.raw_text
                 role.job_description_version = (
                     (role.job_description_version or 0) + 1
+                )
+                role.job_description_parsing_run_id = None
+                await self.session.execute(
+                    delete(JobDescriptionAnalysis).where(
+                        JobDescriptionAnalysis.role_id == role.id
+                    )
                 )
                 role.version += 1
 

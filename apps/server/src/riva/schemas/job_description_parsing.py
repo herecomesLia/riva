@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints
 
@@ -117,3 +118,14 @@ class JobDescriptionParsingInput(BaseModel):
     role_title: RoleTitle
     company: Company
     raw_job_description: RawJobDescription
+
+
+class JobDescriptionParsingRunPayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+    role_id: UUID = Field(alias="roleId")
+    job_description_version: int = Field(alias="jobDescriptionVersion", ge=1)

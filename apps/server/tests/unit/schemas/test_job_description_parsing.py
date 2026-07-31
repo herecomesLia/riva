@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from pydantic import ValidationError
 import pytest
 
@@ -7,6 +9,7 @@ from riva.schemas.job_description_parsing import (
     MAX_JOB_DESCRIPTION_SUMMARY_LENGTH,
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
+    JobDescriptionParsingRunPayload,
 )
 from riva.schemas.roles import MAX_RAW_JOB_DESCRIPTION_LENGTH
 
@@ -194,3 +197,47 @@ def test_input_rejects_unknown_fields() -> None:
                 "role_id": "not-runtime-input",
             }
         )
+
+
+def test_run_payload_validates_aliases_and_serializes_only_references() -> None:
+    role_id = uuid4()
+
+    payload = JobDescriptionParsingRunPayload.model_validate(
+        {"roleId": str(role_id), "jobDescriptionVersion": 3}
+    )
+
+    assert payload.role_id == role_id
+    assert payload.job_description_version == 3
+    assert payload.model_dump(mode="json", by_alias=True) == {
+        "roleId": str(role_id),
+        "jobDescriptionVersion": 3,
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"roleId": "not-a-uuid", "jobDescriptionVersion": 1},
+        {"roleId": str(uuid4()), "jobDescriptionVersion": 0},
+        {
+            "roleId": str(uuid4()),
+            "jobDescriptionVersion": 1,
+            "rawText": "secret JD",
+        },
+        {
+            "roleId": str(uuid4()),
+            "jobDescriptionVersion": 1,
+            "title": "Backend Engineer",
+        },
+        {
+            "roleId": str(uuid4()),
+            "jobDescriptionVersion": 1,
+            "company": "Example",
+        },
+    ],
+)
+def test_run_payload_rejects_invalid_or_non_reference_data(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        JobDescriptionParsingRunPayload.model_validate(payload)

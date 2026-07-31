@@ -20,6 +20,8 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
+    from riva.models.agent_runs import AgentRun
+    from riva.models.job_description_analyses import JobDescriptionAnalysis
     from riva.models.user import User
 
 
@@ -91,6 +93,12 @@ class TargetRole(Base):
     )
     raw_job_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     job_description_version: Mapped[int | None] = mapped_column(nullable=True)
+    job_description_parsing_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     version: Mapped[int] = mapped_column(nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -111,6 +119,15 @@ class TargetRole(Base):
         overlaps="current_target_role,user",
         passive_deletes=True,
         uselist=False,
+    )
+    job_description_analysis: Mapped[JobDescriptionAnalysis | None] = relationship(
+        back_populates="role",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+    job_description_parsing_run: Mapped[AgentRun | None] = relationship(
+        foreign_keys=[job_description_parsing_run_id],
     )
 
 
