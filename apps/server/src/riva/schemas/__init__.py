@@ -1,6 +1,12 @@
 from riva.schemas.auth import AuthCredentials, UserResponse
 from riva.schemas.health import HealthResponse
 from riva.schemas.health import DependencyHealthStatus, ServiceHealthStatus
+from riva.schemas.job_description_parsing import (
+    JobDescriptionParsingInput,
+    JobDescriptionParsingOutput,
+    QualificationRequirements,
+    RequiredSkillGroups,
+)
 from riva.schemas.profile import (
     CareerProfileGetResponse,
     CareerProfilePutRequest,
@@ -39,6 +45,10 @@ __all__ = [
     "CareerProfilePutRequest",
     "CareerProfilePutResponse",
     "CareerProfileResponse",
+    "JobDescriptionParsingInput",
+    "JobDescriptionParsingOutput",
+    "QualificationRequirements",
+    "RequiredSkillGroups",
     "ActiveTargetRolePreparationStatus",
     "ArchiveTargetRoleRequest",
     "CreateTargetRoleRequest",

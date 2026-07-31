@@ -6,6 +6,7 @@ from riva.prompts.base import (
     PromptRenderError,
     RenderedPrompt,
 )
+from riva.prompts.job_description_parsing import JOB_DESCRIPTION_PARSING_PROMPT_V1
 
 __all__ = [
     "DuplicatePromptError",
@@ -14,4 +15,5 @@ __all__ = [
     "PromptRegistry",
     "PromptRenderError",
     "RenderedPrompt",
+    "JOB_DESCRIPTION_PARSING_PROMPT_V1",
 ]
