@@ -83,13 +83,7 @@ class QwenProvider:
         request: StructuredGenerationRequest[StructuredOutputT],
     ) -> LLMResponse[StructuredOutputT]:
         schema = request.output_schema.model_json_schema()
-        messages = _messages(request.messages)
-        messages.append(
-            {
-                "role": "system",
-                "content": _structured_output_instruction(schema),
-            }
-        )
+        messages = _structured_messages(request.messages, schema)
         body: dict[str, object] = {
             "model": request.model,
             "messages": messages,
@@ -187,6 +181,27 @@ def _messages(messages: tuple[LLMMessage, ...]) -> list[dict[str, str]]:
         {"role": message.role.value, "content": message.content}
         for message in messages
     ]
+
+
+def _structured_messages(
+    messages: tuple[LLMMessage, ...],
+    schema: object,
+) -> list[dict[str, str]]:
+    result = _messages(messages)
+    insertion_index = 0
+    while (
+        insertion_index < len(result)
+        and result[insertion_index]["role"] == "system"
+    ):
+        insertion_index += 1
+    result.insert(
+        insertion_index,
+        {
+            "role": "system",
+            "content": _structured_output_instruction(schema),
+        },
+    )
+    return result
 
 
 def _apply_parameters(

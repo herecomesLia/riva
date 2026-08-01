@@ -236,11 +236,15 @@ def test_structured_request_adds_schema_without_mutating_business_messages() -> 
     assert body["top_p"] == 0.9
     messages = body["messages"]
     assert isinstance(messages, list)
-    assert messages[:2] == [
-        {"role": "system", "content": "Business prompt v1."},
-        {"role": "user", "content": "Private JD data."},
-    ]
-    provider_message = messages[2]
+    assert messages[0] == {
+        "role": "system",
+        "content": "Business prompt v1.",
+    }
+    provider_message = messages[1]
+    assert messages[2] == {
+        "role": "user",
+        "content": "Private JD data.",
+    }
     assert provider_message["role"] == "system"
     assert "valid JSON" in provider_message["content"]
     assert "JSON Schema" in provider_message["content"]
@@ -248,6 +252,69 @@ def test_structured_request_adds_schema_without_mutating_business_messages() -> 
     assert result.content == ExampleOutput(name="Python", score=95)
     assert result.usage.input_tokens == 0
     assert result.usage.output_tokens == 0
+
+
+@pytest.mark.parametrize(
+    ("original_messages", "provider_index", "expected_roles"),
+    [
+        (
+            (LLMMessage(role=MessageRole.USER, content="JD data."),),
+            0,
+            ["system", "user"],
+        ),
+        (
+            (
+                LLMMessage(role=MessageRole.SYSTEM, content="System one."),
+                LLMMessage(role=MessageRole.SYSTEM, content="System two."),
+                LLMMessage(role=MessageRole.USER, content="JD data."),
+            ),
+            2,
+            ["system", "system", "system", "user"],
+        ),
+    ],
+)
+def test_structured_constraint_follows_all_leading_system_messages(
+    original_messages: tuple[LLMMessage, ...],
+    provider_index: int,
+    expected_roles: list[str],
+) -> None:
+    captured_bodies: list[dict[str, object]] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        captured_bodies.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json=response(content='{"name":"Python","score":95}'),
+        )
+
+    request = StructuredGenerationRequest(
+        model="qwen-test-model",
+        messages=original_messages,
+        output_schema=ExampleOutput,
+    )
+    original_snapshot = tuple(original_messages)
+
+    asyncio.run(provider(handle).generate_structured(request))
+
+    sent_messages = captured_bodies[0]["messages"]
+    assert isinstance(sent_messages, list)
+    assert [message["role"] for message in sent_messages] == expected_roles
+    provider_message = sent_messages[provider_index]
+    assert provider_message["role"] == "system"
+    assert "JSON" in provider_message["content"]
+    assert "JSON Schema" in provider_message["content"]
+    assert '"score"' in provider_message["content"]
+    assert request.messages == original_snapshot
+    assert request.messages is original_messages
+    sent_original_messages = [
+        message
+        for index, message in enumerate(sent_messages)
+        if index != provider_index
+    ]
+    assert sent_original_messages == [
+        {"role": message.role.value, "content": message.content}
+        for message in original_messages
+    ]
 
 
 @pytest.mark.parametrize(
