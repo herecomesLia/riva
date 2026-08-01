@@ -14,6 +14,7 @@ from riva.integrations.llm import (
     TextGenerationRequest,
     validate_structured_output,
 )
+from riva.integrations.qwen import QwenProvider, build_llm_provider
 
 __all__ = [
     "GenerationParameters",
@@ -27,7 +28,9 @@ __all__ = [
     "MessageRole",
     "ProviderRateLimitedError",
     "ProviderUnavailableError",
+    "QwenProvider",
     "StructuredGenerationRequest",
     "TextGenerationRequest",
     "validate_structured_output",
+    "build_llm_provider",
 ]

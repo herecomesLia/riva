@@ -2,7 +2,7 @@ from enum import StrEnum
 import os
 from typing import Annotated
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from riva.core.logging import LogFormat, LogLevel
@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     database_url: str
     llm_provider: str | None = None
     llm_model: str | None = None
+    llm_api_key: SecretStr | None = None
+    llm_base_url: str | None = None
+    llm_timeout_seconds: float = Field(default=60, gt=0)
+    llm_enable_thinking: bool = False
     worker_id: str | None = None
     worker_lease_seconds: float = Field(default=300, gt=0)
     worker_heartbeat_seconds: float = Field(default=60, gt=0)
@@ -93,6 +97,12 @@ class Settings(BaseSettings):
         os.environ["RIVA_DATABASE_URL"] = self.database_url
         _write_optional_environ("RIVA_LLM_PROVIDER", self.llm_provider)
         _write_optional_environ("RIVA_LLM_MODEL", self.llm_model)
+        _write_optional_secret_environ("RIVA_LLM_API_KEY", self.llm_api_key)
+        _write_optional_environ("RIVA_LLM_BASE_URL", self.llm_base_url)
+        os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.llm_timeout_seconds)
+        os.environ["RIVA_LLM_ENABLE_THINKING"] = str(
+            self.llm_enable_thinking
+        ).lower()
         _write_optional_environ("RIVA_WORKER_ID", self.worker_id)
         os.environ["RIVA_WORKER_LEASE_SECONDS"] = str(self.worker_lease_seconds)
         os.environ["RIVA_WORKER_HEARTBEAT_SECONDS"] = str(
@@ -139,3 +149,10 @@ def _write_optional_environ(name: str, value: str | None) -> None:
         os.environ.pop(name, None)
     else:
         os.environ[name] = value
+
+
+def _write_optional_secret_environ(name: str, value: SecretStr | None) -> None:
+    if value is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = value.get_secret_value()

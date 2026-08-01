@@ -15,6 +15,10 @@ RIVA_ENV_KEYS = [
     "RIVA_DATABASE_URL",
     "RIVA_LLM_PROVIDER",
     "RIVA_LLM_MODEL",
+    "RIVA_LLM_API_KEY",
+    "RIVA_LLM_BASE_URL",
+    "RIVA_LLM_TIMEOUT_SECONDS",
+    "RIVA_LLM_ENABLE_THINKING",
     "RIVA_WORKER_ID",
     "RIVA_WORKER_LEASE_SECONDS",
     "RIVA_WORKER_HEARTBEAT_SECONDS",
@@ -55,6 +59,10 @@ def test_settings_defaults_with_explicit_database_url(monkeypatch) -> None:
     assert settings.database_url == "postgresql+asyncpg://user:pass@localhost/db"
     assert settings.llm_provider is None
     assert settings.llm_model is None
+    assert settings.llm_api_key is None
+    assert settings.llm_base_url is None
+    assert settings.llm_timeout_seconds == 60
+    assert settings.llm_enable_thinking is False
     assert settings.worker_id is None
     assert settings.worker_lease_seconds == 300
     assert settings.worker_heartbeat_seconds == 60
@@ -93,6 +101,10 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
     )
     monkeypatch.setenv("RIVA_LLM_PROVIDER", "future-provider")
     monkeypatch.setenv("RIVA_LLM_MODEL", "future-model")
+    monkeypatch.setenv("RIVA_LLM_API_KEY", "environment-test-key")
+    monkeypatch.setenv("RIVA_LLM_BASE_URL", "https://llm.example/v1")
+    monkeypatch.setenv("RIVA_LLM_TIMEOUT_SECONDS", "45")
+    monkeypatch.setenv("RIVA_LLM_ENABLE_THINKING", "true")
     monkeypatch.setenv("RIVA_WORKER_ID", "env-worker")
     monkeypatch.setenv("RIVA_WORKER_LEASE_SECONDS", "420")
     monkeypatch.setenv("RIVA_WORKER_HEARTBEAT_SECONDS", "70")
@@ -122,6 +134,11 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
     )
     assert settings.llm_provider == "future-provider"
     assert settings.llm_model == "future-model"
+    assert settings.llm_api_key is not None
+    assert settings.llm_api_key.get_secret_value() == "environment-test-key"
+    assert settings.llm_base_url == "https://llm.example/v1"
+    assert settings.llm_timeout_seconds == 45
+    assert settings.llm_enable_thinking is True
     assert settings.worker_id == "env-worker"
     assert settings.worker_lease_seconds == 420
     assert settings.worker_heartbeat_seconds == 70
@@ -190,6 +207,10 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
         database_url="postgresql+asyncpg://write_user:write_pass@localhost/write_db",
         llm_provider="future-provider",
         llm_model="future-model",
+        llm_api_key="write-test-key",
+        llm_base_url="https://llm.example/v1",
+        llm_timeout_seconds=45,
+        llm_enable_thinking=True,
         worker_id="write-worker",
         worker_lease_seconds=420,
         worker_heartbeat_seconds=70,
@@ -223,6 +244,10 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
     )
     assert os.environ["RIVA_LLM_PROVIDER"] == "future-provider"
     assert os.environ["RIVA_LLM_MODEL"] == "future-model"
+    assert os.environ["RIVA_LLM_API_KEY"] == "write-test-key"
+    assert os.environ["RIVA_LLM_BASE_URL"] == "https://llm.example/v1"
+    assert os.environ["RIVA_LLM_TIMEOUT_SECONDS"] == "45.0"
+    assert os.environ["RIVA_LLM_ENABLE_THINKING"] == "true"
     assert os.environ["RIVA_WORKER_ID"] == "write-worker"
     assert os.environ["RIVA_WORKER_LEASE_SECONDS"] == "420.0"
     assert os.environ["RIVA_WORKER_HEARTBEAT_SECONDS"] == "70.0"
@@ -258,6 +283,10 @@ def test_write_environ_round_trips_empty_cors_allowed_origins(monkeypatch) -> No
     assert reloaded_settings.cors_allowed_origins == []
     assert reloaded_settings.llm_provider is None
     assert reloaded_settings.llm_model is None
+    assert reloaded_settings.llm_api_key is None
+    assert reloaded_settings.llm_base_url is None
+    assert reloaded_settings.llm_timeout_seconds == 60
+    assert reloaded_settings.llm_enable_thinking is False
     assert reloaded_settings.worker_id is None
     assert reloaded_settings.worker_lease_seconds == 300
     assert reloaded_settings.worker_heartbeat_seconds == 60
