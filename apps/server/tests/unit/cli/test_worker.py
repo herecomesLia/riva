@@ -6,11 +6,18 @@ import riva.cli.worker as worker_module
 from riva.cli.main import app
 from riva.core.config import Settings
 from riva.core.logging import LogFormat, LogLevel
+from riva.integrations import LLMProviderConfigurationError
 
 
 WORKER_ENV_KEYS = [
     "RIVA_DATABASE_URL",
     "RIVA_SESSION_DIGEST_KEY",
+    "RIVA_LLM_PROVIDER",
+    "RIVA_LLM_MODEL",
+    "RIVA_LLM_API_KEY",
+    "RIVA_LLM_BASE_URL",
+    "RIVA_LLM_TIMEOUT_SECONDS",
+    "RIVA_LLM_ENABLE_THINKING",
     "RIVA_WORKER_ID",
     "RIVA_WORKER_LEASE_SECONDS",
     "RIVA_WORKER_HEARTBEAT_SECONDS",
@@ -157,6 +164,81 @@ def test_worker_runtime_error_has_safe_nonzero_exit(monkeypatch) -> None:
     assert "Worker failed. See logs for details." in result.output
     assert "private payload" not in result.output
     assert "secret:password" not in result.output
+
+
+def test_worker_with_complete_qwen_configuration_enters_run_worker(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    runner = CliRunner()
+    clear_worker_env(monkeypatch)
+    settings_seen: list[Settings] = []
+    api_key = "cli-qwen-test-api-key"
+    env_file = tmp_path / "qwen-worker.env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "RIVA_DATABASE_URL=postgresql+asyncpg://worker:test@localhost/db",
+                "RIVA_SESSION_DIGEST_KEY=worker-session-key",
+                "RIVA_LLM_PROVIDER=qwen",
+                "RIVA_LLM_MODEL=qwen-test-model",
+                f"RIVA_LLM_API_KEY={api_key}",
+                "RIVA_LLM_BASE_URL=https://example.invalid/compatible-mode/v1",
+            ]
+        )
+    )
+
+    async def fake_run_worker(settings: Settings) -> None:
+        settings_seen.append(settings)
+
+    monkeypatch.setattr(worker_module, "run_worker", fake_run_worker)
+    monkeypatch.setattr(worker_module, "configure_logging", lambda *_args: None)
+
+    result = runner.invoke(
+        app,
+        ["worker", "--env-file", str(env_file)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert len(settings_seen) == 1
+    assert settings_seen[0].llm_provider == "qwen"
+    assert settings_seen[0].llm_model == "qwen-test-model"
+    assert settings_seen[0].llm_api_key is not None
+    assert settings_seen[0].llm_api_key.get_secret_value() == api_key
+    assert api_key not in result.output
+
+
+def test_worker_provider_configuration_error_has_safe_nonzero_exit(
+    monkeypatch,
+) -> None:
+    runner = CliRunner()
+    clear_worker_env(monkeypatch)
+    api_key = "cli-private-api-key"
+    monkeypatch.setenv(
+        "RIVA_DATABASE_URL",
+        "postgresql+asyncpg://worker:test@localhost/db",
+    )
+    monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "worker-session-key")
+    monkeypatch.setenv("RIVA_LLM_PROVIDER", "qwen")
+    monkeypatch.setenv("RIVA_LLM_MODEL", "qwen-test-model")
+    monkeypatch.setenv("RIVA_LLM_API_KEY", api_key)
+    monkeypatch.setenv(
+        "RIVA_LLM_BASE_URL",
+        "https://example.invalid/v1?private=value",
+    )
+    monkeypatch.setattr(worker_module, "configure_logging", lambda *_args: None)
+
+    async def failing_worker(_settings: Settings) -> None:
+        raise LLMProviderConfigurationError
+
+    monkeypatch.setattr(worker_module, "run_worker", failing_worker)
+
+    result = runner.invoke(app, ["worker"])
+
+    assert result.exit_code == 1
+    assert result.output.strip() == "Worker failed. See logs for details."
+    assert api_key not in result.output
+    assert "private=value" not in result.output
 
 
 def test_worker_keyboard_interrupt_exits_normally(monkeypatch) -> None:

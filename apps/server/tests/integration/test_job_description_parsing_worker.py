@@ -12,6 +12,7 @@ from riva.agents import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
 )
+from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import (
     LLMProviderConfigurationError,
@@ -33,6 +34,7 @@ from riva.workers import (
     AgentHandlerRegistry,
     AgentWorker,
     JobDescriptionParsingHandler,
+    build_agent_handler_registry,
 )
 from tests.helpers.llm import FakeLLMProvider
 
@@ -156,6 +158,7 @@ async def setup_parsing(
     provider: FakeLLMProvider,
     *,
     mismatched_agent: bool = False,
+    registry: AgentHandlerRegistry | None = None,
 ) -> ParsingSetup:
     user_id = uuid4()
     role = TargetRole(
@@ -187,18 +190,25 @@ async def setup_parsing(
         stored_role.job_description_parsing_run_id = run.id
         await session.commit()
 
-    agent_type = (
-        MismatchedResultAgent
-        if mismatched_agent
-        else JobDescriptionParsingAgent
-    )
-    agent = agent_type(provider, model="fake-jd-model")
-    handler = JobDescriptionParsingHandler(
-        session_factory=database.sessionmaker,
-        agent=agent,
-    )
-    registry = AgentHandlerRegistry()
-    registry.register(handler)
+    if registry is None:
+        agent_type = (
+            MismatchedResultAgent
+            if mismatched_agent
+            else JobDescriptionParsingAgent
+        )
+        agent = agent_type(provider, model="fake-jd-model")
+        handler = JobDescriptionParsingHandler(
+            session_factory=database.sessionmaker,
+            agent=agent,
+        )
+        registry = AgentHandlerRegistry()
+        registry.register(handler)
+    else:
+        if mismatched_agent:
+            raise ValueError("custom registry cannot use a mismatched agent")
+        registered = registry.get("job-description-parser")
+        assert isinstance(registered, JobDescriptionParsingHandler)
+        handler = registered
     worker = AgentWorker(
         worker_id="jd-integration-worker",
         session_factory=database.sessionmaker,
@@ -261,6 +271,74 @@ def test_job_description_parsing_worker_success_chain() -> None:
                 assert "<BEGIN_UNTRUSTED_JOB_DESCRIPTION>" in (
                     request.messages[1].content
                 )
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_production_registry_runs_job_description_parsing_chain() -> None:
+    async def run_test() -> None:
+        provider = FakeLLMProvider(
+            [structured_output()],
+            provider="fake-production-provider",
+            usage=LLMUsage(input_tokens=90, output_tokens=35),
+        )
+        provider_calls: list[Settings] = []
+        test_database_url = database_url()
+        async with Database(test_database_url) as database:
+            await database.reset()
+            try:
+                current = Settings(
+                    database_url=test_database_url,
+                    session_digest_key="integration-session-key",
+                    llm_provider="qwen",
+                    llm_model="  fake-jd-model  ",
+                    llm_api_key="integration-fake-key",
+                    llm_base_url="https://example.invalid/v1",
+                )
+
+                def provider_factory(received: Settings):
+                    provider_calls.append(received)
+                    return provider
+
+                registry = build_agent_handler_registry(
+                    current,
+                    database.sessionmaker,
+                    provider_factory=provider_factory,
+                )
+                assert registry.agent_ids == ("job-description-parser",)
+
+                setup = await setup_parsing(
+                    database,
+                    provider,
+                    registry=registry,
+                )
+                assert await setup.worker.process_one() is True
+
+                async with database.sessionmaker() as session:
+                    stored_run = await session.get(AgentRun, setup.run.id)
+                    analysis = await session.get(
+                        JobDescriptionAnalysis,
+                        setup.role.id,
+                    )
+                    stored_role = await session.get(TargetRole, setup.role.id)
+
+                    assert stored_run is not None
+                    assert stored_run.status is AgentRunStatus.SUCCEEDED
+                    assert stored_run.provider == "fake-production-provider"
+                    assert stored_run.model == "fake-jd-model"
+                    assert stored_run.input_tokens == 90
+                    assert stored_run.output_tokens == 35
+                    assert stored_run.result == structured_output()
+                    assert analysis is not None
+                    assert analysis.source_agent_run_id == setup.run.id
+                    assert stored_role is not None
+                    assert stored_role.version == 2
+
+                assert provider_calls == [current]
+                assert len(provider.calls) == 1
+                assert provider.calls[0].model == "fake-jd-model"
             finally:
                 await database.reset()
 

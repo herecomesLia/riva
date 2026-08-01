@@ -8,21 +8,58 @@ from typing import Any
 
 import structlog
 
+from riva.agents import JobDescriptionParsingAgent
 from riva.core.config import Settings
 from riva.db import Database
+from riva.integrations import (
+    LLMProvider,
+    LLMProviderConfigurationError,
+    build_llm_provider,
+)
 from riva.workers.handlers import AgentHandlerRegistry
-from riva.workers.runtime import AgentWorker
+from riva.workers.job_description_parsing import (
+    JobDescriptionParsingHandler,
+)
+from riva.workers.runtime import AgentWorker, SessionFactory
 
 
 DatabaseFactory = Callable[[str], Database]
-RegistryFactory = Callable[[Settings], AgentHandlerRegistry]
+ProviderFactory = Callable[[Settings], LLMProvider | None]
+AgentFactory = Callable[..., JobDescriptionParsingAgent]
+HandlerFactory = Callable[..., JobDescriptionParsingHandler]
+RegistryFactory = Callable[
+    [Settings, SessionFactory],
+    AgentHandlerRegistry,
+]
 WorkerFactory = Callable[..., AgentWorker]
 SignalCallback = Callable[[signal.Signals], None]
 SignalRegistrar = Callable[[SignalCallback], Callable[[], None]]
 
 
-def build_agent_handler_registry(_settings: Settings) -> AgentHandlerRegistry:
-    return AgentHandlerRegistry()
+def build_agent_handler_registry(
+    settings: Settings,
+    session_factory: SessionFactory,
+    *,
+    provider_factory: ProviderFactory = build_llm_provider,
+    agent_factory: AgentFactory = JobDescriptionParsingAgent,
+    handler_factory: HandlerFactory = JobDescriptionParsingHandler,
+) -> AgentHandlerRegistry:
+    registry = AgentHandlerRegistry()
+    provider = provider_factory(settings)
+    if provider is None:
+        return registry
+
+    model = (settings.llm_model or "").strip()
+    if not model:
+        raise LLMProviderConfigurationError from None
+
+    agent = agent_factory(provider=provider, model=model)
+    handler = handler_factory(
+        session_factory=session_factory,
+        agent=agent,
+    )
+    registry.register(handler)
+    return registry
 
 
 def resolve_worker_id(
@@ -104,7 +141,7 @@ async def run_worker(
         )(request_stop)
         async with database_factory(settings.database_url) as database:
             await database.ping()
-            registry = registry_factory(settings)
+            registry = registry_factory(settings, database.sessionmaker)
             worker = build_agent_worker(
                 settings,
                 database,

@@ -47,5 +47,10 @@ uv run --directory apps/server riva start --env-file "$PWD/.env"
 uv run --directory apps/server riva worker --env-file "$PWD/.env"
 ```
 
-当前 Worker 尚未注册业务 Agent Handler，因此只会轮询数据库队列。JD、匹配和简历
-Handler 将在后续阶段接入。
+未配置 `RIVA_LLM_PROVIDER` 时，Worker 会使用空 Handler Registry 启动。完整配置
+Qwen（`RIVA_LLM_PROVIDER=qwen`、model、API Key 和 base URL）后，会注册
+`job-description-parser`，启动日志中的 `handler_count` 应为 `1`。API 目前尚未提供
+解析任务入队接口，因此前端正常触发解析仍依赖后续 Step3D API。
+
+默认自动化测试只使用 Fake Provider，不会请求 Qwen。真实 Qwen 验收需由开发者准备
+本地 `.env` 后显式执行。

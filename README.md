@@ -58,5 +58,12 @@ uv run --directory apps/server riva start --env-file "$PWD/.env"
 uv run --directory apps/server riva worker --env-file "$PWD/.env"
 ```
 
-The Worker currently has no business Agent handlers, so it only polls the
-database queue. JD, matching, and resume handlers will be registered later.
+Without `RIVA_LLM_PROVIDER`, the Worker starts with an empty handler registry.
+With complete Qwen settings (`RIVA_LLM_PROVIDER=qwen`, model, API key, and base
+URL), it registers `job-description-parser`; the startup log then reports
+`handler_count=1`. The API does not yet expose an endpoint to enqueue parsing,
+so normal frontend-triggered parsing depends on the later Step3D API work.
+
+Default automated tests use a fake provider and never call Qwen. A real Qwen
+check must be run explicitly by a developer with the required values in a
+local `.env` file.
