@@ -6,11 +6,15 @@ from uuid import uuid4
 import pytest
 
 from riva.models import (
+    AgentRun,
+    AgentRunStatus,
     CareerProfile,
     CareerProfileEducation,
     CareerProfileSkill,
+    JobDescriptionAnalysis,
     TargetRole,
 )
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT_V1
 from riva.schemas.roles import UpdateTargetRoleRequest
 from riva.services.roles import TargetRoleService, career_profile_completed
 
@@ -101,6 +105,128 @@ def test_role_response_maps_database_jd_without_ai_analysis(
     assert response.job_description.status == status
     assert response.job_description_analysis is None
     assert response.matching_analysis is None
+
+
+def parsing_run(role: TargetRole, status: AgentRunStatus) -> AgentRun:
+    prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+    run = AgentRun(
+        id=uuid4(),
+        user_id=role.user_id,
+        agent_id="job-description-parser",
+        prompt_id=prompt.prompt_id,
+        prompt_version=prompt.version,
+        output_schema_id=prompt.output_schema_id,
+        status=status,
+        payload={
+            "roleId": str(role.id),
+            "jobDescriptionVersion": role.job_description_version,
+        },
+        idempotency_key="safe-key",
+        attempt_count=0,
+        max_attempts=3,
+        model="test-model",
+    )
+    role.job_description_parsing_run_id = run.id
+    role.job_description_parsing_run = run
+    return run
+
+
+def saved_role() -> TargetRole:
+    now = datetime(2026, 7, 29, tzinfo=UTC)
+    return TargetRole(
+        id=uuid4(),
+        user_id=uuid4(),
+        title="Backend Engineer",
+        preparation_status="preparing",
+        job_description_status="saved",
+        raw_job_description="Build APIs.",
+        job_description_version=2,
+        version=3,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@pytest.mark.parametrize(
+    "run_status,expected",
+    [
+        (AgentRunStatus.QUEUED, "parsing"),
+        (AgentRunStatus.RUNNING, "parsing"),
+        (AgentRunStatus.FAILED, "failed"),
+        (AgentRunStatus.SUCCEEDED, "saved"),
+    ],
+)
+def test_role_response_projects_valid_current_run(
+    run_status: AgentRunStatus, expected: str
+) -> None:
+    role = saved_role()
+    parsing_run(role, run_status)
+
+    response = TargetRoleService._role_response(role)
+
+    assert response.job_description.status == expected
+    if expected == "failed":
+        assert response.job_description.parsing_failure_reason == (
+            "Job description parsing failed. Please review the text and try again."
+        )
+
+
+def test_role_response_rejects_stale_or_wrong_contract_run_projection() -> None:
+    role = saved_role()
+    run = parsing_run(role, AgentRunStatus.QUEUED)
+    run.payload["jobDescriptionVersion"] = 1
+    assert TargetRoleService._role_response(role).job_description.status == "saved"
+
+    run.payload["jobDescriptionVersion"] = 2
+    run.output_schema_id = "wrong-schema"
+    assert TargetRoleService._role_response(role).job_description.status == "saved"
+
+
+def test_role_response_projects_current_analysis_as_ready_with_all_fields() -> None:
+    role = saved_role()
+    parsing_run(role, AgentRunStatus.FAILED)
+    role.job_description_analysis = JobDescriptionAnalysis(
+        role_id=role.id,
+        user_id=role.user_id,
+        job_description_version=2,
+        analysis_version=1,
+        source_agent_run_id=uuid4(),
+        parsed_at=datetime(2026, 7, 29, 1, tzinfo=UTC),
+        riva_summary="Build reliable APIs.",
+        responsibilities=["Design APIs"],
+        qualification_requirements={
+            "education": [],
+            "graduation_cohorts": ["2026 graduates"],
+            "majors": [],
+            "experience": [],
+            "languages": [],
+            "certifications": [],
+            "other": [],
+        },
+        required_skills={
+            "programming_languages": ["Python"],
+            "frameworks_and_libraries": ["FastAPI"],
+            "platforms": [],
+            "tools": [],
+            "concepts_and_methods": [],
+            "databases_and_middleware": ["PostgreSQL"],
+            "other": [],
+        },
+        preferred_qualifications=[],
+        soft_skills=["Communication"],
+        business_domains=["Payments"],
+    )
+
+    response = TargetRoleService._role_response(role)
+
+    assert response.job_description.status == "ready"
+    assert response.job_description_analysis is not None
+    assert response.job_description_analysis.required_skills.programming_languages == [
+        "Python"
+    ]
+    assert response.job_description_analysis.qualification_requirements.graduation_cohorts == [
+        "2026 graduates"
+    ]
 
 
 class RollbackSession:

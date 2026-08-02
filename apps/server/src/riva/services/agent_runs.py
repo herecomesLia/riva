@@ -61,67 +61,84 @@ class AgentRunService:
         available_at: datetime | None = None,
     ) -> AgentRun:
         try:
-            agent_id = _required_text("agent_id", agent_id, 128)
-            prompt_id = _required_text("prompt_id", prompt_id, 128)
-            prompt_version = _required_text(
-                "prompt_version",
-                prompt_version,
-                64,
-            )
-            output_schema_id = _required_text(
-                "output_schema_id",
-                output_schema_id,
-                128,
-            )
-            model = _required_text("model", model, 255)
-            idempotency_key = _required_text(
-                "idempotency_key",
-                idempotency_key,
-                255,
-            )
-            if max_attempts < 1:
-                raise ValueError("max_attempts must be at least 1")
-            serialized_payload = _serialize_payload(payload)
-            scheduled_at = available_at or self.clock()
-            _require_aware_datetime("available_at", scheduled_at)
-
-            run = AgentRun(
+            run = await self.enqueue_in_transaction(
                 user_id=user_id,
                 agent_id=agent_id,
                 prompt_id=prompt_id,
                 prompt_version=prompt_version,
                 output_schema_id=output_schema_id,
-                status=AgentRunStatus.QUEUED,
-                payload=serialized_payload,
-                idempotency_key=idempotency_key,
-                attempt_count=0,
-                max_attempts=max_attempts,
-                available_at=scheduled_at,
                 model=model,
+                payload=payload,
+                idempotency_key=idempotency_key,
+                max_attempts=max_attempts,
+                available_at=available_at,
             )
-
-            try:
-                async with self.session.begin_nested():
-                    self.session.add(run)
-                    await self.session.flush()
-            except IntegrityError:
-                existing = await self._idempotent_run(
-                    user_id=user_id,
-                    agent_id=agent_id,
-                    prompt_id=prompt_id,
-                    prompt_version=prompt_version,
-                    idempotency_key=idempotency_key,
-                )
-                if existing is None:
-                    raise
-                await self.session.commit()
-                return existing
-
             await self.session.commit()
             return run
         except Exception:
             await self.session.rollback()
             raise
+
+    async def enqueue_in_transaction(
+        self,
+        *,
+        user_id: UUID,
+        agent_id: str,
+        prompt_id: str,
+        prompt_version: str,
+        output_schema_id: str,
+        model: str,
+        payload: Mapping[str, PayloadValue],
+        idempotency_key: str,
+        max_attempts: int,
+        available_at: datetime | None = None,
+    ) -> AgentRun:
+        agent_id = _required_text("agent_id", agent_id, 128)
+        prompt_id = _required_text("prompt_id", prompt_id, 128)
+        prompt_version = _required_text("prompt_version", prompt_version, 64)
+        output_schema_id = _required_text(
+            "output_schema_id", output_schema_id, 128
+        )
+        model = _required_text("model", model, 255)
+        idempotency_key = _required_text(
+            "idempotency_key", idempotency_key, 255
+        )
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
+        serialized_payload = _serialize_payload(payload)
+        scheduled_at = available_at or self.clock()
+        _require_aware_datetime("available_at", scheduled_at)
+
+        run = AgentRun(
+            user_id=user_id,
+            agent_id=agent_id,
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            output_schema_id=output_schema_id,
+            status=AgentRunStatus.QUEUED,
+            payload=serialized_payload,
+            idempotency_key=idempotency_key,
+            attempt_count=0,
+            max_attempts=max_attempts,
+            available_at=scheduled_at,
+            model=model,
+        )
+        try:
+            async with self.session.begin_nested():
+                self.session.add(run)
+                await self.session.flush()
+        except IntegrityError:
+            existing = await self._idempotent_run(
+                user_id=user_id,
+                agent_id=agent_id,
+                prompt_id=prompt_id,
+                prompt_version=prompt_version,
+                idempotency_key=idempotency_key,
+            )
+            if existing is None:
+                raise
+            return existing
+        return run
 
     async def claim_next(
         self,

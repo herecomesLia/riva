@@ -1,32 +1,52 @@
+from collections.abc import Callable
+from typing import cast
 from uuid import UUID
 
 from fastapi import status
+from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from riva.core.errors import APIError
 from riva.models import (
+    AgentRun,
+    AgentRunStatus,
     CareerProfile,
     CurrentTargetRole,
     JobDescriptionAnalysis,
     TargetRole,
     User,
 )
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT_V1
+from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
 from riva.schemas.roles import (
     ArchiveTargetRoleRequest,
     CreateTargetRoleRequest,
     ExistingProfileContext,
+    FailedJobDescriptionResponse,
+    JobDescriptionAnalysisResponse,
+    JobDescriptionParsingStatusQuery,
     MissingJobDescriptionResponse,
     MissingProfileContext,
+    ParsingJobDescriptionResponse,
+    ReadyJobDescriptionResponse,
     RolesPageResponse,
     SaveJobDescriptionRequest,
     SavedJobDescriptionResponse,
     SetCurrentTargetRoleRequest,
+    StartJobDescriptionParsingRequest,
     TargetRoleExperienceRange,
     TargetRoleResponse,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
+)
+from riva.services.agent_runs import AgentRunService
+
+
+AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
+PARSING_FAILURE_REASON = (
+    "Job description parsing failed. Please review the text and try again."
 )
 
 
@@ -39,8 +59,18 @@ def career_profile_completed(profile: CareerProfile) -> bool:
 
 
 class TargetRoleService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        llm_provider: str | None = None,
+        llm_model: str | None = None,
+        agent_run_service_factory: AgentRunServiceFactory = AgentRunService,
+    ) -> None:
         self.session = session
+        self.llm_provider = (llm_provider or "").strip().lower()
+        self.llm_model = (llm_model or "").strip()
+        self.agent_run_service_factory = agent_run_service_factory
 
     async def get_roles_page(self, user: User) -> RolesPageResponse:
         return await self._roles_page(user.id)
@@ -270,11 +300,89 @@ class TargetRoleService:
             await self.session.rollback()
             raise
 
+    async def start_job_description_parsing(
+        self,
+        user: User,
+        role_id: UUID,
+        payload: StartJobDescriptionParsingRequest,
+    ) -> RolesPageResponse:
+        try:
+            role = await self._locked_role(user.id, role_id)
+            self._require_version(role, payload.version)
+            self._require_saved_job_description(role)
+            if role.job_description_version != payload.job_description_version:
+                raise APIError(
+                    status.HTTP_409_CONFLICT,
+                    "job_description_version_conflict",
+                )
+
+            if self._has_current_analysis(role):
+                return await self._commit_page(user.id)
+
+            run = self._current_parsing_run(role)
+            if run is not None:
+                if run.status in (
+                    AgentRunStatus.QUEUED,
+                    AgentRunStatus.RUNNING,
+                ):
+                    return await self._commit_page(user.id)
+                if run.status is AgentRunStatus.SUCCEEDED:
+                    raise APIError(
+                        status.HTTP_409_CONFLICT,
+                        "job_description_parsing_state_conflict",
+                    )
+
+            self._require_parsing_configuration()
+            prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+            run_payload = JobDescriptionParsingRunPayload(
+                role_id=role.id,
+                job_description_version=cast(
+                    int, role.job_description_version
+                ),
+            )
+            new_run = await self.agent_run_service_factory(
+                self.session
+            ).enqueue_in_transaction(
+                user_id=user.id,
+                agent_id="job-description-parser",
+                prompt_id=prompt.prompt_id,
+                prompt_version=prompt.version,
+                output_schema_id=prompt.output_schema_id,
+                model=self.llm_model,
+                payload=run_payload.model_dump(mode="json", by_alias=True),
+                idempotency_key=(
+                    f"job-description-parsing:{role.id}:"
+                    f"{role.job_description_version}:{role.version}"
+                ),
+                max_attempts=3,
+            )
+            role.job_description_parsing_run_id = new_run.id
+            role.job_description_parsing_run = new_run
+            role.version += 1
+            return await self._commit_page(user.id)
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def get_job_description_parsing_status(
+        self,
+        user: User,
+        role_id: UUID,
+        query: JobDescriptionParsingStatusQuery,
+    ) -> TargetRoleResponse:
+        del query
+        role = await self._role(user.id, role_id)
+        return self._role_response(role)
+
     async def _roles_page(self, user_id: UUID) -> RolesPageResponse:
         roles = list(
             (
                 await self.session.scalars(
                     select(TargetRole)
+                    .options(
+                        selectinload(TargetRole.job_description_analysis),
+                        selectinload(TargetRole.job_description_parsing_run),
+                    )
                     .where(TargetRole.user_id == user_id)
                     .order_by(TargetRole.created_at.asc(), TargetRole.id.asc())
                 )
@@ -334,11 +442,34 @@ class TargetRoleService:
     ) -> TargetRole:
         role = await self.session.scalar(
             select(TargetRole)
+            .options(
+                selectinload(TargetRole.job_description_analysis),
+                selectinload(TargetRole.job_description_parsing_run),
+            )
             .where(
                 TargetRole.id == role_id,
                 TargetRole.user_id == user_id,
             )
             .with_for_update()
+        )
+        if role is None:
+            raise APIError(
+                status.HTTP_404_NOT_FOUND,
+                "target_role_not_found",
+            )
+        return role
+
+    async def _role(self, user_id: UUID, role_id: UUID) -> TargetRole:
+        role = await self.session.scalar(
+            select(TargetRole)
+            .options(
+                selectinload(TargetRole.job_description_analysis),
+                selectinload(TargetRole.job_description_parsing_run),
+            )
+            .where(
+                TargetRole.id == role_id,
+                TargetRole.user_id == user_id,
+            )
         )
         if role is None:
             raise APIError(
@@ -400,6 +531,66 @@ class TargetRoleService:
         )
 
     @staticmethod
+    def _require_saved_job_description(role: TargetRole) -> None:
+        if (
+            role.job_description_status != "saved"
+            or role.raw_job_description is None
+            or role.job_description_version is None
+        ):
+            raise APIError(
+                status.HTTP_409_CONFLICT,
+                "job_description_missing",
+            )
+
+    def _require_parsing_configuration(self) -> None:
+        if self.llm_provider != "qwen" or not self.llm_model:
+            raise APIError(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "job_description_parsing_unavailable",
+            )
+
+    @staticmethod
+    def _has_current_analysis(role: TargetRole) -> bool:
+        analysis = role.job_description_analysis
+        return (
+            analysis is not None
+            and analysis.job_description_version
+            == role.job_description_version
+        )
+
+    @staticmethod
+    def _current_parsing_run(role: TargetRole) -> AgentRun | None:
+        run = role.job_description_parsing_run
+        if (
+            run is None
+            or role.job_description_parsing_run_id != run.id
+            or run.user_id != role.user_id
+        ):
+            return None
+
+        prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+        if (
+            run.agent_id != "job-description-parser"
+            or run.prompt_id != prompt.prompt_id
+            or run.prompt_version != prompt.version
+            or run.output_schema_id != prompt.output_schema_id
+        ):
+            return None
+        try:
+            payload = JobDescriptionParsingRunPayload.model_validate(
+                run.payload
+            )
+        except ValidationError:
+            return None
+        if (
+            payload.role_id != role.id
+            or payload.job_description_version
+            != role.job_description_version
+        ):
+            return None
+        return run
+
+    @staticmethod
     def _role_response(role: TargetRole) -> TargetRoleResponse:
         experience_range = (
             None
@@ -412,20 +603,57 @@ class TargetRoleService:
                 max_years=role.max_experience_years,
             )
         )
-        job_description = (
-            MissingJobDescriptionResponse(
+        analysis = role.job_description_analysis
+        current_analysis = (
+            analysis
+            if analysis is not None
+            and analysis.job_description_version
+            == role.job_description_version
+            else None
+        )
+        run = TargetRoleService._current_parsing_run(role)
+        if role.job_description_status == "missing":
+            job_description = MissingJobDescriptionResponse(
                 status="missing",
                 raw_text=None,
                 version=None,
                 parsing_failure_reason=None,
             )
-            if role.job_description_status == "missing"
-            else SavedJobDescriptionResponse(
+        elif current_analysis is not None:
+            job_description = ReadyJobDescriptionResponse(
+                status="ready",
+                raw_text=role.raw_job_description,
+                version=role.job_description_version,
+                parsing_failure_reason=None,
+            )
+        elif run is not None and run.status in (
+            AgentRunStatus.QUEUED,
+            AgentRunStatus.RUNNING,
+        ):
+            job_description = ParsingJobDescriptionResponse(
+                status="parsing",
+                raw_text=role.raw_job_description,
+                version=role.job_description_version,
+                parsing_failure_reason=None,
+            )
+        elif run is not None and run.status is AgentRunStatus.FAILED:
+            job_description = FailedJobDescriptionResponse(
+                status="failed",
+                raw_text=role.raw_job_description,
+                version=role.job_description_version,
+                parsing_failure_reason=PARSING_FAILURE_REASON,
+            )
+        else:
+            job_description = SavedJobDescriptionResponse(
                 status="saved",
                 raw_text=role.raw_job_description,
                 version=role.job_description_version,
                 parsing_failure_reason=None,
             )
+        analysis_response = (
+            None
+            if current_analysis is None
+            else TargetRoleService._analysis_response(current_analysis)
         )
         return TargetRoleResponse(
             id=role.id,
@@ -439,6 +667,29 @@ class TargetRoleService:
             updated_at=role.updated_at,
             version=role.version,
             job_description=job_description,
-            job_description_analysis=None,
+            job_description_analysis=analysis_response,
             matching_analysis=None,
+        )
+
+    @staticmethod
+    def _analysis_response(
+        analysis: JobDescriptionAnalysis,
+    ) -> JobDescriptionAnalysisResponse:
+        return JobDescriptionAnalysisResponse.model_validate(
+            {
+                "job_description_version": analysis.job_description_version,
+                "analysis_version": analysis.analysis_version,
+                "parsed_at": analysis.parsed_at,
+                "riva_summary": analysis.riva_summary,
+                "responsibilities": analysis.responsibilities,
+                "qualification_requirements": (
+                    analysis.qualification_requirements
+                ),
+                "required_skills": analysis.required_skills,
+                "preferred_qualifications": (
+                    analysis.preferred_qualifications
+                ),
+                "soft_skills": analysis.soft_skills,
+                "business_domains": analysis.business_domains,
+            }
         )

@@ -8,7 +8,7 @@ from riva.core.auth import get_auth_service, require_current_user
 from riva.core.errors import APIError
 from riva.core.roles import get_target_role_service
 from riva.models import User
-from riva.schemas.roles import RolesPageResponse
+from riva.schemas.roles import RolesPageResponse, TargetRoleResponse
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 ROLE_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -24,6 +24,31 @@ def empty_page() -> RolesPageResponse:
                 "version": None,
                 "completed": False,
             },
+        }
+    )
+
+
+def target_role() -> TargetRoleResponse:
+    return TargetRoleResponse.model_validate(
+        {
+            "id": str(ROLE_ID),
+            "title": "Backend Engineer",
+            "company": None,
+            "recruitmentType": None,
+            "location": None,
+            "experienceRange": None,
+            "preparationStatus": "preparing",
+            "createdAt": "2026-07-29T08:00:00Z",
+            "updatedAt": "2026-07-29T08:00:00Z",
+            "version": 2,
+            "jobDescription": {
+                "status": "saved",
+                "rawText": "Build APIs.",
+                "version": 1,
+                "parsingFailureReason": None,
+            },
+            "jobDescriptionAnalysis": None,
+            "matchingAnalysis": None,
         }
     )
 
@@ -81,6 +106,15 @@ class FakeTargetRoleService:
     async def save_job_description(self, user, role_id, payload):
         return await self._result("jd", user, role_id, payload)
 
+    async def start_job_description_parsing(self, user, role_id, payload):
+        return await self._result("start-parsing", user, role_id, payload)
+
+    async def get_job_description_parsing_status(self, user, role_id, query):
+        self.calls.append(("parsing-status", (user, role_id, query)))
+        if self.error is not None:
+            raise self.error
+        return target_role()
+
 
 def user() -> User:
     return User(
@@ -116,6 +150,17 @@ def roles_client(app, service: FakeTargetRoleService) -> TestClient:
             "put",
             f"/api/roles/{ROLE_ID}/job-description",
             {"version": 1, "rawText": "Build APIs."},
+        ),
+        (
+            "post",
+            f"/api/roles/{ROLE_ID}/job-description/parsing",
+            {"version": 2, "jobDescriptionVersion": 1},
+        ),
+        (
+            "get",
+            f"/api/roles/{ROLE_ID}/job-description/parsing"
+            "?version=2&jobDescriptionVersion=1",
+            None,
         ),
     ],
 )
@@ -158,6 +203,28 @@ def test_create_returns_201_and_passes_normalized_request(app) -> None:
     assert response.status_code == 201
     request = service.calls[0][1][1]
     assert request.title == "Backend Engineer"
+
+
+def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
+    service = FakeTargetRoleService()
+    path = f"/api/roles/{ROLE_ID}/job-description/parsing"
+
+    with roles_client(app, service) as client:
+        started = client.post(
+            path,
+            json={"version": 2, "jobDescriptionVersion": 1},
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+        polled = client.get(
+            f"{path}?version=2&jobDescriptionVersion=1"
+        )
+
+    assert started.status_code == 202
+    assert service.calls[0][0] == "start-parsing"
+    assert service.calls[0][1][2].job_description_version == 1
+    assert polled.status_code == 200
+    assert polled.json() == target_role().model_dump(mode="json")
+    assert service.calls[1][0] == "parsing-status"
 
 
 @pytest.mark.parametrize(
@@ -226,6 +293,11 @@ def test_mutation_routes_return_page_and_forward_path_role(
             f"/api/roles/{ROLE_ID}/job-description",
             {"version": 1, "rawText": "Build APIs."},
         ),
+        (
+            "post",
+            f"/api/roles/{ROLE_ID}/job-description/parsing",
+            {"version": 2, "jobDescriptionVersion": 1},
+        ),
     ],
 )
 def test_all_mutations_require_csrf(app, method, url, payload) -> None:
@@ -254,6 +326,23 @@ def test_all_mutations_require_csrf(app, method, url, payload) -> None:
             {"version": 1, "preparationStatus": "archived"},
         ),
         ("delete", f"/api/roles/{ROLE_ID}?version=0", None),
+        (
+            "post",
+            f"/api/roles/{ROLE_ID}/job-description/parsing",
+            {"version": 2, "jobDescriptionVersion": 0},
+        ),
+        (
+            "get",
+            f"/api/roles/{ROLE_ID}/job-description/parsing"
+            "?version=0&jobDescriptionVersion=1",
+            None,
+        ),
+        (
+            "get",
+            "/api/roles/not-a-uuid/job-description/parsing"
+            "?version=1&jobDescriptionVersion=1",
+            None,
+        ),
     ],
 )
 def test_roles_api_rejects_invalid_input(app, method, url, payload) -> None:

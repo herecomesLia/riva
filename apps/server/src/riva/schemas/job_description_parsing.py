@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints
 
-from riva.schemas.roles import MAX_RAW_JOB_DESCRIPTION_LENGTH
+from riva.schemas.base import MAX_RAW_JOB_DESCRIPTION_LENGTH
 
 
 MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH = 1_000

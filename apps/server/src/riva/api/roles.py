@@ -11,9 +11,12 @@ from riva.schemas.roles import (
     ArchiveTargetRoleRequest,
     CreateTargetRoleRequest,
     DeleteTargetRoleVersion,
+    JobDescriptionParsingStatusQuery,
     RolesPageResponse,
     SaveJobDescriptionRequest,
     SetCurrentTargetRoleRequest,
+    StartJobDescriptionParsingRequest,
+    TargetRoleResponse,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
 )
@@ -21,6 +24,7 @@ from riva.services.roles import TargetRoleService
 
 RoleId = Annotated[UUID, Path(alias="roleId")]
 VersionQuery = Annotated[DeleteTargetRoleVersion, Query()]
+ParsingStatusQuery = Annotated[JobDescriptionParsingStatusQuery, Query()]
 
 router = APIRouter(
     prefix="/roles",
@@ -121,4 +125,39 @@ async def save_job_description(
         current_user,
         role_id,
         payload,
+    )
+
+
+@router.post(
+    "/{roleId}/job-description/parsing",
+    response_model=RolesPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def start_job_description_parsing(
+    role_id: RoleId,
+    payload: StartJobDescriptionParsingRequest,
+    current_user: User = Depends(require_current_user),
+    role_service: TargetRoleService = Depends(get_target_role_service),
+) -> RolesPageResponse:
+    return await role_service.start_job_description_parsing(
+        current_user,
+        role_id,
+        payload,
+    )
+
+
+@router.get(
+    "/{roleId}/job-description/parsing",
+    response_model=TargetRoleResponse,
+)
+async def get_job_description_parsing_status(
+    role_id: RoleId,
+    query: ParsingStatusQuery,
+    current_user: User = Depends(require_current_user),
+    role_service: TargetRoleService = Depends(get_target_role_service),
+) -> TargetRoleResponse:
+    return await role_service.get_job_description_parsing_status(
+        current_user,
+        role_id,
+        query,
     )

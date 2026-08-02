@@ -11,9 +11,11 @@ from pydantic import (
     model_validator,
 )
 
-from riva.schemas.base import APIModel
-
-MAX_RAW_JOB_DESCRIPTION_LENGTH = 50_000
+from riva.schemas.base import APIModel, MAX_RAW_JOB_DESCRIPTION_LENGTH
+from riva.schemas.job_description_parsing import (
+    AnalysisItemList,
+    Summary,
+)
 
 
 def _normalize_optional_text(value: object) -> object:
@@ -95,10 +97,68 @@ class SavedJobDescriptionResponse(RoleAPIModel):
     parsing_failure_reason: None
 
 
+class ParsingJobDescriptionResponse(RoleAPIModel):
+    status: Literal["parsing"]
+    raw_text: RawJobDescription
+    version: TargetRoleVersion
+    parsing_failure_reason: None
+
+
+class ReadyJobDescriptionResponse(RoleAPIModel):
+    status: Literal["ready"]
+    raw_text: RawJobDescription
+    version: TargetRoleVersion
+    parsing_failure_reason: None
+
+
+class FailedJobDescriptionResponse(RoleAPIModel):
+    status: Literal["failed"]
+    raw_text: RawJobDescription
+    version: TargetRoleVersion
+    parsing_failure_reason: RequiredText
+
+
 JobDescriptionResponse = Annotated[
-    MissingJobDescriptionResponse | SavedJobDescriptionResponse,
+    MissingJobDescriptionResponse
+    | SavedJobDescriptionResponse
+    | ParsingJobDescriptionResponse
+    | ReadyJobDescriptionResponse
+    | FailedJobDescriptionResponse,
     Field(discriminator="status"),
 ]
+
+
+class QualificationRequirements(RoleAPIModel):
+    education: AnalysisItemList
+    graduation_cohorts: AnalysisItemList
+    majors: AnalysisItemList
+    experience: AnalysisItemList
+    languages: AnalysisItemList
+    certifications: AnalysisItemList
+    other: AnalysisItemList
+
+
+class RequiredSkillGroups(RoleAPIModel):
+    programming_languages: AnalysisItemList
+    frameworks_and_libraries: AnalysisItemList
+    platforms: AnalysisItemList
+    tools: AnalysisItemList
+    concepts_and_methods: AnalysisItemList
+    databases_and_middleware: AnalysisItemList
+    other: AnalysisItemList
+
+
+class JobDescriptionAnalysisResponse(RoleAPIModel):
+    job_description_version: TargetRoleVersion
+    analysis_version: TargetRoleVersion
+    parsed_at: datetime
+    riva_summary: Summary
+    responsibilities: AnalysisItemList
+    qualification_requirements: QualificationRequirements
+    required_skills: RequiredSkillGroups
+    preferred_qualifications: AnalysisItemList
+    soft_skills: AnalysisItemList
+    business_domains: AnalysisItemList
 
 
 class MissingProfileContext(RoleAPIModel):
@@ -131,8 +191,26 @@ class TargetRoleResponse(RoleAPIModel):
     updated_at: datetime
     version: TargetRoleVersion
     job_description: JobDescriptionResponse
-    job_description_analysis: None
+    job_description_analysis: JobDescriptionAnalysisResponse | None
     matching_analysis: None
+
+    @model_validator(mode="after")
+    def validate_job_description_analysis(self) -> Self:
+        if self.job_description.status == "ready":
+            if self.job_description_analysis is None:
+                raise ValueError("ready job description requires analysis")
+            if (
+                self.job_description.version
+                != self.job_description_analysis.job_description_version
+            ):
+                raise ValueError(
+                    "ready job description and analysis versions must match"
+                )
+        elif self.job_description_analysis is not None:
+            raise ValueError(
+                "non-ready job description cannot include analysis"
+            )
+        return self
 
 
 class RolesPageResponse(RoleAPIModel):
@@ -188,3 +266,13 @@ class ArchiveTargetRoleRequest(RoleAPIModel):
 class SaveJobDescriptionRequest(RoleAPIModel):
     version: TargetRoleVersion
     raw_text: RawJobDescription
+
+
+class StartJobDescriptionParsingRequest(RoleAPIModel):
+    version: TargetRoleVersion
+    job_description_version: TargetRoleVersion
+
+
+class JobDescriptionParsingStatusQuery(RoleAPIModel):
+    version: TargetRoleVersion
+    job_description_version: TargetRoleVersion

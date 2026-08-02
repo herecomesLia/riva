@@ -10,9 +10,12 @@ from riva.schemas.roles import (
     CreateTargetRoleRequest,
     DeleteTargetRoleVersion,
     JobDescriptionResponse,
+    JobDescriptionAnalysisResponse,
+    JobDescriptionParsingStatusQuery,
     RolesPageResponse,
     SaveJobDescriptionRequest,
     SetCurrentTargetRoleRequest,
+    StartJobDescriptionParsingRequest,
     TargetRoleResponse,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
@@ -197,39 +200,154 @@ def test_resource_request_bodies_reject_path_role_id(schema, payload) -> None:
 
 
 @pytest.mark.parametrize(
+    "payload,expected_status",
+    [
+        (
+            {
+                "status": "missing",
+                "rawText": None,
+                "version": None,
+                "parsingFailureReason": None,
+            },
+            "missing",
+        ),
+        *[
+            (
+                {
+                    "status": status,
+                    "rawText": "Build APIs.",
+                    "version": 1,
+                    "parsingFailureReason": (
+                        "Job description parsing failed."
+                        if status == "failed"
+                        else None
+                    ),
+                },
+                status,
+            )
+            for status in ("saved", "parsing", "ready", "failed")
+        ],
+    ],
+)
+def test_job_description_response_supports_five_states(
+    payload, expected_status
+) -> None:
+    parsed = TypeAdapter(JobDescriptionResponse).validate_python(payload)
+
+    assert parsed.status == expected_status
+    assert parsed.model_dump() == payload
+
+
+@pytest.mark.parametrize(
     "payload",
     [
         {
-            "status": "missing",
-            "rawText": None,
-            "version": None,
-            "parsingFailureReason": None,
-        },
-        {
-            "status": "saved",
+            "status": "failed",
             "rawText": "Build APIs.",
             "version": 1,
             "parsingFailureReason": None,
         },
+        {
+            "status": "parsing",
+            "rawText": "Build APIs.",
+            "version": 1,
+            "parsingFailureReason": "internal exception",
+        },
     ],
 )
-def test_job_description_response_supports_only_missing_and_saved(payload) -> None:
-    parsed = TypeAdapter(JobDescriptionResponse).validate_python(payload)
-
-    assert parsed.model_dump() == payload
-
-
-@pytest.mark.parametrize("status", ["parsing", "ready", "failed"])
-def test_job_description_response_rejects_ai_flow_statuses(status: str) -> None:
+def test_job_description_response_enforces_state_fields(payload) -> None:
     with pytest.raises(ValidationError):
-        TypeAdapter(JobDescriptionResponse).validate_python(
-            {
-                "status": status,
-                "rawText": "Build APIs.",
-                "version": 1,
-                "parsingFailureReason": None,
-            }
-        )
+        TypeAdapter(JobDescriptionResponse).validate_python(payload)
+
+
+def valid_analysis_response(job_description_version: int = 1):
+    return {
+        "jobDescriptionVersion": job_description_version,
+        "analysisVersion": 1,
+        "parsedAt": "2026-07-29T08:31:00Z",
+        "rivaSummary": "Build reliable APIs.",
+        "responsibilities": ["Design APIs"],
+        "qualificationRequirements": {
+            "education": [],
+            "graduationCohorts": [],
+            "majors": [],
+            "experience": [],
+            "languages": [],
+            "certifications": [],
+            "other": [],
+        },
+        "requiredSkills": {
+            "programmingLanguages": ["Python"],
+            "frameworksAndLibraries": [],
+            "platforms": [],
+            "tools": [],
+            "conceptsAndMethods": [],
+            "databasesAndMiddleware": [],
+            "other": [],
+        },
+        "preferredQualifications": [],
+        "softSkills": [],
+        "businessDomains": [],
+    }
+
+
+def test_analysis_response_is_camel_case_strict_and_bounded() -> None:
+    analysis = JobDescriptionAnalysisResponse.model_validate(
+        valid_analysis_response()
+    )
+    assert analysis.model_dump()["requiredSkills"]["programmingLanguages"] == [
+        "Python"
+    ]
+
+    invalid = valid_analysis_response()
+    invalid["sourceAgentRunId"] = ROLE_ID
+    with pytest.raises(ValidationError):
+        JobDescriptionAnalysisResponse.model_validate(invalid)
+
+
+@pytest.mark.parametrize(
+    "status,analysis_version",
+    [("ready", None), ("ready", 2), ("saved", 1), ("parsing", 1)],
+)
+def test_target_role_response_enforces_analysis_state_consistency(
+    status: str, analysis_version: int | None
+) -> None:
+    payload = valid_role_response()
+    payload["jobDescription"] = {
+        "status": status,
+        "rawText": "Build APIs.",
+        "version": 1,
+        "parsingFailureReason": None,
+    }
+    payload["jobDescriptionAnalysis"] = (
+        None
+        if analysis_version is None
+        else valid_analysis_response(analysis_version)
+    )
+    with pytest.raises(ValidationError):
+        TargetRoleResponse.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "schema,payload",
+    [
+        (
+            StartJobDescriptionParsingRequest,
+            {"version": 2, "jobDescriptionVersion": 1},
+        ),
+        (
+            JobDescriptionParsingStatusQuery,
+            {"version": 2, "jobDescriptionVersion": 1},
+        ),
+    ],
+)
+def test_parsing_requests_use_camel_case_positive_versions(schema, payload) -> None:
+    parsed = schema.model_validate(payload)
+    assert parsed.job_description_version == 1
+    for key in ("version", "jobDescriptionVersion"):
+        invalid = {**payload, key: 0}
+        with pytest.raises(ValidationError):
+            schema.model_validate(invalid)
 
 
 def test_target_role_response_has_null_analysis_fields() -> None:

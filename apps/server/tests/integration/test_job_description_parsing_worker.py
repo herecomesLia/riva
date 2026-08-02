@@ -5,6 +5,7 @@ import os
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import select
 
 from riva.agents import (
     AgentResult,
@@ -13,6 +14,7 @@ from riva.agents import (
     JobDescriptionParsingOutput,
 )
 from riva.core.config import Settings
+from riva.core.errors import APIError
 from riva.db.database import Database
 from riva.integrations import (
     LLMProviderConfigurationError,
@@ -27,7 +29,11 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.schemas.roles import SaveJobDescriptionRequest
+from riva.schemas.roles import (
+    JobDescriptionParsingStatusQuery,
+    SaveJobDescriptionRequest,
+    StartJobDescriptionParsingRequest,
+)
 from riva.services.agent_runs import AgentRunService
 from riva.services.roles import TargetRoleService
 from riva.workers import (
@@ -339,6 +345,177 @@ def test_production_registry_runs_job_description_parsing_chain() -> None:
                 assert provider_calls == [current]
                 assert len(provider.calls) == 1
                 assert provider.calls[0].model == "fake-jd-model"
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_start_worker_status_end_to_end_with_fake_provider() -> None:
+    async def run_test() -> None:
+        provider = FakeLLMProvider(
+            [structured_output("API-started parsing summary.")],
+            provider="fake-api-provider",
+            usage=LLMUsage(input_tokens=77, output_tokens=23),
+        )
+        test_database_url = database_url()
+        async with Database(test_database_url) as database:
+            await database.reset()
+            try:
+                role_owner = owner(uuid4())
+                target = TargetRole(
+                    id=uuid4(),
+                    user_id=role_owner.id,
+                    title="Backend Engineer",
+                    company="Riva",
+                    preparation_status="preparing",
+                    job_description_status="saved",
+                    raw_job_description="Build reliable payment APIs with Python.",
+                    job_description_version=1,
+                    version=1,
+                )
+                async with database.sessionmaker() as session:
+                    session.add_all([role_owner, target])
+                    await session.commit()
+
+                async with database.sessionmaker() as session:
+                    started = await TargetRoleService(
+                        session,
+                        llm_provider="qwen",
+                        llm_model=" fake-api-model ",
+                    ).start_job_description_parsing(
+                        role_owner,
+                        target.id,
+                        StartJobDescriptionParsingRequest(
+                            version=1,
+                            job_description_version=1,
+                        ),
+                    )
+                assert started.roles[0].job_description.status == "parsing"
+                assert started.roles[0].version == 2
+
+                settings = Settings(
+                    database_url=test_database_url,
+                    session_digest_key="integration-session-key",
+                    llm_provider="qwen",
+                    llm_model=" fake-api-model ",
+                    llm_api_key="integration-fake-key",
+                    llm_base_url="https://example.invalid/v1",
+                )
+                registry = build_agent_handler_registry(
+                    settings,
+                    database.sessionmaker,
+                    provider_factory=lambda _: provider,
+                )
+                worker = AgentWorker(
+                    worker_id="api-e2e-worker",
+                    session_factory=database.sessionmaker,
+                    registry=registry,
+                    lease_duration=timedelta(minutes=10),
+                    heartbeat_interval=timedelta(minutes=2),
+                    poll_interval=timedelta(seconds=1),
+                    requeue_interval=timedelta(minutes=1),
+                    retry_base_delay=timedelta(seconds=30),
+                    retry_max_delay=timedelta(minutes=2),
+                    logger=SilentLogger(),
+                )
+                assert await worker.process_one() is True
+
+                async with database.sessionmaker() as session:
+                    snapshot = await TargetRoleService(
+                        session
+                    ).get_job_description_parsing_status(
+                        role_owner,
+                        target.id,
+                        JobDescriptionParsingStatusQuery(
+                            version=2,
+                            job_description_version=1,
+                        ),
+                    )
+                assert snapshot.version == 3
+                assert snapshot.job_description.status == "ready"
+                assert snapshot.job_description_analysis is not None
+                assert snapshot.job_description_analysis.riva_summary == (
+                    "API-started parsing summary."
+                )
+                assert snapshot.job_description_analysis.required_skills.programming_languages == [
+                    "Python"
+                ]
+
+                async with database.sessionmaker() as session:
+                    ready_no_op = await TargetRoleService(
+                        session
+                    ).start_job_description_parsing(
+                        role_owner,
+                        target.id,
+                        StartJobDescriptionParsingRequest(
+                            version=3,
+                            job_description_version=1,
+                        ),
+                    )
+                assert ready_no_op.roles[0].version == 3
+                assert ready_no_op.roles[0].job_description.status == "ready"
+
+                async with database.sessionmaker() as session:
+                    run = await session.scalar(select(AgentRun))
+                    assert run is not None
+                    assert run.status is AgentRunStatus.SUCCEEDED
+                    assert run.provider == "fake-api-provider"
+                    assert run.model == "fake-api-model"
+                    assert run.input_tokens == 77
+                    assert run.output_tokens == 23
+                    analysis = await session.get(
+                        JobDescriptionAnalysis, target.id
+                    )
+                    assert analysis is not None
+                    await session.delete(analysis)
+                    await session.commit()
+
+                async with database.sessionmaker() as session:
+                    with pytest.raises(APIError) as inconsistent:
+                        await TargetRoleService(
+                            session,
+                            llm_provider="qwen",
+                            llm_model="fake-api-model",
+                        ).start_job_description_parsing(
+                            role_owner,
+                            target.id,
+                            StartJobDescriptionParsingRequest(
+                                version=3,
+                                job_description_version=1,
+                            ),
+                        )
+                    assert inconsistent.value.error == (
+                        "job_description_parsing_state_conflict"
+                    )
+
+                async with database.sessionmaker() as session:
+                    changed = await TargetRoleService(
+                        session
+                    ).save_job_description(
+                        role_owner,
+                        target.id,
+                        SaveJobDescriptionRequest(
+                            version=3,
+                            raw_text="Build distributed systems.",
+                        ),
+                    )
+                assert changed.roles[0].version == 4
+                assert changed.roles[0].job_description.version == 2
+                async with database.sessionmaker() as session:
+                    old_poll = await TargetRoleService(
+                        session
+                    ).get_job_description_parsing_status(
+                        role_owner,
+                        target.id,
+                        JobDescriptionParsingStatusQuery(
+                            version=2,
+                            job_description_version=1,
+                        ),
+                    )
+                assert old_poll.version == 4
+                assert old_poll.job_description.status == "saved"
+                assert old_poll.job_description.version == 2
             finally:
                 await database.reset()
 
