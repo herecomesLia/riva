@@ -276,3 +276,42 @@ class StartJobDescriptionParsingRequest(RoleAPIModel):
 class JobDescriptionParsingStatusQuery(RoleAPIModel):
     version: TargetRoleVersion
     job_description_version: TargetRoleVersion
+
+
+class UpdateJobDescriptionAnalysisListModuleRequest(RoleAPIModel):
+    version: TargetRoleVersion
+    job_description_version: TargetRoleVersion
+    analysis_version: TargetRoleVersion
+    field: Literal[
+        "responsibilities",
+        "preferredQualifications",
+        "softSkills",
+        "businessDomains",
+    ]
+    value: AnalysisItemList
+
+
+class UpdateJobDescriptionAnalysisQualificationRequirementsRequest(
+    RoleAPIModel
+):
+    version: TargetRoleVersion
+    job_description_version: TargetRoleVersion
+    analysis_version: TargetRoleVersion
+    field: Literal["qualificationRequirements"]
+    value: QualificationRequirements
+
+
+class UpdateJobDescriptionAnalysisRequiredSkillsRequest(RoleAPIModel):
+    version: TargetRoleVersion
+    job_description_version: TargetRoleVersion
+    analysis_version: TargetRoleVersion
+    field: Literal["requiredSkills"]
+    value: RequiredSkillGroups
+
+
+UpdateJobDescriptionAnalysisModuleRequest = Annotated[
+    UpdateJobDescriptionAnalysisListModuleRequest
+    | UpdateJobDescriptionAnalysisQualificationRequirementsRequest
+    | UpdateJobDescriptionAnalysisRequiredSkillsRequest,
+    Field(discriminator="field"),
+]

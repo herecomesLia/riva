@@ -71,6 +71,16 @@ def update_payload() -> dict[str, object]:
     return payload
 
 
+def analysis_update_payload() -> dict[str, object]:
+    return {
+        "version": 2,
+        "jobDescriptionVersion": 1,
+        "analysisVersion": 1,
+        "field": "responsibilities",
+        "value": ["Design APIs"],
+    }
+
+
 class FakeTargetRoleService:
     def __init__(self, error: APIError | None = None) -> None:
         self.error = error
@@ -105,6 +115,11 @@ class FakeTargetRoleService:
 
     async def save_job_description(self, user, role_id, payload):
         return await self._result("jd", user, role_id, payload)
+
+    async def update_job_description_analysis_module(
+        self, user, role_id, payload
+    ):
+        return await self._result("analysis", user, role_id, payload)
 
     async def start_job_description_parsing(self, user, role_id, payload):
         return await self._result("start-parsing", user, role_id, payload)
@@ -150,6 +165,11 @@ def roles_client(app, service: FakeTargetRoleService) -> TestClient:
             "put",
             f"/api/roles/{ROLE_ID}/job-description",
             {"version": 1, "rawText": "Build APIs."},
+        ),
+        (
+            "patch",
+            f"/api/roles/{ROLE_ID}/job-description/analysis",
+            analysis_update_payload(),
         ),
         (
             "post",
@@ -251,6 +271,12 @@ def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
             {"version": 1, "rawText": "Build APIs."},
             "jd",
         ),
+        (
+            "patch",
+            f"/api/roles/{ROLE_ID}/job-description/analysis",
+            analysis_update_payload(),
+            "analysis",
+        ),
     ],
 )
 def test_mutation_routes_return_page_and_forward_path_role(
@@ -294,6 +320,11 @@ def test_mutation_routes_return_page_and_forward_path_role(
             {"version": 1, "rawText": "Build APIs."},
         ),
         (
+            "patch",
+            f"/api/roles/{ROLE_ID}/job-description/analysis",
+            analysis_update_payload(),
+        ),
+        (
             "post",
             f"/api/roles/{ROLE_ID}/job-description/parsing",
             {"version": 2, "jobDescriptionVersion": 1},
@@ -332,6 +363,11 @@ def test_all_mutations_require_csrf(app, method, url, payload) -> None:
             {"version": 2, "jobDescriptionVersion": 0},
         ),
         (
+            "patch",
+            f"/api/roles/{ROLE_ID}/job-description/analysis",
+            {**analysis_update_payload(), "rivaSummary": "forbidden"},
+        ),
+        (
             "get",
             f"/api/roles/{ROLE_ID}/job-description/parsing"
             "?version=0&jobDescriptionVersion=1",
@@ -358,6 +394,22 @@ def test_roles_api_rejects_invalid_input(app, method, url, payload) -> None:
 
     assert response.status_code == 422
     assert service.calls == []
+
+
+def test_analysis_update_route_forwards_discriminated_request(app) -> None:
+    service = FakeTargetRoleService()
+
+    with roles_client(app, service) as client:
+        response = client.patch(
+            f"/api/roles/{ROLE_ID}/job-description/analysis",
+            json=analysis_update_payload(),
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 200
+    assert service.calls[0][0] == "analysis"
+    assert service.calls[0][1][1] == ROLE_ID
+    assert service.calls[0][1][2].field == "responsibilities"
 
 
 @pytest.mark.parametrize(

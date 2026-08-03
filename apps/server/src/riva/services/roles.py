@@ -38,10 +38,12 @@ from riva.schemas.roles import (
     StartJobDescriptionParsingRequest,
     TargetRoleExperienceRange,
     TargetRoleResponse,
+    UpdateJobDescriptionAnalysisModuleRequest,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
 )
 from riva.services.agent_runs import AgentRunService
+from riva.services.job_description_analyses import build_riva_summary
 
 
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
@@ -300,6 +302,59 @@ class TargetRoleService:
             await self.session.rollback()
             raise
 
+    async def update_job_description_analysis_module(
+        self,
+        user: User,
+        role_id: UUID,
+        payload: UpdateJobDescriptionAnalysisModuleRequest,
+    ) -> RolesPageResponse:
+        try:
+            role = await self._locked_role(user.id, role_id)
+            self._require_version(role, payload.version)
+            self._require_saved_job_description(role)
+            if role.job_description_version != payload.job_description_version:
+                raise APIError(
+                    status.HTTP_409_CONFLICT,
+                    "job_description_version_conflict",
+                )
+
+            analysis = await self._locked_analysis(user.id, role.id)
+            if (
+                analysis is None
+                or analysis.job_description_version
+                != role.job_description_version
+            ):
+                raise APIError(
+                    status.HTTP_409_CONFLICT,
+                    "job_description_analysis_not_ready",
+                )
+            if analysis.analysis_version != payload.analysis_version:
+                raise APIError(
+                    status.HTTP_409_CONFLICT,
+                    "job_description_analysis_version_conflict",
+                )
+
+            if self._replace_analysis_module(analysis, payload):
+                analysis.riva_summary = build_riva_summary(
+                    responsibilities=analysis.responsibilities,
+                    qualification_requirements=(
+                        analysis.qualification_requirements
+                    ),
+                    required_skills=analysis.required_skills,
+                    preferred_qualifications=(
+                        analysis.preferred_qualifications
+                    ),
+                    soft_skills=analysis.soft_skills,
+                    business_domains=analysis.business_domains,
+                )
+                analysis.analysis_version += 1
+                role.version += 1
+
+            return await self._commit_page(user.id)
+        except Exception:
+            await self.session.rollback()
+            raise
+
     async def start_job_description_parsing(
         self,
         user: User,
@@ -459,6 +514,20 @@ class TargetRoleService:
             )
         return role
 
+    async def _locked_analysis(
+        self,
+        user_id: UUID,
+        role_id: UUID,
+    ) -> JobDescriptionAnalysis | None:
+        return await self.session.scalar(
+            select(JobDescriptionAnalysis)
+            .where(
+                JobDescriptionAnalysis.role_id == role_id,
+                JobDescriptionAnalysis.user_id == user_id,
+            )
+            .with_for_update()
+        )
+
     async def _role(self, user_id: UUID, role_id: UUID) -> TargetRole:
         role = await self.session.scalar(
             select(TargetRole)
@@ -548,6 +617,51 @@ class TargetRoleService:
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 "job_description_parsing_unavailable",
             )
+
+    @staticmethod
+    def _replace_analysis_module(
+        analysis: JobDescriptionAnalysis,
+        payload: UpdateJobDescriptionAnalysisModuleRequest,
+    ) -> bool:
+        if payload.field == "responsibilities":
+            value = list(payload.value)
+            if analysis.responsibilities == value:
+                return False
+            analysis.responsibilities = value
+            return True
+        if payload.field == "preferredQualifications":
+            value = list(payload.value)
+            if analysis.preferred_qualifications == value:
+                return False
+            analysis.preferred_qualifications = value
+            return True
+        if payload.field == "softSkills":
+            value = list(payload.value)
+            if analysis.soft_skills == value:
+                return False
+            analysis.soft_skills = value
+            return True
+        if payload.field == "businessDomains":
+            value = list(payload.value)
+            if analysis.business_domains == value:
+                return False
+            analysis.business_domains = value
+            return True
+        if payload.field == "qualificationRequirements":
+            value = payload.value.model_dump(mode="json", by_alias=False)
+            if analysis.qualification_requirements == value:
+                return False
+            analysis.qualification_requirements = cast(
+                dict[str, list[str]], value
+            )
+            return True
+        if payload.field == "requiredSkills":
+            value = payload.value.model_dump(mode="json", by_alias=False)
+            if analysis.required_skills == value:
+                return False
+            analysis.required_skills = cast(dict[str, list[str]], value)
+            return True
+        raise AssertionError("Unsupported job description analysis field")
 
     @staticmethod
     def _has_current_analysis(role: TargetRole) -> bool:

@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, cast
@@ -13,6 +13,7 @@ from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
     JobDescriptionParsingRunPayload,
+    MAX_JOB_DESCRIPTION_SUMMARY_LENGTH,
 )
 from riva.utils import utc_now
 
@@ -39,6 +40,89 @@ JOB_DESCRIPTION_VERSION_STALE: JobDescriptionParsingStateErrorCode = (
 PARSE_SUPERSEDED: JobDescriptionParsingStateErrorCode = (
     "job_description_parse_superseded"
 )
+RIVA_SUMMARY_FALLBACK = "No specific structured requirements were identified."
+
+
+def build_riva_summary(
+    *,
+    responsibilities: Sequence[str],
+    qualification_requirements: Mapping[str, Sequence[str]],
+    required_skills: Mapping[str, Sequence[str]],
+    preferred_qualifications: Sequence[str],
+    soft_skills: Sequence[str],
+    business_domains: Sequence[str],
+) -> str:
+    """Build a bounded, deterministic summary from structured JD modules."""
+
+    responsibility = _first_item(responsibilities)
+    skills: list[str] = []
+    for category in (
+        "programming_languages",
+        "frameworks_and_libraries",
+        "platforms",
+        "tools",
+        "concepts_and_methods",
+        "databases_and_middleware",
+        "other",
+    ):
+        skills.extend(required_skills.get(category, ()))
+    skills = [_clean_summary_item(item) for item in skills[:3]]
+    skills = [item for item in skills if item]
+
+    qualification = _first_from_categories(
+        qualification_requirements,
+        (
+            "education",
+            "graduation_cohorts",
+            "majors",
+            "experience",
+            "languages",
+            "certifications",
+            "other",
+        ),
+    )
+    preferred = _first_item(preferred_qualifications)
+    soft_skill = _first_item(soft_skills)
+    domain = _first_item(business_domains)
+
+    parts = [
+        responsibility,
+        f"重点要求 {'、'.join(skills)}" if skills else None,
+        f"任职资格包括 {qualification}" if qualification else None,
+        f"加分项为 {preferred}" if preferred else None,
+        f"强调 {soft_skill}" if soft_skill else None,
+        f"业务领域为 {domain}" if domain else None,
+    ]
+    summary = "；".join(item for item in parts if item)
+    if not summary:
+        return RIVA_SUMMARY_FALLBACK
+    bounded = summary[:MAX_JOB_DESCRIPTION_SUMMARY_LENGTH].rstrip("；，, ")
+    return bounded or RIVA_SUMMARY_FALLBACK
+
+
+def _first_item(items: Sequence[str]) -> str | None:
+    for item in items:
+        normalized = _clean_summary_item(item)
+        if normalized:
+            normalized = normalized.rstrip("。.")
+            if normalized:
+                return normalized
+    return None
+
+
+def _first_from_categories(
+    groups: Mapping[str, Sequence[str]],
+    categories: Sequence[str],
+) -> str | None:
+    for category in categories:
+        item = _first_item(groups.get(category, ()))
+        if item:
+            return item
+    return None
+
+
+def _clean_summary_item(item: str) -> str:
+    return item.strip()
 
 
 class JobDescriptionParsingStateError(RuntimeError):

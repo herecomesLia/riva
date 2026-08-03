@@ -17,6 +17,7 @@ from riva.schemas.roles import (
     SetCurrentTargetRoleRequest,
     StartJobDescriptionParsingRequest,
     TargetRoleResponse,
+    UpdateJobDescriptionAnalysisModuleRequest,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
 )
@@ -122,6 +123,23 @@ async def save_job_description(
     role_service: TargetRoleService = Depends(get_target_role_service),
 ) -> RolesPageResponse:
     return await role_service.save_job_description(
+        current_user,
+        role_id,
+        payload,
+    )
+
+
+@router.patch(
+    "/{roleId}/job-description/analysis",
+    response_model=RolesPageResponse,
+)
+async def update_job_description_analysis_module(
+    role_id: RoleId,
+    payload: UpdateJobDescriptionAnalysisModuleRequest,
+    current_user: User = Depends(require_current_user),
+    role_service: TargetRoleService = Depends(get_target_role_service),
+) -> RolesPageResponse:
+    return await role_service.update_job_description_analysis_module(
         current_user,
         role_id,
         payload,

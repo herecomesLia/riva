@@ -17,8 +17,13 @@ from riva.schemas.roles import (
     SetCurrentTargetRoleRequest,
     StartJobDescriptionParsingRequest,
     TargetRoleResponse,
+    UpdateJobDescriptionAnalysisModuleRequest,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
+)
+from riva.schemas.job_description_parsing import (
+    MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH,
+    MAX_JOB_DESCRIPTION_ANALYSIS_LIST_ITEMS,
 )
 
 ROLE_ID = "11111111-1111-4111-8111-111111111111"
@@ -170,6 +175,154 @@ def test_save_job_description_trims_and_limits_raw_text() -> None:
             SaveJobDescriptionRequest.model_validate(
                 {"version": 2, "rawText": raw_text}
             )
+
+
+def analysis_module_payload(field: str, value: object) -> dict[str, object]:
+    return {
+        "version": 4,
+        "jobDescriptionVersion": 2,
+        "analysisVersion": 3,
+        "field": field,
+        "value": value,
+    }
+
+
+def qualification_requirements_payload() -> dict[str, list[str]]:
+    return {
+        "education": [],
+        "graduationCohorts": [],
+        "majors": [],
+        "experience": [],
+        "languages": [],
+        "certifications": [],
+        "other": [],
+    }
+
+
+def required_skills_payload() -> dict[str, list[str]]:
+    return {
+        "programmingLanguages": [],
+        "frameworksAndLibraries": [],
+        "platforms": [],
+        "tools": [],
+        "conceptsAndMethods": [],
+        "databasesAndMiddleware": [],
+        "other": [],
+    }
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("responsibilities", ["Design APIs"]),
+        ("preferredQualifications", ["Payments experience"]),
+        ("softSkills", ["Communication"]),
+        ("businessDomains", ["Payments"]),
+        ("qualificationRequirements", qualification_requirements_payload()),
+        ("requiredSkills", required_skills_payload()),
+    ],
+)
+def test_analysis_module_request_supports_all_camel_case_fields(
+    field: str,
+    value: object,
+) -> None:
+    parsed = TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
+        analysis_module_payload(field, value)
+    )
+
+    assert parsed.field == field
+    assert parsed.version == 4
+    assert parsed.job_description_version == 2
+    assert parsed.analysis_version == 3
+
+
+def test_analysis_module_list_request_reuses_normalization_and_limits() -> None:
+    parsed = TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
+        analysis_module_payload(
+            "responsibilities",
+            ["  Design APIs  ", "", "Design APIs", "  Document APIs"],
+        )
+    )
+    assert parsed.value == ["Design APIs", "Document APIs"]
+
+    invalid_values = [
+        "Design APIs",
+        ["x" * (MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH + 1)],
+        [f"item-{index}" for index in range(MAX_JOB_DESCRIPTION_ANALYSIS_LIST_ITEMS + 1)],
+    ]
+    for value in invalid_values:
+        with pytest.raises(ValidationError):
+            TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
+                analysis_module_payload("responsibilities", value)
+            )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("qualificationRequirements", []),
+        ("requiredSkills", []),
+        ("responsibilities", qualification_requirements_payload()),
+        ("requiredSkills", qualification_requirements_payload()),
+    ],
+)
+def test_analysis_module_request_rejects_field_value_mismatch(
+    field: str,
+    value: object,
+) -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
+            analysis_module_payload(field, value)
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["qualificationRequirements", "requiredSkills"],
+)
+def test_analysis_module_request_requires_complete_nested_structure(field: str) -> None:
+    value = (
+        qualification_requirements_payload()
+        if field == "qualificationRequirements"
+        else required_skills_payload()
+    )
+    value.pop(next(iter(value)))
+
+    with pytest.raises(ValidationError):
+        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
+            analysis_module_payload(field, value)
+        )
+
+
+@pytest.mark.parametrize(
+    "payload_update",
+    [
+        {"field": "unknown"},
+        {"rivaSummary": "must not be editable"},
+        {"extra": True},
+    ],
+)
+def test_analysis_module_request_rejects_unknown_and_forbidden_fields(
+    payload_update: dict[str, object],
+) -> None:
+    payload = analysis_module_payload("responsibilities", [])
+    payload.update(payload_update)
+
+    with pytest.raises(ValidationError):
+        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
+            payload
+        )
+
+
+@pytest.mark.parametrize("field", ["version", "jobDescriptionVersion", "analysisVersion"])
+def test_analysis_module_request_requires_positive_versions(field: str) -> None:
+    payload = analysis_module_payload("responsibilities", [])
+    payload[field] = 0
+
+    with pytest.raises(ValidationError):
+        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
+            payload
+        )
 
 
 @pytest.mark.parametrize(
