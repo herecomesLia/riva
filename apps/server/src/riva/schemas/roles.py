@@ -16,6 +16,7 @@ from riva.schemas.job_description_parsing import (
     AnalysisItemList,
     Summary,
 )
+from riva.schemas.matching_analysis import MatchingAnalysisResultResponse
 
 
 def _normalize_optional_text(value: object) -> object:
@@ -161,6 +162,49 @@ class JobDescriptionAnalysisResponse(RoleAPIModel):
     business_domains: AnalysisItemList
 
 
+class MatchingAnalysisVersionContext(RoleAPIModel):
+    profile_version: TargetRoleVersion
+    job_description_version: TargetRoleVersion
+    job_description_analysis_version: TargetRoleVersion
+
+
+class GeneratingMatchingAnalysisResponse(MatchingAnalysisVersionContext):
+    status: Literal["generating"]
+    generated_at: None
+    failure_reason: None
+    result: None
+
+
+class CurrentMatchingAnalysisResponse(MatchingAnalysisVersionContext):
+    status: Literal["current"]
+    generated_at: datetime
+    failure_reason: None
+    result: MatchingAnalysisResultResponse
+
+
+class StaleMatchingAnalysisResponse(MatchingAnalysisVersionContext):
+    status: Literal["stale"]
+    generated_at: datetime
+    failure_reason: None
+    result: MatchingAnalysisResultResponse
+
+
+class FailedMatchingAnalysisResponse(MatchingAnalysisVersionContext):
+    status: Literal["failed"]
+    generated_at: None
+    failure_reason: RequiredText
+    result: None
+
+
+MatchingAnalysisResponse = Annotated[
+    GeneratingMatchingAnalysisResponse
+    | CurrentMatchingAnalysisResponse
+    | StaleMatchingAnalysisResponse
+    | FailedMatchingAnalysisResponse,
+    Field(discriminator="status"),
+]
+
+
 class MissingProfileContext(RoleAPIModel):
     exists: Literal[False]
     version: None
@@ -192,7 +236,7 @@ class TargetRoleResponse(RoleAPIModel):
     version: TargetRoleVersion
     job_description: JobDescriptionResponse
     job_description_analysis: JobDescriptionAnalysisResponse | None
-    matching_analysis: None
+    matching_analysis: MatchingAnalysisResponse | None
 
     @model_validator(mode="after")
     def validate_job_description_analysis(self) -> Self:
@@ -210,6 +254,30 @@ class TargetRoleResponse(RoleAPIModel):
             raise ValueError(
                 "non-ready job description cannot include analysis"
             )
+        matching = self.matching_analysis
+        if matching is not None and matching.status == "current":
+            if self.job_description.status != "ready":
+                raise ValueError(
+                    "current matching analysis requires ready job description"
+                )
+            if self.job_description_analysis is None:
+                raise ValueError(
+                    "current matching analysis requires job description analysis"
+                )
+            if (
+                matching.job_description_version
+                != self.job_description.version
+            ):
+                raise ValueError(
+                    "current matching analysis and job description versions must match"
+                )
+            if (
+                matching.job_description_analysis_version
+                != self.job_description_analysis.analysis_version
+            ):
+                raise ValueError(
+                    "current matching analysis and job description analysis versions must match"
+                )
         return self
 
 
@@ -220,17 +288,30 @@ class RolesPageResponse(RoleAPIModel):
 
     @model_validator(mode="after")
     def validate_current_role(self) -> Self:
-        if self.current_role_id is None:
-            return self
+        if self.current_role_id is not None:
+            current_role = next(
+                (role for role in self.roles if role.id == self.current_role_id),
+                None,
+            )
+            if current_role is None:
+                raise ValueError("current_role_id must reference a role in roles")
+            if current_role.preparation_status is TargetRolePreparationStatus.ARCHIVED:
+                raise ValueError(
+                    "current_role_id cannot reference an archived role"
+                )
 
-        current_role = next(
-            (role for role in self.roles if role.id == self.current_role_id),
-            None,
-        )
-        if current_role is None:
-            raise ValueError("current_role_id must reference a role in roles")
-        if current_role.preparation_status is TargetRolePreparationStatus.ARCHIVED:
-            raise ValueError("current_role_id cannot reference an archived role")
+        for role in self.roles:
+            matching = role.matching_analysis
+            if matching is None or matching.status != "current":
+                continue
+            if not self.profile_context.exists:
+                raise ValueError(
+                    "current matching analysis requires existing profile context"
+                )
+            if matching.profile_version != self.profile_context.version:
+                raise ValueError(
+                    "current matching analysis and profile context versions must match"
+                )
         return self
 
 
@@ -276,6 +357,14 @@ class StartJobDescriptionParsingRequest(RoleAPIModel):
 class JobDescriptionParsingStatusQuery(RoleAPIModel):
     version: TargetRoleVersion
     job_description_version: TargetRoleVersion
+
+
+class StartMatchingAnalysisRequest(RoleAPIModel):
+    version: TargetRoleVersion
+
+
+class MatchingAnalysisStatusQuery(RoleAPIModel):
+    version: TargetRoleVersion
 
 
 class UpdateJobDescriptionAnalysisListModuleRequest(RoleAPIModel):

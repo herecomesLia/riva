@@ -15,18 +15,30 @@ from riva.models import (
     CareerProfile,
     CurrentTargetRole,
     JobDescriptionAnalysis,
+    MatchingAnalysis,
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT_V1
+from riva.prompts import (
+    JOB_DESCRIPTION_PARSING_PROMPT_V1,
+    MATCHING_ANALYSIS_PROMPT_V1,
+)
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
+from riva.schemas.matching_analysis import (
+    MatchingAnalysisResultResponse,
+    MatchingAnalysisRunPayload,
+)
 from riva.schemas.roles import (
     ArchiveTargetRoleRequest,
     CreateTargetRoleRequest,
+    CurrentMatchingAnalysisResponse,
     ExistingProfileContext,
+    FailedMatchingAnalysisResponse,
     FailedJobDescriptionResponse,
+    GeneratingMatchingAnalysisResponse,
     JobDescriptionAnalysisResponse,
     JobDescriptionParsingStatusQuery,
+    MatchingAnalysisStatusQuery,
     MissingJobDescriptionResponse,
     MissingProfileContext,
     ParsingJobDescriptionResponse,
@@ -35,7 +47,9 @@ from riva.schemas.roles import (
     SaveJobDescriptionRequest,
     SavedJobDescriptionResponse,
     SetCurrentTargetRoleRequest,
+    StaleMatchingAnalysisResponse,
     StartJobDescriptionParsingRequest,
+    StartMatchingAnalysisRequest,
     TargetRoleExperienceRange,
     TargetRoleResponse,
     UpdateJobDescriptionAnalysisModuleRequest,
@@ -51,6 +65,30 @@ AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
 PARSING_FAILURE_REASON = (
     "Job description parsing failed. Please review the text and try again."
 )
+MATCHING_FAILURE_REASON = (
+    "The matching analysis could not be generated right now. "
+    "Your profile and job description are preserved; please try again."
+)
+
+
+def build_matching_analysis_result_response(
+    analysis: MatchingAnalysis,
+) -> MatchingAnalysisResultResponse:
+    return MatchingAnalysisResultResponse(
+        overall_match_score=analysis.overall_match_score,
+        core_requirements_summary=analysis.core_requirements_summary,
+        matched_capabilities=list(analysis.matched_capabilities),
+        missing_capabilities=list(analysis.missing_capabilities),
+        underrepresented_capabilities=list(
+            analysis.underrepresented_capabilities
+        ),
+        resume_highlights=list(analysis.resume_highlights),
+        resume_gaps=list(analysis.resume_gaps),
+        high_risk_questions=list(analysis.high_risk_questions),
+        preparation_recommendations=list(
+            analysis.preparation_recommendations
+        ),
+    )
 
 
 class TargetRoleService:
@@ -420,7 +458,127 @@ class TargetRoleService:
     ) -> TargetRoleResponse:
         del query
         role = await self._role(user.id, role_id)
-        return self._role_response(role)
+        profile = await self._profile(user.id)
+        return self._role_response(role, profile)
+
+    async def start_matching_analysis(
+        self,
+        user: User,
+        role_id: UUID,
+        payload: StartMatchingAnalysisRequest,
+    ) -> RolesPageResponse:
+        try:
+            await self._lock_user(user.id)
+            role = await self._locked_role(user.id, role_id)
+            self._require_version(role, payload.version)
+
+            profile = await self._locked_profile(user.id)
+            if profile is None:
+                raise APIError(
+                    status.HTTP_409_CONFLICT,
+                    "matching_profile_not_found",
+                )
+            if not career_profile_completed(profile):
+                raise APIError(
+                    status.HTTP_409_CONFLICT,
+                    "matching_profile_incomplete",
+                )
+
+            analysis = await self._locked_analysis(user.id, role.id)
+            if not self._matching_job_description_ready(role, analysis):
+                raise APIError(
+                    status.HTTP_409_CONFLICT,
+                    "matching_job_description_analysis_not_ready",
+                )
+            role.job_description_analysis = analysis
+
+            matching = await self._locked_matching_analysis(
+                user.id,
+                role.id,
+            )
+            role.matching_analysis = matching
+            current_result = self._matching_analysis_is_current(
+                role,
+                profile,
+                analysis,
+                matching,
+            )
+            current_run = self._current_matching_run(
+                role,
+                profile,
+                analysis,
+            )
+
+            if current_run is not None:
+                run, _ = current_run
+                if run.status in (
+                    AgentRunStatus.QUEUED,
+                    AgentRunStatus.RUNNING,
+                ):
+                    return await self._commit_page(user.id)
+                if run.status is AgentRunStatus.SUCCEEDED:
+                    if (
+                        current_result
+                        and matching is not None
+                        and matching.source_agent_run_id == run.id
+                    ):
+                        return await self._commit_page(user.id)
+                    raise APIError(
+                        status.HTTP_409_CONFLICT,
+                        "matching_analysis_state_conflict",
+                    )
+            elif current_result and role.matching_analysis_run is None:
+                return await self._commit_page(user.id)
+
+            self._require_matching_configuration()
+            prompt = MATCHING_ANALYSIS_PROMPT_V1
+            run_payload = MatchingAnalysisRunPayload(
+                role_id=role.id,
+                profile_id=profile.profile_id,
+                profile_version=profile.version,
+                job_description_version=cast(
+                    int,
+                    role.job_description_version,
+                ),
+                job_description_analysis_version=analysis.analysis_version,
+            )
+            idempotency_key = (
+                f"matching-analysis:{role.id}:{profile.profile_id}:"
+                f"{profile.version}:{role.job_description_version}:"
+                f"{analysis.analysis_version}:{role.version}"
+            )
+
+            new_run = await self.agent_run_service_factory(
+                self.session
+            ).enqueue_in_transaction(
+                user_id=user.id,
+                agent_id="matching-analyzer",
+                prompt_id=prompt.prompt_id,
+                prompt_version=prompt.version,
+                output_schema_id=prompt.output_schema_id,
+                model=self.llm_model,
+                payload=run_payload.model_dump(mode="json", by_alias=True),
+                idempotency_key=idempotency_key,
+                max_attempts=3,
+            )
+            role.matching_analysis_run_id = new_run.id
+            role.matching_analysis_run = new_run
+            role.version += 1
+            return await self._commit_page(user.id)
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def get_matching_analysis_status(
+        self,
+        user: User,
+        role_id: UUID,
+        query: MatchingAnalysisStatusQuery,
+    ) -> TargetRoleResponse:
+        del query
+        role = await self._role(user.id, role_id)
+        profile = await self._profile(user.id)
+        return self._role_response(role, profile)
 
     async def _roles_page(self, user_id: UUID) -> RolesPageResponse:
         roles = list(
@@ -430,6 +588,8 @@ class TargetRoleService:
                     .options(
                         selectinload(TargetRole.job_description_analysis),
                         selectinload(TargetRole.job_description_parsing_run),
+                        selectinload(TargetRole.matching_analysis),
+                        selectinload(TargetRole.matching_analysis_run),
                     )
                     .where(TargetRole.user_id == user_id)
                     .order_by(TargetRole.created_at.asc(), TargetRole.id.asc())
@@ -456,7 +616,7 @@ class TargetRoleService:
             )
         )
         return RolesPageResponse(
-            roles=[self._role_response(role) for role in roles],
+            roles=[self._role_response(role, profile) for role in roles],
             current_role_id=current_role_id,
             profile_context=profile_context,
         )
@@ -478,6 +638,19 @@ class TargetRoleService:
             .where(CareerProfile.user_id == user_id)
         )
 
+    async def _locked_profile(self, user_id: UUID) -> CareerProfile | None:
+        return await self.session.scalar(
+            select(CareerProfile)
+            .options(
+                selectinload(CareerProfile.education),
+                selectinload(CareerProfile.work_experiences),
+                selectinload(CareerProfile.project_experiences),
+                selectinload(CareerProfile.skills),
+            )
+            .where(CareerProfile.user_id == user_id)
+            .with_for_update()
+        )
+
     async def _lock_user(self, user_id: UUID) -> None:
         await self.session.execute(
             select(User.id).where(User.id == user_id).with_for_update()
@@ -493,6 +666,8 @@ class TargetRoleService:
             .options(
                 selectinload(TargetRole.job_description_analysis),
                 selectinload(TargetRole.job_description_parsing_run),
+                selectinload(TargetRole.matching_analysis),
+                selectinload(TargetRole.matching_analysis_run),
             )
             .where(
                 TargetRole.id == role_id,
@@ -521,12 +696,28 @@ class TargetRoleService:
             .with_for_update()
         )
 
+    async def _locked_matching_analysis(
+        self,
+        user_id: UUID,
+        role_id: UUID,
+    ) -> MatchingAnalysis | None:
+        return await self.session.scalar(
+            select(MatchingAnalysis)
+            .where(
+                MatchingAnalysis.role_id == role_id,
+                MatchingAnalysis.user_id == user_id,
+            )
+            .with_for_update()
+        )
+
     async def _role(self, user_id: UUID, role_id: UUID) -> TargetRole:
         role = await self.session.scalar(
             select(TargetRole)
             .options(
                 selectinload(TargetRole.job_description_analysis),
                 selectinload(TargetRole.job_description_parsing_run),
+                selectinload(TargetRole.matching_analysis),
+                selectinload(TargetRole.matching_analysis_run),
             )
             .where(
                 TargetRole.id == role_id,
@@ -610,6 +801,51 @@ class TargetRoleService:
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 "job_description_parsing_unavailable",
             )
+
+    def _require_matching_configuration(self) -> None:
+        if self.llm_provider != "qwen" or not self.llm_model:
+            raise APIError(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "matching_analysis_unavailable",
+            )
+
+    @staticmethod
+    def _matching_job_description_ready(
+        role: TargetRole,
+        analysis: JobDescriptionAnalysis | None,
+    ) -> bool:
+        return bool(
+            role.job_description_status == "saved"
+            and role.raw_job_description is not None
+            and role.raw_job_description.strip()
+            and role.job_description_version is not None
+            and analysis is not None
+            and analysis.job_description_version
+            == role.job_description_version
+        )
+
+    @staticmethod
+    def _matching_analysis_is_current(
+        role: TargetRole,
+        profile: CareerProfile | None,
+        job_description_analysis: JobDescriptionAnalysis | None,
+        matching_analysis: MatchingAnalysis | None,
+    ) -> bool:
+        return bool(
+            profile is not None
+            and job_description_analysis is not None
+            and matching_analysis is not None
+            and TargetRoleService._matching_job_description_ready(
+                role,
+                job_description_analysis,
+            )
+            and matching_analysis.profile_id == profile.profile_id
+            and matching_analysis.profile_version == profile.version
+            and matching_analysis.job_description_version
+            == role.job_description_version
+            and matching_analysis.job_description_analysis_version
+            == job_description_analysis.analysis_version
+        )
 
     @staticmethod
     def _replace_analysis_module(
@@ -698,7 +934,54 @@ class TargetRoleService:
         return run
 
     @staticmethod
-    def _role_response(role: TargetRole) -> TargetRoleResponse:
+    def _current_matching_run(
+        role: TargetRole,
+        profile: CareerProfile | None,
+        job_description_analysis: JobDescriptionAnalysis | None,
+    ) -> tuple[AgentRun, MatchingAnalysisRunPayload] | None:
+        run = role.matching_analysis_run
+        if (
+            run is None
+            or role.matching_analysis_run_id != run.id
+            or run.user_id != role.user_id
+            or profile is None
+            or job_description_analysis is None
+        ):
+            return None
+
+        prompt = MATCHING_ANALYSIS_PROMPT_V1
+        if (
+            run.agent_id != "matching-analyzer"
+            or run.prompt_id != prompt.prompt_id
+            or run.prompt_version != prompt.version
+            or run.output_schema_id != prompt.output_schema_id
+        ):
+            return None
+        try:
+            payload = MatchingAnalysisRunPayload.model_validate(run.payload)
+        except ValidationError:
+            return None
+        if (
+            payload.role_id != role.id
+            or payload.profile_id != profile.profile_id
+            or payload.profile_version != profile.version
+            or payload.job_description_version
+            != role.job_description_version
+            or payload.job_description_analysis_version
+            != job_description_analysis.analysis_version
+            or not TargetRoleService._matching_job_description_ready(
+                role,
+                job_description_analysis,
+            )
+        ):
+            return None
+        return run, payload
+
+    @staticmethod
+    def _role_response(
+        role: TargetRole,
+        profile: CareerProfile | None = None,
+    ) -> TargetRoleResponse:
         experience_range = (
             None
             if (
@@ -713,9 +996,7 @@ class TargetRoleService:
         analysis = role.job_description_analysis
         current_analysis = (
             analysis
-            if analysis is not None
-            and analysis.job_description_version
-            == role.job_description_version
+            if TargetRoleService._matching_job_description_ready(role, analysis)
             else None
         )
         run = TargetRoleService._current_parsing_run(role)
@@ -762,6 +1043,11 @@ class TargetRoleService:
             if current_analysis is None
             else TargetRoleService._analysis_response(current_analysis)
         )
+        matching_analysis_response = TargetRoleService._matching_response(
+            role,
+            profile,
+            current_analysis,
+        )
         return TargetRoleResponse(
             id=role.id,
             title=role.title,
@@ -775,8 +1061,95 @@ class TargetRoleService:
             version=role.version,
             job_description=job_description,
             job_description_analysis=analysis_response,
-            matching_analysis=None,
+            matching_analysis=matching_analysis_response,
         )
+
+    @staticmethod
+    def _matching_response(
+        role: TargetRole,
+        profile: CareerProfile | None,
+        job_description_analysis: JobDescriptionAnalysis | None,
+    ) -> (
+        GeneratingMatchingAnalysisResponse
+        | CurrentMatchingAnalysisResponse
+        | StaleMatchingAnalysisResponse
+        | FailedMatchingAnalysisResponse
+        | None
+    ):
+        current_run = TargetRoleService._current_matching_run(
+            role,
+            profile,
+            job_description_analysis,
+        )
+        if current_run is not None:
+            run, payload = current_run
+            if run.status in (
+                AgentRunStatus.QUEUED,
+                AgentRunStatus.RUNNING,
+            ):
+                return GeneratingMatchingAnalysisResponse(
+                    status="generating",
+                    profile_version=payload.profile_version,
+                    job_description_version=payload.job_description_version,
+                    job_description_analysis_version=(
+                        payload.job_description_analysis_version
+                    ),
+                    generated_at=None,
+                    failure_reason=None,
+                    result=None,
+                )
+            if run.status is AgentRunStatus.FAILED:
+                return FailedMatchingAnalysisResponse(
+                    status="failed",
+                    profile_version=payload.profile_version,
+                    job_description_version=payload.job_description_version,
+                    job_description_analysis_version=(
+                        payload.job_description_analysis_version
+                    ),
+                    generated_at=None,
+                    failure_reason=MATCHING_FAILURE_REASON,
+                    result=None,
+                )
+
+        analysis = role.matching_analysis
+        if analysis is None:
+            return None
+
+        result = build_matching_analysis_result_response(analysis)
+        if TargetRoleService._matching_analysis_is_current(
+            role,
+            profile,
+            job_description_analysis,
+            analysis,
+        ):
+            return CurrentMatchingAnalysisResponse(
+                status="current",
+                profile_version=analysis.profile_version,
+                job_description_version=analysis.job_description_version,
+                job_description_analysis_version=(
+                    analysis.job_description_analysis_version
+                ),
+                generated_at=analysis.generated_at,
+                failure_reason=None,
+                result=result,
+            )
+        return StaleMatchingAnalysisResponse(
+            status="stale",
+            profile_version=analysis.profile_version,
+            job_description_version=analysis.job_description_version,
+            job_description_analysis_version=(
+                analysis.job_description_analysis_version
+            ),
+            generated_at=analysis.generated_at,
+            failure_reason=None,
+            result=result,
+        )
+
+    @staticmethod
+    def _matching_analysis_result_response(
+        analysis: MatchingAnalysis,
+    ) -> MatchingAnalysisResultResponse:
+        return build_matching_analysis_result_response(analysis)
 
     @staticmethod
     def _analysis_response(

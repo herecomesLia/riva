@@ -10,6 +10,7 @@ from pydantic import (
     model_validator,
 )
 
+from riva.schemas.base import APIModel
 from riva.schemas.job_description_parsing import (
     AnalysisItemList,
     Company,
@@ -175,6 +176,20 @@ class MatchingAnalysisInput(_MatchingInputModel):
 
 
 class MatchingAnalysisOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    overall_match_score: OverallMatchScore
+    core_requirements_summary: Summary
+    matched_capabilities: AnalysisItemList
+    missing_capabilities: AnalysisItemList
+    underrepresented_capabilities: AnalysisItemList
+    resume_highlights: AnalysisItemList
+    resume_gaps: AnalysisItemList
+    high_risk_questions: AnalysisItemList
+    preparation_recommendations: AnalysisItemList
+
+
+class MatchingAnalysisResultResponse(APIModel):
     model_config = ConfigDict(extra="forbid")
 
     overall_match_score: OverallMatchScore

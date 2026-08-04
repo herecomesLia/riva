@@ -12,10 +12,12 @@ from riva.schemas.roles import (
     CreateTargetRoleRequest,
     DeleteTargetRoleVersion,
     JobDescriptionParsingStatusQuery,
+    MatchingAnalysisStatusQuery,
     RolesPageResponse,
     SaveJobDescriptionRequest,
     SetCurrentTargetRoleRequest,
     StartJobDescriptionParsingRequest,
+    StartMatchingAnalysisRequest,
     TargetRoleResponse,
     UpdateJobDescriptionAnalysisModuleRequest,
     UpdatePreparationStatusRequest,
@@ -26,6 +28,7 @@ from riva.services.roles import TargetRoleService
 RoleId = Annotated[UUID, Path(alias="roleId")]
 VersionQuery = Annotated[DeleteTargetRoleVersion, Query()]
 ParsingStatusQuery = Annotated[JobDescriptionParsingStatusQuery, Query()]
+MatchingStatusQuery = Annotated[MatchingAnalysisStatusQuery, Query()]
 
 router = APIRouter(
     prefix="/roles",
@@ -175,6 +178,41 @@ async def get_job_description_parsing_status(
     role_service: TargetRoleService = Depends(get_target_role_service),
 ) -> TargetRoleResponse:
     return await role_service.get_job_description_parsing_status(
+        current_user,
+        role_id,
+        query,
+    )
+
+
+@router.post(
+    "/{roleId}/matching-analysis",
+    response_model=RolesPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def start_matching_analysis(
+    role_id: RoleId,
+    payload: StartMatchingAnalysisRequest,
+    current_user: User = Depends(require_current_user),
+    role_service: TargetRoleService = Depends(get_target_role_service),
+) -> RolesPageResponse:
+    return await role_service.start_matching_analysis(
+        current_user,
+        role_id,
+        payload,
+    )
+
+
+@router.get(
+    "/{roleId}/matching-analysis",
+    response_model=TargetRoleResponse,
+)
+async def get_matching_analysis_status(
+    role_id: RoleId,
+    query: MatchingStatusQuery,
+    current_user: User = Depends(require_current_user),
+    role_service: TargetRoleService = Depends(get_target_role_service),
+) -> TargetRoleResponse:
+    return await role_service.get_matching_analysis_status(
         current_user,
         role_id,
         query,

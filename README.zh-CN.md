@@ -41,7 +41,7 @@ JavaScript/TypeScript 包使用 `pnpm` 管理，Python 服务使用 `uv` 管理�
 先启动 PostgreSQL 并初始化数据库表，再在两个独立终端中运行 API 和 Worker：
 
 ```bash
-docker compose -f infra/local/docker-compose.yml up -d postgres
+podman compose -f infra/local/docker-compose.yml up -d postgres
 uv run --directory apps/server riva db setup --env-file "$PWD/.env"
 uv run --directory apps/server riva start --env-file "$PWD/.env"
 uv run --directory apps/server riva worker --env-file "$PWD/.env"
@@ -49,8 +49,9 @@ uv run --directory apps/server riva worker --env-file "$PWD/.env"
 
 未配置 `RIVA_LLM_PROVIDER` 时，Worker 会使用空 Handler Registry 启动。完整配置
 Qwen（`RIVA_LLM_PROVIDER=qwen`、model、API Key 和 base URL）后，会注册
-`job-description-parser`，启动日志中的 `handler_count` 应为 `1`。API 目前尚未提供
-解析任务入队接口，因此前端正常触发解析仍依赖后续 Step3D API。
+`job-description-parser` 和 `matching-analyzer`，启动日志中的 `handler_count` 应为
+`2`。API 已暴露 JD parsing lifecycle 和 Matching analysis lifecycle；前端真实 API
+接入将在后续完成。
 
 默认自动化测试只使用 Fake Provider，不会请求 Qwen。真实 Qwen 验收需由开发者准备
 本地 `.env` 后显式执行。

@@ -130,6 +130,15 @@ class FakeTargetRoleService:
             raise self.error
         return target_role()
 
+    async def start_matching_analysis(self, user, role_id, payload):
+        return await self._result("start-matching", user, role_id, payload)
+
+    async def get_matching_analysis_status(self, user, role_id, query):
+        self.calls.append(("matching-status", (user, role_id, query)))
+        if self.error is not None:
+            raise self.error
+        return target_role()
+
 
 def user() -> User:
     return User(
@@ -180,6 +189,16 @@ def roles_client(app, service: FakeTargetRoleService) -> TestClient:
             "get",
             f"/api/roles/{ROLE_ID}/job-description/parsing"
             "?version=2&jobDescriptionVersion=1",
+            None,
+        ),
+        (
+            "post",
+            f"/api/roles/{ROLE_ID}/matching-analysis",
+            {"version": 2},
+        ),
+        (
+            "get",
+            f"/api/roles/{ROLE_ID}/matching-analysis?version=2",
             None,
         ),
     ],
@@ -245,6 +264,27 @@ def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
     assert polled.status_code == 200
     assert polled.json() == target_role().model_dump(mode="json")
     assert service.calls[1][0] == "parsing-status"
+
+
+def test_start_matching_returns_202_and_status_get_uses_query_version(app) -> None:
+    service = FakeTargetRoleService()
+    path = f"/api/roles/{ROLE_ID}/matching-analysis"
+
+    with roles_client(app, service) as client:
+        started = client.post(
+            path,
+            json={"version": 2},
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+        polled = client.get(f"{path}?version=2")
+
+    assert started.status_code == 202
+    assert service.calls[0][0] == "start-matching"
+    assert service.calls[0][1][2].version == 2
+    assert polled.status_code == 200
+    assert polled.json() == target_role().model_dump(mode="json")
+    assert service.calls[1][0] == "matching-status"
+    assert service.calls[1][1][2].version == 2
 
 
 @pytest.mark.parametrize(
@@ -329,6 +369,7 @@ def test_mutation_routes_return_page_and_forward_path_role(
             f"/api/roles/{ROLE_ID}/job-description/parsing",
             {"version": 2, "jobDescriptionVersion": 1},
         ),
+        ("post", f"/api/roles/{ROLE_ID}/matching-analysis", {"version": 2}),
     ],
 )
 def test_all_mutations_require_csrf(app, method, url, payload) -> None:
@@ -377,6 +418,16 @@ def test_all_mutations_require_csrf(app, method, url, payload) -> None:
             "get",
             "/api/roles/not-a-uuid/job-description/parsing"
             "?version=1&jobDescriptionVersion=1",
+            None,
+        ),
+        (
+            "post",
+            f"/api/roles/{ROLE_ID}/matching-analysis",
+            {"version": 0},
+        ),
+        (
+            "get",
+            f"/api/roles/{ROLE_ID}/matching-analysis?version=0",
             None,
         ),
     ],
