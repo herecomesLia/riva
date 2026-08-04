@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+import json
 import os
 from uuid import UUID, uuid4
 
@@ -8,6 +9,7 @@ import pytest
 from sqlalchemy import select
 from riva.agents import MatchingAnalysisAgent
 from riva.core.config import Settings
+from riva.core.errors import APIError
 from riva.db.database import Database
 from riva.integrations import LLMUsage, MessageRole, ProviderUnavailableError
 from riva.models import (
@@ -29,7 +31,7 @@ from riva.schemas.roles import (
     StartMatchingAnalysisRequest,
 )
 from riva.services.agent_runs import AgentRunService
-from riva.services.roles import TargetRoleService
+from riva.services.roles import MATCHING_FAILURE_REASON, TargetRoleService
 from riva.workers import (
     AgentHandlerRegistry,
     AgentWorker,
@@ -318,6 +320,20 @@ async def setup_matching(
     return MatchingSetup(owner, role, profile, analysis, run, provider, worker)
 
 
+async def remove_seed_matching_run(
+    database: Database,
+    setup: MatchingSetup,
+) -> None:
+    async with database.sessionmaker() as session:
+        stored_role = await session.get(TargetRole, setup.role.id)
+        stored_run = await session.get(AgentRun, setup.run.id)
+        assert stored_role is not None
+        assert stored_run is not None
+        stored_role.matching_analysis_run_id = None
+        await session.delete(stored_run)
+        await session.commit()
+
+
 def test_matching_worker_success_chain_with_fake_provider() -> None:
     async def run_test() -> None:
         provider = FakeLLMProvider(
@@ -508,6 +524,350 @@ def test_matching_service_worker_status_e2e_with_fake_provider() -> None:
                     )
                     assert stored_analysis is not None
                     assert stored_analysis.source_agent_run_id == stored_run.id
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+@pytest.mark.parametrize("mutation", ["prompt_id", "profile_version"])
+def test_matching_current_result_with_invalid_run_is_noop(
+    mutation: str,
+) -> None:
+    async def run_test() -> None:
+        provider = FakeLLMProvider([MATCHING_OUTPUT])
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                setup = await setup_matching(database, provider)
+                assert await setup.worker.process_one() is True
+
+                async with database.sessionmaker() as session:
+                    stored_role = await session.get(TargetRole, setup.role.id)
+                    stored_run = await session.get(AgentRun, setup.run.id)
+                    stored_analysis = await session.get(
+                        MatchingAnalysis,
+                        setup.role.id,
+                    )
+                    assert stored_role is not None
+                    assert stored_run is not None
+                    assert stored_analysis is not None
+                    assert stored_role.version == 2
+                    pointer = stored_role.matching_analysis_run_id
+                    before_version = stored_role.version
+                    before_result = {
+                        "overall_match_score": stored_analysis.overall_match_score,
+                        "core_requirements_summary": (
+                            stored_analysis.core_requirements_summary
+                        ),
+                        "matched_capabilities": list(
+                            stored_analysis.matched_capabilities
+                        ),
+                        "missing_capabilities": list(
+                            stored_analysis.missing_capabilities
+                        ),
+                        "underrepresented_capabilities": list(
+                            stored_analysis.underrepresented_capabilities
+                        ),
+                        "resume_highlights": list(
+                            stored_analysis.resume_highlights
+                        ),
+                        "resume_gaps": list(stored_analysis.resume_gaps),
+                        "high_risk_questions": list(
+                            stored_analysis.high_risk_questions
+                        ),
+                        "preparation_recommendations": list(
+                            stored_analysis.preparation_recommendations
+                        ),
+                    }
+                    if mutation == "prompt_id":
+                        stored_run.prompt_id = "invalid-matching-prompt"
+                    else:
+                        stored_run.payload = {
+                            **stored_run.payload,
+                            "profileVersion": 999,
+                        }
+                    await session.commit()
+
+                async with database.sessionmaker() as session:
+                    snapshot = await TargetRoleService(
+                        session,
+                    ).start_matching_analysis(
+                        setup.owner,
+                        setup.role.id,
+                        StartMatchingAnalysisRequest(version=before_version),
+                    )
+                    projected = next(
+                        role
+                        for role in snapshot.roles
+                        if role.id == setup.role.id
+                    )
+                    assert projected.version == before_version
+                    assert projected.matching_analysis is not None
+                    assert projected.matching_analysis.status == "current"
+                    assert snapshot.profile_context.version == 1
+
+                async with database.sessionmaker() as session:
+                    matching_runs = list(
+                        (
+                            await session.scalars(
+                                select(AgentRun).where(
+                                    AgentRun.user_id == setup.owner.id,
+                                    AgentRun.agent_id == "matching-analyzer",
+                                )
+                            )
+                        ).all()
+                    )
+                    stored_role = await session.get(TargetRole, setup.role.id)
+                    stored_analysis = await session.get(
+                        MatchingAnalysis,
+                        setup.role.id,
+                    )
+                    assert len(matching_runs) == 1
+                    assert matching_runs[0].id == setup.run.id
+                    assert stored_role is not None
+                    assert stored_role.version == before_version
+                    assert stored_role.matching_analysis_run_id == pointer
+                    assert stored_analysis is not None
+                    after_result = {
+                        "overall_match_score": stored_analysis.overall_match_score,
+                        "core_requirements_summary": (
+                            stored_analysis.core_requirements_summary
+                        ),
+                        "matched_capabilities": list(
+                            stored_analysis.matched_capabilities
+                        ),
+                        "missing_capabilities": list(
+                            stored_analysis.missing_capabilities
+                        ),
+                        "underrepresented_capabilities": list(
+                            stored_analysis.underrepresented_capabilities
+                        ),
+                        "resume_highlights": list(
+                            stored_analysis.resume_highlights
+                        ),
+                        "resume_gaps": list(stored_analysis.resume_gaps),
+                        "high_risk_questions": list(
+                            stored_analysis.high_risk_questions
+                        ),
+                        "preparation_recommendations": list(
+                            stored_analysis.preparation_recommendations
+                        ),
+                    }
+                    assert after_result == before_result
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_matching_start_concurrent_same_version_creates_one_run() -> None:
+    async def start_in_session(database: Database, setup: MatchingSetup):
+        async with database.sessionmaker() as session:
+            return await TargetRoleService(
+                session,
+                llm_provider="qwen",
+                llm_model="fake-matching-model",
+            ).start_matching_analysis(
+                setup.owner,
+                setup.role.id,
+                StartMatchingAnalysisRequest(version=1),
+            )
+
+    async def run_test() -> None:
+        provider = FakeLLMProvider([])
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                setup = await setup_matching(database, provider)
+                await remove_seed_matching_run(database, setup)
+
+                results = await asyncio.gather(
+                    start_in_session(database, setup),
+                    start_in_session(database, setup),
+                    return_exceptions=True,
+                )
+                successes = [
+                    result
+                    for result in results
+                    if not isinstance(result, BaseException)
+                ]
+                errors = [
+                    result
+                    for result in results
+                    if isinstance(result, APIError)
+                ]
+                assert len(successes) == 1
+                assert len(errors) == 1
+                assert errors[0].error == "target_role_version_conflict"
+
+                async with database.sessionmaker() as session:
+                    stored_role = await session.get(TargetRole, setup.role.id)
+                    assert stored_role is not None
+                    matching_runs = list(
+                        (
+                            await session.scalars(
+                                select(AgentRun).where(
+                                    AgentRun.user_id == setup.owner.id,
+                                    AgentRun.agent_id == "matching-analyzer",
+                                )
+                            )
+                        ).all()
+                    )
+                    assert len(matching_runs) == 1
+                    run = matching_runs[0]
+                    assert stored_role.version == 2
+                    assert stored_role.matching_analysis_run_id == run.id
+                    assert run.status is AgentRunStatus.QUEUED
+                    assert run.payload == {
+                        "roleId": str(setup.role.id),
+                        "profileId": str(setup.profile.profile_id),
+                        "profileVersion": 1,
+                        "jobDescriptionVersion": 1,
+                        "jobDescriptionAnalysisVersion": 1,
+                    }
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_matching_failed_run_retry_replaces_pointer_and_preserves_audit() -> None:
+    async def run_test() -> None:
+        provider = FakeLLMProvider([])
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                setup = await setup_matching(database, provider)
+                await remove_seed_matching_run(database, setup)
+
+                async with database.sessionmaker() as session:
+                    started = await TargetRoleService(
+                        session,
+                        llm_provider="qwen",
+                        llm_model="fake-matching-model",
+                    ).start_matching_analysis(
+                        setup.owner,
+                        setup.role.id,
+                        StartMatchingAnalysisRequest(version=1),
+                    )
+                    started_role = next(
+                        role
+                        for role in started.roles
+                        if role.id == setup.role.id
+                    )
+                    assert started_role.version == 2
+                    stored_role = await session.get(TargetRole, setup.role.id)
+                    assert stored_role is not None
+                    old_run = await session.get(
+                        AgentRun,
+                        stored_role.matching_analysis_run_id,
+                    )
+                    assert old_run is not None
+                    old_run.status = AgentRunStatus.FAILED
+                    old_run.attempt_count = 1
+                    old_run.started_at = START
+                    old_run.finished_at = START
+                    old_run.error_code = "provider_secret_internal_failure"
+                    old_key = old_run.idempotency_key
+                    await session.commit()
+                    old_run_id = old_run.id
+
+                async with database.sessionmaker() as session:
+                    retried = await TargetRoleService(
+                        session,
+                        llm_provider="qwen",
+                        llm_model="fake-matching-model",
+                    ).start_matching_analysis(
+                        setup.owner,
+                        setup.role.id,
+                        StartMatchingAnalysisRequest(version=2),
+                    )
+                    retried_role = next(
+                        role
+                        for role in retried.roles
+                        if role.id == setup.role.id
+                    )
+                    assert retried_role.version == 3
+                    assert retried_role.matching_analysis is not None
+                    assert retried_role.matching_analysis.status == "generating"
+                    stored_role = await session.get(TargetRole, setup.role.id)
+                    assert stored_role is not None
+                    assert stored_role.matching_analysis_run_id is not None
+                    new_run = await session.get(
+                        AgentRun,
+                        stored_role.matching_analysis_run_id,
+                    )
+                    old_run = await session.get(AgentRun, old_run_id)
+                    assert new_run is not None
+                    assert old_run is not None
+                    assert new_run.id != old_run.id
+                    assert new_run.status is AgentRunStatus.QUEUED
+                    assert old_run.status is AgentRunStatus.FAILED
+                    assert new_run.idempotency_key != old_key
+                    assert new_run.payload == old_run.payload
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_matching_failed_projection_hides_internal_error_details() -> None:
+    async def run_test() -> None:
+        provider = FakeLLMProvider([])
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                setup = await setup_matching(database, provider)
+                async with database.sessionmaker() as session:
+                    claimed = await AgentRunService(session).claim_next(
+                        lease_owner="matching-failure-test",
+                        lease_duration=timedelta(minutes=5),
+                    )
+                    assert claimed is not None
+                    assert claimed.id == setup.run.id
+                    assert claimed.lease_token is not None
+                    await AgentRunService(session).mark_failed(
+                        run_id=claimed.id,
+                        lease_token=claimed.lease_token,
+                        error_code="provider_secret_internal_failure",
+                        retryable=False,
+                        retry_delay=timedelta(0),
+                    )
+
+                async with database.sessionmaker() as session:
+                    service = TargetRoleService(session)
+                    page = await service.get_roles_page(setup.owner)
+                    snapshot = await service.get_matching_analysis_status(
+                        setup.owner,
+                        setup.role.id,
+                        MatchingAnalysisStatusQuery(version=1),
+                    )
+                    for response in (
+                        next(
+                            role
+                            for role in page.roles
+                            if role.id == setup.role.id
+                        ),
+                        snapshot,
+                    ):
+                        projected = response.matching_analysis
+                        assert projected is not None
+                        assert projected.status == "failed"
+                        assert projected.failure_reason == MATCHING_FAILURE_REASON
+                        encoded = json.dumps(
+                            response.model_dump(mode="json", by_alias=True)
+                        )
+                        assert "provider_secret_internal_failure" not in encoded
+                        for field in (
+                            "errorCode",
+                            "provider",
+                            "model",
+                            "inputTokens",
+                            "outputTokens",
+                            "runId",
+                        ):
+                            assert field not in encoded
             finally:
                 await database.reset()
 

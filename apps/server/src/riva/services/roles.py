@@ -527,7 +527,7 @@ class TargetRoleService:
                         status.HTTP_409_CONFLICT,
                         "matching_analysis_state_conflict",
                     )
-            elif current_result and role.matching_analysis_run is None:
+            elif current_result:
                 return await self._commit_page(user.id)
 
             self._require_matching_configuration()

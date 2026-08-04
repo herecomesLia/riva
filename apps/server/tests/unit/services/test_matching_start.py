@@ -172,6 +172,36 @@ def test_current_and_generating_are_no_ops_before_configuration_check() -> None:
     assert run_service.calls == []
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    ["prompt_id", "profile_version"],
+)
+def test_current_result_with_invalid_run_is_no_op_before_configuration(
+    mutation: str,
+) -> None:
+    owner, role, _profile, _analysis, run_service, service = make_service(
+        provider=None,
+        model=None,
+    )
+    run = role.matching_analysis_run
+    assert run is not None
+    pointer = role.matching_analysis_run_id
+    version = role.version
+    if mutation == "prompt_id":
+        run.prompt_id = "invalid-matching-prompt"
+    else:
+        run.payload = {**run.payload, "profileVersion": 999}
+
+    page = start(service, owner, role)
+
+    projected = page.roles[0].matching_analysis
+    assert projected is not None
+    assert projected.status == "current"
+    assert run_service.calls == []
+    assert role.version == version
+    assert role.matching_analysis_run_id == pointer
+
+
 def test_failed_run_is_retried_and_succeeded_without_result_conflicts() -> None:
     owner, role, _profile, _analysis, run_service, service = make_service()
     role.matching_analysis_run.status = AgentRunStatus.FAILED
