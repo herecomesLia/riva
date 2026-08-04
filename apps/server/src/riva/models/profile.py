@@ -37,7 +37,14 @@ class TimestampMixin:
 
 class CareerProfile(TimestampMixin, Base):
     __tablename__ = "career_profiles"
-    __table_args__ = (CheckConstraint("version >= 1"),)
+    __table_args__ = (
+        CheckConstraint("version >= 1"),
+        UniqueConstraint(
+            "user_id",
+            "id",
+            name="uq_career_profiles_user_id_id",
+        ),
+    )
 
     profile_id: Mapped[UUID] = mapped_column(
         "id",
