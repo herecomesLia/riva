@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
     from riva.models.auth import AuthSession
     from riva.models.profile import CareerProfile
+    from riva.models.resume_documents import ResumeDocument
     from riva.models.roles import CurrentTargetRole, TargetRole
 
 
@@ -51,6 +52,12 @@ class User(Base):
     agent_runs: Mapped[list[AgentRun]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    resume_documents: Mapped[list[ResumeDocument]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="ResumeDocument.user_id",
         passive_deletes=True,
     )
     career_profile: Mapped[CareerProfile | None] = relationship(

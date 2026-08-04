@@ -1,5 +1,6 @@
 from enum import StrEnum
 import os
+from pathlib import Path
 from typing import Annotated
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -39,6 +40,17 @@ class Settings(BaseSettings):
     worker_retry_base_seconds: float = Field(default=10, gt=0)
     worker_retry_max_seconds: float = Field(default=300, gt=0)
     worker_requeue_batch_size: int = Field(default=100, gt=0)
+    resume_storage_dir: Path = Path(".riva/resumes")
+    resume_max_upload_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        gt=0,
+        le=50 * 1024 * 1024,
+    )
+    resume_max_extracted_characters: int = Field(
+        default=100_000,
+        gt=0,
+        le=1_000_000,
+    )
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     cors_allow_credentials: bool = True
     session_digest_key: str
@@ -120,6 +132,13 @@ class Settings(BaseSettings):
         )
         os.environ["RIVA_WORKER_REQUEUE_BATCH_SIZE"] = str(
             self.worker_requeue_batch_size
+        )
+        os.environ["RIVA_RESUME_STORAGE_DIR"] = str(self.resume_storage_dir)
+        os.environ["RIVA_RESUME_MAX_UPLOAD_BYTES"] = str(
+            self.resume_max_upload_bytes
+        )
+        os.environ["RIVA_RESUME_MAX_EXTRACTED_CHARACTERS"] = str(
+            self.resume_max_extracted_characters
         )
         os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(
             self.cors_allowed_origins

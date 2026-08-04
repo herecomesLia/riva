@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -27,6 +28,9 @@ RIVA_ENV_KEYS = [
     "RIVA_WORKER_RETRY_BASE_SECONDS",
     "RIVA_WORKER_RETRY_MAX_SECONDS",
     "RIVA_WORKER_REQUEUE_BATCH_SIZE",
+    "RIVA_RESUME_STORAGE_DIR",
+    "RIVA_RESUME_MAX_UPLOAD_BYTES",
+    "RIVA_RESUME_MAX_EXTRACTED_CHARACTERS",
     "RIVA_CORS_ALLOWED_ORIGINS",
     "RIVA_CORS_ALLOW_CREDENTIALS",
     "RIVA_SESSION_DIGEST_KEY",
@@ -71,6 +75,9 @@ def test_settings_defaults_with_explicit_database_url(monkeypatch) -> None:
     assert settings.worker_retry_base_seconds == 10
     assert settings.worker_retry_max_seconds == 300
     assert settings.worker_requeue_batch_size == 100
+    assert settings.resume_storage_dir == Path(".riva/resumes")
+    assert settings.resume_max_upload_bytes == 10 * 1024 * 1024
+    assert settings.resume_max_extracted_characters == 100_000
     assert settings.cors_allowed_origins == []
     assert settings.cors_allow_credentials is True
     assert settings.session_digest_key == "test-session-digest-key"
@@ -113,6 +120,9 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
     monkeypatch.setenv("RIVA_WORKER_RETRY_BASE_SECONDS", "15")
     monkeypatch.setenv("RIVA_WORKER_RETRY_MAX_SECONDS", "240")
     monkeypatch.setenv("RIVA_WORKER_REQUEUE_BATCH_SIZE", "50")
+    monkeypatch.setenv("RIVA_RESUME_STORAGE_DIR", "var/lib/riva/resumes")
+    monkeypatch.setenv("RIVA_RESUME_MAX_UPLOAD_BYTES", "2097152")
+    monkeypatch.setenv("RIVA_RESUME_MAX_EXTRACTED_CHARACTERS", "250000")
     monkeypatch.setenv("RIVA_CORS_ALLOWED_ORIGINS", "http://localhost:5173")
     monkeypatch.setenv("RIVA_CORS_ALLOW_CREDENTIALS", "false")
     monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "env-session-digest-key")
@@ -147,6 +157,9 @@ def test_settings_reads_riva_environment(monkeypatch) -> None:
     assert settings.worker_retry_base_seconds == 15
     assert settings.worker_retry_max_seconds == 240
     assert settings.worker_requeue_batch_size == 50
+    assert settings.resume_storage_dir == Path("var/lib/riva/resumes")
+    assert settings.resume_max_upload_bytes == 2 * 1024 * 1024
+    assert settings.resume_max_extracted_characters == 250_000
     assert settings.cors_allowed_origins == ["http://localhost:5173"]
     assert settings.cors_allow_credentials is False
     assert settings.session_digest_key == "env-session-digest-key"
@@ -219,6 +232,9 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
         worker_retry_base_seconds=15,
         worker_retry_max_seconds=240,
         worker_requeue_batch_size=50,
+        resume_storage_dir=Path("var/lib/riva/resumes"),
+        resume_max_upload_bytes=2 * 1024 * 1024,
+        resume_max_extracted_characters=250_000,
         cors_allowed_origins=[
             "http://localhost:5173",
             "http://127.0.0.1:5173",
@@ -256,6 +272,9 @@ def test_write_environ_sets_riva_environment(monkeypatch) -> None:
     assert os.environ["RIVA_WORKER_RETRY_BASE_SECONDS"] == "15.0"
     assert os.environ["RIVA_WORKER_RETRY_MAX_SECONDS"] == "240.0"
     assert os.environ["RIVA_WORKER_REQUEUE_BATCH_SIZE"] == "50"
+    assert os.environ["RIVA_RESUME_STORAGE_DIR"] == "var/lib/riva/resumes"
+    assert os.environ["RIVA_RESUME_MAX_UPLOAD_BYTES"] == "2097152"
+    assert os.environ["RIVA_RESUME_MAX_EXTRACTED_CHARACTERS"] == "250000"
     assert os.environ["RIVA_CORS_ALLOWED_ORIGINS"] == (
         "http://localhost:5173,http://127.0.0.1:5173"
     )
@@ -291,6 +310,9 @@ def test_write_environ_round_trips_empty_cors_allowed_origins(monkeypatch) -> No
     assert reloaded_settings.worker_lease_seconds == 300
     assert reloaded_settings.worker_heartbeat_seconds == 60
     assert reloaded_settings.worker_requeue_batch_size == 100
+    assert reloaded_settings.resume_storage_dir == Path(".riva/resumes")
+    assert reloaded_settings.resume_max_upload_bytes == 10 * 1024 * 1024
+    assert reloaded_settings.resume_max_extracted_characters == 100_000
     assert reloaded_settings.cors_allow_credentials is True
     assert reloaded_settings.session_digest_key == "test-session-digest-key"
     assert reloaded_settings.session_cookie_name == "riva_session"
@@ -336,6 +358,32 @@ def test_settings_rejects_retry_max_shorter_than_base(monkeypatch) -> None:
             session_digest_key="test-session-digest-key",
             worker_retry_base_seconds=20,
             worker_retry_max_seconds=10,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("resume_max_upload_bytes", 0),
+        ("resume_max_upload_bytes", -1),
+        ("resume_max_upload_bytes", 50 * 1024 * 1024 + 1),
+        ("resume_max_extracted_characters", 0),
+        ("resume_max_extracted_characters", -1),
+        ("resume_max_extracted_characters", 1_000_001),
+    ],
+)
+def test_settings_rejects_invalid_resume_limits(
+    monkeypatch,
+    field: str,
+    value: int,
+) -> None:
+    clear_riva_env(monkeypatch)
+
+    with pytest.raises(ValidationError, match=field):
+        Settings(
+            database_url="postgresql+asyncpg://user:pass@localhost/db",
+            session_digest_key="test-session-digest-key",
+            **{field: value},
         )
 
 
