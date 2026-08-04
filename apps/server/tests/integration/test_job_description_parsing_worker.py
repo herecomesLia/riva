@@ -313,7 +313,10 @@ def test_production_registry_runs_job_description_parsing_chain() -> None:
                     database.sessionmaker,
                     provider_factory=provider_factory,
                 )
-                assert registry.agent_ids == ("job-description-parser",)
+                assert registry.agent_ids == (
+                    "job-description-parser",
+                    "matching-analyzer",
+                )
 
                 setup = await setup_parsing(
                     database,

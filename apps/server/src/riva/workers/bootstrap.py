@@ -8,7 +8,7 @@ from typing import Any
 
 import structlog
 
-from riva.agents import JobDescriptionParsingAgent
+from riva.agents import JobDescriptionParsingAgent, MatchingAnalysisAgent
 from riva.core.config import Settings
 from riva.db import Database
 from riva.integrations import (
@@ -20,13 +20,16 @@ from riva.workers.handlers import AgentHandlerRegistry
 from riva.workers.job_description_parsing import (
     JobDescriptionParsingHandler,
 )
+from riva.workers.matching_analysis import MatchingAnalysisHandler
 from riva.workers.runtime import AgentWorker, SessionFactory
 
 
 DatabaseFactory = Callable[[str], Database]
 ProviderFactory = Callable[[Settings], LLMProvider | None]
-AgentFactory = Callable[..., JobDescriptionParsingAgent]
-HandlerFactory = Callable[..., JobDescriptionParsingHandler]
+JobDescriptionAgentFactory = Callable[..., JobDescriptionParsingAgent]
+JobDescriptionHandlerFactory = Callable[..., JobDescriptionParsingHandler]
+MatchingAgentFactory = Callable[..., MatchingAnalysisAgent]
+MatchingHandlerFactory = Callable[..., MatchingAnalysisHandler]
 RegistryFactory = Callable[
     [Settings, SessionFactory],
     AgentHandlerRegistry,
@@ -41,8 +44,14 @@ def build_agent_handler_registry(
     session_factory: SessionFactory,
     *,
     provider_factory: ProviderFactory = build_llm_provider,
-    agent_factory: AgentFactory = JobDescriptionParsingAgent,
-    handler_factory: HandlerFactory = JobDescriptionParsingHandler,
+    job_description_agent_factory: JobDescriptionAgentFactory = (
+        JobDescriptionParsingAgent
+    ),
+    job_description_handler_factory: JobDescriptionHandlerFactory = (
+        JobDescriptionParsingHandler
+    ),
+    matching_agent_factory: MatchingAgentFactory = MatchingAnalysisAgent,
+    matching_handler_factory: MatchingHandlerFactory = MatchingAnalysisHandler,
 ) -> AgentHandlerRegistry:
     registry = AgentHandlerRegistry()
     provider = provider_factory(settings)
@@ -53,12 +62,21 @@ def build_agent_handler_registry(
     if not model:
         raise LLMProviderConfigurationError from None
 
-    agent = agent_factory(provider=provider, model=model)
-    handler = handler_factory(
-        session_factory=session_factory,
-        agent=agent,
+    job_description_agent = job_description_agent_factory(
+        provider=provider,
+        model=model,
     )
-    registry.register(handler)
+    job_description_handler = job_description_handler_factory(
+        session_factory=session_factory,
+        agent=job_description_agent,
+    )
+    matching_agent = matching_agent_factory(provider=provider, model=model)
+    matching_handler = matching_handler_factory(
+        session_factory=session_factory,
+        agent=matching_agent,
+    )
+    registry.register(job_description_handler)
+    registry.register(matching_handler)
     return registry
 
 

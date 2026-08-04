@@ -6,13 +6,14 @@ from typing import Any
 
 import pytest
 
-from riva.agents import JobDescriptionParsingAgent
+from riva.agents import JobDescriptionParsingAgent, MatchingAnalysisAgent
 from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
 from riva.workers import (
     AgentHandlerRegistry,
     DuplicateAgentHandlerError,
     JobDescriptionParsingHandler,
+    MatchingAnalysisHandler,
 )
 from riva.workers.bootstrap import (
     build_agent_handler_registry,
@@ -105,6 +106,13 @@ class StubHandler:
         raise AssertionError("handler must not execute in bootstrap tests")
 
 
+class MatchingStubHandler:
+    agent_id = "matching-analyzer"
+
+    async def execute(self, _run):
+        raise AssertionError("handler must not execute in bootstrap tests")
+
+
 def settings(**overrides: object) -> Settings:
     overrides.setdefault("worker_id", None)
     overrides.setdefault("llm_provider", None)
@@ -168,8 +176,10 @@ def test_registry_without_provider_does_not_build_agent_or_handler() -> None:
         current,
         session_factory,  # type: ignore[arg-type]
         provider_factory=provider_factory,
-        agent_factory=unexpected_factory,
-        handler_factory=unexpected_factory,
+        job_description_agent_factory=unexpected_factory,
+        job_description_handler_factory=unexpected_factory,
+        matching_agent_factory=unexpected_factory,
+        matching_handler_factory=unexpected_factory,
     )
 
     assert provider_calls == [current]
@@ -186,43 +196,78 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     session_factory = object()
     provider = FakeLLMProvider([])
     provider_calls: list[Settings] = []
-    agent_calls: list[dict[str, object]] = []
-    handler_calls: list[dict[str, object]] = []
-    handlers: list[JobDescriptionParsingHandler] = []
+    job_description_agent_calls: list[dict[str, object]] = []
+    matching_agent_calls: list[dict[str, object]] = []
+    job_description_handler_calls: list[dict[str, object]] = []
+    matching_handler_calls: list[dict[str, object]] = []
+    job_description_handlers: list[JobDescriptionParsingHandler] = []
+    matching_handlers: list[MatchingAnalysisHandler] = []
 
     def provider_factory(received: Settings):
         provider_calls.append(received)
         return provider
 
-    def agent_factory(**options: object) -> JobDescriptionParsingAgent:
-        agent_calls.append(options)
+    def job_description_agent_factory(
+        **options: object,
+    ) -> JobDescriptionParsingAgent:
+        job_description_agent_calls.append(options)
         return JobDescriptionParsingAgent(**options)  # type: ignore[arg-type]
 
-    def handler_factory(**options: object) -> JobDescriptionParsingHandler:
-        handler_calls.append(options)
+    def matching_agent_factory(**options: object) -> MatchingAnalysisAgent:
+        matching_agent_calls.append(options)
+        return MatchingAnalysisAgent(**options)  # type: ignore[arg-type]
+
+    def job_description_handler_factory(
+        **options: object,
+    ) -> JobDescriptionParsingHandler:
+        job_description_handler_calls.append(options)
         handler = JobDescriptionParsingHandler(**options)  # type: ignore[arg-type]
-        handlers.append(handler)
+        job_description_handlers.append(handler)
+        return handler
+
+    def matching_handler_factory(
+        **options: object,
+    ) -> MatchingAnalysisHandler:
+        matching_handler_calls.append(options)
+        handler = MatchingAnalysisHandler(**options)  # type: ignore[arg-type]
+        matching_handlers.append(handler)
         return handler
 
     registry = build_agent_handler_registry(
         current,
         session_factory,  # type: ignore[arg-type]
         provider_factory=provider_factory,
-        agent_factory=agent_factory,
-        handler_factory=handler_factory,
+        job_description_agent_factory=job_description_agent_factory,
+        job_description_handler_factory=job_description_handler_factory,
+        matching_agent_factory=matching_agent_factory,
+        matching_handler_factory=matching_handler_factory,
     )
 
     assert provider_calls == [current]
-    assert len(agent_calls) == 1
-    assert agent_calls[0] == {"provider": provider, "model": "qwen-test-model"}
-    assert len(handler_calls) == 1
-    assert handler_calls[0]["session_factory"] is session_factory
-    agent = handler_calls[0]["agent"]
-    assert isinstance(agent, JobDescriptionParsingAgent)
-    registered = registry.get("job-description-parser")
-    assert registered is handlers[0]
-    assert handlers[0].agent is agent
-    assert registry.agent_ids == ("job-description-parser",)
+    assert job_description_agent_calls == [
+        {"provider": provider, "model": "qwen-test-model"}
+    ]
+    assert matching_agent_calls == [
+        {"provider": provider, "model": "qwen-test-model"}
+    ]
+    assert len(job_description_handler_calls) == 1
+    assert len(matching_handler_calls) == 1
+    assert job_description_handler_calls[0]["session_factory"] is session_factory
+    assert matching_handler_calls[0]["session_factory"] is session_factory
+    job_description_agent = job_description_handler_calls[0]["agent"]
+    matching_agent = matching_handler_calls[0]["agent"]
+    assert isinstance(job_description_agent, JobDescriptionParsingAgent)
+    assert isinstance(matching_agent, MatchingAnalysisAgent)
+    assert job_description_agent.provider is provider
+    assert matching_agent.provider is provider
+    assert job_description_handlers[0].agent is job_description_agent
+    assert matching_handlers[0].agent is matching_agent
+    assert registry.get("job-description-parser") is job_description_handlers[0]
+    assert registry.get("matching-analyzer") is matching_handlers[0]
+    assert registry.agent_ids == (
+        "job-description-parser",
+        "matching-analyzer",
+    )
 
 
 def test_registry_builds_production_qwen_handler_without_network() -> None:
@@ -241,6 +286,16 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(handler.agent, JobDescriptionParsingAgent)
     assert isinstance(handler.agent.provider, QwenProvider)
     assert handler.agent.model == "qwen-test-model"
+    matching = registry.get("matching-analyzer")
+    assert isinstance(matching, MatchingAnalysisHandler)
+    assert isinstance(matching.agent, MatchingAnalysisAgent)
+    assert isinstance(matching.agent.provider, QwenProvider)
+    assert matching.agent.provider is handler.agent.provider
+    assert matching.agent.model == "qwen-test-model"
+    assert registry.agent_ids == (
+        "job-description-parser",
+        "matching-analyzer",
+    )
 
 
 def test_registry_returns_empty_when_injected_provider_factory_returns_none() -> None:
@@ -248,8 +303,18 @@ def test_registry_returns_empty_when_injected_provider_factory_returns_none() ->
         settings(llm_model=None),
         object(),  # type: ignore[arg-type]
         provider_factory=lambda _settings: None,
-        agent_factory=lambda **_options: pytest.fail("agent constructed"),
-        handler_factory=lambda **_options: pytest.fail("handler constructed"),
+        job_description_agent_factory=lambda **_options: pytest.fail(
+            "agent constructed"
+        ),
+        job_description_handler_factory=lambda **_options: pytest.fail(
+            "handler constructed"
+        ),
+        matching_agent_factory=lambda **_options: pytest.fail(
+            "agent constructed"
+        ),
+        matching_handler_factory=lambda **_options: pytest.fail(
+            "handler constructed"
+        ),
     )
 
     assert len(registry) == 0
@@ -317,7 +382,7 @@ def test_registry_does_not_swallow_duplicate_handler_error() -> None:
             settings(llm_model="qwen-test-model"),
             object(),  # type: ignore[arg-type]
             provider_factory=lambda _settings: FakeLLMProvider([]),
-            handler_factory=duplicate_handler_factory,
+            matching_handler_factory=duplicate_handler_factory,
         )
 
 
@@ -420,6 +485,7 @@ def test_run_worker_logs_registered_handler() -> None:
         logger = FakeLogger()
         registry = AgentHandlerRegistry()
         registry.register(StubHandler())  # type: ignore[arg-type]
+        registry.register(MatchingStubHandler())  # type: ignore[arg-type]
 
         await run_worker(
             settings(),
@@ -440,8 +506,11 @@ def test_run_worker_logs_registered_handler() -> None:
             for _, _, fields in logger.events
             if fields.get("status") == "starting"
         )
-        assert starting["handler_count"] == 1
-        assert starting["agent_ids"] == ["job-description-parser"]
+        assert starting["handler_count"] == 2
+        assert starting["agent_ids"] == [
+            "job-description-parser",
+            "matching-analyzer",
+        ]
         assert not any(
             level == "warning" and fields.get("status") == "empty"
             for level, _, fields in logger.events
