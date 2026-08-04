@@ -44,20 +44,13 @@ from riva.schemas.roles import (
 )
 from riva.services.agent_runs import AgentRunService
 from riva.services.job_description_analyses import build_riva_summary
+from riva.services.profile_completion import career_profile_completed
 
 
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
 PARSING_FAILURE_REASON = (
     "Job description parsing failed. Please review the text and try again."
 )
-
-
-def career_profile_completed(profile: CareerProfile) -> bool:
-    return bool(profile.skills) and bool(
-        profile.education
-        or profile.work_experiences
-        or profile.project_experiences
-    )
 
 
 class TargetRoleService:
