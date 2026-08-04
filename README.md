@@ -52,7 +52,7 @@ Start PostgreSQL, initialize the schema, then run the API and Worker in
 separate terminals:
 
 ```bash
-docker compose -f infra/local/docker-compose.yml up -d postgres
+podman compose -f infra/local/docker-compose.yml up -d postgres
 uv run --directory apps/server riva db setup --env-file "$PWD/.env"
 uv run --directory apps/server riva start --env-file "$PWD/.env"
 uv run --directory apps/server riva worker --env-file "$PWD/.env"
