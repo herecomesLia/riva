@@ -61,9 +61,10 @@ uv run --directory apps/server riva worker --env-file "$PWD/.env"
 Without `RIVA_LLM_PROVIDER`, the Worker starts with an empty handler registry.
 With complete Qwen settings (`RIVA_LLM_PROVIDER=qwen`, model, API key, and base
 URL), it registers `job-description-parser` and `matching-analyzer`; the
-startup log then reports `handler_count=2`. The API does not yet expose an
-endpoint to enqueue either analysis, so normal frontend-triggered processing
-depends on later API work.
+startup log then reports `handler_count=2`. The API already exposes the
+job-description parsing lifecycle. Matching-analysis generation and status
+endpoints are added in the next matching API step, so frontend-triggered
+matching is not available yet.
 
 Default automated tests use a fake provider and never call Qwen. A real Qwen
 check must be run explicitly by a developer with the required values in a

@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.agents import AgentResult, MatchingAnalysisAgent
 from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.matching_analysis import (
-    MatchingAnalysisInput,
     MatchingAnalysisOutput,
 )
 from riva.services.matching_analyses import (
