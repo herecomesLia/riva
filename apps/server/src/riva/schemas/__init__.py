@@ -14,6 +14,16 @@ from riva.schemas.profile import (
     CareerProfilePutResponse,
     CareerProfileResponse,
 )
+from riva.schemas.matching_analysis import (
+    MatchingAnalysisInput,
+    MatchingAnalysisOutput,
+    MatchingAnalysisRunPayload,
+    MatchingCareerProfile,
+    MatchingJobContext,
+    MatchingProfileEducation,
+    MatchingProfileProjectExperience,
+    MatchingProfileWorkExperience,
+)
 from riva.schemas.roles import (
     ActiveTargetRolePreparationStatus,
     ArchiveTargetRoleRequest,
@@ -51,6 +61,14 @@ __all__ = [
     "JobDescriptionParsingRunPayload",
     "QualificationRequirements",
     "RequiredSkillGroups",
+    "MatchingAnalysisInput",
+    "MatchingAnalysisOutput",
+    "MatchingAnalysisRunPayload",
+    "MatchingCareerProfile",
+    "MatchingJobContext",
+    "MatchingProfileEducation",
+    "MatchingProfileProjectExperience",
+    "MatchingProfileWorkExperience",
     "ActiveTargetRolePreparationStatus",
     "ArchiveTargetRoleRequest",
     "CreateTargetRoleRequest",
