@@ -96,10 +96,10 @@ def job_description_snapshot(analysis: JobDescriptionAnalysis) -> dict[str, obje
 def make_user(user_id: UUID, suffix: str) -> User:
     return User(
         id=user_id,
-        username=f"matching-service-{suffix}-{user_id.hex[:8]}",
-        normalized_username=f"matching-service-{suffix}-{user_id.hex[:8]}",
+        username=user_id.hex,
+        normalized_username=user_id.hex,
         password_hash="hash",
-        display_name="Matching Service User",
+        display_name=f"Matching Service User {suffix}"[:64],
     )
 
 
