@@ -1,6 +1,6 @@
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 import pytest
@@ -19,6 +19,8 @@ from riva.prompts import MATCHING_ANALYSIS_PROMPT_V1
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
 from riva.services.matching_analyses import (
     INVALID_MATCHING_ANALYSIS_RUN,
+    MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY,
+    MATCHING_PROFILE_INCOMPLETE,
     MatchingAnalysisService,
     MatchingAnalysisStateError,
 )
@@ -190,6 +192,160 @@ def test_invalid_run_rolls_back_and_exposes_only_safe_matching_error() -> None:
     assert str(exc_info.value) == MatchingAnalysisStateError.safe_message
     assert session.commit_count == 0
     assert session.rollback_count == 1
+
+
+def invalid_contract_cases() -> list[tuple[str, Callable[[AgentRun], None]]]:
+    return [
+        ("agent_id", lambda run: setattr(run, "agent_id", "wrong-agent")),
+        ("prompt_id", lambda run: setattr(run, "prompt_id", "wrong-prompt")),
+        (
+            "prompt_version",
+            lambda run: setattr(run, "prompt_version", "999"),
+        ),
+        (
+            "output_schema_id",
+            lambda run: setattr(run, "output_schema_id", "wrong-schema"),
+        ),
+        (
+            "payload_missing_field",
+            lambda run: run.payload.pop("profileId"),
+        ),
+        (
+            "payload_extra_field",
+            lambda run: run.payload.update({"unexpected": "value"}),
+        ),
+        (
+            "invalid_role_id",
+            lambda run: run.payload.update({"roleId": "not-a-uuid"}),
+        ),
+        (
+            "invalid_profile_id",
+            lambda run: run.payload.update({"profileId": "not-a-uuid"}),
+        ),
+        (
+            "invalid_profile_version",
+            lambda run: run.payload.update({"profileVersion": 0}),
+        ),
+        (
+            "invalid_job_description_version",
+            lambda run: run.payload.update({"jobDescriptionVersion": 0}),
+        ),
+        (
+            "invalid_analysis_version",
+            lambda run: run.payload.update(
+                {"jobDescriptionAnalysisVersion": 0}
+            ),
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "case_name,mutate",
+    invalid_contract_cases(),
+    ids=lambda case: case[0] if isinstance(case, tuple) else str(case),
+)
+@pytest.mark.parametrize("operation", ["load", "persist"])
+def test_invalid_run_contract_matrix_is_safe_and_transactional(
+    case_name: str,
+    mutate: Callable[[AgentRun], None],
+    operation: str,
+) -> None:
+    _, role, _, _, run = graph()
+    mutate(run)
+    session = ScriptedSession()
+    service = MatchingAnalysisService(session, clock=lambda: NOW)
+
+    with pytest.raises(MatchingAnalysisStateError) as exc_info:
+        if operation == "load":
+            asyncio.run(service.load_matching_input(run))
+        else:
+            asyncio.run(service.persist_success(run, matching_output()))
+
+    assert case_name
+    assert exc_info.value.code == INVALID_MATCHING_ANALYSIS_RUN
+    assert str(exc_info.value) == MatchingAnalysisStateError.safe_message
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
+    assert session.added == []
+    assert role.version == 10
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(
+            lambda analysis: setattr(analysis, "riva_summary", "   "),
+            id="blank-summary",
+        ),
+        pytest.param(
+            lambda analysis: setattr(analysis, "responsibilities", [123]),
+            id="invalid-list-item",
+        ),
+    ],
+)
+@pytest.mark.parametrize("operation", ["load", "persist"])
+def test_invalid_jd_analysis_is_mapped_to_safe_state_error(
+    mutate: Callable[[JobDescriptionAnalysis], None],
+    operation: str,
+) -> None:
+    owner, role, profile, analysis, run = graph()
+    mutate(analysis)
+    scalar_values = (
+        (role, profile, analysis)
+        if operation == "load"
+        else (owner.id, role, profile, analysis, None, None)
+    )
+    session = ScriptedSession(*scalar_values)
+
+    with pytest.raises(MatchingAnalysisStateError) as exc_info:
+        if operation == "load":
+            asyncio.run(MatchingAnalysisService(session).load_matching_input(run))
+        else:
+            asyncio.run(
+                MatchingAnalysisService(session).persist_success(
+                    run,
+                    matching_output(),
+                )
+            )
+
+    assert exc_info.value.code == MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY
+    assert str(exc_info.value) == MatchingAnalysisStateError.safe_message
+    assert session.added == []
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
+    assert role.version == 10
+
+
+@pytest.mark.parametrize("operation", ["load", "persist"])
+def test_blank_database_skill_name_is_not_a_completed_profile(
+    operation: str,
+) -> None:
+    owner, role, profile, analysis, run = graph()
+    profile.skills[0].name = "   "
+    scalar_values = (
+        (role, profile, analysis)
+        if operation == "load"
+        else (owner.id, role, profile, analysis, None)
+    )
+    session = ScriptedSession(*scalar_values)
+
+    with pytest.raises(MatchingAnalysisStateError) as exc_info:
+        if operation == "load":
+            asyncio.run(MatchingAnalysisService(session).load_matching_input(run))
+        else:
+            asyncio.run(
+                MatchingAnalysisService(session).persist_success(
+                    run,
+                    matching_output(),
+                )
+            )
+
+    assert exc_info.value.code == MATCHING_PROFILE_INCOMPLETE
+    assert str(exc_info.value) == MatchingAnalysisStateError.safe_message
+    assert session.added == []
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
+    assert role.version == 10
 
 
 def test_persist_locks_in_required_order_and_saves_initial_result() -> None:
