@@ -156,6 +156,30 @@ def make_docx(
     return output.getvalue()
 
 
+def encode_xml(value: bytes, encoding: str, *, bom: bool = True) -> bytes:
+    text = value.decode("utf-8")
+    encoded = text.encode(encoding)
+    if not bom:
+        return encoded
+    if encoding == "utf-16-le":
+        return b"\xff\xfe" + encoded
+    if encoding == "utf-16-be":
+        return b"\xfe\xff" + encoded
+    if encoding == "utf-32-le":
+        return b"\xff\xfe\x00\x00" + encoded
+    if encoding == "utf-32-be":
+        return b"\x00\x00\xfe\xff" + encoded
+    raise AssertionError(f"unsupported test encoding: {encoding}")
+
+
+def xml_with_declaration(value: bytes, encoding: str) -> bytes:
+    return value.replace(
+        b'encoding="UTF-8"',
+        f'encoding="{encoding}"'.encode(),
+        1,
+    )
+
+
 def paragraph(text: str) -> str:
     return f"<w:p><w:r><w:t>{text}</w:t></w:r></w:p>"
 
@@ -354,6 +378,142 @@ def test_docx_extracts_paragraphs_tables_tabs_breaks_and_unicode() -> None:
     assert "Tab\tSeparated\nLine" in result.text
     assert "表格文字" in result.text
     assert result.text.index("第一段") < result.text.index("表格文字")
+
+
+@pytest.mark.parametrize(
+    ("encoding", "bom", "declaration"),
+    [
+        ("utf-16-le", True, "UTF-16"),
+        ("utf-16-be", True, "UTF-16"),
+        ("utf-16-le", False, "UTF-16"),
+        ("utf-16-be", False, "UTF-16"),
+        ("utf-32-le", True, "UTF-32"),
+        ("utf-32-be", True, "UTF-32"),
+        ("utf-32-le", False, "UTF-32"),
+        ("utf-32-be", False, "UTF-32"),
+    ],
+)
+def test_docx_rejects_multibyte_doctype_and_entity_before_xml_parse(
+    encoding: str,
+    bom: bool,
+    declaration: str,
+    monkeypatch,
+) -> None:
+    unsafe_document = (
+        b'<!DoCtYpE w:document [<!EnTiTy secret "blocked">]>'
+        + DOCUMENT_XML.replace(b"Resume", b"&secret;")
+    )
+    unsafe_content_types = b'<!EnTiTy secret "blocked">' + CONTENT_TYPES
+    document = encode_xml(unsafe_document, encoding, bom=bom)
+    content_types = encode_xml(
+        xml_with_declaration(unsafe_content_types, declaration),
+        encoding,
+        bom=bom,
+    )
+
+    def fail(*args, **kwargs):
+        raise AssertionError("ElementTree.fromstring must not be called")
+
+    monkeypatch.setattr(extraction_module.ElementTree, "fromstring", fail)
+    assert_error(
+        make_docx(document_xml=document, content_types=content_types),
+        "resume_docx_unsafe",
+    )
+
+
+@pytest.mark.parametrize(
+    ("encoding", "bom", "declaration"),
+    [
+        ("utf-16-le", True, "UTF-16"),
+        ("utf-16-be", False, "UTF-16"),
+    ],
+)
+def test_docx_content_types_multibyte_doctype_is_rejected(
+    encoding: str,
+    bom: bool,
+    declaration: str,
+) -> None:
+    unsafe_content_types = b"<!DoCtYpE Types>" + CONTENT_TYPES
+
+    assert_error(
+        make_docx(
+            content_types=encode_xml(
+                xml_with_declaration(unsafe_content_types, declaration),
+                encoding,
+                bom=bom,
+            )
+        ),
+        "resume_docx_unsafe",
+    )
+
+
+def test_docx_preflights_every_xml_member_before_elementtree(monkeypatch) -> None:
+    unsafe_document = (
+        b'<!DoCtYpE w:document [<!EnTiTy secret "blocked">]>'
+        + DOCUMENT_XML.replace(b"Resume", b"&secret;")
+    )
+
+    def fail(*args, **kwargs):
+        raise AssertionError("ElementTree.fromstring must not be called")
+
+    monkeypatch.setattr(extraction_module.ElementTree, "fromstring", fail)
+    assert_error(
+        make_docx(
+            document_xml=encode_xml(unsafe_document, "utf-16-le"),
+        ),
+        "resume_docx_unsafe",
+    )
+
+
+@pytest.mark.parametrize("encoding", ["utf-16-le", "utf-16-be"])
+@pytest.mark.parametrize("bom", [True, False])
+def test_docx_extracts_safe_utf16_document_and_content_types(
+    encoding: str,
+    bom: bool,
+) -> None:
+    document = encode_xml(
+        DOCUMENT_XML.replace(b"Resume", "中文简历".encode()),
+        encoding,
+        bom=bom,
+    )
+    content_types = encode_xml(
+        xml_with_declaration(CONTENT_TYPES, "UTF-16"),
+        encoding,
+        bom=bom,
+    )
+
+    result = extract(
+        make_docx(document_xml=document, content_types=content_types),
+        declared_media_type=APPLICATION_DOCX,
+    )
+
+    assert result.text == "中文简历"
+
+
+def test_docx_rejects_damaged_utf16_as_invalid() -> None:
+    damaged_document = encode_xml(DOCUMENT_XML, "utf-16-le")[:-1]
+
+    assert_error(
+        make_docx(document_xml=damaged_document),
+        "resume_docx_invalid",
+    )
+
+
+def test_docx_internal_entity_cannot_reach_extracted_text() -> None:
+    document = (
+        b'<!ENTITY secret "must not appear">'
+        + DOCUMENT_XML.replace(b"Resume", b"&secret;")
+    )
+
+    assert_error(make_docx(document_xml=document), "resume_docx_unsafe")
+
+
+def test_docx_character_limit_is_exact_and_not_silently_truncated() -> None:
+    exact = make_docx(document_xml=DOCUMENT_XML.replace(b"Resume", b"12345"))
+    over = make_docx(document_xml=DOCUMENT_XML.replace(b"Resume", b"123456"))
+
+    assert extract(exact, max_characters=5).text == "12345"
+    assert_error(over, "resume_text_too_large", max_characters=5)
 
 
 def test_docx_appends_header_footer_footnotes_and_endnotes_stably() -> None:

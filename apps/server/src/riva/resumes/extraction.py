@@ -59,6 +59,15 @@ _WORDPROCESSINGML_DOCUMENT_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 )
 _XML_UNSAFE_PATTERN = re.compile(rb"<!\s*(?:doctype|entity)\b", re.IGNORECASE)
+_XML_UNSAFE_TEXT_PATTERN = re.compile(
+    r"<!\s*(?:doctype|entity)\b",
+    re.IGNORECASE,
+)
+_UTF8_BOM = b"\xef\xbb\xbf"
+_UTF16_LE_BOM = b"\xff\xfe"
+_UTF16_BE_BOM = b"\xfe\xff"
+_UTF32_LE_BOM = b"\xff\xfe\x00\x00"
+_UTF32_BE_BOM = b"\x00\x00\xfe\xff"
 _ZIP_SIGNATURES = {
     b"PK\x03\x04",
     b"PK\x05\x06",
@@ -284,12 +293,6 @@ class DefaultResumeTextExtractor:
             if content_types_info is None or document_info is None:
                 raise ResumeExtractionError(RESUME_DOCX_INVALID)
 
-            content_types = self._read_xml_member(
-                archive,
-                content_types_info,
-            )
-            self._validate_content_types(content_types)
-
             xml_names = ["word/document.xml"]
             xml_names.extend(
                 sorted(
@@ -298,12 +301,24 @@ class DefaultResumeTextExtractor:
                     if _is_additional_word_text_member(name)
                 )
             )
+            xml_data = {
+                "[Content_Types].xml": self._read_xml_member(
+                    archive,
+                    content_types_info,
+                )
+            }
+            for name in xml_names:
+                xml_data[name] = self._read_xml_member(archive, members[name])
+
+            for member_data in xml_data.values():
+                _validate_safe_xml_bytes(member_data)
+
+            self._validate_content_types(xml_data["[Content_Types].xml"])
             accumulator = _TextAccumulator(max_characters)
             for member_number, name in enumerate(xml_names):
                 if member_number and accumulator.has_value:
                     accumulator.add("\n", structural=True)
-                xml_data = self._read_xml_member(archive, members[name])
-                root = _parse_xml(xml_data)
+                root = _parse_xml(xml_data[name])
                 try:
                     _append_wordprocessingml_text(root, accumulator)
                 except ResumeExtractionError:
@@ -525,12 +540,46 @@ def _is_additional_word_text_member(name: str) -> bool:
 
 
 def _parse_xml(data: bytes) -> ElementTree.Element:
-    if _XML_UNSAFE_PATTERN.search(data):
-        raise ResumeExtractionError(RESUME_DOCX_UNSAFE)
+    _validate_safe_xml_bytes(data)
     try:
         return ElementTree.fromstring(data)
     except Exception:
         raise ResumeExtractionError(RESUME_DOCX_INVALID) from None
+
+
+def _validate_safe_xml_bytes(data: bytes) -> None:
+    raw_unsafe = _XML_UNSAFE_PATTERN.search(data) is not None
+    encoding = _detect_xml_encoding(data)
+    try:
+        decoded = data.decode(encoding, errors="strict")
+    except UnicodeError:
+        raise ResumeExtractionError(RESUME_DOCX_INVALID) from None
+
+    if raw_unsafe or _XML_UNSAFE_TEXT_PATTERN.search(decoded):
+        raise ResumeExtractionError(RESUME_DOCX_UNSAFE)
+
+
+def _detect_xml_encoding(data: bytes) -> str:
+    if data.startswith(_UTF32_LE_BOM):
+        return "utf-32"
+    if data.startswith(_UTF32_BE_BOM):
+        return "utf-32"
+    if data.startswith(_UTF16_LE_BOM):
+        return "utf-16"
+    if data.startswith(_UTF16_BE_BOM):
+        return "utf-16"
+    if data.startswith(_UTF8_BOM):
+        return "utf-8-sig"
+
+    if data.startswith(b"<\x00\x00\x00"):
+        return "utf-32-le"
+    if data.startswith(b"\x00\x00\x00<"):
+        return "utf-32-be"
+    if data.startswith(b"<\x00"):
+        return "utf-16-le"
+    if data.startswith(b"\x00<"):
+        return "utf-16-be"
+    return "utf-8"
 
 
 def _append_wordprocessingml_text(
