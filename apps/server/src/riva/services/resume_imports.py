@@ -600,12 +600,39 @@ def _same_draft_source(
     result: ResumeParsingResult,
     profile: CareerProfile | None,
 ) -> bool:
-    return (
+    parsing_source_matches = (
         draft.parsing_result_version == result.result_version
         and draft.source_agent_run_id == result.source_agent_run_id
-        and draft.base_profile_id == (profile.profile_id if profile else None)
-        and draft.base_profile_version == (profile.version if profile else None)
     )
+
+    if draft.status == READY:
+        return parsing_source_matches and (
+            draft.base_profile_id == (profile.profile_id if profile else None)
+            and draft.base_profile_version == (profile.version if profile else None)
+        )
+
+    if draft.status == APPLIED:
+        if (
+            profile is None
+            or not isinstance(draft.applied_profile_version, int)
+            or isinstance(draft.applied_profile_version, bool)
+            or draft.applied_profile_version < 1
+        ):
+            raise ResumeImportStateError(RESUME_IMPORT_DRAFT_CONFLICT)
+        if (
+            draft.base_profile_id is not None
+            and profile.profile_id != draft.base_profile_id
+        ):
+            raise ResumeImportStateError(RESUME_IMPORT_DRAFT_CONFLICT)
+
+        return parsing_source_matches and (
+            profile.version == draft.applied_profile_version
+        )
+
+    if draft.status == SUPERSEDED:
+        return False
+
+    raise ResumeImportStateError(RESUME_IMPORT_DRAFT_CONFLICT)
 
 
 def _copy_json_list(value: object) -> list[dict[str, object]]:

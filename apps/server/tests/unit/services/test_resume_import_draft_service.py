@@ -130,6 +130,8 @@ def existing_draft(
     profile_id: UUID | None = None,
     profile_version: int | None = None,
     status: str = "ready",
+    applied_profile_version: int | None = None,
+    applied_at: datetime | None = None,
 ) -> ResumeImportDraft:
     return ResumeImportDraft(
         resume_document_id=document_id,
@@ -150,8 +152,8 @@ def existing_draft(
         skipped_items=[],
         protected_items=[],
         change_summary={"new_items": 0, "changed_items": 0, "missing_items": 0},
-        applied_profile_version=None,
-        applied_at=None,
+        applied_profile_version=applied_profile_version,
+        applied_at=applied_at,
         created_at=NOW,
         updated_at=NOW,
     )
@@ -208,15 +210,17 @@ def test_same_ready_source_is_idempotent_and_applied_source_does_not_reopen() ->
     assert session.commit_count == 1
     assert len(session.statements) == 5
 
+    profile = empty_profile(user_id, version=1)
     applied = existing_draft(
         user_id,
         document.id,
         result.source_agent_run_id,
         status="applied",
+        applied_profile_version=1,
+        applied_at=NOW,
     )
-    applied.applied_profile_version = 5
-    applied.applied_at = NOW
-    session = ScriptedSession(user_id, document, result, None, applied)
+    original_applied_at = applied.applied_at
+    session = ScriptedSession(user_id, document, result, profile, applied)
     returned = asyncio.run(
         ResumeImportDraftService(
             session,
@@ -229,6 +233,171 @@ def test_same_ready_source_is_idempotent_and_applied_source_does_not_reopen() ->
     assert returned is applied
     assert applied.status == "applied"
     assert applied.draft_version == 2
+    assert applied.base_profile_id is None
+    assert applied.base_profile_version is None
+    assert applied.applied_profile_version == 1
+    assert applied.applied_at == original_applied_at
+    assert len(session.statements) == 5
+
+
+def test_ready_source_with_existing_profile_compares_base_snapshot() -> None:
+    user_id, document, result = graph()
+    profile = empty_profile(user_id, version=3)
+    ready = existing_draft(
+        user_id,
+        document.id,
+        result.source_agent_run_id,
+        profile_id=profile.profile_id,
+        profile_version=3,
+    )
+    session = ScriptedSession(user_id, document, result, profile, ready)
+
+    returned = asyncio.run(
+        ResumeImportDraftService(
+            session,
+            clock=lambda: (_ for _ in ()).throw(AssertionError("clock called")),
+        ).build_draft(
+            user_id=user_id,
+            resume_document_id=document.id,
+        )
+    )
+
+    assert returned is ready
+    assert returned.status == "ready"
+    assert returned.draft_version == 2
+    assert len(session.statements) == 5
+
+
+def test_applied_existing_profile_uses_applied_version_not_base_version() -> None:
+    user_id, document, result = graph()
+    profile = empty_profile(user_id, version=4)
+    applied = existing_draft(
+        user_id,
+        document.id,
+        result.source_agent_run_id,
+        profile_id=profile.profile_id,
+        profile_version=3,
+        status="applied",
+        applied_profile_version=4,
+        applied_at=NOW,
+    )
+    session = ScriptedSession(user_id, document, result, profile, applied)
+
+    returned = asyncio.run(
+        ResumeImportDraftService(
+            session,
+            clock=lambda: (_ for _ in ()).throw(AssertionError("clock called")),
+        ).build_draft(
+            user_id=user_id,
+            resume_document_id=document.id,
+        )
+    )
+
+    assert returned is applied
+    assert returned.status == "applied"
+    assert returned.draft_version == 2
+    assert returned.base_profile_version == 3
+    assert returned.applied_profile_version == 4
+    assert len(session.statements) == 5
+
+
+def test_applied_profile_edit_rebuilds_ready_from_current_profile() -> None:
+    user_id, document, result = graph()
+    profile = empty_profile(user_id, version=5)
+    applied = existing_draft(
+        user_id,
+        document.id,
+        result.source_agent_run_id,
+        profile_id=profile.profile_id,
+        profile_version=3,
+        status="applied",
+        applied_profile_version=4,
+        applied_at=NOW,
+    )
+    session = ScriptedSession(user_id, document, result, profile, applied, None)
+
+    rebuilt = asyncio.run(
+        ResumeImportDraftService(session, clock=lambda: NOW).build_draft(
+            user_id=user_id,
+            resume_document_id=document.id,
+        )
+    )
+
+    assert rebuilt is applied
+    assert rebuilt.status == "ready"
+    assert rebuilt.draft_version == 3
+    assert rebuilt.base_profile_id == profile.profile_id
+    assert rebuilt.base_profile_version == 5
+    assert rebuilt.applied_profile_version is None
+    assert rebuilt.applied_at is None
+    assert len(session.statements) == 6
+
+
+@pytest.mark.parametrize("profile_kind", ["missing", "different_id"])
+def test_applied_profile_conflicts_without_reopening(profile_kind: str) -> None:
+    user_id, document, result = graph()
+    original_profile = empty_profile(user_id, version=1)
+    profile = None if profile_kind == "missing" else empty_profile(user_id, version=1)
+    applied = existing_draft(
+        user_id,
+        document.id,
+        result.source_agent_run_id,
+        profile_id=original_profile.profile_id,
+        profile_version=1,
+        status="applied",
+        applied_profile_version=1,
+        applied_at=NOW,
+    )
+    session = ScriptedSession(user_id, document, result, profile, applied)
+    before = (
+        applied.status,
+        applied.draft_version,
+        applied.base_profile_id,
+        applied.base_profile_version,
+        applied.applied_profile_version,
+        applied.applied_at,
+    )
+
+    with pytest.raises(ResumeImportStateError) as exc_info:
+        asyncio.run(
+            ResumeImportDraftService(session).build_draft(
+                user_id=user_id,
+                resume_document_id=document.id,
+            )
+        )
+
+    assert exc_info.value.code == "resume_import_draft_conflict"
+    assert (
+        applied.status,
+        applied.draft_version,
+        applied.base_profile_id,
+        applied.base_profile_version,
+        applied.applied_profile_version,
+        applied.applied_at,
+    ) == before
+    assert session.rollback_count == 1
+
+
+def test_invalid_draft_status_is_a_conflict() -> None:
+    user_id, document, result = graph()
+    invalid = existing_draft(
+        user_id,
+        document.id,
+        result.source_agent_run_id,
+        status="invalid",
+    )
+    session = ScriptedSession(user_id, document, result, None, invalid)
+
+    with pytest.raises(ResumeImportStateError) as exc_info:
+        asyncio.run(
+            ResumeImportDraftService(session).build_draft(
+                user_id=user_id,
+                resume_document_id=document.id,
+            )
+        )
+
+    assert exc_info.value.code == "resume_import_draft_conflict"
+    assert session.rollback_count == 1
 
 
 def test_profile_version_change_rebuilds_without_mutating_profile() -> None:
@@ -321,4 +490,3 @@ def test_naive_clock_and_commit_failure_roll_back() -> None:
             )
         )
     assert session.rollback_count == 1
-

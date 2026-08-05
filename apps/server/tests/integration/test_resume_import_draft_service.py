@@ -163,6 +163,178 @@ def test_service_persists_skips_and_is_idempotent_after_reload() -> None:
     asyncio.run(run())
 
 
+def test_first_import_applied_draft_stays_applied_after_profile_creation() -> None:
+    async def run() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            user, _, document, _ = await seed(database, "applied-first")
+
+            async with database.sessionmaker() as session:
+                draft = await ResumeImportDraftService(
+                    session,
+                    clock=lambda: NOW,
+                ).build_draft(
+                    user_id=user.id,
+                    resume_document_id=document.id,
+                )
+                assert draft.base_profile_id is None
+                assert draft.base_profile_version is None
+                before_apply = (
+                    draft.draft_version,
+                    draft.summary,
+                    draft.education,
+                    draft.work_experiences,
+                    draft.project_experiences,
+                    draft.skills,
+                    draft.unresolved_items,
+                    draft.skipped_items,
+                    draft.protected_items,
+                    draft.change_summary,
+                )
+
+            async with database.sessionmaker() as session:
+                session.add(
+                    CareerProfile(
+                        profile_id=uuid4(),
+                        user_id=user.id,
+                        summary=None,
+                        version=1,
+                        education=[],
+                        work_experiences=[],
+                        project_experiences=[],
+                        skills=[],
+                    )
+                )
+                stored_draft = await session.get(
+                    ResumeImportDraft,
+                    document.id,
+                )
+                assert stored_draft is not None
+                stored_draft.status = "applied"
+                stored_draft.applied_profile_version = 1
+                stored_draft.applied_at = NOW
+                await session.commit()
+
+            async with database.sessionmaker() as session:
+                returned = await ResumeImportDraftService(
+                    session,
+                    clock=lambda: (_ for _ in ()).throw(
+                        AssertionError("idempotent path called clock")
+                    ),
+                ).build_draft(
+                    user_id=user.id,
+                    resume_document_id=document.id,
+                )
+                assert returned.status == "applied"
+                assert returned.draft_version == before_apply[0]
+                assert returned.base_profile_id is None
+                assert returned.base_profile_version is None
+                assert returned.applied_profile_version == 1
+                assert returned.applied_at == NOW
+                assert (
+                    returned.draft_version,
+                    returned.summary,
+                    returned.education,
+                    returned.work_experiences,
+                    returned.project_experiences,
+                    returned.skills,
+                    returned.unresolved_items,
+                    returned.skipped_items,
+                    returned.protected_items,
+                    returned.change_summary,
+                ) == before_apply
+
+    asyncio.run(run())
+
+
+def test_existing_applied_draft_stays_applied_until_profile_changes() -> None:
+    async def run() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            user, _, document, _ = await seed(database, "applied-existing")
+            profile_id = uuid4()
+
+            async with database.sessionmaker() as session:
+                session.add(
+                    CareerProfile(
+                        profile_id=profile_id,
+                        user_id=user.id,
+                        summary="Existing",
+                        version=3,
+                        education=[],
+                        work_experiences=[],
+                        project_experiences=[],
+                        skills=[],
+                    )
+                )
+                await session.commit()
+
+            async with database.sessionmaker() as session:
+                draft = await ResumeImportDraftService(
+                    session,
+                    clock=lambda: NOW,
+                ).build_draft(
+                    user_id=user.id,
+                    resume_document_id=document.id,
+                )
+                assert draft.base_profile_id == profile_id
+                assert draft.base_profile_version == 3
+
+            async with database.sessionmaker() as session:
+                stored_profile = await session.get(CareerProfile, profile_id)
+                stored_draft = await session.get(
+                    ResumeImportDraft,
+                    document.id,
+                )
+                assert stored_profile is not None
+                assert stored_draft is not None
+                stored_profile.version = 4
+                stored_draft.status = "applied"
+                stored_draft.applied_profile_version = 4
+                stored_draft.applied_at = NOW
+                await session.commit()
+
+            async with database.sessionmaker() as session:
+                applied = await ResumeImportDraftService(
+                    session,
+                    clock=lambda: (_ for _ in ()).throw(
+                        AssertionError("applied idempotent path called clock")
+                    ),
+                ).build_draft(
+                    user_id=user.id,
+                    resume_document_id=document.id,
+                )
+                assert applied.status == "applied"
+                assert applied.draft_version == 1
+                assert applied.base_profile_id == profile_id
+                assert applied.base_profile_version == 3
+                assert applied.applied_profile_version == 4
+                assert applied.applied_at == NOW
+
+            async with database.sessionmaker() as session:
+                stored_profile = await session.get(CareerProfile, profile_id)
+                assert stored_profile is not None
+                stored_profile.version = 5
+                await session.commit()
+
+            async with database.sessionmaker() as session:
+                rebuilt = await ResumeImportDraftService(
+                    session,
+                    clock=lambda: NOW,
+                ).build_draft(
+                    user_id=user.id,
+                    resume_document_id=document.id,
+                )
+                assert rebuilt.status == "ready"
+                assert rebuilt.draft_version == 2
+                assert rebuilt.base_profile_id == profile_id
+                assert rebuilt.base_profile_version == 5
+                assert rebuilt.applied_profile_version is None
+                assert rebuilt.applied_at is None
+
+    asyncio.run(run())
+
+
 def test_profile_version_change_rebuilds_and_profile_rows_remain_unchanged() -> None:
     async def run() -> None:
         async with Database(database_url()) as database:
