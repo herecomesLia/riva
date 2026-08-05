@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from riva.db.database import Database
 from riva.models import (
@@ -115,18 +116,21 @@ def test_service_persists_skips_and_is_idempotent_after_reload() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             user, agent_run, document, result = await seed(database, "basic")
+            user_id = user.id
+            document_id = document.id
+            source_agent_run_id = agent_run.id
 
             async with database.sessionmaker() as session:
                 draft = await ResumeImportDraftService(
                     session,
                     clock=lambda: NOW,
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert draft.draft_version == 1
                 assert draft.status == "ready"
-                assert draft.source_agent_run_id == agent_run.id
+                assert draft.source_agent_run_id == source_agent_run_id
                 assert draft.skipped_items[0]["reasons"] == [
                     "start_date_precision_insufficient"
                 ]
@@ -139,8 +143,8 @@ def test_service_persists_skips_and_is_idempotent_after_reload() -> None:
                         AssertionError("idempotent path called clock")
                     ),
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert second.draft_version == 1
                 assert second.updated_at == first_updated_at
@@ -168,14 +172,17 @@ def test_first_import_applied_draft_stays_applied_after_profile_creation() -> No
         async with Database(database_url()) as database:
             await database.reset()
             user, _, document, _ = await seed(database, "applied-first")
+            user_id = user.id
+            document_id = document.id
+            profile_id = uuid4()
 
             async with database.sessionmaker() as session:
                 draft = await ResumeImportDraftService(
                     session,
                     clock=lambda: NOW,
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert draft.base_profile_id is None
                 assert draft.base_profile_version is None
@@ -195,8 +202,8 @@ def test_first_import_applied_draft_stays_applied_after_profile_creation() -> No
             async with database.sessionmaker() as session:
                 session.add(
                     CareerProfile(
-                        profile_id=uuid4(),
-                        user_id=user.id,
+                        profile_id=profile_id,
+                        user_id=user_id,
                         summary=None,
                         version=1,
                         education=[],
@@ -207,7 +214,7 @@ def test_first_import_applied_draft_stays_applied_after_profile_creation() -> No
                 )
                 stored_draft = await session.get(
                     ResumeImportDraft,
-                    document.id,
+                    document_id,
                 )
                 assert stored_draft is not None
                 stored_draft.status = "applied"
@@ -222,8 +229,8 @@ def test_first_import_applied_draft_stays_applied_after_profile_creation() -> No
                         AssertionError("idempotent path called clock")
                     ),
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert returned.status == "applied"
                 assert returned.draft_version == before_apply[0]
@@ -252,13 +259,15 @@ def test_existing_applied_draft_stays_applied_until_profile_changes() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             user, _, document, _ = await seed(database, "applied-existing")
+            user_id = user.id
+            document_id = document.id
             profile_id = uuid4()
 
             async with database.sessionmaker() as session:
                 session.add(
                     CareerProfile(
                         profile_id=profile_id,
-                        user_id=user.id,
+                        user_id=user_id,
                         summary="Existing",
                         version=3,
                         education=[],
@@ -274,8 +283,8 @@ def test_existing_applied_draft_stays_applied_until_profile_changes() -> None:
                     session,
                     clock=lambda: NOW,
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert draft.base_profile_id == profile_id
                 assert draft.base_profile_version == 3
@@ -284,7 +293,7 @@ def test_existing_applied_draft_stays_applied_until_profile_changes() -> None:
                 stored_profile = await session.get(CareerProfile, profile_id)
                 stored_draft = await session.get(
                     ResumeImportDraft,
-                    document.id,
+                    document_id,
                 )
                 assert stored_profile is not None
                 assert stored_draft is not None
@@ -301,8 +310,8 @@ def test_existing_applied_draft_stays_applied_until_profile_changes() -> None:
                         AssertionError("applied idempotent path called clock")
                     ),
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert applied.status == "applied"
                 assert applied.draft_version == 1
@@ -322,8 +331,8 @@ def test_existing_applied_draft_stays_applied_until_profile_changes() -> None:
                     session,
                     clock=lambda: NOW,
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert rebuilt.status == "ready"
                 assert rebuilt.draft_version == 2
@@ -340,9 +349,12 @@ def test_profile_version_change_rebuilds_and_profile_rows_remain_unchanged() -> 
         async with Database(database_url()) as database:
             await database.reset()
             user, _, document, _ = await seed(database, "profile")
+            user_id = user.id
+            document_id = document.id
+            profile_id = uuid4()
             profile = CareerProfile(
-                profile_id=uuid4(),
-                user_id=user.id,
+                profile_id=profile_id,
+                user_id=user_id,
                 summary="Existing",
                 version=1,
                 education=[],
@@ -359,14 +371,14 @@ def test_profile_version_change_rebuilds_and_profile_rows_remain_unchanged() -> 
                     session,
                     clock=lambda: NOW,
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
-                assert first.base_profile_id == profile.profile_id
+                assert first.base_profile_id == profile_id
                 assert first.base_profile_version == 1
 
             async with database.sessionmaker() as session:
-                stored_profile = await session.get(CareerProfile, profile.profile_id)
+                stored_profile = await session.get(CareerProfile, profile_id)
                 assert stored_profile is not None
                 stored_profile.version = 2
                 await session.commit()
@@ -376,18 +388,29 @@ def test_profile_version_change_rebuilds_and_profile_rows_remain_unchanged() -> 
                     session,
                     clock=lambda: NOW,
                 ).build_draft(
-                    user_id=user.id,
-                    resume_document_id=document.id,
+                    user_id=user_id,
+                    resume_document_id=document_id,
                 )
                 assert rebuilt.draft_version == 2
                 assert rebuilt.base_profile_version == 2
 
             async with database.sessionmaker() as session:
-                stored_profile = await session.get(CareerProfile, profile.profile_id)
+                stored_profile = await session.scalar(
+                    select(CareerProfile)
+                    .options(
+                        selectinload(CareerProfile.education),
+                        selectinload(CareerProfile.skills),
+                        selectinload(CareerProfile.work_experiences),
+                        selectinload(CareerProfile.project_experiences),
+                    )
+                    .where(CareerProfile.profile_id == profile_id)
+                )
                 assert stored_profile is not None
                 assert stored_profile.summary == "Existing"
                 assert stored_profile.version == 2
                 assert stored_profile.education == []
+                assert stored_profile.work_experiences == []
+                assert stored_profile.project_experiences == []
                 assert stored_profile.skills == []
 
     asyncio.run(run())
@@ -398,6 +421,8 @@ def test_two_sessions_build_one_draft_without_spurious_version_increment() -> No
         async with Database(database_url()) as database:
             await database.reset()
             user, _, document, _ = await seed(database, "concurrent")
+            user_id = user.id
+            document_id = document.id
 
             async def build_once():
                 async with database.sessionmaker() as session:
@@ -405,8 +430,8 @@ def test_two_sessions_build_one_draft_without_spurious_version_increment() -> No
                         session,
                         clock=lambda: NOW,
                     ).build_draft(
-                        user_id=user.id,
-                        resume_document_id=document.id,
+                        user_id=user_id,
+                        resume_document_id=document_id,
                     )
 
             first, second = await asyncio.gather(build_once(), build_once())
@@ -417,7 +442,7 @@ def test_two_sessions_build_one_draft_without_spurious_version_increment() -> No
                 drafts = (
                     await session.scalars(
                         select(ResumeImportDraft).where(
-                            ResumeImportDraft.resume_document_id == document.id
+                            ResumeImportDraft.resume_document_id == document_id
                         )
                     )
                 ).all()
@@ -432,10 +457,12 @@ def test_service_rejects_isolation_superseded_and_invalid_json_transactionally()
         async with Database(database_url()) as database:
             await database.reset()
             user, _, document, result = await seed(database, "errors")
+            user_id = user.id
+            document_id = document.id
+            source_agent_run_id = result.source_agent_run_id
 
             async with database.sessionmaker() as session:
-                document.parsing_run_id = None
-                stored_document = await session.get(ResumeDocument, document.id)
+                stored_document = await session.get(ResumeDocument, document_id)
                 assert stored_document is not None
                 stored_document.parsing_run_id = None
                 await session.commit()
@@ -443,25 +470,25 @@ def test_service_rejects_isolation_superseded_and_invalid_json_transactionally()
             async with database.sessionmaker() as session:
                 with pytest.raises(ResumeImportStateError) as exc_info:
                     await ResumeImportDraftService(session).build_draft(
-                        user_id=user.id,
-                        resume_document_id=document.id,
+                        user_id=user_id,
+                        resume_document_id=document_id,
                     )
                 assert exc_info.value.code == "resume_parsing_result_superseded"
 
             async with database.sessionmaker() as session:
-                stored_document = await session.get(ResumeDocument, document.id)
-                stored_result = await session.get(ResumeParsingResult, document.id)
+                stored_document = await session.get(ResumeDocument, document_id)
+                stored_result = await session.get(ResumeParsingResult, document_id)
                 assert stored_document is not None
                 assert stored_result is not None
-                stored_document.parsing_run_id = result.source_agent_run_id
+                stored_document.parsing_run_id = source_agent_run_id
                 stored_result.education = [{"bad": "json"}]
                 await session.commit()
 
             async with database.sessionmaker() as session:
                 with pytest.raises(ResumeImportStateError) as exc_info:
                     await ResumeImportDraftService(session).build_draft(
-                        user_id=user.id,
-                        resume_document_id=document.id,
+                        user_id=user_id,
+                        resume_document_id=document_id,
                     )
                 assert exc_info.value.code == "resume_parsing_result_invalid"
                 assert await session.scalar(
@@ -475,7 +502,7 @@ def test_service_rejects_isolation_superseded_and_invalid_json_transactionally()
                         clock=lambda: datetime(2026, 8, 5, 12, 0),
                     ).build_draft(
                         user_id=uuid4(),
-                        resume_document_id=document.id,
+                        resume_document_id=document_id,
                     )
                 assert exc_info.value.code == "resume_document_not_found"
 
