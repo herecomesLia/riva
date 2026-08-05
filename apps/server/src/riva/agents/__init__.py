@@ -1,6 +1,8 @@
 from riva.agents.base import Agent, AgentResult
 from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.agents.matching_analysis import MatchingAnalysisAgent
+from riva.agents.resume_parsing import ResumeParsingAgent
+from riva.schemas.resume_parsing import ResumeParsingInput, ResumeParsingOutput
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
@@ -22,5 +24,8 @@ __all__ = [
     "MatchingAnalysisInput",
     "MatchingAnalysisOutput",
     "QualificationRequirements",
+    "ResumeParsingAgent",
+    "ResumeParsingInput",
+    "ResumeParsingOutput",
     "RequiredSkillGroups",
 ]

@@ -21,6 +21,14 @@ from riva.schemas.resume_documents import (
     ResumeDocumentsResponse,
     SucceededResumeDocumentResponse,
 )
+from riva.schemas.resume_parsing import (
+    ResumeParsingEducation,
+    ResumeParsingInput,
+    ResumeParsingOutput,
+    ResumeParsingProjectExperience,
+    ResumeParsingRunPayload,
+    ResumeParsingWorkExperience,
+)
 from riva.schemas.matching_analysis import (
     MatchingAnalysisInput,
     MatchingAnalysisOutput,
@@ -113,6 +121,12 @@ __all__ = [
     "StaleMatchingAnalysisResponse",
     "StartMatchingAnalysisRequest",
     "SucceededResumeDocumentResponse",
+    "ResumeParsingEducation",
+    "ResumeParsingInput",
+    "ResumeParsingOutput",
+    "ResumeParsingProjectExperience",
+    "ResumeParsingRunPayload",
+    "ResumeParsingWorkExperience",
     "TargetRoleExperienceRange",
     "TargetRolePreparationStatus",
     "TargetRoleRecruitmentType",

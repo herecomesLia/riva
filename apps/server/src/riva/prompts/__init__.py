@@ -8,6 +8,7 @@ from riva.prompts.base import (
 )
 from riva.prompts.job_description_parsing import JOB_DESCRIPTION_PARSING_PROMPT_V1
 from riva.prompts.matching_analysis import MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts.resume_parsing import RESUME_PARSING_PROMPT_V1
 
 __all__ = [
     "DuplicatePromptError",
@@ -18,4 +19,5 @@ __all__ = [
     "RenderedPrompt",
     "JOB_DESCRIPTION_PARSING_PROMPT_V1",
     "MATCHING_ANALYSIS_PROMPT_V1",
+    "RESUME_PARSING_PROMPT_V1",
 ]
