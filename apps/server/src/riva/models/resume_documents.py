@@ -22,6 +22,7 @@ from riva.utils import utc_now
 
 if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
+    from riva.models.resume_import_drafts import ResumeImportDraft
     from riva.models.resume_parsing_results import ResumeParsingResult
     from riva.models.user import User
 
@@ -173,6 +174,16 @@ class ResumeDocument(Base):
     )
     parsing_result: Mapped[ResumeParsingResult | None] = relationship(
         back_populates="document",
+        passive_deletes=True,
+        uselist=False,
+    )
+    import_draft: Mapped[ResumeImportDraft | None] = relationship(
+        "ResumeImportDraft",
+        back_populates="document",
+        foreign_keys=(
+            "[ResumeImportDraft.user_id, "
+            "ResumeImportDraft.resume_document_id]"
+        ),
         passive_deletes=True,
         uselist=False,
     )

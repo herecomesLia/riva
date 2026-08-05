@@ -12,6 +12,7 @@ from riva.models.profile import (
     CareerProfileWorkSkill,
 )
 from riva.models.resume_documents import ResumeDocument
+from riva.models.resume_import_drafts import ResumeImportDraft
 from riva.models.resume_parsing_results import ResumeParsingResult
 from riva.models.roles import CurrentTargetRole, TargetRole
 from riva.models.user import User
@@ -31,6 +32,7 @@ __all__ = [
     "JobDescriptionAnalysis",
     "MatchingAnalysis",
     "ResumeDocument",
+    "ResumeImportDraft",
     "ResumeParsingResult",
     "TargetRole",
     "User",

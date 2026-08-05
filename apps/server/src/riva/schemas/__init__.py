@@ -21,6 +21,12 @@ from riva.schemas.resume_documents import (
     ResumeDocumentsResponse,
     SucceededResumeDocumentResponse,
 )
+from riva.schemas.resume_imports import (
+    ResumeImportChangeSummary,
+    ResumeImportDraftData,
+    ResumeImportProtectedItem,
+    ResumeImportSkippedItem,
+)
 from riva.schemas.resume_parsing import (
     ResumeParsingEducation,
     ResumeParsingInput,
@@ -114,6 +120,10 @@ __all__ = [
     "RolesPageResponse",
     "ResumeDocumentResponse",
     "ResumeDocumentsResponse",
+    "ResumeImportChangeSummary",
+    "ResumeImportDraftData",
+    "ResumeImportProtectedItem",
+    "ResumeImportSkippedItem",
     "SaveJobDescriptionRequest",
     "SavedJobDescriptionResponse",
     "ServiceHealthStatus",
