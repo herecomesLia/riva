@@ -198,6 +198,38 @@ def test_write_failure_cleans_temporary_file(tmp_path: Path) -> None:
     assert list(root.rglob(".riva-resume-*")) == []
 
 
+def test_post_publish_temporary_cleanup_failure_removes_new_target(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root = tmp_path / "resumes"
+    storage = LocalResumeObjectStorage(root)
+    original_unlink = os.unlink
+    temporary_cleanup_failed = False
+
+    def fail_post_publish_temporary_cleanup(path) -> None:
+        nonlocal temporary_cleanup_failed
+        if (
+            not temporary_cleanup_failed
+            and Path(path).name.startswith(storage._TEMP_PREFIX)
+        ):
+            temporary_cleanup_failed = True
+            raise OSError("controlled temporary cleanup failure")
+        original_unlink(path)
+
+    monkeypatch.setattr(os, "unlink", fail_post_publish_temporary_cleanup)
+
+    with pytest.raises(ResumeStorageError) as error:
+        run(storage.store_file("a/b", io.BytesIO(b"data"), max_bytes=100))
+
+    assert error.value.code == "resume_storage_unavailable"
+    assert temporary_cleanup_failed is True
+    with pytest.raises(ResumeStorageError) as read_error:
+        run(storage.read_bytes("a/b"))
+    assert read_error.value.code == "resume_object_not_found"
+    assert list(root.rglob(".riva-resume-*")) == []
+
+
 def test_missing_delete_is_idempotent(tmp_path: Path) -> None:
     storage = LocalResumeObjectStorage(tmp_path / "resumes")
 

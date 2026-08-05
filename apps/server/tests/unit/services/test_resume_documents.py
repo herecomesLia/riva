@@ -2,6 +2,8 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 import io
+from pathlib import Path
+import threading
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,12 +23,14 @@ from riva.services.resume_documents import (
     normalize_resume_filename,
 )
 from riva.storage import (
+    LocalResumeObjectStorage,
     RESUME_FILE_EMPTY,
     RESUME_FILE_TOO_LARGE,
     RESUME_STORAGE_COLLISION,
     RESUME_STORAGE_UNAVAILABLE,
     ResumeStorageError,
     StoredResumeObject,
+    build_resume_storage_key,
 )
 from riva.utils import utc_now
 
@@ -156,6 +160,49 @@ class FakeExtractor:
         if self.error is not None:
             raise self.error
         return self.result
+
+
+class BlockingSource(io.BytesIO):
+    def __init__(self, value: bytes) -> None:
+        super().__init__(value)
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def read(self, size: int = -1) -> bytes:
+        self.started.set()
+        if not self.release.wait(timeout=5):
+            raise OSError("controlled source was not released")
+        return super().read(size)
+
+
+class CompletionGatedLocalStorage(LocalResumeObjectStorage):
+    def __init__(self, root: Path) -> None:
+        super().__init__(root)
+        self.published = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def store_file(
+        self,
+        key: str,
+        file_obj,
+        max_bytes: int,
+    ) -> StoredResumeObject:
+        stored = await super().store_file(key, file_obj, max_bytes)
+        self.published.set()
+        await self.release.wait()
+        return stored
+
+
+class DeletionGatedLocalStorage(LocalResumeObjectStorage):
+    def __init__(self, root: Path) -> None:
+        super().__init__(root)
+        self.delete_started = asyncio.Event()
+        self.delete_release = asyncio.Event()
+
+    async def delete(self, key: str) -> None:
+        self.delete_started.set()
+        await self.delete_release.wait()
+        await super().delete(key)
 
 
 def create_user(user_id: UUID | None = None) -> User:
@@ -406,6 +453,154 @@ def test_cancelled_file_operation_is_rethrown_and_compensated() -> None:
         )
     assert commit_session.rollback_count == 1
     assert len(commit_storage.delete_calls) == 1
+
+
+def test_cancelled_real_storage_waits_for_worker_before_deleting_source(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> tuple[FakeSession, FakeExtractor, BlockingSource]:
+        storage = LocalResumeObjectStorage(tmp_path / "resumes")
+        service, session, _storage, extractor = create_service(
+            storage=storage,  # type: ignore[arg-type]
+        )
+        source = BlockingSource(b"payload")
+        upload_task = asyncio.create_task(
+            service.create_file_document(
+                create_user(),
+                file_obj=source,
+                original_filename="resume.txt",
+                declared_media_type=TEXT_PLAIN,
+            )
+        )
+
+        started = await asyncio.to_thread(source.started.wait, 5)
+        upload_task.cancel()
+        source.release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await upload_task
+        assert started
+        return session, extractor, source
+
+    session, extractor, source = asyncio.run(scenario())
+    root = tmp_path / "resumes"
+    assert list(root.rglob("source")) == []
+    assert list(root.rglob(".riva-resume-*")) == []
+    assert session.added == []
+    assert extractor.calls == []
+    assert source.closed is False
+
+
+def test_repeated_cancellation_during_cleanup_still_deletes_real_source(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> tuple[FakeSession, FakeExtractor, BlockingSource]:
+        storage = DeletionGatedLocalStorage(tmp_path / "resumes")
+        service, session, _storage, extractor = create_service(
+            storage=storage,  # type: ignore[arg-type]
+        )
+        source = BlockingSource(b"payload")
+        upload_task = asyncio.create_task(
+            service.create_file_document(
+                create_user(),
+                file_obj=source,
+                original_filename="resume.txt",
+                declared_media_type=TEXT_PLAIN,
+            )
+        )
+
+        started = await asyncio.to_thread(source.started.wait, 5)
+        upload_task.cancel()
+        source.release.set()
+        await storage.delete_started.wait()
+        upload_task.cancel()
+        storage.delete_release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await upload_task
+        assert started
+        return session, extractor, source
+
+    session, extractor, source = asyncio.run(scenario())
+    root = tmp_path / "resumes"
+    assert list(root.rglob("source")) == []
+    assert list(root.rglob(".riva-resume-*")) == []
+    assert session.added == []
+    assert extractor.calls == []
+    assert source.closed is False
+
+
+def test_cancelled_real_storage_collision_preserves_existing_object(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> tuple[FakeSession, FakeExtractor]:
+        storage = LocalResumeObjectStorage(tmp_path / "resumes")
+        user_id = UUID("11111111-1111-4111-8111-111111111111")
+        document_id = UUID("22222222-2222-4222-8222-222222222222")
+        key = build_resume_storage_key(user_id, document_id)
+        await storage.store_file(key, io.BytesIO(b"original"), max_bytes=100)
+
+        service, session, _storage, extractor = create_service(
+            storage=storage,  # type: ignore[arg-type]
+            document_id=document_id,
+        )
+        source = BlockingSource(b"replacement")
+        upload_task = asyncio.create_task(
+            service.create_file_document(
+                create_user(user_id),
+                file_obj=source,
+                original_filename="resume.txt",
+                declared_media_type=TEXT_PLAIN,
+            )
+        )
+
+        started = await asyncio.to_thread(source.started.wait, 5)
+        upload_task.cancel()
+        source.release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await upload_task
+        assert started
+        assert await storage.read_bytes(key) == b"original"
+        return session, extractor
+
+    session, extractor = asyncio.run(scenario())
+    assert session.added == []
+    assert extractor.calls == []
+
+
+def test_cancelled_after_real_storage_publish_deletes_returned_key(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> tuple[FakeSession, FakeExtractor]:
+        storage = CompletionGatedLocalStorage(tmp_path / "resumes")
+        document_id = UUID("22222222-2222-4222-8222-222222222222")
+        user = create_user(UUID("11111111-1111-4111-8111-111111111111"))
+        key = build_resume_storage_key(user.id, document_id)
+        service, session, _storage, extractor = create_service(
+            storage=storage,  # type: ignore[arg-type]
+            document_id=document_id,
+        )
+
+        upload_task = asyncio.create_task(
+            service.create_file_document(
+                user,
+                file_obj=io.BytesIO(b"payload"),
+                original_filename="resume.txt",
+                declared_media_type=TEXT_PLAIN,
+            )
+        )
+        await storage.published.wait()
+        assert await storage.read_bytes(key) == b"payload"
+        upload_task.cancel()
+        storage.release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await upload_task
+        return session, extractor
+
+    session, extractor = asyncio.run(scenario())
+    root = tmp_path / "resumes"
+    assert list(root.rglob("source")) == []
+    assert list(root.rglob(".riva-resume-*")) == []
+    assert session.added == []
+    assert extractor.calls == []
 
 
 def test_pasted_text_uses_canonical_text_without_storage() -> None:

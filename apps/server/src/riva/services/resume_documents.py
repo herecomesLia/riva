@@ -178,14 +178,11 @@ class ResumeDocumentService:
         storage_key = build_resume_storage_key(user.id, document_id)
 
         try:
-            stored = await self.storage.store_file(
+            stored = await self._store_file_cancellation_safe(
                 storage_key,
                 file_obj,
                 self.max_upload_bytes,
             )
-        except asyncio.CancelledError:
-            await self._delete_safely(storage_key)
-            raise
         except ResumeStorageError as error:
             raise _storage_api_error(error.code) from None
         except Exception:
@@ -197,7 +194,7 @@ class ResumeDocumentService:
         try:
             stored_bytes = await self.storage.read_bytes(stored.key)
         except asyncio.CancelledError:
-            await self._delete_safely(stored.key)
+            await self._delete_cancellation_safe(stored.key)
             raise
         except Exception:
             await self._delete_safely(stored.key)
@@ -213,7 +210,7 @@ class ResumeDocumentService:
                 max_characters=self.max_extracted_characters,
             )
         except asyncio.CancelledError:
-            await self._delete_safely(stored.key)
+            await self._delete_cancellation_safe(stored.key)
             raise
         except ResumeExtractionError as error:
             try:
@@ -445,7 +442,7 @@ class ResumeDocumentService:
         except asyncio.CancelledError:
             await self._rollback_safely()
             if storage_key is not None:
-                await self._delete_safely(storage_key)
+                await self._delete_cancellation_safe(storage_key)
             raise
         except Exception:
             await self._rollback_safely()
@@ -463,6 +460,49 @@ class ResumeDocumentService:
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 RESUME_UPLOAD_UNAVAILABLE,
             ) from None
+
+    async def _store_file_cancellation_safe(
+        self,
+        storage_key: str,
+        file_obj: BinaryIO,
+        max_bytes: int,
+    ) -> StoredResumeObject:
+        store_task = asyncio.create_task(
+            self.storage.store_file(storage_key, file_obj, max_bytes)
+        )
+        try:
+            return await asyncio.shield(store_task)
+        except asyncio.CancelledError as cancellation:
+            await self._wait_for_task_completion(store_task)
+            try:
+                stored = store_task.result()
+            except asyncio.CancelledError:
+                raise cancellation
+            except Exception:
+                raise cancellation
+
+            await self._delete_cancellation_safe(stored.key)
+            raise cancellation
+
+    @staticmethod
+    async def _wait_for_task_completion(task: asyncio.Task[object]) -> None:
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                continue
+
+    async def _delete_cancellation_safe(self, storage_key: str) -> None:
+        delete_task = asyncio.create_task(self.storage.delete(storage_key))
+        await self._wait_for_task_completion(delete_task)
+        try:
+            delete_task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
 
     async def _rollback_safely(self) -> None:
         try:

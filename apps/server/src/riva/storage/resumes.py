@@ -97,6 +97,8 @@ class LocalResumeObjectStorage:
         target = self._path_for_key(key)
         self._ensure_directory_tree(target.parent)
         temporary_path: Path | None = None
+        published_by_call = False
+        completed_successfully = False
 
         try:
             with tempfile.NamedTemporaryFile(
@@ -138,13 +140,16 @@ class LocalResumeObjectStorage:
             except OSError:
                 raise ResumeStorageError(RESUME_STORAGE_UNAVAILABLE) from None
 
+            published_by_call = True
             os.unlink(temporary_path)
             temporary_path = None
-            return StoredResumeObject(
+            stored = StoredResumeObject(
                 key=key,
                 byte_size=byte_size,
                 sha256=digest.hexdigest(),
             )
+            completed_successfully = True
+            return stored
         except ResumeStorageError:
             raise
         except Exception:
@@ -153,6 +158,13 @@ class LocalResumeObjectStorage:
             if temporary_path is not None:
                 try:
                     os.unlink(temporary_path)
+                except FileNotFoundError:
+                    pass
+                except OSError:
+                    pass
+            if published_by_call and not completed_successfully:
+                try:
+                    os.unlink(target)
                 except FileNotFoundError:
                     pass
                 except OSError:
