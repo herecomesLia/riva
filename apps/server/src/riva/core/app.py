@@ -13,6 +13,8 @@ from riva.core.config import Settings
 from riva.core.errors import register_exception_handlers
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
+from riva.resumes import DefaultResumeTextExtractor
+from riva.storage import LocalResumeObjectStorage
 from riva.utils import seconds_to_ms
 
 
@@ -104,6 +106,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Riva API", lifespan=lifespan)
     app.state.settings = settings
     app.state.database = database
+    app.state.resume_storage = LocalResumeObjectStorage(settings.resume_storage_dir)
+    app.state.resume_text_extractor = DefaultResumeTextExtractor()
     register_exception_handlers(app)
     register_middlewares(app, settings)
     app.include_router(router, prefix="/api")

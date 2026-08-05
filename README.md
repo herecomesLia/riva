@@ -66,6 +66,12 @@ job-description parsing lifecycle and the matching-analysis lifecycle. The
 Worker registers both handlers. Frontend real-API integration will be completed
 in a later step.
 
+The API accepts TXT, PDF, DOCX, or pasted resume text through the three
+resume-document endpoints under `/api/profile/resumes`. This step stores the
+source and extracted text in `ResumeDocument`; it does not support legacy DOC,
+encrypted PDF, or OCR. Structured `CareerProfile` generation is planned for a
+later step.
+
 Default automated tests use a fake provider and never call Qwen. A real Qwen
 check must be run explicitly by a developer with the required values in a
 local `.env` file.
