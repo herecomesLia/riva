@@ -52,6 +52,12 @@ ResumeImportStateErrorCode = Literal[
     "resume_parsing_result_superseded",
     "resume_import_profile_invalid",
     "resume_import_draft_conflict",
+    "resume_import_draft_not_found",
+    "resume_import_draft_not_ready",
+    "resume_import_draft_version_conflict",
+    "resume_import_draft_invalid",
+    "resume_import_profile_version_conflict",
+    "resume_import_apply_conflict",
 ]
 
 RESUME_DOCUMENT_NOT_FOUND: ResumeImportStateErrorCode = (
@@ -71,6 +77,24 @@ RESUME_IMPORT_PROFILE_INVALID: ResumeImportStateErrorCode = (
 )
 RESUME_IMPORT_DRAFT_CONFLICT: ResumeImportStateErrorCode = (
     "resume_import_draft_conflict"
+)
+RESUME_IMPORT_DRAFT_NOT_FOUND: ResumeImportStateErrorCode = (
+    "resume_import_draft_not_found"
+)
+RESUME_IMPORT_DRAFT_NOT_READY: ResumeImportStateErrorCode = (
+    "resume_import_draft_not_ready"
+)
+RESUME_IMPORT_DRAFT_VERSION_CONFLICT: ResumeImportStateErrorCode = (
+    "resume_import_draft_version_conflict"
+)
+RESUME_IMPORT_DRAFT_INVALID: ResumeImportStateErrorCode = (
+    "resume_import_draft_invalid"
+)
+RESUME_IMPORT_PROFILE_VERSION_CONFLICT: ResumeImportStateErrorCode = (
+    "resume_import_profile_version_conflict"
+)
+RESUME_IMPORT_APPLY_CONFLICT: ResumeImportStateErrorCode = (
+    "resume_import_apply_conflict"
 )
 
 READY = "ready"
@@ -1149,8 +1173,14 @@ __all__ = [
     "READY",
     "RESUME_DOCUMENT_NOT_FOUND",
     "RESUME_IMPORT_DRAFT_CONFLICT",
+    "RESUME_IMPORT_DRAFT_INVALID",
+    "RESUME_IMPORT_DRAFT_NOT_FOUND",
+    "RESUME_IMPORT_DRAFT_NOT_READY",
+    "RESUME_IMPORT_DRAFT_VERSION_CONFLICT",
+    "RESUME_IMPORT_APPLY_CONFLICT",
     "RESUME_IMPORT_NAMESPACE",
     "RESUME_IMPORT_PROFILE_INVALID",
+    "RESUME_IMPORT_PROFILE_VERSION_CONFLICT",
     "RESUME_PARSING_RESULT_INVALID",
     "RESUME_PARSING_RESULT_NOT_FOUND",
     "RESUME_PARSING_RESULT_SUPERSEDED",
