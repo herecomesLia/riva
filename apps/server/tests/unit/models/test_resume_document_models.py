@@ -117,5 +117,6 @@ def test_resume_document_has_owner_storage_constraints_and_indexes() -> None:
         constraint
         for constraint in table.foreign_key_constraints
         if isinstance(constraint, ForeignKeyConstraint)
+        and next(iter(constraint.elements)).target_fullname == "users.id"
     )
     assert user_foreign_key.ondelete == "CASCADE"

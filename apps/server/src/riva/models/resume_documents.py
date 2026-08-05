@@ -21,6 +21,8 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
+    from riva.models.agent_runs import AgentRun
+    from riva.models.resume_parsing_results import ResumeParsingResult
     from riva.models.user import User
 
 
@@ -141,6 +143,13 @@ class ResumeDocument(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    parsing_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -156,4 +165,14 @@ class ResumeDocument(Base):
     user: Mapped[User] = relationship(
         back_populates="resume_documents",
         foreign_keys=[user_id],
+    )
+    parsing_run: Mapped[AgentRun | None] = relationship(
+        foreign_keys=[parsing_run_id],
+        passive_deletes=True,
+        uselist=False,
+    )
+    parsing_result: Mapped[ResumeParsingResult | None] = relationship(
+        back_populates="document",
+        passive_deletes=True,
+        uselist=False,
     )
