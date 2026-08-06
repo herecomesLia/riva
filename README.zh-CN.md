@@ -51,7 +51,14 @@ uv run --directory apps/server riva worker --env-file "$PWD/.env"
 Qwen（`RIVA_LLM_PROVIDER=qwen`、model、API Key 和 base URL）后，会注册
 `job-description-parser` 和 `matching-analyzer`，启动日志中的 `handler_count` 应为
 `2`。API 已暴露 JD parsing lifecycle 和 Matching analysis lifecycle；前端真实 API
-接入将在后续完成。
+接入将在后续完成。简历解析成功后，API 还提供可审阅的导入 Draft 和显式应用接口：
+
+- `GET /api/profile/resumes/{resumeId}/import-draft` 查看当前 Draft；
+- `POST /api/profile/resumes/{resumeId}/import-draft/apply`，提交
+  `{"draftVersion": 1}` 应用指定版本。
+
+查看 Draft 不会修改 Profile；重复应用已应用 Draft 是幂等的。应用后的 Profile
+仍通过现有 `CareerProfile` GET 接口读取。
 
 默认自动化测试只使用 Fake Provider，不会请求 Qwen。真实 Qwen 验收需由开发者准备
 本地 `.env` 后显式执行。

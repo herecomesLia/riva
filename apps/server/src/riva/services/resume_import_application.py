@@ -51,6 +51,7 @@ from riva.services.resume_imports import (
     _validate_profile,
     build_resume_import_draft_data,
     canonicalize_resume_import_identity,
+    resume_import_draft_data_from_model,
 )
 from riva.utils import utc_now
 
@@ -117,7 +118,7 @@ class ResumeImportApplicationService:
             ):
                 raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
 
-            draft_data = _parse_draft_data(draft)
+            draft_data = resume_import_draft_data_from_model(draft)
 
             if draft.status == APPLIED:
                 _validate_summary_action(draft_data, profile_exists=True)
@@ -542,26 +543,6 @@ def _validate_draft_status(status: object) -> None:
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_NOT_READY)
     if status not in {READY, APPLIED}:
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
-
-
-def _parse_draft_data(draft: ResumeImportDraft) -> ResumeImportDraftData:
-    try:
-        return ResumeImportDraftData.model_validate(
-            {
-                "summary": draft.summary,
-                "summary_action": draft.summary_action,
-                "education": draft.education,
-                "work_experiences": draft.work_experiences,
-                "project_experiences": draft.project_experiences,
-                "skills": draft.skills,
-                "unresolved_items": draft.unresolved_items,
-                "skipped_items": draft.skipped_items,
-                "protected_items": draft.protected_items,
-                "change_summary": draft.change_summary,
-            }
-        )
-    except (TypeError, ValueError, ValidationError):
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID) from None
 
 
 def _validate_recomputed_draft(

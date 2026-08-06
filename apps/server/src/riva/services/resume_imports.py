@@ -121,6 +121,29 @@ class ResumeImportStateError(RuntimeError):
         super().__init__(self.safe_message)
 
 
+def resume_import_draft_data_from_model(
+    draft: ResumeImportDraft,
+) -> ResumeImportDraftData:
+    """Validate and convert persisted draft JSON into the domain model."""
+    try:
+        return ResumeImportDraftData.model_validate(
+            {
+                "summary": draft.summary,
+                "summary_action": draft.summary_action,
+                "education": draft.education,
+                "work_experiences": draft.work_experiences,
+                "project_experiences": draft.project_experiences,
+                "skills": draft.skills,
+                "unresolved_items": draft.unresolved_items,
+                "skipped_items": draft.skipped_items,
+                "protected_items": draft.protected_items,
+                "change_summary": draft.change_summary,
+            }
+        )
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID) from None
+
+
 def canonicalize_resume_import_identity(value: str | None) -> str:
     """Return the stable text form used by import identities."""
     if value is None:
@@ -1189,4 +1212,5 @@ __all__ = [
     "build_resume_import_draft_data",
     "build_resume_import_item_id",
     "canonicalize_resume_import_identity",
+    "resume_import_draft_data_from_model",
 ]

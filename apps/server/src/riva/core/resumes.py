@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,6 +8,9 @@ from riva.resumes import ResumeTextExtractor
 from riva.services.resume_documents import ResumeDocumentService
 from riva.services.resume_parsing_lifecycle import ResumeParsingLifecycleService
 from riva.storage import ResumeObjectStorage
+
+if TYPE_CHECKING:
+    from riva.services.resume_import_api import ResumeImportAPIService
 
 
 def get_resume_object_storage(request: Request) -> ResumeObjectStorage:
@@ -44,8 +49,28 @@ async def get_resume_parsing_lifecycle_service(
     )
 
 
+async def get_resume_import_api_service(
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> "ResumeImportAPIService":
+    from riva.services.resume_import_api import ResumeImportAPIService
+
+    settings = request.app.state.settings
+    return ResumeImportAPIService(
+        session=session,
+        parsing_lifecycle_service_factory=(
+            lambda db_session: ResumeParsingLifecycleService(
+                db_session,
+                llm_provider=settings.llm_provider,
+                llm_model=settings.llm_model,
+            )
+        ),
+    )
+
+
 __all__ = [
     "get_resume_document_service",
+    "get_resume_import_api_service",
     "get_resume_object_storage",
     "get_resume_parsing_lifecycle_service",
     "get_resume_text_extractor",

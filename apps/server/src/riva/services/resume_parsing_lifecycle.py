@@ -21,7 +21,6 @@ from riva.models import (
     User,
 )
 from riva.prompts import RESUME_PARSING_PROMPT_V1
-from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.schemas.resume_parsing import (
     ResumeParsingOutput,
     ResumeParsingRunPayload,
@@ -31,6 +30,10 @@ from riva.services.agent_runs import AgentRunService
 from riva.services.resume_parsing import (
     ResumeParsingStateError,
     resume_parsing_output_from_result,
+)
+from riva.services.resume_imports import (
+    ResumeImportStateError,
+    resume_import_draft_data_from_model,
 )
 
 
@@ -537,20 +540,7 @@ class ResumeParsingLifecycleService:
         try:
             agent_output = ResumeParsingOutput.model_validate(run.result)
             persisted_output = resume_parsing_output_from_result(result)
-            ResumeImportDraftData.model_validate(
-                {
-                    "summary": draft.summary,
-                    "summary_action": draft.summary_action,
-                    "education": draft.education,
-                    "work_experiences": draft.work_experiences,
-                    "project_experiences": draft.project_experiences,
-                    "skills": draft.skills,
-                    "unresolved_items": draft.unresolved_items,
-                    "skipped_items": draft.skipped_items,
-                    "protected_items": draft.protected_items,
-                    "change_summary": draft.change_summary,
-                }
-            )
+            resume_import_draft_data_from_model(draft)
             agent_json = agent_output.model_dump(mode="json")
             persisted_json = persisted_output.model_dump(mode="json")
             if _stable_json(run.result) != _stable_json(agent_json):
@@ -563,6 +553,7 @@ class ResumeParsingLifecycleService:
             ValueError,
             ValidationError,
             ResumeParsingStateError,
+            ResumeImportStateError,
             _InvalidLifecycleState,
         ):
             raise _state_conflict() from None

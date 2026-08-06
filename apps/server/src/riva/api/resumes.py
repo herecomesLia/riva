@@ -8,6 +8,7 @@ from riva.core.csrf import csrf_protect
 from riva.core.errors import APIError
 from riva.core.resumes import (
     get_resume_document_service,
+    get_resume_import_api_service,
     get_resume_parsing_lifecycle_service,
 )
 from riva.models import User
@@ -15,8 +16,14 @@ from riva.schemas.resume_documents import (
     ResumeDocumentResponse,
     ResumeDocumentsResponse,
 )
+from riva.schemas.resume_import_api import (
+    ResumeImportApplicationRequest,
+    ResumeImportApplicationResponse,
+    ResumeImportDraftResponse,
+)
 from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
 from riva.services.resume_documents import ResumeDocumentService
+from riva.services.resume_import_api import ResumeImportAPIService
 from riva.services.resume_parsing_lifecycle import ResumeParsingLifecycleService
 
 
@@ -140,6 +147,42 @@ async def retry_resume_parsing(
     return await lifecycle_service.retry(
         user_id=current_user.id,
         resume_document_id=resume_document_id,
+    )
+
+
+@router.get(
+    "/{resumeId}/import-draft",
+    response_model=ResumeImportDraftResponse,
+)
+async def get_resume_import_draft(
+    resume_document_id: ResumeId,
+    current_user: User = Depends(require_current_user),
+    import_api_service: ResumeImportAPIService = Depends(
+        get_resume_import_api_service
+    ),
+) -> ResumeImportDraftResponse:
+    return await import_api_service.get_draft(
+        user_id=current_user.id,
+        resume_document_id=resume_document_id,
+    )
+
+
+@router.post(
+    "/{resumeId}/import-draft/apply",
+    response_model=ResumeImportApplicationResponse,
+)
+async def apply_resume_import_draft(
+    payload: ResumeImportApplicationRequest,
+    resume_document_id: ResumeId,
+    current_user: User = Depends(require_current_user),
+    import_api_service: ResumeImportAPIService = Depends(
+        get_resume_import_api_service
+    ),
+) -> ResumeImportApplicationResponse:
+    return await import_api_service.apply_draft(
+        user_id=current_user.id,
+        resume_document_id=resume_document_id,
+        draft_version=payload.draft_version,
     )
 
 

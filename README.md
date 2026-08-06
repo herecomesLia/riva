@@ -69,8 +69,16 @@ in a later step.
 The API accepts TXT, PDF, DOCX, or pasted resume text through the three
 resume-document endpoints under `/api/profile/resumes`. This step stores the
 source and extracted text in `ResumeDocument`; it does not support legacy DOC,
-encrypted PDF, or OCR. Structured `CareerProfile` generation is planned for a
-later step.
+encrypted PDF, or OCR. After parsing succeeds, the import lifecycle exposes a
+reviewable draft and an explicit apply action:
+
+- `GET /api/profile/resumes/{resumeId}/import-draft` returns the current draft;
+- `POST /api/profile/resumes/{resumeId}/import-draft/apply` with
+  `{"draftVersion": 1}` applies that exact draft version.
+
+Draft retrieval never changes the profile, and applying an already applied
+draft is idempotent. The existing `CareerProfile` GET endpoint remains the
+source of truth for the resulting profile.
 
 Default automated tests use a fake provider and never call Qwen. A real Qwen
 check must be run explicitly by a developer with the required values in a

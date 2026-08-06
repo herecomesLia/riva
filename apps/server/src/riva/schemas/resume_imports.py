@@ -31,6 +31,8 @@ ResumeImportSkipReason = Literal[
     "employment_type_unknown",
     "profile_schema_invalid",
 ]
+ResumeImportProtectedSource = Literal["userEdited", "userAdded"]
+ResumeImportSummaryAction = Literal["set", "preserve", "none"]
 
 
 class _ResumeImportModel(BaseModel):
@@ -58,7 +60,7 @@ class ResumeImportSkippedItem(_ResumeImportModel):
 class ResumeImportProtectedItem(_ResumeImportModel):
     section: ResumeImportSection
     item_id: StandardUUID
-    source: Literal["userEdited", "userAdded"]
+    source: ResumeImportProtectedSource
 
 
 class ResumeImportChangeSummary(_ResumeImportModel):
@@ -69,7 +71,7 @@ class ResumeImportChangeSummary(_ResumeImportModel):
 
 class ResumeImportDraftData(_ResumeImportModel):
     summary: ProfileSummary
-    summary_action: Literal["set", "preserve", "none"]
+    summary_action: ResumeImportSummaryAction
     education: list[CareerProfileEducationInput] = Field(
         max_length=MAX_SECTION_ITEMS
     )
@@ -129,7 +131,9 @@ __all__ = [
     "ResumeImportChangeSummary",
     "ResumeImportDraftData",
     "ResumeImportProtectedItem",
+    "ResumeImportProtectedSource",
     "ResumeImportSection",
     "ResumeImportSkipReason",
     "ResumeImportSkippedItem",
+    "ResumeImportSummaryAction",
 ]
