@@ -292,6 +292,7 @@ def test_existing_profile_merge_preserves_manual_and_missing_items() -> None:
             manual_education_id = uuid4()
             missing_education_id = uuid4()
             manual_project_id = uuid4()
+            existing_work_skill_id = uuid4()
             async with database.sessionmaker() as session:
                 profile = CareerProfile(
                     profile_id=profile_id,
@@ -363,7 +364,7 @@ def test_existing_profile_merge_preserves_manual_and_missing_items() -> None:
                             source="resumeExtracted",
                             skill_links=[
                                 CareerProfileWorkSkill(
-                                    id=uuid4(),
+                                    id=existing_work_skill_id,
                                     career_profile_id=profile_id,
                                     work_experience_id=candidate.work_experiences[0].id,
                                     skill_id=manual_skill_id,
@@ -436,9 +437,411 @@ def test_existing_profile_merge_preserves_manual_and_missing_items() -> None:
                 assert profile.project_experiences[0].name == "Manual project"
                 assert profile.work_experiences[0].title == "Engineer"
                 assert profile.work_experiences[0].skill_ids == [manual_skill_id]
+                assert [link.id for link in profile.work_experiences[0].skill_links] == [
+                    existing_work_skill_id
+                ]
+                assert profile.work_experiences[0].skill_links[0].skill.id == (
+                    manual_skill_id
+                )
+                work_skill_rows = (
+                    await session.scalars(
+                        select(CareerProfileWorkSkill).where(
+                            CareerProfileWorkSkill.work_experience_id
+                            == candidate.work_experiences[0].id,
+                            CareerProfileWorkSkill.skill_id == manual_skill_id,
+                        )
+                    )
+                ).all()
+                assert len(work_skill_rows) == 1
+                assert work_skill_rows[0].id == existing_work_skill_id
                 assert [item.name for item in profile.skills] == ["Python", "SQL"]
                 assert profile.skills[0].id == manual_skill_id
                 assert [item.position for item in profile.skills] == [0, 1]
+
+    asyncio.run(run())
+
+
+def test_existing_resume_project_reuses_skill_link() -> None:
+    async def run() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            output = parsing_output()
+            user_id, document_id, _ = await seed(
+                database,
+                "project-link-reuse",
+                output=output,
+            )
+            candidate = build_resume_import_draft_data(
+                user_id=user_id,
+                result=output,
+                profile=None,
+            )
+            profile_id = uuid4()
+            manual_skill_id = uuid4()
+            existing_project_skill_id = uuid4()
+            async with database.sessionmaker() as session:
+                project_id = candidate.project_experiences[0].id
+                profile = CareerProfile(
+                    profile_id=profile_id,
+                    user_id=user_id,
+                    summary="Existing summary",
+                    version=1,
+                    education=[],
+                    work_experiences=[],
+                    skills=[
+                        CareerProfileSkill(
+                            id=manual_skill_id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            name="Python",
+                            normalized_name="python",
+                            source="userEdited",
+                        )
+                    ],
+                    project_experiences=[
+                        CareerProfileProjectExperience(
+                            id=project_id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            name="Import Project",
+                            role="Developer",
+                            start_date="2023-01",
+                            end_date=None,
+                            responsibilities=["Design"],
+                            achievements=["Released"],
+                            project_url="https://example.com/project",
+                            source="resumeExtracted",
+                            skill_links=[
+                                CareerProfileProjectSkill(
+                                    id=existing_project_skill_id,
+                                    career_profile_id=profile_id,
+                                    project_experience_id=project_id,
+                                    skill_id=manual_skill_id,
+                                    position=0,
+                                )
+                            ],
+                        )
+                    ],
+                )
+                session.add(profile)
+                await session.commit()
+
+            draft_version = await build_draft(database, user_id, document_id)
+            async with database.sessionmaker() as session:
+                applied = await ResumeImportApplicationService(
+                    session,
+                    clock=lambda: NOW,
+                ).apply_draft(
+                    user_id=user_id,
+                    resume_document_id=document_id,
+                    draft_version=draft_version,
+                )
+                assert applied.profile_changed is True
+                assert applied.profile.version == 2
+
+            async with database.sessionmaker() as session:
+                profile = await load_profile(session, user_id)
+                assert profile is not None
+                project = profile.project_experiences[0]
+                assert project.skill_ids == [manual_skill_id]
+                assert [link.id for link in project.skill_links] == [
+                    existing_project_skill_id
+                ]
+                assert project.skill_links[0].skill.id == manual_skill_id
+                project_skill_rows = (
+                    await session.scalars(
+                        select(CareerProfileProjectSkill).where(
+                            CareerProfileProjectSkill.project_experience_id
+                            == project.id,
+                            CareerProfileProjectSkill.skill_id == manual_skill_id,
+                        )
+                    )
+                ).all()
+                assert len(project_skill_rows) == 1
+                assert project_skill_rows[0].id == existing_project_skill_id
+
+    asyncio.run(run())
+
+
+def test_skill_order_change_reuses_link_ids_and_increments_profile_once() -> None:
+    async def run() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            output = parsing_output()
+            output.skills = ["Python", "SQL"]
+            output.work_experiences[0].skills = ["SQL", "Python"]
+            user_id, document_id, _ = await seed(
+                database,
+                "skill-order",
+                output=output,
+            )
+            candidate = build_resume_import_draft_data(
+                user_id=user_id,
+                result=output,
+                profile=None,
+            )
+            profile_id = uuid4()
+            python_id = candidate.skills[0].id
+            sql_id = candidate.skills[1].id
+            work_id = candidate.work_experiences[0].id
+            project_id = candidate.project_experiences[0].id
+            link_python_id = uuid4()
+            link_sql_id = uuid4()
+            async with database.sessionmaker() as session:
+                education = candidate.education[0]
+                work = candidate.work_experiences[0]
+                project = candidate.project_experiences[0]
+                profile = CareerProfile(
+                    profile_id=profile_id,
+                    user_id=user_id,
+                    summary="Existing summary",
+                    version=1,
+                    education=[
+                        CareerProfileEducation(
+                            id=education.id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            school=education.school,
+                            degree=education.degree,
+                            major=education.major,
+                            start_date=education.start_date,
+                            end_date=education.end_date,
+                            is_current=education.is_current,
+                            source="resumeExtracted",
+                        )
+                    ],
+                    skills=[
+                        CareerProfileSkill(
+                            id=python_id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            name="Python",
+                            normalized_name="python",
+                            source="resumeExtracted",
+                        ),
+                        CareerProfileSkill(
+                            id=sql_id,
+                            career_profile_id=profile_id,
+                            position=1,
+                            name="SQL",
+                            normalized_name="sql",
+                            source="resumeExtracted",
+                        ),
+                    ],
+                    work_experiences=[
+                        CareerProfileWorkExperience(
+                            id=work_id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            company=work.company,
+                            title=work.title,
+                            employment_type=work.employment_type.value,
+                            location=work.location,
+                            start_date=work.start_date,
+                            end_date=work.end_date,
+                            is_current=work.is_current,
+                            responsibilities=list(work.responsibilities),
+                            achievements=list(work.achievements),
+                            source="resumeExtracted",
+                            skill_links=[
+                                CareerProfileWorkSkill(
+                                    id=link_python_id,
+                                    career_profile_id=profile_id,
+                                    work_experience_id=work_id,
+                                    skill_id=python_id,
+                                    position=0,
+                                ),
+                                CareerProfileWorkSkill(
+                                    id=link_sql_id,
+                                    career_profile_id=profile_id,
+                                    work_experience_id=work_id,
+                                    skill_id=sql_id,
+                                    position=1,
+                                ),
+                            ],
+                        )
+                    ],
+                    project_experiences=[
+                        CareerProfileProjectExperience(
+                            id=project_id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            name=project.name,
+                            role=project.role,
+                            start_date=project.start_date,
+                            end_date=project.end_date,
+                            responsibilities=list(project.responsibilities),
+                            achievements=list(project.achievements),
+                            project_url=(
+                                str(project.project_url)
+                                if project.project_url is not None
+                                else None
+                            ),
+                            source="resumeExtracted",
+                            skill_links=[
+                                CareerProfileProjectSkill(
+                                    id=uuid4(),
+                                    career_profile_id=profile_id,
+                                    project_experience_id=project_id,
+                                    skill_id=python_id,
+                                    position=0,
+                                )
+                            ],
+                        )
+                    ],
+                )
+                session.add(profile)
+                await session.commit()
+
+            draft_version = await build_draft(database, user_id, document_id)
+            async with database.sessionmaker() as session:
+                applied = await ResumeImportApplicationService(
+                    session,
+                    clock=lambda: NOW,
+                ).apply_draft(
+                    user_id=user_id,
+                    resume_document_id=document_id,
+                    draft_version=draft_version,
+                )
+                assert applied.profile_changed is True
+                assert applied.profile.version == 2
+
+            async with database.sessionmaker() as session:
+                profile = await load_profile(session, user_id)
+                assert profile is not None
+                work = profile.work_experiences[0]
+                assert [link.skill_id for link in work.skill_links] == [
+                    sql_id,
+                    python_id,
+                ]
+                assert [link.id for link in work.skill_links] == [
+                    link_sql_id,
+                    link_python_id,
+                ]
+                assert [link.position for link in work.skill_links] == [0, 1]
+
+    asyncio.run(run())
+
+
+def test_skill_link_delete_keep_add_persists_expected_rows() -> None:
+    async def run() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            output = parsing_output()
+            output.skills = ["Python", "SQL", "Go"]
+            output.work_experiences[0].skills = ["SQL", "Go"]
+            user_id, document_id, _ = await seed(
+                database,
+                "skill-link-diff",
+                output=output,
+            )
+            candidate = build_resume_import_draft_data(
+                user_id=user_id,
+                result=output,
+                profile=None,
+            )
+            profile_id = uuid4()
+            python_id = candidate.skills[0].id
+            sql_id = candidate.skills[1].id
+            go_id = candidate.skills[2].id
+            work = candidate.work_experiences[0]
+            link_python_id = uuid4()
+            link_sql_id = uuid4()
+            async with database.sessionmaker() as session:
+                profile = CareerProfile(
+                    profile_id=profile_id,
+                    user_id=user_id,
+                    summary="Existing summary",
+                    version=1,
+                    education=[],
+                    project_experiences=[],
+                    skills=[
+                        CareerProfileSkill(
+                            id=python_id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            name="Python",
+                            normalized_name="python",
+                            source="resumeExtracted",
+                        ),
+                        CareerProfileSkill(
+                            id=sql_id,
+                            career_profile_id=profile_id,
+                            position=1,
+                            name="SQL",
+                            normalized_name="sql",
+                            source="resumeExtracted",
+                        ),
+                    ],
+                    work_experiences=[
+                        CareerProfileWorkExperience(
+                            id=work.id,
+                            career_profile_id=profile_id,
+                            position=0,
+                            company=work.company,
+                            title=work.title,
+                            employment_type=work.employment_type.value,
+                            location=work.location,
+                            start_date=work.start_date,
+                            end_date=work.end_date,
+                            is_current=work.is_current,
+                            responsibilities=list(work.responsibilities),
+                            achievements=list(work.achievements),
+                            source="resumeExtracted",
+                            skill_links=[
+                                CareerProfileWorkSkill(
+                                    id=link_python_id,
+                                    career_profile_id=profile_id,
+                                    work_experience_id=work.id,
+                                    skill_id=python_id,
+                                    position=0,
+                                ),
+                                CareerProfileWorkSkill(
+                                    id=link_sql_id,
+                                    career_profile_id=profile_id,
+                                    work_experience_id=work.id,
+                                    skill_id=sql_id,
+                                    position=1,
+                                ),
+                            ],
+                        )
+                    ],
+                )
+                session.add(profile)
+                await session.commit()
+
+            draft_version = await build_draft(database, user_id, document_id)
+            async with database.sessionmaker() as session:
+                applied = await ResumeImportApplicationService(
+                    session,
+                    clock=lambda: NOW,
+                ).apply_draft(
+                    user_id=user_id,
+                    resume_document_id=document_id,
+                    draft_version=draft_version,
+                )
+                assert applied.profile.version == 2
+
+            async with database.sessionmaker() as session:
+                profile = await load_profile(session, user_id)
+                assert profile is not None
+                work = profile.work_experiences[0]
+                assert [link.skill_id for link in work.skill_links] == [sql_id, go_id]
+                assert [link.id for link in work.skill_links][0] == link_sql_id
+                assert link_python_id not in {link.id for link in work.skill_links}
+                assert len({link.skill_id for link in work.skill_links}) == 2
+                rows = (
+                    await session.scalars(
+                        select(CareerProfileWorkSkill).where(
+                            CareerProfileWorkSkill.work_experience_id == work.id
+                        )
+                    )
+                ).all()
+                assert len(rows) == 2
+                assert {(row.work_experience_id, row.skill_id) for row in rows} == {
+                    (work.id, sql_id),
+                    (work.id, go_id),
+                }
 
     asyncio.run(run())
 

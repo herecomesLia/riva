@@ -23,10 +23,13 @@ from riva.services.resume_import_application import (
     ResumeImportApplicationService,
     apply_resume_import_draft_data,
     merge_resume_import_skills,
+    reconcile_project_skill_links,
+    reconcile_work_skill_links,
 )
 from riva.services.resume_imports import (
     RESUME_IMPORT_APPLY_CONFLICT,
     RESUME_IMPORT_DRAFT_INVALID,
+    RESUME_IMPORT_PROFILE_INVALID,
     RESUME_IMPORT_PROFILE_VERSION_CONFLICT,
     ResumeImportStateError,
     build_resume_import_draft_data,
@@ -224,6 +227,89 @@ def full_data() -> ResumeImportDraftData:
             },
         }
     )
+
+
+def skills_by_id(
+    profile_id: UUID,
+    skill_ids: list[UUID],
+) -> dict[UUID, CareerProfileSkill]:
+    return {
+        skill_id: CareerProfileSkill(
+            id=skill_id,
+            career_profile_id=profile_id,
+            position=position,
+            name=f"Skill {position}",
+            normalized_name=f"skill {position}",
+            source="resumeExtracted",
+        )
+        for position, skill_id in enumerate(skill_ids)
+    }
+
+
+def work_with_skill_links(
+    profile_id: UUID,
+    experience_id: UUID,
+    skill_ids: list[UUID],
+    link_ids: list[UUID],
+) -> CareerProfileWorkExperience:
+    experience = CareerProfileWorkExperience(
+        id=experience_id,
+        career_profile_id=profile_id,
+        position=0,
+        company="Example Co",
+        title="Engineer",
+        employment_type="fullTime",
+        location=None,
+        start_date="2024-01",
+        end_date=None,
+        is_current=True,
+        responsibilities=[],
+        achievements=[],
+        source="resumeExtracted",
+    )
+    experience.skill_links = [
+        CareerProfileWorkSkill(
+            id=link_id,
+            career_profile_id=profile_id,
+            work_experience_id=experience_id,
+            skill_id=skill_id,
+            position=position,
+        )
+        for position, (skill_id, link_id) in enumerate(zip(skill_ids, link_ids))
+    ]
+    return experience
+
+
+def project_with_skill_links(
+    profile_id: UUID,
+    project_id: UUID,
+    skill_ids: list[UUID],
+    link_ids: list[UUID],
+) -> CareerProfileProjectExperience:
+    project = CareerProfileProjectExperience(
+        id=project_id,
+        career_profile_id=profile_id,
+        position=0,
+        name="Example Project",
+        role="Engineer",
+        start_date="2024-01",
+        end_date=None,
+        responsibilities=[],
+        achievements=[],
+        project_url=None,
+        source="resumeExtracted",
+    )
+    project.skill_links = [
+        CareerProfileProjectSkill(
+            id=link_id,
+            career_profile_id=profile_id,
+            project_experience_id=project_id,
+            skill_id=skill_id,
+            position=position,
+        )
+        for position, (skill_id, link_id) in enumerate(zip(skill_ids, link_ids))
+    ]
+    return project
 
 
 def graph() -> tuple[ResumeDocument, ResumeParsingResult]:
@@ -424,15 +510,14 @@ def test_merge_sections_updates_resume_items_and_protects_manual_items() -> None
         achievements=[],
         source="userAdded",
     )
-    manual_work.skill_links = [
-        CareerProfileWorkSkill(
-            id=uuid4(),
-            career_profile_id=profile.profile_id,
-            work_experience_id=manual_work_id,
-            skill_id=manual_skill_id,
-            position=0,
-        )
-    ]
+    manual_work_link = CareerProfileWorkSkill(
+        id=uuid4(),
+        career_profile_id=profile.profile_id,
+        work_experience_id=manual_work_id,
+        skill_id=manual_skill_id,
+        position=0,
+    )
+    manual_work.skill_links = [manual_work_link]
     profile.work_experiences = [manual_work]
     manual_project = CareerProfileProjectExperience(
         id=manual_project_id,
@@ -447,15 +532,14 @@ def test_merge_sections_updates_resume_items_and_protects_manual_items() -> None
         project_url=None,
         source="userEdited",
     )
-    manual_project.skill_links = [
-        CareerProfileProjectSkill(
-            id=uuid4(),
-            career_profile_id=profile.profile_id,
-            project_experience_id=manual_project_id,
-            skill_id=manual_skill_id,
-            position=0,
-        )
-    ]
+    manual_project_link = CareerProfileProjectSkill(
+        id=uuid4(),
+        career_profile_id=profile.profile_id,
+        project_experience_id=manual_project_id,
+        skill_id=manual_skill_id,
+        position=0,
+    )
+    manual_project.skill_links = [manual_project_link]
     profile.project_experiences = [manual_project]
 
     apply_resume_import_draft_data(profile, data)
@@ -478,6 +562,8 @@ def test_merge_sections_updates_resume_items_and_protects_manual_items() -> None
     ]
     assert profile.work_experiences[0].title == "Manual title"
     assert profile.work_experiences[0].skill_ids == [manual_skill_id]
+    assert profile.work_experiences[0].skill_links[0] is manual_work_link
+    assert profile.work_experiences[0].source == "userAdded"
     assert profile.work_experiences[1].title == "Engineer"
     assert profile.work_experiences[1].skill_ids == [manual_skill_id]
 
@@ -487,8 +573,236 @@ def test_merge_sections_updates_resume_items_and_protects_manual_items() -> None
     ]
     assert profile.project_experiences[0].name == "Manual project"
     assert profile.project_experiences[0].skill_ids == [manual_skill_id]
+    assert profile.project_experiences[0].skill_links[0] is manual_project_link
+    assert profile.project_experiences[0].source == "userEdited"
     assert profile.project_experiences[1].skill_ids == [manual_skill_id]
     assert [item.position for item in profile.project_experiences] == [0, 1]
+
+
+def test_reconcile_work_skill_links_reuses_existing_link() -> None:
+    profile_id = uuid4()
+    experience_id = uuid4()
+    draft_skill_id = uuid4()
+    persisted_skill_id = uuid4()
+    link_id = uuid4()
+    skills = skills_by_id(profile_id, [persisted_skill_id])
+    experience = work_with_skill_links(
+        profile_id,
+        experience_id,
+        [persisted_skill_id],
+        [link_id],
+    )
+    existing_link = experience.skill_links[0]
+
+    reconciled = reconcile_work_skill_links(
+        profile_id=profile_id,
+        experience=experience,
+        draft_skill_ids=[draft_skill_id],
+        persisted_skill_ids={draft_skill_id: persisted_skill_id},
+        skills_by_id=skills,
+    )
+
+    assert reconciled == [existing_link]
+    assert reconciled[0] is existing_link
+    assert reconciled[0].id == link_id
+    assert reconciled[0].position == 0
+
+
+def test_reconcile_project_skill_links_reuses_existing_link() -> None:
+    profile_id = uuid4()
+    project_id = uuid4()
+    draft_skill_id = uuid4()
+    persisted_skill_id = uuid4()
+    link_id = uuid4()
+    skills = skills_by_id(profile_id, [persisted_skill_id])
+    project = project_with_skill_links(
+        profile_id,
+        project_id,
+        [persisted_skill_id],
+        [link_id],
+    )
+    existing_link = project.skill_links[0]
+
+    reconciled = reconcile_project_skill_links(
+        profile_id=profile_id,
+        project=project,
+        draft_skill_ids=[draft_skill_id],
+        persisted_skill_ids={draft_skill_id: persisted_skill_id},
+        skills_by_id=skills,
+    )
+
+    assert reconciled == [existing_link]
+    assert reconciled[0] is existing_link
+    assert reconciled[0].id == link_id
+    assert reconciled[0].position == 0
+
+
+def test_reconcile_work_skill_links_reorders_and_reuses_links() -> None:
+    profile_id = uuid4()
+    experience_id = uuid4()
+    skill_a, skill_b = uuid4(), uuid4()
+    draft_a, draft_b = uuid4(), uuid4()
+    link_a, link_b = uuid4(), uuid4()
+    experience = work_with_skill_links(
+        profile_id,
+        experience_id,
+        [skill_a, skill_b],
+        [link_a, link_b],
+    )
+
+    reconciled = reconcile_work_skill_links(
+        profile_id=profile_id,
+        experience=experience,
+        draft_skill_ids=[draft_b, draft_a],
+        persisted_skill_ids={draft_a: skill_a, draft_b: skill_b},
+        skills_by_id=skills_by_id(profile_id, [skill_a, skill_b]),
+    )
+
+    assert [link.id for link in reconciled] == [link_b, link_a]
+    assert [link.skill_id for link in reconciled] == [skill_b, skill_a]
+    assert [link.position for link in reconciled] == [0, 1]
+
+
+def test_reconcile_work_skill_links_removes_old_and_creates_new_link() -> None:
+    profile_id = uuid4()
+    experience_id = uuid4()
+    skill_a, skill_b, skill_c = uuid4(), uuid4(), uuid4()
+    draft_a, draft_b, draft_c = uuid4(), uuid4(), uuid4()
+    link_a, link_b = uuid4(), uuid4()
+    experience = work_with_skill_links(
+        profile_id,
+        experience_id,
+        [skill_a, skill_b],
+        [link_a, link_b],
+    )
+
+    reconciled = reconcile_work_skill_links(
+        profile_id=profile_id,
+        experience=experience,
+        draft_skill_ids=[draft_b, draft_c],
+        persisted_skill_ids={
+            draft_a: skill_a,
+            draft_b: skill_b,
+            draft_c: skill_c,
+        },
+        skills_by_id=skills_by_id(profile_id, [skill_a, skill_b, skill_c]),
+    )
+
+    assert [link.id for link in reconciled] == [link_b, reconciled[1].id]
+    assert reconciled[1].id not in {link_a, link_b}
+    assert [link.skill_id for link in reconciled] == [skill_b, skill_c]
+    assert [link.position for link in reconciled] == [0, 1]
+    assert link_a not in {link.id for link in reconciled}
+
+
+def test_reconcile_project_skill_links_reorders_and_replaces_links() -> None:
+    profile_id = uuid4()
+    project_id = uuid4()
+    skill_a, skill_b, skill_c = uuid4(), uuid4(), uuid4()
+    draft_a, draft_b, draft_c = uuid4(), uuid4(), uuid4()
+    link_a, link_b = uuid4(), uuid4()
+    project = project_with_skill_links(
+        profile_id,
+        project_id,
+        [skill_a, skill_b],
+        [link_a, link_b],
+    )
+
+    reconciled = reconcile_project_skill_links(
+        profile_id=profile_id,
+        project=project,
+        draft_skill_ids=[draft_b, draft_c],
+        persisted_skill_ids={
+            draft_a: skill_a,
+            draft_b: skill_b,
+            draft_c: skill_c,
+        },
+        skills_by_id=skills_by_id(profile_id, [skill_a, skill_b, skill_c]),
+    )
+
+    assert reconciled[0] is project.skill_links[1]
+    assert [link.skill_id for link in reconciled] == [skill_b, skill_c]
+    assert [link.position for link in reconciled] == [0, 1]
+    assert reconciled[1].id not in {link_a, link_b}
+    assert link_a not in {link.id for link in reconciled}
+
+
+def test_reconcile_rejects_duplicate_draft_skill_mapping_without_links() -> None:
+    profile_id = uuid4()
+    experience = work_with_skill_links(profile_id, uuid4(), [], [])
+    skill_id = uuid4()
+    draft_a, draft_b = uuid4(), uuid4()
+
+    with pytest.raises(ResumeImportStateError) as exc_info:
+        reconcile_work_skill_links(
+            profile_id=profile_id,
+            experience=experience,
+            draft_skill_ids=[draft_a, draft_b],
+            persisted_skill_ids={draft_a: skill_id, draft_b: skill_id},
+            skills_by_id=skills_by_id(profile_id, [skill_id]),
+        )
+
+    assert exc_info.value.code == RESUME_IMPORT_APPLY_CONFLICT
+    assert experience.skill_links == []
+
+
+def test_reconcile_rejects_duplicate_existing_skill_links() -> None:
+    profile_id = uuid4()
+    skill_id = uuid4()
+    experience = work_with_skill_links(
+        profile_id,
+        uuid4(),
+        [skill_id, skill_id],
+        [uuid4(), uuid4()],
+    )
+    draft_skill_id = uuid4()
+
+    with pytest.raises(ResumeImportStateError) as exc_info:
+        reconcile_work_skill_links(
+            profile_id=profile_id,
+            experience=experience,
+            draft_skill_ids=[draft_skill_id],
+            persisted_skill_ids={draft_skill_id: skill_id},
+            skills_by_id=skills_by_id(profile_id, [skill_id]),
+        )
+
+    assert exc_info.value.code == RESUME_IMPORT_PROFILE_INVALID
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("id", "not-a-uuid"),
+        ("skill_id", "not-a-uuid"),
+        ("career_profile_id", uuid4()),
+        ("work_experience_id", uuid4()),
+    ],
+)
+def test_reconcile_rejects_inconsistent_existing_work_link(
+    attribute: str,
+    value: object,
+) -> None:
+    profile_id = uuid4()
+    skill_id = uuid4()
+    experience = work_with_skill_links(
+        profile_id,
+        uuid4(),
+        [skill_id],
+        [uuid4()],
+    )
+    setattr(experience.skill_links[0], attribute, value)
+    draft_skill_id = uuid4()
+
+    with pytest.raises(ResumeImportStateError) as exc_info:
+        reconcile_work_skill_links(
+            profile_id=profile_id,
+            experience=experience,
+            draft_skill_ids=[draft_skill_id],
+            persisted_skill_ids={draft_skill_id: skill_id},
+            skills_by_id=skills_by_id(profile_id, [skill_id]),
+        )
+
+    assert exc_info.value.code == RESUME_IMPORT_PROFILE_INVALID
 
 
 def test_merge_rejects_skill_id_collision() -> None:

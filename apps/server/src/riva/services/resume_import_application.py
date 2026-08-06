@@ -430,12 +430,12 @@ def merge_resume_import_work_experiences(
                 achievements=list(item.achievements),
                 source=ProfileSource.RESUME_EXTRACTED.value,
             )
-            experience.skill_links = _new_work_skill_links(
-                profile.profile_id,
-                experience,
-                item.skill_ids,
-                draft_skill_ids,
-                skills_by_id,
+            experience.skill_links = reconcile_work_skill_links(
+                profile_id=profile.profile_id,
+                experience=experience,
+                draft_skill_ids=item.skill_ids,
+                persisted_skill_ids=draft_skill_ids,
+                skills_by_id=skills_by_id,
             )
             merged.append(experience)
             continue
@@ -445,12 +445,12 @@ def merge_resume_import_work_experiences(
         ):
             continue
         _update_work_experience(existing, item)
-        existing.skill_links = _new_work_skill_links(
-            profile.profile_id,
-            existing,
-            item.skill_ids,
-            draft_skill_ids,
-            skills_by_id,
+        existing.skill_links = reconcile_work_skill_links(
+            profile_id=profile.profile_id,
+            experience=existing,
+            draft_skill_ids=item.skill_ids,
+            persisted_skill_ids=draft_skill_ids,
+            skills_by_id=skills_by_id,
         )
 
     profile.work_experiences = merged
@@ -485,12 +485,12 @@ def merge_resume_import_project_experiences(
                 ),
                 source=ProfileSource.RESUME_EXTRACTED.value,
             )
-            project.skill_links = _new_project_skill_links(
-                profile.profile_id,
-                project,
-                item.skill_ids,
-                draft_skill_ids,
-                skills_by_id,
+            project.skill_links = reconcile_project_skill_links(
+                profile_id=profile.profile_id,
+                project=project,
+                draft_skill_ids=item.skill_ids,
+                persisted_skill_ids=draft_skill_ids,
+                skills_by_id=skills_by_id,
             )
             merged.append(project)
             continue
@@ -500,12 +500,12 @@ def merge_resume_import_project_experiences(
         ):
             continue
         _update_project_experience(existing, item)
-        existing.skill_links = _new_project_skill_links(
-            profile.profile_id,
-            existing,
-            item.skill_ids,
-            draft_skill_ids,
-            skills_by_id,
+        existing.skill_links = reconcile_project_skill_links(
+            profile_id=profile.profile_id,
+            project=existing,
+            draft_skill_ids=item.skill_ids,
+            persisted_skill_ids=draft_skill_ids,
+            skills_by_id=skills_by_id,
         )
 
     profile.project_experiences = merged
@@ -731,52 +731,127 @@ def _mapped_skill_ids(
     mapped: list[UUID] = []
     for draft_skill_id in draft_skill_ids:
         persisted_skill_id = persisted_skill_ids.get(draft_skill_id)
-        if persisted_skill_id is None or persisted_skill_id not in skills_by_id:
+        if (
+            not isinstance(persisted_skill_id, UUID)
+            or persisted_skill_id not in skills_by_id
+        ):
             raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
         mapped.append(persisted_skill_id)
     return mapped
 
 
-def _new_work_skill_links(
+def reconcile_work_skill_links(
+    *,
     profile_id: UUID,
     experience: CareerProfileWorkExperience,
     draft_skill_ids: list[UUID],
     persisted_skill_ids: dict[UUID, UUID],
     skills_by_id: dict[UUID, CareerProfileSkill],
 ) -> list[CareerProfileWorkSkill]:
-    return [
-        CareerProfileWorkSkill(
-            id=uuid4(),
-            career_profile_id=profile_id,
-            work_experience_id=experience.id,
-            skill_id=skill_id,
-            position=position,
-        )
-        for position, skill_id in enumerate(
-            _mapped_skill_ids(draft_skill_ids, persisted_skill_ids, skills_by_id)
-        )
-    ]
+    mapped_skill_ids = _mapped_skill_ids(
+        draft_skill_ids,
+        persisted_skill_ids,
+        skills_by_id,
+    )
+    if len(mapped_skill_ids) != len(set(mapped_skill_ids)):
+        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+
+    existing_by_skill_id: dict[UUID, CareerProfileWorkSkill] = {}
+    experience_id = getattr(experience, "id", None)
+    if not isinstance(profile_id, UUID) or not isinstance(experience_id, UUID):
+        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+    try:
+        existing_links = list(experience.skill_links)
+    except (AttributeError, TypeError):
+        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
+    existing_link_ids: set[UUID] = set()
+    for link in existing_links:
+        link_id = getattr(link, "id", None)
+        skill_id = getattr(link, "skill_id", None)
+        if (
+            not isinstance(link_id, UUID)
+            or not isinstance(skill_id, UUID)
+            or link_id in existing_link_ids
+            or skill_id in existing_by_skill_id
+            or skill_id not in skills_by_id
+            or getattr(link, "work_experience_id", None) != experience_id
+            or getattr(link, "career_profile_id", None) != profile_id
+        ):
+            raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+        existing_link_ids.add(link_id)
+        existing_by_skill_id[skill_id] = link
+
+    reconciled: list[CareerProfileWorkSkill] = []
+    for position, skill_id in enumerate(mapped_skill_ids):
+        link = existing_by_skill_id.get(skill_id)
+        if link is None:
+            link = CareerProfileWorkSkill(
+                id=uuid4(),
+                career_profile_id=profile_id,
+                work_experience_id=experience_id,
+                skill_id=skill_id,
+            )
+            link.skill = skills_by_id[skill_id]
+        link.position = position
+        reconciled.append(link)
+    return reconciled
 
 
-def _new_project_skill_links(
+def reconcile_project_skill_links(
+    *,
     profile_id: UUID,
     project: CareerProfileProjectExperience,
     draft_skill_ids: list[UUID],
     persisted_skill_ids: dict[UUID, UUID],
     skills_by_id: dict[UUID, CareerProfileSkill],
 ) -> list[CareerProfileProjectSkill]:
-    return [
-        CareerProfileProjectSkill(
-            id=uuid4(),
-            career_profile_id=profile_id,
-            project_experience_id=project.id,
-            skill_id=skill_id,
-            position=position,
-        )
-        for position, skill_id in enumerate(
-            _mapped_skill_ids(draft_skill_ids, persisted_skill_ids, skills_by_id)
-        )
-    ]
+    mapped_skill_ids = _mapped_skill_ids(
+        draft_skill_ids,
+        persisted_skill_ids,
+        skills_by_id,
+    )
+    if len(mapped_skill_ids) != len(set(mapped_skill_ids)):
+        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+
+    existing_by_skill_id: dict[UUID, CareerProfileProjectSkill] = {}
+    project_id = getattr(project, "id", None)
+    if not isinstance(profile_id, UUID) or not isinstance(project_id, UUID):
+        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+    try:
+        existing_links = list(project.skill_links)
+    except (AttributeError, TypeError):
+        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
+    existing_link_ids: set[UUID] = set()
+    for link in existing_links:
+        link_id = getattr(link, "id", None)
+        skill_id = getattr(link, "skill_id", None)
+        if (
+            not isinstance(link_id, UUID)
+            or not isinstance(skill_id, UUID)
+            or link_id in existing_link_ids
+            or skill_id in existing_by_skill_id
+            or skill_id not in skills_by_id
+            or getattr(link, "project_experience_id", None) != project_id
+            or getattr(link, "career_profile_id", None) != profile_id
+        ):
+            raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+        existing_link_ids.add(link_id)
+        existing_by_skill_id[skill_id] = link
+
+    reconciled: list[CareerProfileProjectSkill] = []
+    for position, skill_id in enumerate(mapped_skill_ids):
+        link = existing_by_skill_id.get(skill_id)
+        if link is None:
+            link = CareerProfileProjectSkill(
+                id=uuid4(),
+                career_profile_id=profile_id,
+                project_experience_id=project_id,
+                skill_id=skill_id,
+            )
+            link.skill = skills_by_id[skill_id]
+        link.position = position
+        reconciled.append(link)
+    return reconciled
 
 
 def _profile_business_snapshot(
@@ -853,4 +928,6 @@ __all__ = [
     "merge_resume_import_project_experiences",
     "merge_resume_import_skills",
     "merge_resume_import_work_experiences",
+    "reconcile_project_skill_links",
+    "reconcile_work_skill_links",
 ]
