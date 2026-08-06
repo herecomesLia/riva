@@ -1102,11 +1102,46 @@ def test_import_api_isolates_users_and_rejects_tampered_or_partial_state() -> No
                         resume_document_id=owner.document_id,
                     )
 
+                tamper_source_run = make_run(
+                    owner.user_id,
+                    owner.document_id,
+                    owner.parsed,
+                    status=AgentRunStatus.FAILED,
+                    suffix="tamper-source",
+                )
+                assert tamper_source_run.id != owner.run_id
                 async with database.sessionmaker() as session:
+                    session.add(tamper_source_run)
+                    await session.flush()
+                    assert await session.scalar(
+                        select(ResumeImportDraft).where(
+                            ResumeImportDraft.source_agent_run_id
+                            == tamper_source_run.id
+                        )
+                    ) is None
                     draft = await session.get(ResumeImportDraft, owner.document_id)
                     assert draft is not None
-                    draft.source_agent_run_id = other.run_id
+                    draft.source_agent_run_id = tamper_source_run.id
                     await session.commit()
+                async with database.sessionmaker() as session:
+                    tampered_draft = await session.get(
+                        ResumeImportDraft,
+                        owner.document_id,
+                    )
+                    assert tampered_draft is not None
+                    assert (
+                        tampered_draft.source_agent_run_id
+                        == tamper_source_run.id
+                    )
+                    tamper_source_drafts = (
+                        await session.scalars(
+                            select(ResumeImportDraft).where(
+                                ResumeImportDraft.source_agent_run_id
+                                == tamper_source_run.id
+                            )
+                        )
+                    ).all()
+                    assert len(tamper_source_drafts) == 1
                 with pytest.raises(APIError) as error:
                     async with database.sessionmaker() as session:
                         await ResumeImportAPIService(session).get_draft(
@@ -1115,6 +1150,12 @@ def test_import_api_isolates_users_and_rejects_tampered_or_partial_state() -> No
                         )
                 assert error.value.status_code == 409
                 assert error.value.error == "resume_parsing_state_conflict"
+
+                async with database.sessionmaker() as session:
+                    draft = await session.get(ResumeImportDraft, owner.document_id)
+                    assert draft is not None
+                    draft.source_agent_run_id = owner.run_id
+                    await session.commit()
 
                 pointer_run = make_run(
                     owner.user_id,
