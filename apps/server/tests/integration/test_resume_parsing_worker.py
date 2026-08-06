@@ -651,10 +651,16 @@ def test_resume_parsing_worker_retries_after_result_persisted_before_draft() -> 
                     assert result.summary == "First result is durable."
                     assert result.result_version == 1
                     assert draft is not None
+                    assert draft.summary == "First result is durable."
                     assert draft.status == "ready"
                     assert draft.draft_version == 1
                     assert run is not None
                     assert run.status is AgentRunStatus.SUCCEEDED
+                    assert run.result is not None
+                    assert run.result["summary"] == "First result is durable."
+                    assert "Second result is ignored." not in repr(run.result)
+                    assert "Second result is ignored." not in repr(result)
+                    assert "Second result is ignored." not in repr(draft)
             finally:
                 await database.reset()
 

@@ -14,7 +14,7 @@ from riva.integrations import (
     ProviderRateLimitedError,
     ProviderUnavailableError,
 )
-from riva.models import AgentRun, AgentRunStatus
+from riva.models import AgentRun, AgentRunStatus, ResumeParsingResult
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
     ResumeParsingOutput,
@@ -41,16 +41,35 @@ USER_ID = UUID("11111111-1111-4111-8111-111111111111")
 DOCUMENT_ID = UUID("22222222-2222-4222-8222-222222222222")
 
 
-def output() -> ResumeParsingOutput:
+def output(summary: str = "中文后端工程师，负责可靠 API。") -> ResumeParsingOutput:
     return ResumeParsingOutput.model_validate(
         {
-            "summary": "中文后端工程师，负责可靠 API。",
+            "summary": summary,
             "education": [],
             "work_experiences": [],
             "project_experiences": [],
             "skills": ["Python"],
             "unresolved_items": ["简历包含一段无法安全结构化的内容"],
         }
+    )
+
+
+def persisted_result(
+    result_output: ResumeParsingOutput | None = None,
+) -> ResumeParsingResult:
+    values = (result_output or output()).model_dump(mode="json")
+    return ResumeParsingResult(
+        resume_document_id=DOCUMENT_ID,
+        user_id=USER_ID,
+        result_version=1,
+        source_agent_run_id=uuid4(),
+        parsed_at=NOW,
+        summary=values["summary"],
+        education=values["education"],
+        work_experiences=values["work_experiences"],
+        project_experiences=values["project_experiences"],
+        skills=values["skills"],
+        unresolved_items=values["unresolved_items"],
     )
 
 
@@ -146,6 +165,7 @@ class WorkerState:
         self.draft_error: Exception | None = None
         self.loaded_runs: list[AgentRun] = []
         self.persisted: list[tuple[AgentRun, ResumeParsingOutput]] = []
+        self.persisted_result = persisted_result()
         self.drafts: list[tuple[UUID, UUID]] = []
 
 
@@ -165,12 +185,12 @@ class FakeParsingService:
         self,
         run: AgentRun,
         result_output: ResumeParsingOutput,
-    ) -> object:
+    ) -> ResumeParsingResult:
         assert self.state.sessions.active == 1
         if self.state.persist_error is not None:
             raise self.state.persist_error
         self.state.persisted.append((run, result_output))
-        return object()
+        return self.state.persisted_result
 
 
 class FakeDraftService:
@@ -249,7 +269,14 @@ def test_handler_runs_load_agent_persist_draft_and_returns_original_result() -> 
 
         returned = await handler(sessions, state, agent).execute(run)
 
-        assert returned is expected
+        assert returned is not expected
+        assert returned.output == expected.output
+        assert returned.agent_id == expected.agent_id
+        assert returned.prompt_id == expected.prompt_id
+        assert returned.prompt_version == expected.prompt_version
+        assert returned.provider == expected.provider
+        assert returned.model == expected.model
+        assert returned.usage is expected.usage
         assert ResumeParsingWorkerHandler.agent_id == "resume-parser"
         assert agent.inputs == [state.parsing_input]
         assert state.loaded_runs == [run]
@@ -260,6 +287,53 @@ def test_handler_runs_load_agent_persist_draft_and_returns_original_result() -> 
         assert sessions.active == 0
         assert (run.status, run.lease_token, run.attempt_count) == original_state
         assert set(asyncio.all_tasks()) == tasks_before
+
+    asyncio.run(run_test())
+
+
+def test_handler_returns_persisted_output_and_attempt_metadata() -> None:
+    async def run_test() -> None:
+        sessions = FakeSessionFactory()
+        state = WorkerState(sessions)
+        provider_output = output("Provider output B")
+        expected = result(result_output=provider_output)
+        state.persisted_result = persisted_result(output("Persisted output A"))
+        agent = FakeAgent(expected, sessions)
+        run = running_run()
+
+        returned = await handler(sessions, state, agent).execute(run)
+
+        assert returned.output == output("Persisted output A")
+        assert returned.output != provider_output
+        assert returned.agent_id == expected.agent_id
+        assert returned.prompt_id == expected.prompt_id
+        assert returned.prompt_version == expected.prompt_version
+        assert returned.provider == expected.provider
+        assert returned.model == expected.model
+        assert returned.usage is expected.usage
+        assert state.persisted == [(run, provider_output)]
+        assert state.drafts == [(USER_ID, DOCUMENT_ID)]
+
+    asyncio.run(run_test())
+
+
+def test_handler_rejects_invalid_persisted_result_without_building_draft() -> None:
+    async def run_test() -> None:
+        sessions = FakeSessionFactory()
+        state = WorkerState(sessions)
+        invalid = persisted_result()
+        invalid.education = [{"invalid": "persisted JSON"}]
+        state.persisted_result = invalid
+        agent = FakeAgent(result(), sessions)
+
+        with pytest.raises(AgentExecutionError) as exc_info:
+            await handler(sessions, state, agent).execute(running_run())
+
+        assert exc_info.value.code == INVALID_RESUME_PARSING_RUN
+        assert exc_info.value.retryable is False
+        assert "persisted JSON" not in str(exc_info.value)
+        assert state.persisted
+        assert state.drafts == []
 
     asyncio.run(run_test())
 

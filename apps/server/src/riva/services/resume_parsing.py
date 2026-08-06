@@ -224,6 +224,24 @@ class ResumeParsingService:
         )
 
 
+def resume_parsing_output_from_result(
+    result: ResumeParsingResult,
+) -> ResumeParsingOutput:
+    try:
+        return ResumeParsingOutput.model_validate(
+            {
+                "summary": result.summary,
+                "education": result.education,
+                "work_experiences": result.work_experiences,
+                "project_experiences": result.project_experiences,
+                "skills": result.skills,
+                "unresolved_items": result.unresolved_items,
+            }
+        )
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise ResumeParsingStateError(INVALID_RESUME_PARSING_RUN) from None
+
+
 def _validate_run(run: AgentRun) -> ResumeParsingRunPayload:
     prompt = RESUME_PARSING_PROMPT_V1
     if (
@@ -277,4 +295,5 @@ __all__ = [
     "RESUME_PARSING_SUPERSEDED",
     "ResumeParsingService",
     "ResumeParsingStateError",
+    "resume_parsing_output_from_result",
 ]
