@@ -19,6 +19,7 @@ from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_parsing_lifecycle import (
     RESUME_DOCUMENT_NOT_READY,
     RESUME_DOCUMENT_TEXT_MISSING,
+    RESUME_IMPORT_DRAFT_INVALID,
     RESUME_PARSING_NOT_STARTED,
     RESUME_PARSING_RETRY_REQUIRED,
     RESUME_PARSING_STATE_CONFLICT,
@@ -673,6 +674,33 @@ def test_invalid_succeeded_result_is_a_state_conflict() -> None:
         )
 
     assert_api_error(error, RESUME_PARSING_STATE_CONFLICT)
+
+
+def test_invalid_succeeded_draft_is_reported_as_draft_invalid() -> None:
+    output = parsed_output().model_dump(mode="json")
+    current = run(
+        status=AgentRunStatus.SUCCEEDED,
+        attempt_count=1,
+        output=output,
+    )
+    persisted_draft = draft(current.id)
+    persisted_draft.skills = [{"invalid": "draft"}]
+    session = ScriptedSession(
+        document(parsing_run_id=current.id),
+        current,
+        result(current.id),
+        persisted_draft,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service(session).get_status(
+                user_id=USER_ID,
+                resume_document_id=DOCUMENT_ID,
+            )
+        )
+
+    assert_api_error(error, RESUME_IMPORT_DRAFT_INVALID)
 
 
 def test_commit_failure_rolls_back() -> None:

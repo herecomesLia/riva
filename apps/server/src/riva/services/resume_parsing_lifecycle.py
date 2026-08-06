@@ -32,6 +32,7 @@ from riva.services.resume_parsing import (
     resume_parsing_output_from_result,
 )
 from riva.services.resume_imports import (
+    RESUME_IMPORT_DRAFT_INVALID,
     ResumeImportStateError,
     resume_import_draft_data_from_model,
 )
@@ -540,7 +541,15 @@ class ResumeParsingLifecycleService:
         try:
             agent_output = ResumeParsingOutput.model_validate(run.result)
             persisted_output = resume_parsing_output_from_result(result)
-            resume_import_draft_data_from_model(draft)
+            try:
+                resume_import_draft_data_from_model(draft)
+            except ResumeImportStateError as exc:
+                if exc.code == RESUME_IMPORT_DRAFT_INVALID:
+                    raise APIError(
+                        status.HTTP_409_CONFLICT,
+                        RESUME_IMPORT_DRAFT_INVALID,
+                    ) from None
+                raise
             agent_json = agent_output.model_dump(mode="json")
             persisted_json = persisted_output.model_dump(mode="json")
             if _stable_json(run.result) != _stable_json(agent_json):

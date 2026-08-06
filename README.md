@@ -60,8 +60,8 @@ uv run --directory apps/server riva worker --env-file "$PWD/.env"
 
 Without `RIVA_LLM_PROVIDER`, the Worker starts with an empty handler registry.
 With complete Qwen settings (`RIVA_LLM_PROVIDER=qwen`, model, API key, and base
-URL), it registers `job-description-parser` and `matching-analyzer`; the
-startup log then reports `handler_count=2`. The API already exposes the
+URL), it registers `job-description-parser`, `matching-analyzer`, and
+`resume-parser`; the startup log then reports `handler_count=3`. The API already exposes the
 job-description parsing lifecycle and the matching-analysis lifecycle. The
 Worker registers both handlers. Frontend real-API integration will be completed
 in a later step.

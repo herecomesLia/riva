@@ -68,6 +68,7 @@ class ApplicationSession:
         self.commit_error = commit_error
         self.commit_count = 0
         self.rollback_count = 0
+        self.refresh_calls: list[tuple[object, list[str] | None]] = []
 
     async def scalar(self, statement: Any) -> object:
         self.statements.append(statement)
@@ -91,6 +92,14 @@ class ApplicationSession:
 
     async def rollback(self) -> None:
         self.rollback_count += 1
+
+    async def refresh(
+        self,
+        instance: object,
+        *,
+        attribute_names: list[str] | None = None,
+    ) -> None:
+        self.refresh_calls.append((instance, attribute_names))
 
 
 def empty_profile(*, version: int = 1, summary: str | None = None) -> CareerProfile:
@@ -876,6 +885,9 @@ def test_apply_creates_profile_with_deterministic_ids_and_applies_draft() -> Non
     assert factory_calls == 1
     assert session.commit_count == 1
     assert session.rollback_count == 0
+    assert session.refresh_calls == [
+        (application.profile, ["updated_at"]),
+    ]
     assert len(session.statements) == 6
     assert all("FOR UPDATE" in str(statement) for statement in session.statements)
     assert all(
@@ -969,6 +981,9 @@ def test_applied_replay_is_idempotent_without_clock_or_factory() -> None:
     assert draft.applied_at == NOW
     assert session.commit_count == 1
     assert session.rollback_count == 0
+    assert session.refresh_calls == [
+        (profile, ["updated_at"]),
+    ]
 
 
 def test_ready_base_profile_conflict_does_not_apply() -> None:

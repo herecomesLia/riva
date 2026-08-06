@@ -126,6 +126,10 @@ class ResumeImportApplicationService:
                 if profile is not None:
                     _validate_profile(profile)
                 await self.session.commit()
+                await self.session.refresh(
+                    profile,
+                    attribute_names=["updated_at"],
+                )
                 return ResumeImportApplicationResult(
                     profile=profile,
                     draft=draft,
@@ -183,6 +187,10 @@ class ResumeImportApplicationService:
                 )
 
             await self.session.commit()
+            await self.session.refresh(
+                profile,
+                attribute_names=["updated_at"],
+            )
             return ResumeImportApplicationResult(
                 profile=profile,
                 draft=draft,
