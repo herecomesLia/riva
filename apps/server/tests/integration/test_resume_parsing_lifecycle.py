@@ -52,11 +52,16 @@ def database_url() -> str:
 
 
 def make_user(user_id: UUID) -> User:
-    suffix = user_id.hex[:16]
+    prefix = "resume-lifecycle-"
+    username = f"{prefix}{user_id.hex[: 32 - len(prefix)]}"
+    normalized_username = username
+    assert len(username) <= 32
+    assert len(normalized_username) <= 32
+    assert username == normalized_username
     return User(
         id=user_id,
-        username=f"resume-lifecycle-{suffix}",
-        normalized_username=f"resume-lifecycle-{suffix}",
+        username=username,
+        normalized_username=normalized_username,
         password_hash="hash",
         display_name="Resume Lifecycle User",
     )
