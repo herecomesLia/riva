@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from riva.core.config import Settings
 from riva.db.database import Database
-from riva.integrations import LLMUsage
+from riva.integrations import LLMUsage, ProviderUnavailableError
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -170,6 +170,22 @@ async def status(
             llm_provider="qwen",
             llm_model=MODEL,
         ).get_status(
+            user_id=user_id,
+            resume_document_id=document_id,
+        )
+
+
+async def _retry(
+    database: Database,
+    user_id: UUID,
+    document_id: UUID,
+) -> object:
+    async with database.sessionmaker() as session:
+        return await ResumeParsingLifecycleService(
+            session,
+            llm_provider="qwen",
+            llm_model=MODEL,
+        ).retry(
             user_id=user_id,
             resume_document_id=document_id,
         )
@@ -337,6 +353,154 @@ def test_failed_retry_preserves_old_artifacts_and_advances_versions() -> None:
                     assert document.parsing_run_id == retry_response.run_id
                     assert result.source_agent_run_id == retry_response.run_id
                     assert result.summary == "Second durable result"
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_retry_can_continue_after_retry_run_fails_before_persisting_artifacts() -> None:
+    async def run_test() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                user_id, document_id = await seed_document(database)
+                run_a_response = await start(database, user_id, document_id)
+
+                assert await make_worker(
+                    database,
+                    FakeLLMProvider([parsing_output("Result A")]),
+                ).process_one() is True
+
+                async with database.sessionmaker() as session:
+                    run_a = await session.get(AgentRun, run_a_response.run_id)
+                    result_a = await session.get(
+                        ResumeParsingResult,
+                        document_id,
+                    )
+                    draft_a = await session.get(ResumeImportDraft, document_id)
+                    assert run_a is not None
+                    assert result_a is not None
+                    assert draft_a is not None
+                    assert draft_a.status == "ready"
+
+                    run_a.status = AgentRunStatus.FAILED
+                    run_a.attempt_count = run_a.max_attempts
+                    run_a.finished_at = datetime.now(UTC)
+                    run_a.error_code = "provider_timeout"
+                    run_a.result = None
+                    run_a.provider = None
+                    run_a.input_tokens = None
+                    run_a.output_tokens = None
+                    run_a.lease_owner = None
+                    run_a.lease_token = None
+                    run_a.lease_expires_at = None
+                    await session.commit()
+
+                run_b_response = await _retry(database, user_id, document_id)
+                assert run_b_response.status == "queued"
+                assert run_b_response.run_id != run_a_response.run_id
+
+                async with database.sessionmaker() as session:
+                    stored_b = await session.get(AgentRun, run_b_response.run_id)
+                    stored_result = await session.get(
+                        ResumeParsingResult,
+                        document_id,
+                    )
+                    stored_draft = await session.get(
+                        ResumeImportDraft,
+                        document_id,
+                    )
+                    assert stored_b is not None
+                    assert stored_result is not None
+                    assert stored_draft is not None
+                    stored_b.max_attempts = 1
+                    await session.commit()
+                    result_source_before_b = stored_result.source_agent_run_id
+                    draft_source_before_b = stored_draft.source_agent_run_id
+                    draft_version_before_b = stored_draft.draft_version
+                    draft_summary_before_b = stored_draft.summary
+
+                assert result_source_before_b == run_a_response.run_id
+                assert draft_source_before_b == run_a_response.run_id
+                assert draft_version_before_b == 1
+
+                b_provider = FakeLLMProvider([ProviderUnavailableError()])
+                assert await make_worker(database, b_provider).process_one() is True
+                assert len(b_provider.calls) == 1
+
+                failed_b = await status(database, user_id, document_id)
+                assert failed_b.status == "failed"
+
+                run_c_response = await _retry(database, user_id, document_id)
+                assert run_c_response.status == "queued"
+                assert run_c_response.run_id not in {
+                    run_a_response.run_id,
+                    run_b_response.run_id,
+                }
+
+                async with database.sessionmaker() as session:
+                    document = await session.get(ResumeDocument, document_id)
+                    stored_result = await session.get(
+                        ResumeParsingResult,
+                        document_id,
+                    )
+                    stored_draft = await session.get(
+                        ResumeImportDraft,
+                        document_id,
+                    )
+                    assert document is not None
+                    assert stored_result is not None
+                    assert stored_draft is not None
+                    assert document.parsing_run_id == run_c_response.run_id
+                    assert stored_result.source_agent_run_id == run_a_response.run_id
+                    assert stored_draft.source_agent_run_id == run_a_response.run_id
+                    assert stored_draft.status == "superseded"
+                    assert stored_draft.draft_version == draft_version_before_b
+                    assert stored_draft.summary == draft_summary_before_b
+
+                assert await make_worker(
+                    database,
+                    FakeLLMProvider([parsing_output("Result C")]),
+                ).process_one() is True
+
+                final = await status(database, user_id, document_id)
+                assert final.status == "succeeded"
+                assert final.result_version == 2
+                assert final.draft_version == 2
+                assert final.draft_status == "ready"
+
+                async with database.sessionmaker() as session:
+                    result_c = await session.get(
+                        ResumeParsingResult,
+                        document_id,
+                    )
+                    draft_c = await session.get(ResumeImportDraft, document_id)
+                    run_count = await session.scalar(
+                        select(func.count())
+                        .select_from(AgentRun)
+                        .where(AgentRun.user_id == user_id)
+                    )
+                    assert result_c is not None
+                    assert draft_c is not None
+                    assert result_c.source_agent_run_id == run_c_response.run_id
+                    assert result_c.summary == "Result C"
+                    assert draft_c.source_agent_run_id == run_c_response.run_id
+                    assert draft_c.status == "ready"
+                    assert draft_c.draft_version == 2
+                    assert run_count == 3
+                    assert (
+                        await session.get(AgentRun, run_a_response.run_id)
+                        is not None
+                    )
+                    assert (
+                        await session.get(AgentRun, run_b_response.run_id)
+                        is not None
+                    )
+                    assert (
+                        await session.get(AgentRun, run_c_response.run_id)
+                        is not None
+                    )
             finally:
                 await database.reset()
 

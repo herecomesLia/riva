@@ -149,3 +149,43 @@ def test_lifecycle_routes_require_authentication(app) -> None:
 
     assert response.status_code == 401
     assert service.calls == []
+
+
+def test_openapi_exposes_resume_parsing_lifecycle_contract(app) -> None:
+    paths = app.openapi()["paths"]
+    base = "/api/profile/resumes/{resumeId}/parsing"
+    retry = f"{base}/retry"
+
+    assert base in paths
+    assert retry in paths
+    assert "202" in paths[base]["post"]["responses"]
+    assert "200" in paths[base]["get"]["responses"]
+    assert "202" in paths[retry]["post"]["responses"]
+    assert (
+        paths[base]["post"]["responses"]["202"]["content"][
+            "application/json"
+        ]["schema"]["$ref"]
+        == "#/components/schemas/ResumeParsingStatusResponse"
+    )
+    assert (
+        paths[base]["get"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]["$ref"]
+        == "#/components/schemas/ResumeParsingStatusResponse"
+    )
+    assert (
+        paths[retry]["post"]["responses"]["202"]["content"][
+            "application/json"
+        ]["schema"]["$ref"]
+        == "#/components/schemas/ResumeParsingStatusResponse"
+    )
+    for operation in (
+        paths[base]["post"],
+        paths[base]["get"],
+        paths[retry]["post"],
+    ):
+        assert any(
+            parameter["name"] == "resumeId"
+            and parameter["in"] == "path"
+            for parameter in operation["parameters"]
+        )

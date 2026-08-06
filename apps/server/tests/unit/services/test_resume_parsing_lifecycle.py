@@ -381,10 +381,183 @@ def test_retry_creates_new_run_and_supersedes_failed_ready_draft() -> None:
     assert old_result.source_agent_run_id == failed.id
     assert old_draft.status == "superseded"
     assert old_draft.draft_version == 1
+    assert old_draft.source_agent_run_id == failed.id
     assert calls[0]["idempotency_key"] == (
         f"resume-parsing:{DOCUMENT_ID}:retry:{failed.id}"
     )
     assert session.commit_count == 1
+
+
+def test_retry_allows_superseded_draft_from_an_earlier_run() -> None:
+    run_a_id = uuid4()
+    failed_b = run(
+        status=AgentRunStatus.FAILED,
+        attempt_count=3,
+        error_code="provider_timeout",
+    )
+    run_c = run()
+    document_value = document(parsing_run_id=failed_b.id)
+    old_result = result(run_a_id)
+    old_draft = draft(run_a_id, status="superseded")
+    old_draft.summary = "Original draft"
+    old_draft.skills = [{"id": str(uuid4()), "name": "Python"}]
+    old_draft.applied_profile_version = None
+    old_draft.applied_at = None
+    draft_snapshot = {
+        "source_agent_run_id": old_draft.source_agent_run_id,
+        "draft_version": old_draft.draft_version,
+        "status": old_draft.status,
+        "summary": old_draft.summary,
+        "skills": old_draft.skills.copy(),
+        "applied_profile_version": old_draft.applied_profile_version,
+        "applied_at": old_draft.applied_at,
+    }
+    session = ScriptedSession(
+        USER_ID,
+        document_value,
+        failed_b,
+        old_result,
+        old_draft,
+    )
+    calls: list[dict[str, object]] = []
+
+    response = asyncio.run(
+        service(session, calls=calls, next_run=run_c).retry(
+            user_id=USER_ID,
+            resume_document_id=DOCUMENT_ID,
+        )
+    )
+
+    assert response.run_id == run_c.id
+    assert document_value.parsing_run_id == run_c.id
+    assert {
+        "source_agent_run_id": old_draft.source_agent_run_id,
+        "draft_version": old_draft.draft_version,
+        "status": old_draft.status,
+        "summary": old_draft.summary,
+        "skills": old_draft.skills,
+        "applied_profile_version": old_draft.applied_profile_version,
+        "applied_at": old_draft.applied_at,
+    } == draft_snapshot
+    assert old_result.source_agent_run_id == run_a_id
+    assert old_result.result_version == 1
+    assert len(calls) == 1
+
+
+def test_retry_allows_result_from_an_earlier_run_without_modifying_it() -> None:
+    run_a_id = uuid4()
+    failed_b = run(
+        status=AgentRunStatus.FAILED,
+        attempt_count=3,
+        error_code="provider_timeout",
+    )
+    run_c = run()
+    document_value = document(parsing_run_id=failed_b.id)
+    old_result = result(run_a_id)
+    result_snapshot = {
+        "source_agent_run_id": old_result.source_agent_run_id,
+        "result_version": old_result.result_version,
+        "summary": old_result.summary,
+        "skills": old_result.skills.copy(),
+    }
+    session = ScriptedSession(
+        USER_ID,
+        document_value,
+        failed_b,
+        old_result,
+        None,
+    )
+
+    response = asyncio.run(
+        service(session, next_run=run_c).retry(
+            user_id=USER_ID,
+            resume_document_id=DOCUMENT_ID,
+        )
+    )
+
+    assert response.run_id == run_c.id
+    assert {
+        "source_agent_run_id": old_result.source_agent_run_id,
+        "result_version": old_result.result_version,
+        "summary": old_result.summary,
+        "skills": old_result.skills,
+    } == result_snapshot
+
+
+def test_retry_rejects_ready_draft_from_another_run() -> None:
+    failed = run(
+        status=AgentRunStatus.FAILED,
+        attempt_count=3,
+        error_code="provider_timeout",
+    )
+    old_draft = draft(uuid4(), status="ready")
+    document_value = document(parsing_run_id=failed.id)
+    session = ScriptedSession(USER_ID, document_value, failed, None, old_draft)
+    calls: list[dict[str, object]] = []
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service(session, calls=calls, next_run=run()).retry(
+                user_id=USER_ID,
+                resume_document_id=DOCUMENT_ID,
+            )
+        )
+
+    assert_api_error(error, RESUME_PARSING_STATE_CONFLICT)
+    assert document_value.parsing_run_id == failed.id
+    assert old_draft.status == "ready"
+    assert calls == []
+
+
+def test_retry_rejects_applied_draft_without_enqueue() -> None:
+    failed = run(
+        status=AgentRunStatus.FAILED,
+        attempt_count=3,
+        error_code="provider_timeout",
+    )
+    applied = draft(failed.id, status="applied")
+    applied.applied_profile_version = 1
+    applied.applied_at = NOW
+    document_value = document(parsing_run_id=failed.id)
+    session = ScriptedSession(USER_ID, document_value, failed, None, applied)
+    calls: list[dict[str, object]] = []
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service(session, calls=calls, next_run=run()).retry(
+                user_id=USER_ID,
+                resume_document_id=DOCUMENT_ID,
+            )
+        )
+
+    assert_api_error(error, RESUME_PARSING_STATE_CONFLICT)
+    assert document_value.parsing_run_id == failed.id
+    assert applied.status == "applied"
+    assert calls == []
+
+
+def test_retry_rejects_invalid_draft_status_without_enqueue() -> None:
+    failed = run(
+        status=AgentRunStatus.FAILED,
+        attempt_count=3,
+        error_code="provider_timeout",
+    )
+    invalid = draft(uuid4(), status="invalid")
+    document_value = document(parsing_run_id=failed.id)
+    session = ScriptedSession(USER_ID, document_value, failed, None, invalid)
+    calls: list[dict[str, object]] = []
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service(session, calls=calls, next_run=run()).retry(
+                user_id=USER_ID,
+                resume_document_id=DOCUMENT_ID,
+            )
+        )
+
+    assert_api_error(error, RESUME_PARSING_STATE_CONFLICT)
+    assert document_value.parsing_run_id == failed.id
+    assert calls == []
 
 
 def test_retry_without_start_returns_not_started() -> None:

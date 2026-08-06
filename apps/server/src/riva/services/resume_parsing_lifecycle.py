@@ -394,10 +394,11 @@ class ResumeParsingLifecycleService:
         if (
             draft.user_id != document.user_id
             or draft.resume_document_id != document.id
-            or draft.source_agent_run_id != failed_run.id
         ):
             raise _state_conflict()
         if draft.status == READY:
+            if draft.source_agent_run_id != failed_run.id:
+                raise _state_conflict()
             draft.status = SUPERSEDED
             draft.applied_profile_version = None
             draft.applied_at = None
