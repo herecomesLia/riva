@@ -979,6 +979,7 @@ def test_production_registry_runs_matching_worker_chain() -> None:
                 assert registry.agent_ids == (
                     "job-description-parser",
                     "matching-analyzer",
+                    "resume-parser",
                 )
                 assert isinstance(
                     registry.get("matching-analyzer"), MatchingAnalysisHandler

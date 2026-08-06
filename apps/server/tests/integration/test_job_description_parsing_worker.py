@@ -316,6 +316,7 @@ def test_production_registry_runs_job_description_parsing_chain() -> None:
                 assert registry.agent_ids == (
                     "job-description-parser",
                     "matching-analyzer",
+                    "resume-parser",
                 )
 
                 setup = await setup_parsing(

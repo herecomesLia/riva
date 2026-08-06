@@ -6,7 +6,11 @@ from typing import Any
 
 import pytest
 
-from riva.agents import JobDescriptionParsingAgent, MatchingAnalysisAgent
+from riva.agents import (
+    JobDescriptionParsingAgent,
+    MatchingAnalysisAgent,
+    ResumeParsingAgent,
+)
 from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
 from riva.workers import (
@@ -14,6 +18,7 @@ from riva.workers import (
     DuplicateAgentHandlerError,
     JobDescriptionParsingHandler,
     MatchingAnalysisHandler,
+    ResumeParsingWorkerHandler,
 )
 from riva.workers.bootstrap import (
     build_agent_handler_registry,
@@ -198,10 +203,13 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     provider_calls: list[Settings] = []
     job_description_agent_calls: list[dict[str, object]] = []
     matching_agent_calls: list[dict[str, object]] = []
+    resume_parsing_agent_calls: list[dict[str, object]] = []
     job_description_handler_calls: list[dict[str, object]] = []
     matching_handler_calls: list[dict[str, object]] = []
+    resume_parsing_handler_calls: list[dict[str, object]] = []
     job_description_handlers: list[JobDescriptionParsingHandler] = []
     matching_handlers: list[MatchingAnalysisHandler] = []
+    resume_parsing_handlers: list[ResumeParsingWorkerHandler] = []
 
     def provider_factory(received: Settings):
         provider_calls.append(received)
@@ -216,6 +224,12 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     def matching_agent_factory(**options: object) -> MatchingAnalysisAgent:
         matching_agent_calls.append(options)
         return MatchingAnalysisAgent(**options)  # type: ignore[arg-type]
+
+    def resume_parsing_agent_factory(
+        **options: object,
+    ) -> ResumeParsingAgent:
+        resume_parsing_agent_calls.append(options)
+        return ResumeParsingAgent(**options)  # type: ignore[arg-type]
 
     def job_description_handler_factory(
         **options: object,
@@ -233,6 +247,14 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
         matching_handlers.append(handler)
         return handler
 
+    def resume_parsing_handler_factory(
+        **options: object,
+    ) -> ResumeParsingWorkerHandler:
+        resume_parsing_handler_calls.append(options)
+        handler = ResumeParsingWorkerHandler(**options)  # type: ignore[arg-type]
+        resume_parsing_handlers.append(handler)
+        return handler
+
     registry = build_agent_handler_registry(
         current,
         session_factory,  # type: ignore[arg-type]
@@ -241,6 +263,8 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
         job_description_handler_factory=job_description_handler_factory,
         matching_agent_factory=matching_agent_factory,
         matching_handler_factory=matching_handler_factory,
+        resume_parsing_agent_factory=resume_parsing_agent_factory,
+        resume_parsing_handler_factory=resume_parsing_handler_factory,
     )
 
     assert provider_calls == [current]
@@ -250,23 +274,34 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert matching_agent_calls == [
         {"provider": provider, "model": "qwen-test-model"}
     ]
+    assert resume_parsing_agent_calls == [
+        {"provider": provider, "model": "qwen-test-model"}
+    ]
     assert len(job_description_handler_calls) == 1
     assert len(matching_handler_calls) == 1
+    assert len(resume_parsing_handler_calls) == 1
     assert job_description_handler_calls[0]["session_factory"] is session_factory
     assert matching_handler_calls[0]["session_factory"] is session_factory
+    assert resume_parsing_handler_calls[0]["session_factory"] is session_factory
     job_description_agent = job_description_handler_calls[0]["agent"]
     matching_agent = matching_handler_calls[0]["agent"]
+    resume_parsing_agent = resume_parsing_handler_calls[0]["agent"]
     assert isinstance(job_description_agent, JobDescriptionParsingAgent)
     assert isinstance(matching_agent, MatchingAnalysisAgent)
+    assert isinstance(resume_parsing_agent, ResumeParsingAgent)
     assert job_description_agent.provider is provider
     assert matching_agent.provider is provider
+    assert resume_parsing_agent.provider is provider
     assert job_description_handlers[0].agent is job_description_agent
     assert matching_handlers[0].agent is matching_agent
+    assert resume_parsing_handlers[0].agent is resume_parsing_agent
     assert registry.get("job-description-parser") is job_description_handlers[0]
     assert registry.get("matching-analyzer") is matching_handlers[0]
+    assert registry.get("resume-parser") is resume_parsing_handlers[0]
     assert registry.agent_ids == (
         "job-description-parser",
         "matching-analyzer",
+        "resume-parser",
     )
 
 
@@ -292,9 +327,15 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(matching.agent.provider, QwenProvider)
     assert matching.agent.provider is handler.agent.provider
     assert matching.agent.model == "qwen-test-model"
+    resume_parsing = registry.get("resume-parser")
+    assert isinstance(resume_parsing, ResumeParsingWorkerHandler)
+    assert isinstance(resume_parsing.agent, ResumeParsingAgent)
+    assert resume_parsing.agent.provider is handler.agent.provider
+    assert resume_parsing.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "job-description-parser",
         "matching-analyzer",
+        "resume-parser",
     )
 
 

@@ -8,7 +8,11 @@ from typing import Any
 
 import structlog
 
-from riva.agents import JobDescriptionParsingAgent, MatchingAnalysisAgent
+from riva.agents import (
+    JobDescriptionParsingAgent,
+    MatchingAnalysisAgent,
+    ResumeParsingAgent,
+)
 from riva.core.config import Settings
 from riva.db import Database
 from riva.integrations import (
@@ -21,6 +25,7 @@ from riva.workers.job_description_parsing import (
     JobDescriptionParsingHandler,
 )
 from riva.workers.matching_analysis import MatchingAnalysisHandler
+from riva.workers.resume_parsing import ResumeParsingWorkerHandler
 from riva.workers.runtime import AgentWorker, SessionFactory
 
 
@@ -30,6 +35,8 @@ JobDescriptionAgentFactory = Callable[..., JobDescriptionParsingAgent]
 JobDescriptionHandlerFactory = Callable[..., JobDescriptionParsingHandler]
 MatchingAgentFactory = Callable[..., MatchingAnalysisAgent]
 MatchingHandlerFactory = Callable[..., MatchingAnalysisHandler]
+ResumeParsingAgentFactory = Callable[..., ResumeParsingAgent]
+ResumeParsingHandlerFactory = Callable[..., ResumeParsingWorkerHandler]
 RegistryFactory = Callable[
     [Settings, SessionFactory],
     AgentHandlerRegistry,
@@ -52,6 +59,10 @@ def build_agent_handler_registry(
     ),
     matching_agent_factory: MatchingAgentFactory = MatchingAnalysisAgent,
     matching_handler_factory: MatchingHandlerFactory = MatchingAnalysisHandler,
+    resume_parsing_agent_factory: ResumeParsingAgentFactory = ResumeParsingAgent,
+    resume_parsing_handler_factory: ResumeParsingHandlerFactory = (
+        ResumeParsingWorkerHandler
+    ),
 ) -> AgentHandlerRegistry:
     registry = AgentHandlerRegistry()
     provider = provider_factory(settings)
@@ -75,8 +86,17 @@ def build_agent_handler_registry(
         session_factory=session_factory,
         agent=matching_agent,
     )
+    resume_parsing_agent = resume_parsing_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    resume_parsing_handler = resume_parsing_handler_factory(
+        session_factory=session_factory,
+        agent=resume_parsing_agent,
+    )
     registry.register(job_description_handler)
     registry.register(matching_handler)
+    registry.register(resume_parsing_handler)
     return registry
 
 
