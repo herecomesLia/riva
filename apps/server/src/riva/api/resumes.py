@@ -6,13 +6,18 @@ from fastapi import APIRouter, Depends, File, Form, Path, Query, UploadFile, sta
 from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
 from riva.core.errors import APIError
-from riva.core.resumes import get_resume_document_service
+from riva.core.resumes import (
+    get_resume_document_service,
+    get_resume_parsing_lifecycle_service,
+)
 from riva.models import User
 from riva.schemas.resume_documents import (
     ResumeDocumentResponse,
     ResumeDocumentsResponse,
 )
+from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
 from riva.services.resume_documents import ResumeDocumentService
+from riva.services.resume_parsing_lifecycle import ResumeParsingLifecycleService
 
 
 ResumeId = Annotated[UUID, Path(alias="resumeId")]
@@ -83,6 +88,59 @@ async def get_resume_document(
     resume_service: ResumeDocumentService = Depends(get_resume_document_service),
 ) -> ResumeDocumentResponse:
     return await resume_service.get_document(current_user, resume_document_id)
+
+
+@router.post(
+    "/{resumeId}/parsing",
+    response_model=ResumeParsingStatusResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def start_resume_parsing(
+    resume_document_id: ResumeId,
+    current_user: User = Depends(require_current_user),
+    lifecycle_service: ResumeParsingLifecycleService = Depends(
+        get_resume_parsing_lifecycle_service
+    ),
+) -> ResumeParsingStatusResponse:
+    return await lifecycle_service.start(
+        user_id=current_user.id,
+        resume_document_id=resume_document_id,
+    )
+
+
+@router.get(
+    "/{resumeId}/parsing",
+    response_model=ResumeParsingStatusResponse,
+)
+async def get_resume_parsing_status(
+    resume_document_id: ResumeId,
+    current_user: User = Depends(require_current_user),
+    lifecycle_service: ResumeParsingLifecycleService = Depends(
+        get_resume_parsing_lifecycle_service
+    ),
+) -> ResumeParsingStatusResponse:
+    return await lifecycle_service.get_status(
+        user_id=current_user.id,
+        resume_document_id=resume_document_id,
+    )
+
+
+@router.post(
+    "/{resumeId}/parsing/retry",
+    response_model=ResumeParsingStatusResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def retry_resume_parsing(
+    resume_document_id: ResumeId,
+    current_user: User = Depends(require_current_user),
+    lifecycle_service: ResumeParsingLifecycleService = Depends(
+        get_resume_parsing_lifecycle_service
+    ),
+) -> ResumeParsingStatusResponse:
+    return await lifecycle_service.retry(
+        user_id=current_user.id,
+        resume_document_id=resume_document_id,
+    )
 
 
 __all__ = ["router"]

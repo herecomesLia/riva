@@ -35,6 +35,11 @@ from riva.schemas.resume_parsing import (
     ResumeParsingRunPayload,
     ResumeParsingWorkExperience,
 )
+from riva.schemas.resume_parsing_lifecycle import (
+    ResumeImportDraftLifecycleStatus,
+    ResumeParsingLifecycleStatus,
+    ResumeParsingStatusResponse,
+)
 from riva.schemas.matching_analysis import (
     MatchingAnalysisInput,
     MatchingAnalysisOutput,
@@ -137,6 +142,9 @@ __all__ = [
     "ResumeParsingProjectExperience",
     "ResumeParsingRunPayload",
     "ResumeParsingWorkExperience",
+    "ResumeImportDraftLifecycleStatus",
+    "ResumeParsingLifecycleStatus",
+    "ResumeParsingStatusResponse",
     "TargetRoleExperienceRange",
     "TargetRolePreparationStatus",
     "TargetRoleRecruitmentType",
