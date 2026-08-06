@@ -34,7 +34,10 @@ from riva.schemas.profile import CareerProfilePutRequest, CareerProfileResponse
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.profile import CareerProfileService
 from riva.services.resume_import_api import ResumeImportAPIService
-from riva.services.resume_imports import build_resume_import_draft_data
+from riva.services.resume_imports import (
+    ResumeImportDraftService,
+    build_resume_import_draft_data,
+)
 
 
 pytestmark = pytest.mark.integration
@@ -273,6 +276,24 @@ async def seed_resume(
         if result is not None:
             session.add(result)
         await session.commit()
+
+    if status == AgentRunStatus.SUCCEEDED:
+        async with database.sessionmaker() as session:
+            draft = await ResumeImportDraftService(session).build_draft(
+                user_id=user_id,
+                resume_document_id=document_id,
+            )
+            assert draft.user_id == user_id
+            assert draft.resume_document_id == document_id
+            assert draft.source_agent_run_id == run.id
+            assert draft.status == "ready"
+            assert draft.parsing_result_version == 1
+            assert draft.draft_version == 1
+    else:
+        async with database.sessionmaker() as session:
+            assert await session.get(ResumeParsingResult, document_id) is None
+            assert await session.get(ResumeImportDraft, document_id) is None
+
     return SeededResume(user_id, document_id, run.id, parsed)
 
 
@@ -467,7 +488,6 @@ async def seed_existing_profile(
         role="Manual role",
         start_date="2022-01",
         end_date="2023-01",
-        is_current=False,
         responsibilities=["Keep this project"],
         achievements=["Keep this achievement"],
         project_url=None,
@@ -626,6 +646,7 @@ def test_existing_profile_api_response_preserves_manual_items_and_links() -> Non
                     )
                     assert ready.status == "ready"
                     assert ready.base_profile_version == 1
+                    assert ready.draft_version == 2
 
                 async with database.sessionmaker() as session:
                     applied = await ResumeImportAPIService(session).apply_draft(
