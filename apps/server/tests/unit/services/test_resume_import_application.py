@@ -59,12 +59,17 @@ class ApplicationSession:
         self,
         *scalar_values: object,
         scalar_lists: list[list[object]] | None = None,
-        commit_error: Exception | None = None,
+        flush_error: BaseException | None = None,
+        refresh_error: BaseException | None = None,
+        commit_error: BaseException | None = None,
     ) -> None:
         self.scalar_values = list(scalar_values)
         self.scalar_lists = list(scalar_lists or [])
         self.statements: list[Any] = []
         self.added: list[object] = []
+        self.events: list[str] = []
+        self.flush_error = flush_error
+        self.refresh_error = refresh_error
         self.commit_error = commit_error
         self.commit_count = 0
         self.rollback_count = 0
@@ -85,12 +90,19 @@ class ApplicationSession:
     def add(self, value: object) -> None:
         self.added.append(value)
 
+    async def flush(self) -> None:
+        self.events.append("flush")
+        if self.flush_error is not None:
+            raise self.flush_error
+
     async def commit(self) -> None:
+        self.events.append("commit")
         if self.commit_error is not None:
             raise self.commit_error
         self.commit_count += 1
 
     async def rollback(self) -> None:
+        self.events.append("rollback")
         self.rollback_count += 1
 
     async def refresh(
@@ -99,6 +111,9 @@ class ApplicationSession:
         *,
         attribute_names: list[str] | None = None,
     ) -> None:
+        self.events.append("refresh")
+        if self.refresh_error is not None:
+            raise self.refresh_error
         self.refresh_calls.append((instance, attribute_names))
 
 
@@ -391,6 +406,33 @@ def draft_from_data(
         applied_at=applied_at,
         created_at=NOW,
         updated_at=NOW,
+    )
+
+
+def ready_application_session(
+    *,
+    profile: CareerProfile | None = None,
+    **session_kwargs: object,
+) -> ApplicationSession:
+    document, result = graph()
+    data = build_resume_import_draft_data(
+        user_id=USER_ID,
+        result=_parsed_output_from_result(result),
+        profile=profile,
+    )
+    draft = draft_from_data(
+        data,
+        base_profile_id=profile.profile_id if profile is not None else None,
+        base_profile_version=profile.version if profile is not None else None,
+    )
+    return ApplicationSession(
+        USER_ID,
+        document,
+        result,
+        profile,
+        draft,
+        scalar_lists=[[]],
+        **session_kwargs,
     )
 
 
@@ -885,6 +927,7 @@ def test_apply_creates_profile_with_deterministic_ids_and_applies_draft() -> Non
     assert factory_calls == 1
     assert session.commit_count == 1
     assert session.rollback_count == 0
+    assert session.events == ["flush", "refresh", "commit"]
     assert session.refresh_calls == [
         (application.profile, ["updated_at"]),
     ]
@@ -904,6 +947,30 @@ def test_apply_creates_profile_with_deterministic_ids_and_applies_draft() -> Non
     ]
     assert application.profile.work_experiences[0].skill_ids == [
         data.skills[0].id
+    ]
+
+
+def test_existing_profile_change_flushes_refreshes_then_commits() -> None:
+    profile = empty_profile()
+    session = ready_application_session(profile=profile)
+
+    application = asyncio.run(
+        ResumeImportApplicationService(
+            session,
+            clock=lambda: NOW,
+        ).apply_draft(
+            user_id=USER_ID,
+            resume_document_id=DOCUMENT_ID,
+            draft_version=1,
+        )
+    )
+
+    assert application.profile_changed is True
+    assert application.profile.version == 2
+    assert session.events == ["flush", "refresh", "commit"]
+    assert session.commit_count == 1
+    assert session.refresh_calls == [
+        (profile, ["updated_at"]),
     ]
 
 
@@ -947,6 +1014,7 @@ def test_applied_replay_is_idempotent_without_clock_or_factory() -> None:
         profile=None,
     )
     profile = empty_profile(version=1, summary="Resume summary")
+    profile.updated_at = NOW
     draft = draft_from_data(
         data,
         status="applied",
@@ -981,8 +1049,76 @@ def test_applied_replay_is_idempotent_without_clock_or_factory() -> None:
     assert draft.applied_at == NOW
     assert session.commit_count == 1
     assert session.rollback_count == 0
+    assert profile.updated_at == NOW
+    assert session.events == ["commit"]
+    assert session.refresh_calls == []
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_events"),
+    [
+        (RuntimeError("refresh failed"), ["flush", "refresh", "rollback"]),
+        (asyncio.CancelledError(), ["flush", "refresh", "rollback"]),
+    ],
+)
+def test_refresh_failure_rolls_back_before_commit(
+    failure: BaseException,
+    expected_events: list[str],
+) -> None:
+    session = ready_application_session(refresh_error=failure)
+
+    with pytest.raises(type(failure)):
+        asyncio.run(
+            ResumeImportApplicationService(session, clock=lambda: NOW).apply_draft(
+                user_id=USER_ID,
+                resume_document_id=DOCUMENT_ID,
+                draft_version=1,
+            )
+        )
+
+    assert session.events == expected_events
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
+    assert session.refresh_calls == []
+
+
+def test_flush_failure_rolls_back_before_refresh_or_commit() -> None:
+    session = ready_application_session(flush_error=RuntimeError("flush failed"))
+
+    with pytest.raises(RuntimeError, match="flush failed"):
+        asyncio.run(
+            ResumeImportApplicationService(session, clock=lambda: NOW).apply_draft(
+                user_id=USER_ID,
+                resume_document_id=DOCUMENT_ID,
+                draft_version=1,
+            )
+        )
+
+    assert session.events == ["flush", "rollback"]
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
+    assert session.refresh_calls == []
+
+
+def test_commit_failure_rolls_back_without_post_commit_database_operations() -> None:
+    session = ready_application_session(
+        commit_error=RuntimeError("commit failed")
+    )
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        asyncio.run(
+            ResumeImportApplicationService(session, clock=lambda: NOW).apply_draft(
+                user_id=USER_ID,
+                resume_document_id=DOCUMENT_ID,
+                draft_version=1,
+            )
+        )
+
+    assert session.events == ["flush", "refresh", "commit", "rollback"]
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
     assert session.refresh_calls == [
-        (profile, ["updated_at"]),
+        (session.added[0], ["updated_at"]),
     ]
 
 
@@ -1138,6 +1274,8 @@ def test_no_profile_business_change_does_not_supersede_other_drafts() -> None:
     assert application.profile_changed is False
     assert profile.version == 1
     assert draft.status == "applied"
+    assert session.events == ["commit"]
+    assert session.refresh_calls == []
     assert len(session.statements) == 5
 
 

@@ -651,6 +651,7 @@ def test_existing_profile_api_response_preserves_manual_items_and_links() -> Non
                     item.id: item for item in applied.profile.education
                 }
                 skill_by_id = {item.id: item for item in applied.profile.skills}
+                skill_by_name = {item.name: item for item in applied.profile.skills}
                 assert (
                     education_by_id[existing.resume_education_id].school
                     == "New University"
@@ -673,14 +674,94 @@ def test_existing_profile_api_response_preserves_manual_items_and_links() -> Non
                 )
                 assert skill_by_id[existing.manual_skill_id].name == "Rust"
                 assert skill_by_id[existing.manual_skill_id].source == "userAdded"
+                assert skill_by_name["Python"].source == "resumeExtracted"
+                assert skill_by_name["Kotlin"].source == "userEdited"
+                assert work_by_id[existing.resume_work_id].skill_ids == [
+                    skill_by_name["Python"].id,
+                    skill_by_name["Kotlin"].id,
+                ]
+                assert work_by_id[existing.manual_work_id].skill_ids == [
+                    existing.manual_skill_id
+                ]
+                assert project_by_id[existing.resume_project_id].skill_ids == [
+                    skill_by_name["Python"].id
+                ]
+                assert project_by_id[existing.manual_project_id].skill_ids == [
+                    existing.manual_skill_id
+                ]
 
-                assert [
-                    link.id for link in applied.profile.work_experiences[0].skill_links
-                ] == list(existing.work_link_ids)
-                assert [
-                    link.id
-                    for link in applied.profile.project_experiences[0].skill_links
-                ] == list(existing.project_link_ids)
+                async with database.sessionmaker() as session:
+                    work_links = list(
+                        (
+                            await session.scalars(
+                                select(CareerProfileWorkSkill)
+                                .where(
+                                    CareerProfileWorkSkill.work_experience_id
+                                    == existing.resume_work_id
+                                )
+                                .order_by(CareerProfileWorkSkill.position)
+                            )
+                        ).all()
+                    )
+                    project_links = list(
+                        (
+                            await session.scalars(
+                                select(CareerProfileProjectSkill)
+                                .where(
+                                    CareerProfileProjectSkill.project_experience_id
+                                    == existing.resume_project_id
+                                )
+                                .order_by(CareerProfileProjectSkill.position)
+                            )
+                        ).all()
+                    )
+                    all_work_links = list(
+                        (
+                            await session.scalars(
+                                select(CareerProfileWorkSkill).where(
+                                    CareerProfileWorkSkill.career_profile_id
+                                    == existing.profile_id
+                                )
+                            )
+                        ).all()
+                    )
+                    all_project_links = list(
+                        (
+                            await session.scalars(
+                                select(CareerProfileProjectSkill).where(
+                                    CareerProfileProjectSkill.career_profile_id
+                                    == existing.profile_id
+                                )
+                            )
+                        ).all()
+                    )
+
+                assert [link.id for link in work_links] == list(
+                    existing.work_link_ids
+                )
+                assert [link.skill_id for link in work_links] == [
+                    skill_by_name["Python"].id,
+                    skill_by_name["Kotlin"].id,
+                ]
+                assert [link.position for link in work_links] == [0, 1]
+                work_combinations = [
+                    (link.work_experience_id, link.skill_id)
+                    for link in all_work_links
+                ]
+                assert len(work_combinations) == len(set(work_combinations))
+
+                assert [link.id for link in project_links] == list(
+                    existing.project_link_ids
+                )
+                assert [link.skill_id for link in project_links] == [
+                    skill_by_name["Python"].id
+                ]
+                assert [link.position for link in project_links] == [0]
+                project_combinations = [
+                    (link.project_experience_id, link.skill_id)
+                    for link in all_project_links
+                ]
+                assert len(project_combinations) == len(set(project_combinations))
 
                 fresh = await profile_response(database, seeded.user_id)
                 assert (
