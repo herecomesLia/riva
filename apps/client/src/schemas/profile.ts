@@ -141,7 +141,7 @@ const careerProfileEducationInputSchema = z
   })
 
 const careerProfileEducationResponseSchema: z.ZodType<CareerProfileEducationDto> =
-  careerProfileEducationInputSchema.extend({ source: careerProfileSourceSchema })
+  careerProfileEducationInputSchema.safeExtend({ source: careerProfileSourceSchema })
 
 const careerProfileWorkExperienceInputSchema = z
   .object({
@@ -171,7 +171,7 @@ const careerProfileWorkExperienceInputSchema = z
   })
 
 const careerProfileWorkExperienceResponseSchema: z.ZodType<CareerProfileWorkExperienceDto> =
-  careerProfileWorkExperienceInputSchema.extend({ source: careerProfileSourceSchema })
+  careerProfileWorkExperienceInputSchema.safeExtend({ source: careerProfileSourceSchema })
 
 const careerProfileProjectExperienceInputSchema = z
   .object({
@@ -193,7 +193,7 @@ const careerProfileProjectExperienceInputSchema = z
   })
 
 const careerProfileProjectExperienceResponseSchema: z.ZodType<CareerProfileProjectExperienceDto> =
-  careerProfileProjectExperienceInputSchema.extend({ source: careerProfileSourceSchema })
+  careerProfileProjectExperienceInputSchema.safeExtend({ source: careerProfileSourceSchema })
 
 const careerProfileSkillInputSchema = z
   .object({
