@@ -14,8 +14,6 @@ import {
 } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { ResumeImportDraft } from "@/models/profile"
-import type { ProfileResumeApplyConflict } from "@/pages/profile/profile-resume-workflow"
 
 import { ProfileHeaderIntro } from "./ProfileHeaderIntro"
 
@@ -187,96 +185,6 @@ export function ProfileRecognitionFailureState({
         </div>
       </div>
     </Alert>
-  )
-}
-
-export function ProfileResumeDraftReviewState({
-  applyConflict,
-  applyError,
-  draft,
-  isApplying,
-  onApply,
-  onCancel,
-}: {
-  applyConflict: ProfileResumeApplyConflict | null
-  applyError: boolean
-  draft: ResumeImportDraft
-  isApplying: boolean
-  onApply: () => void
-  onCancel: () => void
-}) {
-  const { t } = useTranslation()
-
-  return (
-    <Card data-testid="profile-resume-draft-review">
-      <CardHeader>
-        <CardTitle>{t("profile.importDraft.title")}</CardTitle>
-        <CardDescription>{t("profile.importDraft.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {applyConflict && (
-          <Alert data-testid="profile-resume-draft-conflict" variant="destructive">
-            <AlertCircleIcon />
-            <AlertTitle>{t("profile.importDraft.conflictTitle")}</AlertTitle>
-            <AlertDescription>{t("profile.importDraft.conflictDescription")}</AlertDescription>
-          </Alert>
-        )}
-        {applyError && (
-          <Alert data-testid="profile-resume-draft-apply-error" variant="destructive">
-            <AlertCircleIcon />
-            <AlertTitle>{t("profile.importDraft.applyFailedTitle")}</AlertTitle>
-            <AlertDescription>{t("profile.importDraft.applyFailedDescription")}</AlertDescription>
-          </Alert>
-        )}
-        <dl className="grid gap-3 sm:grid-cols-3">
-          <DraftCount
-            label={t("profile.importDraft.newItems")}
-            value={draft.changeSummary.newItems}
-          />
-          <DraftCount
-            label={t("profile.importDraft.changedItems")}
-            value={draft.changeSummary.changedItems}
-          />
-          <DraftCount
-            label={t("profile.importDraft.missingItems")}
-            value={draft.changeSummary.missingItems}
-          />
-        </dl>
-        <p className="text-sm text-muted-foreground">
-          {t("profile.importDraft.missingItemsDescription")}
-        </p>
-        <div className="flex flex-col gap-1 text-sm">
-          {draft.protectedItems.length > 0 && (
-            <p>{t("profile.importDraft.protectedItems", { count: draft.protectedItems.length })}</p>
-          )}
-          {draft.skippedItems.length > 0 && (
-            <p>{t("profile.importDraft.skippedItems", { count: draft.skippedItems.length })}</p>
-          )}
-          {draft.unresolvedItems.length > 0 && (
-            <p>
-              {t("profile.importDraft.unresolvedItems", { count: draft.unresolvedItems.length })}
-            </p>
-          )}
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-wrap gap-2">
-        <Button disabled={isApplying} onClick={onApply}>
-          {isApplying ? t("profile.importDraft.applying") : t("profile.importDraft.apply")}
-        </Button>
-        <Button disabled={isApplying} onClick={onCancel} variant="outline">
-          {t("profile.importDraft.cancel")}
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
-function DraftCount({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border p-3">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-2xl font-semibold">{value}</dd>
-    </div>
   )
 }
 

@@ -31,8 +31,8 @@ import {
   ProfileLoadingState,
   ProfileProcessingState,
   ProfileRecognitionFailureState,
-  ProfileResumeDraftReviewState,
 } from "./components/ProfilePageStates"
+import { ProfileResumeDraftReviewState } from "./components/ProfileResumeDraftReviewState"
 import { ProfileResumeDialog, type ResumeDialogMode } from "./components/ProfileResumeDialog"
 import {
   ProfileSectionEditDialog,

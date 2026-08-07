@@ -19,6 +19,7 @@ import type { JobProfileSnapshot, ResumeImportDraft } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
 import { ProfileSectionEditDialog } from "@/pages/profile/components/ProfileSectionEditDialog"
 import { formatDate } from "@/pages/profile/components/profile-formatters"
+import { createResumeDraftStoryFixture } from "@/pages/profile/profile-resume-draft-story-fixtures"
 import { renderWithProviders } from "@/test/render"
 
 function createActions(): ProfileViewActions {
@@ -249,6 +250,34 @@ describe("ProfileView", () => {
     expect(await screen.findByTestId("profile-resume-draft-review")).toHaveTextContent(
       i18n.t("profile.importDraft.title"),
     )
+    expect(screen.queryByTestId("profile-resume-import-form")).not.toBeInTheDocument()
+  })
+
+  it("keeps the profile header above an existing-profile Draft review", async () => {
+    renderWithProviders(
+      <ProfileView
+        actions={createActions()}
+        content={{
+          data: createProfileMockSnapshot("complete"),
+          resumeWorkflow: {
+            applyConflict: null,
+            applyError: false,
+            draft: createResumeDraftStoryFixture("existingProfile"),
+            mode: "update",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "draftReady",
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: i18n.t("profile.title") }),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId("profile-resume-draft-review")).toBeInTheDocument()
   })
 
   it("shows a safe conflict alert in Draft review", async () => {
@@ -302,6 +331,8 @@ describe("ProfileView", () => {
     expect(
       screen.getByRole("button", { name: i18n.t("profile.importDraft.cancel") }),
     ).toBeDisabled()
+    expect(screen.getByTestId("resume-draft-summary")).toBeVisible()
+    expect(screen.getByTestId("resume-draft-education")).toBeVisible()
   })
 
   it("keeps legacy idle rendering when resumeWorkflow is omitted", async () => {

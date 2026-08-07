@@ -2,7 +2,9 @@ import preview from "#storybook/preview"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { createProfileMockSnapshot } from "@/mocks/data/profile"
-import { ProfileView } from "./ProfileView"
+import { ProfileView, type ProfileViewActions } from "./ProfileView"
+import type { ProfileResumeWorkflowState } from "./profile-resume-workflow"
+import { createResumeDraftStoryFixture } from "./profile-resume-draft-story-fixtures"
 import { ProfileStoryHarness } from "./profile-story-harness"
 
 import { withRouter } from "#storybook/decorators/with-router"
@@ -14,12 +16,42 @@ const meta = preview.meta({
   title: "Pages/Profile",
 })
 
-function pageStory(
-  scenario: Parameters<typeof ProfileStoryHarness>[0]["scenario"],
-  autoAdvance = false,
+function pageStory(scenario: Parameters<typeof ProfileStoryHarness>[0]["scenario"]) {
+  return meta.story({
+    render: () => <ProfileStoryHarness scenario={scenario} />,
+  })
+}
+
+function createStoryActions(): ProfileViewActions {
+  return {
+    applyResumeDraft: fn(async () => undefined),
+    createManualProfile: fn(async () => createProfileMockSnapshot("emptyManualProfile")),
+    resetInitialResumeImport: fn(async () => createProfileMockSnapshot("noProfile")),
+    resetResumeWorkflow: fn(),
+    retryRecognition: fn(async () => createProfileMockSnapshot("initialResumeRecognizing")),
+    retryResumeWorkflow: fn(async () => undefined),
+    saveSection: fn(async () => undefined),
+    uploadInitialResume: fn(async () => createProfileMockSnapshot("initialResumeUploading")),
+    uploadUpdatedResume: fn(async () => createProfileMockSnapshot("resumeUpdateUploading")),
+  }
+}
+
+function resumeWorkflowStory(
+  snapshotScenario: Parameters<typeof createProfileMockSnapshot>[0],
+  resumeWorkflow: ProfileResumeWorkflowState,
 ) {
   return meta.story({
-    render: () => <ProfileStoryHarness autoAdvance={autoAdvance} scenario={scenario} />,
+    render: () => (
+      <ProfileView
+        actions={createStoryActions()}
+        content={{
+          data: createProfileMockSnapshot(snapshotScenario),
+          resumeWorkflow,
+          status: "ready",
+        }}
+        variant="default"
+      />
+    ),
   })
 }
 
@@ -37,70 +69,67 @@ export const Error = meta.story({
   },
 })
 
-export const NoProfile = meta.story({
-  render: () => <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="noProfile" />,
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.type(canvas.getByLabelText(/简历文本|resume text/i), "Frontend engineer resume")
-    await userEvent.click(canvas.getByRole("button", { name: /上传并识别|upload and recognize/i }))
-
-    await waitFor(() =>
-      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
-        /正在识别简历|recognizing your resume/i,
-      ),
-    )
-    await waitFor(() => expect(canvas.getByTestId("profile-import-success")).toBeInTheDocument())
-    await expect(canvas.getByTestId("profile-section-education")).toBeInTheDocument()
-  },
-})
+export const NoProfile = pageStory("noProfile")
 export const ManualEmptyProfile = pageStory("emptyManualProfile")
 export const Ready = pageStory("complete")
 export const Partial = pageStory("partial")
-export const NoResume = meta.story({
-  render: () => (
-    <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="profileWithoutResume" />
-  ),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /上传简历|upload resume/i }))
-    const dialog = await screen.findByRole("dialog")
-    await userEvent.type(within(dialog).getByLabelText(/简历文本|resume text/i), "Profile resume")
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: /上传并识别|upload and recognize/i }),
-    )
-
-    await waitFor(() =>
-      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
-        /正在识别简历|recognizing your resume/i,
-      ),
-    )
-    await waitFor(() =>
-      expect(canvas.getByTestId("profile-resume-update-success")).toBeInTheDocument(),
-    )
-  },
+export const NoResume = pageStory("profileWithoutResume")
+export const UploadingResume = resumeWorkflowStory("noProfile", {
+  mode: "initial",
+  status: "uploading",
 })
-export const UploadingResume = pageStory("initialResumeUploading")
-export const ParsingResume = pageStory("initialResumeRecognizing")
+export const ParsingResume = resumeWorkflowStory("noProfile", {
+  isRetrying: false,
+  mode: "initial",
+  resumeId: "50000000-0000-4000-8000-000000000001",
+  status: "parsing",
+  synchronizationError: false,
+})
 export const RecognitionFailed = meta.story({
   render: () => (
-    <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="initialResumeRecognitionFailed" />
+    <ProfileView
+      actions={createStoryActions()}
+      content={{
+        data: createProfileMockSnapshot("noProfile"),
+        resumeWorkflow: {
+          canRetry: true,
+          failureReason: "The resume layout could not be recognized.",
+          isRetrying: false,
+          mode: "initial",
+          resumeId: "50000000-0000-4000-8000-000000000001",
+          status: "failed",
+        },
+        status: "ready",
+      }}
+      variant="default"
+    />
   ),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /重新识别|recognize again/i }))
-
-    await waitFor(() =>
-      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
-        /正在识别简历|recognizing your resume/i,
-      ),
-    )
-    await waitFor(() => expect(canvas.getByTestId("profile-import-success")).toBeInTheDocument())
-    await expect(canvas.queryByTestId("profile-recognition-failure")).not.toBeInTheDocument()
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("profile-recognition-failure")).toBeInTheDocument()
   },
+})
+export const InitialResumeDraftReady = resumeWorkflowStory("noProfile", {
+  applyConflict: null,
+  applyError: false,
+  draft: createResumeDraftStoryFixture("firstImport"),
+  mode: "initial",
+  resumeId: "50000000-0000-4000-8000-000000000001",
+  status: "draftReady",
+})
+export const ExistingProfileDraftReady = resumeWorkflowStory("complete", {
+  applyConflict: null,
+  applyError: false,
+  draft: createResumeDraftStoryFixture("existingProfile"),
+  mode: "update",
+  resumeId: "50000000-0000-4000-8000-000000000001",
+  status: "draftReady",
 })
 export const AfterInitialImport = pageStory("initialResumeRecognitionSucceeded")
 export const AfterResumeUpdate = pageStory("resumeUpdateSucceeded")
 export const MatchingAnalysisStale = pageStory("matchingAnalysisStale")
 
 export const EditableProfile = meta.story({
-  render: () => <ProfileStoryHarness autoAdvance scenario="complete" />,
+  render: () => <ProfileStoryHarness scenario="complete" />,
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getAllByRole("button", { name: /编辑|edit/i })[0]!)
     const dialog = await screen.findByRole("dialog")
@@ -112,33 +141,13 @@ export const EditableProfile = meta.story({
   },
 })
 
-export const ResumeUpdateFlow = meta.story({
-  render: () => <ProfileStoryHarness advanceDelay={50} autoAdvance scenario="complete" />,
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /更新简历|update resume/i }))
-    const dialog = await screen.findByRole("dialog")
-    await userEvent.click(
-      within(dialog).getByRole("button", {
-        name: /更新简历|update resume/i,
-      }),
-    )
-    await userEvent.type(
-      within(dialog).getByLabelText(/简历文本|resume text/i),
-      "Updated frontend resume",
-    )
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: /上传并识别|upload and recognize/i }),
-    )
-
-    await waitFor(() =>
-      expect(canvas.getByTestId("profile-processing-state")).toHaveTextContent(
-        /正在识别简历|recognizing your resume/i,
-      ),
-    )
-    await waitFor(() =>
-      expect(canvas.getByTestId("profile-resume-update-success")).toBeInTheDocument(),
-    )
-  },
+export const ResumeUpdateFlow = resumeWorkflowStory("complete", {
+  applyConflict: null,
+  applyError: false,
+  draft: createResumeDraftStoryFixture("protected"),
+  mode: "update",
+  resumeId: "50000000-0000-4000-8000-000000000001",
+  status: "draftReady",
 })
 
 const deletedWorkExperienceTitle =
