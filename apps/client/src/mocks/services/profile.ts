@@ -644,7 +644,7 @@ function setCareerProfile(profile: CareerProfileDto, state: ResumeImportMockStat
     profile.projectExperiences.length > 0,
     profile.skills.length > 0,
   ].filter(Boolean).length
-  const next: JobProfile = {
+  const nextWithoutMatchingState: JobProfile = {
     ...(current ?? createEmptyProfile(resume, "active")),
     completeness: {
       missingSections: [],
@@ -662,7 +662,22 @@ function setCareerProfile(profile: CareerProfileDto, state: ResumeImportMockStat
     version: profile.version,
     workExperiences: copy(profile.workExperiences),
   }
-  setMockSnapshot({ ...mockSnapshot, matchingAnalysis: null, profile: next })
+
+  const matchingAnalysis = staleMatchingAnalysis(
+    mockSnapshot.matchingAnalysis,
+    nextWithoutMatchingState,
+  )
+
+  const next: JobProfile = {
+    ...nextWithoutMatchingState,
+    matchingAnalysisStale: matchingAnalysis !== null,
+  }
+
+  setMockSnapshot({
+    ...mockSnapshot,
+    matchingAnalysis,
+    profile: next,
+  })
 }
 
 function notStartedParsing(resumeDocumentId: string): ResumeParsingStatus {
@@ -692,7 +707,7 @@ function startParsingRun(state: ResumeImportMockState): ResumeParsingStatus {
     extractionStatus: "succeeded",
   }
   state.parsing = {
-    attemptCount: state.parsing.attemptCount + 1,
+    attemptCount: 1,
     canRetry: false,
     createdAt: timestamp,
     draftStatus: null,
@@ -791,16 +806,23 @@ export async function getResumeParsingStatus(resumeId: string): Promise<ResumePa
 export async function retryResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
   await waitForMockDelay()
   const state = requireResumeImportState(resumeId)
+
+  if (state.parsing.status === "notStarted") {
+    resumeImportError("resume_parsing_not_started")
+  }
+
   if (state.parsing.status === "succeeded") {
     resumeImportError("resume_parsing_retry_not_allowed")
   }
+
   if (state.parsing.status === "running" || state.parsing.status === "queued") {
     return copy(state.parsing)
   }
-  if (state.parsing.status !== "failed") return startParsingRun(state)
+
   if (state.draft?.status === "ready") {
     state.draft = { ...state.draft, canApply: false, status: "superseded" }
   }
+
   return startParsingRun(state)
 }
 

@@ -341,6 +341,7 @@ describe("resume profile service in mock mode", () => {
     expect(failed.status).toBe("failed")
     expect(retried.status).toBe("running")
     expect(retried.runId).not.toBe(started.runId)
+    expect(retried.attemptCount).toBe(1)
   })
 
   it("requires retry instead of ordinary start after failure", async () => {
@@ -395,5 +396,30 @@ describe("resume profile service in mock mode", () => {
     })
     await vi.runAllTimersAsync()
     await expectation
+  })
+
+  it("rejects retry before parsing has started", async () => {
+    const document = await settle(uploadResume({ text: "Resume" }))
+
+    await expectConflict(retryResumeParsing(document.id), "resume_parsing_not_started")
+  })
+
+  it("keeps an existing matching analysis stale after a changing apply", async () => {
+    resetProfileMockState("complete")
+
+    const before = await settle(getJobProfile())
+    const { document } = await uploadAndComplete()
+    const draft = await settle(getResumeImportDraft(document.id))
+
+    await settle(applyResumeImportDraft(document.id, draft.draftVersion))
+
+    const after = await settle(getJobProfile())
+
+    expect(after.matchingAnalysis).toMatchObject({
+      profileVersion: before.profile!.version,
+      status: "stale",
+    })
+    expect(after.profile!.version).toBeGreaterThan(before.profile!.version)
+    expect(after.profile!.matchingAnalysisStale).toBe(true)
   })
 })
