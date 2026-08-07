@@ -48,9 +48,9 @@ const allProfileCapabilities: ProfileCapabilities = {
 const careerProfileApiCapabilities: ProfileCapabilities = {
   credentials: false,
   matchingAnalysis: false,
-  resumeImport: false,
-  resumeRecognition: false,
-  resumeUpdate: false,
+  resumeImport: true,
+  resumeRecognition: true,
+  resumeUpdate: true,
   targetRoles: false,
 }
 

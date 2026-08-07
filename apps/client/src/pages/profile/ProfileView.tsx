@@ -31,6 +31,7 @@ import {
   ProfileLoadingState,
   ProfileProcessingState,
   ProfileRecognitionFailureState,
+  ProfileResumeDraftReviewState,
 } from "./components/ProfilePageStates"
 import { ProfileResumeDialog, type ResumeDialogMode } from "./components/ProfileResumeDialog"
 import {
@@ -38,12 +39,16 @@ import {
   type EditableProfileSection,
 } from "./components/ProfileSectionEditDialog"
 import { ProfileSections } from "./components/ProfileSections"
+import type { ProfileResumeWorkflowState } from "./profile-resume-workflow"
 
 export type ProfileViewActions = {
+  applyResumeDraft: () => Promise<void>
   createManualProfile: () => Promise<JobProfileSnapshot>
   resetInitialResumeImport: (profileId: string, resumeId: string) => Promise<JobProfileSnapshot>
   retryRecognition: (profileId: string, resumeId: string) => Promise<JobProfileSnapshot>
+  retryResumeWorkflow: () => Promise<void>
   retrySynchronization?: () => Promise<JobProfileSnapshot | undefined>
+  resetResumeWorkflow: () => void
   saveSection: (input: SaveProfileSectionInput) => Promise<unknown>
   uploadInitialResume: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
   uploadUpdatedResume: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
@@ -58,6 +63,7 @@ export type ProfileViewProps =
       content: {
         status: "ready"
         data: JobProfileSnapshot
+        resumeWorkflow?: ProfileResumeWorkflowState
         synchronizationError?: "initialRecognition" | "resumeUpdate" | null
       }
       actions: ProfileViewActions
@@ -86,6 +92,7 @@ export function ProfileView(props: ProfileViewProps) {
       actions={props.actions}
       capabilities={props.capabilities ?? defaultProfileCapabilities}
       snapshot={props.content.data}
+      resumeWorkflow={props.content.resumeWorkflow ?? { status: "idle" }}
       synchronizationError={props.content.synchronizationError ?? null}
     />
   )
@@ -94,11 +101,13 @@ export function ProfileView(props: ProfileViewProps) {
 function ProfileReadyView({
   actions,
   capabilities,
+  resumeWorkflow,
   snapshot,
   synchronizationError,
 }: {
   actions: ProfileViewActions
   capabilities: ProfileCapabilities
+  resumeWorkflow: ProfileResumeWorkflowState
   snapshot: JobProfileSnapshot
   synchronizationError: "initialRecognition" | "resumeUpdate" | null
 }) {
@@ -192,6 +201,73 @@ function ProfileReadyView({
     } finally {
       setIsSynchronizing(false)
     }
+  }
+
+  if (resumeWorkflow.status !== "idle") {
+    let workflowContent
+    switch (resumeWorkflow.status) {
+      case "uploading":
+        workflowContent = <ProfileProcessingState status="uploadingResume" />
+        break
+      case "parsing":
+        workflowContent = (
+          <ProfileProcessingState
+            isRetrying={resumeWorkflow.isRetrying}
+            onRetry={() => void actions.retryResumeWorkflow()}
+            status="parsingResume"
+            synchronizationError={resumeWorkflow.synchronizationError}
+          />
+        )
+        break
+      case "failed":
+        workflowContent = (
+          <ProfileRecognitionFailureState
+            canRetry={resumeWorkflow.canRetry}
+            failureReason={resumeWorkflow.failureReason}
+            isActionPending={resumeWorkflow.isRetrying}
+            onManualEntry={() => {
+              actions.resetResumeWorkflow()
+              void runLifecycleAction(actions.createManualProfile)
+            }}
+            onReupload={actions.resetResumeWorkflow}
+            onRetry={() => void actions.retryResumeWorkflow()}
+          />
+        )
+        break
+      case "draftReady":
+        workflowContent = (
+          <ProfileResumeDraftReviewState
+            applyConflict={resumeWorkflow.applyConflict}
+            applyError={resumeWorkflow.applyError}
+            draft={resumeWorkflow.draft}
+            isApplying={false}
+            onApply={() => void actions.applyResumeDraft()}
+            onCancel={actions.resetResumeWorkflow}
+          />
+        )
+        break
+      case "applying":
+        workflowContent = (
+          <ProfileResumeDraftReviewState
+            applyConflict={null}
+            applyError={false}
+            draft={resumeWorkflow.draft}
+            isApplying
+            onApply={() => undefined}
+            onCancel={() => undefined}
+          />
+        )
+    }
+
+    if (!snapshot.profile) {
+      return <div className="mx-auto w-full max-w-3xl">{workflowContent}</div>
+    }
+    return (
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <ProfileHeader profile={snapshot.profile} />
+        {workflowContent}
+      </div>
+    )
   }
 
   if (!snapshot.profile) {

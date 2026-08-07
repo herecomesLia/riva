@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/profile"
-import type { JobProfileSnapshot } from "@/models/profile"
+import type { JobProfileSnapshot, ResumeImportDraft } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
 import { ProfileSectionEditDialog } from "@/pages/profile/components/ProfileSectionEditDialog"
 import { formatDate } from "@/pages/profile/components/profile-formatters"
@@ -23,14 +23,42 @@ import { renderWithProviders } from "@/test/render"
 
 function createActions(): ProfileViewActions {
   return {
+    applyResumeDraft: vi.fn(async () => undefined),
     createManualProfile: vi.fn(async () => structuredClone(profileResponseMock)),
     resetInitialResumeImport: vi.fn(async () => structuredClone(profileResponseMock)),
+    resetResumeWorkflow: vi.fn(() => undefined),
     retryRecognition: vi.fn(async () => structuredClone(profileResponseMock)),
+    retryResumeWorkflow: vi.fn(async () => undefined),
     retrySynchronization: vi.fn(async () => structuredClone(profileResponseMock)),
     saveSection: vi.fn(async () => structuredClone(profileResponseMock.profile!)),
     uploadInitialResume: vi.fn(async () => structuredClone(profileResponseMock)),
     uploadUpdatedResume: vi.fn(async () => structuredClone(profileResponseMock)),
   }
+}
+
+const workflowDraft: ResumeImportDraft = {
+  appliedAt: null,
+  appliedProfileVersion: null,
+  baseProfileId: null,
+  baseProfileVersion: null,
+  canApply: true,
+  changeSummary: { changedItems: 2, missingItems: 1, newItems: 3 },
+  createdAt: "2026-08-06T12:00:00Z",
+  draftVersion: 1,
+  education: [],
+  parsingResultVersion: 1,
+  projectExperiences: [],
+  protectedItems: [],
+  resumeDocumentId: "11111111-1111-4111-8111-111111111111",
+  skippedItems: [],
+  skills: [],
+  sourceRunId: "22222222-2222-4222-8222-222222222222",
+  status: "ready",
+  summary: "Resume summary",
+  summaryAction: "set",
+  unresolvedItems: [],
+  updatedAt: "2026-08-06T12:00:00Z",
+  workExperiences: [],
 }
 
 function renderReady(
@@ -115,6 +143,172 @@ describe("ProfileView", () => {
         name: i18n.t("profile.actions.updateResume"),
       }),
     ).not.toBeInTheDocument()
+  })
+
+  it("prioritizes parsing workflow over the empty-profile upload form", async () => {
+    renderWithProviders(
+      <ProfileView
+        actions={createActions()}
+        content={{
+          data: createProfileMockSnapshot("noProfile"),
+          resumeWorkflow: {
+            isRetrying: false,
+            mode: "initial",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "parsing",
+            synchronizationError: false,
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-resume-import-form")).not.toBeInTheDocument()
+  })
+
+  it("keeps the Profile header beside an update parsing workflow", async () => {
+    renderWithProviders(
+      <ProfileView
+        actions={createActions()}
+        content={{
+          data: createProfileMockSnapshot("complete"),
+          resumeWorkflow: {
+            isRetrying: false,
+            mode: "update",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "parsing",
+            synchronizationError: false,
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { level: 1, name: i18n.t("profile.title") }),
+    ).toBeInTheDocument()
+  })
+
+  it("renders a safe workflow failure and delegates retry", async () => {
+    const actions = createActions()
+    renderWithProviders(
+      <ProfileView
+        actions={actions}
+        content={{
+          data: createProfileMockSnapshot("noProfile"),
+          resumeWorkflow: {
+            canRetry: true,
+            failureReason: null,
+            isRetrying: false,
+            mode: "initial",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "failed",
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    const failure = await screen.findByTestId("profile-recognition-failure")
+    expect(failure).toHaveTextContent(i18n.t("profile.lifecycle.failed.description"))
+    await userEvent.click(
+      within(failure).getByRole("button", { name: i18n.t("profile.actions.retryRecognition") }),
+    )
+    expect(actions.retryResumeWorkflow).toHaveBeenCalledOnce()
+  })
+
+  it("renders the Resume Draft review", async () => {
+    renderWithProviders(
+      <ProfileView
+        actions={createActions()}
+        content={{
+          data: createProfileMockSnapshot("noProfile"),
+          resumeWorkflow: {
+            applyConflict: null,
+            applyError: false,
+            draft: workflowDraft,
+            mode: "initial",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "draftReady",
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(await screen.findByTestId("profile-resume-draft-review")).toHaveTextContent(
+      i18n.t("profile.importDraft.title"),
+    )
+  })
+
+  it("shows a safe conflict alert in Draft review", async () => {
+    renderWithProviders(
+      <ProfileView
+        actions={createActions()}
+        content={{
+          data: createProfileMockSnapshot("complete"),
+          resumeWorkflow: {
+            applyConflict: "resume_import_profile_version_conflict",
+            applyError: false,
+            draft: workflowDraft,
+            mode: "update",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "draftReady",
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(await screen.findByTestId("profile-resume-draft-conflict")).toHaveTextContent(
+      i18n.t("profile.importDraft.conflictDescription"),
+    )
+  })
+
+  it("disables Draft apply and cancel controls while applying", async () => {
+    renderWithProviders(
+      <ProfileView
+        actions={createActions()}
+        content={{
+          data: createProfileMockSnapshot("complete"),
+          resumeWorkflow: {
+            draft: workflowDraft,
+            mode: "update",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "applying",
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.importDraft.applying") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("profile.importDraft.cancel") }),
+    ).toBeDisabled()
+  })
+
+  it("keeps legacy idle rendering when resumeWorkflow is omitted", async () => {
+    renderReady(createProfileMockSnapshot("complete"))
+
+    expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
+    expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
   })
 
   it("offers manual creation and hides resume import when the API lacks resume capabilities", async () => {

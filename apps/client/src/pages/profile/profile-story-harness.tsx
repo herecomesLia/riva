@@ -85,6 +85,7 @@ export function ProfileStoryHarness({
   useStoryLifecycle({ advanceDelay, enabled: autoAdvance, snapshot, setSnapshot })
 
   const actions: ProfileViewActions = {
+    applyResumeDraft: fn(async () => undefined),
     createManualProfile: fn(async () => {
       const next = createProfileMockSnapshot("emptyManualProfile")
       setSnapshot(next)
@@ -95,11 +96,13 @@ export function ProfileStoryHarness({
       setSnapshot(next)
       return next
     }),
+    resetResumeWorkflow: fn(() => undefined),
     retryRecognition: fn(async () => {
       const next = createProfileMockSnapshot("initialResumeRecognizing")
       setSnapshot(next)
       return next
     }),
+    retryResumeWorkflow: fn(async () => undefined),
     saveSection: fn(async (input) => {
       if (!snapshot.profile) throw new Error("A profile is required to save a section.")
       const profile = replaceSection(structuredClone(snapshot.profile), input)

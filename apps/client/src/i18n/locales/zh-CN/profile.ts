@@ -27,8 +27,8 @@ export const profile = {
   import: {
     title: "上传简历以建立档案",
     updateTitle: "新版简历识别结果",
-    description: "上传文件或粘贴简历文本。识别结果会直接更新当前正式档案。",
-    updateDescription: "新版简历识别后会自动合并到当前正式档案。",
+    description: "上传文件或粘贴简历文本。识别完成后，你可以确认是否导入档案。",
+    updateDescription: "新版简历识别完成后，你可以检查变更并确认是否导入。",
     file: "简历文件",
     text: "或粘贴简历文本",
     noFileSelected: "未选择文件",
@@ -48,10 +48,28 @@ export const profile = {
     updateSummary:
       "新增 {{newItems}} 项，更新 {{changedItems}} 项，保留 {{missingItems}} 项现有内容。",
   },
+  importDraft: {
+    title: "简历解析完成",
+    description: "请确认本次简历将如何更新求职档案。确认前不会修改现有档案。",
+    newItems: "新增内容",
+    changedItems: "更新内容",
+    missingItems: "简历中缺少的旧内容",
+    missingItemsDescription: "简历中缺少的旧内容不会被自动删除。",
+    protectedItems: "受保护的手动修改：{{count}}",
+    skippedItems: "无法自动导入：{{count}}",
+    unresolvedItems: "需要留意的信息：{{count}}",
+    apply: "确认导入",
+    applying: "正在导入...",
+    cancel: "暂不导入",
+    conflictTitle: "档案已发生变化",
+    conflictDescription: "RIVA 已重新生成导入草稿，请重新确认后再导入。",
+    applyFailedTitle: "导入失败",
+    applyFailedDescription: "导入失败，请稍后重试。当前档案未被此次操作覆盖。",
+  },
   lifecycle: {
     uploading: {
       title: "简历正在上传",
-      description: "上传完成后，我们会开始识别并更新结构化档案。",
+      description: "上传完成后，我们会开始识别简历并生成待确认的导入草稿。",
     },
     parsing: { title: "正在识别简历", description: "Riva 正在提取简历中的经历与技能信息。" },
     failed: {

@@ -2,34 +2,55 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 
 import { useAuthenticationInvalidation } from "@/hooks/use-authentication-invalidation"
-import type { JobProfileSnapshot, ResumeUploadInput } from "@/models/profile"
+import type { JobProfileSnapshot, ResumeParsingStatus, ResumeUploadInput } from "@/models/profile"
+import { ApiError } from "@/services/api"
 import {
+  applyResumeImportDraft,
   createManualJobProfile,
   getJobProfile,
-  getResumeRecognitionStatus,
-  getResumeUpdateStatus,
-  resetInitialResumeImport,
-  saveProfileSection,
-  startInitialResumeRecognition,
-  startUpdatedResumeRecognition,
-  uploadInitialResume,
-  uploadUpdatedResume,
+  getResumeImportDraft,
+  getResumeParsingStatus,
   profileCapabilities,
+  retryResumeParsing,
+  saveProfileSection,
+  startResumeParsing,
+  uploadResume,
 } from "@/services/profile"
-import { ApiError } from "@/services/api"
 
 import { ProfileView, type ProfileViewActions } from "./ProfileView"
+import type {
+  ProfileResumeApplyConflict,
+  ProfileResumeWorkflowMode,
+  ProfileResumeWorkflowState,
+} from "./profile-resume-workflow"
 
 const profileQueryKey = ["profile"] as const
 const rolesQueryKey = ["roles"] as const
 
-type ProfileSynchronizationError = "initialRecognition" | "resumeUpdate"
+function resumeParsingQueryKey(resumeId: string) {
+  return ["profile", "resumeParsing", resumeId] as const
+}
+
+function resumeDraftQueryKey(resumeId: string) {
+  return ["profile", "resumeImportDraft", resumeId] as const
+}
+
+type ActiveResume = {
+  id: string
+  mode: ProfileResumeWorkflowMode
+}
 
 export function ProfilePage() {
   const queryClient = useQueryClient()
   const invalidateAuthentication = useAuthenticationInvalidation()
-  const [synchronizationError, setSynchronizationError] =
-    useState<ProfileSynchronizationError | null>(null)
+  const [activeResume, setActiveResume] = useState<ActiveResume | null>(null)
+  const [pendingUploadMode, setPendingUploadMode] = useState<ProfileResumeWorkflowMode | null>(null)
+  const [resumeSynchronizationError, setResumeSynchronizationError] = useState(false)
+  const [resumeApplyConflict, setResumeApplyConflict] = useState<ProfileResumeApplyConflict | null>(
+    null,
+  )
+  const [resumeApplyError, setResumeApplyError] = useState(false)
+
   const profileQuery = useQuery({
     queryFn: getJobProfile,
     queryKey: profileQueryKey,
@@ -45,65 +66,42 @@ export function ProfilePage() {
     return snapshot
   }
 
-  async function refreshSnapshotBestEffort(fallback: JobProfileSnapshot) {
-    try {
-      return { snapshot: setSnapshot(await getJobProfile()), synchronized: true }
-    } catch {
-      try {
-        return { snapshot: setSnapshot(await getJobProfile()), synchronized: true }
-      } catch {
-        return { snapshot: fallback, synchronized: false }
-      }
-    }
-  }
+  const parsingQuery = useQuery({
+    enabled: activeResume !== null && !resumeSynchronizationError,
+    queryFn: () => getResumeParsingStatus(activeResume!.id),
+    queryKey: resumeParsingQueryKey(activeResume?.id ?? "inactive"),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === "queued" || status === "running" ? 1500 : false
+    },
+    refetchIntervalInBackground: false,
+    retry: false,
+  })
 
-  async function synchronizeRecognition(
-    fallback: JobProfileSnapshot,
-    task: ProfileSynchronizationError,
-  ) {
-    const result = await refreshSnapshotBestEffort(fallback)
-    setSynchronizationError(result.synchronized ? null : task)
-    return result.snapshot
-  }
+  const draftQuery = useQuery({
+    enabled:
+      activeResume !== null &&
+      parsingQuery.data?.status === "succeeded" &&
+      !resumeSynchronizationError,
+    queryFn: () => getResumeImportDraft(activeResume!.id),
+    queryKey: resumeDraftQueryKey(activeResume?.id ?? "inactive"),
+    retry: false,
+  })
 
-  async function advanceInitialRecognition(
-    profileId: string,
-    resumeId: string,
-    fallback: JobProfileSnapshot,
-  ) {
-    let latest = fallback
-    try {
-      latest = setSnapshot(await startInitialResumeRecognition(profileId, resumeId))
-      await getResumeRecognitionStatus(profileId, resumeId)
-    } catch {
-      return synchronizeRecognition(latest, "initialRecognition")
-    }
-    return synchronizeRecognition(latest, "initialRecognition")
-  }
+  useEffect(() => {
+    if (!parsingQuery.error || invalidateAuthentication(parsingQuery.error)) return
+    setResumeSynchronizationError(true)
+  }, [invalidateAuthentication, parsingQuery.error])
 
-  async function advanceUpdatedResumeRecognition(
-    profileId: string,
-    resumeUpdateId: string,
-    fallback: JobProfileSnapshot,
-  ) {
-    let latest = fallback
-    try {
-      latest = setSnapshot(await startUpdatedResumeRecognition(profileId, resumeUpdateId))
-      await getResumeUpdateStatus(profileId, resumeUpdateId)
-    } catch {
-      return synchronizeRecognition(latest, "resumeUpdate")
-    }
-    return synchronizeRecognition(latest, "resumeUpdate")
-  }
+  useEffect(() => {
+    if (!draftQuery.error || invalidateAuthentication(draftQuery.error)) return
+    setResumeSynchronizationError(true)
+  }, [draftQuery.error, invalidateAuthentication])
 
   const saveMutation = useMutation({
     mutationFn: saveProfileSection,
     onSuccess: async (snapshot) => {
       setSnapshot(snapshot)
-      if (profileCapabilities.resumeRecognition) {
-        const cachedSnapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
-        if (cachedSnapshot) await refreshSnapshotBestEffort(cachedSnapshot)
-      }
       await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
     },
     onError: async (error) => {
@@ -117,77 +115,251 @@ export function ProfilePage() {
       }
     },
   })
-  const recognitionMutation = useMutation({
-    mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) => {
-      const fallback = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
-      if (!fallback) throw new Error("Job profile is not available.")
-      setSynchronizationError(null)
-      return advanceInitialRecognition(profileId, resumeId, fallback)
+
+  const resumeUploadMutation = useMutation({
+    mutationFn: async ({
+      input,
+      mode,
+    }: {
+      input: ResumeUploadInput
+      mode: ProfileResumeWorkflowMode
+    }) => {
+      setResumeSynchronizationError(false)
+      setResumeApplyConflict(null)
+      setResumeApplyError(false)
+      const document = await uploadResume(input)
+      try {
+        const parsing = await startResumeParsing(document.id)
+        queryClient.setQueryData(resumeParsingQueryKey(document.id), parsing)
+        setActiveResume({ id: document.id, mode })
+      } catch (error) {
+        setActiveResume({ id: document.id, mode })
+        setResumeSynchronizationError(true)
+        throw error
+      }
+      return document
+    },
+    onError: invalidateAuthentication,
+    onMutate: ({ mode }) => setPendingUploadMode(mode),
+    onSettled: () => setPendingUploadMode(null),
+  })
+
+  const resumeRecoveryMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeResume) return
+      const current = await getResumeParsingStatus(activeResume.id)
+      let nextStatus: ResumeParsingStatus
+      switch (current.status) {
+        case "notStarted":
+          nextStatus = await startResumeParsing(activeResume.id)
+          break
+        case "failed":
+          nextStatus = await retryResumeParsing(activeResume.id)
+          break
+        default:
+          nextStatus = current
+      }
+      queryClient.setQueryData(resumeParsingQueryKey(activeResume.id), nextStatus)
+      setResumeSynchronizationError(false)
+    },
+    onError: (error) => {
+      if (!invalidateAuthentication(error)) setResumeSynchronizationError(true)
     },
   })
-  const uploadInitialMutation = useMutation({
-    mutationFn: async (input: ResumeUploadInput) => {
-      setSynchronizationError(null)
-      const snapshot = setSnapshot(await uploadInitialResume(input))
-      const profile = snapshot.profile
-      if (!profile?.resume) throw new Error("Resume upload returned no profile.")
-      return advanceInitialRecognition(profile.profileId, profile.resume.id, snapshot)
+
+  const resumeRetryMutation = useMutation({
+    mutationFn: async (resumeId: string) => {
+      const parsing = await retryResumeParsing(resumeId)
+      queryClient.removeQueries({ queryKey: resumeDraftQueryKey(resumeId) })
+      queryClient.setQueryData(resumeParsingQueryKey(resumeId), parsing)
+      setResumeApplyConflict(null)
+      setResumeApplyError(false)
+      setResumeSynchronizationError(false)
+    },
+    onError: (error) => {
+      if (!invalidateAuthentication(error)) setResumeSynchronizationError(true)
     },
   })
-  const uploadUpdatedMutation = useMutation({
-    mutationFn: async (input: ResumeUploadInput) => {
-      setSynchronizationError(null)
-      const snapshot = setSnapshot(await uploadUpdatedResume(input))
-      const profile = snapshot.profile
-      const resumeUpdate = snapshot.resumeUpdate
-      if (!profile || !resumeUpdate) throw new Error("Resume update returned no result.")
-      return advanceUpdatedResumeRecognition(profile.profileId, resumeUpdate.id, snapshot)
+
+  const resumeApplyMutation = useMutation({
+    mutationFn: ({ resumeId, draftVersion }: { resumeId: string; draftVersion: number }) =>
+      applyResumeImportDraft(resumeId, draftVersion),
+    onSuccess: async (response, { resumeId }) => {
+      queryClient.setQueryData(resumeDraftQueryKey(resumeId), response.draft)
+      const refreshed = setSnapshot(await getJobProfile())
+      await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
+      setResumeApplyConflict(null)
+      setResumeApplyError(false)
+      setResumeSynchronizationError(false)
+      setActiveResume(null)
+      queryClient.removeQueries({ queryKey: resumeParsingQueryKey(resumeId) })
+      queryClient.removeQueries({ queryKey: resumeDraftQueryKey(resumeId) })
+      return refreshed
+    },
+    onError: async (error, { resumeId }) => {
+      if (invalidateAuthentication(error)) return
+      if (
+        error instanceof ApiError &&
+        error.status === 409 &&
+        (error.code === "resume_import_profile_version_conflict" ||
+          error.code === "resume_import_draft_version_conflict")
+      ) {
+        setResumeApplyConflict(error.code)
+        setResumeApplyError(false)
+        try {
+          setSnapshot(await getJobProfile())
+          const latestDraft = await getResumeImportDraft(resumeId)
+          queryClient.setQueryData(resumeDraftQueryKey(resumeId), latestDraft)
+        } catch (recoveryError) {
+          if (!invalidateAuthentication(recoveryError)) setResumeApplyError(true)
+        }
+        return
+      }
+      if (
+        error instanceof ApiError &&
+        error.status === 409 &&
+        error.code === "resume_import_draft_not_ready"
+      ) {
+        try {
+          const parsing = await getResumeParsingStatus(resumeId)
+          queryClient.setQueryData(resumeParsingQueryKey(resumeId), parsing)
+        } catch (recoveryError) {
+          invalidateAuthentication(recoveryError)
+        }
+        setResumeSynchronizationError(true)
+        return
+      }
+      setResumeApplyError(true)
     },
   })
+
   const manualProfileMutation = useMutation({
     mutationFn: createManualJobProfile,
-    onMutate: () => setSynchronizationError(null),
     onSuccess: async (snapshot) => {
       setSnapshot(snapshot)
       await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
     },
     onError: invalidateAuthentication,
   })
-  const resetInitialImportMutation = useMutation({
-    mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) =>
-      resetInitialResumeImport(profileId, resumeId),
-    onMutate: () => setSynchronizationError(null),
-    onSuccess: setSnapshot,
-  })
 
-  async function retrySynchronization() {
-    const snapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
-    const profile = snapshot?.profile
-    if (!snapshot || !profile) return
-
-    if (
-      snapshot.resumeUpdate?.status === "uploading" ||
-      snapshot.resumeUpdate?.status === "parsing"
-    ) {
-      setSynchronizationError(null)
-      return advanceUpdatedResumeRecognition(profile.profileId, snapshot.resumeUpdate.id, snapshot)
+  function resetResumeWorkflow() {
+    if (activeResume) {
+      queryClient.removeQueries({ queryKey: resumeParsingQueryKey(activeResume.id) })
+      queryClient.removeQueries({ queryKey: resumeDraftQueryKey(activeResume.id) })
     }
-    if (profile.resume) {
-      setSynchronizationError(null)
-      return advanceInitialRecognition(profile.profileId, profile.resume.id, snapshot)
+    setActiveResume(null)
+    setPendingUploadMode(null)
+    setResumeSynchronizationError(false)
+    setResumeApplyConflict(null)
+    setResumeApplyError(false)
+  }
+
+  async function retryResumeWorkflow() {
+    if (!activeResume) return
+    const parsing = parsingQuery.data
+    try {
+      if (parsing?.status === "failed" && parsing.canRetry) {
+        await resumeRetryMutation.mutateAsync(activeResume.id)
+        return
+      }
+      await resumeRecoveryMutation.mutateAsync()
+    } catch {
+      // Mutation callbacks convert transport errors into safe workflow state.
     }
   }
 
+  async function applyResumeDraft() {
+    if (!activeResume || !draftQuery.data || resumeApplyMutation.isPending) return
+    try {
+      await resumeApplyMutation.mutateAsync({
+        draftVersion: draftQuery.data.draftVersion,
+        resumeId: activeResume.id,
+      })
+    } catch {
+      // Mutation callbacks convert domain errors into safe workflow state.
+    }
+  }
+
+  function currentSnapshot(): JobProfileSnapshot {
+    const snapshot = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
+    if (!snapshot) throw new Error("Job profile is not available.")
+    return snapshot
+  }
+
+  async function uploadForMode(input: ResumeUploadInput, mode: ProfileResumeWorkflowMode) {
+    await resumeUploadMutation.mutateAsync({ input, mode })
+    return currentSnapshot()
+  }
+
+  const resumeWorkflow: ProfileResumeWorkflowState = (() => {
+    if (resumeUploadMutation.isPending && pendingUploadMode) {
+      return { mode: pendingUploadMode, status: "uploading" }
+    }
+    if (!activeResume) return { status: "idle" }
+    const parsing = parsingQuery.data
+    const isRetrying = resumeRecoveryMutation.isPending || resumeRetryMutation.isPending
+    if (resumeSynchronizationError) {
+      return {
+        isRetrying,
+        mode: activeResume.mode,
+        resumeId: activeResume.id,
+        status: "parsing",
+        synchronizationError: true,
+      }
+    }
+    if (parsing?.status === "failed") {
+      return {
+        canRetry: parsing.canRetry,
+        failureReason: parsing.failureReason,
+        isRetrying,
+        mode: activeResume.mode,
+        resumeId: activeResume.id,
+        status: "failed",
+      }
+    }
+    const draft = draftQuery.data
+    if (parsing?.status === "succeeded" && draft?.status === "ready") {
+      if (resumeApplyMutation.isPending) {
+        return { draft, mode: activeResume.mode, resumeId: activeResume.id, status: "applying" }
+      }
+      return {
+        applyConflict: resumeApplyConflict,
+        applyError: resumeApplyError,
+        draft,
+        mode: activeResume.mode,
+        resumeId: activeResume.id,
+        status: "draftReady",
+      }
+    }
+    return {
+      isRetrying,
+      mode: activeResume.mode,
+      resumeId: activeResume.id,
+      status: "parsing",
+      synchronizationError: false,
+    }
+  })()
+
   const actions: ProfileViewActions = {
+    applyResumeDraft,
     createManualProfile: () => manualProfileMutation.mutateAsync(),
-    resetInitialResumeImport: (profileId, resumeId) =>
-      resetInitialImportMutation.mutateAsync({ profileId, resumeId }),
-    retryRecognition: (profileId, resumeId) =>
-      recognitionMutation.mutateAsync({ profileId, resumeId }),
-    retrySynchronization,
+    resetInitialResumeImport: async () => {
+      resetResumeWorkflow()
+      return currentSnapshot()
+    },
+    resetResumeWorkflow,
+    retryRecognition: async () => {
+      await retryResumeWorkflow()
+      return currentSnapshot()
+    },
+    retryResumeWorkflow,
+    retrySynchronization: async () => {
+      await retryResumeWorkflow()
+      return currentSnapshot()
+    },
     saveSection: (input) => saveMutation.mutateAsync(input),
-    uploadInitialResume: (input) => uploadInitialMutation.mutateAsync(input),
-    uploadUpdatedResume: (input) => uploadUpdatedMutation.mutateAsync(input),
+    uploadInitialResume: (input) => uploadForMode(input, "initial"),
+    uploadUpdatedResume: (input) => uploadForMode(input, "update"),
   }
 
   if (profileQuery.data !== undefined) {
@@ -195,7 +367,7 @@ export function ProfilePage() {
       <ProfileView
         actions={actions}
         capabilities={profileCapabilities}
-        content={{ status: "ready", data: profileQuery.data, synchronizationError }}
+        content={{ status: "ready", data: profileQuery.data, resumeWorkflow }}
         variant="default"
       />
     )

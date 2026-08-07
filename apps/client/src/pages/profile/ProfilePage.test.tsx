@@ -3,8 +3,13 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { defaultLanguage } from "@/i18n/resources"
 import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/profile"
+import type {
+  ResumeDocument,
+  ResumeImportApplication,
+  ResumeImportDraft,
+  ResumeParsingStatus,
+} from "@/models/profile"
 import { ProfilePage } from "@/pages/profile"
 import { ApiError } from "@/services/api"
 import * as profileService from "@/services/profile"
@@ -13,10 +18,11 @@ import { renderWithProviders } from "@/test/render"
 
 vi.mock("@/services/profile", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/profile")>()),
+  applyResumeImportDraft: vi.fn(),
   createManualJobProfile: vi.fn(),
   getJobProfile: vi.fn(),
-  getResumeRecognitionStatus: vi.fn(),
-  getResumeUpdateStatus: vi.fn(),
+  getResumeImportDraft: vi.fn(),
+  getResumeParsingStatus: vi.fn(),
   profileCapabilities: {
     credentials: true,
     matchingAnalysis: true,
@@ -25,13 +31,108 @@ vi.mock("@/services/profile", async (importOriginal) => ({
     resumeUpdate: true,
     targetRoles: true,
   },
-  resetInitialResumeImport: vi.fn(),
+  retryResumeParsing: vi.fn(),
   saveProfileSection: vi.fn(),
-  startInitialResumeRecognition: vi.fn(),
-  startUpdatedResumeRecognition: vi.fn(),
+  startResumeParsing: vi.fn(),
   uploadInitialResume: vi.fn(),
+  uploadResume: vi.fn(),
   uploadUpdatedResume: vi.fn(),
 }))
+
+const resumeId = "11111111-1111-4111-8111-111111111111"
+const runId = "22222222-2222-4222-8222-222222222222"
+const skillId = "33333333-3333-4333-8333-333333333333"
+const timestamp = "2026-08-06T12:00:00Z"
+
+function parsingQueryKey(id: string) {
+  return ["profile", "resumeParsing", id] as const
+}
+
+const document: ResumeDocument = {
+  byteSize: 10,
+  extractedAt: null,
+  extractionStatus: "pending",
+  failureReason: null,
+  id: resumeId,
+  mediaType: "text/plain",
+  originalFilename: null,
+  sourceType: "pastedText",
+  uploadedAt: timestamp,
+}
+
+function parsingStatus(
+  status: "notStarted" | "queued" | "running" | "succeeded" | "failed",
+): ResumeParsingStatus {
+  const active = status !== "notStarted"
+  const terminal = status === "succeeded" || status === "failed"
+  return {
+    attemptCount: status === "notStarted" || status === "queued" ? 0 : 1,
+    canRetry: status === "failed",
+    createdAt: active ? timestamp : null,
+    draftStatus: status === "succeeded" ? "ready" : null,
+    draftVersion: status === "succeeded" ? 1 : null,
+    errorCode: status === "failed" ? "resume_parsing_unavailable" : null,
+    failureReason: status === "failed" ? "Safe parsing failure" : null,
+    finishedAt: terminal ? timestamp : null,
+    maxAttempts: active ? 3 : null,
+    resultVersion: status === "succeeded" ? 1 : null,
+    resumeDocumentId: resumeId,
+    runId: active ? runId : null,
+    startedAt: status === "queued" || status === "notStarted" ? null : timestamp,
+    status,
+  }
+}
+
+function readyDraft(version = 1): ResumeImportDraft {
+  return {
+    appliedAt: null,
+    appliedProfileVersion: null,
+    baseProfileId: null,
+    baseProfileVersion: null,
+    canApply: true,
+    changeSummary: { changedItems: 2, missingItems: 1, newItems: 3 },
+    createdAt: timestamp,
+    draftVersion: version,
+    education: [],
+    parsingResultVersion: 1,
+    projectExperiences: [],
+    protectedItems: [{ itemId: skillId, section: "skills", source: "userAdded" }],
+    resumeDocumentId: resumeId,
+    skippedItems: [],
+    skills: [{ id: skillId, name: "TypeScript" }],
+    sourceRunId: runId,
+    status: "ready",
+    summary: "Resume summary",
+    summaryAction: "set",
+    unresolvedItems: ["Review location"],
+    updatedAt: timestamp,
+    workExperiences: [],
+  }
+}
+
+function application(draft = readyDraft()): ResumeImportApplication {
+  return {
+    draft: {
+      ...draft,
+      appliedAt: timestamp,
+      appliedProfileVersion: 1,
+      canApply: false,
+      status: "applied",
+    },
+    profile: {
+      education: [],
+      profileId: "44444444-4444-4444-8444-444444444444",
+      projectExperiences: [],
+      skills: [],
+      summary: "Resume summary",
+      updatedAt: timestamp,
+      version: 1,
+      workExperiences: [],
+    },
+    profileChanged: true,
+    profileCreated: true,
+  }
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -47,22 +148,297 @@ function renderPage() {
   return renderWithProviders(<ProfilePage />, { router: { initialEntries: ["/profile"] } })
 }
 
-describe("ProfilePage orchestration", () => {
-  beforeEach(async () => {
+async function submitInitialResume(user = userEvent.setup()) {
+  await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
+  await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
+}
+
+async function reachDraftReview(snapshot = createProfileMockSnapshot("noProfile")) {
+  vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
+  vi.mocked(profileService.uploadResume).mockResolvedValue(document)
+  vi.mocked(profileService.startResumeParsing).mockResolvedValue(parsingStatus("running"))
+  vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("succeeded"))
+  vi.mocked(profileService.getResumeImportDraft).mockResolvedValue(readyDraft())
+  const result = renderPage()
+  if (snapshot.profile) {
+    const user = userEvent.setup()
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    )
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: i18n.t("profile.actions.updateResume"),
+      }),
+    )
+    await user.type(screen.getByLabelText(i18n.t("profile.import.text")), "resume text")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
+  } else {
+    await submitInitialResume()
+  }
+  await screen.findByTestId("profile-resume-draft-review")
+  return result
+}
+
+describe("ProfilePage resume import orchestration", () => {
+  beforeEach(() => {
     useAuthStore.getState().clearCurrentUser()
-    await i18n.changeLanguage(defaultLanguage)
-    vi.clearAllMocks()
-    Object.assign(profileService.profileCapabilities, {
-      credentials: true,
-      matchingAnalysis: true,
-      resumeImport: true,
-      resumeRecognition: true,
-      resumeUpdate: true,
-      targetRoles: true,
-    })
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(
+      createProfileMockSnapshot("noProfile"),
+    )
+    vi.mocked(profileService.uploadResume).mockResolvedValue(document)
+    vi.mocked(profileService.startResumeParsing).mockResolvedValue(parsingStatus("running"))
+    vi.mocked(profileService.getResumeParsingStatus).mockReturnValue(new Promise(() => undefined))
   })
 
-  it("clears authentication and user query data after a 401", async () => {
+  it("uploads and starts an initial Resume using only the unified services", async () => {
+    const result = renderPage()
+    await submitInitialResume()
+
+    expect(profileService.uploadResume).toHaveBeenCalledWith({ text: "resume text" })
+    expect(profileService.startResumeParsing).toHaveBeenCalledWith(resumeId)
+    expect(profileService.uploadInitialResume).not.toHaveBeenCalled()
+    expect(result.queryClient.getQueryData(parsingQueryKey(resumeId))).toEqual(
+      parsingStatus("running"),
+    )
+  })
+
+  it("shows processing for an initial Resume without creating a fake Profile", async () => {
+    const result = renderPage()
+    await submitInitialResume()
+
+    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
+    expect(result.queryClient.getQueryData(["profile"])).toEqual(
+      createProfileMockSnapshot("noProfile"),
+    )
+    expect(profileService.applyResumeImportDraft).not.toHaveBeenCalled()
+  })
+
+  it("polls active parsing, stops after success, and loads the Draft", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.mocked(profileService.getResumeParsingStatus)
+      .mockResolvedValueOnce(parsingStatus("running"))
+      .mockResolvedValueOnce(parsingStatus("succeeded"))
+    vi.mocked(profileService.getResumeImportDraft).mockResolvedValue(readyDraft())
+    renderPage()
+    await submitInitialResume(user)
+    await act(async () => vi.advanceTimersByTime(1500))
+    await vi.waitFor(() =>
+      expect(profileService.getResumeImportDraft).toHaveBeenCalledWith(resumeId),
+    )
+    const callsAfterSuccess = vi.mocked(profileService.getResumeParsingStatus).mock.calls.length
+    await act(async () => vi.advanceTimersByTime(3000))
+
+    expect(profileService.getResumeParsingStatus).toHaveBeenCalledTimes(callsAfterSuccess)
+    expect(screen.getByTestId("profile-resume-draft-review")).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it("shows Draft review and never applies before confirmation", async () => {
+    await reachDraftReview()
+
+    const review = screen.getByTestId("profile-resume-draft-review")
+    expect(review).toHaveTextContent(i18n.t("profile.importDraft.title"))
+    expect(review).toHaveTextContent("3")
+    expect(profileService.applyResumeImportDraft).not.toHaveBeenCalled()
+  })
+
+  it("applies only resumeId and draftVersion, refreshes Profile, invalidates roles, and clears workflow", async () => {
+    const refreshed = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
+    const result = await reachDraftReview()
+    vi.mocked(profileService.applyResumeImportDraft).mockResolvedValue(application())
+    vi.mocked(profileService.getJobProfile).mockResolvedValueOnce(refreshed)
+    const invalidateQueries = vi.spyOn(result.queryClient, "invalidateQueries")
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("profile.importDraft.apply") }))
+
+    await waitFor(() =>
+      expect(profileService.applyResumeImportDraft).toHaveBeenCalledWith(resumeId, 1),
+    )
+    await waitFor(() => expect(result.queryClient.getQueryData(["profile"])).toEqual(refreshed))
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["roles"] })
+    expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
+  })
+
+  it("uses the unified upload service for an existing Profile update", async () => {
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(createProfileMockSnapshot("complete"))
+    renderPage()
+    const user = userEvent.setup()
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    )
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: i18n.t("profile.actions.updateResume"),
+      }),
+    )
+    await user.type(screen.getByLabelText(i18n.t("profile.import.text")), "updated resume")
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
+
+    expect(profileService.uploadResume).toHaveBeenCalledWith({ text: "updated resume" })
+    expect(profileService.uploadUpdatedResume).not.toHaveBeenCalled()
+    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: i18n.t("profile.title") })).toBeInTheDocument()
+  })
+
+  it("shows safe lifecycle failure and retries with retryResumeParsing", async () => {
+    vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("failed"))
+    vi.mocked(profileService.retryResumeParsing).mockResolvedValue(parsingStatus("running"))
+    renderPage()
+    await submitInitialResume()
+    const failure = await screen.findByTestId("profile-recognition-failure")
+    await userEvent.click(
+      within(failure).getByRole("button", { name: i18n.t("profile.actions.retryRecognition") }),
+    )
+
+    expect(profileService.retryResumeParsing).toHaveBeenCalledWith(resumeId)
+    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
+  })
+
+  it("preserves resumeId after start fails and recovers notStarted with start", async () => {
+    vi.mocked(profileService.startResumeParsing)
+      .mockRejectedValueOnce(new Error("start transport failure"))
+      .mockResolvedValueOnce(parsingStatus("running"))
+    vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("notStarted"))
+    renderPage()
+    await submitInitialResume()
+    const syncError = await screen.findByTestId("profile-synchronization-error")
+    await userEvent.click(
+      within(syncError).getByRole("button", {
+        name: i18n.t("profile.lifecycle.syncFailed.retry"),
+      }),
+    )
+
+    expect(profileService.getResumeParsingStatus).toHaveBeenCalledWith(resumeId)
+    expect(profileService.startResumeParsing).toHaveBeenCalledTimes(2)
+    expect(screen.queryByText("start transport failure")).not.toBeInTheDocument()
+  })
+
+  it("uses retry when synchronization recovery finds an authoritative failed state", async () => {
+    vi.mocked(profileService.startResumeParsing).mockRejectedValueOnce(new Error("start failed"))
+    vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("failed"))
+    vi.mocked(profileService.retryResumeParsing).mockResolvedValue(parsingStatus("running"))
+    renderPage()
+    await submitInitialResume()
+    await userEvent.click(
+      within(await screen.findByTestId("profile-synchronization-error")).getByRole("button", {
+        name: i18n.t("profile.lifecycle.syncFailed.retry"),
+      }),
+    )
+
+    expect(profileService.retryResumeParsing).toHaveBeenCalledWith(resumeId)
+  })
+
+  it("turns parsing GET failure into a recoverable synchronization state", async () => {
+    vi.mocked(profileService.getResumeParsingStatus).mockRejectedValue(
+      new Error("private parsing error"),
+    )
+    renderPage()
+    await submitInitialResume()
+
+    expect(await screen.findByTestId("profile-synchronization-error")).toBeInTheDocument()
+    expect(screen.queryByText("private parsing error")).not.toBeInTheDocument()
+  })
+
+  it.each([
+    "resume_import_profile_version_conflict",
+    "resume_import_draft_version_conflict",
+  ] as const)("refreshes Profile and Draft after %s without automatic reapply", async (code) => {
+    const latestDraft = readyDraft(2)
+    await reachDraftReview(createProfileMockSnapshot("complete"))
+    vi.mocked(profileService.applyResumeImportDraft).mockRejectedValue(
+      new ApiError(409, code, { error: code }),
+    )
+    vi.mocked(profileService.getJobProfile).mockResolvedValueOnce(
+      createProfileMockSnapshot("partial"),
+    )
+    vi.mocked(profileService.getResumeImportDraft).mockResolvedValueOnce(latestDraft)
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("profile.importDraft.apply") }))
+
+    expect(await screen.findByTestId("profile-resume-draft-conflict")).toBeInTheDocument()
+    expect(profileService.getJobProfile).toHaveBeenCalledTimes(2)
+    expect(profileService.getResumeImportDraft).toHaveBeenCalledTimes(2)
+    expect(profileService.applyResumeImportDraft).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole("button", { name: i18n.t("profile.importDraft.apply") })).toBeEnabled()
+  })
+
+  it("keeps the existing Profile and shows safe feedback after apply failure", async () => {
+    const initial = createProfileMockSnapshot("complete")
+    const result = await reachDraftReview(initial)
+    vi.mocked(profileService.applyResumeImportDraft).mockRejectedValue(
+      new ApiError(409, "resume_import_apply_conflict", {
+        error: "resume_import_apply_conflict",
+      }),
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("profile.importDraft.apply") }))
+
+    expect(await screen.findByTestId("profile-resume-draft-apply-error")).toBeInTheDocument()
+    expect(result.queryClient.getQueryData(["profile"])).toEqual(initial)
+  })
+
+  it("invalidates authentication after an apply 401", async () => {
+    useAuthStore.getState().setCurrentUser({
+      avatarFallback: "L",
+      avatarUrl: null,
+      displayName: "Lia",
+      id: "user-1",
+      username: "lia",
+    })
+    await reachDraftReview()
+    vi.mocked(profileService.applyResumeImportDraft).mockRejectedValue(
+      new ApiError(401, "not_authenticated", { error: "not_authenticated" }),
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("profile.importDraft.apply") }))
+    await waitFor(() => expect(useAuthStore.getState().currentUser).toBeNull())
+  })
+
+  it("disables Apply and Cancel while applying and prevents concurrent apply", async () => {
+    const pending = deferred<ResumeImportApplication>()
+    await reachDraftReview()
+    vi.mocked(profileService.applyResumeImportDraft).mockReturnValue(pending.promise)
+    const apply = screen.getByRole("button", { name: i18n.t("profile.importDraft.apply") })
+    await userEvent.click(apply)
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.importDraft.applying") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("profile.importDraft.cancel") }),
+    ).toBeDisabled()
+    expect(profileService.applyResumeImportDraft).toHaveBeenCalledOnce()
+  })
+
+  it("stops polling after unmount", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("running"))
+    const result = renderPage()
+    await submitInitialResume(user)
+    await vi.waitFor(() => expect(profileService.getResumeParsingStatus).toHaveBeenCalled())
+    const calls = vi.mocked(profileService.getResumeParsingStatus).mock.calls.length
+    result.unmount()
+    await act(async () => vi.advanceTimersByTime(3000))
+
+    expect(profileService.getResumeParsingStatus).toHaveBeenCalledTimes(calls)
+    vi.useRealTimers()
+  })
+
+  it("cancels only the frontend workflow", async () => {
+    const result = await reachDraftReview()
+    await userEvent.click(
+      screen.getByRole("button", { name: i18n.t("profile.importDraft.cancel") }),
+    )
+
+    expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
+    expect(result.queryClient.getQueryData(parsingQueryKey(resumeId))).toBeUndefined()
+  })
+})
+
+describe("ProfilePage base profile behavior", () => {
+  it("clears authentication and cached data after a profile 401", async () => {
     useAuthStore.getState().setCurrentUser({
       avatarFallback: "L",
       avatarUrl: null,
@@ -73,606 +449,37 @@ describe("ProfilePage orchestration", () => {
     vi.mocked(profileService.getJobProfile).mockRejectedValue(
       new ApiError(401, "not_authenticated", { error: "not_authenticated" }),
     )
-
     const result = renderPage()
-    result.queryClient.setQueryData(["roles"], { user: "previous" })
+    result.queryClient.setQueryData(["roles"], { old: true })
 
     await waitFor(() => expect(useAuthStore.getState().currentUser).toBeNull())
     expect(result.queryClient.getQueryData(["roles"])).toBeUndefined()
-    expect(result.queryClient.getQueryData(["profile"])).toBeUndefined()
   })
 
-  it("maps the initial request to loading", async () => {
-    vi.mocked(profileService.getJobProfile).mockReturnValue(new Promise(() => undefined))
-    renderPage()
-    expect(await screen.findByTestId("profile-loading-state")).toBeInTheDocument()
-  })
-
-  it("maps a successful request to ready", async () => {
+  it("renders a persisted Profile normally while workflow is idle", async () => {
     vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
     renderPage()
+
     expect(
       await screen.findByText(profileResponseMock.profile!.projectExperiences[0]!.name),
     ).toBeInTheDocument()
   })
 
-  it("creates a manual profile, updates profile cache, and invalidates roles", async () => {
-    const user = userEvent.setup()
-    const noProfile = createProfileMockSnapshot("noProfile")
+  it("creates a manual Profile and invalidates roles", async () => {
+    Object.assign(profileService.profileCapabilities, { resumeImport: false })
     const manual = createProfileMockSnapshot("emptyManualProfile")
-    Object.assign(profileService.profileCapabilities, {
-      credentials: false,
-      matchingAnalysis: false,
-      resumeImport: false,
-      resumeRecognition: false,
-      resumeUpdate: false,
-      targetRoles: false,
-    })
-    vi.mocked(profileService.getJobProfile).mockResolvedValue(noProfile)
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(
+      createProfileMockSnapshot("noProfile"),
+    )
     vi.mocked(profileService.createManualJobProfile).mockResolvedValue(manual)
-
     const result = renderPage()
     const invalidateQueries = vi.spyOn(result.queryClient, "invalidateQueries")
-    await user.click(
+    await userEvent.click(
       await screen.findByRole("button", { name: i18n.t("profile.actions.manualEntry") }),
     )
 
     await waitFor(() => expect(result.queryClient.getQueryData(["profile"])).toEqual(manual))
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["roles"] })
-    expect(screen.queryByTestId("profile-resume-import-form")).not.toBeInTheDocument()
-  })
-
-  it("moves error through retry loading to ready", async () => {
-    const user = userEvent.setup()
-    const retry = deferred<typeof profileResponseMock>()
-    vi.mocked(profileService.getJobProfile)
-      .mockRejectedValueOnce(new Error("private failure"))
-      .mockReturnValueOnce(retry.promise)
-
-    renderPage()
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("common.pageState.error.retry") }),
-    )
-    expect(screen.getByTestId("profile-loading-state")).toBeInTheDocument()
-    expect(screen.queryByText("private failure")).not.toBeInTheDocument()
-
-    await act(async () => retry.resolve(structuredClone(profileResponseMock)))
-    expect(
-      await screen.findByText(profileResponseMock.profile!.projectExperiences[0]!.name),
-    ).toBeInTheDocument()
-  })
-
-  it("returns to error when retry fails again", async () => {
-    const user = userEvent.setup()
-    vi.mocked(profileService.getJobProfile)
-      .mockRejectedValueOnce(new Error("first"))
-      .mockRejectedValueOnce(new Error("second"))
-    renderPage()
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("common.pageState.error.retry") }),
-    )
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      i18n.t("common.pageState.error.title"),
-    )
-  })
-
-  it("keeps ready data visible during a background refresh", async () => {
-    const refresh = deferred<typeof profileResponseMock>()
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(structuredClone(profileResponseMock))
-      .mockReturnValueOnce(refresh.promise)
-    const result = renderPage()
-    expect(
-      await screen.findByText(profileResponseMock.profile!.projectExperiences[0]!.name),
-    ).toBeInTheDocument()
-
-    await act(async () => void result.queryClient.refetchQueries({ queryKey: ["profile"] }))
-    await waitFor(() => expect(profileService.getJobProfile).toHaveBeenCalledTimes(2))
-    expect(
-      screen.getByText(profileResponseMock.profile!.projectExperiences[0]!.name),
-    ).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-loading-state")).not.toBeInTheDocument()
-    await act(async () => refresh.resolve(structuredClone(profileResponseMock)))
-  })
-
-  it("updates the cache from uploading through parsing to an active initial profile", async () => {
-    const user = userEvent.setup()
-    const empty = createProfileMockSnapshot("noProfile")
-    const uploading = createProfileMockSnapshot("initialResumeUploading")
-    const parsing = createProfileMockSnapshot("initialResumeRecognizing")
-    const recognized = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
-    const recognition = deferred<NonNullable<typeof recognized.recognition>>()
-    const startRecognition = deferred<typeof parsing>()
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(empty)
-      .mockResolvedValueOnce(recognized)
-    vi.mocked(profileService.uploadInitialResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startInitialResumeRecognition).mockReturnValue(
-      startRecognition.promise,
-    )
-    vi.mocked(profileService.getResumeRecognitionStatus).mockReturnValue(recognition.promise)
-
-    const result = renderPage()
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        profile: { status: "uploadingResume" },
-      }),
-    )
-    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
-
-    await act(async () => startRecognition.resolve(parsing))
-    await waitFor(() =>
-      expect(profileService.startInitialResumeRecognition).toHaveBeenCalledWith(
-        uploading.profile!.profileId,
-        "resume_initial_uploaded",
-      ),
-    )
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        profile: { status: "parsingResume" },
-      }),
-    )
-    await act(async () => recognition.resolve(recognized.recognition!))
-
-    expect(await screen.findByTestId("profile-import-success")).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-review-notice")).not.toBeInTheDocument()
-  })
-
-  it("renders a recognition failure returned by the final snapshot", async () => {
-    const user = userEvent.setup()
-    const empty = createProfileMockSnapshot("noProfile")
-    const uploading = createProfileMockSnapshot("initialResumeUploading")
-    const parsing = createProfileMockSnapshot("initialResumeRecognizing")
-    const failed = createProfileMockSnapshot("initialResumeRecognitionFailed")
-    const startRecognition = deferred<typeof parsing>()
-    const recognition = deferred<NonNullable<typeof failed.recognition>>()
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(empty)
-      .mockResolvedValueOnce(failed)
-    vi.mocked(profileService.uploadInitialResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startInitialResumeRecognition).mockReturnValue(
-      startRecognition.promise,
-    )
-    vi.mocked(profileService.getResumeRecognitionStatus).mockReturnValue(recognition.promise)
-
-    const result = renderPage()
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        profile: { status: "uploadingResume" },
-      }),
-    )
-    await act(async () => startRecognition.resolve(parsing))
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        profile: { status: "parsingResume" },
-      }),
-    )
-    await act(async () => recognition.resolve(failed.recognition!))
-
-    expect(await screen.findByTestId("profile-recognition-failure")).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-synchronization-error")).not.toBeInTheDocument()
-  })
-
-  it("shows a safe recovery action when initial recognition synchronization fails", async () => {
-    const user = userEvent.setup()
-    const empty = createProfileMockSnapshot("noProfile")
-    const uploading = createProfileMockSnapshot("initialResumeUploading")
-    const parsing = createProfileMockSnapshot("initialResumeRecognizing")
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(empty)
-      .mockRejectedValueOnce(new Error("synchronization failed"))
-      .mockRejectedValueOnce(new Error("synchronization failed again"))
-    vi.mocked(profileService.uploadInitialResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startInitialResumeRecognition).mockResolvedValue(parsing)
-    vi.mocked(profileService.getResumeRecognitionStatus).mockRejectedValue(
-      new Error("recognition status request failed"),
-    )
-
-    const result = renderPage()
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        profile: { status: "parsingResume" },
-      }),
-    )
-    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
-    expect(await screen.findByTestId("profile-synchronization-error")).toBeInTheDocument()
-    expect(
-      screen.getByRole("button", { name: i18n.t("profile.lifecycle.syncFailed.retry") }),
-    ).toBeEnabled()
-    expect(screen.queryByText("recognition status request failed")).not.toBeInTheDocument()
-  })
-
-  it("recovers an initial recognition synchronization failure after retry", async () => {
-    const user = userEvent.setup()
-    const empty = createProfileMockSnapshot("noProfile")
-    const uploading = createProfileMockSnapshot("initialResumeUploading")
-    const parsing = createProfileMockSnapshot("initialResumeRecognizing")
-    const recognized = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(empty)
-      .mockRejectedValueOnce(new Error("first refresh failed"))
-      .mockRejectedValueOnce(new Error("second refresh failed"))
-      .mockResolvedValueOnce(recognized)
-    vi.mocked(profileService.uploadInitialResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startInitialResumeRecognition).mockResolvedValue(parsing)
-    vi.mocked(profileService.getResumeRecognitionStatus)
-      .mockRejectedValueOnce(new Error("status failed"))
-      .mockResolvedValueOnce(recognized.recognition!)
-
-    const result = renderPage()
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-    const retry = await screen.findByRole("button", {
-      name: i18n.t("profile.lifecycle.syncFailed.retry"),
-    })
-
-    await user.click(retry)
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        profile: { status: "active" },
-      }),
-    )
-    expect(await screen.findByTestId("profile-import-success")).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-synchronization-error")).not.toBeInTheDocument()
-  })
-
-  it("keeps the synchronization recovery action available when retry fails again", async () => {
-    const user = userEvent.setup()
-    const empty = createProfileMockSnapshot("noProfile")
-    const uploading = createProfileMockSnapshot("initialResumeUploading")
-    const parsing = createProfileMockSnapshot("initialResumeRecognizing")
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(empty)
-      .mockRejectedValueOnce(new Error("refresh failed"))
-      .mockRejectedValueOnce(new Error("refresh failed again"))
-      .mockRejectedValueOnce(new Error("retry refresh failed"))
-      .mockRejectedValueOnce(new Error("retry refresh failed again"))
-    vi.mocked(profileService.uploadInitialResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startInitialResumeRecognition).mockResolvedValue(parsing)
-    vi.mocked(profileService.getResumeRecognitionStatus).mockRejectedValue(
-      new Error("status failed"),
-    )
-
-    renderPage()
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-    const retry = await screen.findByRole("button", {
-      name: i18n.t("profile.lifecycle.syncFailed.retry"),
-    })
-
-    await user.click(retry)
-    expect(await screen.findByTestId("profile-synchronization-error")).toBeInTheDocument()
-    expect(
-      screen.getByRole("button", { name: i18n.t("profile.lifecycle.syncFailed.retry") }),
-    ).toBeEnabled()
-  })
-
-  it("keeps the active profile when resume update synchronization fails", async () => {
-    const user = userEvent.setup()
-    const initial = createProfileMockSnapshot()
-    const uploading = createProfileMockSnapshot("resumeUpdateUploading")
-    const parsing = createProfileMockSnapshot("resumeUpdateRecognizing")
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(initial)
-      .mockRejectedValueOnce(new Error("refresh failed"))
-      .mockRejectedValueOnce(new Error("refresh failed again"))
-    vi.mocked(profileService.uploadUpdatedResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startUpdatedResumeRecognition).mockResolvedValue(parsing)
-    vi.mocked(profileService.getResumeUpdateStatus).mockRejectedValue(
-      new Error("update status failed"),
-    )
-
-    const result = renderPage()
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    await user.click(
-      within(await screen.findByRole("dialog")).getByRole("button", {
-        name: i18n.t("profile.actions.updateResume"),
-      }),
-    )
-    await user.type(screen.getByLabelText(i18n.t("profile.import.text")), "updated resume")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    expect(await screen.findByTestId("profile-synchronization-error")).toBeInTheDocument()
-    expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-      profile: { status: "active" },
-      resumeUpdate: { status: "parsing" },
-    })
-    expect(screen.queryByTestId("profile-recognition-failure")).not.toBeInTheDocument()
-    expect(screen.queryByText("update status failed")).not.toBeInTheDocument()
-  })
-
-  it("retries a failed recognition through parsing to active", async () => {
-    const user = userEvent.setup()
-    const failed = createProfileMockSnapshot("initialResumeRecognitionFailed")
-    const parsing = createProfileMockSnapshot("initialResumeRecognizing")
-    const recognized = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(failed)
-      .mockResolvedValueOnce(recognized)
-    vi.mocked(profileService.startInitialResumeRecognition).mockResolvedValue(parsing)
-    vi.mocked(profileService.getResumeRecognitionStatus).mockResolvedValue(recognized.recognition!)
-
-    const result = renderPage()
-    const failure = await screen.findByTestId("profile-recognition-failure")
-    await user.click(
-      within(failure).getByRole("button", { name: i18n.t("profile.actions.retryRecognition") }),
-    )
-
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        profile: { status: "active" },
-      }),
-    )
-    expect(await screen.findByTestId("profile-import-success")).toBeInTheDocument()
-  })
-
-  it("keeps the upload form and shows safe feedback when upload fails", async () => {
-    const user = userEvent.setup()
-    vi.mocked(profileService.getJobProfile).mockResolvedValue({
-      profile: null,
-      recognition: null,
-      resumeUpdate: null,
-      matchingAnalysis: null,
-    })
-    vi.mocked(profileService.uploadInitialResume).mockRejectedValue(new Error("raw upload error"))
-    renderPage()
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-    expect(await screen.findByText(i18n.t("profile.import.failed"))).toBeInTheDocument()
-    expect(screen.queryByText("raw upload error")).not.toBeInTheDocument()
-  })
-
-  it("updates the cache and feedback after an updated resume succeeds", async () => {
-    const user = userEvent.setup()
-    const initial = createProfileMockSnapshot()
-    const uploading = createProfileMockSnapshot("resumeUpdateUploading")
-    const parsing = createProfileMockSnapshot("resumeUpdateRecognizing")
-    const succeeded = createProfileMockSnapshot("resumeUpdateSucceeded")
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(initial)
-      .mockResolvedValueOnce(succeeded)
-    vi.mocked(profileService.uploadUpdatedResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startUpdatedResumeRecognition).mockResolvedValue(parsing)
-    vi.mocked(profileService.getResumeUpdateStatus).mockResolvedValue(succeeded.resumeUpdate!)
-
-    const result = renderPage()
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    await user.click(
-      within(await screen.findByRole("dialog")).getByRole("button", {
-        name: i18n.t("profile.actions.updateResume"),
-      }),
-    )
-    await user.type(screen.getByLabelText(i18n.t("profile.import.text")), "updated resume")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    expect(await screen.findByTestId("profile-resume-update-success")).toBeInTheDocument()
-    expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-      resumeUpdate: { status: "succeeded" },
-    })
-  })
-
-  it("updates the cache without exposing raw errors when an updated resume fails", async () => {
-    const user = userEvent.setup()
-    const initial = createProfileMockSnapshot()
-    const uploading = createProfileMockSnapshot("resumeUpdateUploading")
-    const parsing = createProfileMockSnapshot("resumeUpdateRecognizing")
-    const failed = createProfileMockSnapshot("resumeUpdateFailed")
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(initial)
-      .mockResolvedValueOnce(failed)
-    vi.mocked(profileService.uploadUpdatedResume).mockResolvedValue(uploading)
-    vi.mocked(profileService.startUpdatedResumeRecognition).mockResolvedValue(parsing)
-    vi.mocked(profileService.getResumeUpdateStatus).mockResolvedValue(failed.resumeUpdate!)
-
-    const result = renderPage()
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    await user.click(
-      within(await screen.findByRole("dialog")).getByRole("button", {
-        name: i18n.t("profile.actions.updateResume"),
-      }),
-    )
-    await user.type(screen.getByLabelText(i18n.t("profile.import.text")), "updated resume")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    await waitFor(() =>
-      expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-        resumeUpdate: { status: "failed" },
-      }),
-    )
-    expect(screen.queryByText("raw update error")).not.toBeInTheDocument()
-  })
-
-  it("updates the query cache with the saved section returned by the mutation", async () => {
-    const user = userEvent.setup()
-    const snapshot = structuredClone(profileResponseMock)
-    const saved = structuredClone(snapshot.profile!)
-    saved.education[0]!.school = "Updated University"
-    saved.matchingAnalysisStale = true
-    saved.version += 1
-    const savedSnapshot = {
-      ...snapshot,
-      matchingAnalysis: { ...snapshot.matchingAnalysis!, status: "stale" as const },
-      profile: saved,
-    }
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(snapshot)
-      .mockResolvedValueOnce(savedSnapshot)
-    vi.mocked(profileService.saveProfileSection).mockResolvedValue(savedSnapshot)
-
-    const result = renderPage()
-    const invalidateQueries = vi.spyOn(result.queryClient, "invalidateQueries")
-    const educationCard = await screen.findByTestId("profile-section-education")
-    await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
-    const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
-    await user.clear(school)
-    await user.type(school, "Updated University")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    expect(await screen.findByText("Updated University")).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-save-success")).not.toBeInTheDocument()
-    expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-      matchingAnalysis: { profileVersion: 7, status: "stale" },
-      profile: { matchingAnalysisStale: true, version: 8 },
-    })
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["roles"] })
-  })
-
-  it("keeps a successful save successful when its background refresh fails", async () => {
-    const user = userEvent.setup()
-    const snapshot = structuredClone(profileResponseMock)
-    const saved = structuredClone(snapshot.profile!)
-    saved.education[0]!.school = "Saved Despite Refresh Failure"
-    saved.matchingAnalysisStale = true
-    saved.version += 1
-    const savedSnapshot = {
-      ...snapshot,
-      matchingAnalysis: { ...snapshot.matchingAnalysis!, status: "stale" as const },
-      profile: saved,
-    }
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(snapshot)
-      .mockRejectedValueOnce(new Error("refresh failed"))
-      .mockRejectedValueOnce(new Error("refresh failed again"))
-    vi.mocked(profileService.saveProfileSection).mockResolvedValue(savedSnapshot)
-
-    const result = renderPage()
-    const educationCard = await screen.findByTestId("profile-section-education")
-    await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
-    const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
-    await user.clear(school)
-    await user.type(school, "Saved Despite Refresh Failure")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    expect(await screen.findByText("Saved Despite Refresh Failure")).toBeInTheDocument()
-    expect(screen.queryByText(i18n.t("profile.editor.saveError"))).not.toBeInTheDocument()
-    expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-      matchingAnalysis: { profileVersion: 7, status: "stale" },
-      profile: { matchingAnalysisStale: true, version: 8 },
-    })
-  })
-
-  it("retains the draft after a save failure", async () => {
-    const user = userEvent.setup()
-    vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
-    vi.mocked(profileService.saveProfileSection).mockRejectedValue(new Error("raw save error"))
-    renderPage()
-    const educationCard = await screen.findByTestId("profile-section-education")
-    await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
-    const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
-    await user.clear(school)
-    await user.type(school, "Unsaved University")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
-    expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
-    expect(school).toHaveValue("Unsaved University")
-  })
-
-  it("refetches the latest profile after a structured version conflict", async () => {
-    const user = userEvent.setup()
-    const initial = structuredClone(profileResponseMock)
-    const latest = structuredClone(profileResponseMock)
-    latest.profile!.version += 1
-    latest.profile!.education[0]!.school = "Server Updated University"
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(initial)
-      .mockResolvedValueOnce(latest)
-    vi.mocked(profileService.saveProfileSection).mockRejectedValue(
-      new ApiError(409, "profile_version_conflict", {
-        error: "profile_version_conflict",
-      }),
-    )
-
-    const result = renderPage()
-    const educationCard = await screen.findByTestId("profile-section-education")
-    await user.click(withinCardButton(educationCard, i18n.t("profile.actions.edit")))
-    const school = screen.getAllByLabelText(i18n.t("profile.formField.school"))[0]!
-    await user.clear(school)
-    await user.type(school, "Conflicting University")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
-    await waitFor(() => expect(profileService.getJobProfile).toHaveBeenCalledTimes(2))
-    expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-      profile: {
-        education: expect.arrayContaining([
-          expect.objectContaining({ school: "Server Updated University" }),
-        ]),
-        version: latest.profile!.version,
-      },
-    })
-    expect(school).toHaveValue("Conflicting University")
-  })
-
-  it("removes an experience after the section mutation succeeds", async () => {
-    const user = userEvent.setup()
-    const snapshot = structuredClone(profileResponseMock)
-    const removedTitle = snapshot.profile!.workExperiences[0].title
-    const saved = structuredClone(snapshot.profile!)
-    saved.workExperiences = saved.workExperiences.slice(1)
-    saved.matchingAnalysisStale = true
-    saved.version += 1
-    const savedSnapshot = {
-      ...snapshot,
-      matchingAnalysis: { ...snapshot.matchingAnalysis!, status: "stale" as const },
-      profile: saved,
-    }
-    vi.mocked(profileService.getJobProfile)
-      .mockResolvedValueOnce(snapshot)
-      .mockResolvedValueOnce(savedSnapshot)
-    vi.mocked(profileService.saveProfileSection).mockResolvedValue(savedSnapshot)
-
-    renderPage()
-    const section = await screen.findByTestId("profile-section-workExperience")
-    await user.click(withinCardButton(section, i18n.t("profile.actions.edit")))
-    await user.click(screen.getAllByRole("button", { name: i18n.t("profile.editor.delete") })[0])
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    await waitFor(() => expect(profileService.saveProfileSection).toHaveBeenCalledOnce())
-    await waitFor(() =>
-      expect(screen.queryByTestId("profile-editor-workExperience")).not.toBeInTheDocument(),
-    )
-    expect(
-      withinSection("profile-section-workExperience").queryByText(removedTitle),
-    ).not.toBeInTheDocument()
-  })
-
-  it("keeps a deleted experience in the draft when the mutation fails", async () => {
-    const user = userEvent.setup()
-    vi.mocked(profileService.getJobProfile).mockResolvedValue(structuredClone(profileResponseMock))
-    vi.mocked(profileService.saveProfileSection).mockRejectedValue(new Error("delete failed"))
-
-    renderPage()
-    const section = await screen.findByTestId("profile-section-workExperience")
-    await user.click(withinCardButton(section, i18n.t("profile.actions.edit")))
-    await user.click(screen.getAllByRole("button", { name: i18n.t("profile.editor.delete") })[0])
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
-
-    expect(await screen.findByText(i18n.t("profile.editor.saveError"))).toBeInTheDocument()
-    expect(screen.getByTestId("profile-editor-workExperience")).toBeInTheDocument()
-    expect(screen.queryByText("delete failed")).not.toBeInTheDocument()
+    Object.assign(profileService.profileCapabilities, { resumeImport: true })
   })
 })
-
-function withinCardButton(card: HTMLElement, name: string) {
-  return Array.from(card.querySelectorAll("button")).find((button) =>
-    button.textContent?.includes(name),
-  )!
-}
-
-function withinSection(testId: string) {
-  return within(screen.getByTestId(testId))
-}

@@ -29,9 +29,9 @@ export const profile = {
     title: "Upload a resume to create your profile",
     updateTitle: "New resume recognition result",
     description:
-      "Upload a file or paste resume text. Recognition updates your current profile directly.",
+      "Upload a file or paste resume text. After recognition, you can confirm whether to import it.",
     updateDescription:
-      "A new resume is recognized and automatically merged into your current profile.",
+      "After the new resume is recognized, review the changes and confirm whether to import them.",
     file: "Resume file",
     text: "Or paste resume text",
     noFileSelected: "No file selected",
@@ -52,11 +52,31 @@ export const profile = {
     updateSummary:
       "{{newItems}} added, {{changedItems}} updated, and {{missingItems}} existing items retained.",
   },
+  importDraft: {
+    title: "Resume parsing complete",
+    description:
+      "Review how this resume will update your job profile. Nothing changes until you confirm.",
+    newItems: "New items",
+    changedItems: "Updated items",
+    missingItems: "Existing items missing from resume",
+    missingItemsDescription: "Existing items missing from this resume will not be deleted.",
+    protectedItems: "Protected manual changes: {{count}}",
+    skippedItems: "Unable to import automatically: {{count}}",
+    unresolvedItems: "Items needing attention: {{count}}",
+    apply: "Confirm import",
+    applying: "Importing...",
+    cancel: "Not now",
+    conflictTitle: "Your profile has changed",
+    conflictDescription: "RIVA regenerated the import draft. Review it again before importing.",
+    applyFailedTitle: "Import failed",
+    applyFailedDescription:
+      "Import failed. Try again later. This operation did not overwrite your current profile.",
+  },
   lifecycle: {
     uploading: {
       title: "Your resume is uploading",
       description:
-        "Once it finishes uploading, we will recognize it and update your structured profile.",
+        "Once it finishes uploading, we will recognize it and prepare an import draft for review.",
     },
     parsing: {
       title: "Recognizing your resume",

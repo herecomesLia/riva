@@ -144,9 +144,9 @@ describe("profile service API", () => {
     expect(profileCapabilities).toEqual({
       credentials: false,
       matchingAnalysis: false,
-      resumeImport: false,
-      resumeRecognition: false,
-      resumeUpdate: false,
+      resumeImport: true,
+      resumeRecognition: true,
+      resumeUpdate: true,
       targetRoles: false,
     })
   })
