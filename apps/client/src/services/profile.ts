@@ -16,13 +16,25 @@ import type {
   ProfileSection,
   ProfileSkill,
   ProjectExperience,
+  ResumeDocument,
+  ResumeImportApplication,
+  ResumeImportDraft,
+  ResumeParsingStatus,
+  ResumeFile,
   ResumeRecognition,
   ResumeUpdate,
   ResumeUploadInput,
   SaveProfileSectionInput,
   WorkExperience,
 } from "@/models/profile"
-import { careerProfileGetResponseSchema, careerProfilePutResponseSchema } from "@/schemas/profile"
+import {
+  careerProfileGetResponseSchema,
+  careerProfilePutResponseSchema,
+  resumeDocumentSchema,
+  resumeImportApplicationSchema,
+  resumeImportDraftSchema,
+  resumeParsingStatusSchema,
+} from "@/schemas/profile"
 import { apiRequest, ApiError } from "@/services/api"
 
 const allProfileCapabilities: ProfileCapabilities = {
@@ -49,6 +61,177 @@ const standardUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 
 function realApiUnavailable(feature: string): never {
   throw new Error(`${feature} is not supported by the CareerProfile API.`)
+}
+
+function createResumeUploadFormData(input: ResumeUploadInput): FormData {
+  const hasFile = input.file !== undefined
+  const hasText = input.text !== undefined
+
+  if (hasFile === hasText) {
+    throw new TypeError("Exactly one of file or text is required for a resume upload.")
+  }
+  if (input.text !== undefined && !input.text.trim()) {
+    throw new TypeError("Resume text must not be empty.")
+  }
+
+  const formData = new FormData()
+  if (input.file !== undefined) {
+    formData.append("file", input.file)
+  } else if (input.text !== undefined) {
+    formData.append("text", input.text)
+  }
+
+  return formData
+}
+
+function mapMockResumeDocument(resume: ResumeFile): ResumeDocument {
+  const extractionStatus =
+    resume.processingStatus === "succeeded"
+      ? "succeeded"
+      : resume.processingStatus === "failed"
+        ? "failed"
+        : "pending"
+
+  return {
+    byteSize: resume.fileSize,
+    extractedAt: resume.parsedAt,
+    extractionStatus,
+    failureReason: resume.failureReason,
+    id: resume.id,
+    mediaType: resume.mimeType,
+    originalFilename: resume.fileName === "pasted-resume.txt" ? null : resume.fileName,
+    sourceType: resume.fileName === "pasted-resume.txt" ? "pastedText" : "file",
+    uploadedAt: resume.uploadedAt,
+  }
+}
+
+function mapMockParsingStatus(
+  resumeId: string,
+  processingStatus: ResumeFile["processingStatus"],
+  failureReason: string | null,
+): ResumeParsingStatus {
+  const runId = "00000000-0000-4000-8000-000000000001"
+  const createdAt = "2026-07-13T08:00:00.000Z"
+  const finishedAt = "2026-07-13T08:02:00.000Z"
+
+  if (processingStatus === "uploaded") {
+    return {
+      attemptCount: 0,
+      canRetry: false,
+      createdAt: null,
+      draftStatus: null,
+      draftVersion: null,
+      errorCode: null,
+      failureReason: null,
+      finishedAt: null,
+      maxAttempts: null,
+      resultVersion: null,
+      resumeDocumentId: resumeId,
+      runId: null,
+      startedAt: null,
+      status: "notStarted",
+    }
+  }
+
+  if (processingStatus === "parsing") {
+    return {
+      attemptCount: 1,
+      canRetry: false,
+      createdAt,
+      draftStatus: null,
+      draftVersion: null,
+      errorCode: null,
+      failureReason: null,
+      finishedAt: null,
+      maxAttempts: 3,
+      resultVersion: null,
+      resumeDocumentId: resumeId,
+      runId,
+      startedAt: createdAt,
+      status: "running",
+    }
+  }
+
+  if (processingStatus === "succeeded") {
+    return {
+      attemptCount: 1,
+      canRetry: false,
+      createdAt,
+      draftStatus: "ready",
+      draftVersion: 1,
+      errorCode: null,
+      failureReason: null,
+      finishedAt,
+      maxAttempts: 3,
+      resultVersion: 1,
+      resumeDocumentId: resumeId,
+      runId,
+      startedAt: createdAt,
+      status: "succeeded",
+    }
+  }
+
+  return {
+    attemptCount: 1,
+    canRetry: true,
+    createdAt,
+    draftStatus: null,
+    draftVersion: null,
+    errorCode: "resume_parsing_unavailable",
+    failureReason: failureReason ?? "Resume parsing failed.",
+    finishedAt,
+    maxAttempts: 3,
+    resultVersion: null,
+    resumeDocumentId: resumeId,
+    runId,
+    startedAt: createdAt,
+    status: "failed",
+  }
+}
+
+function getMockResumeContext(resumeId: string) {
+  const snapshot = profileMockService.getProfileMockSnapshot()
+  const profile = snapshot.profile
+  if (!profile) {
+    throw new Error("Job profile was not found.")
+  }
+
+  if (profile.resume?.id === resumeId) {
+    return { kind: "initial" as const, profileId: profile.profileId }
+  }
+
+  if (snapshot.resumeUpdate?.resume.id === resumeId) {
+    return {
+      kind: "update" as const,
+      profileId: profile.profileId,
+      resumeUpdateId: snapshot.resumeUpdate.id,
+    }
+  }
+
+  throw new Error("Resume was not found.")
+}
+
+function getMockParsingStatusFromSnapshot(
+  resumeId: string,
+  snapshot: JobProfileSnapshot,
+): ResumeParsingStatus {
+  if (snapshot.recognition?.resumeId === resumeId) {
+    return mapMockParsingStatus(
+      resumeId,
+      snapshot.recognition.processingStatus,
+      snapshot.recognition.failureReason,
+    )
+  }
+
+  if (snapshot.resumeUpdate?.resume.id === resumeId) {
+    return mapMockParsingStatus(
+      resumeId,
+      snapshot.resumeUpdate.resume.processingStatus,
+      snapshot.resumeUpdate.failureReason,
+    )
+  }
+
+  throw new Error("Resume parsing was not found.")
 }
 
 function requireStandardUuid(id: string): string {
@@ -194,6 +377,133 @@ async function putCareerProfile(request: CareerProfilePutRequestDto): Promise<Jo
   )
 
   return toSnapshot(response.profile)
+}
+
+function resumeApiPath(resumeId: string, suffix = ""): string {
+  return `/profile/resumes/${encodeURIComponent(resumeId)}${suffix}`
+}
+
+function resumeImportMockUnavailable(feature: string): never {
+  throw new Error(`${feature} is not available in the existing profile mock.`)
+}
+
+export async function uploadResume(input: ResumeUploadInput): Promise<ResumeDocument> {
+  const formData = createResumeUploadFormData(input)
+
+  if (!env.mock) {
+    return resumeDocumentSchema.parse(
+      await apiRequest<unknown>("/profile/resumes", {
+        body: formData,
+        method: "POST",
+      }),
+    )
+  }
+
+  const current = profileMockService.getProfileMockSnapshot()
+  const snapshot = current.profile
+    ? await profileMockService.uploadUpdatedResume(input)
+    : await profileMockService.uploadInitialResume(input)
+  const resume = snapshot.resumeUpdate?.resume ?? snapshot.profile?.resume
+  if (!resume) {
+    throw new Error("The mock resume upload did not return a resume document.")
+  }
+
+  return mapMockResumeDocument(resume)
+}
+
+export async function startResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
+  if (!env.mock) {
+    return resumeParsingStatusSchema.parse(
+      await apiRequest<unknown>(`${resumeApiPath(resumeId)}/parsing`, {
+        method: "POST",
+      }),
+    )
+  }
+
+  const context = getMockResumeContext(resumeId)
+  const snapshot =
+    context.kind === "initial"
+      ? await profileMockService.startInitialResumeRecognition(context.profileId, resumeId)
+      : await profileMockService.startUpdatedResumeRecognition(
+          context.profileId,
+          context.resumeUpdateId,
+        )
+
+  return getMockParsingStatusFromSnapshot(resumeId, snapshot)
+}
+
+export async function getResumeParsingStatus(resumeId: string): Promise<ResumeParsingStatus> {
+  if (!env.mock) {
+    return resumeParsingStatusSchema.parse(
+      await apiRequest<unknown>(`${resumeApiPath(resumeId)}/parsing`),
+    )
+  }
+
+  const context = getMockResumeContext(resumeId)
+  if (context.kind === "initial") {
+    const recognition = await profileMockService.getResumeRecognitionStatus(
+      context.profileId,
+      resumeId,
+    )
+    return mapMockParsingStatus(resumeId, recognition.processingStatus, recognition.failureReason)
+  }
+
+  const resumeUpdate = await profileMockService.getResumeUpdateStatus(
+    context.profileId,
+    context.resumeUpdateId,
+  )
+  return mapMockParsingStatus(
+    resumeId,
+    resumeUpdate.resume.processingStatus,
+    resumeUpdate.failureReason,
+  )
+}
+
+export async function retryResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
+  if (!env.mock) {
+    return resumeParsingStatusSchema.parse(
+      await apiRequest<unknown>(`${resumeApiPath(resumeId)}/parsing/retry`, {
+        method: "POST",
+      }),
+    )
+  }
+
+  const context = getMockResumeContext(resumeId)
+  const snapshot =
+    context.kind === "initial"
+      ? await profileMockService.startInitialResumeRecognition(context.profileId, resumeId)
+      : await profileMockService.startUpdatedResumeRecognition(
+          context.profileId,
+          context.resumeUpdateId,
+        )
+
+  return getMockParsingStatusFromSnapshot(resumeId, snapshot)
+}
+
+export async function getResumeImportDraft(resumeId: string): Promise<ResumeImportDraft> {
+  if (env.mock) {
+    return resumeImportMockUnavailable(`Resume import draft ${resumeId}`)
+  }
+
+  return resumeImportDraftSchema.parse(
+    await apiRequest<unknown>(`${resumeApiPath(resumeId)}/import-draft`),
+  )
+}
+
+export async function applyResumeImportDraft(
+  resumeId: string,
+  draftVersion: number,
+): Promise<ResumeImportApplication> {
+  if (env.mock) {
+    return resumeImportMockUnavailable(`Resume import application ${resumeId}`)
+  }
+
+  return resumeImportApplicationSchema.parse(
+    await apiRequest<unknown>(`${resumeApiPath(resumeId)}/import-draft/apply`, {
+      json: { draftVersion },
+      method: "POST",
+    }),
+  )
 }
 
 function createDraftSkillIdMap(skillsToCreate: NewProfileSkillInput[]) {

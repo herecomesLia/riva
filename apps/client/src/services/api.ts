@@ -1,6 +1,7 @@
 import { env } from "@/app/env"
 
 type ApiRequestOptions = Omit<RequestInit, "body" | "credentials"> & {
+  body?: BodyInit | null
   json?: unknown
 }
 
@@ -43,7 +44,7 @@ function getErrorCode(body: unknown): string | null {
 }
 
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const { headers: initialHeaders, json, ...requestOptions } = options
+  const { body: rawBody, headers: initialHeaders, json, ...requestOptions } = options
   const headers = new Headers(initialHeaders)
 
   if (json !== undefined) {
@@ -52,7 +53,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   const response = await fetch(buildApiUrl(path), {
     ...requestOptions,
-    body: json === undefined ? undefined : JSON.stringify(json),
+    body: json === undefined ? rawBody : JSON.stringify(json),
     credentials: "include",
     headers,
   })

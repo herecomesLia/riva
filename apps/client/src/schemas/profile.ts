@@ -9,6 +9,10 @@ import type {
   CareerProfilePutResponseDto,
   CareerProfileSkillDto,
   CareerProfileWorkExperienceDto,
+  ResumeDocument,
+  ResumeImportApplication,
+  ResumeImportDraft,
+  ResumeParsingStatus,
 } from "@/models/profile"
 
 export const profileEmploymentTypes = [
@@ -108,60 +112,98 @@ export const credentialsSchema = z.object({
 const careerProfileSourceSchema = z.enum(["resumeExtracted", "userEdited", "userAdded"])
 const careerProfileUuidSchema = z.uuid()
 const careerProfileMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)
-const careerProfileNullableTextSchema = z.string().nullable()
+const careerProfileRequiredTextSchema = z.string().trim().min(1).max(255)
+const careerProfileNullableTextSchema = z.string().max(255).nullable()
+const careerProfileSummarySchema = z.string().max(2000).nullable()
+const careerProfileBulletSchema = z.string().trim().min(1).max(1000)
 
-const careerProfileEducationResponseSchema: z.ZodType<CareerProfileEducationDto> = z
+const careerProfileEducationInputSchema = z
   .object({
     degree: careerProfileNullableTextSchema,
     endDate: careerProfileMonthSchema.nullable(),
     id: careerProfileUuidSchema,
     isCurrent: z.boolean(),
     major: careerProfileNullableTextSchema,
-    school: z.string(),
-    source: careerProfileSourceSchema,
+    school: careerProfileRequiredTextSchema,
     startDate: careerProfileMonthSchema,
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.isCurrent && value.endDate !== null) {
+      context.addIssue({ code: "custom", message: "current entries cannot have an end date" })
+    }
+    if (!value.isCurrent && value.endDate === null) {
+      context.addIssue({ code: "custom", message: "non-current entries require an end date" })
+    }
+    if (value.endDate !== null && value.endDate < value.startDate) {
+      context.addIssue({ code: "custom", message: "end date cannot be before start date" })
+    }
+  })
 
-const careerProfileWorkExperienceResponseSchema: z.ZodType<CareerProfileWorkExperienceDto> = z
+const careerProfileEducationResponseSchema: z.ZodType<CareerProfileEducationDto> =
+  careerProfileEducationInputSchema.extend({ source: careerProfileSourceSchema })
+
+const careerProfileWorkExperienceInputSchema = z
   .object({
-    achievements: z.array(z.string()),
-    company: z.string(),
+    achievements: z.array(careerProfileBulletSchema).max(100),
+    company: careerProfileRequiredTextSchema,
     employmentType: z.enum(profileEmploymentTypes),
     endDate: careerProfileMonthSchema.nullable(),
     id: careerProfileUuidSchema,
     isCurrent: z.boolean(),
     location: careerProfileNullableTextSchema,
-    responsibilities: z.array(z.string()),
-    skillIds: z.array(careerProfileUuidSchema),
-    source: careerProfileSourceSchema,
+    responsibilities: z.array(careerProfileBulletSchema).max(100),
+    skillIds: z.array(careerProfileUuidSchema).max(100),
     startDate: careerProfileMonthSchema,
-    title: z.string(),
+    title: careerProfileRequiredTextSchema,
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.isCurrent && value.endDate !== null) {
+      context.addIssue({ code: "custom", message: "current entries cannot have an end date" })
+    }
+    if (!value.isCurrent && value.endDate === null) {
+      context.addIssue({ code: "custom", message: "non-current entries require an end date" })
+    }
+    if (value.endDate !== null && value.endDate < value.startDate) {
+      context.addIssue({ code: "custom", message: "end date cannot be before start date" })
+    }
+  })
 
-const careerProfileProjectExperienceResponseSchema: z.ZodType<CareerProfileProjectExperienceDto> = z
+const careerProfileWorkExperienceResponseSchema: z.ZodType<CareerProfileWorkExperienceDto> =
+  careerProfileWorkExperienceInputSchema.extend({ source: careerProfileSourceSchema })
+
+const careerProfileProjectExperienceInputSchema = z
   .object({
-    achievements: z.array(z.string()),
+    achievements: z.array(careerProfileBulletSchema).max(100),
     endDate: careerProfileMonthSchema.nullable(),
     id: careerProfileUuidSchema,
-    name: z.string(),
+    name: careerProfileRequiredTextSchema,
     projectUrl: z.url().nullable(),
-    responsibilities: z.array(z.string()),
+    responsibilities: z.array(careerProfileBulletSchema).max(100),
     role: careerProfileNullableTextSchema,
-    skillIds: z.array(careerProfileUuidSchema),
-    source: careerProfileSourceSchema,
+    skillIds: z.array(careerProfileUuidSchema).max(100),
     startDate: careerProfileMonthSchema,
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.endDate !== null && value.endDate < value.startDate) {
+      context.addIssue({ code: "custom", message: "end date cannot be before start date" })
+    }
+  })
 
-const careerProfileSkillResponseSchema: z.ZodType<CareerProfileSkillDto> = z
+const careerProfileProjectExperienceResponseSchema: z.ZodType<CareerProfileProjectExperienceDto> =
+  careerProfileProjectExperienceInputSchema.extend({ source: careerProfileSourceSchema })
+
+const careerProfileSkillInputSchema = z
   .object({
     id: careerProfileUuidSchema,
-    name: z.string(),
-    source: careerProfileSourceSchema,
+    name: careerProfileRequiredTextSchema,
   })
   .strict()
+
+const careerProfileSkillResponseSchema: z.ZodType<CareerProfileSkillDto> =
+  careerProfileSkillInputSchema.extend({ source: careerProfileSourceSchema })
 
 const careerProfileResponseSchema: z.ZodType<CareerProfileDto> = z
   .object({
@@ -169,7 +211,7 @@ const careerProfileResponseSchema: z.ZodType<CareerProfileDto> = z
     profileId: careerProfileUuidSchema,
     projectExperiences: z.array(careerProfileProjectExperienceResponseSchema),
     skills: z.array(careerProfileSkillResponseSchema),
-    summary: careerProfileNullableTextSchema,
+    summary: careerProfileSummarySchema,
     updatedAt: z.iso.datetime({ offset: true }),
     version: z.number().int().positive(),
     workExperiences: z.array(careerProfileWorkExperienceResponseSchema),
@@ -185,5 +227,342 @@ export const careerProfileGetResponseSchema: z.ZodType<CareerProfileGetResponseD
 export const careerProfilePutResponseSchema: z.ZodType<CareerProfilePutResponseDto> = z
   .object({
     profile: careerProfileResponseSchema,
+  })
+  .strict()
+
+const resumeDateTimeSchema = z.iso.datetime({ offset: true })
+const resumeUuidSchema = z.uuid()
+
+const pendingResumeDocumentSchema = z
+  .object({
+    byteSize: z.number().int().positive(),
+    extractedAt: z.null(),
+    extractionStatus: z.literal("pending"),
+    failureReason: z.null(),
+    id: resumeUuidSchema,
+    mediaType: z.string().min(1).max(127),
+    originalFilename: z.string().max(255).nullable(),
+    sourceType: z.enum(["file", "pastedText"]),
+    uploadedAt: resumeDateTimeSchema,
+  })
+  .strict()
+
+const succeededResumeDocumentSchema = z
+  .object({
+    byteSize: z.number().int().positive(),
+    extractedAt: resumeDateTimeSchema,
+    extractionStatus: z.literal("succeeded"),
+    failureReason: z.null(),
+    id: resumeUuidSchema,
+    mediaType: z.string().min(1).max(127),
+    originalFilename: z.string().max(255).nullable(),
+    sourceType: z.enum(["file", "pastedText"]),
+    uploadedAt: resumeDateTimeSchema,
+  })
+  .strict()
+
+const failedResumeDocumentSchema = z
+  .object({
+    byteSize: z.number().int().positive(),
+    extractedAt: resumeDateTimeSchema,
+    extractionStatus: z.literal("failed"),
+    failureReason: z.string().trim().min(1).max(255),
+    id: resumeUuidSchema,
+    mediaType: z.string().min(1).max(127),
+    originalFilename: z.string().max(255).nullable(),
+    sourceType: z.enum(["file", "pastedText"]),
+    uploadedAt: resumeDateTimeSchema,
+  })
+  .strict()
+
+export const resumeDocumentSchema: z.ZodType<ResumeDocument> = z.discriminatedUnion(
+  "extractionStatus",
+  [pendingResumeDocumentSchema, succeededResumeDocumentSchema, failedResumeDocumentSchema],
+)
+
+const resumeImportDraftStatusSchema = z.enum(["ready", "applied", "superseded"])
+const resumeParsingLifecycleStatusSchema = z.enum([
+  "notStarted",
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+])
+
+export const resumeParsingStatusSchema: z.ZodType<ResumeParsingStatus> = z
+  .object({
+    attemptCount: z.number().int().nonnegative(),
+    canRetry: z.boolean(),
+    createdAt: resumeDateTimeSchema.nullable(),
+    draftStatus: resumeImportDraftStatusSchema.nullable(),
+    draftVersion: z.number().int().positive().nullable(),
+    errorCode: z.string().nullable(),
+    failureReason: z.string().nullable(),
+    finishedAt: resumeDateTimeSchema.nullable(),
+    maxAttempts: z.number().int().positive().nullable(),
+    resultVersion: z.number().int().positive().nullable(),
+    resumeDocumentId: resumeUuidSchema,
+    runId: resumeUuidSchema.nullable(),
+    startedAt: resumeDateTimeSchema.nullable(),
+    status: resumeParsingLifecycleStatusSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const requireState = (condition: boolean, message: string) => {
+      if (!condition) context.addIssue({ code: "custom", message })
+    }
+    const requireActiveState = () => {
+      requireState(
+        value.runId !== null && value.maxAttempts !== null && value.createdAt !== null,
+        "active state is incomplete",
+      )
+    }
+    const requireTerminalState = () => {
+      requireState(
+        value.runId !== null &&
+          value.maxAttempts !== null &&
+          value.createdAt !== null &&
+          value.finishedAt !== null,
+        "terminal state is incomplete",
+      )
+    }
+
+    switch (value.status) {
+      case "notStarted":
+        requireState(
+          value.runId === null &&
+            value.attemptCount === 0 &&
+            value.maxAttempts === null &&
+            value.errorCode === null &&
+            value.failureReason === null &&
+            !value.canRetry &&
+            value.createdAt === null &&
+            value.startedAt === null &&
+            value.finishedAt === null &&
+            value.resultVersion === null &&
+            value.draftVersion === null &&
+            value.draftStatus === null,
+          "notStarted state contains run data",
+        )
+        break
+      case "queued":
+        requireActiveState()
+        requireState(
+          value.failureReason === null &&
+            !value.canRetry &&
+            value.finishedAt === null &&
+            value.errorCode === null &&
+            value.resultVersion === null &&
+            value.draftVersion === null &&
+            value.draftStatus === null,
+          "queued state contains finished data",
+        )
+        break
+      case "running":
+        requireActiveState()
+        requireState(
+          value.startedAt !== null &&
+            value.failureReason === null &&
+            !value.canRetry &&
+            value.finishedAt === null &&
+            value.errorCode === null &&
+            value.resultVersion === null &&
+            value.draftVersion === null &&
+            value.draftStatus === null,
+          "running state contains invalid lifecycle data",
+        )
+        break
+      case "succeeded":
+        requireTerminalState()
+        requireState(
+          value.errorCode === null &&
+            value.failureReason === null &&
+            !value.canRetry &&
+            value.resultVersion !== null &&
+            value.draftVersion !== null &&
+            value.draftStatus !== null,
+          "succeeded state is incomplete",
+        )
+        break
+      case "failed":
+        requireTerminalState()
+        requireState(
+          value.errorCode !== null &&
+            value.failureReason !== null &&
+            value.failureReason.trim().length > 0 &&
+            value.canRetry &&
+            value.resultVersion === null &&
+            value.draftVersion === null &&
+            value.draftStatus === null,
+          "failed state is invalid",
+        )
+        break
+    }
+  })
+
+const resumeImportSectionSchema = z.enum([
+  "education",
+  "workExperience",
+  "projectExperience",
+  "skills",
+  "summary",
+])
+const resumeImportSkipReasonSchema = z.enum([
+  "start_date_missing",
+  "start_date_precision_insufficient",
+  "end_date_missing",
+  "end_date_precision_insufficient",
+  "current_status_unknown",
+  "employment_type_unknown",
+  "profile_schema_invalid",
+])
+const resumeImportProtectedSourceSchema = z.enum(["userEdited", "userAdded"])
+const resumeImportSummaryActionSchema = z.enum(["set", "preserve", "none"])
+const resumeImportSkippedItemSchema = z
+  .object({
+    reasons: z.array(resumeImportSkipReasonSchema).min(1),
+    section: resumeImportSectionSchema,
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict()
+const resumeImportProtectedItemSchema = z
+  .object({
+    itemId: resumeUuidSchema,
+    section: resumeImportSectionSchema,
+    source: resumeImportProtectedSourceSchema,
+  })
+  .strict()
+const resumeImportChangeSummarySchema = z
+  .object({
+    changedItems: z.number().int().nonnegative(),
+    missingItems: z.number().int().nonnegative(),
+    newItems: z.number().int().nonnegative(),
+  })
+  .strict()
+const resumeImportSummarySchema = z
+  .string()
+  .max(2000)
+  .refine((value) => value.trim().length > 0, "summary must not be blank")
+  .nullable()
+const resumeImportUnresolvedItemsSchema = z
+  .array(
+    z
+      .string()
+      .max(1000)
+      .refine((value) => value.trim().length > 0, "unresolved item must not be blank"),
+  )
+  .max(100)
+
+export const resumeImportDraftSchema: z.ZodType<ResumeImportDraft> = z
+  .object({
+    appliedAt: resumeDateTimeSchema.nullable(),
+    appliedProfileVersion: z.number().int().positive().nullable(),
+    baseProfileId: resumeUuidSchema.nullable(),
+    baseProfileVersion: z.number().int().positive().nullable(),
+    canApply: z.boolean(),
+    changeSummary: resumeImportChangeSummarySchema,
+    createdAt: resumeDateTimeSchema,
+    draftVersion: z.number().int().positive(),
+    education: z.array(careerProfileEducationInputSchema).max(100),
+    projectExperiences: z.array(careerProfileProjectExperienceInputSchema).max(100),
+    parsingResultVersion: z.number().int().positive(),
+    protectedItems: z.array(resumeImportProtectedItemSchema),
+    resumeDocumentId: resumeUuidSchema,
+    skippedItems: z.array(resumeImportSkippedItemSchema),
+    skills: z.array(careerProfileSkillInputSchema).max(200),
+    sourceRunId: resumeUuidSchema,
+    status: resumeImportDraftStatusSchema,
+    summary: resumeImportSummarySchema,
+    summaryAction: resumeImportSummaryActionSchema,
+    unresolvedItems: resumeImportUnresolvedItemsSchema,
+    updatedAt: resumeDateTimeSchema,
+    workExperiences: z.array(careerProfileWorkExperienceInputSchema).max(100),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.baseProfileId === null) !== (value.baseProfileVersion === null)) {
+      context.addIssue({ code: "custom", message: "base profile fields must be provided together" })
+    }
+
+    if (Date.parse(value.updatedAt) < Date.parse(value.createdAt)) {
+      context.addIssue({ code: "custom", message: "updatedAt cannot be before createdAt" })
+    }
+
+    if (value.summaryAction === "set" && (value.summary === null || !value.summary.trim())) {
+      context.addIssue({ code: "custom", message: "set drafts require a summary" })
+    }
+    if (value.summaryAction === "preserve" && value.summary === null) {
+      context.addIssue({ code: "custom", message: "preserve drafts require a summary" })
+    }
+    if (value.summaryAction === "none" && value.summary !== null) {
+      context.addIssue({ code: "custom", message: "none drafts cannot contain a summary" })
+    }
+
+    if (
+      value.status === "ready" &&
+      (!value.canApply || value.appliedProfileVersion !== null || value.appliedAt !== null)
+    ) {
+      context.addIssue({ code: "custom", message: "ready draft state is invalid" })
+    }
+    if (
+      value.status === "applied" &&
+      (value.canApply || value.appliedProfileVersion === null || value.appliedAt === null)
+    ) {
+      context.addIssue({ code: "custom", message: "applied draft state is invalid" })
+    }
+    if (
+      value.status === "superseded" &&
+      (value.canApply || value.appliedProfileVersion !== null || value.appliedAt !== null)
+    ) {
+      context.addIssue({ code: "custom", message: "superseded draft state is invalid" })
+    }
+
+    const sectionIds = [
+      value.education,
+      value.workExperiences,
+      value.projectExperiences,
+      value.skills,
+    ]
+    for (const section of sectionIds) {
+      const ids = section.map((item) => item.id)
+      if (ids.length !== new Set(ids).size) {
+        context.addIssue({
+          code: "custom",
+          message: "draft item ids must be unique within each section",
+        })
+      }
+    }
+
+    const skillIds = new Set(value.skills.map((skill) => skill.id))
+    const experiences = [...value.workExperiences, ...value.projectExperiences]
+    if (experiences.some((experience) => experience.skillIds.some((id) => !skillIds.has(id)))) {
+      context.addIssue({
+        code: "custom",
+        message: "draft experience skillIds must reference draft skills",
+      })
+    }
+
+    const skillNames = value.skills.map((skill) => skill.name.trim().toLowerCase())
+    if (skillNames.length !== new Set(skillNames).size) {
+      context.addIssue({ code: "custom", message: "draft skill names must be unique" })
+    }
+
+    const protectedKeys = value.protectedItems.map((item) => `${item.section}:${item.itemId}`)
+    if (protectedKeys.length !== new Set(protectedKeys).size) {
+      context.addIssue({ code: "custom", message: "draft protected items must be unique" })
+    }
+
+    const skippedKeys = value.skippedItems.map((item) => `${item.section}:${item.sourceIndex}`)
+    if (skippedKeys.length !== new Set(skippedKeys).size) {
+      context.addIssue({ code: "custom", message: "draft skipped items must be unique" })
+    }
+  })
+
+export const resumeImportApplicationSchema: z.ZodType<ResumeImportApplication> = z
+  .object({
+    draft: resumeImportDraftSchema,
+    profile: careerProfileResponseSchema,
+    profileChanged: z.boolean(),
+    profileCreated: z.boolean(),
   })
   .strict()
