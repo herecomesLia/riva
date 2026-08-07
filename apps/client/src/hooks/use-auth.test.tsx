@@ -13,6 +13,7 @@ vi.mock("@/services/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/auth")>()),
   login: vi.fn(),
   logout: vi.fn(),
+  register: vi.fn(),
   restoreCurrentUser: vi.fn(),
 }))
 
@@ -54,6 +55,26 @@ describe("useAuth", () => {
     await act(async () => {
       await expect(
         result.current.login({
+          password: "correct-password",
+          username: "rivauser",
+        }),
+      ).resolves.toEqual(userMock)
+    })
+
+    expect(useAuthStore.getState().currentUser).toEqual(userMock)
+    expect(queryClient.getQueryData(["roles"])).toBeUndefined()
+    expect(result.current.isAuthenticated).toBe(true)
+  })
+
+  it("stores a user after registration", async () => {
+    const { register } = await import("@/services/auth")
+    vi.mocked(register).mockResolvedValue(userMock)
+    queryClient.setQueryData(["roles"], { stale: true })
+    const { result } = renderUseAuth()
+
+    await act(async () => {
+      await expect(
+        result.current.register({
           password: "correct-password",
           username: "rivauser",
         }),

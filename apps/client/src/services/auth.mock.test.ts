@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { mockLoginCredentials, userMock } from "@/mocks/data/auth"
-import { getCurrentAuthUser, login, logout, restoreCurrentUser } from "@/services/auth"
+import { getCurrentAuthUser, login, logout, register, restoreCurrentUser } from "@/services/auth"
 
 async function resolveMockLogin(
   username: string = mockLoginCredentials.username,
@@ -26,6 +26,21 @@ describe("auth service mock login", () => {
 
   it("returns a user for the configured mock credentials", async () => {
     await expect(resolveMockLogin()).resolves.toEqual(userMock)
+  })
+
+  it("registers without fetching and uses the submitted username", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+    const registerPromise = register({ password: "Correct123!", username: "new_user" })
+
+    await vi.advanceTimersByTimeAsync(500)
+
+    await expect(registerPromise).resolves.toMatchObject({
+      avatarUrl: null,
+      displayName: "new_user",
+      id: userMock.id,
+      username: "new_user",
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it("throws invalidCredentials for incorrect mock credentials", async () => {

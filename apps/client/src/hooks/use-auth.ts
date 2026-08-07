@@ -22,6 +22,17 @@ export function useAuth() {
     [queryClient, setCurrentUser],
   )
 
+  const register = useCallback(
+    async (input: authService.LoginCredentials) => {
+      const user = await authService.register(input)
+
+      queryClient.clear()
+      setCurrentUser(user)
+      return user
+    },
+    [queryClient, setCurrentUser],
+  )
+
   const logout = useCallback(async () => {
     await authService.logout()
     queryClient.clear()
@@ -47,6 +58,7 @@ export function useAuth() {
     isAuthenticated,
     login,
     logout,
+    register,
     restoreCurrentUser,
   }
 }

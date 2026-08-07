@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ZodError } from "zod"
 
-import { getCurrentAuthUser, login, logout, restoreCurrentUser } from "@/services/auth"
+import { getCurrentAuthUser, login, logout, register, restoreCurrentUser } from "@/services/auth"
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -59,6 +59,82 @@ describe("auth service API", () => {
       credentials: "include",
       method: "POST",
     })
+  })
+
+  it("registers and loads the full user account", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ id: userId, username: "new_user" }, 201))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          avatarUrl: null,
+          displayName: "New User",
+          id: userId,
+          username: "new_user",
+        }),
+      )
+
+    await expect(register({ password: "Correct123!", username: "new_user" })).resolves.toEqual({
+      avatarFallback: "NU",
+      avatarUrl: null,
+      displayName: "New User",
+      id: userId,
+      username: "new_user",
+    })
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/auth/register",
+      "/api/users/me",
+    ])
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      body: JSON.stringify({ password: "Correct123!", username: "new_user" }),
+      credentials: "include",
+      method: "POST",
+    })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      password: "Correct123!",
+      username: "new_user",
+    })
+  })
+
+  it.each([
+    [409, "username_taken"],
+    [422, "invalid_username"],
+    [422, "invalid_password"],
+  ])("preserves register API error %s %s", async (status, code) => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: code }, status))
+
+    await expect(register({ password: "Correct123!", username: "new_user" })).rejects.toMatchObject(
+      {
+        code,
+        status,
+      },
+    )
+  })
+
+  it("rejects a malformed register identity", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "not-a-uuid", username: "new_user" }, 201))
+
+    await expect(
+      register({ password: "Correct123!", username: "new_user" }),
+    ).rejects.toBeInstanceOf(ZodError)
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it("rejects a users/me account that does not match the register identity", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ id: userId, username: "new_user" }, 201))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          avatarUrl: null,
+          displayName: "Another User",
+          id: otherUserId,
+          username: "other",
+        }),
+      )
+
+    await expect(register({ password: "Correct123!", username: "new_user" })).rejects.toThrow(
+      "Authenticated identity does not match the current user account.",
+    )
   })
 
   it("maps invalid credentials without matching error messages", async () => {

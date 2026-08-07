@@ -18,7 +18,13 @@ vi.mock("@/pages/login/LoginForm", () => ({
   ),
 }))
 vi.mock("@/pages/login/RegisterForm", () => ({
-  RegisterForm: () => <form aria-label="Register form" />,
+  RegisterForm: ({ onRegisterSuccess }: { onRegisterSuccess: () => void }) => (
+    <form aria-label="Register form">
+      <button onClick={onRegisterSuccess} type="button">
+        Complete registration
+      </button>
+    </form>
+  ),
 }))
 vi.mock("@/pages/login/LoginHeroes", () => ({
   LoginHeroes: () => <div data-testid="login-heroes" />,
@@ -35,6 +41,20 @@ describe("LoginPage", () => {
     })
 
     await user.click(await screen.findByRole("button", { name: "Complete login" }))
+
+    await waitFor(() => {
+      expect(router?.state.location.pathname).toBe("/dashboard")
+    })
+  })
+
+  it("navigates to dashboard after the form reports a successful registration", async () => {
+    const user = userEvent.setup()
+    useMediaMock.mockReturnValue(false)
+    const { router } = renderWithProviders(<LoginPage mode="register" />, {
+      router: { initialEntries: ["/register"] },
+    })
+
+    await user.click(await screen.findByRole("button", { name: "Complete registration" }))
 
     await waitFor(() => {
       expect(router?.state.location.pathname).toBe("/dashboard")

@@ -19,7 +19,7 @@ export function LoginPage({ mode = "login" }: { mode?: LoginPageMode }) {
   const { t } = useTranslation()
   const isRegisterMode = mode === "register"
 
-  function handleLoginSuccess() {
+  function handleAuthSuccess() {
     void navigate({ to: "/dashboard" })
   }
 
@@ -76,9 +76,9 @@ export function LoginPage({ mode = "login" }: { mode?: LoginPageMode }) {
                 </p>
               </div>
               {isRegisterMode ? (
-                <RegisterForm />
+                <RegisterForm onRegisterSuccess={handleAuthSuccess} />
               ) : (
-                <LoginForm onLoginSuccess={handleLoginSuccess} />
+                <LoginForm onLoginSuccess={handleAuthSuccess} />
               )}
               {isRegisterMode ? (
                 <p className="text-center text-sm text-muted-foreground">

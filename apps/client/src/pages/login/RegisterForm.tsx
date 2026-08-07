@@ -9,17 +9,29 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { useAuth } from "@/hooks/use-auth"
 import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
+import { ApiError } from "@/services/api"
+
+type RegisterFormProps = {
+  onRegisterSuccess: () => void
+}
+
+const usernamePattern = /^[A-Za-z0-9_-]{4,32}$/
+const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_\-+=\x5B\x5D{}|\\:;"'<>?,./~`]{8,128}$/
 
 function createRegisterSchema(t: TFunction) {
   return z
     .object({
       confirmPassword: z.string().min(1, t("login.confirmPasswordRequired")),
-      password: z.string().min(1, t("login.passwordRequired")),
+      password: z
+        .string()
+        .min(1, t("login.passwordRequired"))
+        .regex(passwordPattern, t("login.passwordFormat")),
       username: z
         .string()
         .min(1, t("login.usernameRequired"))
-        .refine((value) => value === value.trim(), t("login.usernameNoOuterSpaces")),
+        .regex(usernamePattern, t("login.usernameFormat")),
     })
     .refine((value) => value.password === value.confirmPassword, {
       message: t("login.confirmPasswordMismatch"),
@@ -27,7 +39,30 @@ function createRegisterSchema(t: TFunction) {
     })
 }
 
-export function RegisterForm() {
+function resolveRegisterError(error: unknown) {
+  if (error instanceof ApiError) {
+    if (error.status === 409 && error.code === "username_taken") {
+      return "login.registerErrorUsernameTaken" as const
+    }
+    if (error.status === 422 && error.code === "invalid_username") {
+      return "login.registerErrorInvalidUsername" as const
+    }
+    if (error.status === 422 && error.code === "invalid_password") {
+      return "login.registerErrorInvalidPassword" as const
+    }
+    if (error.status === 503) {
+      return "login.registerErrorServiceUnavailable" as const
+    }
+  }
+  if (error instanceof TypeError) {
+    return "login.registerErrorServiceUnavailable" as const
+  }
+
+  return "login.registerErrorUnknown" as const
+}
+
+export function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
+  const { register } = useAuth()
   const { t } = useTranslation()
   const [, setHerosState] = useLoginHeroesContext()
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -40,8 +75,18 @@ export function RegisterForm() {
     validators: {
       onSubmit: createRegisterSchema(t),
     },
-    onSubmit: () => {
-      setSubmitError(t("login.registerUnavailableDescription"))
+    onSubmit: async ({ value }) => {
+      setSubmitError(null)
+
+      try {
+        await register({
+          password: value.password,
+          username: value.username,
+        })
+        onRegisterSuccess()
+      } catch (error) {
+        setSubmitError(resolveRegisterError(error))
+      }
     },
   })
 
@@ -161,8 +206,8 @@ export function RegisterForm() {
 
       {submitError && (
         <Alert variant="destructive">
-          <AlertTitle>{t("login.registerUnavailableTitle")}</AlertTitle>
-          <AlertDescription>{submitError}</AlertDescription>
+          <AlertTitle>{t("login.registerErrorTitle")}</AlertTitle>
+          <AlertDescription>{t(submitError)}</AlertDescription>
         </Alert>
       )}
 

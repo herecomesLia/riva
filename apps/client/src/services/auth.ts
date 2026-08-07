@@ -38,6 +38,15 @@ function createUser(account: UserAccountDto): User {
   }
 }
 
+async function loadUserAccount(identity: AuthenticatedUser): Promise<User> {
+  const account = userAccountSchema.parse(await apiRequest<unknown>("/users/me"))
+  if (account.id !== identity.id || account.username !== identity.username) {
+    throw new Error("Authenticated identity does not match the current user account.")
+  }
+
+  return createUser(account)
+}
+
 function mapLoginError(error: unknown): LoginError {
   if (error instanceof ApiError && error.status === 401 && error.code === "invalid_credentials") {
     return new LoginError("invalidCredentials")
@@ -71,15 +80,31 @@ export async function login(credentials: LoginCredentials): Promise<User> {
         method: "POST",
       }),
     )
-    const account = userAccountSchema.parse(await apiRequest<unknown>("/users/me"))
-    if (account.id !== identity.id || account.username !== identity.username) {
-      throw new Error("Authenticated identity does not match the current user account.")
-    }
-
-    return createUser(account)
+    return await loadUserAccount(identity)
   } catch (error) {
     throw mapLoginError(error)
   }
+}
+
+export async function register(credentials: LoginCredentials): Promise<User> {
+  if (env.mock) {
+    await waitForMockDelay(authDelayMs)
+    return createUser({
+      avatarUrl: null,
+      displayName: credentials.username,
+      id: userMock.id,
+      username: credentials.username,
+    })
+  }
+
+  const identity = authenticatedUserSchema.parse(
+    await apiRequest<unknown>("/auth/register", {
+      json: credentials,
+      method: "POST",
+    }),
+  )
+
+  return loadUserAccount(identity)
 }
 
 export async function logout(): Promise<void> {
