@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 
 import { useAuthenticationInvalidation } from "@/hooks/use-authentication-invalidation"
-import type { JobProfileSnapshot, ResumeParsingStatus, ResumeUploadInput } from "@/models/profile"
+import type {
+  JobProfileSnapshot,
+  ResumeImportDraft,
+  ResumeParsingStatus,
+  ResumeUploadInput,
+} from "@/models/profile"
 import { ApiError } from "@/services/api"
 import {
   applyResumeImportDraft,
@@ -147,19 +152,39 @@ export function ProfilePage() {
   const resumeRecoveryMutation = useMutation({
     mutationFn: async () => {
       if (!activeResume) return
-      const current = await getResumeParsingStatus(activeResume.id)
+
+      const resumeId = activeResume.id
+      const current = await getResumeParsingStatus(resumeId)
+
+      if (current.status === "succeeded") {
+        const cachedDraft = queryClient.getQueryData<ResumeImportDraft>(
+          resumeDraftQueryKey(resumeId),
+        )
+
+        if (cachedDraft?.status === "applied") {
+          setSnapshot(await getJobProfile())
+          await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
+          resetResumeWorkflow()
+          return
+        }
+      }
+
       let nextStatus: ResumeParsingStatus
+
       switch (current.status) {
         case "notStarted":
-          nextStatus = await startResumeParsing(activeResume.id)
+          nextStatus = await startResumeParsing(resumeId)
           break
+
         case "failed":
-          nextStatus = await retryResumeParsing(activeResume.id)
+          nextStatus = await retryResumeParsing(resumeId)
           break
+
         default:
           nextStatus = current
       }
-      queryClient.setQueryData(resumeParsingQueryKey(activeResume.id), nextStatus)
+
+      queryClient.setQueryData(resumeParsingQueryKey(resumeId), nextStatus)
       setResumeSynchronizationError(false)
     },
     onError: (error) => {
@@ -186,15 +211,22 @@ export function ProfilePage() {
       applyResumeImportDraft(resumeId, draftVersion),
     onSuccess: async (response, { resumeId }) => {
       queryClient.setQueryData(resumeDraftQueryKey(resumeId), response.draft)
-      const refreshed = setSnapshot(await getJobProfile())
+
+      try {
+        setSnapshot(await getJobProfile())
+      } catch (error) {
+        if (invalidateAuthentication(error)) {
+          resetResumeWorkflow()
+          return
+        }
+
+        setResumeSynchronizationError(true)
+        return
+      }
+
       await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
-      setResumeApplyConflict(null)
-      setResumeApplyError(false)
-      setResumeSynchronizationError(false)
-      setActiveResume(null)
-      queryClient.removeQueries({ queryKey: resumeParsingQueryKey(resumeId) })
-      queryClient.removeQueries({ queryKey: resumeDraftQueryKey(resumeId) })
-      return refreshed
+
+      resetResumeWorkflow()
     },
     onError: async (error, { resumeId }) => {
       if (invalidateAuthentication(error)) return

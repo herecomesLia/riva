@@ -260,6 +260,46 @@ describe("ProfilePage resume import orchestration", () => {
     expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
   })
 
+  it("recovers when Profile synchronization fails after a successful apply without reapplying", async () => {
+    const initial = createProfileMockSnapshot("noProfile")
+    const refreshed = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
+
+    const result = await reachDraftReview(initial)
+
+    vi.mocked(profileService.applyResumeImportDraft).mockResolvedValue(application())
+
+    vi.mocked(profileService.getJobProfile)
+      .mockRejectedValueOnce(new Error("profile synchronization failed"))
+      .mockResolvedValueOnce(refreshed)
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: i18n.t("profile.importDraft.apply"),
+      }),
+    )
+
+    expect(await screen.findByTestId("profile-synchronization-error")).toBeInTheDocument()
+
+    expect(profileService.applyResumeImportDraft).toHaveBeenCalledTimes(1)
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: i18n.t("profile.lifecycle.syncFailed.retry"),
+      }),
+    )
+
+    await waitFor(() => {
+      expect(result.queryClient.getQueryData(["profile"])).toEqual(refreshed)
+    })
+
+    expect(profileService.getResumeParsingStatus).toHaveBeenCalledWith(resumeId)
+    expect(profileService.applyResumeImportDraft).toHaveBeenCalledTimes(1)
+
+    expect(screen.queryByTestId("profile-synchronization-error")).not.toBeInTheDocument()
+
+    expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
+  })
+
   it("uses the unified upload service for an existing Profile update", async () => {
     vi.mocked(profileService.getJobProfile).mockResolvedValue(createProfileMockSnapshot("complete"))
     renderPage()
