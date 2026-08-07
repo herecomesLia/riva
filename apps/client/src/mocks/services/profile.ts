@@ -6,17 +6,24 @@ import {
 import { waitForMockDelay } from "@/mocks/utils"
 import { normalizeSkillIds, normalizeSkillName } from "@/models/profile-text"
 import type {
+  CareerProfileDto,
+  CareerProfileSkillInputDto,
   JobProfile,
   JobProfileSnapshot,
   MatchingAnalysis,
   NewProfileSkillInput,
   ProfileSource,
+  ResumeDocument,
   ResumeFile,
+  ResumeImportApplication,
+  ResumeImportDraft,
+  ResumeParsingStatus,
   ResumeRecognition,
   ResumeUpdate,
   ResumeUploadInput,
   SaveProfileSectionInput,
 } from "@/models/profile"
+import { ApiError } from "@/services/api"
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -25,9 +32,38 @@ function copy<T>(value: T): T {
 let mockSnapshot: JobProfileSnapshot = copy(profileResponseMock)
 const retryableRecognitionFailures = new Set<string>()
 
+type ResumeImportCandidate = Pick<
+  ResumeImportDraft,
+  | "education"
+  | "projectExperiences"
+  | "skills"
+  | "summary"
+  | "unresolvedItems"
+  | "skippedItems"
+  | "workExperiences"
+>
+
+type ResumeImportMockState = {
+  candidate: ResumeImportCandidate
+  document: ResumeDocument
+  draft: ResumeImportDraft | null
+  failuresRemaining: number
+  isInitialImport: boolean
+  parsing: ResumeParsingStatus
+}
+
+const resumeImportStates = new Map<string, ResumeImportMockState>()
+const contractIds = new Map<string, string>()
+let mockUuidSequence = 1
+let mockTimestampSequence = 0
+
 export function resetProfileMockState(scenario: ProfileMockScenario = "complete") {
   mockSnapshot = createProfileMockSnapshot(scenario)
   retryableRecognitionFailures.clear()
+  resumeImportStates.clear()
+  contractIds.clear()
+  mockUuidSequence = 1
+  mockTimestampSequence = 0
 }
 
 export function getProfileMockSnapshot(): JobProfileSnapshot {
@@ -265,6 +301,617 @@ function mergeRecognizedProfile(profile: JobProfile): JobProfile {
     ),
     skills: mergeRecognizedItems(profile.skills, recognized.skills),
     workExperiences: mergeRecognizedItems(profile.workExperiences, recognized.workExperiences),
+  }
+}
+
+const standardUuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function nextContractUuid(): string {
+  const suffix = mockUuidSequence.toString(16).padStart(12, "0")
+  mockUuidSequence += 1
+  return `00000000-0000-4000-8000-${suffix}`
+}
+
+function contractId(id: string): string {
+  if (standardUuidPattern.test(id)) return id
+  const existing = contractIds.get(id)
+  if (existing) return existing
+  const mapped = nextContractUuid()
+  contractIds.set(id, mapped)
+  return mapped
+}
+
+function nextMockTimestamp(): string {
+  const timestamp = new Date(Date.UTC(2026, 6, 13, 9, 0, mockTimestampSequence)).toISOString()
+  mockTimestampSequence += 1
+  return timestamp
+}
+
+function resumeImportError(code: string): never {
+  const body = { error: code }
+  throw new ApiError(409, code, body)
+}
+
+function requireResumeImportState(resumeId: string): ResumeImportMockState {
+  const state = resumeImportStates.get(resumeId)
+  if (!state) {
+    const body = { error: "resume_document_not_found" }
+    throw new ApiError(404, body.error, body)
+  }
+  return state
+}
+
+function toCareerProfile(profile: JobProfile | null): CareerProfileDto | null {
+  if (!profile) return null
+  return {
+    education: profile.education.map(({ source, ...item }) => ({
+      ...item,
+      id: contractId(item.id),
+      source,
+      startDate: item.startDate ?? "2000-01",
+    })),
+    profileId: contractId(profile.profileId),
+    projectExperiences: profile.projectExperiences.map(({ source, ...item }) => ({
+      ...item,
+      id: contractId(item.id),
+      skillIds: item.skillIds.map(contractId),
+      source,
+      startDate: item.startDate ?? "2000-01",
+    })),
+    skills: profile.skills.map(({ source, ...item }) => ({
+      ...item,
+      id: contractId(item.id),
+      source,
+    })),
+    summary: profile.summary,
+    updatedAt: profile.updatedAt,
+    version: profile.version,
+    workExperiences: profile.workExperiences.map(({ source, ...item }) => ({
+      ...item,
+      id: contractId(item.id),
+      skillIds: item.skillIds.map(contractId),
+      source,
+      startDate: item.startDate ?? "2000-01",
+    })),
+  }
+}
+
+function buildResumeCandidate(index: number): ResumeImportCandidate {
+  const recognized = recognizedProfile()
+  const skills: CareerProfileSkillInputDto[] = recognized.skills.map((item) => ({
+    id: contractId(item.id),
+    name: item.name,
+  }))
+  const extraSkillId = nextContractUuid()
+  skills.push({ id: extraSkillId, name: `Resume Skill ${index}` })
+
+  return {
+    education: recognized.education.slice(0, 1).map(({ source: _source, ...item }) => ({
+      ...item,
+      id: contractId(item.id),
+      startDate: item.startDate ?? "2000-01",
+    })),
+    projectExperiences: recognized.projectExperiences.map(({ source: _source, ...item }) => ({
+      ...item,
+      id: contractId(item.id),
+      skillIds: item.skillIds.map(contractId),
+      startDate: item.startDate ?? "2000-01",
+    })),
+    skills,
+    skippedItems: [],
+    summary: recognized.summary,
+    unresolvedItems: [],
+    workExperiences: recognized.workExperiences.map(({ source: _source, ...item }) => ({
+      ...item,
+      id: contractId(item.id),
+      skillIds: item.skillIds.map(contractId),
+      startDate: item.startDate ?? "2000-01",
+      title: item.id === "work_orbit_2018" ? `Frontend Engineer ${index}` : item.title,
+    })),
+  }
+}
+
+function withoutSource<T extends { source: ProfileSource }>(item: T): Omit<T, "source"> {
+  const { source: _source, ...value } = item
+  return value
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function normalizedSkillName(name: string): string {
+  return normalizeSkillName(name)
+}
+
+function buildProtectedItems(
+  profile: CareerProfileDto | null,
+  candidate: ResumeImportCandidate,
+): ResumeImportDraft["protectedItems"] {
+  if (!profile) return []
+  const protectedItems: ResumeImportDraft["protectedItems"] = []
+  const sections = [
+    ["education", profile.education, candidate.education],
+    ["workExperience", profile.workExperiences, candidate.workExperiences],
+    ["projectExperience", profile.projectExperiences, candidate.projectExperiences],
+  ] as const
+  for (const [section, currentItems, candidateItems] of sections) {
+    const candidateIds = new Set(candidateItems.map((item) => item.id))
+    for (const item of currentItems) {
+      if (
+        candidateIds.has(item.id) &&
+        (item.source === "userEdited" || item.source === "userAdded")
+      ) {
+        protectedItems.push({ itemId: item.id, section, source: item.source })
+      }
+    }
+  }
+  const candidateSkillNames = new Set(
+    candidate.skills.map((item) => normalizedSkillName(item.name)),
+  )
+  for (const skill of profile.skills) {
+    if (
+      candidateSkillNames.has(normalizedSkillName(skill.name)) &&
+      (skill.source === "userEdited" || skill.source === "userAdded")
+    ) {
+      protectedItems.push({ itemId: skill.id, section: "skills", source: skill.source })
+    }
+  }
+  return protectedItems
+}
+
+function buildChangeSummary(
+  profile: CareerProfileDto | null,
+  candidate: ResumeImportCandidate,
+): ResumeImportDraft["changeSummary"] {
+  if (!profile) {
+    return {
+      changedItems: 0,
+      missingItems: 0,
+      newItems:
+        candidate.education.length +
+        candidate.workExperiences.length +
+        candidate.projectExperiences.length +
+        candidate.skills.length,
+    }
+  }
+
+  let newItems = 0
+  let changedItems = 0
+  let missingItems = 0
+  const sections = [
+    [profile.education, candidate.education],
+    [profile.workExperiences, candidate.workExperiences],
+    [profile.projectExperiences, candidate.projectExperiences],
+  ] as const
+  for (const [currentItems, candidateItems] of sections) {
+    const currentById = new Map(currentItems.map((item) => [item.id, item]))
+    const candidateIds = new Set(candidateItems.map((item) => item.id))
+    for (const candidateItem of candidateItems) {
+      const current = currentById.get(candidateItem.id)
+      if (!current) newItems += 1
+      else if (
+        current.source === "resumeExtracted" &&
+        !sameValue(withoutSource(current), candidateItem)
+      ) {
+        changedItems += 1
+      }
+    }
+    missingItems += currentItems.filter(
+      (item) => item.source === "resumeExtracted" && !candidateIds.has(item.id),
+    ).length
+  }
+
+  const currentSkillsByName = new Map(
+    profile.skills.map((item) => [normalizedSkillName(item.name), item]),
+  )
+  const candidateSkillNames = new Set<string>()
+  for (const candidateSkill of candidate.skills) {
+    const name = normalizedSkillName(candidateSkill.name)
+    candidateSkillNames.add(name)
+    const current = currentSkillsByName.get(name)
+    if (!current) newItems += 1
+    else if (current.source === "resumeExtracted" && current.name !== candidateSkill.name) {
+      changedItems += 1
+    }
+  }
+  missingItems += profile.skills.filter(
+    (item) =>
+      item.source === "resumeExtracted" && !candidateSkillNames.has(normalizedSkillName(item.name)),
+  ).length
+  return { changedItems, missingItems, newItems }
+}
+
+function buildResumeImportDraft(state: ResumeImportMockState): ResumeImportDraft {
+  const profile = toCareerProfile(mockSnapshot.profile)
+  const previous = state.draft
+  const timestamp = nextMockTimestamp()
+  const summaryAction =
+    state.candidate.summary === null
+      ? "none"
+      : profile === null || profile.summary === null || !profile.summary.trim()
+        ? "set"
+        : "preserve"
+  return {
+    ...copy(state.candidate),
+    appliedAt: null,
+    appliedProfileVersion: null,
+    baseProfileId: profile?.profileId ?? null,
+    baseProfileVersion: profile?.version ?? null,
+    canApply: true,
+    changeSummary: buildChangeSummary(profile, state.candidate),
+    createdAt: previous?.createdAt ?? timestamp,
+    draftVersion: (previous?.draftVersion ?? 0) + 1,
+    parsingResultVersion: state.parsing.resultVersion ?? 1,
+    protectedItems: buildProtectedItems(profile, state.candidate),
+    resumeDocumentId: state.document.id,
+    sourceRunId: state.parsing.runId!,
+    status: "ready",
+    summaryAction,
+    updatedAt: timestamp,
+  }
+}
+
+function mergeSection<
+  Input extends { id: string },
+  Output extends Input & { source: ProfileSource },
+>(currentItems: Output[], candidateItems: Input[]): Output[] {
+  const currentById = new Map(currentItems.map((item) => [item.id, item]))
+  const merged = copy(currentItems)
+  for (const candidate of candidateItems) {
+    const current = currentById.get(candidate.id)
+    if (!current) {
+      merged.push({ ...candidate, source: "resumeExtracted" } as Output)
+    } else if (current.source === "resumeExtracted") {
+      const index = merged.findIndex((item) => item.id === current.id)
+      merged[index] = { ...candidate, source: "resumeExtracted" } as Output
+    }
+  }
+  return merged
+}
+
+function mergeResumeCandidate(
+  current: CareerProfileDto | null,
+  candidate: ResumeImportCandidate,
+): Omit<CareerProfileDto, "updatedAt" | "version"> {
+  const profileId = current?.profileId ?? nextContractUuid()
+  const currentSkills = copy(current?.skills ?? [])
+  const currentSkillsByName = new Map(
+    currentSkills.map((skill) => [normalizedSkillName(skill.name), skill]),
+  )
+  const persistedSkillIds = new Map<string, string>()
+  for (const candidateSkill of candidate.skills) {
+    const currentSkill = currentSkillsByName.get(normalizedSkillName(candidateSkill.name))
+    if (currentSkill) {
+      persistedSkillIds.set(candidateSkill.id, currentSkill.id)
+      if (currentSkill.source === "resumeExtracted") currentSkill.name = candidateSkill.name
+    } else {
+      currentSkills.push({ ...candidateSkill, source: "resumeExtracted" })
+      currentSkillsByName.set(normalizedSkillName(candidateSkill.name), currentSkills.at(-1)!)
+      persistedSkillIds.set(candidateSkill.id, candidateSkill.id)
+    }
+  }
+  const mapDraftSkillIds = (skillIds: string[]) =>
+    skillIds.map((id) => {
+      const persisted = persistedSkillIds.get(id)
+      if (!persisted) resumeImportError("resume_import_apply_conflict")
+      return persisted
+    })
+  const workExperiences = candidate.workExperiences.map((item) => ({
+    ...item,
+    skillIds: mapDraftSkillIds(item.skillIds),
+  }))
+  const projectExperiences = candidate.projectExperiences.map((item) => ({
+    ...item,
+    skillIds: mapDraftSkillIds(item.skillIds),
+  }))
+
+  return {
+    education: mergeSection(current?.education ?? [], candidate.education),
+    profileId,
+    projectExperiences: mergeSection(current?.projectExperiences ?? [], projectExperiences),
+    skills: currentSkills,
+    summary:
+      candidate.summary !== null && (current === null || current.summary === null)
+        ? candidate.summary
+        : (current?.summary ?? null),
+    workExperiences: mergeSection(current?.workExperiences ?? [], workExperiences),
+  }
+}
+
+function careerProfileBusinessValue(profile: CareerProfileDto | null): unknown {
+  if (!profile) return null
+  const { updatedAt: _updatedAt, version: _version, ...businessValue } = profile
+  return businessValue
+}
+
+function setCareerProfile(profile: CareerProfileDto, state: ResumeImportMockState) {
+  const current = mockSnapshot.profile
+  const resume: ResumeFile = {
+    failureReason: null,
+    fileName: state.document.originalFilename ?? "pasted-resume.txt",
+    fileSize: state.document.byteSize,
+    id: state.document.id,
+    mimeType: state.document.mediaType,
+    parsedAt: state.document.extractedAt,
+    processingStatus: "succeeded",
+    uploadedAt: state.document.uploadedAt,
+  }
+  const presentSections = [
+    profile.education.length > 0,
+    profile.workExperiences.length > 0,
+    profile.projectExperiences.length > 0,
+    profile.skills.length > 0,
+  ].filter(Boolean).length
+  const next: JobProfile = {
+    ...(current ?? createEmptyProfile(resume, "active")),
+    completeness: {
+      missingSections: [],
+      percentage: Math.round((presentSections / 4) * 100),
+    },
+    education: copy(profile.education),
+    matchingAnalysisStale: false,
+    profileId: profile.profileId,
+    projectExperiences: copy(profile.projectExperiences),
+    resume,
+    skills: copy(profile.skills),
+    status: "active",
+    summary: profile.summary,
+    updatedAt: profile.updatedAt,
+    version: profile.version,
+    workExperiences: copy(profile.workExperiences),
+  }
+  setMockSnapshot({ ...mockSnapshot, matchingAnalysis: null, profile: next })
+}
+
+function notStartedParsing(resumeDocumentId: string): ResumeParsingStatus {
+  return {
+    attemptCount: 0,
+    canRetry: false,
+    createdAt: null,
+    draftStatus: null,
+    draftVersion: null,
+    errorCode: null,
+    failureReason: null,
+    finishedAt: null,
+    maxAttempts: null,
+    resultVersion: null,
+    resumeDocumentId,
+    runId: null,
+    startedAt: null,
+    status: "notStarted",
+  }
+}
+
+function startParsingRun(state: ResumeImportMockState): ResumeParsingStatus {
+  const timestamp = nextMockTimestamp()
+  state.document = {
+    ...state.document,
+    extractedAt: timestamp,
+    extractionStatus: "succeeded",
+  }
+  state.parsing = {
+    attemptCount: state.parsing.attemptCount + 1,
+    canRetry: false,
+    createdAt: timestamp,
+    draftStatus: null,
+    draftVersion: null,
+    errorCode: null,
+    failureReason: null,
+    finishedAt: null,
+    maxAttempts: 3,
+    resultVersion: null,
+    resumeDocumentId: state.document.id,
+    runId: nextContractUuid(),
+    startedAt: timestamp,
+    status: "running",
+  }
+  return copy(state.parsing)
+}
+
+export async function uploadResume(input: ResumeUploadInput): Promise<ResumeDocument> {
+  await waitForMockDelay()
+  const hasFile = input.file !== undefined
+  const hasText = input.text !== undefined
+  if (hasFile === hasText || (input.text !== undefined && !input.text.trim())) {
+    throw new TypeError("Exactly one non-empty resume file or text value is required.")
+  }
+  const index = resumeImportStates.size + 1
+  const timestamp = nextMockTimestamp()
+  const document: ResumeDocument = {
+    byteSize: Math.max(1, input.file?.size ?? new Blob([input.text!]).size),
+    extractedAt: null,
+    extractionStatus: "pending",
+    failureReason: null,
+    id: nextContractUuid(),
+    mediaType: input.file?.type || "text/plain",
+    originalFilename: input.file?.name ?? null,
+    sourceType: input.file ? "file" : "pastedText",
+    uploadedAt: timestamp,
+  }
+  const name = input.file?.name.toLowerCase() ?? input.text!.toLowerCase()
+  resumeImportStates.set(document.id, {
+    candidate: buildResumeCandidate(index),
+    document,
+    draft: null,
+    failuresRemaining: name.includes("unreadable") || name.includes("retryable") ? 1 : 0,
+    isInitialImport: mockSnapshot.profile === null,
+    parsing: notStartedParsing(document.id),
+  })
+  return copy(document)
+}
+
+export async function startResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
+  await waitForMockDelay()
+  const state = requireResumeImportState(resumeId)
+  if (state.parsing.status === "failed") resumeImportError("resume_parsing_retry_required")
+  if (state.parsing.status !== "notStarted") return copy(state.parsing)
+  return startParsingRun(state)
+}
+
+export async function getResumeParsingStatus(resumeId: string): Promise<ResumeParsingStatus> {
+  await waitForMockDelay()
+  const state = requireResumeImportState(resumeId)
+  if (state.parsing.status !== "running" && state.parsing.status !== "queued") {
+    return copy(state.parsing)
+  }
+  const timestamp = nextMockTimestamp()
+  if (state.failuresRemaining > 0) {
+    state.failuresRemaining -= 1
+    state.parsing = {
+      ...state.parsing,
+      canRetry: true,
+      errorCode: "resume_parsing_unavailable",
+      failureReason: "The resume parsing service temporarily failed.",
+      finishedAt: timestamp,
+      status: "failed",
+    }
+    return copy(state.parsing)
+  }
+  const resultVersion = (state.parsing.resultVersion ?? 0) + 1
+  state.parsing = {
+    ...state.parsing,
+    canRetry: false,
+    errorCode: null,
+    failureReason: null,
+    finishedAt: timestamp,
+    resultVersion,
+    status: "succeeded",
+  }
+  state.draft = buildResumeImportDraft(state)
+  state.parsing = {
+    ...state.parsing,
+    draftStatus: state.draft.status,
+    draftVersion: state.draft.draftVersion,
+  }
+  return copy(state.parsing)
+}
+
+export async function retryResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
+  await waitForMockDelay()
+  const state = requireResumeImportState(resumeId)
+  if (state.parsing.status === "succeeded") {
+    resumeImportError("resume_parsing_retry_not_allowed")
+  }
+  if (state.parsing.status === "running" || state.parsing.status === "queued") {
+    return copy(state.parsing)
+  }
+  if (state.parsing.status !== "failed") return startParsingRun(state)
+  if (state.draft?.status === "ready") {
+    state.draft = { ...state.draft, canApply: false, status: "superseded" }
+  }
+  return startParsingRun(state)
+}
+
+export async function getResumeImportDraft(resumeId: string): Promise<ResumeImportDraft> {
+  await waitForMockDelay()
+  const state = requireResumeImportState(resumeId)
+  if (state.parsing.status !== "succeeded" || !state.draft) {
+    resumeImportError("resume_import_draft_not_ready")
+  }
+  const profile = toCareerProfile(mockSnapshot.profile)
+  const profileId = profile?.profileId ?? null
+  const profileVersion = profile?.version ?? null
+  const appliedIsCurrent =
+    state.draft.status === "applied" &&
+    state.draft.appliedProfileVersion === profileVersion &&
+    (state.draft.baseProfileId === null || state.draft.baseProfileId === profileId)
+  const readyIsCurrent =
+    state.draft.status === "ready" &&
+    state.draft.baseProfileId === profileId &&
+    state.draft.baseProfileVersion === profileVersion
+  if (!appliedIsCurrent && !readyIsCurrent) {
+    state.draft = buildResumeImportDraft(state)
+    state.parsing = {
+      ...state.parsing,
+      draftStatus: state.draft.status,
+      draftVersion: state.draft.draftVersion,
+    }
+  }
+  return copy(state.draft)
+}
+
+export async function applyResumeImportDraft(
+  resumeId: string,
+  draftVersion: number,
+): Promise<ResumeImportApplication> {
+  await waitForMockDelay()
+  const state = requireResumeImportState(resumeId)
+  if (state.parsing.status !== "succeeded" || !state.draft) {
+    resumeImportError("resume_import_draft_not_ready")
+  }
+  const draft = state.draft
+  if (draft.draftVersion !== draftVersion) {
+    resumeImportError("resume_import_draft_version_conflict")
+  }
+  const current = toCareerProfile(mockSnapshot.profile)
+  if (draft.status === "applied") {
+    if (
+      !current ||
+      current.version !== draft.appliedProfileVersion ||
+      (draft.baseProfileId !== null && current.profileId !== draft.baseProfileId)
+    ) {
+      resumeImportError("resume_import_apply_conflict")
+    }
+    return {
+      draft: copy(draft),
+      profile: copy(current),
+      profileChanged: false,
+      profileCreated: false,
+    }
+  }
+  if (draft.status !== "ready") resumeImportError("resume_import_apply_conflict")
+  if (
+    draft.baseProfileId !== (current?.profileId ?? null) ||
+    draft.baseProfileVersion !== (current?.version ?? null)
+  ) {
+    resumeImportError("resume_import_profile_version_conflict")
+  }
+
+  const merged = mergeResumeCandidate(current, state.candidate)
+  const profileCreated = current === null
+  const profileChanged = profileCreated || !sameValue(careerProfileBusinessValue(current), merged)
+  const timestamp = nextMockTimestamp()
+  const profile: CareerProfileDto = {
+    ...merged,
+    updatedAt: profileChanged ? timestamp : current!.updatedAt,
+    version: profileCreated ? 1 : current!.version + (profileChanged ? 1 : 0),
+  }
+  if (profileChanged) setCareerProfile(profile, state)
+
+  const appliedAt = nextMockTimestamp()
+  state.draft = {
+    ...draft,
+    appliedAt,
+    appliedProfileVersion: profile.version,
+    canApply: false,
+    status: "applied",
+    updatedAt: appliedAt,
+  }
+  state.parsing = {
+    ...state.parsing,
+    draftStatus: "applied",
+    draftVersion: state.draft.draftVersion,
+  }
+  if (profileChanged) {
+    for (const [otherResumeId, otherState] of resumeImportStates) {
+      if (otherResumeId !== resumeId && otherState.draft?.status === "ready") {
+        otherState.draft = {
+          ...otherState.draft,
+          canApply: false,
+          status: "superseded",
+          updatedAt: appliedAt,
+        }
+        otherState.parsing = { ...otherState.parsing, draftStatus: "superseded" }
+      }
+    }
+  }
+  return {
+    draft: copy(state.draft),
+    profile: copy(profile),
+    profileChanged,
+    profileCreated,
   }
 }
 
