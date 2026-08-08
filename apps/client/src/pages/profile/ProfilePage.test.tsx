@@ -1,3 +1,4 @@
+import { focusManager } from "@tanstack/react-query"
 import { act, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -293,6 +294,26 @@ describe("ProfilePage resume import orchestration", () => {
     expect(review).toHaveTextContent(i18n.t("profile.importDraft.title"))
     expect(review).toHaveTextContent("3")
     expect(profileService.applyResumeImportDraft).not.toHaveBeenCalled()
+  })
+
+  it("keeps the reviewed Draft stable when window focus changes", async () => {
+    await reachDraftReview()
+
+    const callsBeforeFocus = vi.mocked(profileService.getResumeImportDraft).mock.calls.length
+
+    try {
+      await act(async () => {
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+        await Promise.resolve()
+      })
+
+      expect(profileService.getResumeImportDraft).toHaveBeenCalledTimes(callsBeforeFocus)
+
+      expect(screen.getByTestId("profile-resume-draft-review")).toBeInTheDocument()
+    } finally {
+      focusManager.setFocused(undefined)
+    }
   })
 
   it("applies only resumeId and draftVersion, refreshes Profile, invalidates roles, and clears workflow", async () => {

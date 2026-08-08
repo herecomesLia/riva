@@ -103,7 +103,10 @@ export function ProfilePage() {
       !resumeSynchronizationError,
     queryFn: () => getResumeImportDraft(activeResume!.id),
     queryKey: resumeDraftQueryKey(activeResume?.id ?? "inactive"),
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     retry: false,
+    staleTime: Infinity,
   })
 
   useEffect(() => {
