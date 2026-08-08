@@ -5,6 +5,7 @@ import {
   applyResumeImportDraft,
   getResumeImportDraft,
   getResumeParsingStatus,
+  listResumeDocuments,
   retryResumeParsing,
   startResumeParsing,
   uploadResume,
@@ -149,6 +150,40 @@ describe("resume profile API service", () => {
     expect(body).toBeInstanceOf(FormData)
     expect((body as FormData).get("file")).toBe(file)
     expect((body as FormData).get("text")).toBeNull()
+  })
+
+  it("lists one Resume Document through the authenticated API", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ documents: [documentResponse()] }))
+
+    await expect(listResumeDocuments(1)).resolves.toEqual([documentResponse()])
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/profile/resumes?limit=1")
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: "include" })
+  })
+
+  it("returns an empty Resume Document list", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ documents: [] }))
+
+    await expect(listResumeDocuments(1)).resolves.toEqual([])
+  })
+
+  it("rejects malformed Resume Documents in list responses", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ documents: [{ ...documentResponse(), id: "not-a-uuid" }] }),
+    )
+
+    await expect(listResumeDocuments(1)).rejects.toBeInstanceOf(ZodError)
+  })
+
+  it("rejects extra Resume Document response fields", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ documents: [], extra: true }))
+
+    await expect(listResumeDocuments(1)).rejects.toBeInstanceOf(ZodError)
+  })
+
+  it.each([0, -1, 1.5])("rejects invalid Resume Document limits: %s", async (limit) => {
+    await expect(listResumeDocuments(limit)).rejects.toBeInstanceOf(TypeError)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it.each([{ file: new File(["resume"], "resume.pdf"), text: "Resume text" }, {}])(

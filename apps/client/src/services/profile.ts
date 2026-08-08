@@ -30,6 +30,7 @@ import {
   careerProfileGetResponseSchema,
   careerProfilePutResponseSchema,
   resumeDocumentSchema,
+  resumeDocumentsResponseSchema,
   resumeImportApplicationSchema,
   resumeImportDraftSchema,
   resumeParsingStatusSchema,
@@ -230,6 +231,18 @@ async function putCareerProfile(request: CareerProfilePutRequestDto): Promise<Jo
 
 function resumeApiPath(resumeId: string, suffix = ""): string {
   return `/profile/resumes/${encodeURIComponent(resumeId)}${suffix}`
+}
+
+export async function listResumeDocuments(limit = 20): Promise<ResumeDocument[]> {
+  if (!Number.isInteger(limit) || limit <= 0) {
+    throw new TypeError("Resume document limit must be a positive integer.")
+  }
+
+  const response = !env.mock
+    ? await apiRequest<unknown>(`/profile/resumes?limit=${limit}`)
+    : { documents: await profileMockService.listResumeDocuments(limit) }
+
+  return resumeDocumentsResponseSchema.parse(response).documents
 }
 
 export async function uploadResume(input: ResumeUploadInput): Promise<ResumeDocument> {

@@ -757,6 +757,18 @@ export async function uploadResume(input: ResumeUploadInput): Promise<ResumeDocu
   return copy(document)
 }
 
+export async function listResumeDocuments(limit = 20): Promise<ResumeDocument[]> {
+  await waitForMockDelay()
+  if (!Number.isInteger(limit) || limit <= 0) {
+    throw new TypeError("Resume document limit must be a positive integer.")
+  }
+
+  return Array.from(resumeImportStates.values())
+    .reverse()
+    .slice(0, limit)
+    .map(({ document }) => copy(document))
+}
+
 export async function startResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
   await waitForMockDelay()
   const state = requireResumeImportState(resumeId)

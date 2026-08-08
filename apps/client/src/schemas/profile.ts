@@ -10,6 +10,7 @@ import type {
   CareerProfileSkillDto,
   CareerProfileWorkExperienceDto,
   ResumeDocument,
+  ResumeDocumentsResponseDto,
   ResumeImportApplication,
   ResumeImportDraft,
   ResumeParsingStatus,
@@ -279,6 +280,12 @@ export const resumeDocumentSchema: z.ZodType<ResumeDocument> = z.discriminatedUn
   "extractionStatus",
   [pendingResumeDocumentSchema, succeededResumeDocumentSchema, failedResumeDocumentSchema],
 )
+
+export const resumeDocumentsResponseSchema: z.ZodType<ResumeDocumentsResponseDto> = z
+  .object({
+    documents: z.array(resumeDocumentSchema),
+  })
+  .strict()
 
 const resumeImportDraftStatusSchema = z.enum(["ready", "applied", "superseded"])
 const resumeParsingLifecycleStatusSchema = z.enum([

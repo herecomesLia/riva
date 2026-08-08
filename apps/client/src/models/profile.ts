@@ -134,6 +134,10 @@ export type ResumeDocument = {
 
 export type ResumeDocumentDto = ResumeDocument
 
+export type ResumeDocumentsResponseDto = {
+  documents: ResumeDocument[]
+}
+
 export type ResumeParsingLifecycleStatus =
   "notStarted" | "queued" | "running" | "succeeded" | "failed"
 

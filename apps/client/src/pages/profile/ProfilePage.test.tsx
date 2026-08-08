@@ -23,6 +23,7 @@ vi.mock("@/services/profile", async (importOriginal) => ({
   getJobProfile: vi.fn(),
   getResumeImportDraft: vi.fn(),
   getResumeParsingStatus: vi.fn(),
+  listResumeDocuments: vi.fn(),
   profileCapabilities: {
     credentials: true,
     matchingAnalysis: true,
@@ -47,6 +48,8 @@ const timestamp = "2026-08-06T12:00:00Z"
 function parsingQueryKey(id: string) {
   return ["profile", "resumeParsing", id] as const
 }
+
+const resumeDocumentsQueryKey = ["profile", "resumeDocuments"] as const
 
 const document: ResumeDocument = {
   byteSize: 10,
@@ -155,6 +158,7 @@ async function submitInitialResume(user = userEvent.setup()) {
 
 async function reachDraftReview(snapshot = createProfileMockSnapshot("noProfile")) {
   vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
+  if (snapshot.profile) vi.mocked(profileService.listResumeDocuments).mockResolvedValue([document])
   vi.mocked(profileService.uploadResume).mockResolvedValue(document)
   vi.mocked(profileService.startResumeParsing).mockResolvedValue(parsingStatus("running"))
   vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("succeeded"))
@@ -185,6 +189,7 @@ describe("ProfilePage resume import orchestration", () => {
     vi.mocked(profileService.getJobProfile).mockResolvedValue(
       createProfileMockSnapshot("noProfile"),
     )
+    vi.mocked(profileService.listResumeDocuments).mockResolvedValue([])
     vi.mocked(profileService.uploadResume).mockResolvedValue(document)
     vi.mocked(profileService.startResumeParsing).mockResolvedValue(parsingStatus("running"))
     vi.mocked(profileService.getResumeParsingStatus).mockReturnValue(new Promise(() => undefined))
@@ -200,6 +205,53 @@ describe("ProfilePage resume import orchestration", () => {
     expect(result.queryClient.getQueryData(parsingQueryKey(resumeId))).toEqual(
       parsingStatus("running"),
     )
+    expect(result.queryClient.getQueryData(resumeDocumentsQueryKey)).toEqual([document])
+  })
+
+  it("shows Upload resume for a manual Profile without ResumeDocuments", async () => {
+    const snapshot = createProfileMockSnapshot("emptyManualProfile")
+    snapshot.profile!.resume = null
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
+
+    renderPage()
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
+    ).toBeInTheDocument()
+    expect(profileService.listResumeDocuments).toHaveBeenCalledWith(1)
+  })
+
+  it("shows Update resume from ResumeDocument presence when profile.resume is null", async () => {
+    const snapshot = createProfileMockSnapshot("complete")
+    snapshot.profile!.resume = null
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
+    vi.mocked(profileService.listResumeDocuments).mockResolvedValue([document])
+
+    renderPage()
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    ).toBeInTheDocument()
+    expect(profileService.listResumeDocuments).toHaveBeenCalledWith(1)
+    expect(profileService.startResumeParsing).not.toHaveBeenCalled()
+    expect(profileService.applyResumeImportDraft).not.toHaveBeenCalled()
+  })
+
+  it("restores Update resume after remounting from the ResumeDocument list", async () => {
+    const snapshot = createProfileMockSnapshot("complete")
+    snapshot.profile!.resume = null
+    vi.mocked(profileService.getJobProfile).mockResolvedValue(snapshot)
+    vi.mocked(profileService.listResumeDocuments).mockResolvedValue([document])
+    const first = renderPage()
+
+    await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") })
+    first.unmount()
+    renderPage()
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    ).toBeInTheDocument()
+    expect(profileService.listResumeDocuments).toHaveBeenCalledTimes(2)
   })
 
   it("shows processing for an initial Resume without creating a fake Profile", async () => {
@@ -245,6 +297,7 @@ describe("ProfilePage resume import orchestration", () => {
 
   it("applies only resumeId and draftVersion, refreshes Profile, invalidates roles, and clears workflow", async () => {
     const refreshed = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
+    refreshed.profile!.resume = null
     const result = await reachDraftReview()
     vi.mocked(profileService.applyResumeImportDraft).mockResolvedValue(application())
     vi.mocked(profileService.getJobProfile).mockResolvedValueOnce(refreshed)
@@ -258,6 +311,9 @@ describe("ProfilePage resume import orchestration", () => {
     await waitFor(() => expect(result.queryClient.getQueryData(["profile"])).toEqual(refreshed))
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["roles"] })
     expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    ).toBeInTheDocument()
   })
 
   it("recovers when Profile synchronization fails after a successful apply without reapplying", async () => {
@@ -302,6 +358,7 @@ describe("ProfilePage resume import orchestration", () => {
 
   it("uses the unified upload service for an existing Profile update", async () => {
     vi.mocked(profileService.getJobProfile).mockResolvedValue(createProfileMockSnapshot("complete"))
+    vi.mocked(profileService.listResumeDocuments).mockResolvedValue([document])
     renderPage()
     const user = userEvent.setup()
     await user.click(
@@ -340,9 +397,10 @@ describe("ProfilePage resume import orchestration", () => {
       .mockRejectedValueOnce(new Error("start transport failure"))
       .mockResolvedValueOnce(parsingStatus("running"))
     vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("notStarted"))
-    renderPage()
+    const result = renderPage()
     await submitInitialResume()
     const syncError = await screen.findByTestId("profile-synchronization-error")
+    expect(result.queryClient.getQueryData(resumeDocumentsQueryKey)).toEqual([document])
     await userEvent.click(
       within(syncError).getByRole("button", {
         name: i18n.t("profile.lifecycle.syncFailed.retry"),

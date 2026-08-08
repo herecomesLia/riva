@@ -9,6 +9,7 @@ import { ProfileView, type ProfileViewActions } from "./ProfileView"
 type ProfileStoryHarnessProps = {
   advanceDelay?: number
   autoAdvance?: boolean
+  hasResumeDocuments?: boolean
   scenario: ProfileMockScenario
 }
 
@@ -79,6 +80,7 @@ function useStoryLifecycle({
 export function ProfileStoryHarness({
   advanceDelay = 0,
   autoAdvance = false,
+  hasResumeDocuments,
   scenario,
 }: ProfileStoryHarnessProps) {
   const [snapshot, setSnapshot] = useState(() => createProfileMockSnapshot(scenario))
@@ -124,7 +126,7 @@ export function ProfileStoryHarness({
   return (
     <ProfileView
       actions={actions}
-      content={{ status: "ready", data: snapshot }}
+      content={{ status: "ready", data: snapshot, hasResumeDocuments }}
       variant="default"
     />
   )

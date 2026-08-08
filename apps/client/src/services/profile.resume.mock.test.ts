@@ -7,6 +7,7 @@ import {
   getJobProfile,
   getResumeImportDraft,
   getResumeParsingStatus,
+  listResumeDocuments,
   retryResumeParsing,
   saveProfileSection,
   startResumeParsing,
@@ -67,6 +68,29 @@ describe("resume profile service in mock mode", () => {
       originalFilename: "resume.pdf",
       sourceType: "file",
     })
+  })
+
+  it("lists API-native Resume Documents and honors the limit", async () => {
+    await expect(settle(listResumeDocuments())).resolves.toEqual([])
+    const first = await settle(uploadResume({ text: "Resume A" }))
+    const second = await settle(uploadResume({ text: "Resume B" }))
+
+    await expect(settle(listResumeDocuments(1))).resolves.toEqual([second])
+    await expect(settle(listResumeDocuments(2))).resolves.toEqual([second, first])
+  })
+
+  it("clears uploaded Resume Documents on reset", async () => {
+    await settle(uploadResume({ text: "Resume" }))
+    resetProfileMockState("noProfile")
+
+    await expect(settle(listResumeDocuments())).resolves.toEqual([])
+  })
+
+  it("does not derive API-native Resume Documents from legacy profile.resume", async () => {
+    resetProfileMockState("complete")
+
+    expect((await settle(getJobProfile())).profile?.resume).not.toBeNull()
+    await expect(settle(listResumeDocuments())).resolves.toEqual([])
   })
 
   it("starts parsing and keeps an active run idempotent", async () => {

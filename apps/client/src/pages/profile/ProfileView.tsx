@@ -63,6 +63,7 @@ export type ProfileViewProps =
       content: {
         status: "ready"
         data: JobProfileSnapshot
+        hasResumeDocuments?: boolean
         resumeWorkflow?: ProfileResumeWorkflowState
         synchronizationError?: "initialRecognition" | "resumeUpdate" | null
       }
@@ -91,6 +92,7 @@ export function ProfileView(props: ProfileViewProps) {
     <ProfileReadyView
       actions={props.actions}
       capabilities={props.capabilities ?? defaultProfileCapabilities}
+      hasResume={props.content.hasResumeDocuments ?? Boolean(props.content.data.profile?.resume)}
       snapshot={props.content.data}
       resumeWorkflow={props.content.resumeWorkflow ?? { status: "idle" }}
       synchronizationError={props.content.synchronizationError ?? null}
@@ -101,12 +103,14 @@ export function ProfileView(props: ProfileViewProps) {
 function ProfileReadyView({
   actions,
   capabilities,
+  hasResume,
   resumeWorkflow,
   snapshot,
   synchronizationError,
 }: {
   actions: ProfileViewActions
   capabilities: ProfileCapabilities
+  hasResume: boolean
   resumeWorkflow: ProfileResumeWorkflowState
   snapshot: JobProfileSnapshot
   synchronizationError: "initialRecognition" | "resumeUpdate" | null
@@ -264,7 +268,7 @@ function ProfileReadyView({
     }
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <ProfileHeader profile={snapshot.profile} />
+        <ProfileHeader hasResume={hasResume} profile={snapshot.profile} />
         {workflowContent}
       </div>
     )
@@ -346,6 +350,7 @@ function ProfileReadyView({
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <ProfileHeader
+        hasResume={hasResume}
         onOpenResume={
           capabilities.resumeUpdate ? () => handleResumeDialogOpenChange(true) : undefined
         }

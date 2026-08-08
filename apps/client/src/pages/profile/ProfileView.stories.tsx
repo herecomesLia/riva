@@ -16,9 +16,14 @@ const meta = preview.meta({
   title: "Pages/Profile",
 })
 
-function pageStory(scenario: Parameters<typeof ProfileStoryHarness>[0]["scenario"]) {
+function pageStory(
+  scenario: Parameters<typeof ProfileStoryHarness>[0]["scenario"],
+  hasResumeDocuments?: boolean,
+) {
   return meta.story({
-    render: () => <ProfileStoryHarness scenario={scenario} />,
+    render: () => (
+      <ProfileStoryHarness hasResumeDocuments={hasResumeDocuments} scenario={scenario} />
+    ),
   })
 }
 
@@ -39,6 +44,7 @@ function createStoryActions(): ProfileViewActions {
 function resumeWorkflowStory(
   snapshotScenario: Parameters<typeof createProfileMockSnapshot>[0],
   resumeWorkflow: ProfileResumeWorkflowState,
+  hasResumeDocuments: boolean,
 ) {
   return meta.story({
     render: () => (
@@ -46,6 +52,7 @@ function resumeWorkflowStory(
         actions={createStoryActions()}
         content={{
           data: createProfileMockSnapshot(snapshotScenario),
+          hasResumeDocuments,
           resumeWorkflow,
           status: "ready",
         }}
@@ -70,27 +77,36 @@ export const Error = meta.story({
 })
 
 export const NoProfile = pageStory("noProfile")
-export const ManualEmptyProfile = pageStory("emptyManualProfile")
-export const Ready = pageStory("complete")
+export const ManualEmptyProfile = pageStory("emptyManualProfile", false)
+export const Ready = pageStory("complete", true)
 export const Partial = pageStory("partial")
-export const NoResume = pageStory("profileWithoutResume")
-export const UploadingResume = resumeWorkflowStory("noProfile", {
-  mode: "initial",
-  status: "uploading",
-})
-export const ParsingResume = resumeWorkflowStory("noProfile", {
-  isRetrying: false,
-  mode: "initial",
-  resumeId: "50000000-0000-4000-8000-000000000001",
-  status: "parsing",
-  synchronizationError: false,
-})
+export const NoResume = pageStory("profileWithoutResume", false)
+export const UploadingResume = resumeWorkflowStory(
+  "noProfile",
+  {
+    mode: "initial",
+    status: "uploading",
+  },
+  true,
+)
+export const ParsingResume = resumeWorkflowStory(
+  "noProfile",
+  {
+    isRetrying: false,
+    mode: "initial",
+    resumeId: "50000000-0000-4000-8000-000000000001",
+    status: "parsing",
+    synchronizationError: false,
+  },
+  true,
+)
 export const RecognitionFailed = meta.story({
   render: () => (
     <ProfileView
       actions={createStoryActions()}
       content={{
         data: createProfileMockSnapshot("noProfile"),
+        hasResumeDocuments: true,
         resumeWorkflow: {
           canRetry: true,
           failureReason: "The resume layout could not be recognized.",
@@ -108,24 +124,32 @@ export const RecognitionFailed = meta.story({
     await expect(canvas.getByTestId("profile-recognition-failure")).toBeInTheDocument()
   },
 })
-export const InitialResumeDraftReady = resumeWorkflowStory("noProfile", {
-  applyConflict: null,
-  applyError: false,
-  draft: createResumeDraftStoryFixture("firstImport"),
-  mode: "initial",
-  resumeId: "50000000-0000-4000-8000-000000000001",
-  status: "draftReady",
-})
-export const ExistingProfileDraftReady = resumeWorkflowStory("complete", {
-  applyConflict: null,
-  applyError: false,
-  draft: createResumeDraftStoryFixture("existingProfile"),
-  mode: "update",
-  resumeId: "50000000-0000-4000-8000-000000000001",
-  status: "draftReady",
-})
-export const AfterInitialImport = pageStory("initialResumeRecognitionSucceeded")
-export const AfterResumeUpdate = pageStory("resumeUpdateSucceeded")
+export const InitialResumeDraftReady = resumeWorkflowStory(
+  "noProfile",
+  {
+    applyConflict: null,
+    applyError: false,
+    draft: createResumeDraftStoryFixture("firstImport"),
+    mode: "initial",
+    resumeId: "50000000-0000-4000-8000-000000000001",
+    status: "draftReady",
+  },
+  true,
+)
+export const ExistingProfileDraftReady = resumeWorkflowStory(
+  "complete",
+  {
+    applyConflict: null,
+    applyError: false,
+    draft: createResumeDraftStoryFixture("existingProfile"),
+    mode: "update",
+    resumeId: "50000000-0000-4000-8000-000000000001",
+    status: "draftReady",
+  },
+  true,
+)
+export const AfterInitialImport = pageStory("initialResumeRecognitionSucceeded", true)
+export const AfterResumeUpdate = pageStory("resumeUpdateSucceeded", true)
 export const MatchingAnalysisStale = pageStory("matchingAnalysisStale")
 
 export const EditableProfile = meta.story({
@@ -141,14 +165,18 @@ export const EditableProfile = meta.story({
   },
 })
 
-export const ResumeUpdateFlow = resumeWorkflowStory("complete", {
-  applyConflict: null,
-  applyError: false,
-  draft: createResumeDraftStoryFixture("protected"),
-  mode: "update",
-  resumeId: "50000000-0000-4000-8000-000000000001",
-  status: "draftReady",
-})
+export const ResumeUpdateFlow = resumeWorkflowStory(
+  "complete",
+  {
+    applyConflict: null,
+    applyError: false,
+    draft: createResumeDraftStoryFixture("protected"),
+    mode: "update",
+    resumeId: "50000000-0000-4000-8000-000000000001",
+    status: "draftReady",
+  },
+  true,
+)
 
 const deletedWorkExperienceTitle =
   createProfileMockSnapshot("complete").profile!.workExperiences[0]!.title

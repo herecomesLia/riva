@@ -65,13 +65,14 @@ const workflowDraft: ResumeImportDraft = {
 function renderReady(
   snapshot: JobProfileSnapshot = structuredClone(profileResponseMock),
   actions = createActions(),
+  hasResumeDocuments?: boolean,
 ) {
   return {
     actions,
     ...renderWithProviders(
       <ProfileView
         actions={actions}
-        content={{ status: "ready", data: snapshot }}
+        content={{ status: "ready", data: snapshot, hasResumeDocuments }}
         variant="default"
       />,
       { router: { initialEntries: ["/profile"] } },
@@ -340,6 +341,73 @@ describe("ProfileView", () => {
 
     expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
     expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
+  })
+
+  it("shows Update resume from ResumeDocument presence when profile.resume is null", async () => {
+    const snapshot = createProfileMockSnapshot("complete")
+    snapshot.profile!.resume = null
+
+    renderReady(snapshot, createActions(), true)
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("shows Upload resume for a manual Profile without ResumeDocuments", async () => {
+    const snapshot = createProfileMockSnapshot("emptyManualProfile")
+    snapshot.profile!.resume = null
+
+    renderReady(snapshot, createActions(), false)
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
+    ).toBeInTheDocument()
+  })
+
+  it("keeps the legacy profile.resume fallback when presence is omitted", async () => {
+    renderReady(createProfileMockSnapshot("complete"))
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
+    ).toBeInTheDocument()
+  })
+
+  it("keeps the existing Profile header during a ResumeDocument Draft workflow", async () => {
+    const snapshot = createProfileMockSnapshot("complete")
+    snapshot.profile!.resume = null
+
+    renderWithProviders(
+      <ProfileView
+        actions={createActions()}
+        content={{
+          data: snapshot,
+          hasResumeDocuments: true,
+          resumeWorkflow: {
+            applyConflict: null,
+            applyError: false,
+            draft: createResumeDraftStoryFixture("existingProfile"),
+            mode: "update",
+            resumeId: workflowDraft.resumeDocumentId,
+            status: "draftReady",
+          },
+          status: "ready",
+        }}
+        variant="default"
+      />,
+      { router: { initialEntries: ["/profile"] } },
+    )
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: i18n.t("profile.title") }),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId("profile-resume-draft-review")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
+    ).not.toBeInTheDocument()
   })
 
   it("offers manual creation and hides resume import when the API lacks resume capabilities", async () => {

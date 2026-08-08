@@ -15,6 +15,7 @@ import {
   getJobProfile,
   getResumeImportDraft,
   getResumeParsingStatus,
+  listResumeDocuments,
   profileCapabilities,
   retryResumeParsing,
   saveProfileSection,
@@ -30,6 +31,7 @@ import type {
 } from "./profile-resume-workflow"
 
 const profileQueryKey = ["profile"] as const
+const resumeDocumentsQueryKey = ["profile", "resumeDocuments"] as const
 const rolesQueryKey = ["roles"] as const
 
 function resumeParsingQueryKey(resumeId: string) {
@@ -62,9 +64,20 @@ export function ProfilePage() {
     retry: false,
   })
 
+  const resumeDocumentsQuery = useQuery({
+    queryFn: () => listResumeDocuments(1),
+    queryKey: resumeDocumentsQueryKey,
+    retry: false,
+  })
+  const hasResumeDocuments = (resumeDocumentsQuery.data?.length ?? 0) > 0
+
   useEffect(() => {
     invalidateAuthentication(profileQuery.error)
   }, [invalidateAuthentication, profileQuery.error])
+
+  useEffect(() => {
+    invalidateAuthentication(resumeDocumentsQuery.error)
+  }, [invalidateAuthentication, resumeDocumentsQuery.error])
 
   function setSnapshot(snapshot: JobProfileSnapshot) {
     queryClient.setQueryData(profileQueryKey, snapshot)
@@ -133,6 +146,7 @@ export function ProfilePage() {
       setResumeApplyConflict(null)
       setResumeApplyError(false)
       const document = await uploadResume(input)
+      queryClient.setQueryData(resumeDocumentsQueryKey, [document])
       try {
         const parsing = await startResumeParsing(document.id)
         queryClient.setQueryData(resumeParsingQueryKey(document.id), parsing)
@@ -399,7 +413,12 @@ export function ProfilePage() {
       <ProfileView
         actions={actions}
         capabilities={profileCapabilities}
-        content={{ status: "ready", data: profileQuery.data, resumeWorkflow }}
+        content={{
+          status: "ready",
+          data: profileQuery.data,
+          hasResumeDocuments,
+          resumeWorkflow,
+        }}
         variant="default"
       />
     )

@@ -9,9 +9,11 @@ import { formatDate } from "./profile-formatters"
 import { ProfileHeaderIntro } from "./ProfileHeaderIntro"
 
 export function ProfileHeader({
+  hasResume,
   onOpenResume,
   profile,
 }: {
+  hasResume: boolean
   onOpenResume?: () => void
   profile: JobProfile
 }) {
@@ -38,7 +40,7 @@ export function ProfileHeader({
           size="lg"
         >
           <UploadIcon data-icon="inline-start" />
-          {profile.resume ? t("profile.actions.updateResume") : t("profile.actions.uploadResume")}
+          {hasResume ? t("profile.actions.updateResume") : t("profile.actions.uploadResume")}
         </Button>
       )}
     </header>
