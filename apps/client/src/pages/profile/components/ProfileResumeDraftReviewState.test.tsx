@@ -82,8 +82,8 @@ describe("ProfileResumeDraftReviewState", () => {
   })
 
   it("renders a summary that will be set", () => {
-    const draft = createResumeDraftStoryFixture("firstImport")
-    renderDraft("firstImport")
+    const draft = createResumeDraftStoryFixture("explicitSummary")
+    renderDraft("explicitSummary")
     const section = screen.getByTestId("resume-draft-summary")
 
     expect(section).toHaveTextContent(i18n.t("profile.importDraft.summarySet"))
@@ -100,11 +100,23 @@ describe("ProfileResumeDraftReviewState", () => {
     expect(section).toHaveTextContent(draft.summary!)
   })
 
-  it("always renders the summary section when no summary was detected", () => {
-    renderDraft("minimal")
-    expect(screen.getByTestId("resume-draft-summary")).toHaveTextContent(
-      i18n.t("profile.importDraft.summaryNone"),
-    )
+  it("omits the summary section when no summary was detected", () => {
+    renderDraft("firstImport")
+
+    expect(screen.queryByTestId("resume-draft-summary")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("No professional summary was detected in this resume."),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText("本次简历没有可导入的个人总结。")).not.toBeInTheDocument()
+  })
+
+  it("keeps education, work, projects, and skills visible without a summary", () => {
+    renderDraft("firstImport")
+
+    expect(screen.getByTestId("resume-draft-education")).toBeInTheDocument()
+    expect(screen.getByTestId("resume-draft-work")).toBeInTheDocument()
+    expect(screen.getByTestId("resume-draft-projects")).toBeInTheDocument()
+    expect(screen.getByTestId("resume-draft-skills")).toBeInTheDocument()
   })
 
   it("renders education details and date range", () => {

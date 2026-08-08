@@ -71,7 +71,6 @@ export const profile = {
     summaryPreserveDescription:
       "The detected summary is shown for reference and will not replace your current summary.",
     summaryDetected: "Summary detected in resume",
-    summaryNone: "No professional summary was detected in this resume.",
     emptyEducation: "No education entries are ready to import.",
     emptyWorkExperience: "No work experience entries are ready to import.",
     emptyProjectExperience: "No project experience entries are ready to import.",

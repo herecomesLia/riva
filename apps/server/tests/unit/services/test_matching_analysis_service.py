@@ -24,6 +24,7 @@ from riva.services.matching_analyses import (
     MatchingAnalysisService,
     MatchingAnalysisStateError,
 )
+from riva.services.profile_completion import career_profile_completed
 
 
 NOW = datetime(2026, 8, 4, 9, 30, tzinfo=UTC)
@@ -176,6 +177,17 @@ def test_load_matching_input_commits_and_returns_only_pydantic_data() -> None:
     assert session.rollback_count == 0
     assert all("FOR UPDATE" not in str(statement) for statement in session.statements)
     assert owner.id == role.user_id
+
+
+def test_matching_input_accepts_profile_without_summary() -> None:
+    _, role, profile, analysis, run = graph()
+    profile.summary = None
+    session = ScriptedSession(role, profile, analysis)
+
+    result = asyncio.run(MatchingAnalysisService(session).load_matching_input(run))
+
+    assert result.career_profile.summary is None
+    assert career_profile_completed(profile) is True
 
 
 def test_invalid_run_rolls_back_and_exposes_only_safe_matching_error() -> None:

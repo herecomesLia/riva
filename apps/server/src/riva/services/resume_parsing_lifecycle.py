@@ -20,7 +20,7 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V1
+from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
 from riva.schemas.resume_parsing import (
     ResumeParsingOutput,
     ResumeParsingRunPayload,
@@ -293,12 +293,13 @@ class ResumeParsingLifecycleService:
             or run.user_id != document.user_id
         ):
             return None
-        prompt = RESUME_PARSING_PROMPT_V1
+        active_prompt = RESUME_PARSING_PROMPT_V2
         if (
             run.agent_id != "resume-parser"
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version != prompt.version
-            or run.output_schema_id != prompt.output_schema_id
+            or run.prompt_id != active_prompt.prompt_id
+            or run.prompt_version
+            not in {RESUME_PARSING_PROMPT_V1.version, active_prompt.version}
+            or run.output_schema_id != active_prompt.output_schema_id
         ):
             return None
         try:
@@ -336,7 +337,7 @@ class ResumeParsingLifecycleService:
         model: str,
         idempotency_key: str,
     ) -> AgentRun:
-        prompt = RESUME_PARSING_PROMPT_V1
+        prompt = RESUME_PARSING_PROMPT_V2
         payload = ResumeParsingRunPayload(
             resume_document_id=document_id,
         )

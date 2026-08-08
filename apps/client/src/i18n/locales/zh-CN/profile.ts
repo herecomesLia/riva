@@ -65,7 +65,6 @@ export const profile = {
     summaryPreserve: "保留你当前的个人总结",
     summaryPreserveDescription: "简历中识别到了新的总结，但不会覆盖当前手动维护的内容。",
     summaryDetected: "简历识别内容",
-    summaryNone: "本次简历没有可导入的个人总结。",
     emptyEducation: "没有可自动导入的教育经历。",
     emptyWorkExperience: "没有可自动导入的工作经历。",
     emptyProjectExperience: "没有可自动导入的项目经历。",

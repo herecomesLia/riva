@@ -15,6 +15,7 @@ from riva.integrations import (
     ProviderUnavailableError,
 )
 from riva.models import AgentRun, AgentRunStatus, ResumeParsingResult
+from riva.prompts import RESUME_PARSING_PROMPT_V2
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
     ResumeParsingOutput,
@@ -87,7 +88,7 @@ def result(
     *,
     agent_id: str = "resume-parser",
     prompt_id: str = "resume-parser",
-    prompt_version: str = "1",
+    prompt_version: str = RESUME_PARSING_PROMPT_V2.version,
     result_output: BaseModel | None = None,
 ) -> AgentResult[BaseModel]:
     return AgentResult(
@@ -107,7 +108,7 @@ def running_run(*, payload: dict[str, object] | None = None) -> AgentRun:
         user_id=USER_ID,
         agent_id="resume-parser",
         prompt_id="resume-parser",
-        prompt_version="1",
+        prompt_version=RESUME_PARSING_PROMPT_V2.version,
         output_schema_id="resume-parsing-v1",
         status=AgentRunStatus.RUNNING,
         payload=payload
@@ -446,7 +447,7 @@ def test_handler_preserves_provider_error_for_runtime_classification(
     [
         result(agent_id="other-agent"),
         result(prompt_id="other-prompt"),
-        result(prompt_version="2"),
+        result(prompt_version="1"),
         result(result_output=OtherOutput(value="wrong schema")),
     ],
 )

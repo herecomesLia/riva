@@ -9,7 +9,7 @@ from riva.integrations import (
     MessageRole,
     ProviderUnavailableError,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V1
+from riva.prompts import RESUME_PARSING_PROMPT_V2
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
     ResumeParsingOutput,
@@ -52,10 +52,10 @@ def test_agent_uses_fixed_identity_schema_model_parameters_and_two_messages() ->
 
     assert agent.agent_id == "resume-parser"
     assert agent.prompt_id == "resume-parser"
-    assert agent.prompt_version == "1"
+    assert agent.prompt_version == "2"
     assert result.agent_id == "resume-parser"
     assert result.prompt_id == "resume-parser"
-    assert result.prompt_version == "1"
+    assert result.prompt_version == "2"
     request = provider.calls[0]
     assert request.output_schema is ResumeParsingOutput
     assert request.model == "test-resume-model"
@@ -93,10 +93,10 @@ def test_agent_uses_fixed_prompt_and_preserves_unicode_and_injection_as_data() -
     asyncio.run(agent.run(input))
 
     system_message, user_message = provider.calls[0].messages
-    assert system_message.content == RESUME_PARSING_PROMPT_V1.render(
+    assert system_message.content == RESUME_PARSING_PROMPT_V2.render(
         {"resume_text": input.resume_text}
     ).system
-    assert user_message.content == RESUME_PARSING_PROMPT_V1.render(
+    assert user_message.content == RESUME_PARSING_PROMPT_V2.render(
         {"resume_text": input.resume_text}
     ).user
     assert "中文简历" in user_message.content

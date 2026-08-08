@@ -1,6 +1,6 @@
 import pytest
 
-from riva.prompts import RESUME_PARSING_PROMPT_V1
+from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
 from riva.prompts.base import PromptRenderError
 from riva.schemas.resume_parsing import ResumeParsingOutput
 
@@ -10,6 +10,15 @@ def test_resume_prompt_has_fixed_versioned_contract() -> None:
 
     assert prompt.prompt_id == "resume-parser"
     assert prompt.version == "1"
+    assert prompt.output_schema_id == "resume-parsing-v1"
+    assert prompt.output_schema is ResumeParsingOutput
+
+
+def test_resume_prompt_v2_has_fixed_versioned_contract() -> None:
+    prompt = RESUME_PARSING_PROMPT_V2
+
+    assert prompt.prompt_id == "resume-parser"
+    assert prompt.version == "2"
     assert prompt.output_schema_id == "resume-parsing-v1"
     assert prompt.output_schema is ResumeParsingOutput
 
@@ -62,6 +71,23 @@ def test_resume_system_prompt_defines_evidence_and_task_boundaries() -> None:
     assert "UUIDs" in system
     assert "hidden reasoning" in system
     assert "chain of thought" in system
+
+
+def test_resume_v2_system_prompt_defines_summary_extraction_boundary() -> None:
+    system = RESUME_PARSING_PROMPT_V2.system_template
+
+    assert "summary is extraction, never generation or synthesis" in system
+    assert "summary is extraction, not synthesis" in system
+    assert "explicit summary-like section" in system
+    assert "explicit candidate-authored summary-like section" in system
+    assert "summary MUST be null" in system
+    assert (
+        "Do not construct a summary from work, education, projects, skills"
+        in system
+    )
+    assert "求职方向" in system
+    assert "target job title" in system
+    assert "is NOT a professional summary" in system
 
 
 def test_resume_user_prompt_has_explicit_untrusted_markers() -> None:

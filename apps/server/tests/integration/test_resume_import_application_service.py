@@ -24,7 +24,7 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V1
+from riva.prompts import RESUME_PARSING_PROMPT_V2
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_import_application import (
     ResumeImportApplicationService,
@@ -139,9 +139,9 @@ async def seed(
         id=source_run_id,
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT_V1.prompt_id,
-        prompt_version=RESUME_PARSING_PROMPT_V1.version,
-        output_schema_id=RESUME_PARSING_PROMPT_V1.output_schema_id,
+        prompt_id=RESUME_PARSING_PROMPT_V2.prompt_id,
+        prompt_version=RESUME_PARSING_PROMPT_V2.version,
+        output_schema_id=RESUME_PARSING_PROMPT_V2.output_schema_id,
         payload={"resumeDocumentId": str(document_id)},
         idempotency_key=f"application-{suffix}-{uuid4()}",
         max_attempts=3,

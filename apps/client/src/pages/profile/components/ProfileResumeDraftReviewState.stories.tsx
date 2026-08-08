@@ -21,13 +21,20 @@ export const FirstImport = meta.story({
   args: { ...defaultArgs, draft: createResumeDraftStoryFixture("firstImport"), onApply: fn() },
   play: async ({ args, canvas, userEvent }) => {
     await expect(canvas.getByTestId("resume-draft-overview")).toBeInTheDocument()
-    await expect(canvas.getByTestId("resume-draft-summary")).toBeInTheDocument()
+    await expect(canvas.queryByTestId("resume-draft-summary")).not.toBeInTheDocument()
     await expect(canvas.getByTestId("resume-draft-education")).toBeInTheDocument()
     await expect(canvas.getByTestId("resume-draft-work")).toBeInTheDocument()
     await expect(canvas.getByTestId("resume-draft-projects")).toBeInTheDocument()
     await expect(canvas.getByTestId("resume-draft-skills")).toBeInTheDocument()
     await userEvent.click(canvas.getByRole("button", { name: /确认导入|confirm import/i }))
     await expect(args.onApply).toHaveBeenCalledTimes(1)
+  },
+})
+
+export const ExplicitSummary = meta.story({
+  args: { ...defaultArgs, draft: createResumeDraftStoryFixture("explicitSummary") },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId("resume-draft-summary")).toBeInTheDocument()
   },
 })
 

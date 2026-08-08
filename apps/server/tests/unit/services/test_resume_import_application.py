@@ -130,9 +130,9 @@ def empty_profile(*, version: int = 1, summary: str | None = None) -> CareerProf
     )
 
 
-def parsing_output() -> ResumeParsingOutput:
+def parsing_output(summary: str | None = "Resume summary") -> ResumeParsingOutput:
     return ResumeParsingOutput(
-        summary="Resume summary",
+        summary=summary,
         education=[
             {
                 "school": "Example University",
@@ -336,7 +336,10 @@ def project_with_skill_links(
     return project
 
 
-def graph() -> tuple[ResumeDocument, ResumeParsingResult]:
+def graph(
+    *,
+    parsed_output: ResumeParsingOutput | None = None,
+) -> tuple[ResumeDocument, ResumeParsingResult]:
     document = ResumeDocument(
         id=DOCUMENT_ID,
         user_id=USER_ID,
@@ -355,7 +358,7 @@ def graph() -> tuple[ResumeDocument, ResumeParsingResult]:
         created_at=NOW,
         updated_at=NOW,
     )
-    output = parsing_output()
+    output = parsed_output or parsing_output()
     values = output.model_dump(mode="json", by_alias=False)
     result = ResumeParsingResult(
         resume_document_id=DOCUMENT_ID,
@@ -975,13 +978,12 @@ def test_existing_profile_change_flushes_refreshes_then_commits() -> None:
 
 
 def test_first_import_with_no_summary_keeps_profile_summary_none() -> None:
-    document, result = graph()
-    result.summary = None
-    result.education = []
-    result.work_experiences = []
-    result.project_experiences = []
-    result.skills = []
-    data = empty_data()
+    document, result = graph(parsed_output=parsing_output(summary=None))
+    data = build_resume_import_draft_data(
+        user_id=USER_ID,
+        result=_parsed_output_from_result(result),
+        profile=None,
+    )
     draft = draft_from_data(data)
     session = ApplicationSession(
         USER_ID,
@@ -1003,6 +1005,10 @@ def test_first_import_with_no_summary_keeps_profile_summary_none() -> None:
     assert application.profile.summary is None
     assert application.profile.version == 1
     assert application.profile_created is True
+    assert application.profile.education
+    assert application.profile.work_experiences
+    assert application.profile.project_experiences
+    assert application.profile.skills
 
 
 def test_applied_replay_is_idempotent_without_clock_or_factory() -> None:

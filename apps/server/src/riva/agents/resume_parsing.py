@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from riva.agents.base import Agent
 from riva.integrations import GenerationParameters, LLMProvider
-from riva.prompts.resume_parsing import RESUME_PARSING_PROMPT_V1
+from riva.prompts.resume_parsing import RESUME_PARSING_PROMPT_V2
 from riva.schemas.resume_parsing import ResumeParsingInput, ResumeParsingOutput
 
 
@@ -15,7 +15,7 @@ class ResumeParsingAgent(Agent[ResumeParsingInput, ResumeParsingOutput]):
     ) -> None:
         super().__init__(
             provider=provider,
-            prompt=RESUME_PARSING_PROMPT_V1,
+            prompt=RESUME_PARSING_PROMPT_V2,
             model=model,
             parameters=parameters,
         )

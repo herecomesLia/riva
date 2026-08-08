@@ -2,7 +2,12 @@ import type { ResumeImportDraft } from "@/models/profile"
 import { resumeImportDraftSchema } from "@/schemas/profile"
 
 export type ResumeDraftStoryScenario =
-  "firstImport" | "existingProfile" | "protected" | "skippedAndUnresolved" | "minimal"
+  | "firstImport"
+  | "explicitSummary"
+  | "existingProfile"
+  | "protected"
+  | "skippedAndUnresolved"
+  | "minimal"
 
 const ids = {
   baseProfile: "10000000-0000-4000-8000-000000000001",
@@ -61,9 +66,8 @@ const richDraft = {
   ],
   sourceRunId: ids.run,
   status: "ready",
-  summary:
-    "Frontend engineer focused on accessible product experiences and maintainable design systems.",
-  summaryAction: "set",
+  summary: null,
+  summaryAction: "none",
   unresolvedItems: [],
   updatedAt: "2026-08-07T08:01:00+08:00",
   workExperiences: [
@@ -100,6 +104,15 @@ export function createResumeDraftStoryFixture(
       summary: null,
       summaryAction: "none",
       workExperiences: [],
+    })
+  }
+
+  if (scenario === "explicitSummary") {
+    return resumeImportDraftSchema.parse({
+      ...richDraft,
+      summary:
+        "Frontend engineer focused on accessible product experiences and maintainable design systems.",
+      summaryAction: "set",
     })
   }
 

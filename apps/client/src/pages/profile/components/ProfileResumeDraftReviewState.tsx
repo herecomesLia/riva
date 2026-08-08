@@ -125,34 +125,33 @@ export function ProfileResumeDraftReviewState({
           )}
         </section>
 
-        <DraftSection
-          icon={SparklesIcon}
-          testId="resume-draft-summary"
-          title={t("profile.importDraft.summary")}
-        >
-          {draft.summaryAction === "set" && (
-            <>
-              <Badge variant="secondary">{t("profile.importDraft.summarySet")}</Badge>
-              <p className="text-sm font-medium">{t("profile.importDraft.summaryDetected")}</p>
-              <p className="whitespace-pre-wrap text-sm leading-6">{draft.summary}</p>
-            </>
-          )}
-          {draft.summaryAction === "preserve" && (
-            <>
-              <Badge variant="secondary">{t("profile.importDraft.summaryPreserve")}</Badge>
-              <p className="text-sm text-muted-foreground">
-                {t("profile.importDraft.summaryPreserveDescription")}
-              </p>
-              <p className="text-sm font-medium">{t("profile.importDraft.summaryDetected")}</p>
-              <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm leading-6">
-                {draft.summary}
-              </p>
-            </>
-          )}
-          {draft.summaryAction === "none" && (
-            <p className="text-sm text-muted-foreground">{t("profile.importDraft.summaryNone")}</p>
-          )}
-        </DraftSection>
+        {draft.summaryAction !== "none" && (
+          <DraftSection
+            icon={SparklesIcon}
+            testId="resume-draft-summary"
+            title={t("profile.importDraft.summary")}
+          >
+            {draft.summaryAction === "set" && (
+              <>
+                <Badge variant="secondary">{t("profile.importDraft.summarySet")}</Badge>
+                <p className="text-sm font-medium">{t("profile.importDraft.summaryDetected")}</p>
+                <p className="whitespace-pre-wrap text-sm leading-6">{draft.summary}</p>
+              </>
+            )}
+            {draft.summaryAction === "preserve" && (
+              <>
+                <Badge variant="secondary">{t("profile.importDraft.summaryPreserve")}</Badge>
+                <p className="text-sm text-muted-foreground">
+                  {t("profile.importDraft.summaryPreserveDescription")}
+                </p>
+                <p className="text-sm font-medium">{t("profile.importDraft.summaryDetected")}</p>
+                <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm leading-6">
+                  {draft.summary}
+                </p>
+              </>
+            )}
+          </DraftSection>
+        )}
 
         <DraftSection
           empty={draft.education.length === 0 ? t("profile.importDraft.emptyEducation") : undefined}

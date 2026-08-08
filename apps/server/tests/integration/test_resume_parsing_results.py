@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from riva.db.database import Database
 from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
-from riva.prompts import RESUME_PARSING_PROMPT_V1
+from riva.prompts import RESUME_PARSING_PROMPT_V2
 from riva.utils import utc_now
 
 
@@ -39,9 +39,9 @@ def make_run(user_id: UUID, document_id: UUID, suffix: str) -> AgentRun:
         id=uuid4(),
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT_V1.prompt_id,
-        prompt_version=RESUME_PARSING_PROMPT_V1.version,
-        output_schema_id=RESUME_PARSING_PROMPT_V1.output_schema_id,
+        prompt_id=RESUME_PARSING_PROMPT_V2.prompt_id,
+        prompt_version=RESUME_PARSING_PROMPT_V2.version,
+        output_schema_id=RESUME_PARSING_PROMPT_V2.output_schema_id,
         payload={"resumeDocumentId": str(document_id)},
         idempotency_key=f"resume-result-run-{suffix}-{uuid4()}",
         max_attempts=3,

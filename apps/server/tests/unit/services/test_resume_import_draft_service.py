@@ -190,6 +190,30 @@ def test_build_draft_creates_internal_json_and_uses_lock_order() -> None:
     assert all("FOR UPDATE" in str(statement) for statement in session.statements)
 
 
+def test_build_draft_preserves_null_summary_and_none_action() -> None:
+    user_id, document, result = graph()
+    result.summary = None
+    session = ScriptedSession(
+        user_id,
+        document,
+        result,
+        None,
+        None,
+        None,
+    )
+
+    draft = asyncio.run(
+        ResumeImportDraftService(session, clock=lambda: NOW).build_draft(
+            user_id=user_id,
+            resume_document_id=document.id,
+        )
+    )
+
+    assert draft.summary is None
+    assert draft.summary_action == "none"
+    assert draft.status == "ready"
+
+
 def test_same_ready_source_is_idempotent_and_applied_source_does_not_reopen() -> None:
     user_id, document, result = graph()
     ready = existing_draft(user_id, document.id, result.source_agent_run_id)

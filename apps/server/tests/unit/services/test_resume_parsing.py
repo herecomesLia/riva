@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
-from riva.prompts import RESUME_PARSING_PROMPT_V1
+from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_parsing import (
     INVALID_RESUME_PARSING_RUN,
@@ -52,6 +52,7 @@ class ScriptedSession:
 
 def graph(
     *,
+    prompt_version: str = RESUME_PARSING_PROMPT_V2.version,
     extracted_text: str | None = "姓名不应输出\n负责 Python API。",
 ) -> tuple[User, ResumeDocument, AgentRun]:
     owner = User(
@@ -65,9 +66,9 @@ def graph(
         id=uuid4(),
         user_id=owner.id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT_V1.prompt_id,
-        prompt_version=RESUME_PARSING_PROMPT_V1.version,
-        output_schema_id=RESUME_PARSING_PROMPT_V1.output_schema_id,
+        prompt_id=RESUME_PARSING_PROMPT_V2.prompt_id,
+        prompt_version=prompt_version,
+        output_schema_id=RESUME_PARSING_PROMPT_V2.output_schema_id,
         payload={"resumeDocumentId": str(uuid4())},
         idempotency_key=f"resume-unit-{uuid4()}",
         max_attempts=3,
@@ -273,6 +274,41 @@ def test_persist_success_locks_user_document_result_in_order_and_copies_json() -
 
     persisted_output.skills.append("Mutated after persistence")
     assert persisted.skills == ["Python"]
+
+
+def test_persist_success_preserves_null_summary() -> None:
+    owner, document, run = graph(
+        extracted_text=(
+            "教育经历：某大学，计算机科学，2020-2024。"
+            " 工作经历：Example Co，后端工程师，2024-至今。"
+            " 项目经历：API Platform。技能：Python。"
+            " 求职方向：后端开发工程师。"
+        )
+    )
+    session = ScriptedSession(owner.id, document, None, None)
+
+    persisted = asyncio.run(
+        ResumeParsingService(session, clock=lambda: NOW).persist_success(
+            run,
+            output(None),
+        )
+    )
+
+    assert persisted.summary is None
+
+
+def test_persist_success_accepts_historical_v1_run() -> None:
+    owner, document, run = graph(prompt_version=RESUME_PARSING_PROMPT_V1.version)
+    session = ScriptedSession(owner.id, document, None, None)
+
+    persisted = asyncio.run(
+        ResumeParsingService(session, clock=lambda: NOW).persist_success(
+            run,
+            output(),
+        )
+    )
+
+    assert persisted.source_agent_run_id == run.id
 
 
 def test_same_run_persist_is_idempotent_and_does_not_call_clock_or_overwrite() -> None:

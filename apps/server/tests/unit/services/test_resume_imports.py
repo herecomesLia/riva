@@ -137,6 +137,51 @@ def simple_output() -> ResumeParsingOutput:
     )
 
 
+def ordinary_technical_resume_output() -> ResumeParsingOutput:
+    return ResumeParsingOutput(
+        summary=None,
+        education=[
+            {
+                "school": "Example University",
+                "degree": "BSc",
+                "major": "Computer Science",
+                "start_date": "2020-09",
+                "end_date": "2024-06",
+                "is_current": False,
+            }
+        ],
+        work_experiences=[
+            {
+                "company": "Example Co",
+                "title": "Backend Engineer",
+                "employment_type": EmploymentType.FULL_TIME,
+                "location": "Shanghai",
+                "start_date": "2024-07",
+                "end_date": None,
+                "is_current": True,
+                "responsibilities": ["Build Python APIs"],
+                "achievements": ["Improved service reliability"],
+                "skills": ["Python"],
+            }
+        ],
+        project_experiences=[
+            {
+                "name": "API Platform",
+                "role": "Developer",
+                "start_date": "2023-01",
+                "end_date": None,
+                "is_current": None,
+                "responsibilities": ["Design service integrations"],
+                "achievements": ["Released the first version"],
+                "skills": ["Python"],
+                "project_url": None,
+            }
+        ],
+        skills=["Python"],
+        unresolved_items=[],
+    )
+
+
 def test_deterministic_ids_are_user_and_section_scoped() -> None:
     key = '["example","2024-01"]'
     first = build_resume_import_item_id(
@@ -269,6 +314,21 @@ def test_same_result_has_stable_ids_across_documents_and_summary_actions() -> No
         ).summary_action
         == "preserve"
     )
+
+
+def test_ordinary_technical_resume_without_summary_builds_none_action() -> None:
+    data = build_resume_import_draft_data(
+        user_id=USER_ID,
+        result=ordinary_technical_resume_output(),
+        profile=None,
+    )
+
+    assert data.summary is None
+    assert data.summary_action == "none"
+    assert len(data.education) == 1
+    assert len(data.work_experiences) == 1
+    assert len(data.project_experiences) == 1
+    assert [skill.name for skill in data.skills] == ["Python"]
 
 
 def test_profile_preview_protects_manual_items_and_counts_missing() -> None:
