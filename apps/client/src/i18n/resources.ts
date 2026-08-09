@@ -22,12 +22,13 @@ import { placeholderPages as zhCNPlaceholderPages } from "./locales/zh-CN/placeh
 import { practice as zhCNPractice } from "./locales/zh-CN/practice"
 import { profile as zhCNProfile } from "./locales/zh-CN/profile"
 import { roles as zhCNRoles } from "./locales/zh-CN/roles"
+import { interactionLanguages, type InteractionLanguage } from "@/types/language"
 
 export const defaultLanguage = "zh-CN"
 
-export const supportedLanguages = ["zh-CN", "en"] as const
+export const supportedLanguages = interactionLanguages
 
-export type SupportedLanguage = (typeof supportedLanguages)[number]
+export type SupportedLanguage = InteractionLanguage
 
 export const i18nSupportedLanguages = [...supportedLanguages, "zh"] as const
 

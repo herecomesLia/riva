@@ -250,6 +250,7 @@ def test_run_payload_validates_aliases_and_serializes_only_references() -> None:
     assert payload.model_dump(mode="json", by_alias=True) == {
         "roleId": str(role_id),
         "jobDescriptionVersion": 3,
+        "interactionLanguage": "zh-CN",
     }
 
 

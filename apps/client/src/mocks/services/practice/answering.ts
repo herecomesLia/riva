@@ -262,6 +262,7 @@ export async function skipPracticeQuestion(
     session: {
       status: "generatingQuestion",
       sessionId: session.sessionId,
+      language: session.language,
       version: session.version + 1,
       selection: copyPracticeState(session.selection),
       startedAt: session.startedAt,

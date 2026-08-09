@@ -104,3 +104,38 @@ Layer responsibilities:
 - `workers/`: AgentRun handlers, registry, lease heartbeats, and queue execution.
 - `prompts/`: prompt templates, scoring rubrics, and output formats.
 - `integrations/`: adapters for LLM providers, object storage, email, and third-party APIs.
+
+## Interaction Language Contract
+
+RIVA's public language type is `InteractionLanguage`. Its only current values are
+`zh-CN` and `en`, with `zh-CN` as the default. Frontend `SupportedLanguage` maps
+one-to-one to it. All language normalization must use the shared helper; Resume,
+Roles, Practice, and Interview modules must not define separate normalization rules.
+
+The language source has three distinct layers:
+
+- **UI language**: the current interface language, which can change at any time.
+  Real API requests default to `Accept-Language` resolved from i18next at request
+  time so the first request does not race language initialization.
+- **Artifact language**: the language frozen for one Resume Parsing, JD Parsing,
+  Matching Analysis, or future independent QuestionCard generation. It is captured
+  from the UI language when the AgentRun is created and stored as
+  `AgentRun.payload.interactionLanguage`; Workers restore it only from that payload.
+  Future QuestionCard models must also expose `language: InteractionLanguage` explicitly;
+  their language must never be inferred only from their text.
+- **Session language**: the language frozen when a PracticeSession or
+  InterviewSession is created. Session child operations (questions, follow-ups,
+  scoring, reviews, and recommendations) inherit `Session.language` and never read
+  the browser language again. UI chrome may change while AI content in the active
+  Session remains unchanged.
+
+Every new user-visible AI workflow must declare its language source in both design
+and code: an independent artifact uses the AgentRun `interactionLanguage`, while a
+Session child operation uses its owning Session's `language`. Do not use “detect the
+primary language of the JD, resume, or answer” as the main output-language strategy.
+
+Company, school, project, product, skill, programming-language, framework, database,
+protocol, standard, and URL entities should remain in their original form where
+practical. Translate surrounding natural-language descriptions without adding,
+removing, or changing facts. Raw user resumes, raw JDs, user answers, and historical
+AI artifacts are never silently translated when the UI language changes.

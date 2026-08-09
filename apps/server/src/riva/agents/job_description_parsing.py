@@ -36,4 +36,5 @@ class JobDescriptionParsingAgent(
             "role_title": input.role_title,
             "company": input.company or "",
             "raw_job_description": input.raw_job_description,
+            "interaction_language": input.interaction_language,
         }

@@ -191,6 +191,7 @@ export const targetedPracticeRecordDetailsMock = [
   {
     id: "targeted-practice-record-001",
     kind: "targetedPractice",
+    language: "zh-CN",
     status: "completed",
     startedAt: "2026-07-20T02:00:00.000Z",
     endedAt: "2026-07-20T02:15:00.000Z",
@@ -218,6 +219,7 @@ export const targetedPracticeRecordDetailsMock = [
   {
     id: "targeted-practice-record-002",
     kind: "targetedPractice",
+    language: "zh-CN",
     status: "partiallyCompleted",
     startedAt: "2026-07-18T08:00:00.000Z",
     endedAt: "2026-07-18T08:08:00.000Z",
@@ -245,6 +247,7 @@ export const targetedPracticeRecordDetailsMock = [
   {
     id: "targeted-practice-record-003",
     kind: "targetedPractice",
+    language: "zh-CN",
     status: "endedEarly",
     startedAt: "2026-07-12T01:30:00.000Z",
     endedAt: "2026-07-12T01:32:00.000Z",
@@ -392,6 +395,7 @@ export const mockInterviewRecordDetailsMock = [
   {
     id: "mock-interview-record-001",
     kind: "mockInterview",
+    language: "zh-CN",
     status: "completed",
     completionReason: "formalQuestionsCompleted",
     startedAt: "2026-07-16T03:00:00.000Z",
@@ -440,6 +444,7 @@ export const mockInterviewRecordDetailsMock = [
   {
     id: "mock-interview-record-002",
     kind: "mockInterview",
+    language: "zh-CN",
     status: "endedEarly",
     completionReason: "userEndedEarly",
     startedAt: "2026-07-10T06:00:00.000Z",
@@ -499,6 +504,7 @@ export const mockInterviewRecordDetailsMock = [
   {
     id: "mock-interview-record-003",
     kind: "mockInterview",
+    language: "zh-CN",
     status: "endedEarly",
     completionReason: "userEndedEarly",
     startedAt: "2026-07-08T01:00:00.000Z",

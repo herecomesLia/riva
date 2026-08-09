@@ -405,16 +405,21 @@ def test_run_payload_accepts_both_names_and_serializes_camel_case() -> None:
     )
 
     assert str(parsed.resume_document_id) == document_id
-    assert parsed.model_dump(mode="json") == {"resumeDocumentId": document_id}
+    assert parsed.model_dump(mode="json") == {
+        "resumeDocumentId": document_id,
+        "interactionLanguage": "zh-CN",
+    }
     assert parsed.model_dump(mode="json", by_alias=False) == {
-        "resume_document_id": document_id
+        "resume_document_id": document_id,
+        "interaction_language": "zh-CN",
     }
 
     snake_parsed = ResumeParsingRunPayload.model_validate(
         {"resume_document_id": document_id}
     )
     assert snake_parsed.model_dump(mode="json") == {
-        "resumeDocumentId": document_id
+        "resumeDocumentId": document_id,
+        "interactionLanguage": "zh-CN",
     }
 
 

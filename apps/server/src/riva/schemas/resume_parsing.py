@@ -10,6 +10,10 @@ from pydantic import (
     model_validator,
 )
 
+from riva.core.language import (
+    DEFAULT_INTERACTION_LANGUAGE,
+    InteractionLanguage,
+)
 from riva.schemas.job_description_parsing import AnalysisItemList
 from riva.schemas.profile import (
     Bullet,
@@ -172,6 +176,7 @@ class _ResumeDatedModel(_ResumeParsingModel):
 
 class ResumeParsingInput(_ResumeParsingModel):
     resume_text: ResumeText
+    interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE
 
 
 class ResumeParsingEducation(_ResumeDatedModel):
@@ -245,3 +250,7 @@ class ResumeParsingRunPayload(BaseModel):
     )
 
     resume_document_id: StandardUUID = Field(alias="resumeDocumentId")
+    interaction_language: InteractionLanguage = Field(
+        default=DEFAULT_INTERACTION_LANGUAGE,
+        alias="interactionLanguage",
+    )

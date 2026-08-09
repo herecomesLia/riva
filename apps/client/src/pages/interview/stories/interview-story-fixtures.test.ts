@@ -8,6 +8,7 @@ import {
 
 import {
   createInterviewSessionStoryFixture,
+  createEnglishInterviewSessionStoryFixture,
   createInterviewSetupStoryFixture,
   createGeneratingReferenceReviewStoryFixture,
   createLongCandidateExchangesStoryFixture,
@@ -28,6 +29,17 @@ describe("interview Story fixtures", () => {
     const secondSession = createInterviewSessionStoryFixture()
 
     expect(secondSession.completedQuestions[0]?.answer.content).not.toBe("被 Story 修改的回答")
+  })
+
+  it("provides an explicit English session fixture without translating user input", () => {
+    const fixture = createEnglishInterviewSessionStoryFixture()
+
+    expect(fixture.language).toBe("en")
+    expect(fixture.openingMessage).toContain("Welcome")
+    expect(fixture.candidatePrompt).toContain("formal questions")
+    expect(fixture.candidateExchange.question.content).toContain("岗位")
+    expect(fixture.candidateExchange.interviewerAnswer).toContain("This role")
+    expect(fixture.history[0]?.answer).toContain("我")
   })
 
   it("derives product-ready and missing-JD Stories from shared Roles scenarios", () => {

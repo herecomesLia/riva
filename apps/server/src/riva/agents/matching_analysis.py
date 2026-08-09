@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from riva.agents.base import Agent
 from riva.integrations import GenerationParameters, LLMProvider
-from riva.prompts.matching_analysis import MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import (
     MatchingAnalysisInput,
     MatchingAnalysisOutput,
@@ -33,7 +33,7 @@ class MatchingAnalysisAgent(
     ) -> None:
         super().__init__(
             provider=provider,
-            prompt=MATCHING_ANALYSIS_PROMPT_V1,
+            prompt=MATCHING_ANALYSIS_PROMPT,
             model=model,
             parameters=parameters,
         )
@@ -48,4 +48,5 @@ class MatchingAnalysisAgent(
         return {
             "career_profile": _stable_json(input.career_profile),
             "job": _stable_json(input.job),
+            "interaction_language": input.interaction_language,
         }

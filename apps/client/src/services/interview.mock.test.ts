@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { i18n } from "@/i18n/i18n"
 import {
   createInterviewAgentPlanMock,
   createInterviewCompletedSessionMock,
@@ -60,6 +61,10 @@ beforeEach(() => {
   resetRolesMockState()
   resetProfileMockState()
   resetScenario()
+})
+
+afterEach(() => {
+  void i18n.changeLanguage("zh-CN")
 })
 
 async function startOpening(
@@ -948,6 +953,20 @@ describe("interview mock reset boundaries", () => {
       version: first.version + 1,
       progress: { completedMainQuestions: 1 },
     })
+  })
+
+  it("freezes the session language while a new interview uses the switched UI language", async () => {
+    await i18n.changeLanguage("zh-CN")
+    const opening = await startCurrentOpening()
+    expect(opening.language).toBe("zh-CN")
+
+    await i18n.changeLanguage("en")
+    const firstQuestion = await beginQuestions(opening)
+    expect(firstQuestion.language).toBe("zh-CN")
+
+    resetScenario("noFollowUps")
+    const nextOpening = await startCurrentOpening()
+    expect(nextOpening.language).toBe("en")
   })
 
   it("derives the current target role name and company from roles state", async () => {

@@ -1,10 +1,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, Request, status
 
 from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
+from riva.core.language import normalize_interaction_language
 from riva.core.roles import get_target_role_service
 from riva.models import User
 from riva.schemas.roles import (
@@ -157,6 +158,7 @@ async def update_job_description_analysis_module(
 async def start_job_description_parsing(
     role_id: RoleId,
     payload: StartJobDescriptionParsingRequest,
+    request: Request,
     current_user: User = Depends(require_current_user),
     role_service: TargetRoleService = Depends(get_target_role_service),
 ) -> RolesPageResponse:
@@ -164,6 +166,9 @@ async def start_job_description_parsing(
         current_user,
         role_id,
         payload,
+        interaction_language=normalize_interaction_language(
+            request.headers.get("accept-language")
+        ),
     )
 
 
@@ -192,6 +197,7 @@ async def get_job_description_parsing_status(
 async def start_matching_analysis(
     role_id: RoleId,
     payload: StartMatchingAnalysisRequest,
+    request: Request,
     current_user: User = Depends(require_current_user),
     role_service: TargetRoleService = Depends(get_target_role_service),
 ) -> RolesPageResponse:
@@ -199,6 +205,9 @@ async def start_matching_analysis(
         current_user,
         role_id,
         payload,
+        interaction_language=normalize_interaction_language(
+            request.headers.get("accept-language")
+        ),
     )
 
 

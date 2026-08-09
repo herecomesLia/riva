@@ -50,6 +50,7 @@ function createStartedResponse(
     session: {
       status: "opening",
       sessionId: "mock-interview-session-page",
+      language: "zh-CN",
       version: 1,
       configuration,
       startedAt: "2026-07-24T02:00:00.000Z",

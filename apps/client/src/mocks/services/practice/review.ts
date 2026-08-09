@@ -30,6 +30,7 @@ export async function retryCurrentPracticeQuestion(
     session: {
       status: "answering",
       sessionId: session.sessionId,
+      language: session.language,
       version: session.version + 1,
       selection: copyPracticeState(session.selection),
       startedAt: session.startedAt,
@@ -70,6 +71,7 @@ export async function continueToNextPracticeQuestion(
     session: {
       status: "generatingQuestion",
       sessionId: session.sessionId,
+      language: session.language,
       version: session.version + 1,
       selection: copyPracticeState(selection),
       startedAt: session.startedAt,

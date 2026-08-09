@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import type { InterviewCompletedSessionResponse } from "@/models/interview"
+import { interactionLanguages } from "@/types/language"
 
 export const INTERVIEW_MOCK_REPOSITORY_STORAGE_KEY = "riva:mock:interview:completed-sessions"
 
@@ -210,6 +211,9 @@ const sessionReviewSchema = z.discriminatedUnion("status", [
 const completedSessionSchema = z.object({
   status: z.literal("completed"),
   sessionId: z.string().min(1),
+  // Older persisted mock sessions predate the language field; keep their
+  // original zh-CN fixture semantics when they are read back.
+  language: z.enum(interactionLanguages).default("zh-CN"),
   version: z.number().int().positive(),
   configuration: configurationSchema,
   startedAt: z.string().min(1),

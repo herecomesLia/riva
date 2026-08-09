@@ -28,6 +28,7 @@ function completeQuestionGeneration(): PracticePageResponse {
     session: {
       status: "answering",
       sessionId: currentSession.sessionId,
+      language: currentSession.language,
       version: currentSession.version + 1,
       selection: copyPracticeState(currentSession.selection),
       startedAt: currentSession.startedAt,

@@ -256,7 +256,11 @@ def test_start_enqueues_initial_run_and_sets_pointer_atomically() -> None:
             calls=calls,
             next_run=new_run,
             sessions=sessions,
-        ).start(user_id=USER_ID, resume_document_id=DOCUMENT_ID)
+        ).start(
+            user_id=USER_ID,
+            resume_document_id=DOCUMENT_ID,
+            interaction_language="en",
+        )
     )
 
     assert response.status == "queued"
@@ -267,11 +271,14 @@ def test_start_enqueues_initial_run_and_sets_pointer_atomically() -> None:
         "user_id": USER_ID,
         "agent_id": "resume-parser",
         "prompt_id": RESUME_PARSING_PROMPT_V2.prompt_id,
-        "prompt_version": RESUME_PARSING_PROMPT_V2.version,
+        "prompt_version": "3",
         "output_schema_id": RESUME_PARSING_PROMPT_V2.output_schema_id,
         "model": "fake-resume-model",
-        "payload": {"resumeDocumentId": str(DOCUMENT_ID)},
-        "idempotency_key": f"resume-parsing:{DOCUMENT_ID}:initial",
+        "payload": {
+            "resumeDocumentId": str(DOCUMENT_ID),
+            "interactionLanguage": "en",
+        },
+        "idempotency_key": f"resume-parsing:{DOCUMENT_ID}:initial:en",
         "max_attempts": 3,
     }
     assert session.commit_count == 1
@@ -384,9 +391,10 @@ def test_retry_creates_new_run_and_supersedes_failed_ready_draft() -> None:
     assert old_draft.status == "superseded"
     assert old_draft.draft_version == 1
     assert old_draft.source_agent_run_id == failed.id
-    assert calls[0]["prompt_version"] == RESUME_PARSING_PROMPT_V2.version
+    assert calls[0]["prompt_version"] == "3"
     assert calls[0]["idempotency_key"] == (
         f"resume-parsing:{DOCUMENT_ID}:retry:{failed.id}"
+        ":zh-CN"
     )
     assert session.commit_count == 1
 

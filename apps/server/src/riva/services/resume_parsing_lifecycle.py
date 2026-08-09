@@ -20,7 +20,15 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
+from riva.core.language import (
+    DEFAULT_INTERACTION_LANGUAGE,
+    InteractionLanguage,
+)
+from riva.prompts import (
+    RESUME_PARSING_PROMPT,
+    RESUME_PARSING_PROMPT_V1,
+    RESUME_PARSING_PROMPT_V2,
+)
 from riva.schemas.resume_parsing import (
     ResumeParsingOutput,
     ResumeParsingRunPayload,
@@ -79,6 +87,7 @@ class ResumeParsingLifecycleService:
         *,
         user_id: UUID,
         resume_document_id: UUID,
+        interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE,
     ) -> ResumeParsingStatusResponse:
         try:
             await self._lock_user(user_id)
@@ -125,7 +134,10 @@ class ResumeParsingLifecycleService:
                 user_id=user_id,
                 document_id=document.id,
                 model=model,
-                idempotency_key=f"resume-parsing:{document.id}:initial",
+                interaction_language=interaction_language,
+                idempotency_key=(
+                    f"resume-parsing:{document.id}:initial:{interaction_language}"
+                ),
             )
             document.parsing_run_id = new_run.id
             response = self._status_response(
@@ -145,6 +157,7 @@ class ResumeParsingLifecycleService:
         *,
         user_id: UUID,
         resume_document_id: UUID,
+        interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE,
     ) -> ResumeParsingStatusResponse:
         try:
             await self._lock_user(user_id)
@@ -192,8 +205,10 @@ class ResumeParsingLifecycleService:
                 user_id=user_id,
                 document_id=document.id,
                 model=model,
+                interaction_language=interaction_language,
                 idempotency_key=(
-                    f"resume-parsing:{document.id}:retry:{run.id}"
+                    f"resume-parsing:{document.id}:retry:{run.id}:"
+                    f"{interaction_language}"
                 ),
             )
             document.parsing_run_id = new_run.id
@@ -293,12 +308,16 @@ class ResumeParsingLifecycleService:
             or run.user_id != document.user_id
         ):
             return None
-        active_prompt = RESUME_PARSING_PROMPT_V2
+        active_prompt = RESUME_PARSING_PROMPT
         if (
             run.agent_id != "resume-parser"
             or run.prompt_id != active_prompt.prompt_id
             or run.prompt_version
-            not in {RESUME_PARSING_PROMPT_V1.version, active_prompt.version}
+            not in {
+                RESUME_PARSING_PROMPT_V1.version,
+                RESUME_PARSING_PROMPT_V2.version,
+                active_prompt.version,
+            }
             or run.output_schema_id != active_prompt.output_schema_id
         ):
             return None
@@ -335,11 +354,13 @@ class ResumeParsingLifecycleService:
         user_id: UUID,
         document_id: UUID,
         model: str,
+        interaction_language: InteractionLanguage,
         idempotency_key: str,
     ) -> AgentRun:
-        prompt = RESUME_PARSING_PROMPT_V2
+        prompt = RESUME_PARSING_PROMPT
         payload = ResumeParsingRunPayload(
             resume_document_id=document_id,
+            interaction_language=interaction_language,
         )
         return await self.agent_run_service_factory(
             self.session

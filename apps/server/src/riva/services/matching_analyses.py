@@ -20,7 +20,7 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import MATCHING_ANALYSIS_PROMPT, MATCHING_ANALYSIS_PROMPT_V1
 from riva.schemas.job_description_parsing import JobDescriptionParsingOutput
 from riva.schemas.matching_analysis import (
     MAX_MATCHING_EDUCATION_ITEMS,
@@ -384,11 +384,12 @@ class MatchingAnalysisService:
         *,
         for_update: bool,
     ) -> _MatchingContext:
-        prompt = MATCHING_ANALYSIS_PROMPT_V1
+        prompt = MATCHING_ANALYSIS_PROMPT
         if (
             run.agent_id != "matching-analyzer"
             or run.prompt_id != prompt.prompt_id
-            or run.prompt_version != prompt.version
+            or run.prompt_version
+            not in {MATCHING_ANALYSIS_PROMPT_V1.version, prompt.version}
             or run.output_schema_id != prompt.output_schema_id
         ):
             raise MatchingAnalysisStateError(INVALID_MATCHING_ANALYSIS_RUN)
@@ -514,6 +515,7 @@ def _build_matching_input(context: _MatchingContext) -> MatchingAnalysisInput:
         return MatchingAnalysisInput(
             career_profile=career_profile,
             job=job,
+            interaction_language=context.payload.interaction_language,
         )
     except (TypeError, ValueError, ValidationError):
         raise MatchingAnalysisStateError(INVALID_MATCHING_ANALYSIS_RUN) from None

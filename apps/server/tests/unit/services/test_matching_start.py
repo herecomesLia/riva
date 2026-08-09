@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from riva.core.errors import APIError
+from riva.core.language import InteractionLanguage
 from riva.models import AgentRun, AgentRunStatus
 from riva.prompts import MATCHING_ANALYSIS_PROMPT_V1
 from riva.schemas.roles import (
@@ -105,12 +106,18 @@ def make_service(*, provider: str | None = "qwen", model: str | None = "test-mod
     return owner, role, profile, analysis, run_service, service
 
 
-def start(service: TargetRoleService, owner, role) -> RolesPageResponse:
+def start(
+    service: TargetRoleService,
+    owner,
+    role,
+    interaction_language: InteractionLanguage = "zh-CN",
+) -> RolesPageResponse:
     return asyncio.run(
         service.start_matching_analysis(
             owner,
             role.id,
             StartMatchingAnalysisRequest(version=role.version),
+            interaction_language=interaction_language,
         )
     )
 
@@ -121,7 +128,7 @@ def test_start_creates_run_with_contract_payload_and_lock_order() -> None:
     role.matching_analysis_run = None
     role.matching_analysis_run_id = None
 
-    page = start(service, owner, role)
+    page = start(service, owner, role, interaction_language="en")
 
     assert page.roles[0].matching_analysis is not None
     assert page.roles[0].matching_analysis.status == "generating"
@@ -137,7 +144,7 @@ def test_start_creates_run_with_contract_payload_and_lock_order() -> None:
     call = run_service.calls[0]
     assert call["agent_id"] == "matching-analyzer"
     assert call["prompt_id"] == MATCHING_ANALYSIS_PROMPT_V1.prompt_id
-    assert call["prompt_version"] == MATCHING_ANALYSIS_PROMPT_V1.version
+    assert call["prompt_version"] == "2"
     assert call["output_schema_id"] == MATCHING_ANALYSIS_PROMPT_V1.output_schema_id
     assert call["model"] == "test-model"
     assert call["max_attempts"] == 3
@@ -147,9 +154,10 @@ def test_start_creates_run_with_contract_payload_and_lock_order() -> None:
         "profileVersion": 3,
         "jobDescriptionVersion": 2,
         "jobDescriptionAnalysisVersion": 4,
+        "interactionLanguage": "en",
     }
     assert call["idempotency_key"] == (
-        f"matching-analysis:{role.id}:{service.profile.profile_id}:3:2:4:7"
+        f"matching-analysis:{role.id}:{service.profile.profile_id}:3:2:4:7:en"
     )
 
 
@@ -215,7 +223,7 @@ def test_failed_run_is_retried_and_succeeded_without_result_conflicts() -> None:
     assert role.version == 9
     assert len(run_service.calls) == 1
     assert run_service.calls[0]["idempotency_key"] == (
-        f"matching-analysis:{role.id}:{service.profile.profile_id}:3:2:4:8"
+        f"matching-analysis:{role.id}:{service.profile.profile_id}:3:2:4:8:zh-CN"
     )
     assert old_run.status is AgentRunStatus.FAILED
 

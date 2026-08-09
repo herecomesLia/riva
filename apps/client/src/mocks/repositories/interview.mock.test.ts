@@ -50,6 +50,25 @@ describe("interview Mock repository", () => {
     expect(listCompletedInterviewSessions()).toEqual([session])
   })
 
+  it("preserves the session language when reading persisted history", () => {
+    const session = createInterviewCompletedSessionMock({ language: "en" })
+
+    saveCompletedInterviewSession(session)
+
+    expect(getCompletedInterviewSession(session.sessionId)?.language).toBe("en")
+  })
+
+  it("defaults legacy persisted sessions to zh-CN", () => {
+    const session = completedSession("legacy-interview-session")
+    const { language: _language, ...legacySession } = session
+    sessionStorage.setItem(
+      INTERVIEW_MOCK_REPOSITORY_STORAGE_KEY,
+      JSON.stringify({ version: 1, sessions: [legacySession] }),
+    )
+
+    expect(getCompletedInterviewSession(session.sessionId)?.language).toBe("zh-CN")
+  })
+
   it("keeps multiple sessions without overwriting one another", () => {
     const first = completedSession("mock-interview-session-1")
     const second = completedSession("mock-interview-session-2")

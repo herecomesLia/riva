@@ -167,12 +167,14 @@ def graph() -> tuple[User, TargetRole, CareerProfile, JobDescriptionAnalysis, Ag
 
 def test_load_matching_input_commits_and_returns_only_pydantic_data() -> None:
     owner, role, profile, analysis, run = graph()
+    run.payload["interactionLanguage"] = "en"
     session = ScriptedSession(role, profile, analysis)
 
     result = asyncio.run(MatchingAnalysisService(session).load_matching_input(run))
 
     assert result.job.role_title == "Backend Engineer"
     assert result.career_profile.skills == ["Python"]
+    assert result.interaction_language == "en"
     assert session.commit_count == 1
     assert session.rollback_count == 0
     assert all("FOR UPDATE" not in str(statement) for statement in session.statements)

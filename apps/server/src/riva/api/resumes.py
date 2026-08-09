@@ -1,11 +1,12 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Path, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Path, Query, Request, UploadFile, status
 
 from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
 from riva.core.errors import APIError
+from riva.core.language import normalize_interaction_language
 from riva.core.resumes import (
     get_resume_document_service,
     get_resume_import_api_service,
@@ -104,6 +105,7 @@ async def get_resume_document(
 )
 async def start_resume_parsing(
     resume_document_id: ResumeId,
+    request: Request,
     current_user: User = Depends(require_current_user),
     lifecycle_service: ResumeParsingLifecycleService = Depends(
         get_resume_parsing_lifecycle_service
@@ -112,6 +114,9 @@ async def start_resume_parsing(
     return await lifecycle_service.start(
         user_id=current_user.id,
         resume_document_id=resume_document_id,
+        interaction_language=normalize_interaction_language(
+            request.headers.get("accept-language")
+        ),
     )
 
 
@@ -139,6 +144,7 @@ async def get_resume_parsing_status(
 )
 async def retry_resume_parsing(
     resume_document_id: ResumeId,
+    request: Request,
     current_user: User = Depends(require_current_user),
     lifecycle_service: ResumeParsingLifecycleService = Depends(
         get_resume_parsing_lifecycle_service
@@ -147,6 +153,9 @@ async def retry_resume_parsing(
     return await lifecycle_service.retry(
         user_id=current_user.id,
         resume_document_id=resume_document_id,
+        interaction_language=normalize_interaction_language(
+            request.headers.get("accept-language")
+        ),
     )
 
 

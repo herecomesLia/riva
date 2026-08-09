@@ -1,3 +1,5 @@
+import type { InteractionLanguage } from "@/types/language"
+
 export type TrainingRecordKind = "targetedPractice" | "mockInterview"
 
 export type TrainingRecordStatus = "completed" | "endedEarly" | "partiallyCompleted"
@@ -198,6 +200,7 @@ export type TrainingRecordRecommendation =
 
 type TrainingRecordBase = {
   id: string
+  language: InteractionLanguage
   status: TrainingRecordStatus
   startedAt: string
   endedAt: string

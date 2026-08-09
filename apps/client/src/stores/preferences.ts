@@ -1,7 +1,8 @@
 import { create } from "zustand"
 
 import { defaultThemePreference, type ThemePreference } from "@/app/theme"
-import { defaultLanguage, supportedLanguages, type SupportedLanguage } from "@/i18n/resources"
+import { normalizeInteractionLanguage } from "@/i18n/language"
+import { defaultLanguage, type SupportedLanguage } from "@/i18n/resources"
 
 type PreferencesState = {
   language: SupportedLanguage
@@ -11,13 +12,7 @@ type PreferencesState = {
 }
 
 export function normalizeLanguagePreference(language: string | undefined): SupportedLanguage {
-  if (language === "zh") {
-    return defaultLanguage
-  }
-
-  return supportedLanguages.includes(language as SupportedLanguage)
-    ? (language as SupportedLanguage)
-    : defaultLanguage
+  return normalizeInteractionLanguage(language)
 }
 
 export const usePreferencesStore = create<PreferencesState>((set) => ({

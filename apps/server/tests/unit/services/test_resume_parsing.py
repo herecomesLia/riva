@@ -167,6 +167,15 @@ def test_load_input_commits_and_preserves_database_text() -> None:
     assert "FOR UPDATE" not in str(session.statements[0])
 
 
+def test_load_input_restores_language_from_run_payload() -> None:
+    _, document, run = graph(extracted_text="English resume: built APIs.")
+    run.payload["interactionLanguage"] = "en"
+
+    loaded = asyncio.run(ResumeParsingService(ScriptedSession(document)).load_input(run))
+
+    assert loaded.interaction_language == "en"
+
+
 @pytest.mark.parametrize("case_name,mutate", invalid_contract_cases())
 @pytest.mark.parametrize("operation", ["load", "persist"])
 def test_invalid_run_contract_is_safe_and_transactional(

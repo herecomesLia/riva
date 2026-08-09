@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { i18n } from "@/i18n/i18n"
 import { apiRequest, ApiError } from "@/services/api"
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -20,6 +21,7 @@ describe("API client", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    void i18n.changeLanguage("zh-CN")
   })
 
   it("joins paths to apiBaseUrl and includes credentials", async () => {
@@ -32,6 +34,31 @@ describe("API client", () => {
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       credentials: "include",
     })
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Accept-Language")).toBe("zh-CN")
+  })
+
+  it.each([
+    ["zh-CN", "zh-CN"],
+    ["zh", "zh-CN"],
+    ["en", "en"],
+    ["en-US", "en"],
+  ])("sends the normalized UI language as Accept-Language (%s)", async (language, expected) => {
+    await i18n.changeLanguage(language)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }))
+
+    await apiRequest("/language-check")
+
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Accept-Language")).toBe(expected)
+  })
+
+  it("preserves an explicit Accept-Language override", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }))
+
+    await apiRequest("/language-check", {
+      headers: { "Accept-Language": "fr-FR" },
+    })
+
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Accept-Language")).toBe("fr-FR")
   })
 
   it("serializes JSON requests and parses JSON responses", async () => {

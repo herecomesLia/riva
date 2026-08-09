@@ -233,6 +233,7 @@ export async function getTrainingRecordReferenceAnswerGenerationStatus(
 function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
   const base = {
     id: record.id,
+    language: record.language,
     status: record.status,
     startedAt: record.startedAt,
     endedAt: record.endedAt,

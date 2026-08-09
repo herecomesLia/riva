@@ -11,7 +11,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
-from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
+from riva.prompts import (
+    RESUME_PARSING_PROMPT,
+    RESUME_PARSING_PROMPT_V1,
+    RESUME_PARSING_PROMPT_V2,
+)
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
     ResumeParsingOutput,
@@ -80,6 +84,7 @@ class ResumeParsingService:
             try:
                 parsing_input = ResumeParsingInput(
                     resume_text=context.document.extracted_text,
+                    interaction_language=context.payload.interaction_language,
                 )
             except (TypeError, ValueError, ValidationError):
                 raise ResumeParsingStateError(
@@ -243,12 +248,16 @@ def resume_parsing_output_from_result(
 
 
 def _validate_run(run: AgentRun) -> ResumeParsingRunPayload:
-    active_prompt = RESUME_PARSING_PROMPT_V2
+    active_prompt = RESUME_PARSING_PROMPT
     if (
         run.agent_id != "resume-parser"
         or run.prompt_id != active_prompt.prompt_id
         or run.prompt_version
-        not in {RESUME_PARSING_PROMPT_V1.version, active_prompt.version}
+        not in {
+            RESUME_PARSING_PROMPT_V1.version,
+            RESUME_PARSING_PROMPT_V2.version,
+            active_prompt.version,
+        }
         or run.output_schema_id != active_prompt.output_schema_id
     ):
         raise ResumeParsingStateError(INVALID_RESUME_PARSING_RUN)

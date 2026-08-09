@@ -10,6 +10,10 @@ from pydantic import (
     model_validator,
 )
 
+from riva.core.language import (
+    DEFAULT_INTERACTION_LANGUAGE,
+    InteractionLanguage,
+)
 from riva.schemas.base import APIModel
 from riva.schemas.job_description_parsing import (
     AnalysisItemList,
@@ -173,6 +177,7 @@ class MatchingJobContext(_MatchingInputModel):
 class MatchingAnalysisInput(_MatchingInputModel):
     career_profile: MatchingCareerProfile
     job: MatchingJobContext
+    interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE
 
 
 class MatchingAnalysisOutput(BaseModel):
@@ -217,4 +222,8 @@ class MatchingAnalysisRunPayload(BaseModel):
     job_description_version: int = Field(alias="jobDescriptionVersion", ge=1)
     job_description_analysis_version: int = Field(
         alias="jobDescriptionAnalysisVersion", ge=1
+    )
+    interaction_language: InteractionLanguage = Field(
+        default=DEFAULT_INTERACTION_LANGUAGE,
+        alias="interactionLanguage",
     )

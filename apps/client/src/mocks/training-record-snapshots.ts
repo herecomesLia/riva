@@ -234,6 +234,7 @@ export function createTargetedPracticeRecordSnapshot(
   return {
     id: `targeted-practice-record-${session.sessionId}`,
     kind: "targetedPractice",
+    language: session.language,
     status:
       session.completionReason === "userEndedEarly" && session.attemptRecords.length === 0
         ? "endedEarly"
@@ -443,6 +444,7 @@ export function createMockInterviewRecordSnapshot(
   return {
     id: `mock-interview-record-${session.sessionId}`,
     kind: "mockInterview",
+    language: session.language,
     status:
       session.completionReason === "formalQuestionsCompleted"
         ? "completed"

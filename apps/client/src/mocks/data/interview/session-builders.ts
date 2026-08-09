@@ -7,6 +7,7 @@ import type {
   InterviewPageResponse,
   InterviewQuestionRecordResponse,
 } from "@/models/interview"
+import type { InteractionLanguage } from "@/types/language"
 
 import { createProfileMockSnapshot, profileResponseMock } from "../profile"
 import { createRolesMockResponse } from "../roles"
@@ -60,11 +61,13 @@ export function createInterviewCompletedSessionMock(
     completionReason?: InterviewCompletionReason
     completedMainQuestions?: number
     configuration?: InterviewConfiguration
+    language?: InteractionLanguage
   } = {},
 ): InterviewCompletedSessionResponse {
   const agentScenario = options.agentScenario ?? "singleFollowUp"
   const completionReason = options.completionReason ?? "formalQuestionsCompleted"
   const configuration = options.configuration ?? defaultInterviewConfigurationMock
+  const language = options.language ?? "zh-CN"
   const plan = createInterviewAgentPlanMock({ ...configuration, scenario: agentScenario })
   const completedQuestions = createCompletedQuestionRecords(configuration, agentScenario).slice(
     0,
@@ -82,6 +85,7 @@ export function createInterviewCompletedSessionMock(
   return {
     status: "completed",
     sessionId: "mock-interview-session-completed",
+    language,
     version: 10,
     configuration: structuredClone(configuration),
     startedAt: "2026-07-24T02:00:00.000Z",

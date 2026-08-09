@@ -1,3 +1,5 @@
+import type { InteractionLanguage } from "@/types/language"
+
 export type InterviewRound =
   "hr" | "firstBusiness" | "technical" | "manager" | "final" | "comprehensive"
 
@@ -142,6 +144,7 @@ export type InterviewProgressResponse = {
 
 type InterviewActiveSessionResponseBase = {
   sessionId: string
+  language: InteractionLanguage
   /** Positive integer incremented by each persisted session mutation. */
   version: number
   configuration: InterviewConfiguration

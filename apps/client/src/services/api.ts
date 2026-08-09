@@ -1,4 +1,5 @@
 import { env } from "@/app/env"
+import { getCurrentInteractionLanguage } from "@/i18n/language"
 
 type ApiRequestOptions = Omit<RequestInit, "body" | "credentials"> & {
   body?: BodyInit | null
@@ -46,6 +47,10 @@ function getErrorCode(body: unknown): string | null {
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const { body: rawBody, headers: initialHeaders, json, ...requestOptions } = options
   const headers = new Headers(initialHeaders)
+
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", getCurrentInteractionLanguage())
+  }
 
   if (json !== undefined) {
     headers.set("Content-Type", "application/json")

@@ -8,10 +8,14 @@ import {
 } from "@/mocks/data/interview"
 import type { InterviewConversationRecordViewData } from "@/models/interview"
 
-import { createInterviewSessionStoryFixture } from "./stories/interview-story-fixtures"
+import {
+  createEnglishInterviewSessionStoryFixture,
+  createInterviewSessionStoryFixture,
+} from "./stories/interview-story-fixtures"
 import { InterviewSessionView, type InterviewSessionSummary } from "./InterviewSessionView"
 
 const fixture = createInterviewSessionStoryFixture()
+const englishFixture = createEnglishInterviewSessionStoryFixture()
 function createPlan(scenario: InterviewAgentMockScenario) {
   return createInterviewAgentPlanMock({ ...defaultInterviewConfigurationMock, scenario })
 }
@@ -290,6 +294,22 @@ export const CandidateQuestions = meta.story({
     onSubmitQuestion: fn(async () => undefined),
     onFinish: fn(async () => undefined),
   },
+})
+
+export const English = meta.story({
+  args: {
+    status: "candidateQuestions",
+    summary: englishFixture.summary,
+    prompt: englishFixture.candidatePrompt,
+    history: englishFixture.history,
+    exchanges: [englishFixture.candidateExchange],
+    isSubmittingQuestion: false,
+    isFinishing: false,
+    isInteractionLocked: false,
+    onSubmitQuestion: fn(async () => undefined),
+    onFinish: fn(async () => undefined),
+  },
+  globals: { locale: "en" },
 })
 
 export const MissingSession = meta.story({

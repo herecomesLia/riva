@@ -213,6 +213,7 @@ export async function submitFollowUpAnswer(
       session: {
         status: "evaluating",
         sessionId: session.sessionId,
+        language: session.language,
         version: session.version + 1,
         selection: copyPracticeState(session.selection),
         startedAt: session.startedAt,
@@ -258,6 +259,7 @@ export async function endPracticeFollowUps(
     session: {
       status: "evaluating",
       sessionId: session.sessionId,
+      language: session.language,
       version: session.version + 1,
       selection: copyPracticeState(session.selection),
       startedAt: session.startedAt,

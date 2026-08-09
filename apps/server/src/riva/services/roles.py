@@ -9,6 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from riva.core.errors import APIError
+from riva.core.language import (
+    DEFAULT_INTERACTION_LANGUAGE,
+    InteractionLanguage,
+)
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -21,6 +25,8 @@ from riva.models import (
 )
 from riva.prompts import (
     JOB_DESCRIPTION_PARSING_PROMPT,
+    JOB_DESCRIPTION_PARSING_PROMPT_V2,
+    MATCHING_ANALYSIS_PROMPT,
     MATCHING_ANALYSIS_PROMPT_V1,
 )
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
@@ -391,6 +397,7 @@ class TargetRoleService:
         user: User,
         role_id: UUID,
         payload: StartJobDescriptionParsingRequest,
+        interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE,
     ) -> RolesPageResponse:
         try:
             role = await self._locked_role(user.id, role_id)
@@ -425,6 +432,7 @@ class TargetRoleService:
                 job_description_version=cast(
                     int, role.job_description_version
                 ),
+                interaction_language=interaction_language,
             )
             new_run = await self.agent_run_service_factory(
                 self.session
@@ -438,7 +446,8 @@ class TargetRoleService:
                 payload=run_payload.model_dump(mode="json", by_alias=True),
                 idempotency_key=(
                     f"job-description-parsing:{role.id}:"
-                    f"{role.job_description_version}:{role.version}"
+                    f"{role.job_description_version}:{role.version}:"
+                    f"{interaction_language}"
                 ),
                 max_attempts=3,
             )
@@ -466,6 +475,7 @@ class TargetRoleService:
         user: User,
         role_id: UUID,
         payload: StartMatchingAnalysisRequest,
+        interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE,
     ) -> RolesPageResponse:
         try:
             await self._lock_user(user.id)
@@ -531,7 +541,7 @@ class TargetRoleService:
                 return await self._commit_page(user.id)
 
             self._require_matching_configuration()
-            prompt = MATCHING_ANALYSIS_PROMPT_V1
+            prompt = MATCHING_ANALYSIS_PROMPT
             run_payload = MatchingAnalysisRunPayload(
                 role_id=role.id,
                 profile_id=profile.profile_id,
@@ -541,11 +551,13 @@ class TargetRoleService:
                     role.job_description_version,
                 ),
                 job_description_analysis_version=analysis.analysis_version,
+                interaction_language=interaction_language,
             )
             idempotency_key = (
                 f"matching-analysis:{role.id}:{profile.profile_id}:"
                 f"{profile.version}:{role.job_description_version}:"
-                f"{analysis.analysis_version}:{role.version}"
+                f"{analysis.analysis_version}:{role.version}:"
+                f"{interaction_language}"
             )
 
             new_run = await self.agent_run_service_factory(
@@ -915,7 +927,8 @@ class TargetRoleService:
         if (
             run.agent_id != "job-description-parser"
             or run.prompt_id != prompt.prompt_id
-            or run.prompt_version != prompt.version
+            or run.prompt_version
+            not in {JOB_DESCRIPTION_PARSING_PROMPT_V2.version, prompt.version}
             or run.output_schema_id != prompt.output_schema_id
         ):
             return None
@@ -949,11 +962,12 @@ class TargetRoleService:
         ):
             return None
 
-        prompt = MATCHING_ANALYSIS_PROMPT_V1
+        prompt = MATCHING_ANALYSIS_PROMPT
         if (
             run.agent_id != "matching-analyzer"
             or run.prompt_id != prompt.prompt_id
-            or run.prompt_version != prompt.version
+            or run.prompt_version
+            not in {MATCHING_ANALYSIS_PROMPT_V1.version, prompt.version}
             or run.output_schema_id != prompt.output_schema_id
         ):
             return None

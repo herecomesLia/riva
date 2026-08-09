@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+import pytest
 
 from riva.core.auth import get_auth_service, require_current_user
 from riva.core.errors import APIError
@@ -47,10 +48,16 @@ def queued_response() -> ResumeParsingStatusResponse:
 class FakeResumeParsingLifecycleService:
     def __init__(self, *, error: APIError | None = None) -> None:
         self.error = error
-        self.calls: list[tuple[str, UUID, UUID]] = []
+        self.calls: list[tuple[object, ...]] = []
 
-    async def start(self, *, user_id: UUID, resume_document_id: UUID):
-        self.calls.append(("start", user_id, resume_document_id))
+    async def start(
+        self,
+        *,
+        user_id: UUID,
+        resume_document_id: UUID,
+        interaction_language: str,
+    ):
+        self.calls.append(("start", user_id, resume_document_id, interaction_language))
         if self.error is not None:
             raise self.error
         return queued_response()
@@ -61,8 +68,14 @@ class FakeResumeParsingLifecycleService:
             raise self.error
         return queued_response()
 
-    async def retry(self, *, user_id: UUID, resume_document_id: UUID):
-        self.calls.append(("retry", user_id, resume_document_id))
+    async def retry(
+        self,
+        *,
+        user_id: UUID,
+        resume_document_id: UUID,
+        interaction_language: str,
+    ):
+        self.calls.append(("retry", user_id, resume_document_id, interaction_language))
         if self.error is not None:
             raise self.error
         return queued_response()
@@ -85,14 +98,14 @@ def test_lifecycle_routes_forward_user_and_resume_id_and_use_status_codes(app) -
     with client:
         started = client.post(
             f"/api/profile/resumes/{RESUME_ID}/parsing",
-            headers={"Origin": TRUSTED_ORIGIN},
+            headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "en-US"},
         )
         status_response = client.get(
             f"/api/profile/resumes/{RESUME_ID}/parsing",
         )
         retried = client.post(
             f"/api/profile/resumes/{RESUME_ID}/parsing/retry",
-            headers={"Origin": TRUSTED_ORIGIN},
+            headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "en-US"},
         )
 
     assert started.status_code == 202
@@ -101,9 +114,9 @@ def test_lifecycle_routes_forward_user_and_resume_id_and_use_status_codes(app) -
     assert started.json()["resumeDocumentId"] == str(RESUME_ID)
     assert started.json()["maxAttempts"] == 3
     assert service.calls == [
-        ("start", current_user.id, RESUME_ID),
+        ("start", current_user.id, RESUME_ID, "en"),
         ("status", current_user.id, RESUME_ID),
-        ("retry", current_user.id, RESUME_ID),
+        ("retry", current_user.id, RESUME_ID, "en"),
     ]
 
 
@@ -120,6 +133,35 @@ def test_write_routes_are_csrf_protected_but_get_does_not_need_body(app) -> None
     assert retry.status_code == 403
     assert status_response.status_code == 200
     assert service.calls == [("status", _user.id, RESUME_ID)]
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        ("zh-CN", "zh-CN"),
+        ("zh", "zh-CN"),
+        ("zh-TW", "zh-CN"),
+        ("en", "en"),
+        ("en-US", "en"),
+        ("fr", "zh-CN"),
+    ],
+)
+def test_start_normalizes_accept_language_before_service_call(
+    app,
+    header: str,
+    expected: str,
+) -> None:
+    service = FakeResumeParsingLifecycleService()
+    client, _user = create_client(app, service)
+
+    with client:
+        response = client.post(
+            f"/api/profile/resumes/{RESUME_ID}/parsing",
+            headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": header},
+        )
+
+    assert response.status_code == 202
+    assert service.calls[0][3] == expected
 
 
 def test_lifecycle_service_errors_keep_existing_error_contract(app) -> None:

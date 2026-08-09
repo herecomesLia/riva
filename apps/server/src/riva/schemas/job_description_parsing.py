@@ -3,6 +3,10 @@ from uuid import UUID
 
 from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints
 
+from riva.core.language import (
+    DEFAULT_INTERACTION_LANGUAGE,
+    InteractionLanguage,
+)
 from riva.schemas.base import MAX_RAW_JOB_DESCRIPTION_LENGTH
 
 
@@ -186,6 +190,7 @@ class JobDescriptionParsingInput(BaseModel):
     role_title: RoleTitle
     company: Company
     raw_job_description: RawJobDescription
+    interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE
 
 
 class JobDescriptionParsingRunPayload(BaseModel):
@@ -197,3 +202,7 @@ class JobDescriptionParsingRunPayload(BaseModel):
 
     role_id: UUID = Field(alias="roleId")
     job_description_version: int = Field(alias="jobDescriptionVersion", ge=1)
+    interaction_language: InteractionLanguage = Field(
+        default=DEFAULT_INTERACTION_LANGUAGE,
+        alias="interactionLanguage",
+    )

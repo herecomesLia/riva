@@ -11,8 +11,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { getCurrentInteractionLanguage, normalizeInteractionLanguage } from "@/i18n/language"
 import { supportedLanguages, type SupportedLanguage } from "@/i18n/resources"
-import { normalizeLanguagePreference, usePreferencesStore } from "@/stores/preferences"
+import { usePreferencesStore } from "@/stores/preferences"
 
 export function LanguageSwitcher() {
   const { i18n, t } = useTranslation()
@@ -20,10 +21,10 @@ export function LanguageSwitcher() {
   const setLanguage = usePreferencesStore((state) => state.setLanguage)
 
   useEffect(() => {
-    setLanguage(normalizeLanguagePreference(i18n.resolvedLanguage ?? i18n.language))
+    setLanguage(getCurrentInteractionLanguage())
 
     function handleLanguageChanged(language: string) {
-      setLanguage(normalizeLanguagePreference(language))
+      setLanguage(normalizeInteractionLanguage(language))
     }
 
     i18n.on("languageChanged", handleLanguageChanged)

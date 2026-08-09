@@ -36,7 +36,7 @@ export function toAttemptRecord(
 
 type PracticeCompletionBase = Pick<
   PracticeCompletedState,
-  "sessionId" | "version" | "selection" | "startedAt" | "attemptId" | "attemptNumber"
+  "sessionId" | "language" | "version" | "selection" | "startedAt" | "attemptId" | "attemptNumber"
 >
 
 function createCompletedPracticeSession({
@@ -105,6 +105,7 @@ export async function endPracticeSession(
   const records = [...copyPracticeState(session.attemptRecords), toAttemptRecord(session)]
   const completionBase: PracticeCompletionBase = {
     sessionId: session.sessionId,
+    language: session.language,
     version: session.version + 1,
     selection: copyPracticeState(session.selection),
     startedAt: session.startedAt,
@@ -131,6 +132,7 @@ export async function requestEndPracticeSession(
   const session = requireCurrentQuestion(input)
   const completionBase: PracticeCompletionBase = {
     sessionId: session.sessionId,
+    language: session.language,
     version: session.version + 1,
     selection: copyPracticeState(session.selection),
     startedAt: session.startedAt,

@@ -73,6 +73,7 @@ export async function getPracticeEvaluationStatus(
     session: {
       status: "review",
       sessionId: session.sessionId,
+      language: session.language,
       version: session.version + 1,
       selection: copyPracticeState(session.selection),
       startedAt: session.startedAt,

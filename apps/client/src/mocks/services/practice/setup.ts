@@ -1,4 +1,5 @@
 import { derivePracticeSupportedQuestionTypes } from "@/mocks/data/role-fixture-builders"
+import { getCurrentInteractionLanguage } from "@/i18n/language"
 import { getRolesPage } from "@/mocks/services/roles"
 import type {
   PracticeMutationResponse,
@@ -135,6 +136,7 @@ export async function startPracticeSession(
     session: {
       status: "generatingQuestion",
       sessionId,
+      language: getCurrentInteractionLanguage(),
       version: 1,
       selection: copyPracticeState(input),
       startedAt: new Date(Date.UTC(2026, 6, 20, 2, sessionSequence)).toISOString(),

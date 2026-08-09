@@ -48,6 +48,7 @@ export const defaultSelection = {
 
 export const activeSession = {
   sessionId: "practice_session_20260720_01",
+  language: "zh-CN" as const,
   version: 1,
   selection: defaultSelection,
   startedAt: "2026-07-20T01:30:00.000Z",

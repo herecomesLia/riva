@@ -72,6 +72,7 @@ function createPracticeReviewState(session: PracticeEvaluatingState): PracticeRe
   return {
     status: "review",
     sessionId: session.sessionId,
+    language: session.language,
     version: session.version + 1,
     selection: session.selection,
     startedAt: session.startedAt,

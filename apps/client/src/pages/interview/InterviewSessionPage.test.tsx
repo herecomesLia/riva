@@ -83,6 +83,7 @@ function openingResponse(): InterviewPageResponse {
   return responseWithSession({
     status: "opening",
     sessionId,
+    language: "zh-CN",
     version: 1,
     configuration: {
       targetRoleId: "role_frontend_bytedance",
@@ -106,6 +107,7 @@ function questionSession(order: number, version: number): InterviewQuestionSessi
   return {
     status: "question",
     sessionId,
+    language: "zh-CN",
     version,
     configuration: {
       targetRoleId: "role_frontend_bytedance",
@@ -133,6 +135,7 @@ function followUpSession(followUpIndex: number, version: number): InterviewFollo
   return {
     status: "followUp",
     sessionId,
+    language: "zh-CN",
     version,
     configuration: {
       targetRoleId: "role_frontend_bytedance",
@@ -188,6 +191,7 @@ function candidateSession(
   return {
     status: "candidateQuestions",
     sessionId,
+    language: "zh-CN",
     version,
     configuration: completed.configuration,
     startedAt: completed.startedAt,

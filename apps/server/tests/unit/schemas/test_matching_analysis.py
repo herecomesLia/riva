@@ -370,6 +370,7 @@ def run_payload(**overrides: object) -> dict[str, object]:
         "profileVersion": 2,
         "jobDescriptionVersion": 3,
         "jobDescriptionAnalysisVersion": 4,
+        "interactionLanguage": "zh-CN",
     }
     payload.update(overrides)
     return payload
@@ -389,6 +390,7 @@ def test_matching_run_payload_accepts_camel_and_snake_names_and_dumps_camel_case
         "profile_version": 2,
         "job_description_version": 3,
         "job_description_analysis_version": 4,
+        "interaction_language": "zh-CN",
     }
 
     snake_payload = {
@@ -397,6 +399,7 @@ def test_matching_run_payload_accepts_camel_and_snake_names_and_dumps_camel_case
         "profile_version": 5,
         "job_description_version": 6,
         "job_description_analysis_version": 7,
+        "interaction_language": "zh-CN",
     }
     snake_parsed = MatchingAnalysisRunPayload.model_validate(snake_payload)
     assert snake_parsed.model_dump(mode="json") == {
@@ -405,6 +408,7 @@ def test_matching_run_payload_accepts_camel_and_snake_names_and_dumps_camel_case
         "profileVersion": 5,
         "jobDescriptionVersion": 6,
         "jobDescriptionAnalysisVersion": 7,
+        "interactionLanguage": "zh-CN",
     }
 
 

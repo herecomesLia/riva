@@ -4,13 +4,14 @@ import json
 import pytest
 
 from riva.agents import MatchingAnalysisAgent
+from riva.core.language import InteractionLanguage
 from riva.integrations import (
     GenerationParameters,
     LLMUsage,
     MessageRole,
     ProviderUnavailableError,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import (
     MatchingAnalysisInput,
     MatchingAnalysisOutput,
@@ -18,7 +19,7 @@ from riva.schemas.matching_analysis import (
 from tests.helpers.llm import FakeLLMProvider
 
 
-def matching_input() -> MatchingAnalysisInput:
+def matching_input(language: InteractionLanguage = "zh-CN") -> MatchingAnalysisInput:
     return MatchingAnalysisInput.model_validate(
         {
             "career_profile": {
@@ -57,6 +58,7 @@ def matching_input() -> MatchingAnalysisInput:
                     "business_domains": ["支付"],
                 },
             },
+            "interaction_language": language,
         }
     )
 
@@ -88,10 +90,10 @@ def test_agent_uses_fixed_identity_prompt_schema_model_and_parameters() -> None:
 
     assert agent.agent_id == "matching-analyzer"
     assert agent.prompt_id == "matching-analyzer"
-    assert agent.prompt_version == "1"
+    assert agent.prompt_version == "2"
     assert result.agent_id == "matching-analyzer"
     assert result.prompt_id == "matching-analyzer"
-    assert result.prompt_version == "1"
+    assert result.prompt_version == "2"
 
     request = provider.calls[0]
     assert request.output_schema is MatchingAnalysisOutput
@@ -110,7 +112,8 @@ def test_agent_uses_matching_prompt_and_stable_utf8_compact_json_without_mutatio
     before = input.model_dump(mode="json")
 
     values = agent.prompt_values(input)
-    assert set(values) == {"career_profile", "job"}
+    assert set(values) == {"career_profile", "job", "interaction_language"}
+    assert values["interaction_language"] == "zh-CN"
     assert values["career_profile"] == json.dumps(
         input.career_profile.model_dump(mode="json"),
         ensure_ascii=False,
@@ -129,13 +132,25 @@ def test_agent_uses_matching_prompt_and_stable_utf8_compact_json_without_mutatio
     asyncio.run(agent.run(input))
 
     request = provider.calls[0]
-    assert request.messages[0].content == MATCHING_ANALYSIS_PROMPT_V1.render(
+    assert request.messages[0].content == MATCHING_ANALYSIS_PROMPT.render(
         values
     ).system
-    assert request.messages[1].content == MATCHING_ANALYSIS_PROMPT_V1.render(
+    assert request.messages[1].content == MATCHING_ANALYSIS_PROMPT.render(
         values
     ).user
     assert input.model_dump(mode="json") == before
+
+
+def test_agent_uses_interaction_language_over_structured_source_languages() -> None:
+    agent = MatchingAnalysisAgent(
+        FakeLLMProvider([valid_output()]), model="test-model"
+    )
+    values = agent.prompt_values(matching_input("en"))
+    rendered = agent.prompt.render(values)
+
+    assert values["interaction_language"] == "en"
+    assert "Interaction language: en" in rendered.system
+    assert "primary language of the structured JD" not in rendered.system
 
 
 def test_agent_returns_output_and_provider_metadata_and_usage() -> None:

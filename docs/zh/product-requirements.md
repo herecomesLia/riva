@@ -19,6 +19,52 @@ Riva 是面向求职者的 AI 面试训练助理。产品基于用户简历、�
 - [题卡生成与单题训练](#题卡生成与单题训练)
 - [专项练习与模拟面试](#专项练习与模拟面试)
 - [训练记录与推荐](#训练记录与推荐)
+- [语言一致性 / Interaction Language](#语言一致性--interaction-language)
+
+## 语言一致性 / Interaction Language
+
+RIVA 的核心语言规则是：用户选择什么语言，本次交互或训练产生的所有用户可见 AI 内容
+就使用什么语言。当前支持 `zh-CN` 和 `en`，默认 `zh-CN`。该规则覆盖简历解析、JD
+解析、匹配分析、题目和题卡、答题提示、示例回答、动态追问、评分、单题复盘、薄弱项
+说明、下一题推荐、专项练习、模拟面试、用户反问反馈和整场复盘，也覆盖训练记录中由
+RIVA 生成的所有人类可读内容。
+
+### 三种语言语义
+
+1. **UI language** 是当前界面语言，可以随时切换；真实 API 请求默认携带当前规范化的
+   `Accept-Language`。
+2. **Artifact language** 是一次独立 AI 结果的冻结语言。Resume Parsing、JD Parsing、
+   Matching Analysis 以及未来独立生成的 QuestionCard，在创建 AgentRun 时捕获当前 UI
+   language，并通过 `interactionLanguage` 保存在 invocation metadata 中。
+3. **Session language** 是连续训练的业务属性。创建 `PracticeSession` 或
+   `InterviewSession` 时捕获并持久化当前 UI language；本场的 QuestionCard、Question
+   Generation、Follow-up、Evaluation、Review 和 Recommendation 全部继承该值。
+
+UI language 改变只影响导航、按钮和其他固定 UI 文案，不改变已经创建的 artifact，也不
+改变活动 Session 的题目、追问、反馈或复盘。用户下一次创建新的训练 Session 时才使用
+新的 UI language。历史 AI artifact、训练记录和面试记录不自动翻译；如需另一种语言，
+必须通过明确的 regenerate lifecycle 实现。
+
+### 输出语言与事实边界
+
+自然语言描述应使用 interaction language。公司名、学校名、项目名、产品名、技能名、
+编程语言、框架、数据库、协议、标准和 URL 等专有实体尽量保留原文。例如中文交互可以
+输出“负责使用 Python 和 FastAPI 开发后端 API”，而不是强制翻译技术名词。语言转换不得
+增加、删除或改变事实。用户的原始简历、原始 JD 和用户回答原样保存，不由 RIVA 自动翻译。
+
+任何新的用户可见 AI workflow 都必须明确声明语言来源：独立 artifact 使用
+`AgentRun.interactionLanguage`，Session 子操作使用所属 Session 的 `language`。禁止使用
+“检测主要语言并选择输出语言”作为新 Prompt 的主策略；只有历史兼容数据缺少语言时才
+允许使用默认值 `zh-CN`。
+
+### 当前 Agent 与未来能力
+
+当前 Resume Parsing、JD Parsing 和 Matching Analysis 的一次性任务都把规范化语言写入
+AgentRun payload，并由 Worker 从 payload 恢复到 Agent Input 和 Prompt。Worker 不读取
+`Accept-Language`、全局 locale 或浏览器状态。未来 QuestionCard、动态追问、评分、复盘和
+推荐等 Session 子 Agent 不能独立读取 UI language，必须继承 Session language；
+`PracticeSession.language` 和 `InterviewSession.language` 必须在生命周期内不可变并持久化，
+以保证一整轮训练不会出现中英文混杂。
 
 ## 求职档案管理
 
@@ -99,13 +145,18 @@ Riva 应结合用户简历和目标岗位 JD，生成匹配分析报告。报告
 题卡至少应包含以下内容：
 
 1. 题目。
-2. 题目类型。
-3. 难度。
-4. 考察能力。
-5. 推荐使用的项目或经历素材。
-6. 答题提示。
-7. 可能追问方向。
-8. 评分参考。
+2. `language: InteractionLanguage`，明确题卡中所有 RIVA 生成的人类可读内容的语言。
+3. 题目类型。
+4. 难度。
+5. 考察能力。
+6. 推荐使用的项目或经历素材。
+7. 答题提示。
+8. 可能追问方向。
+9. 评分参考。
+
+题卡不能依赖文本内容猜测语言。独立题卡使用创建 AgentRun 时捕获的
+`interactionLanguage`；属于 `PracticeSession` 或 `InterviewSession` 的题卡必须与所属
+Session 的 `language` 相同。
 
 Riva 生成个性化题卡时，应参考以下信息：
 

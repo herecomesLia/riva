@@ -19,6 +19,64 @@ Across the user's journey from building a job search profile and understanding a
 - [Question Cards and Single-Question Practice](#question-cards-and-single-question-practice)
 - [Targeted Practice and Mock Interviews](#targeted-practice-and-mock-interviews)
 - [Training Records and Recommendations](#training-records-and-recommendations)
+- [Language consistency / Interaction Language](#language-consistency--interaction-language)
+
+## Language consistency / Interaction Language
+
+RIVA's core language rule is: every user-visible AI artifact produced during the
+current interaction or training uses the language selected by the user. The current
+supported values are `zh-CN` and `en`, with `zh-CN` as the default. This covers resume
+parsing, JD parsing, matching analysis, questions and QuestionCards, answering hints,
+example answers, dynamic follow-ups, scoring, single-question reviews, weak-area
+explanations, next-question recommendations, targeted practice, mock interviews,
+candidate-question feedback, full-session reviews, and all human-readable RIVA
+content stored in training records.
+
+### Three language meanings
+
+1. **UI language** is the current interface language and can change at any time. Real
+   API requests default to the normalized current language in `Accept-Language`.
+2. **Artifact language** is the frozen language of one independent AI result. Resume
+   Parsing, JD Parsing, Matching Analysis, and future independent QuestionCard
+   generation capture the current UI language when their AgentRun is created and
+   store it as `interactionLanguage` in invocation metadata.
+3. **Session language** is business metadata for continuous training. A
+   `PracticeSession` or `InterviewSession` captures and persists the current UI
+   language at creation; every QuestionCard, Question Generation, Follow-up,
+   Evaluation, Review, and Recommendation in that session inherits it.
+
+Changing the UI language affects navigation, buttons, and other fixed UI copy only.
+It does not change an existing artifact or the questions, follow-ups, feedback, or
+review of an active Session. The next newly created training Session uses the new UI
+language. Historical AI artifacts, training records, and interview records are not
+automatically translated; another language requires an explicit regenerate lifecycle.
+
+### Output language and evidence boundary
+
+Natural-language descriptions use the interaction language. Company, school, project,
+product, skill, programming-language, framework, database, protocol, standard, and
+URL entities should remain in their original form where practical. For example, a
+Chinese interaction may say “负责使用 Python 和 FastAPI 开发后端 API” without
+translating the technical names. Language conversion must not add, remove, or change
+facts. Raw user resumes, raw JDs, and user answers are stored as entered and are not
+automatically translated by RIVA.
+
+Every new user-visible AI workflow must declare its language source: an independent
+artifact uses `AgentRun.interactionLanguage`, and a Session child operation uses its
+owning Session's `language`. New Prompts must not use “detect the primary language and
+choose the output language” as their main strategy; a default of `zh-CN` is allowed
+only for historical compatibility data that lacks a language.
+
+### Current Agents and future capabilities
+
+The current Resume Parsing, JD Parsing, and Matching Analysis one-shot operations
+write the normalized language into the AgentRun payload. Workers restore it from the
+payload into Agent Input and Prompt rendering; they never read `Accept-Language`, a
+global locale, or browser state. Future QuestionCard, follow-up, evaluation, review,
+and recommendation Agents must inherit Session language rather than independently
+reading UI language. `PracticeSession.language` and `InterviewSession.language` must
+be immutable for the session lifetime and persisted so a full training round cannot
+mix Chinese and English.
 
 ## Job Search Profile Management
 
@@ -99,13 +157,20 @@ A question card is the smallest interview training unit in Riva. It is a structu
 A question card should include at least:
 
 1. Question.
-2. Question type.
-3. Difficulty.
-4. Assessed capabilities.
-5. Recommended project or experience materials.
-6. Answering hints.
-7. Possible follow-up directions.
-8. Scoring reference.
+2. `language: InteractionLanguage`, explicitly identifying the language of all
+   human-readable RIVA-generated content in the card.
+3. Question type.
+4. Difficulty.
+5. Assessed capabilities.
+6. Recommended project or experience materials.
+7. Answering hints.
+8. Possible follow-up directions.
+9. Scoring reference.
+
+A question card must not make its language guessable only from its text. An
+independent card uses the `interactionLanguage` captured when its AgentRun is
+created; a card belonging to a `PracticeSession` or `InterviewSession` must equal
+the owning Session's `language`.
 
 When generating personalized question cards, Riva should refer to:
 

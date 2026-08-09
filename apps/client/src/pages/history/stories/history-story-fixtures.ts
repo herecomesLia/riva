@@ -12,6 +12,7 @@ type TrainingRecordDetail = TargetedPracticeRecordDetailResponse | MockInterview
 function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
   const base = {
     id: record.id,
+    language: record.language,
     status: record.status,
     startedAt: record.startedAt,
     endedAt: record.endedAt,

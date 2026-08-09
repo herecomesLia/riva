@@ -1,6 +1,12 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+import { i18n } from "@/i18n/i18n"
 
 import * as context from "./practice.mock-test-utils"
+
+afterEach(() => {
+  void i18n.changeLanguage("zh-CN")
+})
 
 describe("practice stateful mock service: setup", () => {
   it("projects current target-role data from the roles mock service", async () => {
@@ -70,6 +76,45 @@ describe("practice stateful mock service: setup", () => {
       sessionId: generating.session.sessionId,
       version: 2,
     })
+  })
+
+  it("freezes the session language while a new session uses the switched UI language", async () => {
+    await i18n.changeLanguage("zh-CN")
+    const setup = await context.settle(context.getPracticePage())
+    const targetRoleId = setup.setupContext.defaultTargetRoleId
+    if (targetRoleId === null) throw new Error("Expected a default target role.")
+
+    const started = await context.settle(
+      context.startPracticeSession({ ...setup.session.selection, targetRoleId }),
+    )
+    expect(started.session).toMatchObject({
+      status: "generatingQuestion",
+      language: "zh-CN",
+    })
+    if (started.session.status !== "generatingQuestion") return
+
+    await i18n.changeLanguage("en")
+    const pollInput = {
+      sessionId: started.session.sessionId,
+      version: started.session.version,
+    }
+    const firstPoll = await context.settle(context.getQuestionGenerationStatus(pollInput))
+    const secondPoll = await context.settle(context.getQuestionGenerationStatus(pollInput))
+    if (firstPoll.session.status === "setup" || secondPoll.session.status === "setup") return
+    expect(firstPoll.session.language).toBe("zh-CN")
+    expect(secondPoll.session.language).toBe("zh-CN")
+
+    context.resetPracticeMockState("setupReady")
+    const nextSetup = await context.settle(context.getPracticePage())
+    const nextTargetRoleId = nextSetup.setupContext.defaultTargetRoleId
+    if (nextTargetRoleId === null) throw new Error("Expected a default target role.")
+    const next = await context.settle(
+      context.startPracticeSession({
+        ...nextSetup.session.selection,
+        targetRoleId: nextTargetRoleId,
+      }),
+    )
+    expect(next.session).toMatchObject({ language: "en" })
   })
 
   it("prepares a completed session for another round without retaining session or attempt state", async () => {

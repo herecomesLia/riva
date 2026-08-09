@@ -13,8 +13,10 @@ import type {
   GetInterviewReviewResponse,
   InterviewCandidateQuestionExchangeResponse,
   InterviewConversationRecordViewData,
+  InterviewQuestionResponse,
   InterviewSetupResponse,
 } from "@/models/interview"
+import type { InteractionLanguage } from "@/types/language"
 
 import type { InterviewSessionSummary } from "../InterviewSessionView"
 
@@ -40,8 +42,11 @@ export function createInterviewSetupStoryFixture(
   return structuredClone(createInterviewMockResponse(scenario).setup)
 }
 
-export function createInterviewSessionStoryFixture() {
-  const response = createInterviewMockResponse("completed")
+export function createInterviewSessionStoryFixture(language: InteractionLanguage = "zh-CN") {
+  const response = {
+    ...createInterviewMockResponse("completed"),
+    session: createInterviewCompletedSessionMock({ language }),
+  }
   const session = response.session
   if (session?.status !== "completed") {
     throw new Error("Completed interview fixture required.")
@@ -86,12 +91,72 @@ export function createInterviewSessionStoryFixture() {
   }
 
   return {
+    language: session.language,
     candidateExchange: structuredClone(candidateExchange),
     candidatePrompt: candidateQuestionsPromptMock,
     completedQuestions: structuredClone(session.completedQuestions),
     history,
     openingMessage: interviewOpeningMessageMock,
     summary,
+  }
+}
+
+export function createEnglishInterviewSessionStoryFixture() {
+  const fixture = createInterviewSessionStoryFixture("en")
+  const englishPrompts: Record<string, string> = {
+    [fixture.completedQuestions[0]?.question.id ?? ""]:
+      "Please introduce your experience and explain how it aligns with this role.",
+    [fixture.completedQuestions[1]?.question.id ?? ""]:
+      "Describe a complex technical project you led and how you measured its result.",
+  }
+
+  const completedQuestions = fixture.completedQuestions.map((completedQuestion) => ({
+    ...completedQuestion,
+    question: {
+      ...completedQuestion.question,
+      prompt: englishPrompts[completedQuestion.question.id] ?? completedQuestion.question.prompt,
+    },
+    followUps: completedQuestion.followUps.map((followUp) => ({
+      ...followUp,
+      question: {
+        ...followUp.question,
+        prompt: "What evidence would you use to validate that result?",
+      },
+    })),
+  })) satisfies Array<{
+    question: InterviewQuestionResponse
+  }>
+
+  return {
+    ...fixture,
+    completedQuestions,
+    openingMessage:
+      "Welcome to this mock interview. I will ask a series of questions about your experience, project capabilities, and motivation. Please answer as you would in a formal interview.",
+    candidatePrompt:
+      "The formal questions are complete. You can now ask the interviewer questions.",
+    candidateExchange: {
+      ...fixture.candidateExchange,
+      interviewerAnswer:
+        "This role works closely with the recommendations, search, and commerce teams. The initial focus is learning the core flows and gradually taking ownership of cross-team technical projects.",
+      feedback: {
+        summary:
+          "The question focuses on collaboration and onboarding goals, which helps clarify the practical scope of the role.",
+        strengths: ["Focuses on real responsibilities", "Shows interest in long-term contribution"],
+        improvementSuggestions: [
+          "You could also ask about the concrete success criteria for the first six months.",
+        ],
+        suggestedAlternatives: [
+          "What outcomes does the team use to evaluate success after six months in this role?",
+        ],
+      },
+    },
+    history: fixture.history.map((record, index) => ({
+      ...record,
+      prompt:
+        index === 0
+          ? "Please introduce your experience and explain how it aligns with this role."
+          : "Describe a complex technical project you led and how you measured its result.",
+    })),
   }
 }
 

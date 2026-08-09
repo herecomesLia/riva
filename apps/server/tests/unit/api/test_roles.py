@@ -121,8 +121,12 @@ class FakeTargetRoleService:
     ):
         return await self._result("analysis", user, role_id, payload)
 
-    async def start_job_description_parsing(self, user, role_id, payload):
-        return await self._result("start-parsing", user, role_id, payload)
+    async def start_job_description_parsing(
+        self, user, role_id, payload, *, interaction_language
+    ):
+        return await self._result(
+            "start-parsing", user, role_id, payload, interaction_language
+        )
 
     async def get_job_description_parsing_status(self, user, role_id, query):
         self.calls.append(("parsing-status", (user, role_id, query)))
@@ -130,8 +134,12 @@ class FakeTargetRoleService:
             raise self.error
         return target_role()
 
-    async def start_matching_analysis(self, user, role_id, payload):
-        return await self._result("start-matching", user, role_id, payload)
+    async def start_matching_analysis(
+        self, user, role_id, payload, *, interaction_language
+    ):
+        return await self._result(
+            "start-matching", user, role_id, payload, interaction_language
+        )
 
     async def get_matching_analysis_status(self, user, role_id, query):
         self.calls.append(("matching-status", (user, role_id, query)))
@@ -252,7 +260,7 @@ def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
         started = client.post(
             path,
             json={"version": 2, "jobDescriptionVersion": 1},
-            headers={"Origin": TRUSTED_ORIGIN},
+            headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "en-US"},
         )
         polled = client.get(
             f"{path}?version=2&jobDescriptionVersion=1"
@@ -261,6 +269,7 @@ def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
     assert started.status_code == 202
     assert service.calls[0][0] == "start-parsing"
     assert service.calls[0][1][2].job_description_version == 1
+    assert service.calls[0][1][3] == "en"
     assert polled.status_code == 200
     assert polled.json() == target_role().model_dump(mode="json")
     assert service.calls[1][0] == "parsing-status"
@@ -274,13 +283,14 @@ def test_start_matching_returns_202_and_status_get_uses_query_version(app) -> No
         started = client.post(
             path,
             json={"version": 2},
-            headers={"Origin": TRUSTED_ORIGIN},
+            headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "zh"},
         )
         polled = client.get(f"{path}?version=2")
 
     assert started.status_code == 202
     assert service.calls[0][0] == "start-matching"
     assert service.calls[0][1][2].version == 2
+    assert service.calls[0][1][3] == "zh-CN"
     assert polled.status_code == 200
     assert polled.json() == target_role().model_dump(mode="json")
     assert service.calls[1][0] == "matching-status"

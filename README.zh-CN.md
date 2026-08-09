@@ -50,8 +50,7 @@ uv run --directory apps/server riva worker --env-file "$PWD/.env"
 未配置 `RIVA_LLM_PROVIDER` 时，Worker 会使用空 Handler Registry 启动。完整配置
 Qwen（`RIVA_LLM_PROVIDER=qwen`、model、API Key 和 base URL）后，会注册
 `job-description-parser`、`matching-analyzer` 和 `resume-parser`，启动日志中的
-`handler_count` 应为 `3`。API 已暴露 JD parsing lifecycle 和 Matching analysis lifecycle；前端真实 API
-接入将在后续完成。简历解析成功后，API 还提供可审阅的导入 Draft 和显式应用接口：
+`handler_count` 应为 `3`。API 已暴露 JD parsing lifecycle 和 Matching analysis lifecycle；API 与前端已完成 JD parsing lifecycle 和 Matching analysis lifecycle 的真实接入。前端会在 Agent 任务执行期间轮询状态，并在求职档案或 JD 结构化分析发生变化后将已有匹配结果标记为 stale，支持基于最新数据重新生成。简历解析成功后，API 还提供可审阅的导入 Draft 和显式应用接口：
 
 - `GET /api/profile/resumes/{resumeId}/import-draft` 查看当前 Draft；
 - `POST /api/profile/resumes/{resumeId}/import-draft/apply`，提交

@@ -135,3 +135,32 @@ Output:
 <END_UNTRUSTED_RESUME_TEXT>
 """,
 )
+
+
+RESUME_PARSING_PROMPT_V3 = PromptDefinition(
+    prompt_id="resume-parser",
+    version="3",
+    output_schema_id="resume-parsing-v1",
+    output_schema=ResumeParsingOutput,
+    system_template=RESUME_PARSING_PROMPT_V2.system_template.replace(
+        """Language:
+- Write summary, responsibilities, achievements, and unresolved_items in the primary language of the resume.
+- Preserve company, school, project, and skill names in their original form where practical, while keeping the output language consistent.
+""",
+        """Language:
+- Interaction language: {interaction_language}.
+- If interaction_language is zh-CN, write all naturally translatable human-readable fields in Simplified Chinese.
+- If interaction_language is en, write all naturally translatable human-readable fields in English.
+- This includes summary, responsibilities, achievements, and unresolved_items, as well as ordinary descriptive fields such as degree, major, role, and title when translation does not change the facts.
+- Keep company names, school names, project names, skill names, product names, URLs, framework names, programming languages, database names, and standard or protocol abbreviations in their original form where practical.
+- Translate surrounding descriptions without translating technical entities merely for consistency. For example, an English source may produce “负责使用 Python 和 FastAPI 开发后端 API” for zh-CN.
+- Never add, remove, or change facts to satisfy the interaction language.
+""",
+    ),
+    user_template="""Interaction language: {interaction_language}
+
+""" + RESUME_PARSING_PROMPT_V2.user_template,
+)
+
+
+RESUME_PARSING_PROMPT = RESUME_PARSING_PROMPT_V3

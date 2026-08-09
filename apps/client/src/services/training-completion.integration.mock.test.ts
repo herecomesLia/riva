@@ -5,6 +5,7 @@ import { resetPracticeMockState } from "@/mocks/services/practice"
 import { resetProfileMockState } from "@/mocks/services/profile"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
+import { i18n } from "@/i18n/i18n"
 import {
   beginInterviewQuestions,
   endInterview,
@@ -95,6 +96,7 @@ describe("training completion to history mock integration", () => {
     )
     expect(detail).toMatchObject({
       id: recordId,
+      language: completed.session.language,
       setup: {
         questionType: completed.session.selection.questionType,
         difficulty: completed.session.selection.difficulty,
@@ -140,6 +142,7 @@ describe("training completion to history mock integration", () => {
       getMockInterviewRecord(`mock-interview-record-${completed.session.sessionId}`),
     )
     expect(detail).toMatchObject({
+      language: completed.session.language,
       status: "endedEarly",
       completionReason: "userEndedEarly",
       answeredQuestionCount: 0,
@@ -155,6 +158,29 @@ describe("training completion to history mock integration", () => {
         },
       ],
     })
+  })
+
+  it("persists the original session language in generated training records", async () => {
+    await i18n.changeLanguage("en")
+
+    const practice = await completePractice()
+    const practiceRecord = await settle(
+      getTargetedPracticeRecord(`targeted-practice-record-${practice.session.sessionId}`),
+    )
+    expect(practiceRecord.language).toBe(practice.session.language)
+
+    const question = await startInterviewAtFirstQuestion()
+    const interview = await endInterview({
+      sessionId: question.sessionId,
+      version: question.version,
+    })
+    if (interview.session?.status !== "completed") throw new Error("Expected completion.")
+    expect(interview.session.language).toBe("en")
+
+    const interviewRecord = await settle(
+      getMockInterviewRecord(`mock-interview-record-${interview.session.sessionId}`),
+    )
+    expect(interviewRecord.language).toBe(interview.session.language)
   })
 
   it("creates a partial interview record from answered and unanswered questions", async () => {

@@ -14,6 +14,7 @@ import {
   type InterviewMockScenario,
   type MockInterviewAgentPlan,
 } from "@/mocks/data/interview"
+import { getCurrentInteractionLanguage } from "@/i18n/language"
 import {
   clearCompletedInterviewSessions,
   getCompletedInterviewSession,
@@ -200,6 +201,7 @@ function toQuestionSession(
   return {
     status: "question",
     sessionId: session.sessionId,
+    language: session.language,
     version: session.version + 1,
     configuration: session.configuration,
     startedAt: session.startedAt,
@@ -221,6 +223,7 @@ function toCandidateQuestionsSession(
   return {
     status: "candidateQuestions",
     sessionId: session.sessionId,
+    language: session.language,
     version: session.version + 1,
     configuration: session.configuration,
     startedAt: session.startedAt,
@@ -358,6 +361,7 @@ export async function startInterview(
   return commit({
     status: "opening",
     sessionId: `mock-interview-session-${sessionSequence}`,
+    language: getCurrentInteractionLanguage(),
     version: 1,
     configuration: copy(input),
     startedAt: nextTimestamp(),
@@ -406,6 +410,7 @@ export async function submitInterviewAnswer(
       return commit({
         status: "followUp",
         sessionId: session.sessionId,
+        language: session.language,
         version: session.version + 1,
         configuration: session.configuration,
         startedAt: session.startedAt,
@@ -541,6 +546,7 @@ function toCompletedSession(
   return {
     status: "completed",
     sessionId: session.sessionId,
+    language: session.language,
     version: session.version + 1,
     configuration: session.configuration,
     startedAt: session.startedAt,

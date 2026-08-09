@@ -1,3 +1,5 @@
+import type { InteractionLanguage } from "@/types/language"
+
 export type PracticeQuestionType =
   "projectDeepDive" | "behavioral" | "businessUnderstanding" | "motivation" | "technicalFoundation"
 
@@ -210,6 +212,7 @@ export type UnfinishedPracticeAttempt = {
 
 type PracticeActiveSessionBase = {
   sessionId: string
+  language: InteractionLanguage
   /** Positive integer incremented by persisted session state changes. */
   version: number
   selection: ActivePracticeSelection
