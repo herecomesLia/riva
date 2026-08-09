@@ -53,7 +53,7 @@ describe("RolesPage Target Roles API capabilities", () => {
     vi.unstubAllGlobals()
   })
 
-  it("shows saved JD text without polling or exposing parsing and matching actions", async () => {
+  it("shows saved JD text and exposes the real analysis capabilities", async () => {
     const user = userEvent.setup()
     renderWithProviders(<RolesPage />, { router: { initialEntries: ["/roles"] } })
 
@@ -66,7 +66,7 @@ describe("RolesPage Target Roles API capabilities", () => {
     expect(within(card).getByText(i18n.t("roles.jd.saved.description"))).toBeInTheDocument()
     expect(
       screen.queryByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }),
-    ).not.toBeInTheDocument()
+    ).toBeInTheDocument()
     expect(
       within(card).queryByRole("button", { name: i18n.t("roles.jd.actions.retry") }),
     ).not.toBeInTheDocument()

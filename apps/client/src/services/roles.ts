@@ -8,17 +8,15 @@ import type {
   GetJobDescriptionParsingStatusInput,
   GetMatchingAnalysisStatusInput,
   RolesPageResponse,
-  RolesPageResponseDto,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
   TargetRole,
-  TargetRoleApiDto,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
-import { rolesPageResponseSchema } from "@/schemas/roles"
+import { rolesPageResponseSchema, targetRoleResponseSchema } from "@/schemas/roles"
 import { apiRequest } from "@/services/api"
 
 export type RolesCapabilities = {
@@ -31,39 +29,20 @@ const allRolesCapabilities: RolesCapabilities = {
   matchingAnalysis: true,
 }
 
-const targetRolesApiCapabilities: RolesCapabilities = {
-  jobDescriptionAnalysis: false,
-  matchingAnalysis: false,
-}
-
-export const rolesCapabilities = env.mock ? allRolesCapabilities : targetRolesApiCapabilities
-
-function realApiUnavailable(feature: string): never {
-  throw new Error(`${feature} is not supported by the Target Roles API.`)
-}
-
-function mapRolesPageResponse(dto: RolesPageResponseDto): RolesPageResponse {
-  return {
-    currentRoleId: dto.currentRoleId,
-    profileContext: dto.profileContext,
-    roles: dto.roles.map(mapTargetRole),
-  }
-}
-
-function mapTargetRole(role: TargetRoleApiDto): TargetRole {
-  if (role.jobDescription.status === "missing") {
-    return { ...role, jobDescription: role.jobDescription }
-  }
-
-  return { ...role, jobDescription: role.jobDescription }
-}
+export const rolesCapabilities = allRolesCapabilities
 
 async function requestRolesPage(
   path: string,
   options?: Parameters<typeof apiRequest>[1],
 ): Promise<RolesPageResponse> {
-  const dto = rolesPageResponseSchema.parse(await apiRequest<unknown>(path, options))
-  return mapRolesPageResponse(dto)
+  return rolesPageResponseSchema.parse(await apiRequest<unknown>(path, options))
+}
+
+async function requestTargetRole(
+  path: string,
+  options?: Parameters<typeof apiRequest>[1],
+): Promise<TargetRole> {
+  return targetRoleResponseSchema.parse(await apiRequest<unknown>(path, options))
 }
 
 export function getRolesPage(): Promise<RolesPageResponse> {
@@ -135,33 +114,51 @@ export function startJobDescriptionParsing(
   input: StartOrRetryJobDescriptionParsingInput,
 ): Promise<RolesPageResponse> {
   if (env.mock) return rolesMockService.startJobDescriptionParsing(input)
-  return Promise.reject(realApiUnavailable("Job description parsing"))
+  const { roleId, ...request } = input
+  return requestRolesPage(`/roles/${encodeURIComponent(roleId)}/job-description/parsing`, {
+    json: request,
+    method: "POST",
+  })
 }
 
 export function getJobDescriptionParsingStatus(
   input: GetJobDescriptionParsingStatusInput,
 ): Promise<TargetRole> {
   if (env.mock) return rolesMockService.getJobDescriptionParsingStatus(input)
-  return Promise.reject(realApiUnavailable("Job description parsing status"))
+  const query = new URLSearchParams({
+    version: String(input.version),
+    jobDescriptionVersion: String(input.jobDescriptionVersion),
+  })
+  return requestTargetRole(
+    `/roles/${encodeURIComponent(input.roleId)}/job-description/parsing?${query}`,
+  )
 }
 
 export function generateMatchingAnalysis(
   input: GenerateOrRegenerateMatchingAnalysisInput,
 ): Promise<RolesPageResponse> {
   if (env.mock) return rolesMockService.generateMatchingAnalysis(input)
-  return Promise.reject(realApiUnavailable("Matching analysis generation"))
+  return requestRolesPage(`/roles/${encodeURIComponent(input.roleId)}/matching-analysis`, {
+    json: { version: input.version },
+    method: "POST",
+  })
 }
 
 export function getMatchingAnalysisStatus(
   input: GetMatchingAnalysisStatusInput,
 ): Promise<TargetRole> {
   if (env.mock) return rolesMockService.getMatchingAnalysisStatus(input)
-  return Promise.reject(realApiUnavailable("Matching analysis status"))
+  const query = new URLSearchParams({ version: String(input.version) })
+  return requestTargetRole(`/roles/${encodeURIComponent(input.roleId)}/matching-analysis?${query}`)
 }
 
 export function updateJobDescriptionAnalysisModule(
   input: UpdateJobDescriptionAnalysisModuleInput,
 ): Promise<RolesPageResponse> {
   if (env.mock) return rolesMockService.updateJobDescriptionAnalysisModule(input)
-  return Promise.reject(realApiUnavailable("Job description analysis editing"))
+  const { roleId, ...request } = input
+  return requestRolesPage(`/roles/${encodeURIComponent(roleId)}/job-description/analysis`, {
+    json: request,
+    method: "PATCH",
+  })
 }

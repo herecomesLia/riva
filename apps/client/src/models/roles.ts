@@ -230,27 +230,9 @@ export type RolesPageResponse = {
   profileContext: ProfileContext
 }
 
-export type TargetRoleApiDto = {
-  id: string
-  title: string
-  company: string | null
-  recruitmentType: TargetRoleRecruitmentType | null
-  location: string | null
-  experienceRange: TargetRoleExperienceRange | null
-  preparationStatus: TargetRolePreparationStatus
-  createdAt: string
-  updatedAt: string
-  version: number
-  jobDescription: MissingJobDescription | SavedJobDescription
-  jobDescriptionAnalysis: null
-  matchingAnalysis: null
-}
+export type TargetRoleApiDto = TargetRole
 
-export type RolesPageResponseDto = {
-  roles: TargetRoleApiDto[]
-  currentRoleId: string | null
-  profileContext: ProfileContext
-}
+export type RolesPageResponseDto = RolesPageResponse
 
 export type CreateTargetRoleInput = {
   title: string
