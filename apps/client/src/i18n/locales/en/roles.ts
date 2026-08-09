@@ -71,6 +71,7 @@ export const roles = {
       editModuleLabel: "Edit {{module}}",
       saveCorrection: "Save changes",
       savingCorrection: "Saving",
+      startParsing: "Start parsing",
       retry: "Retry parsing",
       resynchronize: "Synchronize status",
     },
@@ -79,7 +80,7 @@ export const roles = {
       replaceTitle: "Edit or replace job description",
       description: "The first version supports pasted text only. Saving starts structured parsing.",
       saveOnlyDescription:
-        "Save the original job-description text. Structured parsing is not available yet.",
+        "Save the original job-description text. Structured parsing can be started after saving.",
       fieldLabel: "Job description text",
       placeholder: "Paste the full responsibilities, requirements, and preferred qualifications…",
       required: "Paste the job description text.",
@@ -90,7 +91,7 @@ export const roles = {
     saved: {
       title: "JD saved",
       description:
-        "The original text is saved and waiting for structured parsing in a later release.",
+        "The original JD is saved, but structured parsing has not started. Start parsing and finish it before generating match analysis.",
     },
     failed: {
       title: "JD parsing did not complete",
@@ -181,8 +182,7 @@ export const roles = {
         },
         saved: {
           title: "JD saved but not parsed",
-          description:
-            "Structured parsing is not available from the current service, so match analysis is unavailable.",
+          description: "Start and finish structured JD parsing before generating match analysis.",
         },
         parsing: {
           title: "Waiting for JD parsing",

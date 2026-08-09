@@ -67,6 +67,7 @@ export const roles = {
       editModuleLabel: "编辑 {{module}}",
       saveCorrection: "保存修改",
       savingCorrection: "正在保存",
+      startParsing: "开始解析",
       retry: "重试解析",
       resynchronize: "重新同步状态",
     },
@@ -74,7 +75,7 @@ export const roles = {
       addTitle: "粘贴岗位 JD",
       replaceTitle: "编辑或替换岗位 JD",
       description: "第一版仅支持粘贴文本。保存后将开始结构化解析。",
-      saveOnlyDescription: "保存岗位 JD 原文。当前服务暂不提供结构化解析。",
+      saveOnlyDescription: "保存岗位 JD 原文。保存完成后可以开始结构化解析。",
       fieldLabel: "岗位 JD 原文",
       placeholder: "在这里粘贴完整的岗位职责、任职要求和加分项……",
       required: "请粘贴岗位 JD 文本。",
@@ -84,7 +85,7 @@ export const roles = {
     },
     saved: {
       title: "JD 已保存",
-      description: "原始文本已保存，等待后续版本提供结构化解析。",
+      description: "JD 原文已保存，但尚未开始结构化解析。开始解析并完成后，才能生成匹配分析。",
     },
     failed: {
       title: "JD 解析未完成",
@@ -170,7 +171,7 @@ export const roles = {
         },
         saved: {
           title: "JD 已保存，尚未解析",
-          description: "当前服务暂不提供结构化解析，因此匹配分析暂不可用。",
+          description: "请先开始并完成 JD 结构化解析，完成后才能生成匹配分析。",
         },
         parsing: {
           title: "正在等待 JD 解析",

@@ -19,7 +19,7 @@ export type RoleDetailsActions = {
   togglePreparationStatus: () => void
   editJobDescription: () => void
   editJobDescriptionAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
-  retryJobDescriptionParsing?: () => void
+  startJobDescriptionParsing?: () => void
   retryJobDescriptionSynchronization?: () => void
   generateMatchingAnalysis?: () => void
   retryMatchingAnalysisSynchronization?: () => void
@@ -119,7 +119,7 @@ export function RoleDetails({
                   role.preparationStatus === "archived" ? undefined : actions?.editJobDescription
                 }
                 onEditAnalysisModule={actions?.editJobDescriptionAnalysisModule}
-                onRetry={actions?.retryJobDescriptionParsing}
+                onStartParsing={actions?.startJobDescriptionParsing}
                 onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
                 pending={pending}
                 role={role}

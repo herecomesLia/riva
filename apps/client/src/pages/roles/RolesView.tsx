@@ -56,7 +56,7 @@ export type RolesViewActions = {
   generateMatchingAnalysis?: (
     input: GenerateOrRegenerateMatchingAnalysisInput,
   ) => Promise<RolesPageResponse>
-  retryJobDescriptionParsing?: (
+  startJobDescriptionParsing?: (
     input: StartOrRetryJobDescriptionParsingInput,
   ) => Promise<RolesPageResponse>
   retryJobDescriptionSynchronization?: (
@@ -308,15 +308,20 @@ function RolesReadyView({
                                 )
                               }
                             : undefined,
-                          retryJobDescriptionParsing: actions.retryJobDescriptionParsing
+                          startJobDescriptionParsing: actions.startJobDescriptionParsing
                             ? () => {
-                                const retryJobDescriptionParsing =
-                                  actions.retryJobDescriptionParsing
-                                if (!retryJobDescriptionParsing) return
-                                if (selectedRole.jobDescription.status !== "failed") return
+                                const startJobDescriptionParsing =
+                                  actions.startJobDescriptionParsing
+                                if (!startJobDescriptionParsing) return
+                                if (
+                                  selectedRole.jobDescription.status !== "saved" &&
+                                  selectedRole.jobDescription.status !== "failed"
+                                ) {
+                                  return
+                                }
                                 const jobDescriptionVersion = selectedRole.jobDescription.version
                                 void runAction(() =>
-                                  retryJobDescriptionParsing({
+                                  startJobDescriptionParsing({
                                     roleId: selectedRole.id,
                                     version: selectedRole.version,
                                     jobDescriptionVersion,
@@ -422,7 +427,7 @@ function RolesReadyView({
             }}
             onSaved={closeEditor}
             open={isJobDescriptionEditorOpen}
-            parsingSupported={actions.retryJobDescriptionParsing !== undefined}
+            parsingSupported={actions.startJobDescriptionParsing !== undefined}
             role={selectedRole}
           />
           {actions.updateJobDescriptionAnalysisModule && (

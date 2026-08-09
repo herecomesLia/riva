@@ -65,7 +65,7 @@ export function RolesPage() {
   const deleteMutation = useMutation({ mutationFn: deleteTargetRole, onSuccess: setRolesResponse })
   const generateMatchingAnalysisMutation = useMutation({ mutationFn: generateMatchingAnalysis })
   const saveJobDescriptionMutation = useMutation({ mutationFn: saveJobDescription })
-  const retryJobDescriptionParsingMutation = useMutation({
+  const startJobDescriptionParsingMutation = useMutation({
     mutationFn: startJobDescriptionParsing,
   })
   const updateJobDescriptionAnalysisModuleMutation = useMutation({
@@ -111,8 +111,8 @@ export function RolesPage() {
       },
     }),
     ...(rolesCapabilities.jobDescriptionAnalysis && {
-      retryJobDescriptionParsing: async (input) => {
-        const response = await runMutation(retryJobDescriptionParsingMutation.mutateAsync, input)
+      startJobDescriptionParsing: async (input) => {
+        const response = await runMutation(startJobDescriptionParsingMutation.mutateAsync, input)
         setRolesResponse(response)
         clearSynchronizationError(input.roleId)
         return response
@@ -131,10 +131,22 @@ export function RolesPage() {
       },
     }),
     saveJobDescription: async (input) => {
-      const response = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
-      setRolesResponse(response)
+      const savedResponse = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
+      setRolesResponse(savedResponse)
       clearSynchronizationError(input.roleId)
-      return response
+
+      const savedRole = savedResponse.roles.find((role) => role.id === input.roleId)
+      if (!savedRole) throw new RolesActionError("requestFailed")
+      if (savedRole.jobDescription.status !== "saved") return savedResponse
+
+      const parsingResponse = await runMutation(startJobDescriptionParsingMutation.mutateAsync, {
+        jobDescriptionVersion: savedRole.jobDescription.version,
+        roleId: savedRole.id,
+        version: savedRole.version,
+      })
+      setRolesResponse(parsingResponse)
+      clearSynchronizationError(input.roleId)
+      return parsingResponse
     },
     setCurrentTargetRole: (input) => runMutation(setCurrentMutation.mutateAsync, input),
     ...(rolesCapabilities.jobDescriptionAnalysis && {

@@ -29,7 +29,7 @@ import type {
 export function JobDescriptionCard({
   onEdit,
   onEditAnalysisModule,
-  onRetry,
+  onStartParsing,
   onRetrySynchronization,
   pending,
   role,
@@ -37,7 +37,7 @@ export function JobDescriptionCard({
 }: {
   onEdit?: () => void
   onEditAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
-  onRetry?: () => void
+  onStartParsing?: () => void
   onRetrySynchronization?: () => void
   pending?: boolean
   role: TargetRole
@@ -87,12 +87,18 @@ export function JobDescriptionCard({
             synchronizationError={synchronizationError}
           />
         )}
-        {jobDescription.status === "saved" && <SavedState rawText={jobDescription.rawText} />}
+        {jobDescription.status === "saved" && (
+          <SavedState
+            onStartParsing={onStartParsing}
+            pending={pending}
+            rawText={jobDescription.rawText}
+          />
+        )}
         {jobDescription.status === "failed" && (
           <FailedState
             failureReason={jobDescription.parsingFailureReason}
             onEdit={onEdit}
-            onRetry={onRetry}
+            onStartParsing={onStartParsing}
             pending={pending}
           />
         )}
@@ -108,7 +114,15 @@ export function JobDescriptionCard({
   )
 }
 
-function SavedState({ rawText }: { rawText: string }) {
+function SavedState({
+  onStartParsing,
+  pending,
+  rawText,
+}: {
+  onStartParsing?: () => void
+  pending?: boolean
+  rawText: string
+}) {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-4" data-testid="saved-job-description">
@@ -116,6 +130,18 @@ function SavedState({ rawText }: { rawText: string }) {
         <AlertTitle>{t("roles.jd.saved.title")}</AlertTitle>
         <AlertDescription>{t("roles.jd.saved.description")}</AlertDescription>
       </Alert>
+      <div className="flex flex-wrap gap-2">
+        {onStartParsing && (
+          <Button disabled={pending} onClick={onStartParsing} size="sm">
+            {pending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <RefreshCwIcon data-icon="inline-start" />
+            )}
+            {t("roles.jd.actions.startParsing")}
+          </Button>
+        )}
+      </div>
       <div className="rounded-xl border bg-muted/30 p-4">
         <p className="whitespace-pre-wrap text-sm leading-6">{rawText}</p>
       </div>
@@ -186,12 +212,12 @@ function ParsingState({
 function FailedState({
   failureReason,
   onEdit,
-  onRetry,
+  onStartParsing,
   pending,
 }: {
   failureReason: string
   onEdit?: () => void
-  onRetry?: () => void
+  onStartParsing?: () => void
   pending?: boolean
 }) {
   const { t } = useTranslation()
@@ -202,8 +228,8 @@ function FailedState({
         <AlertDescription>{failureReason}</AlertDescription>
       </Alert>
       <div className="flex flex-wrap gap-2">
-        {onRetry && (
-          <Button disabled={pending} onClick={onRetry} size="sm">
+        {onStartParsing && (
+          <Button disabled={pending} onClick={onStartParsing} size="sm">
             {pending ? (
               <Spinner data-icon="inline-start" />
             ) : (

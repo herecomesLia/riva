@@ -39,18 +39,22 @@ const savedRole: TargetRole = {
   jobDescriptionAnalysis: null,
   matchingAnalysis: null,
 }
+const startParsing = fn()
 
 export const Saved = meta.story({
   args: {
     onEdit: fn(),
+    onStartParsing: startParsing,
     role: savedRole,
     synchronizationError: false,
   },
-  play: async () => {
+  play: async ({ userEvent }) => {
     await expect(screen.getByTestId("saved-job-description")).toHaveTextContent(
       "Design and build reliable APIs.",
     )
     await expect(screen.queryByRole("status")).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: /开始解析|start parsing/i }))
+    await expect(startParsing).toHaveBeenCalledTimes(1)
   },
 })
 
@@ -90,7 +94,7 @@ export const SynchronizationRetry = meta.story({
 export const Failed = meta.story({
   args: {
     onEdit: fn(),
-    onRetry: fn(),
+    onStartParsing: fn(),
     role: roleFor("roleWithJobDescriptionFailed"),
     synchronizationError: false,
   },

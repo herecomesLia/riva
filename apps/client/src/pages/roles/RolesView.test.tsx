@@ -21,7 +21,7 @@ function createActions(
     createTargetRole: vi.fn(async () => data),
     deleteTargetRole: vi.fn(async () => data),
     generateMatchingAnalysis: vi.fn(async () => data),
-    retryJobDescriptionParsing: vi.fn(async () => data),
+    startJobDescriptionParsing: vi.fn(async () => data),
     retryJobDescriptionSynchronization: vi.fn(async () => data),
     retryMatchingAnalysisSynchronization: vi.fn(async () => data),
     saveJobDescription: vi.fn(async () => data),
@@ -657,6 +657,42 @@ describe("RolesView", () => {
     ).toBeEnabled()
   })
 
+  it("starts parsing a saved JD with the current role and JD versions", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("singleRoleWithoutJobDescription")
+    const role = data.roles[0]!
+    if (role.jobDescription.status !== "missing") {
+      throw new Error("Expected a missing JD fixture.")
+    }
+    data.roles[0] = {
+      ...role,
+      jobDescription: {
+        parsingFailureReason: null,
+        rawText: "Build reliable APIs.",
+        status: "saved",
+        version: 4,
+      },
+      jobDescriptionAnalysis: null,
+    }
+    const startJobDescriptionParsing = vi.fn(async () => data)
+    renderReadyView(data, {
+      actions: createActions(data, { startJobDescriptionParsing }),
+      initialActiveTab: "job-description",
+    })
+
+    const card = await screen.findByTestId("job-description-card")
+    await user.click(
+      within(card).getByRole("button", { name: i18n.t("roles.jd.actions.startParsing") }),
+    )
+
+    await waitFor(() => expect(startJobDescriptionParsing).toHaveBeenCalledTimes(1))
+    expect(startJobDescriptionParsing).toHaveBeenCalledWith({
+      jobDescriptionVersion: 4,
+      roleId: role.id,
+      version: role.version,
+    })
+  })
+
   it("shows the safe business failure and retry action", async () => {
     const data = createRolesMockResponse("roleWithJobDescriptionFailed")
     const role = data.roles[0]!
@@ -673,21 +709,21 @@ describe("RolesView", () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("roleWithJobDescriptionFailed")
     let resolveRetry!: (response: RolesPageResponse) => void
-    const retryJobDescriptionParsing = vi.fn(
+    const startJobDescriptionParsing = vi.fn(
       () =>
         new Promise<RolesPageResponse>((resolve) => {
           resolveRetry = resolve
         }),
     )
     renderReadyView(data, {
-      actions: createActions(data, { retryJobDescriptionParsing }),
+      actions: createActions(data, { startJobDescriptionParsing }),
       initialActiveTab: "job-description",
     })
 
     const retry = await screen.findByRole("button", { name: i18n.t("roles.jd.actions.retry") })
     await user.click(retry)
 
-    await waitFor(() => expect(retryJobDescriptionParsing).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(startJobDescriptionParsing).toHaveBeenCalledTimes(1))
     expect(retry).toBeDisabled()
     resolveRetry(data)
   })

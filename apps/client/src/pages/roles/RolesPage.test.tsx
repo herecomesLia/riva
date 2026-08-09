@@ -440,6 +440,7 @@ describe("RolesPage", () => {
           .jobDescription.status,
       ).toBe("parsing"),
     )
+    expect(startJobDescriptionParsing).not.toHaveBeenCalled()
   })
 
   it("replaces the parsing cache entry with the successful parsing result", async () => {
