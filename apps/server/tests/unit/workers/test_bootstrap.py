@@ -13,6 +13,7 @@ from riva.agents import (
 )
 from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.workers import (
     AgentHandlerRegistry,
     DuplicateAgentHandlerError,
@@ -290,6 +291,10 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(matching_agent, MatchingAnalysisAgent)
     assert isinstance(resume_parsing_agent, ResumeParsingAgent)
     assert job_description_agent.provider is provider
+    assert job_description_agent.prompt_id == JOB_DESCRIPTION_PARSING_PROMPT.prompt_id
+    assert (
+        job_description_agent.prompt_version == JOB_DESCRIPTION_PARSING_PROMPT.version
+    )
     assert matching_agent.provider is provider
     assert resume_parsing_agent.provider is provider
     assert job_description_handlers[0].agent is job_description_agent

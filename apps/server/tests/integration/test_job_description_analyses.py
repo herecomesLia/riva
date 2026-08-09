@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from riva.db.database import Database
 from riva.models import AgentRun, JobDescriptionAnalysis, TargetRole, User
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import JobDescriptionParsingOutput
 from riva.schemas.roles import SaveJobDescriptionRequest
 from riva.services.job_description_analyses import (
@@ -58,9 +59,9 @@ def parsing_run(
     run_id: UUID | None = None,
     job_description_version: int = 1,
     agent_id: str = "job-description-parser",
-    prompt_id: str = "job-description-parser",
-    prompt_version: str = "1",
-    output_schema_id: str = "job-description-analysis-v1",
+    prompt_id: str = JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
+    prompt_version: str = JOB_DESCRIPTION_PARSING_PROMPT.version,
+    output_schema_id: str = JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
     payload: dict[str, str | int] | None = None,
 ) -> AgentRun:
     identifier = run_id or uuid4()
@@ -90,7 +91,9 @@ def output(summary: str) -> JobDescriptionParsingOutput:
             "qualification_requirements": {
                 "education": ["Bachelor's degree"],
                 "graduation_cohorts": [],
-                "majors": ["Computer Science"],
+                "majors": [
+                    "Computer Science, Software Engineering, or a related field"
+                ],
                 "experience": ["Three years of experience"],
                 "languages": ["English"],
                 "certifications": [],
@@ -105,7 +108,9 @@ def output(summary: str) -> JobDescriptionParsingOutput:
                 "databases_and_middleware": ["PostgreSQL"],
                 "other": [],
             },
-            "preferred_qualifications": ["Payments experience preferred"],
+            "preferred_qualifications": [
+                "Kubernetes or cloud platform experience"
+            ],
             "soft_skills": ["Communication"],
             "business_domains": ["Payments"],
         }
@@ -199,7 +204,7 @@ def test_job_description_analysis_lifecycle_guards_and_invalidation() -> None:
                 for invalid_run in (
                     parsing_run(owner.id, target.id, agent_id="other-agent"),
                     parsing_run(owner.id, target.id, prompt_id="other-prompt"),
-                    parsing_run(owner.id, target.id, prompt_version="2"),
+                    parsing_run(owner.id, target.id, prompt_version="1"),
                     parsing_run(
                         owner.id,
                         target.id,
@@ -234,8 +239,11 @@ def test_job_description_analysis_lifecycle_guards_and_invalidation() -> None:
                 assert analysis.required_skills["programming_languages"] == [
                     "Python"
                 ]
+                assert analysis.qualification_requirements["majors"] == [
+                    "Computer Science, Software Engineering, or a related field"
+                ]
                 assert analysis.preferred_qualifications == [
-                    "Payments experience preferred"
+                    "Kubernetes or cloud platform experience"
                 ]
                 assert analysis.soft_skills == ["Communication"]
                 assert analysis.business_domains == ["Payments"]

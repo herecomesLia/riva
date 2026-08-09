@@ -170,7 +170,16 @@ function JobDescriptionAnalysisEditorForm({
             <form.Field key={key} name={key}>
               {(input) => (
                 <JobDescriptionBulletListEditor
-                  description={t("roles.jd.analysisEditor.bulletListDescription")}
+                  addItemLabel={
+                    field === "qualificationRequirements"
+                      ? t("roles.jd.analysisEditor.addRequirement")
+                      : undefined
+                  }
+                  description={t(
+                    field === "qualificationRequirements"
+                      ? "roles.jd.analysisEditor.qualificationBulletListDescription"
+                      : "roles.jd.analysisEditor.bulletListDescription",
+                  )}
                   items={input.state.value}
                   label={label}
                   onChange={input.handleChange}

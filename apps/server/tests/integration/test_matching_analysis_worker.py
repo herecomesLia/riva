@@ -24,7 +24,7 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT_V1
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
 from riva.schemas.roles import (
     MatchingAnalysisStatusQuery,
@@ -182,10 +182,10 @@ async def setup_matching(
     parsing_run = AgentRun(
         id=uuid4(),
         user_id=user_id,
-        agent_id="job-description-parser",
-        prompt_id="job-description-parser",
-        prompt_version="1",
-        output_schema_id="job-description-analysis-v1",
+        agent_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
+        prompt_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
+        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
+        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
         status=AgentRunStatus.SUCCEEDED,
         payload={
             "roleId": str(role_id),

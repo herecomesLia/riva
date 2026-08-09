@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from riva.agents.base import Agent
 from riva.integrations import GenerationParameters, LLMProvider
-from riva.prompts.job_description_parsing import JOB_DESCRIPTION_PARSING_PROMPT_V1
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
@@ -20,7 +20,7 @@ class JobDescriptionParsingAgent(
     ) -> None:
         super().__init__(
             provider=provider,
-            prompt=JOB_DESCRIPTION_PARSING_PROMPT_V1,
+            prompt=JOB_DESCRIPTION_PARSING_PROMPT,
             model=model,
             parameters=parameters,
         )

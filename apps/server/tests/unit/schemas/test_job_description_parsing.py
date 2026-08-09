@@ -10,6 +10,8 @@ from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
     JobDescriptionParsingRunPayload,
+    QualificationRequirements,
+    RequiredSkillGroups,
 )
 from riva.schemas.roles import MAX_RAW_JOB_DESCRIPTION_LENGTH
 
@@ -83,6 +85,43 @@ def test_complete_structured_output_is_valid() -> None:
 
     assert output.required_skills.programming_languages == ["Python"]
     assert output.qualification_requirements.education == ["Bachelor's degree"]
+
+
+def test_semantic_list_items_are_preserved_as_complete_or_atomic_values() -> None:
+    payload = complete_output()
+    payload["qualification_requirements"]["majors"] = [
+        "计算机科学、软件工程或相关专业",
+        "人工智能、机器学习相关方向",
+    ]
+    payload["qualification_requirements"]["languages"] = [
+        "英语 CET-6 或同等水平"
+    ]
+    payload["required_skills"]["programming_languages"] = ["Python", "Go"]
+    payload["preferred_qualifications"] = ["有 Kubernetes 或云平台使用经验"]
+
+    output = JobDescriptionParsingOutput.model_validate(payload)
+
+    assert output.qualification_requirements.majors == [
+        "计算机科学、软件工程或相关专业",
+        "人工智能、机器学习相关方向",
+    ]
+    assert output.qualification_requirements.languages == ["英语 CET-6 或同等水平"]
+    assert output.required_skills.programming_languages == ["Python", "Go"]
+    assert output.preferred_qualifications == ["有 Kubernetes 或云平台使用经验"]
+
+
+def test_semantic_list_fields_describe_their_element_boundaries() -> None:
+    qualification_schema = QualificationRequirements.model_json_schema()
+    skill_schema = RequiredSkillGroups.model_json_schema()
+    output_schema = JobDescriptionParsingOutput.model_json_schema()
+
+    assert "complete" in qualification_schema["properties"]["majors"]["description"]
+    assert "alternatives" in qualification_schema["properties"]["majors"]["description"]
+    assert "atomic hard-skill" in skill_schema["properties"]["tools"]["description"]
+    assert (
+        "complete preferred"
+        in output_schema["properties"]["preferred_qualifications"]["description"]
+    )
 
 
 def test_all_categories_allow_empty_lists() -> None:

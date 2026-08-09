@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { parseBulletItems } from "@/models/profile-text"
 
 type JobDescriptionBulletListEditorProps = {
+  addItemLabel?: string
   description?: string
   items: string[]
   label: string
@@ -23,6 +24,7 @@ type JobDescriptionBulletListEditorProps = {
 }
 
 export function JobDescriptionBulletListEditor({
+  addItemLabel,
   description,
   items,
   label,
@@ -96,7 +98,7 @@ export function JobDescriptionBulletListEditor({
         <div className="flex flex-wrap gap-2">
           <Button onClick={addItem} type="button" variant="outline">
             <PlusIcon data-icon="inline-start" />
-            {t("roles.jd.analysisEditor.addBullet")}
+            {addItemLabel ?? t("roles.jd.analysisEditor.addBullet")}
           </Button>
           <Button onClick={() => setIsPasteDialogOpen(true)} type="button" variant="outline">
             {t("roles.jd.analysisEditor.pasteAndOrganize")}

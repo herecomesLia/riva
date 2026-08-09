@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.models import AgentRun, JobDescriptionAnalysis, TargetRole
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT_V1
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
@@ -259,7 +259,7 @@ class JobDescriptionAnalysisService:
         *,
         for_update: bool,
     ) -> _ParsingContext:
-        prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+        prompt = JOB_DESCRIPTION_PARSING_PROMPT
         if (
             run.agent_id != "job-description-parser"
             or run.prompt_id != prompt.prompt_id

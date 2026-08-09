@@ -132,11 +132,14 @@ export const roles = {
       listDescription:
         "Edit each item or paste and organize a batch. This does not reparse the JD text.",
       qualificationsDescription:
-        "Edit each item. Qualifications must be required conditions; place preferred conditions under Preferred Qualifications.",
+        "Each item is one complete, independent qualification requirement. Preserve the original alternatives, conjunctions, and scope qualifiers; place preferred conditions under Preferred Qualifications.",
       preferredQualificationsDescription:
-        "Edit each preferred, bonus, or non-required condition separately.",
+        "Each item is one complete preferred, bonus, or non-required condition. Preserve its alternatives and scope qualifiers.",
       bulletListDescription: "Each item is shown as a separate bullet point.",
+      qualificationBulletListDescription:
+        "Each item is one independent requirement. Preserve the original alternatives, conjunctions, and scope qualifiers.",
       bulletListEmpty: "No bullet points yet.",
+      addRequirement: "Add requirement",
       addBullet: "Add item",
       deleteBullet: "Delete item {{count}}",
       pasteAndOrganize: "Paste and organize",

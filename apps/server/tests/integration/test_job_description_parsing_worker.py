@@ -29,6 +29,7 @@ from riva.models import (
     TargetRole,
     User,
 )
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.roles import (
     JobDescriptionParsingStatusQuery,
     SaveJobDescriptionRequest,
@@ -94,7 +95,9 @@ def structured_output(summary: str = "Build reliable payment APIs.") -> dict[str
         "qualification_requirements": {
             "education": ["Bachelor's degree"],
             "graduation_cohorts": [],
-            "majors": ["Computer Science"],
+            "majors": [
+                "Computer Science, Software Engineering, or a related field"
+            ],
             "experience": ["Three years of backend experience"],
             "languages": ["English"],
             "certifications": [],
@@ -109,7 +112,9 @@ def structured_output(summary: str = "Build reliable payment APIs.") -> dict[str
             "databases_and_middleware": ["PostgreSQL"],
             "other": [],
         },
-        "preferred_qualifications": ["Payments experience preferred"],
+        "preferred_qualifications": [
+            "Kubernetes or cloud platform experience"
+        ],
         "soft_skills": ["Communication"],
         "business_domains": ["Payments"],
     }
@@ -143,12 +148,13 @@ async def enqueue_parsing_run(
     key: str,
 ) -> AgentRun:
     async with database.sessionmaker() as session:
+        prompt = JOB_DESCRIPTION_PARSING_PROMPT
         return await AgentRunService(session).enqueue(
             user_id=user_id,
             agent_id="job-description-parser",
-            prompt_id="job-description-parser",
-            prompt_version="1",
-            output_schema_id="job-description-analysis-v1",
+            prompt_id=prompt.prompt_id,
+            prompt_version=prompt.version,
+            output_schema_id=prompt.output_schema_id,
             model="fake-jd-model",
             payload={
                 "roleId": role_id,
@@ -262,6 +268,12 @@ def test_job_description_parsing_worker_success_chain() -> None:
                     assert analysis.source_agent_run_id == setup.run.id
                     assert analysis.job_description_version == 1
                     assert analysis.analysis_version == 1
+                    assert analysis.qualification_requirements["majors"] == [
+                        "Computer Science, Software Engineering, or a related field"
+                    ]
+                    assert analysis.preferred_qualifications == [
+                        "Kubernetes or cloud platform experience"
+                    ]
                     assert stored_role is not None
                     assert stored_role.version == 2
                     assert stored_role.job_description_parsing_run_id == setup.run.id

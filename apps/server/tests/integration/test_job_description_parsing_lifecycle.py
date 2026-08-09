@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from riva.core.errors import APIError
 from riva.db import Database
 from riva.models import AgentRun, AgentRunStatus, TargetRole, User
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT_V1
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.roles import (
     JobDescriptionParsingStatusQuery,
     StartJobDescriptionParsingRequest,
@@ -103,6 +103,12 @@ def test_start_retry_status_conflicts_and_concurrency() -> None:
                     )
                     assert run is not None
                     assert run.status is AgentRunStatus.QUEUED
+                    assert run.prompt_id == JOB_DESCRIPTION_PARSING_PROMPT.prompt_id
+                    assert run.prompt_version == JOB_DESCRIPTION_PARSING_PROMPT.version
+                    assert (
+                        run.output_schema_id
+                        == JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id
+                    )
                     assert run.payload == {
                         "roleId": str(target.id),
                         "jobDescriptionVersion": 1,
@@ -265,7 +271,7 @@ def test_transactional_enqueue_is_invisible_until_role_binding_commits() -> None
                         .with_for_update()
                     )
                     assert locked is not None
-                    prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+                    prompt = JOB_DESCRIPTION_PARSING_PROMPT
                     run = await AgentRunService(
                         enqueue_session
                     ).enqueue_in_transaction(

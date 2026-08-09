@@ -890,7 +890,7 @@ describe("RolesView", () => {
     expect(education).toHaveValue("本科及以上")
     await user.click(
       within(dialog).getAllByRole("button", {
-        name: i18n.t("roles.jd.analysisEditor.addBullet"),
+        name: i18n.t("roles.jd.analysisEditor.addRequirement"),
       })[1]!,
     )
     const graduationCohorts = within(dialog).getByLabelText(
@@ -906,6 +906,99 @@ describe("RolesView", () => {
         value: expect.objectContaining({ graduationCohorts: ["2027 届"] }),
       }),
     )
+  })
+
+  it("keeps qualification clauses and preferred conditions intact while editing", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    const role = data.roles[0]!
+    const analysis = role.jobDescriptionAnalysis!
+    analysis.qualificationRequirements.majors = ["计算机科学、软件工程或相关专业"]
+    analysis.requiredSkills.programmingLanguages = ["Python", "Go"]
+    analysis.preferredQualifications = ["有 Kubernetes 或云平台使用经验"]
+    const updateJobDescriptionAnalysisModule = vi.fn(async () => data)
+    renderReadyView(data, {
+      actions: createActions(data, { updateJobDescriptionAnalysisModule }),
+      initialActiveTab: "job-description",
+    })
+
+    const result = await screen.findByTestId("job-description-analysis")
+    const qualificationSection = within(result)
+      .getByRole("heading", { name: i18n.t("roles.jd.analysis.qualificationRequirements") })
+      .closest("section")!
+    const majorRequirement = "计算机科学、软件工程或相关专业"
+    expect(within(qualificationSection).getAllByText(majorRequirement)).toHaveLength(1)
+    const preferredSection = within(result)
+      .getByRole("heading", { name: i18n.t("roles.jd.analysis.preferredQualifications") })
+      .closest("section")!
+    expect(within(preferredSection).getAllByRole("listitem")).toHaveLength(1)
+    expect(within(preferredSection).getByText("有 Kubernetes 或云平台使用经验")).toBeInTheDocument()
+
+    await user.click(
+      within(preferredSection).getByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.preferredQualifications"),
+        }),
+      }),
+    )
+    let dialog = await screen.findByRole("dialog")
+    expect(
+      within(dialog).getByLabelText(`${i18n.t("roles.jd.analysis.preferredQualifications")} 1`),
+    ).toHaveValue("有 Kubernetes 或云平台使用经验")
+    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.cancel") }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+
+    const requiredSkillsSection = within(result)
+      .getByRole("heading", { name: i18n.t("roles.jd.analysis.requiredSkills") })
+      .closest("section")!
+    expect(within(requiredSkillsSection).getAllByText("Python")).toHaveLength(1)
+    expect(within(requiredSkillsSection).getAllByText("Go")).toHaveLength(1)
+
+    await user.click(
+      within(qualificationSection).getByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.qualificationRequirements"),
+        }),
+      }),
+    )
+    dialog = await screen.findByRole("dialog")
+    const majors = i18n.t("roles.jd.analysis.qualificationCategories.majors")
+    const majorInput = within(dialog).getByLabelText(`${majors} 1`)
+    expect(majorInput).toHaveValue(majorRequirement)
+    expect(within(dialog).queryByLabelText(`${majors} 2`)).not.toBeInTheDocument()
+
+    await user.click(
+      within(dialog).getAllByRole("button", {
+        name: i18n.t("roles.jd.analysisEditor.addRequirement"),
+      })[2]!,
+    )
+    const secondMajorInput = await within(dialog).findByLabelText(`${majors} 2`)
+    await user.type(secondMajorInput, "人工智能、机器学习相关方向")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.jd.actions.saveCorrection") }),
+    )
+
+    expect(updateJobDescriptionAnalysisModule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "qualificationRequirements",
+        value: expect.objectContaining({
+          majors: [majorRequirement, "人工智能、机器学习相关方向"],
+        }),
+      }),
+    )
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    await user.click(
+      within(result).getByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", {
+          module: i18n.t("roles.jd.analysis.requiredSkills"),
+        }),
+      }),
+    )
+    dialog = await screen.findByRole("dialog")
+    const programmingLanguages = i18n.t("roles.jd.analysis.skillCategories.programmingLanguages")
+    expect(within(dialog).getByLabelText(`${programmingLanguages} 1`)).toHaveValue("Python")
+    expect(within(dialog).getByLabelText(`${programmingLanguages} 2`)).toHaveValue("Go")
   })
 
   it("prefills and submits all required-skill categories together", async () => {

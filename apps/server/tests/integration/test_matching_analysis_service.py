@@ -22,7 +22,7 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT_V1
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
 from riva.services.matching_analyses import (
     INVALID_MATCHING_ANALYSIS_RUN,
@@ -300,10 +300,10 @@ def make_graph(suffix: str) -> tuple[Graph, JobDescriptionAnalysis]:
     parsing_run = AgentRun(
         id=uuid4(),
         user_id=owner.id,
-        agent_id="job-description-parser",
-        prompt_id="job-description-parser",
-        prompt_version="1",
-        output_schema_id="job-description-analysis-v1",
+        agent_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
+        prompt_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
+        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
+        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
         payload={
             "roleId": str(role.id),
             "jobDescriptionVersion": 2,

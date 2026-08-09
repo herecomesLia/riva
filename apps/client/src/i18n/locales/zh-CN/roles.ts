@@ -124,10 +124,14 @@ export const roles = {
     analysisEditor: {
       listDescription: "逐项填写或批量粘贴整理。修改不会重新解析 JD 原文。",
       qualificationsDescription:
-        "逐项填写。任职资格只填写必须满足的条件；加分条件请填写在“加分项”中。",
-      preferredQualificationsDescription: "逐项填写优先、加分或非必需条件。",
+        "每项代表一条独立的完整任职要求，请保留原始的选择、并列和范围限定关系；加分条件请填写在“加分项”中。",
+      preferredQualificationsDescription:
+        "每项代表一条完整的优先、加分或非必需条件，请保留其中的选择和范围限定关系。",
       bulletListDescription: "每项将作为一个独立要点显示。",
+      qualificationBulletListDescription:
+        "每项代表一条独立要求，请保留原始的选择、并列和范围限定关系。",
       bulletListEmpty: "还没有要点。",
+      addRequirement: "新增一条要求",
       addBullet: "新增一项",
       deleteBullet: "删除第 {{count}} 项",
       pasteAndOrganize: "批量粘贴并整理",

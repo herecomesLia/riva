@@ -14,7 +14,11 @@ from riva.integrations import (
     MessageRole,
     ProviderUnavailableError,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT_V1
+from riva.prompts import (
+    JOB_DESCRIPTION_PARSING_PROMPT,
+    JOB_DESCRIPTION_PARSING_PROMPT_V1,
+    JOB_DESCRIPTION_PARSING_PROMPT_V2,
+)
 from tests.helpers.llm import FakeLLMProvider
 
 
@@ -71,10 +75,10 @@ def test_agent_uses_fixed_identity_prompt_schema_model_and_two_messages() -> Non
 
     assert agent.agent_id == "job-description-parser"
     assert agent.prompt_id == "job-description-parser"
-    assert agent.prompt_version == "1"
+    assert agent.prompt_version == "2"
     assert result.agent_id == "job-description-parser"
     assert result.prompt_id == "job-description-parser"
-    assert result.prompt_version == "1"
+    assert result.prompt_version == "2"
     request = provider.calls[0]
     assert request.output_schema is JobDescriptionParsingOutput
     assert request.model == "test-structured-model"
@@ -114,6 +118,21 @@ def test_prompt_has_stable_versioned_contract() -> None:
     assert "Return an empty list" in prompt.system_template
     assert "primary language" in prompt.system_template
     assert "Do not output Markdown" in prompt.system_template
+
+
+def test_job_description_prompt_v2_defines_distinct_list_semantics() -> None:
+    assert JOB_DESCRIPTION_PARSING_PROMPT_V1.version == "1"
+    assert JOB_DESCRIPTION_PARSING_PROMPT_V2.version == "2"
+    assert JOB_DESCRIPTION_PARSING_PROMPT is JOB_DESCRIPTION_PARSING_PROMPT_V2
+    assert JOB_DESCRIPTION_PARSING_PROMPT_V1.output_schema_id == (
+        JOB_DESCRIPTION_PARSING_PROMPT_V2.output_schema_id
+    )
+    assert "complete" in JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
+    assert "atomic hard-skill" in JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
+    assert "complete, independently understandable preferred condition" in (
+        JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
+    )
+    assert "related field" in JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
 
 
 def test_agent_returns_validated_result_with_provider_model_and_usage() -> None:

@@ -79,25 +79,88 @@ RawJobDescription = Annotated[
 class QualificationRequirements(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    education: AnalysisItemList
-    graduation_cohorts: AnalysisItemList
-    majors: AnalysisItemList
-    experience: AnalysisItemList
-    languages: AnalysisItemList
-    certifications: AnalysisItemList
-    other: AnalysisItemList
+    education: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete, independently understandable education "
+            "requirement clause."
+        )
+    )
+    graduation_cohorts: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete, independently understandable "
+            "graduation-cohort requirement clause."
+        )
+    )
+    majors: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete major or field-of-study requirement. "
+            "Keep alternatives and qualifiers such as related fields in the same item."
+        )
+    )
+    experience: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete, independently understandable experience "
+            "requirement clause."
+        )
+    )
+    languages: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete, independently understandable language "
+            "requirement clause."
+        )
+    )
+    certifications: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete, independently understandable certification "
+            "requirement clause."
+        )
+    )
+    other: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete, independently understandable qualification "
+            "requirement clause."
+        )
+    )
 
 
 class RequiredSkillGroups(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    programming_languages: AnalysisItemList
-    frameworks_and_libraries: AnalysisItemList
-    platforms: AnalysisItemList
-    tools: AnalysisItemList
-    concepts_and_methods: AnalysisItemList
-    databases_and_middleware: AnalysisItemList
-    other: AnalysisItemList
+    programming_languages: AnalysisItemList = Field(
+        description=(
+            "Each item is one independent atomic hard-skill or technology entity."
+        )
+    )
+    frameworks_and_libraries: AnalysisItemList = Field(
+        description=(
+            "Each item is one independent atomic hard-skill or technology entity."
+        )
+    )
+    platforms: AnalysisItemList = Field(
+        description=(
+            "Each item is one independent atomic hard-skill or technology entity."
+        )
+    )
+    tools: AnalysisItemList = Field(
+        description=(
+            "Each item is one independent atomic hard-skill or technology entity."
+        )
+    )
+    concepts_and_methods: AnalysisItemList = Field(
+        description=(
+            "Each item is one independent atomic hard-skill or technology entity."
+        )
+    )
+    databases_and_middleware: AnalysisItemList = Field(
+        description=(
+            "Each item is one independent atomic hard-skill or technology entity."
+        )
+    )
+    other: AnalysisItemList = Field(
+        description=(
+            "Each item is one independent atomic hard-skill or technology entity."
+        )
+    )
 
 
 class JobDescriptionParsingOutput(BaseModel):
@@ -107,7 +170,12 @@ class JobDescriptionParsingOutput(BaseModel):
     responsibilities: AnalysisItemList
     qualification_requirements: QualificationRequirements
     required_skills: RequiredSkillGroups
-    preferred_qualifications: AnalysisItemList
+    preferred_qualifications: AnalysisItemList = Field(
+        description=(
+            "Each item is one complete preferred, bonus, or priority condition. "
+            "Keep alternatives and qualifiers inside the same item."
+        )
+    )
     soft_skills: AnalysisItemList
     business_domains: AnalysisItemList
 

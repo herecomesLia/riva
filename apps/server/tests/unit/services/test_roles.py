@@ -14,7 +14,10 @@ from riva.models import (
     JobDescriptionAnalysis,
     TargetRole,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT_V1
+from riva.prompts import (
+    JOB_DESCRIPTION_PARSING_PROMPT,
+    JOB_DESCRIPTION_PARSING_PROMPT_V1,
+)
 from riva.schemas.roles import UpdateTargetRoleRequest
 from riva.services.roles import TargetRoleService, career_profile_completed
 
@@ -108,7 +111,7 @@ def test_role_response_maps_database_jd_without_ai_analysis(
 
 
 def parsing_run(role: TargetRole, status: AgentRunStatus) -> AgentRun:
-    prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+    prompt = JOB_DESCRIPTION_PARSING_PROMPT
     run = AgentRun(
         id=uuid4(),
         user_id=role.user_id,
@@ -178,6 +181,10 @@ def test_role_response_rejects_stale_or_wrong_contract_run_projection() -> None:
     assert TargetRoleService._role_response(role).job_description.status == "saved"
 
     run.payload["jobDescriptionVersion"] = 2
+    run.prompt_version = JOB_DESCRIPTION_PARSING_PROMPT_V1.version
+    assert TargetRoleService._role_response(role).job_description.status == "saved"
+
+    run.prompt_version = JOB_DESCRIPTION_PARSING_PROMPT.version
     run.output_schema_id = "wrong-schema"
     assert TargetRoleService._role_response(role).job_description.status == "saved"
 
@@ -224,9 +231,10 @@ def test_role_response_projects_current_analysis_as_ready_with_all_fields() -> N
     assert response.job_description_analysis.required_skills.programming_languages == [
         "Python"
     ]
-    assert response.job_description_analysis.qualification_requirements.graduation_cohorts == [
-        "2026 graduates"
-    ]
+    assert (
+        response.job_description_analysis.qualification_requirements.graduation_cohorts
+        == ["2026 graduates"]
+    )
 
 
 class RollbackSession:

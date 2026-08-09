@@ -1,6 +1,8 @@
 import preview from "#storybook/preview"
 import { expect, fn, screen, within } from "storybook/test"
 
+import type { TargetRole } from "@/models/roles"
+
 import { createRoleStoryResponse } from "../stories/role-story-fixtures"
 import { JobDescriptionAnalysisEditorDialog } from "./JobDescriptionAnalysisEditorDialog"
 
@@ -16,6 +18,7 @@ function dialogArgs(
     | "preferredQualifications"
     | "businessDomains"
     | "responsibilities",
+  role: TargetRole = parsedRole,
 ) {
   return {
     field,
@@ -23,15 +26,32 @@ function dialogArgs(
     onOpenChange: fn(),
     onSave: fn(async () => undefined),
     onSaved: fn(),
-    role: createRoleStoryResponse("roleWithParsedJobDescription").roles[0]!,
+    role,
   }
 }
 
+const parsedRole = createRoleStoryResponse("roleWithParsedJobDescription").roles[0]!
+if (parsedRole.jobDescription.status !== "ready" || !parsedRole.jobDescriptionAnalysis) {
+  throw new Error("Expected a ready JD fixture.")
+}
+const semanticRole = structuredClone(parsedRole)
+semanticRole.jobDescriptionAnalysis!.qualificationRequirements.majors = [
+  "计算机科学、软件工程或相关专业",
+]
+semanticRole.jobDescriptionAnalysis!.requiredSkills.programmingLanguages = ["Python", "Go"]
+semanticRole.jobDescriptionAnalysis!.preferredQualifications = ["有 Kubernetes 或云平台使用经验"]
+
 export const EditQualifications = meta.story({
-  args: dialogArgs("qualificationRequirements"),
-  play: async () => {
+  args: dialogArgs("qualificationRequirements", semanticRole),
+  play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")
-    await expect(within(dialog).getAllByRole("textbox")[0]!).toBeInTheDocument()
+    const majors = within(dialog).getByLabelText(/专业 1|majors 1/i)
+    await expect(majors).toHaveValue("计算机科学、软件工程或相关专业")
+    await expect(within(dialog).queryByLabelText(/专业 2|majors 2/i)).not.toBeInTheDocument()
+    await userEvent.click(
+      within(dialog).getAllByRole("button", { name: /新增一条要求|add requirement/i })[2]!,
+    )
+    await expect(within(dialog).getByLabelText(/专业 2|majors 2/i)).toBeInTheDocument()
   },
 })
 

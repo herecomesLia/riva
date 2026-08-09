@@ -20,7 +20,7 @@ from riva.models import (
     User,
 )
 from riva.prompts import (
-    JOB_DESCRIPTION_PARSING_PROMPT_V1,
+    JOB_DESCRIPTION_PARSING_PROMPT,
     MATCHING_ANALYSIS_PROMPT_V1,
 )
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
@@ -419,7 +419,7 @@ class TargetRoleService:
                     )
 
             self._require_parsing_configuration()
-            prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+            prompt = JOB_DESCRIPTION_PARSING_PROMPT
             run_payload = JobDescriptionParsingRunPayload(
                 role_id=role.id,
                 job_description_version=cast(
@@ -911,7 +911,7 @@ class TargetRoleService:
         ):
             return None
 
-        prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+        prompt = JOB_DESCRIPTION_PARSING_PROMPT
         if (
             run.agent_id != "job-description-parser"
             or run.prompt_id != prompt.prompt_id
