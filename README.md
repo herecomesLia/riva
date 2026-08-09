@@ -63,8 +63,7 @@ With complete Qwen settings (`RIVA_LLM_PROVIDER=qwen`, model, API key, and base
 URL), it registers `job-description-parser`, `matching-analyzer`, and
 `resume-parser`; the startup log then reports `handler_count=3`. The API already exposes the
 job-description parsing lifecycle and the matching-analysis lifecycle. The
-Worker registers all three handlers. Frontend real-API integration will be completed
-in a later step.
+Worker registers all three handlers. The frontend is integrated with the real job-description parsing and matching-analysis lifecycles. It polls while Agent runs are in progress, marks existing matching results stale when the career profile or structured JD analysis changes, and supports regeneration from the latest data.
 
 The API accepts TXT, PDF, DOCX, or pasted resume text through the three
 resume-document endpoints under `/api/profile/resumes`. This step stores the
