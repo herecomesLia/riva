@@ -70,6 +70,17 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
     QuestionCardResponse,
 )
+from riva.schemas.question_generation import (
+    QuestionGenerationEducationContext,
+    QuestionGenerationInput,
+    QuestionGenerationJobContext,
+    QuestionGenerationMatchingAnalysisContext,
+    QuestionGenerationOutput,
+    QuestionGenerationProfileContext,
+    QuestionGenerationProjectExperienceContext,
+    QuestionGenerationTargetRoleContext,
+    QuestionGenerationWorkExperienceContext,
+)
 from riva.schemas.roles import (
     ActiveTargetRolePreparationStatus,
     ArchiveTargetRoleRequest,
@@ -131,6 +142,15 @@ __all__ = [
     "QuestionCardMaterialType",
     "QuestionCardQuestionType",
     "QuestionCardResponse",
+    "QuestionGenerationEducationContext",
+    "QuestionGenerationInput",
+    "QuestionGenerationJobContext",
+    "QuestionGenerationMatchingAnalysisContext",
+    "QuestionGenerationOutput",
+    "QuestionGenerationProfileContext",
+    "QuestionGenerationProjectExperienceContext",
+    "QuestionGenerationTargetRoleContext",
+    "QuestionGenerationWorkExperienceContext",
     "ActiveTargetRolePreparationStatus",
     "ArchiveTargetRoleRequest",
     "CreateTargetRoleRequest",
