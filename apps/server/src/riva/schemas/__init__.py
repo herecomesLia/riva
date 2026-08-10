@@ -63,6 +63,13 @@ from riva.schemas.matching_analysis import (
     MatchingProfileProjectExperience,
     MatchingProfileWorkExperience,
 )
+from riva.schemas.question_cards import (
+    QuestionCardDifficulty,
+    QuestionCardMaterialReference,
+    QuestionCardMaterialType,
+    QuestionCardQuestionType,
+    QuestionCardResponse,
+)
 from riva.schemas.roles import (
     ActiveTargetRolePreparationStatus,
     ArchiveTargetRoleRequest,
@@ -119,6 +126,11 @@ __all__ = [
     "MatchingProfileEducation",
     "MatchingProfileProjectExperience",
     "MatchingProfileWorkExperience",
+    "QuestionCardDifficulty",
+    "QuestionCardMaterialReference",
+    "QuestionCardMaterialType",
+    "QuestionCardQuestionType",
+    "QuestionCardResponse",
     "ActiveTargetRolePreparationStatus",
     "ArchiveTargetRoleRequest",
     "CreateTargetRoleRequest",

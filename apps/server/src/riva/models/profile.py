@@ -20,6 +20,7 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
+    from riva.models.question_cards import QuestionCard
     from riva.models.user import User
 
 
@@ -86,6 +87,13 @@ class CareerProfile(TimestampMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="CareerProfileSkill.position",
+    )
+    question_cards: Mapped[list[QuestionCard]] = relationship(
+        back_populates="career_profile",
+        cascade="all, delete-orphan",
+        foreign_keys="[QuestionCard.user_id, QuestionCard.profile_id]",
+        passive_deletes=True,
+        overlaps="user,question_cards",
     )
 
 
