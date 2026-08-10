@@ -1,4 +1,5 @@
-import { AlertCircleIcon, CalendarClockIcon, FileUpIcon, LoaderCircleIcon } from "lucide-react"
+import { AlertCircleIcon, CalendarClockIcon, FileUpIcon } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -120,7 +121,7 @@ export function ProfileProcessingState({
     <Card data-testid="profile-processing-state">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <LoaderCircleIcon className="size-5" />
+          <Spinner className="size-5" />
           {t(`profile.lifecycle.${stateKey}.title`)}
         </CardTitle>
         <CardDescription>{t(`profile.lifecycle.${stateKey}.description`)}</CardDescription>
