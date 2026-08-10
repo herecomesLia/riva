@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BeforeValidator, BaseModel, ConfigDict, Field
 
-from riva.core.language import DEFAULT_INTERACTION_LANGUAGE, InteractionLanguage
+from riva.core.language import InteractionLanguage
 from riva.schemas.job_description_parsing import (
     Company,
     JobDescriptionParsingOutput,
@@ -13,7 +13,6 @@ from riva.schemas.profile import (
     OptionalText,
     RequiredText,
     StandardUUID,
-    Summary as ProfileSummary,
 )
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -93,14 +92,12 @@ class QuestionGenerationProjectExperienceContext(_QuestionGenerationModel):
     id: StandardUUID
     name: RequiredText
     role: OptionalText
-    description: ProfileSummary
     responsibilities: QuestionCardTextList = Field(default_factory=list)
     achievements: QuestionCardTextList
     skills: QuestionGenerationSkillList
 
 
 class QuestionGenerationProfileContext(_QuestionGenerationModel):
-    summary: ProfileSummary
     education: list[QuestionGenerationEducationContext] = Field(
         max_length=MAX_QUESTION_GENERATION_EDUCATION_ITEMS
     )
@@ -123,7 +120,7 @@ class QuestionGenerationMatchingAnalysisContext(MatchingAnalysisOutput):
 
 
 class QuestionGenerationInput(_QuestionGenerationModel):
-    interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE
+    interaction_language: InteractionLanguage
     question_type: QuestionCardQuestionType
     difficulty: QuestionCardDifficulty
     target_role: QuestionGenerationTargetRoleContext

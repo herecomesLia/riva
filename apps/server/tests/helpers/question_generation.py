@@ -19,7 +19,6 @@ def valid_question_generation_input(language: str = "zh-CN") -> QuestionGenerati
                 "location": "Shanghai",
             },
             "career_profile": {
-                "summary": "Backend engineer focused on reliable APIs.",
                 "education": [
                     {
                         "school": "Tongji University",
@@ -42,7 +41,6 @@ def valid_question_generation_input(language: str = "zh-CN") -> QuestionGenerati
                         "id": str(project_id),
                         "name": "Payment API",
                         "role": "Backend owner",
-                        "description": "A service for reliable payment processing.",
                         "responsibilities": ["Designed the service boundary"],
                         "achievements": ["Reduced payment failures"],
                         "skills": ["Python", "PostgreSQL"],

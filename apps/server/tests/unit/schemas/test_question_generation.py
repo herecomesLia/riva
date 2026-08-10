@@ -31,6 +31,14 @@ def test_question_generation_input_accepts_both_interaction_languages(
     assert input.interaction_language == language
 
 
+def test_question_generation_input_requires_interaction_language() -> None:
+    payload = valid_question_generation_input().model_dump(mode="json")
+    payload.pop("interaction_language")
+
+    with pytest.raises(ValidationError):
+        QuestionGenerationInput.model_validate(payload)
+
+
 def test_question_generation_input_covers_all_question_types_and_difficulties() -> None:
     for question_type in QuestionCardQuestionType:
         payload = valid_question_generation_input().model_dump(mode="json")
@@ -63,7 +71,7 @@ def test_question_generation_input_preserves_real_experience_ids_and_context_sha
 
     assert work.id is not None
     assert project.id is not None
-    assert project.description == "A service for reliable payment processing."
+    assert project.name == "Payment API"
     assert input.job_description_analysis.required_skills.programming_languages == [
         "Python"
     ]

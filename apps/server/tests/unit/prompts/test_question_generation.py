@@ -68,7 +68,7 @@ def test_question_generation_user_prompt_has_untrusted_context_regions() -> None
         "question_type": "projectDeepDive",
         "difficulty": "pressure",
         "target_role": '{"title":"Backend Engineer"}',
-        "career_profile": '{"summary":"candidate-secret-marker"}',
+        "career_profile": '{"skills":["candidate-secret-marker"]}',
         "job_description_analysis": '{"riva_summary":"Build APIs"}',
         "matching_analysis": '{"overall_match_score":80}',
     }
