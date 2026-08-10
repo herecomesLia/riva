@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents import AgentResult
+from riva.core.language import INTERACTION_LANGUAGES
 from riva.models import AgentRun, AgentRunStatus
 from riva.models.agent_runs import AgentRunPayload, AgentRunResult
 from riva.utils import utc_now
@@ -361,25 +362,40 @@ def _serialize_payload(
     payload: Mapping[str, PayloadValue],
 ) -> AgentRunPayload:
     if not payload:
-        raise ValueError("payload must contain resource identifiers or versions")
+        raise ValueError(
+            "payload must contain resource snapshot fields or approved invocation metadata"
+        )
 
     serialized: AgentRunPayload = {}
     for key, value in payload.items():
         normalized_key = key.replace("_", "").lower()
-        if not key or not normalized_key.endswith(("id", "version")):
+        if not key:
             raise ValueError(
-                "payload keys must identify a business resource or version"
+                "payload keys must identify a business resource/version or approved invocation metadata"
             )
-        if isinstance(value, UUID):
-            serialized[key] = str(value)
-        elif isinstance(value, bool) or not isinstance(value, (str, int)):
-            raise ValueError("payload values must be resource identifiers or versions")
-        elif isinstance(value, int):
-            if value < 1:
-                raise ValueError("payload numeric versions must be at least 1")
+        if key == "interactionLanguage":
+            if not isinstance(value, str) or value not in INTERACTION_LANGUAGES:
+                raise ValueError(
+                    "payload.interactionLanguage must be a supported interaction language"
+                )
             serialized[key] = value
+        elif normalized_key.endswith(("id", "version")):
+            if isinstance(value, UUID):
+                serialized[key] = str(value)
+            elif isinstance(value, bool) or not isinstance(value, (str, int)):
+                raise ValueError(
+                    "payload values must be resource identifiers or versions"
+                )
+            elif isinstance(value, int):
+                if value < 1:
+                    raise ValueError("payload numeric versions must be at least 1")
+                serialized[key] = value
+            else:
+                serialized[key] = _required_text(f"payload.{key}", value, 255)
         else:
-            serialized[key] = _required_text(f"payload.{key}", value, 255)
+            raise ValueError(
+                "payload keys must identify a business resource/version or approved invocation metadata"
+            )
     return serialized
 
 

@@ -2,6 +2,7 @@ from typing import Literal
 
 
 InteractionLanguage = Literal["zh-CN", "en"]
+INTERACTION_LANGUAGES: tuple[InteractionLanguage, ...] = ("zh-CN", "en")
 DEFAULT_INTERACTION_LANGUAGE: InteractionLanguage = "zh-CN"
 
 
@@ -21,6 +22,7 @@ def normalize_interaction_language(value: str | None) -> InteractionLanguage:
 
 __all__ = [
     "DEFAULT_INTERACTION_LANGUAGE",
+    "INTERACTION_LANGUAGES",
     "InteractionLanguage",
     "normalize_interaction_language",
 ]
