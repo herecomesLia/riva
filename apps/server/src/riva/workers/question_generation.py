@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from riva.schemas.question_generation import (
 from riva.services.question_generation import (
     QuestionGenerationService,
     QuestionGenerationStateError,
+    question_generation_output_from_card,
 )
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
@@ -74,14 +76,19 @@ class QuestionGenerationHandler:
 
         try:
             async with self.session_factory() as session:
-                await self.generation_service_factory(session).persist_success(
+                card = await self.generation_service_factory(
+                    session
+                ).persist_success(
                     run,
                     result.output,
                 )
         except QuestionGenerationStateError as error:
             raise AgentExecutionError(error.code, retryable=False) from None
 
-        return result
+        canonical_output = question_generation_output_from_card(card)
+        if canonical_output == result.output:
+            return result
+        return replace(result, output=canonical_output)
 
 
 __all__ = ["QuestionGenerationHandler"]

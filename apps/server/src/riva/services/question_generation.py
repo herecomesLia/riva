@@ -269,6 +269,24 @@ def build_question_generation_input(
     )
 
 
+def question_generation_output_from_card(
+    card: QuestionCard,
+) -> QuestionGenerationOutput:
+    return QuestionGenerationOutput.model_validate(
+        {
+            "prompt": card.prompt,
+            "question_type": QuestionCardQuestionType(card.question_type),
+            "difficulty": QuestionCardDifficulty(card.difficulty),
+            "assessed_capabilities": card.assessed_capabilities,
+            "recommended_materials": card.recommended_materials,
+            "answer_hints": card.answer_hints,
+            "answer_framework": card.answer_framework,
+            "follow_up_directions": card.follow_up_directions,
+            "scoring_focus": card.scoring_focus,
+        }
+    )
+
+
 class QuestionGenerationService:
     def __init__(
         self,
@@ -755,4 +773,5 @@ __all__ = [
     "build_question_generation_matching_context",
     "build_question_generation_profile_context",
     "build_question_generation_target_role_context",
+    "question_generation_output_from_card",
 ]

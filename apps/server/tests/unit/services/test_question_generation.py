@@ -23,6 +23,7 @@ from riva.models import (
 from riva.prompts import QUESTION_GENERATION_PROMPT
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
+    QuestionCardMaterialReference,
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import (
@@ -43,6 +44,7 @@ from riva.services.question_generation import (
     QuestionGenerationService,
     QuestionGenerationStateError,
     build_question_generation_profile_context,
+    question_generation_output_from_card,
 )
 
 
@@ -324,6 +326,77 @@ def test_profile_context_uses_stable_order_and_only_curated_fields() -> None:
     assert context.project_experiences[0].skills == ["FastAPI"]
     assert "summary" not in context.model_dump()
     assert "description" not in context.project_experiences[0].model_dump()
+
+
+def test_question_generation_output_projection_from_card_is_validated() -> None:
+    owner, role, profile, analysis, matching = graph()
+    expected = QuestionGenerationOutput(
+        prompt="Explain how you designed the payment workflows.",
+        question_type=QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+        difficulty=QuestionCardDifficulty.BASIC,
+        assessed_capabilities=["Technical decision-making"],
+        recommended_materials=[
+            QuestionCardMaterialReference(
+                type="projectExperience",
+                id=profile.project_experiences[0].id,
+                label="Payment Platform",
+                reason="Relevant project evidence.",
+            )
+        ],
+        answer_hints=["Explain your personal contribution."],
+        answer_framework=["Context", "Decision", "Result"],
+        follow_up_directions=["Technical rationale"],
+        scoring_focus=["Evidence of personal contribution"],
+    )
+    card = QuestionCard(
+        id=uuid4(),
+        user_id=owner.id,
+        target_role_id=role.id,
+        profile_id=profile.profile_id,
+        source_agent_run_id=uuid4(),
+        matching_analysis_run_id=matching.source_agent_run_id,
+        language="en",
+        question_type=expected.question_type.value,
+        difficulty=expected.difficulty.value,
+        prompt=expected.prompt,
+        assessed_capabilities=expected.assessed_capabilities,
+        recommended_materials=[
+            material.model_dump(mode="json")
+            for material in expected.recommended_materials
+        ],
+        answer_hints=expected.answer_hints,
+        answer_framework=expected.answer_framework,
+        follow_up_directions=expected.follow_up_directions,
+        scoring_focus=expected.scoring_focus,
+        profile_version=profile.version,
+        job_description_version=analysis.job_description_version,
+        job_description_analysis_version=analysis.analysis_version,
+        is_saved=True,
+        is_marked_weak=True,
+        created_at=NOW,
+        updated_at=NOW,
+    )
+
+    projected = question_generation_output_from_card(card)
+
+    assert projected == expected
+    assert projected.question_type is QuestionCardQuestionType.PROJECT_DEEP_DIVE
+    assert projected.difficulty is QuestionCardDifficulty.BASIC
+    assert set(projected.model_dump()) == {
+        "prompt",
+        "question_type",
+        "difficulty",
+        "assessed_capabilities",
+        "recommended_materials",
+        "answer_hints",
+        "answer_framework",
+        "follow_up_directions",
+        "scoring_focus",
+    }
+    assert "is_saved" not in projected.model_dump()
+    assert "is_marked_weak" not in projected.model_dump()
+    assert "source_agent_run_id" not in projected.model_dump()
+    assert "created_at" not in projected.model_dump()
 
 
 def test_load_generation_input_rebuilds_real_db_snapshot() -> None:

@@ -34,6 +34,7 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import QuestionGenerationOutput
+from riva.services.agent_runs import AgentRunService
 from riva.services.question_generation import QuestionGenerationService
 from riva.workers import AgentHandlerRegistry, AgentWorker, QuestionGenerationHandler
 from tests.helpers.llm import FakeLLMProvider
@@ -384,6 +385,114 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                     )
                     assert returned.id == card.id
                     assert count == 1
+
+                async with database.sessionmaker() as session:
+                    retry_run = await QuestionGenerationService(
+                        session,
+                        llm_model="fake-question-model",
+                    ).enqueue_generation(
+                        user_id=owner.id,
+                        target_role_id=role.id,
+                        question_type=QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+                        difficulty=QuestionCardDifficulty.BASIC,
+                        interaction_language="en",
+                        idempotency_key="question-generation-retry-window",
+                    )
+
+                async with database.sessionmaker() as session:
+                    claimed = await AgentRunService(session).claim_next(
+                        lease_owner="question-generation-first-attempt",
+                        lease_duration=timedelta(minutes=10),
+                    )
+                    assert claimed is not None
+                    assert claimed.id == retry_run.id
+
+                retry_response_a = {
+                    **response,
+                    "prompt": "Explain how you designed the payment workflows for the retry case.",
+                    "recommended_materials": [],
+                }
+                retry_output_a = QuestionGenerationOutput.model_validate(
+                    retry_response_a
+                )
+                async with database.sessionmaker() as session:
+                    await QuestionGenerationService(
+                        session
+                    ).persist_success(claimed, retry_output_a)
+
+                async with database.sessionmaker() as session:
+                    now = datetime.now(UTC)
+                    running = await session.get(AgentRun, retry_run.id)
+                    assert running is not None
+                    running.lease_expires_at = now - timedelta(seconds=1)
+                    await session.commit()
+                    assert (
+                        await AgentRunService(
+                            session,
+                            clock=lambda: now,
+                        ).requeue_expired()
+                        == 1
+                    )
+
+                retry_response_b = {
+                    **retry_response_a,
+                    "prompt": "Describe a completely different retry question.",
+                }
+                retry_provider = FakeLLMProvider(
+                    [retry_response_b],
+                    provider="fake-question-retry-provider",
+                    usage=LLMUsage(input_tokens=30, output_tokens=12),
+                )
+                retry_handler = QuestionGenerationHandler(
+                    session_factory=database.sessionmaker,
+                    agent=QuestionGenerationAgent(
+                        retry_provider,
+                        model="fake-question-retry-model",
+                    ),
+                )
+                retry_registry = AgentHandlerRegistry()
+                retry_registry.register(retry_handler)
+                retry_worker = AgentWorker(
+                    worker_id="question-generation-retry-worker",
+                    session_factory=database.sessionmaker,
+                    registry=retry_registry,
+                    lease_duration=timedelta(minutes=10),
+                    heartbeat_interval=timedelta(minutes=2),
+                    poll_interval=timedelta(seconds=1),
+                    requeue_interval=timedelta(minutes=1),
+                    retry_base_delay=timedelta(seconds=1),
+                    retry_max_delay=timedelta(minutes=2),
+                    logger=SilentLogger(),
+                )
+                assert await retry_worker.process_one() is True
+
+                async with database.sessionmaker() as session:
+                    stored_retry_run = await session.get(
+                        AgentRun,
+                        retry_run.id,
+                    )
+                    retry_cards = list(
+                        (
+                            await session.scalars(
+                                select(QuestionCard).where(
+                                    QuestionCard.source_agent_run_id
+                                    == retry_run.id
+                                )
+                            )
+                        ).all()
+                    )
+                    assert stored_retry_run is not None
+                    assert stored_retry_run.status is AgentRunStatus.SUCCEEDED
+                    assert len(retry_cards) == 1
+                    assert retry_cards[0].source_agent_run_id == retry_run.id
+                    assert retry_cards[0].prompt == retry_response_a["prompt"]
+                    assert stored_retry_run.result is not None
+                    assert stored_retry_run.result["prompt"] == retry_response_a[
+                        "prompt"
+                    ]
+                    assert stored_retry_run.result["prompt"] != retry_response_b[
+                        "prompt"
+                    ]
             finally:
                 await database.reset()
 

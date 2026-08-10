@@ -1,7 +1,8 @@
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel
 import pytest
@@ -14,7 +15,7 @@ from riva.integrations import (
     ProviderRateLimitedError,
     ProviderUnavailableError,
 )
-from riva.models import AgentRun, AgentRunStatus
+from riva.models import AgentRun, AgentRunStatus, QuestionCard
 from riva.schemas.question_generation import (
     QuestionGenerationInput,
     QuestionGenerationOutput,
@@ -91,6 +92,43 @@ def running_agent_run() -> AgentRun:
     )
 
 
+def question_card_for(
+    run: AgentRun,
+    result_output: QuestionGenerationOutput,
+) -> QuestionCard:
+    values = result_output.model_dump(mode="json")
+    payload = run.payload
+    return QuestionCard(
+        id=uuid4(),
+        user_id=run.user_id,
+        target_role_id=UUID(cast(str, payload["roleId"])),
+        profile_id=UUID(cast(str, payload["profileId"])),
+        source_agent_run_id=run.id,
+        matching_analysis_run_id=UUID(
+            cast(str, payload["matchingAnalysisRunId"])
+        ),
+        language=cast(str, payload["interactionLanguage"]),
+        question_type=cast(str, values["question_type"]),
+        difficulty=cast(str, values["difficulty"]),
+        prompt=cast(str, values["prompt"]),
+        assessed_capabilities=cast(list[str], values["assessed_capabilities"]),
+        recommended_materials=cast(
+            list[dict[str, object]], values["recommended_materials"]
+        ),
+        answer_hints=cast(list[str], values["answer_hints"]),
+        answer_framework=cast(list[str], values["answer_framework"]),
+        follow_up_directions=cast(list[str], values["follow_up_directions"]),
+        scoring_focus=cast(list[str], values["scoring_focus"]),
+        profile_version=cast(int, payload["profileVersion"]),
+        job_description_version=cast(int, payload["jobDescriptionVersion"]),
+        job_description_analysis_version=cast(
+            int, payload["jobDescriptionAnalysisVersion"]
+        ),
+        is_saved=False,
+        is_marked_weak=False,
+    )
+
+
 class FakeSession:
     def __init__(self, identifier: int) -> None:
         self.identifier = identifier
@@ -131,6 +169,7 @@ class GenerationState:
         self.load_sessions: list[int] = []
         self.persist_sessions: list[int] = []
         self.persisted_outputs: list[QuestionGenerationOutput] = []
+        self.persisted_card: QuestionCard | None = None
 
 
 class FakeGenerationService:
@@ -152,13 +191,15 @@ class FakeGenerationService:
         self,
         run: AgentRun,
         result_output: QuestionGenerationOutput,
-    ) -> object:
+    ) -> QuestionCard:
         assert self.state.sessions.active == 1
         self.state.persist_sessions.append(self.session.identifier)
         if self.state.persist_error is not None:
             raise self.state.persist_error
         self.state.persisted_outputs.append(result_output)
-        return object()
+        if self.state.persisted_card is None:
+            self.state.persisted_card = question_card_for(run, result_output)
+        return self.state.persisted_card
 
 
 class FakeAgent:
@@ -223,6 +264,47 @@ def test_handler_loads_generates_persists_and_returns_result() -> None:
         assert sessions.entered == [1, 2]
         assert sessions.exited == [1, 2]
         assert sessions.active == 0
+
+    asyncio.run(run_test())
+
+
+def test_handler_returns_existing_card_output_and_keeps_retry_metadata() -> None:
+    async def run_test() -> None:
+        sessions = FakeSessionFactory()
+        state = GenerationState(sessions)
+        run = running_agent_run()
+        output_a = output()
+        output_b = output().model_copy(
+            update={
+                "prompt": "Describe a completely different retry question."
+            }
+        )
+        state.persisted_card = question_card_for(run, output_a)
+        retry_result = agent_result(
+            result_output=output_b,
+        )
+        retry_result = replace(
+            retry_result,
+            provider="retry-provider",
+            model="retry-model",
+            usage=LLMUsage(input_tokens=20, output_tokens=8),
+        )
+
+        result = await handler(
+            sessions,
+            state,
+            FakeAgent(sessions, retry_result),
+        ).execute(run)
+
+        assert result.output == output_a
+        assert result.output != output_b
+        assert result.agent_id == retry_result.agent_id
+        assert result.prompt_id == retry_result.prompt_id
+        assert result.prompt_version == retry_result.prompt_version
+        assert result.provider == retry_result.provider
+        assert result.model == retry_result.model
+        assert result.usage == retry_result.usage
+        assert state.persisted_outputs == [output_b]
 
     asyncio.run(run_test())
 
