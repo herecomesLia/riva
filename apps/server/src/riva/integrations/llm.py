@@ -1,12 +1,48 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 ResponseT = TypeVar("ResponseT")
+StructuredOutputStage = Literal[
+    "json_decode",
+    "provider_response",
+    "schema_validation",
+]
+
+
+@dataclass(frozen=True)
+class StructuredOutputValidationError:
+    location: str
+    type: str
+
+
+@dataclass(frozen=True)
+class StructuredOutputDiagnostics:
+    stage: StructuredOutputStage
+    output_schema: str
+    validation_errors: tuple[StructuredOutputValidationError, ...] = ()
+
+    @property
+    def error_count(self) -> int:
+        return len(self.validation_errors)
+
+    def as_log_fields(self) -> dict[str, object]:
+        return {
+            "structured_output_stage": self.stage,
+            "output_schema": self.output_schema,
+            "validation_error_count": self.error_count,
+            "validation_errors": [
+                {
+                    "location": error.location,
+                    "type": error.type,
+                }
+                for error in self.validation_errors
+            ],
+        }
 
 
 class MessageRole(StrEnum):
@@ -109,6 +145,14 @@ class ProviderRateLimitedError(LLMProviderError):
 class InvalidStructuredOutputError(LLMProviderError):
     code = "invalid_structured_output"
     safe_message = "The LLM provider returned invalid structured output."
+    retryable = True
+
+    def __init__(
+        self,
+        diagnostics: StructuredOutputDiagnostics | None = None,
+    ) -> None:
+        self.diagnostics = diagnostics
+        super().__init__()
 
 
 class LLMProviderConfigurationError(LLMProviderError):
@@ -121,7 +165,28 @@ def validate_structured_output(
     value: object,
 ) -> StructuredOutputT:
     try:
-        return output_schema.model_validate(value)
-    except ValidationError:
-        pass
-    raise InvalidStructuredOutputError
+        validated = output_schema.model_validate(value)
+    except ValidationError as error:
+        diagnostics = StructuredOutputDiagnostics(
+            stage="schema_validation",
+            output_schema=output_schema.__name__,
+            validation_errors=_safe_validation_errors(error),
+        )
+    else:
+        return validated
+    raise InvalidStructuredOutputError(diagnostics)
+
+
+def _safe_validation_errors(
+    error: ValidationError,
+) -> tuple[StructuredOutputValidationError, ...]:
+    safe_errors: list[StructuredOutputValidationError] = []
+    for item in error.errors():
+        location = ".".join(str(part) for part in item.get("loc", ()))
+        safe_errors.append(
+            StructuredOutputValidationError(
+                location=location or "<root>",
+                type=str(item.get("type", "unknown")),
+            )
+        )
+    return tuple(safe_errors)

@@ -15,6 +15,8 @@ from riva.integrations.llm import (
     ProviderRateLimitedError,
     ProviderUnavailableError,
     StructuredGenerationRequest,
+    StructuredOutputDiagnostics,
+    StructuredOutputStage,
     TextGenerationRequest,
     validate_structured_output,
 )
@@ -93,13 +95,63 @@ class QwenProvider:
         }
         _apply_parameters(body, request, include_max_tokens=False)
         response = await self._post(body)
+
         try:
-            data = _response_object(response)
+            raw_data = response.json()
+        except (TypeError, ValueError):
+            diagnostics = _structured_output_diagnostics(
+                request.output_schema,
+                "json_decode",
+            )
+        else:
+            diagnostics = None
+        if diagnostics is not None:
+            raise InvalidStructuredOutputError(diagnostics)
+        if not isinstance(raw_data, dict):
+            raise InvalidStructuredOutputError(
+                _structured_output_diagnostics(
+                    request.output_schema,
+                    "provider_response",
+                )
+            )
+        data = cast(dict[str, object], raw_data)
+
+        try:
             content = _message_content(data)
+        except (TypeError, ValueError, ValidationError):
+            diagnostics = _structured_output_diagnostics(
+                request.output_schema,
+                "provider_response",
+            )
+        else:
+            diagnostics = None
+        if diagnostics is not None:
+            raise InvalidStructuredOutputError(diagnostics)
+
+        try:
             parsed = json.loads(content)
+        except (TypeError, ValueError):
+            diagnostics = _structured_output_diagnostics(
+                request.output_schema,
+                "json_decode",
+            )
+        else:
+            diagnostics = None
+        if diagnostics is not None:
+            raise InvalidStructuredOutputError(diagnostics)
+
+        try:
             usage = _usage(data)
-        except (json.JSONDecodeError, TypeError, ValueError, ValidationError):
-            raise InvalidStructuredOutputError from None
+        except (TypeError, ValueError, ValidationError):
+            diagnostics = _structured_output_diagnostics(
+                request.output_schema,
+                "provider_response",
+            )
+        else:
+            diagnostics = None
+        if diagnostics is not None:
+            raise InvalidStructuredOutputError(diagnostics)
+
         return LLMResponse(
             content=validate_structured_output(request.output_schema, parsed),
             usage=usage,
@@ -239,6 +291,16 @@ def _response_object(response: httpx.Response) -> dict[str, object]:
     if not isinstance(value, dict):
         raise TypeError
     return cast(dict[str, object], value)
+
+
+def _structured_output_diagnostics(
+    output_schema: type[StructuredOutputT],
+    stage: StructuredOutputStage,
+) -> StructuredOutputDiagnostics:
+    return StructuredOutputDiagnostics(
+        stage=stage,
+        output_schema=output_schema.__name__,
+    )
 
 
 def _message_content(data: Mapping[str, object]) -> str:

@@ -16,6 +16,7 @@ from riva.integrations import (
     LLMProviderConfigurationError,
     ProviderRateLimitedError,
     ProviderUnavailableError,
+    StructuredOutputDiagnostics,
 )
 from riva.models import AgentRun
 from riva.services.agent_runs import (
@@ -36,6 +37,7 @@ WaitForEvent = Callable[[asyncio.Event, timedelta], Awaitable[bool]]
 class _Failure:
     code: str
     retryable: bool
+    diagnostics: StructuredOutputDiagnostics | None = None
 
 
 @dataclass(frozen=True)
@@ -292,6 +294,11 @@ class AgentWorker:
             "agent.worker.run",
             status=failed.status.value,
             error_code=failure.code,
+            **(
+                failure.diagnostics.as_log_fields()
+                if failure.diagnostics is not None
+                else {}
+            ),
             **_log_fields(self.worker_id, run),
         )
 
@@ -359,7 +366,11 @@ def _failure_for(exc: Exception) -> _Failure:
     if isinstance(exc, ProviderRateLimitedError):
         return _Failure(exc.code, retryable=True)
     if isinstance(exc, InvalidStructuredOutputError):
-        return _Failure(exc.code, retryable=True)
+        return _Failure(
+            exc.code,
+            retryable=exc.retryable,
+            diagnostics=exc.diagnostics,
+        )
     if isinstance(exc, LLMProviderConfigurationError):
         return _Failure(exc.code, retryable=False)
     return _Failure("agent_execution_error", retryable=True)

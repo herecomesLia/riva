@@ -13,6 +13,8 @@ from riva.integrations import (
     LLMUsage,
     ProviderRateLimitedError,
     ProviderUnavailableError,
+    StructuredOutputDiagnostics,
+    StructuredOutputValidationError,
 )
 from riva.models import AgentRun, AgentRunStatus
 from riva.services.agent_runs import (
@@ -355,6 +357,68 @@ def test_process_one_maps_safe_failure(
         timedelta(seconds=10) if retryable else timedelta(0)
     )
     assert "private resume contents" not in repr(logger.events)
+
+
+def test_invalid_structured_output_retries_and_logs_safe_diagnostics() -> None:
+    runs = [agent_run(max_attempts=3) for _ in range(3)]
+    for attempt, run in enumerate(runs, start=1):
+        run.attempt_count = attempt
+    service = FakeAgentRunService(runs)
+    sessions = FakeSessionFactory()
+    diagnostics = StructuredOutputDiagnostics(
+        stage="schema_validation",
+        output_schema="ResumeParsingOutput",
+        validation_errors=(
+            StructuredOutputValidationError(
+                location="work_experiences.0.is_current",
+                type="bool_parsing",
+            ),
+        ),
+    )
+    registry = AgentHandlerRegistry()
+    registry.register(
+        FakeHandler(
+            InvalidStructuredOutputError(diagnostics),
+            sessions,
+        )
+    )
+    logger = FakeLogger()
+    runtime = worker(service, sessions, registry, logger=logger)
+
+    for _ in runs:
+        assert asyncio.run(runtime.process_one()) is True
+
+    assert [run.status for run in runs] == [
+        AgentRunStatus.QUEUED,
+        AgentRunStatus.QUEUED,
+        AgentRunStatus.FAILED,
+    ]
+    assert [failure["error_code"] for failure in service.failures] == [
+        "invalid_structured_output",
+        "invalid_structured_output",
+        "invalid_structured_output",
+    ]
+    final_failure_event = [
+        event
+        for event in logger.events
+        if event[2].get("error_code") == "invalid_structured_output"
+    ][-1][2]
+    assert final_failure_event["run_id"] == str(runs[-1].id)
+    assert final_failure_event["agent_id"] == runs[-1].agent_id
+    assert final_failure_event["attempt_count"] == 3
+    assert final_failure_event["error_code"] == "invalid_structured_output"
+    assert final_failure_event["structured_output_stage"] == (
+        "schema_validation"
+    )
+    assert final_failure_event["output_schema"] == "ResumeParsingOutput"
+    assert final_failure_event["validation_error_count"] == 1
+    assert final_failure_event["validation_errors"] == [
+        {
+            "location": "work_experiences.0.is_current",
+            "type": "bool_parsing",
+        }
+    ]
+    assert "PRIVATE_RESUME_CONTENT" not in repr(logger.events)
 
 
 def test_result_mismatch_becomes_permanent_failure() -> None:

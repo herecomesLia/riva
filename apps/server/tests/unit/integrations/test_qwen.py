@@ -318,21 +318,53 @@ def test_structured_constraint_follows_all_leading_system_messages(
 
 
 @pytest.mark.parametrize(
-    "payload",
+    ("payload", "stage"),
     [
-        response(content="not json"),
-        response(content='{"name":"Python","score":"invalid"}'),
-        {"usage": {"prompt_tokens": 1, "completion_tokens": 1}},
-        {"choices": [{"message": {}}]},
+        (response(content="not json"), "json_decode"),
+        (
+            response(content='{"name":"Python","score":"invalid"}'),
+            "schema_validation",
+        ),
+        (
+            {"usage": {"prompt_tokens": 1, "completion_tokens": 1}},
+            "provider_response",
+        ),
+        ({"choices": [{"message": {}}]}, "provider_response"),
     ],
 )
 def test_structured_response_rejects_invalid_json_schema_or_shape(
     payload: dict[str, object],
+    stage: str,
 ) -> None:
     qwen = provider(lambda _request: httpx.Response(200, json=payload))
 
-    with pytest.raises(InvalidStructuredOutputError):
+    with pytest.raises(InvalidStructuredOutputError) as exc_info:
         asyncio.run(qwen.generate_structured(structured_request()))
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics is not None
+    assert diagnostics.stage == stage
+    assert diagnostics.output_schema == "ExampleOutput"
+
+
+def test_structured_json_decode_diagnostics_do_not_retain_raw_content() -> None:
+    marker = "PRIVATE_RESUME_CONTENT"
+    qwen = provider(
+        lambda _request: httpx.Response(
+            200,
+            json=response(content=f'{{"name":"{marker}"'),
+        )
+    )
+
+    with pytest.raises(InvalidStructuredOutputError) as exc_info:
+        asyncio.run(qwen.generate_structured(structured_request()))
+
+    error = exc_info.value
+    assert error.diagnostics is not None
+    assert error.diagnostics.stage == "json_decode"
+    assert marker not in repr(error)
+    assert error.__cause__ is None
+    assert error.__context__ is None
 
 
 def test_text_response_rejects_incomplete_success_response() -> None:

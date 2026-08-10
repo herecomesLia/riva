@@ -14,6 +14,7 @@ from riva.integrations import (
     ProviderUnavailableError,
     StructuredGenerationRequest,
     TextGenerationRequest,
+    validate_structured_output,
 )
 from tests.helpers.llm import FakeLLMProvider
 
@@ -21,6 +22,14 @@ from tests.helpers.llm import FakeLLMProvider
 class ExampleOutput(BaseModel):
     name: str
     score: int
+
+
+class WorkExperienceOutput(BaseModel):
+    is_current: bool
+
+
+class NestedOutput(BaseModel):
+    work_experiences: list[WorkExperienceOutput]
 
 
 def structured_request() -> StructuredGenerationRequest[ExampleOutput]:
@@ -68,6 +77,47 @@ def test_fake_provider_rejects_invalid_structured_output() -> None:
 
     assert "private resume content" not in str(exc_info.value)
     assert exc_info.value.__context__ is None
+
+
+def test_schema_validation_error_exposes_only_safe_diagnostics() -> None:
+    with pytest.raises(InvalidStructuredOutputError) as exc_info:
+        validate_structured_output(
+            ExampleOutput,
+            {"name": "PRIVATE_RESUME_CONTENT", "score": "not-a-number"},
+        )
+
+    error = exc_info.value
+    assert error.diagnostics is not None
+    assert error.diagnostics.stage == "schema_validation"
+    assert error.diagnostics.output_schema == "ExampleOutput"
+    assert error.diagnostics.error_count == 1
+    assert error.diagnostics.validation_errors[0].location == "score"
+    assert error.diagnostics.validation_errors[0].type == "int_parsing"
+    assert "PRIVATE_RESUME_CONTENT" not in repr(error)
+    assert error.__cause__ is None
+    assert error.__context__ is None
+
+
+def test_schema_validation_diagnostics_preserve_nested_error_path() -> None:
+    with pytest.raises(InvalidStructuredOutputError) as exc_info:
+        validate_structured_output(
+            NestedOutput,
+            {
+                "work_experiences": [
+                    {"is_current": "PRIVATE_RESUME_CONTENT"}
+                ]
+            },
+        )
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics is not None
+    assert diagnostics.stage == "schema_validation"
+    assert len(diagnostics.validation_errors) == 1
+    assert diagnostics.validation_errors[0].location == (
+        "work_experiences.0.is_current"
+    )
+    assert diagnostics.validation_errors[0].type == "bool_parsing"
+    assert "PRIVATE_RESUME_CONTENT" not in repr(diagnostics)
 
 
 def test_fake_provider_raises_configured_error() -> None:
