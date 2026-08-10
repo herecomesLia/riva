@@ -163,4 +163,51 @@ RESUME_PARSING_PROMPT_V3 = PromptDefinition(
 )
 
 
-RESUME_PARSING_PROMPT = RESUME_PARSING_PROMPT_V3
+_RESUME_PARSING_SKILL_CONSISTENCY = """Skill consistency:
+- `skills` is the canonical top-level set of explicitly supported skills in the resume.
+- Any skill placed in a work experience or project experience `skills` list MUST also appear in the top-level `skills` list.
+- Experience-level skills are references to the canonical top-level skill set, not a separate vocabulary.
+- If the resume explicitly associates Docker with a project, it is valid to put Docker in that project's skills, but Docker must also be included in top-level skills.
+- Never add a skill to the top-level list merely to satisfy consistency unless the resume itself explicitly supports that skill.
+- Do not associate every global skill with every experience; experience-level skills still require explicit evidence tying the skill to that experience.
+- Use one consistent canonical spelling/casing for the same skill across top-level and experience-level lists.
+
+Correct:
+{{
+  "skills": ["Python", "FastAPI", "Docker"],
+  "project_experiences": [
+    {{
+      "skills": ["Python", "Docker"]
+    }}
+  ]
+}}
+
+Incorrect:
+{{
+  "skills": ["Python", "FastAPI"],
+  "project_experiences": [
+    {{
+      "skills": ["Python", "Docker"]
+    }}
+  ]
+}}
+
+The incorrect example violates the contract because Docker is not in the canonical top-level `skills` list. Do not remove a real experience skill to evade this rule; if the resume explicitly supports Docker, include it in both places.
+"""
+
+
+RESUME_PARSING_PROMPT_V4 = PromptDefinition(
+    prompt_id="resume-parser",
+    version="4",
+    output_schema_id="resume-parsing-v1",
+    output_schema=ResumeParsingOutput,
+    system_template=RESUME_PARSING_PROMPT_V3.system_template.replace(
+        "\nOutput:\n",
+        f"\n\n{_RESUME_PARSING_SKILL_CONSISTENCY}\n\nOutput:\n",
+        1,
+    ),
+    user_template=RESUME_PARSING_PROMPT_V3.user_template,
+)
+
+
+RESUME_PARSING_PROMPT = RESUME_PARSING_PROMPT_V4

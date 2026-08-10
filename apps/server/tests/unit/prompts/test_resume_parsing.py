@@ -1,6 +1,12 @@
 import pytest
 
-from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
+from riva.prompts import (
+    RESUME_PARSING_PROMPT,
+    RESUME_PARSING_PROMPT_V1,
+    RESUME_PARSING_PROMPT_V2,
+    RESUME_PARSING_PROMPT_V3,
+    RESUME_PARSING_PROMPT_V4,
+)
 from riva.prompts.base import PromptRenderError
 from riva.schemas.resume_parsing import ResumeParsingOutput
 
@@ -21,6 +27,43 @@ def test_resume_prompt_v2_has_fixed_versioned_contract() -> None:
     assert prompt.version == "2"
     assert prompt.output_schema_id == "resume-parsing-v1"
     assert prompt.output_schema is ResumeParsingOutput
+
+
+def test_resume_prompt_v3_and_v4_versions_are_stable() -> None:
+    assert RESUME_PARSING_PROMPT_V3.version == "3"
+    assert RESUME_PARSING_PROMPT_V4.version == "4"
+    assert RESUME_PARSING_PROMPT is RESUME_PARSING_PROMPT_V4
+    assert RESUME_PARSING_PROMPT_V3.output_schema_id == (
+        RESUME_PARSING_PROMPT_V4.output_schema_id
+    )
+    assert RESUME_PARSING_PROMPT_V3.output_schema is ResumeParsingOutput
+    assert RESUME_PARSING_PROMPT_V4.output_schema is ResumeParsingOutput
+    assert "Skill consistency:" not in RESUME_PARSING_PROMPT_V3.system_template
+
+
+def test_resume_prompt_v4_explicitly_defines_skill_consistency() -> None:
+    rendered = RESUME_PARSING_PROMPT_V4.render(
+        {
+            "resume_text": "项目使用 Docker。",
+            "interaction_language": "zh-CN",
+        }
+    )
+
+    assert "Skill consistency:" in rendered.system
+    assert "canonical top-level set" in rendered.system
+    assert (
+        "Any skill placed in a work experience or project experience `skills` "
+        "list MUST also appear in the top-level `skills` list."
+        in rendered.system
+    )
+    assert "explicit evidence tying the skill to that experience" in (
+        rendered.system
+    )
+    assert '"skills": ["Python", "FastAPI", "Docker"]' in rendered.system
+    assert '"skills": ["Python", "FastAPI"]' in rendered.system
+    assert '"skills": ["Python", "Docker"]' in rendered.system
+    assert "Interaction language: zh-CN" in rendered.system
+    assert "Never add, remove, or change facts" in rendered.system
 
 
 def test_resume_contract_identity_and_output_schema_keys_are_stable() -> None:

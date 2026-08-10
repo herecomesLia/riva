@@ -27,7 +27,7 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V2
+from riva.prompts import RESUME_PARSING_PROMPT_V4
 from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.agent_runs import AgentRunService
@@ -191,10 +191,13 @@ async def seed_parsing_run(
             user_id=user_id,
             agent_id="resume-parser",
             prompt_id="resume-parser",
-            prompt_version=RESUME_PARSING_PROMPT_V2.version,
+            prompt_version=RESUME_PARSING_PROMPT_V4.version,
             output_schema_id="resume-parsing-v1",
             model=MODEL,
-            payload={"resumeDocumentId": str(document_id)},
+            payload={
+                "resumeDocumentId": str(document_id),
+                "interactionLanguage": "zh-CN",
+            },
             idempotency_key=f"resume-worker-{uuid4()}",
             max_attempts=max_attempts,
         )
@@ -735,10 +738,13 @@ def test_resume_parsing_worker_rejects_superseded_pointer() -> None:
                         user_id=setup.user_id,
                         agent_id="resume-parser",
                         prompt_id="resume-parser",
-                        prompt_version=RESUME_PARSING_PROMPT_V2.version,
+                        prompt_version=RESUME_PARSING_PROMPT_V4.version,
                         output_schema_id="resume-parsing-v1",
                         model=MODEL,
-                        payload={"resumeDocumentId": str(setup.document_id)},
+                        payload={
+                            "resumeDocumentId": str(setup.document_id),
+                            "interactionLanguage": "zh-CN",
+                        },
                         idempotency_key=f"resume-worker-replacement-{uuid4()}",
                         max_attempts=3,
                     )

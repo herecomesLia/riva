@@ -325,6 +325,72 @@ def test_skill_lists_trim_and_deduplicate_case_insensitively() -> None:
     assert parsed.work_experiences[0].skills == ["Python"]
 
 
+def test_project_experience_skills_may_reference_top_level_skills() -> None:
+    payload = minimal_output()
+    payload["skills"] = ["Python", "Docker"]
+    payload["project_experiences"] = [
+        {
+            **project(),
+            "skills": ["Python", "Docker"],
+        }
+    ]
+
+    parsed = ResumeParsingOutput.model_validate(payload)
+
+    assert parsed.skills == ["Python", "Docker"]
+    assert parsed.project_experiences[0].skills == ["Python", "Docker"]
+
+
+def test_project_experience_skills_must_be_top_level_skill_subset() -> None:
+    payload = minimal_output()
+    payload["skills"] = ["Python"]
+    payload["project_experiences"] = [
+        {
+            **project(),
+            "skills": ["Python", "Docker"],
+        }
+    ]
+
+    with pytest.raises(ValidationError, match="top-level skills"):
+        ResumeParsingOutput.model_validate(payload)
+
+
+def test_project_experience_skill_case_is_normalized_to_top_level_spelling() -> None:
+    payload = minimal_output()
+    payload["skills"] = ["Python"]
+    payload["project_experiences"] = [
+        {
+            **project(),
+            "skills": ["python"],
+        }
+    ]
+
+    parsed = ResumeParsingOutput.model_validate(payload)
+
+    assert parsed.project_experiences[0].skills == ["Python"]
+
+
+def test_skill_field_json_schema_describes_canonical_reference_contract() -> None:
+    schema = ResumeParsingOutput.model_json_schema()
+    project_schema = schema["$defs"]["ResumeParsingProjectExperience"]
+    work_schema = schema["$defs"]["ResumeParsingWorkExperience"]
+
+    assert schema["properties"]["skills"]["description"] == (
+        "Canonical set of all explicitly supported skills referenced anywhere "
+        "in the parsed resume. Every experience-level skill must exist here."
+    )
+    expected_experience_description = (
+        "Skills explicitly tied to this experience. Every item must also "
+        "appear in the top-level skills list."
+    )
+    assert project_schema["properties"]["skills"]["description"] == (
+        expected_experience_description
+    )
+    assert work_schema["properties"]["skills"]["description"] == (
+        expected_experience_description
+    )
+
+
 def test_experience_skills_must_be_top_level_skill_subset() -> None:
     payload = complete_output()
     payload["work_experiences"][0]["skills"] = ["Django"]

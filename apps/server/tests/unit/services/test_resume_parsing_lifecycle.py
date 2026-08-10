@@ -14,7 +14,12 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
+from riva.prompts import (
+    RESUME_PARSING_PROMPT_V1,
+    RESUME_PARSING_PROMPT_V2,
+    RESUME_PARSING_PROMPT_V3,
+    RESUME_PARSING_PROMPT_V4,
+)
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_parsing_lifecycle import (
     RESUME_DOCUMENT_NOT_READY,
@@ -117,7 +122,7 @@ def document(
 def run(
     document_id: UUID = DOCUMENT_ID,
     *,
-    prompt_version: str = RESUME_PARSING_PROMPT_V2.version,
+    prompt_version: str = RESUME_PARSING_PROMPT_V4.version,
     status: AgentRunStatus = AgentRunStatus.QUEUED,
     run_id: UUID | None = None,
     attempt_count: int = 0,
@@ -134,11 +139,14 @@ def run(
         id=run_id or uuid4(),
         user_id=USER_ID,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT_V2.prompt_id,
+        prompt_id=RESUME_PARSING_PROMPT_V4.prompt_id,
         prompt_version=prompt_version,
-        output_schema_id=RESUME_PARSING_PROMPT_V2.output_schema_id,
+        output_schema_id=RESUME_PARSING_PROMPT_V4.output_schema_id,
         status=status,
-        payload={"resumeDocumentId": str(document_id)},
+        payload={
+            "resumeDocumentId": str(document_id),
+            "interactionLanguage": "zh-CN",
+        },
         idempotency_key=f"run-{uuid4()}",
         attempt_count=attempt_count,
         max_attempts=3,
@@ -270,9 +278,9 @@ def test_start_enqueues_initial_run_and_sets_pointer_atomically() -> None:
     assert calls[0] == {
         "user_id": USER_ID,
         "agent_id": "resume-parser",
-        "prompt_id": RESUME_PARSING_PROMPT_V2.prompt_id,
-        "prompt_version": "3",
-        "output_schema_id": RESUME_PARSING_PROMPT_V2.output_schema_id,
+        "prompt_id": RESUME_PARSING_PROMPT_V4.prompt_id,
+        "prompt_version": RESUME_PARSING_PROMPT_V4.version,
+        "output_schema_id": RESUME_PARSING_PROMPT_V4.output_schema_id,
         "model": "fake-resume-model",
         "payload": {
             "resumeDocumentId": str(DOCUMENT_ID),
@@ -391,7 +399,7 @@ def test_retry_creates_new_run_and_supersedes_failed_ready_draft() -> None:
     assert old_draft.status == "superseded"
     assert old_draft.draft_version == 1
     assert old_draft.source_agent_run_id == failed.id
-    assert calls[0]["prompt_version"] == "3"
+    assert calls[0]["prompt_version"] == RESUME_PARSING_PROMPT_V4.version
     assert calls[0]["idempotency_key"] == (
         f"resume-parsing:{DOCUMENT_ID}:retry:{failed.id}"
         ":zh-CN"
@@ -636,6 +644,56 @@ def test_status_succeeded_validates_result_and_draft_together() -> None:
 def test_status_keeps_historical_v1_succeeded_run_readable() -> None:
     current = run(
         prompt_version=RESUME_PARSING_PROMPT_V1.version,
+        status=AgentRunStatus.SUCCEEDED,
+        attempt_count=1,
+        output=parsed_output().model_dump(mode="json"),
+    )
+    session = ScriptedSession(
+        document(parsing_run_id=current.id),
+        current,
+        result(current.id),
+        draft(current.id),
+    )
+
+    response = asyncio.run(
+        service(session).get_status(
+            user_id=USER_ID,
+            resume_document_id=DOCUMENT_ID,
+        )
+    )
+
+    assert response.status == "succeeded"
+    assert response.run_id == current.id
+
+
+def test_status_keeps_historical_v3_succeeded_run_readable() -> None:
+    current = run(
+        prompt_version=RESUME_PARSING_PROMPT_V3.version,
+        status=AgentRunStatus.SUCCEEDED,
+        attempt_count=1,
+        output=parsed_output().model_dump(mode="json"),
+    )
+    session = ScriptedSession(
+        document(parsing_run_id=current.id),
+        current,
+        result(current.id),
+        draft(current.id),
+    )
+
+    response = asyncio.run(
+        service(session).get_status(
+            user_id=USER_ID,
+            resume_document_id=DOCUMENT_ID,
+        )
+    )
+
+    assert response.status == "succeeded"
+    assert response.run_id == current.id
+
+
+def test_status_keeps_historical_v2_succeeded_run_readable() -> None:
+    current = run(
+        prompt_version=RESUME_PARSING_PROMPT_V2.version,
         status=AgentRunStatus.SUCCEEDED,
         attempt_count=1,
         output=parsed_output().model_dump(mode="json"),

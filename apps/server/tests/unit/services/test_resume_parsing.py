@@ -6,7 +6,12 @@ from uuid import uuid4
 import pytest
 
 from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
-from riva.prompts import RESUME_PARSING_PROMPT_V1, RESUME_PARSING_PROMPT_V2
+from riva.prompts import (
+    RESUME_PARSING_PROMPT_V1,
+    RESUME_PARSING_PROMPT_V2,
+    RESUME_PARSING_PROMPT_V3,
+    RESUME_PARSING_PROMPT_V4,
+)
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_parsing import (
     INVALID_RESUME_PARSING_RUN,
@@ -52,7 +57,7 @@ class ScriptedSession:
 
 def graph(
     *,
-    prompt_version: str = RESUME_PARSING_PROMPT_V2.version,
+    prompt_version: str = RESUME_PARSING_PROMPT_V4.version,
     extracted_text: str | None = "姓名不应输出\n负责 Python API。",
 ) -> tuple[User, ResumeDocument, AgentRun]:
     owner = User(
@@ -66,10 +71,13 @@ def graph(
         id=uuid4(),
         user_id=owner.id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT_V2.prompt_id,
+        prompt_id=RESUME_PARSING_PROMPT_V4.prompt_id,
         prompt_version=prompt_version,
-        output_schema_id=RESUME_PARSING_PROMPT_V2.output_schema_id,
-        payload={"resumeDocumentId": str(uuid4())},
+        output_schema_id=RESUME_PARSING_PROMPT_V4.output_schema_id,
+        payload={
+            "resumeDocumentId": str(uuid4()),
+            "interactionLanguage": "zh-CN",
+        },
         idempotency_key=f"resume-unit-{uuid4()}",
         max_attempts=3,
         model="test-model",
@@ -306,8 +314,18 @@ def test_persist_success_preserves_null_summary() -> None:
     assert persisted.summary is None
 
 
-def test_persist_success_accepts_historical_v1_run() -> None:
-    owner, document, run = graph(prompt_version=RESUME_PARSING_PROMPT_V1.version)
+@pytest.mark.parametrize(
+    "prompt_version",
+    [
+        RESUME_PARSING_PROMPT_V1.version,
+        RESUME_PARSING_PROMPT_V2.version,
+        RESUME_PARSING_PROMPT_V3.version,
+    ],
+)
+def test_persist_success_accepts_historical_resume_parsing_runs(
+    prompt_version: str,
+) -> None:
+    owner, document, run = graph(prompt_version=prompt_version)
     session = ScriptedSession(owner.id, document, None, None)
 
     persisted = asyncio.run(

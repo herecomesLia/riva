@@ -192,7 +192,12 @@ class ResumeParsingWorkExperience(_ResumeDatedModel):
     location: OptionalText
     responsibilities: BulletList
     achievements: AchievementList
-    skills: SkillList
+    skills: SkillList = Field(
+        description=(
+            "Skills explicitly tied to this experience. Every item must "
+            "also appear in the top-level skills list."
+        )
+    )
 
 
 class ResumeParsingProjectExperience(_ResumeDatedModel):
@@ -200,7 +205,12 @@ class ResumeParsingProjectExperience(_ResumeDatedModel):
     role: OptionalText
     responsibilities: BulletList
     achievements: AchievementList
-    skills: SkillList
+    skills: SkillList = Field(
+        description=(
+            "Skills explicitly tied to this experience. Every item must "
+            "also appear in the top-level skills list."
+        )
+    )
     project_url: OptionalProjectUrl
 
 
@@ -215,7 +225,13 @@ class ResumeParsingOutput(_ResumeParsingModel):
     project_experiences: list[ResumeParsingProjectExperience] = Field(
         max_length=MAX_RESUME_PROJECT_EXPERIENCE_ITEMS
     )
-    skills: TopLevelSkillList
+    skills: TopLevelSkillList = Field(
+        description=(
+            "Canonical set of all explicitly supported skills referenced "
+            "anywhere in the parsed resume. Every experience-level skill "
+            "must exist here."
+        )
+    )
     unresolved_items: AnalysisItemList
 
     @model_validator(mode="after")

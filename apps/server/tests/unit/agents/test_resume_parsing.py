@@ -54,10 +54,10 @@ def test_agent_uses_fixed_identity_schema_model_parameters_and_two_messages() ->
 
     assert agent.agent_id == "resume-parser"
     assert agent.prompt_id == "resume-parser"
-    assert agent.prompt_version == "3"
+    assert agent.prompt_version == RESUME_PARSING_PROMPT.version
     assert result.agent_id == "resume-parser"
     assert result.prompt_id == "resume-parser"
-    assert result.prompt_version == "3"
+    assert result.prompt_version == RESUME_PARSING_PROMPT.version
     request = provider.calls[0]
     assert request.output_schema is ResumeParsingOutput
     assert request.model == "test-resume-model"

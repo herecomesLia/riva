@@ -15,6 +15,7 @@ from riva.prompts import (
     RESUME_PARSING_PROMPT,
     RESUME_PARSING_PROMPT_V1,
     RESUME_PARSING_PROMPT_V2,
+    RESUME_PARSING_PROMPT_V3,
 )
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
@@ -256,6 +257,7 @@ def _validate_run(run: AgentRun) -> ResumeParsingRunPayload:
         not in {
             RESUME_PARSING_PROMPT_V1.version,
             RESUME_PARSING_PROMPT_V2.version,
+            RESUME_PARSING_PROMPT_V3.version,
             active_prompt.version,
         }
         or run.output_schema_id != active_prompt.output_schema_id
