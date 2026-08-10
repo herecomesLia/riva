@@ -6,6 +6,11 @@ import pytest
 
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
 from riva.schemas.matching_analysis import MatchingAnalysisRunPayload
+from riva.schemas.question_cards import (
+    QuestionCardDifficulty,
+    QuestionCardQuestionType,
+)
+from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.schemas.resume_parsing import ResumeParsingRunPayload
 from riva.services.agent_runs import AgentRunService, _serialize_payload
 
@@ -63,6 +68,35 @@ def test_serialize_payload_accepts_resource_snapshot_and_english_metadata() -> N
     }
 
 
+def test_serialize_payload_accepts_question_generation_invocation_metadata() -> None:
+    assert _serialize_payload(
+        {
+            "questionType": "technicalFoundation",
+            "difficulty": "pressure",
+        }
+    ) == {
+        "questionType": "technicalFoundation",
+        "difficulty": "pressure",
+    }
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("questionType", "not-a-question-type"),
+        ("difficulty", "not-a-difficulty"),
+        ("questionType", "resumeParsing"),
+        ("difficulty", "advanced"),
+    ],
+)
+def test_serialize_payload_rejects_invalid_question_generation_metadata(
+    key: str,
+    value: str,
+) -> None:
+    with pytest.raises(ValueError):
+        _serialize_payload({key: value})
+
+
 def test_current_agent_payloads_are_accepted_after_alias_serialization() -> None:
     role_id = uuid4()
     profile_id = uuid4()
@@ -89,6 +123,47 @@ def test_current_agent_payloads_are_accepted_after_alias_serialization() -> None
 
     for payload in payloads:
         assert _serialize_payload(payload) == payload
+
+
+def test_question_generation_run_payload_is_strict_and_camel_case() -> None:
+    role_id = uuid4()
+    profile_id = uuid4()
+    matching_run_id = uuid4()
+    payload = QuestionGenerationRunPayload(
+        role_id=role_id,
+        profile_id=profile_id,
+        profile_version=3,
+        job_description_version=2,
+        job_description_analysis_version=4,
+        matching_analysis_run_id=matching_run_id,
+        interaction_language="en",
+        question_type=QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+        difficulty=QuestionCardDifficulty.PRESSURE,
+    )
+
+    assert payload.model_dump(mode="json", by_alias=True) == {
+        "roleId": str(role_id),
+        "profileId": str(profile_id),
+        "profileVersion": 3,
+        "jobDescriptionVersion": 2,
+        "jobDescriptionAnalysisVersion": 4,
+        "matchingAnalysisRunId": str(matching_run_id),
+        "interactionLanguage": "en",
+        "questionType": "projectDeepDive",
+        "difficulty": "pressure",
+    }
+
+    with pytest.raises(ValueError):
+        QuestionGenerationRunPayload.model_validate(
+            {
+                **payload.model_dump(mode="json", by_alias=True),
+                "interactionLanguage": None,
+            }
+        )
+    missing_language = payload.model_dump(mode="json", by_alias=True)
+    missing_language.pop("interactionLanguage")
+    with pytest.raises(ValueError):
+        QuestionGenerationRunPayload.model_validate(missing_language)
 
 
 @pytest.mark.parametrize("language", ["zh", "en-US", "fr", "", 1, True])

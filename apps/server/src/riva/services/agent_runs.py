@@ -13,12 +13,18 @@ from riva.agents import AgentResult
 from riva.core.language import INTERACTION_LANGUAGES
 from riva.models import AgentRun, AgentRunStatus
 from riva.models.agent_runs import AgentRunPayload, AgentRunResult
+from riva.schemas.question_cards import (
+    QuestionCardDifficulty,
+    QuestionCardQuestionType,
+)
 from riva.utils import utc_now
 
 
 AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
 PayloadValue = UUID | str | int
 _ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_QUESTION_TYPES = frozenset(item.value for item in QuestionCardQuestionType)
+_DIFFICULTIES = frozenset(item.value for item in QuestionCardDifficulty)
 
 
 class AgentRunLeaseError(RuntimeError):
@@ -377,6 +383,18 @@ def _serialize_payload(
             if not isinstance(value, str) or value not in INTERACTION_LANGUAGES:
                 raise ValueError(
                     "payload.interactionLanguage must be a supported interaction language"
+                )
+            serialized[key] = value
+        elif key == "questionType":
+            if not isinstance(value, str) or value not in _QUESTION_TYPES:
+                raise ValueError(
+                    "payload.questionType must be a supported question type"
+                )
+            serialized[key] = value
+        elif key == "difficulty":
+            if not isinstance(value, str) or value not in _DIFFICULTIES:
+                raise ValueError(
+                    "payload.difficulty must be a supported difficulty"
                 )
             serialized[key] = value
         elif normalized_key.endswith(("id", "version")):

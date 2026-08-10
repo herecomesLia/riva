@@ -141,6 +141,33 @@ class QuestionGenerationOutput(_QuestionGenerationModel):
     scoring_focus: QuestionCardTextList
 
 
+class QuestionGenerationRunPayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    role_id: StandardUUID = Field(alias="roleId")
+    profile_id: StandardUUID = Field(alias="profileId")
+    profile_version: int = Field(alias="profileVersion", ge=1)
+    job_description_version: int = Field(
+        alias="jobDescriptionVersion",
+        ge=1,
+    )
+    job_description_analysis_version: int = Field(
+        alias="jobDescriptionAnalysisVersion",
+        ge=1,
+    )
+    matching_analysis_run_id: StandardUUID = Field(
+        alias="matchingAnalysisRunId"
+    )
+    interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
+    question_type: QuestionCardQuestionType = Field(alias="questionType")
+    difficulty: QuestionCardDifficulty
+
+
 __all__ = [
     "MAX_QUESTION_GENERATION_EDUCATION_ITEMS",
     "MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS",
@@ -155,6 +182,7 @@ __all__ = [
     "QuestionGenerationProfileContext",
     "QuestionGenerationProfileSkillList",
     "QuestionGenerationProjectExperienceContext",
+    "QuestionGenerationRunPayload",
     "QuestionGenerationSkill",
     "QuestionGenerationSkillList",
     "QuestionGenerationTargetRoleContext",

@@ -11,6 +11,7 @@ import structlog
 from riva.agents import (
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
+    QuestionGenerationAgent,
     ResumeParsingAgent,
 )
 from riva.core.config import Settings
@@ -25,6 +26,7 @@ from riva.workers.job_description_parsing import (
     JobDescriptionParsingHandler,
 )
 from riva.workers.matching_analysis import MatchingAnalysisHandler
+from riva.workers.question_generation import QuestionGenerationHandler
 from riva.workers.resume_parsing import ResumeParsingWorkerHandler
 from riva.workers.runtime import AgentWorker, SessionFactory
 
@@ -35,6 +37,8 @@ JobDescriptionAgentFactory = Callable[..., JobDescriptionParsingAgent]
 JobDescriptionHandlerFactory = Callable[..., JobDescriptionParsingHandler]
 MatchingAgentFactory = Callable[..., MatchingAnalysisAgent]
 MatchingHandlerFactory = Callable[..., MatchingAnalysisHandler]
+QuestionGenerationAgentFactory = Callable[..., QuestionGenerationAgent]
+QuestionGenerationHandlerFactory = Callable[..., QuestionGenerationHandler]
 ResumeParsingAgentFactory = Callable[..., ResumeParsingAgent]
 ResumeParsingHandlerFactory = Callable[..., ResumeParsingWorkerHandler]
 RegistryFactory = Callable[
@@ -59,6 +63,12 @@ def build_agent_handler_registry(
     ),
     matching_agent_factory: MatchingAgentFactory = MatchingAnalysisAgent,
     matching_handler_factory: MatchingHandlerFactory = MatchingAnalysisHandler,
+    question_generation_agent_factory: QuestionGenerationAgentFactory = (
+        QuestionGenerationAgent
+    ),
+    question_generation_handler_factory: QuestionGenerationHandlerFactory = (
+        QuestionGenerationHandler
+    ),
     resume_parsing_agent_factory: ResumeParsingAgentFactory = ResumeParsingAgent,
     resume_parsing_handler_factory: ResumeParsingHandlerFactory = (
         ResumeParsingWorkerHandler
@@ -86,6 +96,14 @@ def build_agent_handler_registry(
         session_factory=session_factory,
         agent=matching_agent,
     )
+    question_generation_agent = question_generation_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    question_generation_handler = question_generation_handler_factory(
+        session_factory=session_factory,
+        agent=question_generation_agent,
+    )
     resume_parsing_agent = resume_parsing_agent_factory(
         provider=provider,
         model=model,
@@ -96,6 +114,7 @@ def build_agent_handler_registry(
     )
     registry.register(job_description_handler)
     registry.register(matching_handler)
+    registry.register(question_generation_handler)
     registry.register(resume_parsing_handler)
     return registry
 

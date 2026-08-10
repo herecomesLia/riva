@@ -78,6 +78,7 @@ from riva.schemas.question_generation import (
     QuestionGenerationOutput,
     QuestionGenerationProfileContext,
     QuestionGenerationProjectExperienceContext,
+    QuestionGenerationRunPayload,
     QuestionGenerationTargetRoleContext,
     QuestionGenerationWorkExperienceContext,
 )
@@ -149,6 +150,7 @@ __all__ = [
     "QuestionGenerationOutput",
     "QuestionGenerationProfileContext",
     "QuestionGenerationProjectExperienceContext",
+    "QuestionGenerationRunPayload",
     "QuestionGenerationTargetRoleContext",
     "QuestionGenerationWorkExperienceContext",
     "ActiveTargetRolePreparationStatus",
