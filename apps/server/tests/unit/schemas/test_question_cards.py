@@ -16,6 +16,8 @@ from riva.schemas.question_cards import (
     QuestionCardMaterialType,
     QuestionCardQuestionType,
     QuestionCardResponse,
+    QuestionGenerationStatusResponse,
+    StartQuestionGenerationRequest,
 )
 
 
@@ -224,3 +226,61 @@ def test_question_card_response_serializes_camel_case_and_hides_internal_fields(
         "created_at",
         "updated_at",
     }
+
+
+def test_start_question_generation_request_is_camel_case_and_strict() -> None:
+    request = StartQuestionGenerationRequest.model_validate(
+        {
+            "requestId": str(uuid4()),
+            "targetRoleId": str(uuid4()),
+            "questionType": "projectDeepDive",
+            "difficulty": "basic",
+        }
+    )
+
+    assert set(request.model_dump(mode="json")) == {
+        "requestId",
+        "targetRoleId",
+        "questionType",
+        "difficulty",
+    }
+    with pytest.raises(ValidationError):
+        StartQuestionGenerationRequest.model_validate(
+            {
+                **request.model_dump(mode="json"),
+                "interactionLanguage": "en",
+            }
+        )
+
+
+def test_question_generation_status_response_enforces_lifecycle_states() -> None:
+    common = {
+        "runId": str(uuid4()),
+        "questionType": "projectDeepDive",
+        "difficulty": "basic",
+        "language": "en",
+        "attemptCount": 0,
+        "maxAttempts": 3,
+        "errorCode": None,
+        "failureReason": None,
+        "createdAt": datetime(2026, 1, 1, tzinfo=UTC).isoformat(),
+        "startedAt": None,
+        "finishedAt": None,
+        "questionCard": None,
+    }
+    queued = QuestionGenerationStatusResponse.model_validate(
+        {**common, "status": "queued"}
+    )
+    assert queued.status == "queued"
+
+    with pytest.raises(ValidationError):
+        QuestionGenerationStatusResponse.model_validate(
+            {
+                **common,
+                "status": "succeeded",
+            }
+        )
+    with pytest.raises(ValidationError):
+        QuestionGenerationStatusResponse.model_validate(
+            {**common, "status": "queued", "createdAt": "2026-01-01T00:00:00"}
+        )

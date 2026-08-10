@@ -69,6 +69,9 @@ from riva.schemas.question_cards import (
     QuestionCardMaterialType,
     QuestionCardQuestionType,
     QuestionCardResponse,
+    QuestionGenerationLifecycleStatus,
+    QuestionGenerationStatusResponse,
+    StartQuestionGenerationRequest,
 )
 from riva.schemas.question_generation import (
     QuestionGenerationEducationContext,
@@ -143,6 +146,8 @@ __all__ = [
     "QuestionCardMaterialType",
     "QuestionCardQuestionType",
     "QuestionCardResponse",
+    "QuestionGenerationLifecycleStatus",
+    "QuestionGenerationStatusResponse",
     "QuestionGenerationEducationContext",
     "QuestionGenerationInput",
     "QuestionGenerationJobContext",
@@ -153,6 +158,7 @@ __all__ = [
     "QuestionGenerationRunPayload",
     "QuestionGenerationTargetRoleContext",
     "QuestionGenerationWorkExperienceContext",
+    "StartQuestionGenerationRequest",
     "ActiveTargetRolePreparationStatus",
     "ArchiveTargetRoleRequest",
     "CreateTargetRoleRequest",
