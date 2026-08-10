@@ -17,6 +17,7 @@ from riva.schemas.question_cards import (
 from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.services.question_cards import (
     QUESTION_GENERATION_FAILURE_REASON,
+    QUESTION_GENERATION_REQUEST_CONFLICT,
     QUESTION_GENERATION_STATE_CONFLICT,
     QUESTION_GENERATION_UNAVAILABLE,
     QuestionCardService,
@@ -90,6 +91,7 @@ def run_for(
     run_payload: QuestionGenerationRunPayload,
     *,
     state: AgentRunStatus = AgentRunStatus.QUEUED,
+    idempotency_key: str = "question-generation:request",
 ) -> AgentRun:
     return AgentRun(
         id=uuid4(),
@@ -100,7 +102,7 @@ def run_for(
         output_schema_id=QUESTION_GENERATION_PROMPT.output_schema_id,
         status=state,
         payload=run_payload.model_dump(mode="json", by_alias=True),
-        idempotency_key="question-generation:request",
+        idempotency_key=idempotency_key,
         attempt_count=0 if state is AgentRunStatus.QUEUED else 1,
         max_attempts=3,
         available_at=NOW,
@@ -159,9 +161,13 @@ def service(
     )
 
 
-def start_payload(run_payload: QuestionGenerationRunPayload) -> StartQuestionGenerationRequest:
+def start_payload(
+    run_payload: QuestionGenerationRunPayload,
+    *,
+    request_id: UUID | None = None,
+) -> StartQuestionGenerationRequest:
     return StartQuestionGenerationRequest(
-        request_id=uuid4(),
+        request_id=request_id or uuid4(),
         target_role_id=run_payload.role_id,
         question_type=run_payload.question_type,
         difficulty=run_payload.difficulty,
@@ -199,7 +205,13 @@ def test_start_generation_uses_frozen_language_and_request_idempotency_key() -> 
 def test_duplicate_request_id_returns_existing_state_before_configuration_check() -> None:
     owner = user()
     run_payload = payload()
-    existing = run_for(owner.id, run_payload, state=AgentRunStatus.FAILED)
+    request_id = uuid4()
+    existing = run_for(
+        owner.id,
+        run_payload,
+        state=AgentRunStatus.FAILED,
+        idempotency_key=f"question-generation:{request_id}",
+    )
     fake_generation = FakeGenerationService()
     session = ScriptedSession(existing)
 
@@ -211,13 +223,86 @@ def test_duplicate_request_id_returns_existing_state_before_configuration_check(
             model=None,
         ).start_generation(
             owner,
-            start_payload(run_payload),
-            interaction_language="zh-CN",
+            start_payload(run_payload, request_id=request_id),
+            interaction_language="en",
         )
     )
 
     assert response.status == "failed"
     assert response.failure_reason == QUESTION_GENERATION_FAILURE_REASON
+    assert fake_generation.calls == []
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    ["target_role_id", "question_type", "difficulty", "interaction_language"],
+)
+def test_duplicate_request_id_conflicts_on_different_client_intent(
+    mismatch: str,
+) -> None:
+    owner = user()
+    run_payload = payload()
+    request_id = uuid4()
+    existing = run_for(
+        owner.id,
+        run_payload,
+        idempotency_key=f"question-generation:{request_id}",
+    )
+    request = start_payload(run_payload, request_id=request_id)
+    if mismatch == "target_role_id":
+        request = request.model_copy(update={"target_role_id": uuid4()})
+    elif mismatch == "question_type":
+        request = request.model_copy(
+            update={"question_type": QuestionCardQuestionType.BEHAVIORAL}
+        )
+    elif mismatch == "difficulty":
+        request = request.model_copy(
+            update={"difficulty": QuestionCardDifficulty.PRESSURE}
+        )
+
+    fake_generation = FakeGenerationService()
+    session = ScriptedSession(existing)
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service(session, fake_generation).start_generation(
+                owner,
+                request,
+                interaction_language=(
+                    "zh-CN" if mismatch == "interaction_language" else "en"
+                ),
+            )
+        )
+
+    assert error.value.status_code == status.HTTP_409_CONFLICT
+    assert error.value.error == QUESTION_GENERATION_REQUEST_CONFLICT
+    assert fake_generation.calls == []
+
+
+def test_existing_request_with_invalid_payload_is_state_conflict() -> None:
+    owner = user()
+    run_payload = payload()
+    request_id = uuid4()
+    existing = run_for(
+        owner.id,
+        run_payload,
+        idempotency_key=f"question-generation:{request_id}",
+    )
+    existing.payload = {"invalid": "payload"}
+    fake_generation = FakeGenerationService()
+    session = ScriptedSession(existing)
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service(session, fake_generation).start_generation(
+                owner,
+                start_payload(run_payload, request_id=request_id),
+                interaction_language="en",
+            )
+        )
+
+    assert error.value.status_code == status.HTTP_409_CONFLICT
+    assert error.value.error == QUESTION_GENERATION_STATE_CONFLICT
     assert fake_generation.calls == []
 
 

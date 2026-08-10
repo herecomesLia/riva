@@ -30,6 +30,7 @@ from riva.services.question_generation import (
 QUESTION_GENERATION_FAILURE_REASON = (
     "The question could not be generated right now. Please try again."
 )
+QUESTION_GENERATION_REQUEST_CONFLICT = "question_generation_request_conflict"
 QUESTION_GENERATION_NOT_FOUND = "question_generation_not_found"
 QUESTION_GENERATION_STATE_CONFLICT = "question_generation_state_conflict"
 QUESTION_GENERATION_UNAVAILABLE = "question_generation_unavailable"
@@ -69,6 +70,12 @@ class QuestionCardService:
                 idempotency_key=idempotency_key,
             )
             if existing is not None:
+                existing_payload = self._validate_replay_payload(existing)
+                self._require_replay_intent(
+                    existing_payload,
+                    payload,
+                    interaction_language,
+                )
                 return await self._status_response(existing)
 
             self._configured_model()
@@ -84,6 +91,12 @@ class QuestionCardService:
             except QuestionGenerationStateError as error:
                 raise question_generation_state_api_error(error) from None
 
+            run_payload = self._validate_replay_payload(run)
+            self._require_replay_intent(
+                run_payload,
+                payload,
+                interaction_language,
+            )
             return await self._status_response(run)
         except BaseException:
             await self.session.rollback()
@@ -238,6 +251,32 @@ class QuestionCardService:
             ) from None
 
     @staticmethod
+    def _validate_replay_payload(
+        run: AgentRun,
+    ) -> QuestionGenerationRunPayload:
+        try:
+            return QuestionGenerationRunPayload.model_validate(run.payload)
+        except ValidationError:
+            raise _state_conflict() from None
+
+    @staticmethod
+    def _require_replay_intent(
+        existing_payload: QuestionGenerationRunPayload,
+        request: StartQuestionGenerationRequest,
+        interaction_language: InteractionLanguage,
+    ) -> None:
+        if (
+            existing_payload.role_id != request.target_role_id
+            or existing_payload.question_type != request.question_type
+            or existing_payload.difficulty != request.difficulty
+            or existing_payload.interaction_language != interaction_language
+        ):
+            raise APIError(
+                status.HTTP_409_CONFLICT,
+                QUESTION_GENERATION_REQUEST_CONFLICT,
+            )
+
+    @staticmethod
     def _card_lineage_matches(
         card: QuestionCard,
         run: AgentRun,
@@ -300,6 +339,7 @@ __all__ = [
     "QUESTION_CARD_NOT_FOUND",
     "QUESTION_GENERATION_FAILURE_REASON",
     "QUESTION_GENERATION_NOT_FOUND",
+    "QUESTION_GENERATION_REQUEST_CONFLICT",
     "QUESTION_GENERATION_STATE_CONFLICT",
     "QUESTION_GENERATION_UNAVAILABLE",
     "QuestionCardService",

@@ -13,6 +13,7 @@ from riva.schemas.question_cards import (
     QuestionCardResponse,
     QuestionGenerationStatusResponse,
 )
+from riva.services.question_cards import QUESTION_GENERATION_REQUEST_CONFLICT
 
 
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -296,6 +297,26 @@ def test_application_error_contract_is_preserved(app) -> None:
 
     assert response.status_code == 404
     assert response.json() == {"error": "question_generation_not_found"}
+
+
+def test_start_generation_request_conflict_is_not_accepted_as_replay(app) -> None:
+    service = FakeQuestionCardService(
+        error=APIError(409, QUESTION_GENERATION_REQUEST_CONFLICT)
+    )
+    client, _current_user = create_client(app, service)
+
+    with client:
+        response = client.post(
+            "/api/question-cards/generations",
+            json=generation_payload(),
+            headers={
+                "Origin": TRUSTED_ORIGIN,
+                "Accept-Language": "en-US",
+            },
+        )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"error": QUESTION_GENERATION_REQUEST_CONFLICT}
 
 
 def test_openapi_exposes_question_card_contract(app) -> None:

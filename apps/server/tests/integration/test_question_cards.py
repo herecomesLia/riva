@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from riva.agents import QuestionGenerationAgent
 from riva.core.auth import require_current_user
@@ -12,6 +13,7 @@ from riva.core.app import create_app
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMUsage
+from riva.models import AgentRun
 from riva.workers import AgentHandlerRegistry, AgentWorker, QuestionGenerationHandler
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_question_generation import seed_context
@@ -142,6 +144,32 @@ def test_question_card_http_flow_with_real_worker() -> None:
                     assert replay.status_code == 202
                     assert replay.json()["runId"] == run_id
                     assert replay.json()["status"] == "succeeded"
+
+                    conflict = client.post(
+                        "/api/question-cards/generations",
+                        json={**body, "difficulty": "pressure"},
+                        headers={
+                            "Origin": TRUSTED_ORIGIN,
+                            "Accept-Language": "en-US",
+                        },
+                    )
+                    assert conflict.status_code == 409
+                    assert conflict.json() == {
+                        "error": "question_generation_request_conflict"
+                    }
+
+                    async with database.sessionmaker() as session:
+                        runs = (
+                            await session.scalars(
+                                select(AgentRun).where(
+                                    AgentRun.user_id == owner.id,
+                                    AgentRun.agent_id == "question-generator",
+                                    AgentRun.idempotency_key
+                                    == f"question-generation:{request_id}",
+                                )
+                            )
+                        ).all()
+                    assert [str(run.id) for run in runs] == [run_id]
 
                     new_request = {**body, "requestId": str(uuid4())}
                     new_generation = client.post(
