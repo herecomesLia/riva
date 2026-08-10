@@ -17,9 +17,6 @@ from riva.integrations import (
 )
 from riva.prompts import (
     JOB_DESCRIPTION_PARSING_PROMPT,
-    JOB_DESCRIPTION_PARSING_PROMPT_V1,
-    JOB_DESCRIPTION_PARSING_PROMPT_V2,
-    JOB_DESCRIPTION_PARSING_PROMPT_V3,
 )
 from tests.helpers.llm import FakeLLMProvider
 
@@ -111,33 +108,27 @@ def test_prompt_contains_context_delimiters_and_treats_malicious_jd_as_data() ->
     assert request.output_schema is JobDescriptionParsingOutput
 
 
-def test_prompt_has_stable_versioned_contract() -> None:
-    prompt = JOB_DESCRIPTION_PARSING_PROMPT_V1
+def test_prompt_has_current_contract() -> None:
+    prompt = JOB_DESCRIPTION_PARSING_PROMPT
 
     assert prompt.prompt_id == "job-description-parser"
-    assert prompt.version == "1"
+    assert prompt.version == "3"
     assert prompt.output_schema_id == "job-description-analysis-v1"
     assert prompt.output_schema is JobDescriptionParsingOutput
     assert "Return an empty list" in prompt.system_template
-    assert "primary language" in prompt.system_template
     assert "Do not output Markdown" in prompt.system_template
 
 
-def test_job_description_prompt_v2_defines_distinct_list_semantics() -> None:
-    assert JOB_DESCRIPTION_PARSING_PROMPT_V1.version == "1"
-    assert JOB_DESCRIPTION_PARSING_PROMPT_V2.version == "2"
-    assert JOB_DESCRIPTION_PARSING_PROMPT_V3.version == "3"
-    assert JOB_DESCRIPTION_PARSING_PROMPT is JOB_DESCRIPTION_PARSING_PROMPT_V3
-    assert JOB_DESCRIPTION_PARSING_PROMPT_V1.output_schema_id == (
-        JOB_DESCRIPTION_PARSING_PROMPT_V2.output_schema_id
-    )
-    assert "complete" in JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
-    assert "atomic hard-skill" in JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
+def test_job_description_prompt_defines_distinct_list_semantics() -> None:
+    prompt = JOB_DESCRIPTION_PARSING_PROMPT
+
+    assert "complete" in prompt.system_template
+    assert "atomic hard-skill" in prompt.system_template
     assert "complete, independently understandable preferred condition" in (
-        JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
+        prompt.system_template
     )
-    assert "related field" in JOB_DESCRIPTION_PARSING_PROMPT_V2.system_template
-    assert "interaction_language" in JOB_DESCRIPTION_PARSING_PROMPT_V3.system_template
+    assert "related field" in prompt.system_template
+    assert "interaction_language" in prompt.system_template
 
 
 def test_agent_uses_interaction_language_over_jd_source_language() -> None:

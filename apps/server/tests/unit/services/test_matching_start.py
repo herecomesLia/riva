@@ -7,7 +7,7 @@ import pytest
 from riva.core.errors import APIError
 from riva.core.language import InteractionLanguage
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import MATCHING_ANALYSIS_PROMPT
 from riva.schemas.roles import (
     RolesPageResponse,
     StartMatchingAnalysisRequest,
@@ -143,9 +143,9 @@ def test_start_creates_run_with_contract_payload_and_lock_order() -> None:
     assert len(run_service.calls) == 1
     call = run_service.calls[0]
     assert call["agent_id"] == "matching-analyzer"
-    assert call["prompt_id"] == MATCHING_ANALYSIS_PROMPT_V1.prompt_id
+    assert call["prompt_id"] == MATCHING_ANALYSIS_PROMPT.prompt_id
     assert call["prompt_version"] == "2"
-    assert call["output_schema_id"] == MATCHING_ANALYSIS_PROMPT_V1.output_schema_id
+    assert call["output_schema_id"] == MATCHING_ANALYSIS_PROMPT.output_schema_id
     assert call["model"] == "test-model"
     assert call["max_attempts"] == 3
     assert call["payload"] == {

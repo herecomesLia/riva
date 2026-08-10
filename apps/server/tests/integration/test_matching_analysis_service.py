@@ -22,7 +22,7 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
 from riva.services.matching_analyses import (
     INVALID_MATCHING_ANALYSIS_RUN,
@@ -114,7 +114,7 @@ def make_run(
     job_description_version: int = 2,
     analysis_version: int = 4,
 ) -> AgentRun:
-    prompt = MATCHING_ANALYSIS_PROMPT_V1
+    prompt = MATCHING_ANALYSIS_PROMPT
     identifier = run_id or uuid4()
     return AgentRun(
         id=identifier,

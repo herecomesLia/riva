@@ -24,12 +24,7 @@ from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
     InteractionLanguage,
 )
-from riva.prompts import (
-    RESUME_PARSING_PROMPT,
-    RESUME_PARSING_PROMPT_V1,
-    RESUME_PARSING_PROMPT_V2,
-    RESUME_PARSING_PROMPT_V3,
-)
+from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import (
     ResumeParsingOutput,
     ResumeParsingRunPayload,
@@ -40,6 +35,7 @@ from riva.services.resume_parsing import (
     ResumeParsingStateError,
     resume_parsing_output_from_result,
 )
+from riva.services.prompt_versions import RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
 from riva.services.resume_imports import (
     RESUME_IMPORT_DRAFT_INVALID,
     ResumeImportStateError,
@@ -313,13 +309,7 @@ class ResumeParsingLifecycleService:
         if (
             run.agent_id != "resume-parser"
             or run.prompt_id != active_prompt.prompt_id
-            or run.prompt_version
-            not in {
-                RESUME_PARSING_PROMPT_V1.version,
-                RESUME_PARSING_PROMPT_V2.version,
-                RESUME_PARSING_PROMPT_V3.version,
-                active_prompt.version,
-            }
+            or run.prompt_version not in RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != active_prompt.output_schema_id
         ):
             return None

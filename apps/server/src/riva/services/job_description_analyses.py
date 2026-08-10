@@ -9,15 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.language import InteractionLanguage
 from riva.models import AgentRun, JobDescriptionAnalysis, TargetRole
-from riva.prompts import (
-    JOB_DESCRIPTION_PARSING_PROMPT,
-    JOB_DESCRIPTION_PARSING_PROMPT_V2,
-)
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
     JobDescriptionParsingRunPayload,
     MAX_JOB_DESCRIPTION_SUMMARY_LENGTH,
+)
+from riva.services.prompt_versions import (
+    JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS,
 )
 from riva.utils import utc_now
 
@@ -269,7 +269,7 @@ class JobDescriptionAnalysisService:
             run.agent_id != "job-description-parser"
             or run.prompt_id != prompt.prompt_id
             or run.prompt_version
-            not in {JOB_DESCRIPTION_PARSING_PROMPT_V2.version, prompt.version}
+            not in JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != prompt.output_schema_id
         ):
             raise JobDescriptionParsingStateError(INVALID_PARSE_RUN)

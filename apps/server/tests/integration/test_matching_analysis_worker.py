@@ -24,7 +24,7 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
 from riva.schemas.roles import (
     MatchingAnalysisStatusQuery,
@@ -109,7 +109,7 @@ def make_run(
     profile_id: UUID,
     key: str,
 ) -> AgentRun:
-    prompt = MATCHING_ANALYSIS_PROMPT_V1
+    prompt = MATCHING_ANALYSIS_PROMPT
     return AgentRun(
         id=uuid4(),
         user_id=user_id,
@@ -900,7 +900,7 @@ def test_matching_enqueue_is_invisible_until_role_binding_commits() -> None:
                         .with_for_update()
                     )
                     assert stored_role is not None
-                    prompt = MATCHING_ANALYSIS_PROMPT_V1
+                    prompt = MATCHING_ANALYSIS_PROMPT
                     run = await AgentRunService(
                         enqueue_session
                     ).enqueue_in_transaction(

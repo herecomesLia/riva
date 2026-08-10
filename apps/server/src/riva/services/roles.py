@@ -25,9 +25,7 @@ from riva.models import (
 )
 from riva.prompts import (
     JOB_DESCRIPTION_PARSING_PROMPT,
-    JOB_DESCRIPTION_PARSING_PROMPT_V2,
     MATCHING_ANALYSIS_PROMPT,
-    MATCHING_ANALYSIS_PROMPT_V1,
 )
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
 from riva.schemas.matching_analysis import (
@@ -65,6 +63,10 @@ from riva.schemas.roles import (
 from riva.services.agent_runs import AgentRunService
 from riva.services.job_description_analyses import build_riva_summary
 from riva.services.profile_completion import career_profile_completed
+from riva.services.prompt_versions import (
+    JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS,
+    MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS,
+)
 
 
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
@@ -928,7 +930,7 @@ class TargetRoleService:
             run.agent_id != "job-description-parser"
             or run.prompt_id != prompt.prompt_id
             or run.prompt_version
-            not in {JOB_DESCRIPTION_PARSING_PROMPT_V2.version, prompt.version}
+            not in JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != prompt.output_schema_id
         ):
             return None
@@ -967,7 +969,7 @@ class TargetRoleService:
             run.agent_id != "matching-analyzer"
             or run.prompt_id != prompt.prompt_id
             or run.prompt_version
-            not in {MATCHING_ANALYSIS_PROMPT_V1.version, prompt.version}
+            not in MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != prompt.output_schema_id
         ):
             return None

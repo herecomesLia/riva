@@ -17,7 +17,7 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V4
+from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_parsing_lifecycle import (
     RESUME_PARSING_FAILURE_REASON,
@@ -222,7 +222,7 @@ def test_start_is_idempotent_and_worker_reaches_succeeded() -> None:
                     assert document is not None
                     assert document.parsing_run_id == first.run_id
                     assert run is not None
-                    assert run.prompt_version == RESUME_PARSING_PROMPT_V4.version
+                    assert run.prompt_version == RESUME_PARSING_PROMPT.version
                     assert run.payload == {
                         "resumeDocumentId": str(document_id),
                         "interactionLanguage": "zh-CN",

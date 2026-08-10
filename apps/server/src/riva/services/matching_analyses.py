@@ -20,7 +20,7 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT, MATCHING_ANALYSIS_PROMPT_V1
+from riva.prompts import MATCHING_ANALYSIS_PROMPT
 from riva.schemas.job_description_parsing import JobDescriptionParsingOutput
 from riva.schemas.matching_analysis import (
     MAX_MATCHING_EDUCATION_ITEMS,
@@ -39,6 +39,7 @@ from riva.schemas.matching_analysis import (
     MatchingProfileProjectExperience,
     MatchingProfileWorkExperience,
 )
+from riva.services.prompt_versions import MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
 from riva.services.profile_completion import career_profile_completed
 from riva.utils import utc_now
 
@@ -389,7 +390,7 @@ class MatchingAnalysisService:
             run.agent_id != "matching-analyzer"
             or run.prompt_id != prompt.prompt_id
             or run.prompt_version
-            not in {MATCHING_ANALYSIS_PROMPT_V1.version, prompt.version}
+            not in MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != prompt.output_schema_id
         ):
             raise MatchingAnalysisStateError(INVALID_MATCHING_ANALYSIS_RUN)

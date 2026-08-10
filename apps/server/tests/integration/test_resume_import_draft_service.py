@@ -16,7 +16,7 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V2
+from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.services.resume_imports import (
     ResumeImportDraftService,
@@ -52,9 +52,9 @@ def seed_graph(suffix: str):
         id=uuid4(),
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT_V2.prompt_id,
-        prompt_version=RESUME_PARSING_PROMPT_V2.version,
-        output_schema_id=RESUME_PARSING_PROMPT_V2.output_schema_id,
+        prompt_id=RESUME_PARSING_PROMPT.prompt_id,
+        prompt_version="2",
+        output_schema_id=RESUME_PARSING_PROMPT.output_schema_id,
         payload={"resumeDocumentId": str(document_id)},
         idempotency_key=f"import-service-{suffix}-{uuid4()}",
         max_attempts=3,

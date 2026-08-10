@@ -27,7 +27,7 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT_V4
+from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.agent_runs import AgentRunService
@@ -191,7 +191,7 @@ async def seed_parsing_run(
             user_id=user_id,
             agent_id="resume-parser",
             prompt_id="resume-parser",
-            prompt_version=RESUME_PARSING_PROMPT_V4.version,
+            prompt_version=RESUME_PARSING_PROMPT.version,
             output_schema_id="resume-parsing-v1",
             model=MODEL,
             payload={
@@ -738,7 +738,7 @@ def test_resume_parsing_worker_rejects_superseded_pointer() -> None:
                         user_id=setup.user_id,
                         agent_id="resume-parser",
                         prompt_id="resume-parser",
-                        prompt_version=RESUME_PARSING_PROMPT_V4.version,
+                        prompt_version=RESUME_PARSING_PROMPT.version,
                         output_schema_id="resume-parsing-v1",
                         model=MODEL,
                         payload={
