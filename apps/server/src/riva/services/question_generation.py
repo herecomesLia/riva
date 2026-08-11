@@ -314,51 +314,70 @@ class QuestionGenerationService:
         idempotency_key: str,
     ) -> AgentRun:
         try:
-            self._require_configuration()
-            await self._lock_user(user_id)
-            context = await self._load_context(
+            run = await self.enqueue_generation_in_transaction(
                 user_id=user_id,
-                role_id=target_role_id,
-                for_update=True,
-            )
-            payload = QuestionGenerationRunPayload(
-                role_id=context.role.id,
-                profile_id=context.profile.profile_id,
-                profile_version=context.profile.version,
-                job_description_version=cast(
-                    int,
-                    context.role.job_description_version,
-                ),
-                job_description_analysis_version=(
-                    context.job_description_analysis.analysis_version
-                ),
-                matching_analysis_run_id=(
-                    context.matching_analysis.source_agent_run_id
-                ),
-                interaction_language=interaction_language,
+                target_role_id=target_role_id,
                 question_type=question_type,
                 difficulty=difficulty,
-            )
-            _build_context_input(context, payload)
-            prompt = QUESTION_GENERATION_PROMPT
-            run = await self.agent_run_service_factory(
-                self.session
-            ).enqueue_in_transaction(
-                user_id=user_id,
-                agent_id="question-generator",
-                prompt_id=prompt.prompt_id,
-                prompt_version=prompt.version,
-                output_schema_id=prompt.output_schema_id,
-                model=self.llm_model,
-                payload=payload.model_dump(mode="json", by_alias=True),
+                interaction_language=interaction_language,
                 idempotency_key=idempotency_key,
-                max_attempts=3,
             )
             await self.session.commit()
             return run
         except Exception:
             await self.session.rollback()
             raise
+
+    async def enqueue_generation_in_transaction(
+        self,
+        *,
+        user_id: UUID,
+        target_role_id: UUID,
+        question_type: QuestionCardQuestionType,
+        difficulty: QuestionCardDifficulty,
+        interaction_language: InteractionLanguage,
+        idempotency_key: str,
+    ) -> AgentRun:
+        self._require_configuration()
+        await self._lock_user(user_id)
+        context = await self._load_context(
+            user_id=user_id,
+            role_id=target_role_id,
+            for_update=True,
+        )
+        payload = QuestionGenerationRunPayload(
+            role_id=context.role.id,
+            profile_id=context.profile.profile_id,
+            profile_version=context.profile.version,
+            job_description_version=cast(
+                int,
+                context.role.job_description_version,
+            ),
+            job_description_analysis_version=(
+                context.job_description_analysis.analysis_version
+            ),
+            matching_analysis_run_id=(
+                context.matching_analysis.source_agent_run_id
+            ),
+            interaction_language=interaction_language,
+            question_type=question_type,
+            difficulty=difficulty,
+        )
+        _build_context_input(context, payload)
+        prompt = QUESTION_GENERATION_PROMPT
+        return await self.agent_run_service_factory(
+            self.session
+        ).enqueue_in_transaction(
+            user_id=user_id,
+            agent_id="question-generator",
+            prompt_id=prompt.prompt_id,
+            prompt_version=prompt.version,
+            output_schema_id=prompt.output_schema_id,
+            model=self.llm_model,
+            payload=payload.model_dump(mode="json", by_alias=True),
+            idempotency_key=idempotency_key,
+            max_attempts=3,
+        )
 
     async def load_generation_input(
         self,

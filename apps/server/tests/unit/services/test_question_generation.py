@@ -463,6 +463,63 @@ def test_enqueue_generation_freezes_only_snapshot_and_controls() -> None:
     }
 
 
+def test_enqueue_generation_in_transaction_does_not_commit_or_rollback() -> None:
+    owner, role, profile, analysis, matching = graph()
+    expected_run = run_for(owner, payload(role, profile, analysis, matching))
+    fake_agent_runs = FakeAgentRunService(expected_run)
+    session = ScriptedSession(owner.id, role, profile, analysis, matching)
+
+    run = asyncio.run(
+        QuestionGenerationService(
+            session,  # type: ignore[arg-type]
+            llm_model="test-model",
+            agent_run_service_factory=lambda _session: fake_agent_runs,  # type: ignore[arg-type]
+        ).enqueue_generation_in_transaction(
+            user_id=owner.id,
+            target_role_id=role.id,
+            question_type=QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+            difficulty=QuestionCardDifficulty.BASIC,
+            interaction_language="en",
+            idempotency_key="practice-session:session:attempt:question-generation",
+        )
+    )
+
+    assert run is expected_run
+    assert session.commit_count == 0
+    assert session.rollback_count == 0
+    assert fake_agent_runs.calls[0]["max_attempts"] == 3
+
+
+def test_enqueue_generation_rolls_back_when_in_transaction_enqueue_fails() -> None:
+    owner, role, profile, analysis, matching = graph()
+
+    class FailingAgentRunService:
+        async def enqueue_in_transaction(self, **kwargs: object) -> AgentRun:
+            del kwargs
+            raise RuntimeError("enqueue failed")
+
+    session = ScriptedSession(owner.id, role, profile, analysis, matching)
+
+    with pytest.raises(RuntimeError, match="enqueue failed"):
+        asyncio.run(
+            QuestionGenerationService(
+                session,  # type: ignore[arg-type]
+                llm_model="test-model",
+                agent_run_service_factory=lambda _session: FailingAgentRunService(),  # type: ignore[arg-type]
+            ).enqueue_generation(
+                user_id=owner.id,
+                target_role_id=role.id,
+                question_type=QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+                difficulty=QuestionCardDifficulty.BASIC,
+                interaction_language="en",
+                idempotency_key="question-generation-failure",
+            )
+        )
+
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
+
+
 @pytest.mark.parametrize(
     ("mutate", "expected"),
     [
