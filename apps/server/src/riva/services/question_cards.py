@@ -24,6 +24,7 @@ from riva.services.question_generation import (
     QuestionGenerationService,
     QuestionGenerationStateError,
     question_generation_output_from_card,
+    validate_question_generation_run,
 )
 
 
@@ -234,17 +235,9 @@ class QuestionCardService:
 
     @staticmethod
     def _validate_run(run: AgentRun) -> QuestionGenerationRunPayload:
-        prompt = QUESTION_GENERATION_PROMPT
-        if (
-            run.agent_id != "question-generator"
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version != prompt.version
-            or run.output_schema_id != prompt.output_schema_id
-        ):
-            raise APIError(status.HTTP_404_NOT_FOUND, QUESTION_GENERATION_NOT_FOUND)
         try:
-            return QuestionGenerationRunPayload.model_validate(run.payload)
-        except ValidationError:
+            return validate_question_generation_run(run)
+        except QuestionGenerationStateError:
             raise APIError(
                 status.HTTP_404_NOT_FOUND,
                 QUESTION_GENERATION_NOT_FOUND,

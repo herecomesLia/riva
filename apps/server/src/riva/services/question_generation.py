@@ -112,6 +112,27 @@ class QuestionGenerationStateError(RuntimeError):
         super().__init__(self.safe_message)
 
 
+def validate_question_generation_run(
+    run: AgentRun,
+) -> QuestionGenerationRunPayload:
+    """Validate the immutable contract shared by generation consumers."""
+
+    prompt = QUESTION_GENERATION_PROMPT
+    if (
+        run.agent_id != "question-generator"
+        or run.prompt_id != prompt.prompt_id
+        or run.prompt_version != prompt.version
+        or run.output_schema_id != prompt.output_schema_id
+    ):
+        raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
+    try:
+        return QuestionGenerationRunPayload.model_validate(run.payload)
+    except ValidationError:
+        raise QuestionGenerationStateError(
+            INVALID_QUESTION_GENERATION_RUN
+        ) from None
+
+
 _Item = TypeVar("_Item")
 
 
@@ -384,7 +405,7 @@ class QuestionGenerationService:
         run: AgentRun,
     ) -> QuestionGenerationInput:
         try:
-            payload = self._validate_run(run)
+            payload = validate_question_generation_run(run)
             context = await self._load_context(
                 user_id=run.user_id,
                 role_id=payload.role_id,
@@ -410,7 +431,7 @@ class QuestionGenerationService:
         output: QuestionGenerationOutput,
     ) -> QuestionCard:
         try:
-            payload = self._validate_run(run)
+            payload = validate_question_generation_run(run)
             await self._lock_user(run.user_id)
             context = await self._load_context(
                 user_id=run.user_id,
@@ -629,23 +650,6 @@ class QuestionGenerationService:
             matching_analysis=matching,
         )
 
-    @staticmethod
-    def _validate_run(run: AgentRun) -> QuestionGenerationRunPayload:
-        prompt = QUESTION_GENERATION_PROMPT
-        if (
-            run.agent_id != "question-generator"
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version != prompt.version
-            or run.output_schema_id != prompt.output_schema_id
-        ):
-            raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
-        try:
-            return QuestionGenerationRunPayload.model_validate(run.payload)
-        except ValidationError:
-            raise QuestionGenerationStateError(
-                INVALID_QUESTION_GENERATION_RUN
-            ) from None
-
     def _require_configuration(self) -> None:
         if not self.llm_model:
             raise ValueError("llm_model must not be empty")
@@ -793,4 +797,5 @@ __all__ = [
     "build_question_generation_profile_context",
     "build_question_generation_target_role_context",
     "question_generation_output_from_card",
+    "validate_question_generation_run",
 ]

@@ -566,9 +566,9 @@ def test_refresh_failed_raises_without_changing_session_state() -> None:
     [
         ((None,), PRACTICE_SESSION_NOT_FOUND),
         (
-            (
-                practice_session(user_id=uuid4(), role_id=uuid4(), version=2),
-            ),
+                (
+                    practice_session(user_id=uuid4(), role_id=uuid4(), version=3),
+                ),
             PRACTICE_SESSION_VERSION_CONFLICT,
         ),
     ],
@@ -791,3 +791,186 @@ def test_refresh_rejects_missing_or_mismatched_question_card() -> None:
             )
         )
     assert mismatch_error.value.code == PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+
+
+def test_refresh_replays_lost_success_response_without_mutating_workflow() -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    active = practice_session(user_id=user_id, role_id=role_id)
+    payload = generation_payload(role_id=role_id)
+    run = generation_run(
+        user_id=user_id,
+        payload=payload,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    card = question_card(user_id=user_id, role_id=role_id, run_id=run.id)
+    attempt = practice_attempt(
+        user_id=user_id,
+        session_id=active.id,
+        run_id=run.id,
+    )
+
+    first_session = ScriptedSession(active, attempt, run, card)
+    first = asyncio.run(
+        service(first_session).refresh_question_generation(
+            user_id=user_id,
+            session_id=active.id,
+            expected_version=1,
+        )
+    )
+    assert first.session.version == 2
+    assert first.attempt.status == "answering"
+
+    replay_session = ScriptedSession(active, attempt, run, card)
+    replay = asyncio.run(
+        service(replay_session).refresh_question_generation(
+            user_id=user_id,
+            session_id=active.id,
+            expected_version=1,
+        )
+    )
+
+    assert replay.session is active
+    assert replay.attempt is attempt
+    assert replay.question_card is card
+    assert replay.session.version == 2
+    assert replay.attempt.question_card_id == card.id
+    assert replay_session.added == []
+    assert replay_session.commit_count == 1
+    assert replay_session.rollback_count == 0
+
+
+def test_refresh_rejects_invalid_version_plus_one_as_version_conflict() -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    active = practice_session(user_id=user_id, role_id=role_id, version=2)
+    payload = generation_payload(role_id=role_id)
+    run = generation_run(user_id=user_id, payload=payload)
+    attempt = practice_attempt(
+        user_id=user_id,
+        session_id=active.id,
+        run_id=run.id,
+    )
+    scripted = ScriptedSession(active, attempt, run)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_question_generation(
+                user_id=user_id,
+                session_id=active.id,
+                expected_version=1,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert active.version == 2
+    assert attempt.status == "generatingQuestion"
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_get_session_context_returns_generating_without_reconciling() -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    active = practice_session(user_id=user_id, role_id=role_id)
+    payload = generation_payload(role_id=role_id)
+    run = generation_run(
+        user_id=user_id,
+        payload=payload,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    attempt = practice_attempt(
+        user_id=user_id,
+        session_id=active.id,
+        run_id=run.id,
+    )
+    scripted = ScriptedSession(active, attempt, run)
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=user_id,
+            session_id=active.id,
+        )
+    )
+
+    assert result.session.version == 1
+    assert result.attempt.status == "generatingQuestion"
+    assert result.question_card is None
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+
+
+def test_get_session_context_returns_answering_snapshot_without_mutation() -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    active = practice_session(user_id=user_id, role_id=role_id, version=2)
+    payload = generation_payload(role_id=role_id)
+    run = generation_run(
+        user_id=user_id,
+        payload=payload,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    card = question_card(user_id=user_id, role_id=role_id, run_id=run.id)
+    attempt = practice_attempt(
+        user_id=user_id,
+        session_id=active.id,
+        run_id=run.id,
+        status="answering",
+        question_card_id=card.id,
+    )
+    scripted = ScriptedSession(active, attempt, run, card)
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=user_id,
+            session_id=active.id,
+        )
+    )
+
+    assert result.question_card is card
+    assert result.session.version == 2
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_session_context_rejects_future_attempt_states() -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    active = practice_session(user_id=user_id, role_id=role_id)
+    attempt = practice_attempt(
+        user_id=user_id,
+        session_id=active.id,
+        run_id=uuid4(),
+        status="review",
+    )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).get_session_context(
+                user_id=user_id,
+                session_id=active.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert scripted.rollback_count == 1
+
+
+def test_get_session_context_maps_missing_or_wrong_owner_to_not_found() -> None:
+    scripted = ScriptedSession(None)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).get_session_context(
+                user_id=uuid4(),
+                session_id=uuid4(),
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_NOT_FOUND
+    assert scripted.rollback_count == 1

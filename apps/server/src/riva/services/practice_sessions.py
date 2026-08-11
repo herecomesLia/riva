@@ -27,6 +27,7 @@ from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.services.question_generation import (
     QuestionGenerationService,
     QuestionGenerationStateError,
+    validate_question_generation_run,
 )
 from riva.utils import utc_now
 
@@ -228,6 +229,17 @@ class PracticeSessionService:
             )
             if practice_session.status != "active":
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if practice_session.version == expected_version + 1:
+                try:
+                    context = await self._load_completed_generation_replay_context(
+                        practice_session
+                    )
+                except PracticeSessionStateError:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
             if practice_session.version != expected_version:
                 raise PracticeSessionStateError(
                     PRACTICE_SESSION_VERSION_CONFLICT
@@ -296,6 +308,71 @@ class PracticeSessionService:
             practice_session.version += 1
             practice_session.updated_at = now
             await self.session.commit()
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_generation_run=run,
+                question_card=card,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def get_session_context(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        try:
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=False,
+            )
+            if practice_session.status != "active":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=False,
+            )
+            if attempt is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if attempt.status not in {
+                PracticeAttemptStatus.GENERATING_QUESTION.value,
+                PracticeAttemptStatus.ANSWERING.value,
+            }:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            run, _ = await self._load_generation_run(
+                practice_session,
+                attempt,
+                for_update=False,
+            )
+            if attempt.status == PracticeAttemptStatus.GENERATING_QUESTION.value:
+                if attempt.question_card_id is not None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                    )
+                return PracticeSessionWorkflowContext(
+                    session=practice_session,
+                    attempt=attempt,
+                    question_generation_run=run,
+                    question_card=None,
+                )
+
+            if run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if attempt.question_card_id is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            card = await self._load_card_by_id(
+                practice_session,
+                attempt,
+                run,
+                for_update=False,
+            )
             return PracticeSessionWorkflowContext(
                 session=practice_session,
                 attempt=attempt,
@@ -403,7 +480,7 @@ class PracticeSessionService:
         if attempt.status not in valid_active_statuses:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
         if attempt.status != PracticeAttemptStatus.GENERATING_QUESTION.value:
-            if card is None:
+            if run.status != AgentRunStatus.SUCCEEDED or card is None:
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
         elif run.status in (
             AgentRunStatus.QUEUED,
@@ -419,26 +496,65 @@ class PracticeSessionService:
             question_card=card,
         )
 
+    async def _load_completed_generation_replay_context(
+        self,
+        practice_session: PracticeSession,
+    ) -> PracticeSessionWorkflowContext:
+        attempt = await self._load_current_attempt(
+            user_id=practice_session.user_id,
+            session_id=practice_session.id,
+            for_update=True,
+        )
+        if attempt is None or attempt.status != PracticeAttemptStatus.ANSWERING.value:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if attempt.question_card_id is None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        run, _ = await self._load_generation_run(
+            practice_session,
+            attempt,
+            for_update=True,
+        )
+        if run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        card = await self._load_card_by_id(
+            practice_session,
+            attempt,
+            run,
+            for_update=True,
+        )
+        return PracticeSessionWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_generation_run=run,
+            question_card=card,
+        )
+
     async def _load_generation_run(
         self,
         practice_session: PracticeSession,
         attempt: PracticeAttempt,
+        *,
+        for_update: bool = True,
     ) -> tuple[AgentRun, QuestionGenerationRunPayload]:
         if attempt.question_generation_run_id is None:
             raise PracticeSessionStateError(
                 PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
             )
-        run = await self.session.scalar(
-            select(AgentRun)
-            .where(AgentRun.id == attempt.question_generation_run_id)
-            .with_for_update()
+        statement = select(AgentRun).where(
+            AgentRun.id == attempt.question_generation_run_id
         )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
         if run is None or run.user_id != practice_session.user_id:
             raise PracticeSessionStateError(
                 PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
             )
         try:
-            payload = QuestionGenerationService._validate_run(run)
+            payload = validate_question_generation_run(run)
         except QuestionGenerationStateError as error:
             raise PracticeSessionStateError(
                 PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
@@ -460,15 +576,16 @@ class PracticeSessionService:
         practice_session: PracticeSession,
         attempt: PracticeAttempt,
         run: AgentRun,
+        *,
+        for_update: bool = True,
     ) -> QuestionCard:
-        card = await self.session.scalar(
-            select(QuestionCard)
-            .where(
-                QuestionCard.source_agent_run_id == run.id,
-                QuestionCard.user_id == practice_session.user_id,
-            )
-            .with_for_update()
+        statement = select(QuestionCard).where(
+            QuestionCard.source_agent_run_id == run.id,
+            QuestionCard.user_id == practice_session.user_id,
         )
+        if for_update:
+            statement = statement.with_for_update()
+        card = await self.session.scalar(statement)
         if card is None:
             raise PracticeSessionStateError(
                 PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
@@ -481,16 +598,17 @@ class PracticeSessionService:
         practice_session: PracticeSession,
         attempt: PracticeAttempt,
         run: AgentRun,
+        *,
+        for_update: bool = True,
     ) -> QuestionCard:
         assert attempt.question_card_id is not None
-        card = await self.session.scalar(
-            select(QuestionCard)
-            .where(
-                QuestionCard.id == attempt.question_card_id,
-                QuestionCard.user_id == practice_session.user_id,
-            )
-            .with_for_update()
+        statement = select(QuestionCard).where(
+            QuestionCard.id == attempt.question_card_id,
+            QuestionCard.user_id == practice_session.user_id,
         )
+        if for_update:
+            statement = statement.with_for_update()
+        card = await self.session.scalar(statement)
         if card is None:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
         self._validate_question_card(practice_session, attempt, run, card)
