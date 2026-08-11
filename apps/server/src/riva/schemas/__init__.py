@@ -16,6 +16,7 @@ from riva.schemas.profile import (
     CareerProfileResponse,
 )
 from riva.schemas.practice_sessions import (
+    CurrentPracticeSessionResponse,
     PracticeAttemptStatus,
     PracticeActiveSessionBase,
     PracticeActiveSessionResponse,
@@ -161,6 +162,7 @@ __all__ = [
     "PracticeActiveSessionBase",
     "PracticeActiveSessionResponse",
     "PracticeAnsweringResponse",
+    "CurrentPracticeSessionResponse",
     "PracticeGeneratingQuestionResponse",
     "PracticeGuidanceNotRequestedResponse",
     "PracticeQuestionSource",

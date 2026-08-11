@@ -9,6 +9,7 @@ from riva.core.language import normalize_interaction_language
 from riva.core.practice import get_practice_api_service
 from riva.models import User
 from riva.schemas.practice_sessions import (
+    CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
@@ -63,6 +64,21 @@ async def refresh_practice_question_generation(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,
+    )
+
+
+@router.get(
+    "/sessions/current",
+    response_model=CurrentPracticeSessionResponse,
+)
+async def get_current_practice_session(
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> CurrentPracticeSessionResponse:
+    return await practice_api_service.get_current_session(
+        user_id=current_user.id,
     )
 
 

@@ -9,6 +9,7 @@ from riva.core.errors import APIError
 from riva.core.language import InteractionLanguage
 from riva.models import QuestionCard
 from riva.schemas.practice_sessions import (
+    CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
     PracticeAnsweringResponse,
     PracticeGeneratingQuestionResponse,
@@ -104,6 +105,25 @@ class PracticeAPIService:
                 session_id=session_id,
             )
             return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def get_current_session(
+        self,
+        *,
+        user_id: UUID,
+    ) -> CurrentPracticeSessionResponse:
+        try:
+            context = await self._practice_service().get_active_session_context(
+                user_id=user_id,
+            )
+            return CurrentPracticeSessionResponse(
+                session=(
+                    build_practice_session_response(context)
+                    if context is not None
+                    else None
+                )
+            )
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 

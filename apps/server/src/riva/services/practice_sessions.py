@@ -129,7 +129,10 @@ class PracticeSessionService:
         try:
             self._require_supported_selection(selection)
             await self._lock_user(user_id)
-            active_session = await self._load_active_session(user_id)
+            active_session = await self._load_active_session(
+                user_id,
+                for_update=True,
+            )
             if active_session is not None:
                 if not self._same_intent(
                     active_session,
@@ -332,52 +335,29 @@ class PracticeSessionService:
             )
             if practice_session.status != "active":
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-
-            attempt = await self._load_current_attempt(
-                user_id=user_id,
-                session_id=practice_session.id,
-                for_update=False,
-            )
-            if attempt is None:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-            if attempt.status not in {
-                PracticeAttemptStatus.GENERATING_QUESTION.value,
-                PracticeAttemptStatus.ANSWERING.value,
-            }:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-
-            run, _ = await self._load_generation_run(
+            return await self._load_public_active_context(
                 practice_session,
-                attempt,
                 for_update=False,
             )
-            if attempt.status == PracticeAttemptStatus.GENERATING_QUESTION.value:
-                if attempt.question_card_id is not None:
-                    raise PracticeSessionStateError(
-                        PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-                    )
-                return PracticeSessionWorkflowContext(
-                    session=practice_session,
-                    attempt=attempt,
-                    question_generation_run=run,
-                    question_card=None,
-                )
+        except BaseException:
+            await self.session.rollback()
+            raise
 
-            if run.status != AgentRunStatus.SUCCEEDED:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-            if attempt.question_card_id is None:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-            card = await self._load_card_by_id(
-                practice_session,
-                attempt,
-                run,
+    async def get_active_session_context(
+        self,
+        *,
+        user_id: UUID,
+    ) -> PracticeSessionWorkflowContext | None:
+        try:
+            practice_session = await self._load_active_session(
+                user_id,
                 for_update=False,
             )
-            return PracticeSessionWorkflowContext(
-                session=practice_session,
-                attempt=attempt,
-                question_generation_run=run,
-                question_card=card,
+            if practice_session is None:
+                return None
+            return await self._load_public_active_context(
+                practice_session,
+                for_update=False,
             )
         except BaseException:
             await self.session.rollback()
@@ -396,15 +376,22 @@ class PracticeSessionService:
         if user is None:
             raise PracticeSessionStateError(PRACTICE_SESSION_NOT_FOUND)
 
-    async def _load_active_session(self, user_id: UUID) -> PracticeSession | None:
-        return await self.session.scalar(
-            select(PracticeSession)
-            .where(
-                PracticeSession.user_id == user_id,
-                PracticeSession.status == "active",
-            )
-            .with_for_update()
+    async def _load_active_session(
+        self,
+        user_id: UUID,
+        *,
+        for_update: bool,
+    ) -> PracticeSession | None:
+        statement = select(PracticeSession).where(
+            PracticeSession.user_id == user_id,
+            PracticeSession.status == "active",
         )
+        if for_update:
+            statement = statement.with_for_update()
+        practice_session = await self.session.scalar(statement)
+        if practice_session is not None and practice_session.status != "active":
+            return None
+        return practice_session
 
     async def _load_session(
         self,
@@ -489,6 +476,59 @@ class PracticeSessionService:
         ) and card is not None:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
+        return PracticeSessionWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_generation_run=run,
+            question_card=card,
+        )
+
+    async def _load_public_active_context(
+        self,
+        practice_session: PracticeSession,
+        *,
+        for_update: bool,
+    ) -> PracticeSessionWorkflowContext:
+        attempt = await self._load_current_attempt(
+            user_id=practice_session.user_id,
+            session_id=practice_session.id,
+            for_update=for_update,
+        )
+        if attempt is None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if attempt.status not in {
+            PracticeAttemptStatus.GENERATING_QUESTION.value,
+            PracticeAttemptStatus.ANSWERING.value,
+        }:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        run, _ = await self._load_generation_run(
+            practice_session,
+            attempt,
+            for_update=for_update,
+        )
+        if attempt.status == PracticeAttemptStatus.GENERATING_QUESTION.value:
+            if attempt.question_card_id is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_generation_run=run,
+                question_card=None,
+            )
+
+        if run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if attempt.question_card_id is None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        card = await self._load_card_by_id(
+            practice_session,
+            attempt,
+            run,
+            for_update=for_update,
+        )
         return PracticeSessionWorkflowContext(
             session=practice_session,
             attempt=attempt,

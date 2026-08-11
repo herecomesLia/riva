@@ -7,6 +7,7 @@ from riva.core.auth import get_auth_service, require_current_user
 from riva.core.practice import get_practice_api_service
 from riva.models import User
 from riva.schemas.practice_sessions import (
+    CurrentPracticeSessionResponse,
     PracticeGeneratingQuestionResponse,
     PracticeSessionSelection,
 )
@@ -52,6 +53,7 @@ def response() -> PracticeGeneratingQuestionResponse:
 class FakePracticeAPIService:
     def __init__(self) -> None:
         self.result = response()
+        self.current_result = CurrentPracticeSessionResponse(session=self.result)
         self.calls: list[tuple[str, dict[str, object]]] = []
 
     async def start_session(self, **kwargs: object):
@@ -65,6 +67,10 @@ class FakePracticeAPIService:
     async def get_session(self, **kwargs: object):
         self.calls.append(("get", kwargs))
         return self.result
+
+    async def get_current_session(self, **kwargs: object):
+        self.calls.append(("current", kwargs))
+        return self.current_result
 
 
 def request(app, method: str, path: str, **kwargs: object) -> httpx.Response:
@@ -170,10 +176,38 @@ def test_practice_routes_require_authentication(app) -> None:
     app.dependency_overrides[get_auth_service] = get_auth
 
     result = request(app, "GET", f"/api/practice/sessions/{SESSION_ID}")
+    current = request(app, "GET", "/api/practice/sessions/current")
 
     assert result.status_code == 401
     assert result.json() == {"error": "not_authenticated"}
+    assert current.status_code == 401
+    assert current.json() == {"error": "not_authenticated"}
     assert service.calls == []
+
+
+def test_current_session_is_static_safe_and_returns_camel_case(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+
+    result = request(app, "GET", "/api/practice/sessions/current")
+
+    assert result.status_code == 200
+    assert result.json()["session"]["sessionId"] == str(SESSION_ID)
+    assert service.calls == [("current", {"user_id": current_user.id})]
+
+
+def test_current_session_returns_null_without_an_active_session(app) -> None:
+    service = FakePracticeAPIService()
+    service.current_result = CurrentPracticeSessionResponse(session=None)
+    current_user = user()
+    install_service(app, service, current_user)
+
+    result = request(app, "GET", "/api/practice/sessions/current")
+
+    assert result.status_code == 200
+    assert result.json() == {"session": None}
+    assert service.calls == [("current", {"user_id": current_user.id})]
 
 
 def test_openapi_exposes_practice_union_contract(app) -> None:
@@ -181,6 +215,7 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
 
     assert "/api/practice/sessions" in paths
     assert "/api/practice/sessions/{sessionId}" in paths
+    assert "/api/practice/sessions/current" in paths
     assert (
         "/api/practice/sessions/{sessionId}/question-generation/refresh"
         in paths
@@ -191,3 +226,9 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
         "content"
     ]["application/json"]["schema"]
     assert response_schema["discriminator"]["propertyName"] == "status"
+    current_schema = paths["/api/practice/sessions/current"]["get"]["responses"][
+        "200"
+    ]["content"]["application/json"]["schema"]
+    assert current_schema["$ref"] == (
+        "#/components/schemas/CurrentPracticeSessionResponse"
+    )

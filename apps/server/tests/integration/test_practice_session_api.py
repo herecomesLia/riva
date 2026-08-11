@@ -70,6 +70,12 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                 }
 
                 with TestClient(app) as client:
+                    initial_current = client.get(
+                        "/api/practice/sessions/current"
+                    )
+                    assert initial_current.status_code == 200
+                    assert initial_current.json() == {"session": None}
+
                     started = client.post(
                         "/api/practice/sessions",
                         json=body,
@@ -85,6 +91,18 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                     assert started_body["language"] == "en"
                     session_id = started_body["sessionId"]
                     session_uuid = UUID(session_id)
+
+                    current_generating = client.get(
+                        "/api/practice/sessions/current"
+                    )
+                    assert current_generating.status_code == 200
+                    assert current_generating.json()["session"]["sessionId"] == (
+                        session_id
+                    )
+                    assert current_generating.json()["session"]["status"] == (
+                        "generatingQuestion"
+                    )
+                    assert current_generating.json()["session"]["version"] == 1
 
                     async with database.sessionmaker() as session:
                         stored_session = await session.get(
@@ -133,6 +151,15 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                     )
                     assert await worker.process_one() is True
 
+                    current_before_refresh = client.get(
+                        "/api/practice/sessions/current"
+                    )
+                    assert current_before_refresh.status_code == 200
+                    assert current_before_refresh.json()["session"]["status"] == (
+                        "generatingQuestion"
+                    )
+                    assert current_before_refresh.json()["session"]["version"] == 1
+
                     refreshed = client.post(
                         "/api/practice/sessions/"
                         f"{session_id}/question-generation/refresh",
@@ -163,6 +190,18 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                     assert replay.json()["version"] == 2
                     assert replay.json()["question"]["id"] == question_id
 
+                    current_answering = client.get(
+                        "/api/practice/sessions/current"
+                    )
+                    assert current_answering.status_code == 200
+                    assert current_answering.json()["session"]["status"] == (
+                        "answering"
+                    )
+                    assert current_answering.json()["session"]["version"] == 2
+                    assert current_answering.json()["session"]["question"]["id"] == (
+                        question_id
+                    )
+
                     fetched = client.get(f"/api/practice/sessions/{session_id}")
                     assert fetched.status_code == 200
                     assert fetched.json() == replay.json()
@@ -180,6 +219,11 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                     isolated = client.get(f"/api/practice/sessions/{session_id}")
                     assert isolated.status_code == 404
                     assert isolated.json() == {"error": "practice_session_not_found"}
+                    isolated_current = client.get(
+                        "/api/practice/sessions/current"
+                    )
+                    assert isolated_current.status_code == 200
+                    assert isolated_current.json() == {"session": None}
             finally:
                 await database.reset()
 

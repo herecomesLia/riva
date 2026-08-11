@@ -137,6 +137,10 @@ PracticeActiveSessionResponse = Annotated[
 ]
 
 
+class CurrentPracticeSessionResponse(PracticeAPIModel):
+    session: PracticeActiveSessionResponse | None
+
+
 __all__ = [
     "PracticeAttemptStatus",
     "PracticeActiveSessionBase",
@@ -147,6 +151,7 @@ __all__ = [
     "PracticeQuestionSource",
     "PracticeQuestionResponse",
     "PracticeReferenceAnswerNotRequestedResponse",
+    "CurrentPracticeSessionResponse",
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
     "PracticeSessionStatus",

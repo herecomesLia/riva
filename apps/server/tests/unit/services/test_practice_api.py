@@ -12,10 +12,12 @@ from riva.services.practice_api import (
 from riva.services.practice_sessions import (
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_SESSION_NOT_FOUND,
+    PRACTICE_SESSION_STATE_CONFLICT,
     PracticeSessionStateError,
     PracticeSessionWorkflowContext,
 )
 from riva.schemas.practice_sessions import (
+    CurrentPracticeSessionResponse,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
 )
@@ -37,6 +39,7 @@ class FakePracticeSessionService:
         error: PracticeSessionStateError | None = None,
     ) -> None:
         self.context = context
+        self.current_context = context
         self.error = error
         self.calls: list[tuple[str, object]] = []
 
@@ -63,6 +66,15 @@ class FakePracticeSessionService:
         if self.error is not None:
             raise self.error
         return self.context
+
+    async def get_active_session_context(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext | None:
+        self.calls.append(("current", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.current_context
 
 
 def context(*, answering: bool) -> PracticeSessionWorkflowContext:
@@ -252,3 +264,55 @@ def test_question_projection_hides_db_guidance_and_internal_lineage() -> None:
         "templateId",
     ):
         assert field not in question
+
+
+def test_current_session_returns_null_without_llm_configuration() -> None:
+    domain = FakePracticeSessionService(context=context(answering=False))
+    domain.current_context = None
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    user_id = uuid4()
+
+    result = asyncio.run(service.get_current_session(user_id=user_id))
+
+    assert isinstance(result, CurrentPracticeSessionResponse)
+    assert result.session is None
+    assert domain.calls == [("current", {"user_id": user_id})]
+
+
+def test_current_session_maps_domain_state_errors_to_409() -> None:
+    domain = FakePracticeSessionService(
+        context=context(answering=False),
+        error=PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT),
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(service.get_current_session(user_id=uuid4()))
+
+    assert error.value.status_code == 409
+    assert error.value.error == PRACTICE_SESSION_STATE_CONFLICT
+
+
+@pytest.mark.parametrize("answering", [False, True])
+def test_current_session_wraps_active_context(answering: bool) -> None:
+    domain = FakePracticeSessionService(context=context(answering=answering))
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(service.get_current_session(user_id=uuid4()))
+
+    assert result.session is not None
+    assert result.session.status == (
+        "answering" if answering else "generatingQuestion"
+    )
+    if answering:
+        assert result.session.question.answer_hints.content is None
+        assert result.session.question.reference_answer.status == "notRequested"
