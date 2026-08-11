@@ -8,8 +8,10 @@ import {
   createPracticeMockEvaluationResult,
   createPracticeMockResponse,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
   practiceResponseMock,
+  type MockPracticeQuestionTemplateId,
   type PracticeMockScenario,
 } from "@/mocks/data/practice"
 import type {
@@ -19,7 +21,6 @@ import type {
   PracticeFollowUpQuestion,
   PracticePageResponse,
   PracticeQuestionCard,
-  PracticeQuestionTemplateId,
   PracticeQuestionType,
   PracticeScoreDimension,
 } from "@/models/practice"
@@ -87,11 +88,11 @@ const templateIds = [
   "motivation.careerDirection",
   "technicalFoundation.reactRepeatedRendering",
   "technicalFoundation.requestLayerDesign",
-] as const satisfies readonly PracticeQuestionTemplateId[]
+] as const satisfies readonly MockPracticeQuestionTemplateId[]
 
 function referenceForQuestion(question: PracticeQuestionCard) {
   return createPracticeReferenceAnswer({
-    templateId: question.templateId,
+    templateId: getMockQuestionTemplateId(question),
     questionType: question.questionType,
     targetRoleTitle: "Senior Frontend Engineer",
     questionPrompt: question.prompt,
@@ -116,7 +117,8 @@ function expectUnrequestedGuidance(question: PracticeQuestionCard) {
 }
 
 function expectConsistentReferenceAnswer(question: PracticeQuestionCard) {
-  expect(question.templateId.startsWith(`${question.questionType}.`)).toBe(true)
+  const templateId = getMockQuestionTemplateId(question)
+  expect(templateId.startsWith(`${question.questionType}.`)).toBe(true)
   const state = question.referenceAnswer
   if (state.status === "revealed") {
     expect(state.content.answer.trim()).not.toBe("")
@@ -135,13 +137,14 @@ function expectFollowUpQuestionMatchesPlan(
   question: PracticeQuestionCard,
   followUp: PracticeFollowUpQuestion,
 ) {
-  const templates = getPracticeFollowUpPlan(question.templateId)
+  const templateId = getMockQuestionTemplateId(question)
+  const templates = getPracticeFollowUpPlan(templateId)
   expect(followUp.order).toBeGreaterThan(0)
   expect(followUp.order).toBeLessThanOrEqual(templates.length)
   expect(followUp.prompt).toBe(templates[followUp.order - 1]?.prompt)
   expect(followUp.templateId).toBe(templates[followUp.order - 1]?.id)
   expect(followUp.id).toBe(`${question.id}_follow_up_${followUp.order}`)
-  expect(followUp.templateId.startsWith(`${question.templateId}.`)).toBe(true)
+  expect(followUp.templateId.startsWith(`${templateId}.`)).toBe(true)
   expectConsistentGuidance(followUp.answerHints)
   expectConsistentGuidance(followUp.answerFramework)
   const reference = followUp.referenceAnswer
@@ -163,7 +166,7 @@ function expectCompletedFollowUpsMatchPlan({
   exchanges: Array<{ question: PracticeFollowUpQuestion; answer: { order: number } }>
   completion: PracticeFollowUpCompletion
 }) {
-  const templates = getPracticeFollowUpPlan(question.templateId)
+  const templates = getPracticeFollowUpPlan(getMockQuestionTemplateId(question))
   exchanges.forEach((exchange, index) => {
     expectFollowUpQuestionMatchesPlan(question, exchange.question)
     expect(exchange.question.order).toBe(index + 1)
@@ -392,8 +395,8 @@ function expectConsistentPracticeResponse(response: PracticePageResponse) {
 
 describe("practice mock scenarios", () => {
   it("maps all ten stable template IDs to unique, type-correct reference answers", () => {
-    const generatedIds: PracticeQuestionTemplateId[] = []
-    const answers = new Map<PracticeQuestionTemplateId, string>()
+    const generatedIds: MockPracticeQuestionTemplateId[] = []
+    const answers = new Map<MockPracticeQuestionTemplateId, string>()
     for (const questionType of questionTypes) {
       const selection = {
         targetRoleId: "role_frontend_bytedance",
@@ -410,11 +413,12 @@ describe("practice mock scenarios", () => {
           selection,
         })
         const first = referenceForQuestion(question)
-        generatedIds.push(question.templateId)
-        answers.set(question.templateId, first.answer)
+        const templateId = getMockQuestionTemplateId(question)
+        generatedIds.push(templateId)
+        answers.set(templateId, first.answer)
         typeAnswers.push(first.answer)
         expect(referenceForQuestion(question)).toEqual(first)
-        expect(question.templateId.startsWith(`${question.questionType}.`)).toBe(true)
+        expect(templateId.startsWith(`${question.questionType}.`)).toBe(true)
         expect(first.answer.trim()).not.toBe("")
         expect(first.keyPoints.length).toBeGreaterThan(0)
         expect(first.commonMistakes.length).toBeGreaterThan(0)
@@ -562,9 +566,11 @@ describe("practice mock scenarios", () => {
       expect(first.id).toContain("practice_session_factory")
       expect(second.id).not.toBe(first.id)
       expect(second.prompt).not.toBe(first.prompt)
-      expect(first.templateId.startsWith(`${questionType}.`)).toBe(true)
-      expect(second.templateId.startsWith(`${questionType}.`)).toBe(true)
-      expect(second.templateId).not.toBe(first.templateId)
+      const firstTemplateId = getMockQuestionTemplateId(first)
+      const secondTemplateId = getMockQuestionTemplateId(second)
+      expect(firstTemplateId.startsWith(`${questionType}.`)).toBe(true)
+      expect(secondTemplateId.startsWith(`${questionType}.`)).toBe(true)
+      expect(secondTemplateId).not.toBe(firstTemplateId)
     },
   )
 

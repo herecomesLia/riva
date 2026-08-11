@@ -10,6 +10,7 @@ import type {
 import { createPracticeMockEvaluationResult } from "./evaluation-builders"
 import { createPracticeFollowUpReferenceAnswer } from "./follow-up-catalog"
 import { createPracticeReferenceAnswer } from "./reference-answer-catalog"
+import { getMockQuestionTemplateId } from "./types"
 import {
   activeSession,
   behavioralActiveSession,
@@ -87,7 +88,7 @@ function createPracticeReviewState(session: PracticeEvaluatingState): PracticeRe
           : {
               status: "revealed",
               content: createPracticeReferenceAnswer({
-                templateId: session.question.templateId,
+                templateId: getMockQuestionTemplateId(session.question),
                 questionType: session.question.questionType,
                 targetRoleTitle,
                 questionPrompt: session.question.prompt,
@@ -195,6 +196,7 @@ const practiceMockScenarios = {
       targetRoles: [],
       defaultTargetRoleId: null,
       availableDifficulties: ["basic", "pressure"],
+      canPrioritizeWeaknesses: true,
       eligibleQuestionCounts: { saved: 0, history: 0 },
     },
     session: {
@@ -587,7 +589,7 @@ export function createPracticeMockResponse(
     reviewSession.question.referenceAnswer = {
       status: "revealed",
       content: createPracticeReferenceAnswer({
-        templateId: reviewSession.question.templateId,
+        templateId: getMockQuestionTemplateId(reviewSession.question),
         questionType: reviewSession.question.questionType,
         targetRoleTitle: roleTitle ?? "Target role",
         questionPrompt: reviewSession.question.prompt,
@@ -620,7 +622,7 @@ export function createPracticeMockResponse(
       record.question.referenceAnswer = {
         status: "revealed",
         content: createPracticeReferenceAnswer({
-          templateId: record.question.templateId,
+          templateId: getMockQuestionTemplateId(record.question),
           questionType: record.question.questionType,
           targetRoleTitle:
             response.setupContext.targetRoles.find(

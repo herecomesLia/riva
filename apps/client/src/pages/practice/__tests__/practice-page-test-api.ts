@@ -1,6 +1,7 @@
 export {
   createPracticeMockResponse,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
 export {

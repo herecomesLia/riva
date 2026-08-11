@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, vi } from "vitest"
 
-import { createPracticeMockResponse, getPracticeFollowUpPlan } from "@/mocks/data/practice"
+import {
+  createPracticeMockResponse,
+  getMockQuestionTemplateId,
+  getPracticeFollowUpPlan,
+} from "@/mocks/data/practice"
 import { reconcilePracticeSetupSelection, resetPracticeMockState } from "@/mocks/services/practice"
+import { copyPracticeState, getPracticeMockState } from "@/mocks/services/practice/state"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   endPracticeFollowUps,
   getPracticePage,
   getPracticeEvaluationStatus,
-  getQuestionGenerationStatus,
+  getQuestionGenerationStatus as requestQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
@@ -24,7 +29,7 @@ import {
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
-  startPracticeSession,
+  startPracticeSession as requestStartPracticeSession,
   submitFollowUpAnswer,
   submitPrimaryAnswer,
 } from "@/services/practice"
@@ -80,6 +85,24 @@ export async function generateQuestion(
     throw new Error("Question generation must produce an answering session.")
   }
   return response.session
+}
+
+async function startPracticeSession(input: Parameters<typeof requestStartPracticeSession>[0]) {
+  const session = await requestStartPracticeSession(input)
+  return {
+    ...copyPracticeState(getPracticeMockState()),
+    session: copyPracticeState(session),
+  }
+}
+
+async function getQuestionGenerationStatus(
+  input: Parameters<typeof requestQuestionGenerationStatus>[0],
+) {
+  const session = await requestQuestionGenerationStatus(input)
+  return {
+    ...copyPracticeState(getPracticeMockState()),
+    session: copyPracticeState(session),
+  }
 }
 
 export async function completeQuestionToReview(
@@ -296,6 +319,7 @@ export async function completeRetriedQuestionWithFinalFlags(
 
 export {
   createPracticeMockResponse,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
   reconcilePracticeSetupSelection,
   resetPracticeMockState,

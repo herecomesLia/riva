@@ -8,7 +8,9 @@ describe("practice stateful mock service: answering", () => {
       await context.generateQuestion("technicalFoundation"),
     )
     const firstReference = context.getRevealedReferenceAnswer(first)
-    expect(first.question.templateId).toBe("technicalFoundation.reactRepeatedRendering")
+    expect(context.getMockQuestionTemplateId(first.question)).toBe(
+      "technicalFoundation.reactRepeatedRendering",
+    )
     expect(firstReference.answer).toMatch(/React|Profiler/)
 
     context.resetPracticeMockState()
@@ -16,7 +18,9 @@ describe("practice stateful mock service: answering", () => {
       await context.continueToSecondQuestion("technicalFoundation"),
     )
     const secondReference = context.getRevealedReferenceAnswer(second)
-    expect(second.question.templateId).toBe("technicalFoundation.requestLayerDesign")
+    expect(context.getMockQuestionTemplateId(second.question)).toBe(
+      "technicalFoundation.requestLayerDesign",
+    )
     expect(secondReference.answer).toMatch(/类型安全/)
     expect(secondReference.answer).toMatch(/缓存 key|缓存一致性/)
     expect(secondReference.answer).toMatch(/错误边界|错误分类/)
@@ -45,7 +49,7 @@ describe("practice stateful mock service: answering", () => {
         await context.continueToSecondQuestion(questionType),
       )
       const secondReference = context.getRevealedReferenceAnswer(second)
-      expect(second.question.templateId).toBe(id)
+      expect(context.getMockQuestionTemplateId(second.question)).toBe(id)
       expect(secondReference.answer).toMatch(pattern)
       expect(secondReference.answer).not.toBe(firstReference.answer)
     },
@@ -115,12 +119,18 @@ describe("practice stateful mock service: answering", () => {
     )
     if (retried.session.status !== "answering") throw new Error("Expected retry answering.")
     expect(context.isCurrentPracticeAttemptRetry(retried.session)).toBe(true)
-    expect(retried.session.question.templateId).toBe(review.question.templateId)
+    expect(context.getMockQuestionTemplateId(retried.session.question)).toBe(
+      context.getMockQuestionTemplateId(review.question),
+    )
     expect(retried.session.question.referenceAnswer).toEqual({
       ...original,
       viewedBeforeSubmission: true,
     })
-    expect(retried.session.attemptRecords[0]?.question.templateId).toBe(review.question.templateId)
+    expect(
+      retried.session.attemptRecords[0]
+        ? context.getMockQuestionTemplateId(retried.session.attemptRecords[0].question)
+        : undefined,
+    ).toBe(context.getMockQuestionTemplateId(review.question))
     expect(retried.session.attemptRecords[0]?.question.referenceAnswer).toEqual(original)
 
     context.resetPracticeMockState()

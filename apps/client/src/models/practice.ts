@@ -3,8 +3,6 @@ import type { InteractionLanguage } from "@/types/language"
 export type PracticeQuestionType =
   "projectDeepDive" | "behavioral" | "businessUnderstanding" | "motivation" | "technicalFoundation"
 
-export type PracticeQuestionTemplateId = string
-
 export type PracticeFollowUpTemplateId = string
 
 export type PracticeDifficulty = "basic" | "pressure"
@@ -53,20 +51,27 @@ export type PracticeSetupContext = {
   targetRoles: PracticeTargetRoleOption[]
   defaultTargetRoleId: string | null
   availableDifficulties: PracticeDifficulty[]
+  canPrioritizeWeaknesses: boolean
   eligibleQuestionCounts: {
     saved: number
     history: number
   }
 }
 
+export type PracticeRecommendedMaterial = {
+  type: "projectExperience" | "workExperience"
+  id: string
+  label: string
+  reason: string
+}
+
 export type PracticeQuestionCard = {
   id: string
-  templateId: PracticeQuestionTemplateId
   prompt: string
   questionType: PracticeQuestionType
   difficulty: PracticeDifficulty
   assessedCapabilities: string[]
-  recommendedMaterials: string[]
+  recommendedMaterials: PracticeRecommendedMaterial[]
   answerHints: PracticeGuidance<string[]>
   answerFramework: PracticeGuidance<string[]>
   referenceAnswer: PracticeReferenceAnswerState
@@ -257,6 +262,8 @@ export type PracticeAnsweringState = PracticeQuestionSessionBase & {
   status: "answering"
 }
 
+export type PracticeActiveSessionState = PracticeGeneratingQuestionState | PracticeAnsweringState
+
 export type PracticeAnsweringFollowUpState = PracticeQuestionSessionBase & {
   status: "answeringFollowUp"
   mainAnswer: PracticeAnswer
@@ -303,8 +310,8 @@ export type PracticePageResponse = {
 }
 
 /**
- * Every successful practice write endpoint returns the complete authoritative page snapshot.
- * Clients must validate its requested identity, exact next version, and state transition.
+ * Practice mutations beyond session start return the complete authoritative page snapshot.
+ * Clients must validate their requested identity, exact next version, and state transition.
  */
 export type PracticeMutationResponse = PracticePageResponse
 

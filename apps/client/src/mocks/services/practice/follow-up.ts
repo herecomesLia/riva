@@ -1,6 +1,7 @@
 import {
   createPracticeFollowUpQuestion,
   createPracticeFollowUpReferenceAnswer,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
 import type {
@@ -57,7 +58,7 @@ export async function requestPracticeFollowUpHint(
   if (session.currentFollowUp.question.answerHints.status === "revealed") {
     return commitUnchangedFollowUpMutation(session)
   }
-  const template = getPracticeFollowUpPlan(session.question.templateId).find(
+  const template = getPracticeFollowUpPlan(getMockQuestionTemplateId(session.question)).find(
     ({ id }) => id === session.currentFollowUp.question.templateId,
   )
   if (!template) throw new Error("Practice follow-up template was not found.")
@@ -105,7 +106,7 @@ export async function requestPracticeFollowUpFramework(
   if (session.currentFollowUp.question.answerFramework.status === "revealed") {
     return commitUnchangedFollowUpMutation(session)
   }
-  const template = getPracticeFollowUpPlan(session.question.templateId).find(
+  const template = getPracticeFollowUpPlan(getMockQuestionTemplateId(session.question)).find(
     ({ id }) => id === session.currentFollowUp.question.templateId,
   )
   if (!template) throw new Error("Practice follow-up template was not found.")
@@ -203,7 +204,7 @@ export async function submitFollowUpAnswer(
     },
   }
   const followUpExchanges = [...session.followUpExchanges, answeredExchange]
-  const plan = getPracticeFollowUpPlan(session.question.templateId)
+  const plan = getPracticeFollowUpPlan(getMockQuestionTemplateId(session.question))
   const nextOrder = session.currentFollowUp.question.order + 1
   const nextTemplate = plan[nextOrder - 1]
 

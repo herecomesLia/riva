@@ -24,7 +24,7 @@ describe("PracticePage: generation", () => {
     answering.session.selection = structuredClone(generating.session.selection)
     answering.session.startedAt = generating.session.startedAt
     vi.mocked(api.getPracticePage).mockResolvedValue(generating)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(answering)
+    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(answering.session)
 
     context.renderPracticePage()
 
@@ -48,12 +48,14 @@ describe("PracticePage: generation", () => {
     ) {
       throw new Error("Generating and answering fixtures are required.")
     }
+    const answeringSession = answering.session
     generating.session.selection.difficulty = "pressure"
     answering.session.sessionId = generating.session.sessionId
     answering.session.version = generating.session.version + 1
     answering.session.selection = structuredClone(generating.session.selection)
     answering.session.startedAt = generating.session.startedAt
-    const retryQuery = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+    const retryQuery =
+      context.createDeferred<import("@/models/practice").PracticeActiveSessionState>()
     vi.mocked(api.getPracticePage).mockResolvedValue(generating)
     vi.mocked(api.getQuestionGenerationStatus)
       .mockRejectedValueOnce(new Error("unsafe generation details"))
@@ -82,7 +84,7 @@ describe("PracticePage: generation", () => {
     ])
     expect(api.startPracticeSession).not.toHaveBeenCalled()
     await testing.act(async () => {
-      retryQuery.resolve(answering)
+      retryQuery.resolve(answeringSession)
       await retryQuery.promise
     })
     expect(await testing.screen.findByTestId("practice-answering-state")).toBeInTheDocument()
@@ -102,11 +104,13 @@ describe("PracticePage: generation", () => {
     ) {
       throw new Error("Expected generating and answering fixtures.")
     }
+    const oldAnsweringSession = oldAnswering.session
     second.session.sessionId = "practice_session_newer"
     second.session.selection.difficulty = "pressure"
     oldAnswering.session.sessionId = first.session.sessionId
     oldAnswering.session.version = first.session.version + 1
-    const firstPoll = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+    const firstPoll =
+      context.createDeferred<import("@/models/practice").PracticeActiveSessionState>()
     vi.mocked(api.getPracticePage).mockResolvedValue(first)
     vi.mocked(api.getQuestionGenerationStatus)
       .mockReturnValueOnce(firstPoll.promise)
@@ -119,7 +123,7 @@ describe("PracticePage: generation", () => {
       renderResult.queryClient.setQueryData(PRACTICE_QUERY_KEY, second)
     })
     await testing.act(async () => {
-      firstPoll.resolve(oldAnswering)
+      firstPoll.resolve(oldAnsweringSession)
       await firstPoll.promise
     })
 

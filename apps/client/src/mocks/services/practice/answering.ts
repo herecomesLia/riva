@@ -2,6 +2,7 @@ import {
   createGeneratedPracticeQuestionGuidance,
   createPracticeFollowUpQuestion,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
 import type {
@@ -147,7 +148,7 @@ export async function requestPracticeReferenceAnswer(
         referenceAnswer: {
           status: "revealed",
           content: createPracticeReferenceAnswer({
-            templateId: session.question.templateId,
+            templateId: getMockQuestionTemplateId(session.question),
             questionType: session.question.questionType,
             targetRoleTitle: getCurrentTargetRoleTitle(session.selection.targetRoleId),
             questionPrompt: session.question.prompt,
@@ -210,7 +211,7 @@ export async function submitPrimaryAnswer(
     createdAt: submittedAt,
     order: 1,
   }
-  const followUpPlan = getPracticeFollowUpPlan(session.question.templateId)
+  const followUpPlan = getPracticeFollowUpPlan(getMockQuestionTemplateId(session.question))
   const firstTemplate = followUpPlan[0]
 
   if (!firstTemplate) {

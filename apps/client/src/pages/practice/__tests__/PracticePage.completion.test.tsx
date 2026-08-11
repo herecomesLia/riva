@@ -104,7 +104,7 @@ describe("PracticePage: completion", () => {
         adjustments: ["practiceQuestionTypeUnsupported"],
       },
     })
-    vi.mocked(api.startPracticeSession).mockResolvedValue(generating)
+    vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
       "/practice?entry=history&targetRoleId=role_product_manager_meituan&questionType=technicalFoundation&difficulty=basic&source=history",
@@ -136,6 +136,9 @@ describe("PracticePage: completion", () => {
       source: "history",
     }
     const generating = api.createPracticeMockResponse("generatingQuestion")
+    if (generating.session.status !== "generatingQuestion") {
+      throw new Error("Expected generating state.")
+    }
     vi.mocked(api.getPracticePage).mockResolvedValue(current)
     vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue({
       page: prepared,
@@ -145,7 +148,7 @@ describe("PracticePage: completion", () => {
         configuration: prepared.session.selection,
       },
     })
-    vi.mocked(api.startPracticeSession).mockResolvedValue(generating)
+    vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
       "/practice?entry=history&targetRoleId=role_deleted&questionType=projectDeepDive&difficulty=basic&source=history",
@@ -239,7 +242,7 @@ describe("PracticePage: completion", () => {
     generating.session.version = review.session.version + 1
     const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating)
+    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating.session)
     vi.mocked(api.continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
     const nextButton = await testing.screen.findByRole("button", { name: /继续下一题/i })
@@ -439,7 +442,7 @@ describe("PracticePage: completion", () => {
     generating.session.sessionId = review.session.sessionId
     generating.session.version = review.session.version + 1
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating)
+    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating.session)
     vi.mocked(api.continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
     const nextButton = await testing.screen.findByRole("button", { name: /继续下一题/i })

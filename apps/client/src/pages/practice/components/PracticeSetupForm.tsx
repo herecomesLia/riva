@@ -92,13 +92,23 @@ export function PracticeSetupForm({
     historyEntryResolution?.status !== "adjusted",
   )
   const form = useForm({
-    defaultValues: initialSelection,
+    defaultValues: {
+      ...initialSelection,
+      prioritizeWeaknesses:
+        context.canPrioritizeWeaknesses && initialSelection.prioritizeWeaknesses,
+    },
     validators: { onSubmit: setupSchema },
     onSubmit: async ({ value }) => {
       if (!value.targetRoleId) return
       setSubmitError(false)
       try {
-        await onStart({ ...value, targetRoleId: value.targetRoleId })
+        await onStart({
+          ...value,
+          prioritizeWeaknesses: context.canPrioritizeWeaknesses
+            ? value.prioritizeWeaknesses
+            : false,
+          targetRoleId: value.targetRoleId,
+        })
       } catch {
         setSubmitError(true)
       }
@@ -320,9 +330,9 @@ export function PracticeSetupForm({
               </FieldContent>
               <Switch
                 aria-label={t("practice.setup.fields.prioritizeWeaknesses")}
-                checked={field.state.value}
+                checked={context.canPrioritizeWeaknesses && field.state.value}
                 className="mt-0.5"
-                disabled={pending}
+                disabled={pending || !context.canPrioritizeWeaknesses}
                 onCheckedChange={field.handleChange}
               />
             </Field>

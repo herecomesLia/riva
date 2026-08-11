@@ -27,7 +27,9 @@ describe("practice stateful mock service: followUp", () => {
     expect(response.session.currentFollowUp.question).toMatchObject({
       id: `${initial.session.question.id}_follow_up_1`,
       order: 1,
-      prompt: context.getPracticeFollowUpPlan(initial.session.question.templateId)[0]?.prompt,
+      prompt: context.getPracticeFollowUpPlan(
+        context.getMockQuestionTemplateId(initial.session.question),
+      )[0]?.prompt,
     })
     expect(response.session.version).toBe(initial.session.version + 1)
 
@@ -215,7 +217,8 @@ describe("practice stateful mock service: followUp", () => {
     expect(second.session.followUpExchanges.map(({ question }) => question.order)).toEqual([1])
     expect(second.session.currentFollowUp.question.order).toBe(2)
     expect(second.session.currentFollowUp.question.prompt).toBe(
-      context.getPracticeFollowUpPlan(second.session.question.templateId)[1]?.prompt,
+      context.getPracticeFollowUpPlan(context.getMockQuestionTemplateId(second.session.question))[1]
+        ?.prompt,
     )
     expect(second.session.currentFollowUp.question.id).not.toBe(firstInput.followUpQuestionId)
     expect(second.session.version).toBe(first.session.version + 1)

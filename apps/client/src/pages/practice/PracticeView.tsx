@@ -51,6 +51,7 @@ import type {
   SubmitFollowUpAnswerInput,
   SubmitPrimaryAnswerInput,
 } from "@/models/practice"
+import { reconcilePracticeSetupSelection } from "@/models/practice-setup"
 import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 import {
@@ -700,15 +701,8 @@ function resolveActiveSelection(
   selection: PracticeSetupSelection,
   context: PracticePageResponse["setupContext"],
 ): ActivePracticeSelection | null {
-  const targetRoleId = selection.targetRoleId
+  const reconciled = reconcilePracticeSetupSelection(context, selection)
+  const targetRoleId = reconciled.targetRoleId
   if (!targetRoleId) return null
-
-  const role = context.targetRoles.find((candidate) => candidate.id === targetRoleId)
-  if (!role) return null
-  const questionType = role.supportedQuestionTypes.includes(selection.questionType)
-    ? selection.questionType
-    : role.supportedQuestionTypes[0]
-  if (!questionType) return null
-
-  return { ...selection, targetRoleId, questionType }
+  return { ...reconciled, targetRoleId }
 }

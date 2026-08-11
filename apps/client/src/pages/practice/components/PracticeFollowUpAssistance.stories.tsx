@@ -6,6 +6,7 @@ import {
   createPracticeFollowUpQuestion,
   createPracticeFollowUpReferenceAnswer,
   createPracticeMockResponse,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
 import type { PracticeAnswer, PracticeFollowUpQuestion } from "@/models/practice"
@@ -16,7 +17,7 @@ const response = createPracticeMockResponse("answeringFirstFollowUp")
 if (response.session.status !== "answeringFollowUp") throw new Error("Follow-up fixture required.")
 const session = response.session
 const baseQuestion = session.currentFollowUp.question
-const template = getPracticeFollowUpPlan(session.question.templateId)[0]!
+const template = getPracticeFollowUpPlan(getMockQuestionTemplateId(session.question))[0]!
 const reference = createPracticeFollowUpReferenceAnswer({
   mainQuestion: session.question,
   mainAnswer: session.mainAnswer,

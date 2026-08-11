@@ -9,7 +9,7 @@ import type {
   PracticeReview,
   PracticeSetupContext,
 } from "@/models/practice"
-import { derivePracticeSupportedQuestionTypes } from "@/mocks/data/role-fixture-builders"
+import { derivePracticeSupportedQuestionTypes } from "@/models/practice-role-support"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 
 import { createPracticeFollowUpQuestion } from "./follow-up-catalog"
@@ -32,6 +32,7 @@ export const setupContext = {
   targetRoles,
   defaultTargetRoleId: rolesFixture.currentRoleId,
   availableDifficulties: ["basic", "pressure"],
+  canPrioritizeWeaknesses: true,
   eligibleQuestionCounts: {
     saved: 3,
     history: 5,

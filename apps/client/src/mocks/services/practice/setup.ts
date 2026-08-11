@@ -1,16 +1,14 @@
-import { derivePracticeSupportedQuestionTypes } from "@/mocks/data/role-fixture-builders"
 import { getCurrentInteractionLanguage } from "@/i18n/language"
 import { getRolesPage } from "@/mocks/services/roles"
+import { buildPracticeSetupContext, reconcilePracticeSetupSelection } from "@/models/practice-setup"
 import type {
   PracticeMutationResponse,
   PracticePageResponse,
   PrepareNextPracticeSessionInput,
   PracticeSetupContext,
-  PracticeSetupSelection,
-  PracticeTargetRoleOption,
   StartPracticeSessionInput,
 } from "@/models/practice"
-import type { RolesPageResponse, TargetRole } from "@/models/roles"
+import type { RolesPageResponse } from "@/models/roles"
 import {
   resolvePracticeTrainingEntry,
   resolveTrainingEntryRoleAvailability,
@@ -29,54 +27,19 @@ import {
   setHistoryEntryRoleSelectionRequired,
 } from "./state"
 
-function toPracticeRoleOption(role: TargetRole): PracticeTargetRoleOption {
-  return {
-    id: role.id,
-    title: role.title,
-    company: role.company,
-    supportedQuestionTypes: derivePracticeSupportedQuestionTypes(role),
-  }
-}
-
 async function getCurrentSetupContext(
   rolesResponse?: RolesPageResponse,
 ): Promise<PracticeSetupContext> {
   const currentRoles = rolesResponse ?? (await getRolesPage())
-  const targetRoles = currentRoles.roles
-    .filter((role) => role.preparationStatus !== "archived")
-    .map(toPracticeRoleOption)
-  const defaultTargetRoleId = targetRoles.some((role) => role.id === currentRoles.currentRoleId)
-    ? currentRoles.currentRoleId
-    : null
-
-  return {
-    targetRoles,
-    defaultTargetRoleId,
-    availableDifficulties: ["basic", "pressure"],
+  return buildPracticeSetupContext(currentRoles, {
+    canPrioritizeWeaknesses: true,
     eligibleQuestionCounts: copyPracticeState(
       getPracticeMockState().setupContext.eligibleQuestionCounts,
     ),
-  }
+  })
 }
 
-export function reconcilePracticeSetupSelection(
-  context: PracticeSetupContext,
-  selection: PracticeSetupSelection,
-): PracticeSetupSelection {
-  const existingRole = context.targetRoles.find((role) => role.id === selection.targetRoleId)
-  const defaultRole = context.targetRoles.find((role) => role.id === context.defaultTargetRoleId)
-  const selectedRole = existingRole ?? defaultRole ?? context.targetRoles[0]
-
-  if (!selectedRole) return { ...selection, targetRoleId: null }
-
-  return {
-    ...selection,
-    targetRoleId: selectedRole.id,
-    questionType: selectedRole.supportedQuestionTypes.includes(selection.questionType)
-      ? selection.questionType
-      : (selectedRole.supportedQuestionTypes[0] ?? selection.questionType),
-  }
-}
+export { reconcilePracticeSetupSelection }
 
 function withSetupContext(setupContext: PracticeSetupContext): PracticePageResponse {
   const current = getPracticeMockState()

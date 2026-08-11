@@ -831,7 +831,7 @@ describe("PracticeView", () => {
     const difficulty = i18n.t(`practice.difficulty.${data.session.selection.difficulty}`)
     expect(card).toHaveTextContent(data.session.question.prompt)
     expect(card).toHaveTextContent(data.session.question.assessedCapabilities[0] ?? "")
-    expect(card).toHaveTextContent(data.session.question.recommendedMaterials[0] ?? "")
+    expect(card).toHaveTextContent(data.session.question.recommendedMaterials[0]?.label ?? "")
     expect(within(card).queryByText(questionType)).not.toBeInTheDocument()
     expect(within(card).queryByText(difficulty)).not.toBeInTheDocument()
     expect(within(sessionHeader).getByText(questionType)).toHaveClass(
@@ -848,13 +848,19 @@ describe("PracticeView", () => {
     expect(screen.queryByText(/完整参考答案|完整评分标准|内部追问策略/)).not.toBeInTheDocument()
   })
 
-  it("renders service-provided question data for an unknown template ID", async () => {
+  it("renders service-provided question data without fixture metadata", async () => {
     const data = createPracticeMockResponse("answeringQuestion")
     if (data.session.status !== "answering") return
-    data.session.question.templateId = "backend.new-question-template"
     data.session.question.prompt = "后端新增模板返回的问题正文"
     data.session.question.assessedCapabilities = ["后端返回的能力"]
-    data.session.question.recommendedMaterials = ["后端返回的材料"]
+    data.session.question.recommendedMaterials = [
+      {
+        type: "projectExperience",
+        id: "backend-material",
+        label: "后端返回的材料",
+        reason: "后端返回的材料理由",
+      },
+    ]
     data.session.question.referenceAnswer = {
       status: "revealed",
       content: {

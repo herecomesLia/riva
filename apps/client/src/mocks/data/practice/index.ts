@@ -10,6 +10,8 @@ export {
   createGeneratedPracticeQuestionGuidance,
 } from "./question-builders"
 export { createPracticeReferenceAnswer } from "./reference-answer-catalog"
+export { getMockQuestionTemplateId, type MockPracticeQuestionCard } from "./types"
+export type { MockPracticeQuestionTemplateId } from "./question-catalog"
 export {
   createPracticeMockResponse,
   practiceResponseMock,

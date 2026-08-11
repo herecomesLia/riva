@@ -100,7 +100,6 @@ describe("practice stateful mock service: setup", () => {
     }
     const firstPoll = await context.settle(context.getQuestionGenerationStatus(pollInput))
     const secondPoll = await context.settle(context.getQuestionGenerationStatus(pollInput))
-    if (firstPoll.session.status === "setup" || secondPoll.session.status === "setup") return
     expect(firstPoll.session.language).toBe("zh-CN")
     expect(secondPoll.session.language).toBe("zh-CN")
 

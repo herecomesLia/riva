@@ -1,4 +1,8 @@
-import type { PracticeQuestionType, PracticeReferenceAnswer } from "@/models/practice"
+import type {
+  PracticeQuestionType,
+  PracticeRecommendedMaterial,
+  PracticeReferenceAnswer,
+} from "@/models/practice"
 
 import type { MockPracticeQuestionTemplateId } from "./question-catalog"
 
@@ -141,7 +145,7 @@ export function createPracticeReferenceAnswer({
   questionType: PracticeQuestionType
   targetRoleTitle: string
   questionPrompt: string
-  recommendedMaterials: string[]
+  recommendedMaterials: readonly PracticeRecommendedMaterial[]
 }): PracticeReferenceAnswer {
   if (!isMockPracticeQuestionTemplateId(templateId)) {
     throw new Error("Practice reference answer template is not in the mock catalog.")
@@ -151,7 +155,7 @@ export function createPracticeReferenceAnswer({
   if (!templateId.startsWith(expectedPrefix)) {
     throw new Error("Practice question template does not match its question type.")
   }
-  const context = `围绕问题“${questionPrompt}”，针对目标岗位“${targetRoleTitle}”，可用材料为“${recommendedMaterials.join("、")}”。`
+  const context = `围绕问题“${questionPrompt}”，针对目标岗位“${targetRoleTitle}”，可用材料为“${recommendedMaterials.map(({ label }) => label).join("、")}”。`
   return {
     ...template,
     answer:

@@ -21,8 +21,7 @@ export function usePracticeGenerationPolling(data: PracticePageResponse | undefi
       return getQuestionGenerationStatus({ sessionId, version })
     },
     queryKey: [...PRACTICE_QUERY_KEY, "question-generation", sessionId, version],
-    refetchInterval: (query) =>
-      query.state.data?.session.status === "generatingQuestion" ? 500 : false,
+    refetchInterval: (query) => (query.state.data?.status === "generatingQuestion" ? 500 : false),
     retry: false,
   })
 

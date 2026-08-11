@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { createPracticeMockResponse, createPracticeReferenceAnswer } from "@/mocks/data/practice"
+import {
+  createGeneratedPracticeQuestion,
+  createPracticeMockResponse,
+  createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
+} from "@/mocks/data/practice"
 import { renderWithProviders } from "@/test/render"
 
 import { PracticeReferenceAnswer } from "./PracticeReferenceAnswer"
@@ -110,15 +115,19 @@ describe("PracticeReferenceAnswer", () => {
   })
 
   it("shows technical content and safe request errors", async () => {
-    const technicalResponse = createPracticeMockResponse("answeringQuestion")
-    if (technicalResponse.session.status !== "answering") throw new Error("Question required.")
-    const technicalQuestion = {
-      ...technicalResponse.session.question,
-      templateId: "technicalFoundation.reactRepeatedRendering" as const,
-      questionType: "technicalFoundation" as const,
-    }
+    const technicalQuestion = createGeneratedPracticeQuestion({
+      sessionId: "practice-reference-technical",
+      ordinal: 1,
+      selection: {
+        targetRoleId: "role_frontend_bytedance",
+        questionType: "technicalFoundation",
+        difficulty: "basic",
+        source: "personalized",
+        prioritizeWeaknesses: false,
+      },
+    })
     const technical = createPracticeReferenceAnswer({
-      templateId: technicalQuestion.templateId,
+      templateId: getMockQuestionTemplateId(technicalQuestion),
       questionType: technicalQuestion.questionType,
       targetRoleTitle: "Senior Frontend Engineer",
       questionPrompt: technicalQuestion.prompt,

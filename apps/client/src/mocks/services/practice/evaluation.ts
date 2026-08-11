@@ -2,6 +2,7 @@ import {
   createPracticeFollowUpReferenceAnswer,
   createPracticeMockEvaluationResult,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
 } from "@/mocks/data/practice"
 import type {
   GetPracticeEvaluationStatusInput,
@@ -60,7 +61,7 @@ export async function getPracticeEvaluationStatus(
       : {
           status: "revealed" as const,
           content: createPracticeReferenceAnswer({
-            templateId: session.question.templateId,
+            templateId: getMockQuestionTemplateId(session.question),
             questionType: session.question.questionType,
             targetRoleTitle: getCurrentTargetRoleTitle(session.selection.targetRoleId),
             questionPrompt: session.question.prompt,

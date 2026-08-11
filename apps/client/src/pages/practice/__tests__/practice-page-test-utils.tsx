@@ -5,6 +5,7 @@ import { defaultLanguage } from "@/i18n/resources"
 import {
   createPracticeMockResponse,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
 import { PracticePage } from "@/pages/practice"
@@ -81,6 +82,7 @@ beforeEach(async () => {
 export {
   createPracticeMockResponse,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
   getPracticePage,
   getPracticeEvaluationStatus,

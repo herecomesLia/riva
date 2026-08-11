@@ -5,6 +5,7 @@ import { useState } from "react"
 import {
   createGeneratedPracticeQuestion,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
 } from "@/mocks/data/practice"
 import type { ActivePracticeSelection, PracticeReferenceAnswerState } from "@/models/practice"
 
@@ -29,7 +30,7 @@ const technicalQuestion = createGeneratedPracticeQuestion({
 })
 function answerFor(question: typeof projectQuestion) {
   return createPracticeReferenceAnswer({
-    templateId: question.templateId,
+    templateId: getMockQuestionTemplateId(question),
     questionType: question.questionType,
     targetRoleTitle: "Senior Frontend Engineer",
     questionPrompt: question.prompt,

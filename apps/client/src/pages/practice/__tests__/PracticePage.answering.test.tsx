@@ -20,7 +20,7 @@ describe("PracticePage: answering", () => {
     revealedSession.question.referenceAnswer = {
       status: "revealed",
       content: api.createPracticeReferenceAnswer({
-        templateId: initial.session.question.templateId,
+        templateId: api.getMockQuestionTemplateId(initial.session.question),
         questionType: initial.session.question.questionType,
         targetRoleTitle: "Senior Frontend Engineer",
         questionPrompt: initial.session.question.prompt,
@@ -395,7 +395,9 @@ describe("PracticePage: answering", () => {
       throw new Error("Follow-up fixture required.")
     }
     revealed.session.version += 1
-    const template = api.getPracticeFollowUpPlan(revealed.session.question.templateId)[0]!
+    const template = api.getPracticeFollowUpPlan(
+      api.getMockQuestionTemplateId(revealed.session.question),
+    )[0]!
     revealed.session.currentFollowUp.question.answerHints = {
       status: "revealed",
       content: [...template.answerHints],

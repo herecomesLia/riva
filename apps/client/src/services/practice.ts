@@ -1,6 +1,8 @@
 import { env } from "@/app/env"
 import * as practiceMockService from "@/mocks/services/practice"
+import { buildPracticeSetupContext, createDefaultPracticeSelection } from "@/models/practice-setup"
 import type {
+  PracticeActiveSessionState,
   GetQuestionGenerationStatusInput,
   GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
@@ -25,6 +27,13 @@ import type {
   SubmitFollowUpAnswerInput,
   SubmitPrimaryAnswerInput,
 } from "@/models/practice"
+import type { PracticeActiveSessionWire } from "@/schemas/practice"
+import {
+  currentPracticeSessionResponseSchema,
+  practiceActiveSessionResponseSchema,
+} from "@/schemas/practice"
+import { getRolesPage } from "@/services/roles"
+import { apiRequest } from "@/services/api"
 import type {
   PracticeTrainingEntryParameters,
   PracticeTrainingEntryPreparationResponse,
@@ -34,14 +43,52 @@ function realApiUnavailable(): never {
   throw new Error("Real practice API is not implemented.")
 }
 
-export function getPracticePage(): Promise<PracticePageResponse> {
-  return env.mock ? practiceMockService.getPracticePage() : realApiUnavailable()
+async function requestCurrentPracticeSession() {
+  return currentPracticeSessionResponseSchema.parse(
+    await apiRequest<unknown>("/practice/sessions/current"),
+  )
 }
 
-export function startPracticeSession(
+async function requestPracticeActiveSession(
+  path: string,
+  options?: Parameters<typeof apiRequest>[1],
+): Promise<PracticeActiveSessionState> {
+  const response = practiceActiveSessionResponseSchema.parse(
+    await apiRequest<unknown>(path, options),
+  )
+  return toPracticeActiveSessionState(response)
+}
+
+export async function getPracticePage(): Promise<PracticePageResponse> {
+  if (env.mock) return practiceMockService.getPracticePage()
+
+  const [rolesResponse, currentResponse] = await Promise.all([
+    getRolesPage(),
+    requestCurrentPracticeSession(),
+  ])
+  const setupContext = buildPracticeSetupContext(rolesResponse)
+
+  return {
+    setupContext,
+    session:
+      currentResponse.session === null
+        ? {
+            status: "setup",
+            selection: createDefaultPracticeSelection(setupContext),
+          }
+        : toPracticeActiveSessionState(currentResponse.session),
+  }
+}
+
+export async function startPracticeSession(
   input: StartPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.startPracticeSession(input) : realApiUnavailable()
+): Promise<PracticeActiveSessionState> {
+  if (env.mock)
+    return requireActivePracticeSession(await practiceMockService.startPracticeSession(input))
+  return requestPracticeActiveSession("/practice/sessions", {
+    json: input,
+    method: "POST",
+  })
 }
 
 export function prepareNextPracticeSession(
@@ -56,10 +103,21 @@ export function preparePracticeTrainingEntry(
   return env.mock ? practiceMockService.preparePracticeTrainingEntry(input) : realApiUnavailable()
 }
 
-export function getQuestionGenerationStatus(
+export async function getQuestionGenerationStatus(
   input: GetQuestionGenerationStatusInput,
-): Promise<PracticePageResponse> {
-  return env.mock ? practiceMockService.getQuestionGenerationStatus(input) : realApiUnavailable()
+): Promise<PracticeActiveSessionState> {
+  if (env.mock) {
+    return requireActivePracticeSession(
+      await practiceMockService.getQuestionGenerationStatus(input),
+    )
+  }
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/question-generation/refresh`,
+    {
+      json: { version: input.version },
+      method: "POST",
+    },
+  )
 }
 
 export function getPracticeEvaluationStatus(
@@ -172,4 +230,42 @@ export function requestEndPracticeSession(
   input: RequestEndPracticeSessionInput,
 ): Promise<PracticeMutationResponse> {
   return env.mock ? practiceMockService.requestEndPracticeSession(input) : realApiUnavailable()
+}
+
+export function toPracticeActiveSessionState(
+  session: PracticeActiveSessionWire,
+): PracticeActiveSessionState {
+  const base = {
+    attemptId: session.attemptId,
+    attemptNumber: session.attemptNumber,
+    attemptRecords: [],
+    language: session.language,
+    selection: session.selection,
+    sessionId: session.sessionId,
+    startedAt: session.startedAt,
+    version: session.version,
+  }
+
+  if (session.status === "generatingQuestion") {
+    return {
+      ...base,
+      previousAttempt: null,
+      status: "generatingQuestion",
+    }
+  }
+
+  return {
+    ...base,
+    question: session.question,
+    status: "answering",
+  }
+}
+
+function requireActivePracticeSession(
+  response: PracticeMutationResponse,
+): PracticeActiveSessionState {
+  if (response.session.status === "generatingQuestion" || response.session.status === "answering") {
+    return response.session
+  }
+  throw new Error("The practice session response is not active.")
 }

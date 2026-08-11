@@ -7,6 +7,7 @@ import type {
 } from "@/models/practice"
 
 import type { MockPracticeQuestionTemplateId } from "./question-catalog"
+import { getMockQuestionTemplateId } from "./types"
 import type { GeneratedPracticeFollowUpTemplate } from "./types"
 
 export const practiceFollowUpTemplates = {
@@ -237,9 +238,10 @@ export function createPracticeFollowUpQuestion({
   order: number
   createdAt: string
 }): PracticeFollowUpQuestion {
-  const template = getPracticeFollowUpPlan(question.templateId)[order - 1]
+  const templateId = getMockQuestionTemplateId(question)
+  const template = getPracticeFollowUpPlan(templateId)[order - 1]
   if (!template) throw new Error("Practice follow-up order is outside the mock plan.")
-  if (!template.id.startsWith(`${question.templateId}.`)) {
+  if (!template.id.startsWith(`${templateId}.`)) {
     throw new Error("Practice follow-up template does not match its main question.")
   }
 
@@ -272,10 +274,11 @@ export function createPracticeFollowUpReferenceAnswer({
   currentFollowUp: PracticeFollowUpQuestion
   targetRoleTitle: string
 }): PracticeFollowUpReferenceAnswer {
-  const template = getPracticeFollowUpPlan(mainQuestion.templateId).find(
+  const templateId = getMockQuestionTemplateId(mainQuestion)
+  const template = getPracticeFollowUpPlan(templateId).find(
     ({ id }) => id === currentFollowUp.templateId,
   )
-  if (!template || !currentFollowUp.templateId.startsWith(`${mainQuestion.templateId}.`)) {
+  if (!template || !currentFollowUp.templateId.startsWith(`${templateId}.`)) {
     throw new Error("Practice follow-up template does not match its main question.")
   }
 
@@ -284,7 +287,7 @@ export function createPracticeFollowUpReferenceAnswer({
         .map(({ question, answer }) => `“${question.prompt}”→“${answer.content}”`)
         .join("；")}。补充时应承接已有信息，避免重复。`
     : "这是本题第一道追问，补充时应直接承接主回答。"
-  const context = `针对目标岗位“${targetRoleTitle}”和主问题“${mainQuestion.prompt}”，用户主回答为“${mainAnswer.content.trim()}”；当前追问为“${currentFollowUp.prompt}”。推荐材料是“${mainQuestion.recommendedMaterials.join("、")}”。${previousContext}`
+  const context = `针对目标岗位“${targetRoleTitle}”和主问题“${mainQuestion.prompt}”，用户主回答为“${mainAnswer.content.trim()}”；当前追问为“${currentFollowUp.prompt}”。推荐材料是“${mainQuestion.recommendedMaterials.map(({ label }) => label).join("、")}”。${previousContext}`
 
   return {
     ...structuredClone(template.referenceAnswer),

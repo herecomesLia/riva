@@ -9,7 +9,7 @@ import {
 } from "./practice-cache"
 
 describe("practice mutation cache contract", () => {
-  it("accepts a start response only from setup with version one and the requested selection", () => {
+  it("accepts a start response from setup with a self-consistent requested selection", () => {
     const current = createPracticeMockResponse("setupReady")
     const response = createPracticeMockResponse("generatingQuestion")
     if (current.session.status !== "setup" || response.session.status !== "generatingQuestion")
@@ -25,16 +25,44 @@ describe("practice mutation cache contract", () => {
     }
     const input = response.session.selection
 
+    const next = synchronizePracticeMutationResponse(current, response.session, {
+      kind: "startSession",
+      input,
+    })
+
+    expect(next?.session).toBe(response.session)
+    expect(next?.setupContext).toBe(current.setupContext)
+
+    response.session.version = 2
+    const replay = synchronizePracticeMutationResponse(current, response.session, {
+      kind: "startSession",
+      input,
+    })
+    expect(replay?.session).toBe(response.session)
+
+    response.session.version = 0
     expect(
-      synchronizePracticeMutationResponse(current, response, {
+      synchronizePracticeMutationResponse(current, response.session, {
         kind: "startSession",
         input,
       }),
-    ).toBe(response)
+    ).toBe(current)
 
-    response.session.version = 2
+    const answering = createPracticeMockResponse("answeringQuestion")
+    if (answering.session.status !== "answering") return
+    answering.session.sessionId = response.session.sessionId
+    answering.session.version = 2
+    answering.session.selection = structuredClone(input)
+    const answeringPage = synchronizePracticeMutationResponse(current, answering.session, {
+      kind: "startSession",
+      input,
+    })
+    expect(answeringPage?.session.status).toBe("answering")
+
+    const mismatched = structuredClone(answering.session)
+    mismatched.selection.questionType = "behavioral"
     expect(
-      synchronizePracticeMutationResponse(current, response, {
+      synchronizePracticeMutationResponse(current, mismatched, {
         kind: "startSession",
         input,
       }),
@@ -223,26 +251,27 @@ describe("practice polling cache contract", () => {
     const current = createPracticeMockResponse("generatingQuestion")
     const pending = structuredClone(current)
     const answering = createPracticeMockResponse("answeringQuestion")
-    const illegal = createPracticeMockResponse("reviewBalanced")
     if (
       current.session.status !== "generatingQuestion" ||
       pending.session.status !== "generatingQuestion" ||
-      answering.session.status !== "answering" ||
-      illegal.session.status !== "review"
+      answering.session.status !== "answering"
     ) {
       return
     }
     const request = { sessionId: current.session.sessionId, version: current.session.version }
     answering.session.sessionId = request.sessionId
     answering.session.version = request.version + 1
-    illegal.session.sessionId = request.sessionId
-    illegal.session.version = request.version + 1
 
-    expect(synchronizeQuestionGenerationResponse(current, pending, request)).toBe(pending)
-    expect(synchronizeQuestionGenerationResponse(current, answering, request)).toBe(answering)
-    expect(synchronizeQuestionGenerationResponse(current, illegal, request)).toBe(current)
+    const pendingPage = synchronizeQuestionGenerationResponse(current, pending.session, request)
+    expect(pendingPage?.session).toBe(pending.session)
+    expect(pendingPage?.setupContext).toBe(current.setupContext)
+
+    const answeringPage = synchronizeQuestionGenerationResponse(current, answering.session, request)
+    expect(answeringPage?.session).toBe(answering.session)
+    expect(answeringPage?.setupContext).toBe(current.setupContext)
+
     answering.session.version = request.version + 2
-    expect(synchronizeQuestionGenerationResponse(current, answering, request)).toBe(current)
+    expect(synchronizeQuestionGenerationResponse(current, answering.session, request)).toBe(current)
   })
 
   it("accepts only pending or exact-next review evaluation snapshots", () => {

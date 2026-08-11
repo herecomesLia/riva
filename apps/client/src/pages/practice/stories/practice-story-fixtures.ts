@@ -4,6 +4,7 @@ import {
   createGeneratedPracticeQuestion,
   createPracticeMockResponse,
   createPracticeReferenceAnswer,
+  getMockQuestionTemplateId,
 } from "@/mocks/data/practice"
 import type { PracticeReviewState } from "@/models/practice"
 
@@ -202,7 +203,7 @@ export function withReferenceAnswer(
   response.session.question.referenceAnswer = {
     status: "revealed",
     content: createPracticeReferenceAnswer({
-      templateId: response.session.question.templateId,
+      templateId: getMockQuestionTemplateId(response.session.question),
       questionType: response.session.question.questionType,
       targetRoleTitle: "Senior Frontend Engineer",
       questionPrompt: response.session.question.prompt,

@@ -4,6 +4,7 @@ import type {
   GetQuestionGenerationStatusInput,
   GetPracticeEvaluationStatusInput,
   PracticeFollowUpMutationInput,
+  PracticeActiveSessionState,
   PracticePageResponse,
   PracticeQuestionMutationInput,
   PrepareNextPracticeSessionInput,
@@ -33,15 +34,17 @@ export type PracticeMutationInputFor<TKind extends PracticeMutationKind> =
 
 export function synchronizePracticeMutationResponse<TKind extends PracticeMutationKind>(
   current: PracticePageResponse | undefined,
-  response: PracticePageResponse,
+  response: PracticePageResponse | PracticeActiveSessionState,
   mutation: {
     kind: TKind
     input: PracticeMutationInputFor<TKind>
   },
 ): PracticePageResponse | undefined {
   if (mutation.kind === "startSession") {
+    if (!isActivePracticeSessionState(response)) return current
     return synchronizeStartResponse(current, response, mutation.input as StartPracticeSessionInput)
   }
+  if (!isPracticePageResponse(response)) return current
   if (mutation.kind === "prepareNextSession") {
     return synchronizePrepareNextResponse(
       current,
@@ -77,7 +80,7 @@ export function synchronizePracticeMutationResponse<TKind extends PracticeMutati
 
 export function synchronizeQuestionGenerationResponse(
   current: PracticePageResponse | undefined,
-  response: PracticePageResponse,
+  response: PracticeActiveSessionState,
   request: GetQuestionGenerationStatusInput,
 ) {
   if (
@@ -88,7 +91,7 @@ export function synchronizeQuestionGenerationResponse(
     return current
   }
 
-  const responseSession = response.session
+  const responseSession = response
   const isPendingSnapshot =
     responseSession.status === "generatingQuestion" && responseSession.version === request.version
   const isCompletedSnapshot =
@@ -101,7 +104,7 @@ export function synchronizeQuestionGenerationResponse(
     return current
   }
 
-  return response
+  return { ...current, session: responseSession }
 }
 
 export function synchronizePracticeEvaluationResponse(
@@ -137,19 +140,18 @@ export function synchronizePracticeEvaluationResponse(
 
 function synchronizeStartResponse(
   current: PracticePageResponse | undefined,
-  response: PracticePageResponse,
+  response: PracticeActiveSessionState,
   request: StartPracticeSessionInput,
 ) {
-  const responseSession = response.session
+  const responseSession = response
   if (
     current?.session.status !== "setup" ||
-    responseSession.status !== "generatingQuestion" ||
-    responseSession.version !== 1 ||
+    !isSelfConsistentActiveSession(responseSession) ||
     !sameSelection(responseSession.selection, request)
   ) {
     return current
   }
-  return response
+  return { ...current, session: responseSession }
 }
 
 function synchronizePrepareNextResponse(
@@ -274,5 +276,27 @@ function sameSelection(selection: StartPracticeSessionInput, request: StartPract
     selection.difficulty === request.difficulty &&
     selection.source === request.source &&
     selection.prioritizeWeaknesses === request.prioritizeWeaknesses
+  )
+}
+
+function isActivePracticeSessionState(
+  response: PracticePageResponse | PracticeActiveSessionState,
+): response is PracticeActiveSessionState {
+  return "status" in response
+}
+
+function isPracticePageResponse(
+  response: PracticePageResponse | PracticeActiveSessionState,
+): response is PracticePageResponse {
+  return "setupContext" in response && "session" in response
+}
+
+function isSelfConsistentActiveSession(session: PracticeActiveSessionState): boolean {
+  return (
+    session.sessionId.length > 0 &&
+    session.attemptId.length > 0 &&
+    session.version > 0 &&
+    session.attemptNumber > 0 &&
+    session.selection.targetRoleId.length > 0
   )
 }
