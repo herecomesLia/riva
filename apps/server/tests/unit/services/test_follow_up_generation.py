@@ -207,7 +207,7 @@ def test_enqueue_order_one_freezes_ids_without_committing_transaction_variant() 
     session, attempt, card, main_answer, _, _ = context_graph()
     expected_run = run_for(session, attempt, card, main_answer)
     agent_runs = FakeAgentRunService(expected_run)
-    db = ScriptedSession(attempt, session, card, main_answer, None)
+    db = ScriptedSession(attempt, session, attempt, card, main_answer, None)
     service = FollowUpGenerationService(
         db,  # type: ignore[arg-type]
         llm_model="test-model",
@@ -249,6 +249,7 @@ def test_enqueue_wrapper_commits_and_order_two_freezes_previous_ids() -> None:
     db = ScriptedSession(
         attempt,
         session,
+        attempt,
         card,
         main_answer,
         previous_question,
@@ -305,7 +306,15 @@ def test_persist_success_recovers_first_artifact_without_comparing_retry_output(
         answer_hints=["Metric"],
         answer_framework=["Baseline", "Result"],
     )
-    first_db = ScriptedSession(attempt, session, card, main_answer, None, None)
+    first_db = ScriptedSession(
+        attempt,
+        session,
+        attempt,
+        card,
+        main_answer,
+        None,
+        None,
+    )
     service = FollowUpGenerationService(
         first_db,
         llm_model="test-model",
@@ -318,6 +327,7 @@ def test_persist_success_recovers_first_artifact_without_comparing_retry_output(
     retry_db = ScriptedSession(
         attempt,
         session,
+        attempt,
         card,
         main_answer,
         None,
@@ -341,7 +351,15 @@ def test_persist_success_recovers_first_artifact_without_comparing_retry_output(
 def test_persist_success_complete_creates_only_a_decision() -> None:
     session, attempt, card, main_answer, _, _ = context_graph()
     run = run_for(session, attempt, card, main_answer)
-    db = ScriptedSession(attempt, session, card, main_answer, None, None)
+    db = ScriptedSession(
+        attempt,
+        session,
+        attempt,
+        card,
+        main_answer,
+        None,
+        None,
+    )
 
     output = asyncio.run(
         FollowUpGenerationService(

@@ -8,11 +8,16 @@ import pytest
 from riva.models import (
     AgentRun,
     AgentRunStatus,
+    PracticeAnswer,
     PracticeAttempt,
+    PracticeFollowUpDecision,
+    PracticeFollowUpQuestion,
     PracticeSession,
     QuestionCard,
 )
-from riva.prompts import QUESTION_GENERATION_PROMPT
+from riva.prompts import FOLLOW_UP_PROMPT, QUESTION_GENERATION_PROMPT
+from riva.schemas.follow_up import FollowUpRunPayload
+from riva.schemas.practice_interactions import PracticeAnswerKind
 from riva.schemas.practice_sessions import PracticeSessionSelection
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -20,6 +25,8 @@ from riva.schemas.question_cards import (
 )
 from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.services.practice_sessions import (
+    PRACTICE_FOLLOW_UP_GENERATION_FAILED,
+    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
     PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
@@ -31,7 +38,9 @@ from riva.services.practice_sessions import (
     PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE,
     PracticeSessionService,
     PracticeSessionStateError,
+    practice_follow_up_idempotency_key,
 )
+from riva.services.follow_up_generation import FollowUpGenerationStateError
 from riva.services.question_generation import QuestionGenerationStateError
 
 
@@ -44,6 +53,7 @@ class ScriptedSession:
         self.statements: list[Any] = []
         self.added: list[object] = []
         self.commit_count = 0
+        self.flush_count = 0
         self.rollback_count = 0
 
     async def scalar(self, statement: Any) -> object:
@@ -58,6 +68,9 @@ class ScriptedSession:
     def add_all(self, values: list[object]) -> None:
         self.added.extend(values)
 
+    async def flush(self) -> None:
+        self.flush_count += 1
+
     async def commit(self) -> None:
         self.commit_count += 1
 
@@ -70,6 +83,27 @@ class FakeGenerationService:
         self,
         run: AgentRun | None = None,
         error: QuestionGenerationStateError | None = None,
+    ) -> None:
+        self.run = run
+        self.error = error
+        self.calls: list[dict[str, object]] = []
+
+    async def enqueue_generation_in_transaction(
+        self,
+        **kwargs: object,
+    ) -> AgentRun:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        assert self.run is not None
+        return self.run
+
+
+class FakeFollowUpGenerationService:
+    def __init__(
+        self,
+        run: AgentRun | None = None,
+        error: BaseException | None = None,
     ) -> None:
         self.run = run
         self.error = error
@@ -246,15 +280,150 @@ def question_card(
     )
 
 
+def main_answer(
+    *,
+    attempt_id: UUID,
+    content: str = "  I reduced failures by 20%.  ",
+) -> PracticeAnswer:
+    return PracticeAnswer(
+        id=uuid4(),
+        attempt_id=attempt_id,
+        kind=PracticeAnswerKind.MAIN.value,
+        order=1,
+        content=content,
+        follow_up_question_id=None,
+        submitted_at=NOW,
+    )
+
+
+def follow_up_run(
+    *,
+    user_id: UUID,
+    attempt_id: UUID,
+    question_card_id: UUID,
+    main_answer_id: UUID,
+    status: AgentRunStatus = AgentRunStatus.QUEUED,
+    previous_question_id: UUID | None = None,
+    previous_answer_id: UUID | None = None,
+) -> AgentRun:
+    payload = FollowUpRunPayload(
+        attempt_id=attempt_id,
+        question_card_id=question_card_id,
+        main_answer_id=main_answer_id,
+        interaction_language="en",
+        next_follow_up_order=1,
+        previous_follow_up_question_id=previous_question_id,
+        previous_follow_up_answer_id=previous_answer_id,
+    )
+    return AgentRun(
+        id=uuid4(),
+        user_id=user_id,
+        agent_id="follow-up-generator",
+        prompt_id=FOLLOW_UP_PROMPT.prompt_id,
+        prompt_version=FOLLOW_UP_PROMPT.version,
+        output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+        status=status,
+        payload=payload.model_dump(mode="json", by_alias=True),
+        idempotency_key=practice_follow_up_idempotency_key(attempt_id, 1),
+        attempt_count=0 if status is AgentRunStatus.QUEUED else 1,
+        max_attempts=3,
+        available_at=NOW,
+        started_at=None if status is AgentRunStatus.QUEUED else NOW,
+        finished_at=NOW
+        if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
+        else None,
+        provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
+        model="test-model",
+        input_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        output_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        result={"action": "complete"}
+        if status is AgentRunStatus.SUCCEEDED
+        else None,
+        error_code="provider_unavailable" if status is AgentRunStatus.FAILED else None,
+    )
+
+
+def primary_answer_context(
+    *,
+    version: int = 2,
+    attempt_status: str = "answering",
+) -> tuple[PracticeSession, PracticeAttempt, AgentRun, QuestionCard]:
+    user_id = uuid4()
+    role_id = uuid4()
+    active = practice_session(
+        user_id=user_id,
+        role_id=role_id,
+        version=version,
+    )
+    question_run = generation_run(
+        user_id=user_id,
+        payload=generation_payload(role_id=role_id),
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    card = question_card(
+        user_id=user_id,
+        role_id=role_id,
+        run_id=question_run.id,
+    )
+    attempt = practice_attempt(
+        user_id=user_id,
+        session_id=active.id,
+        run_id=question_run.id,
+        status=attempt_status,
+        question_card_id=card.id,
+    )
+    return active, attempt, question_run, card
+
+
+def follow_up_decision(
+    *,
+    attempt_id: UUID,
+    run_id: UUID,
+    action: str,
+    question_id: UUID | None = None,
+) -> PracticeFollowUpDecision:
+    return PracticeFollowUpDecision(
+        id=uuid4(),
+        attempt_id=attempt_id,
+        source_agent_run_id=run_id,
+        order=1,
+        action=action,
+        follow_up_question_id=question_id,
+        created_at=NOW,
+    )
+
+
+def follow_up_question(
+    *,
+    attempt_id: UUID,
+    run_id: UUID,
+    question_id: UUID | None = None,
+) -> PracticeFollowUpQuestion:
+    return PracticeFollowUpQuestion(
+        id=question_id or uuid4(),
+        attempt_id=attempt_id,
+        source_agent_run_id=run_id,
+        order=1,
+        prompt="What metric changed?",
+        focus="Evidence",
+        answer_hints=["Name the metric."],
+        answer_framework=["Baseline", "Result"],
+        created_at=NOW,
+    )
+
+
 def service(
     session: ScriptedSession,
     fake_generation: FakeGenerationService | None = None,
+    fake_follow_up: FakeFollowUpGenerationService | None = None,
 ) -> PracticeSessionService:
     fake_generation = fake_generation or FakeGenerationService()
+    fake_follow_up = fake_follow_up or FakeFollowUpGenerationService()
     return PracticeSessionService(
         session,  # type: ignore[arg-type]
         llm_model="test-model",
         question_generation_service_factory=lambda _session, **kwargs: fake_generation,  # type: ignore[arg-type]
+        follow_up_generation_service_factory=lambda _session, **kwargs: fake_follow_up,  # type: ignore[arg-type]
         clock=lambda: NOW,
     )
 
@@ -1130,4 +1299,578 @@ def test_get_active_session_context_rejects_invalid_question_card_link() -> None
         )
 
     assert error.value.code == PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+    assert scripted.rollback_count == 1
+
+
+def test_submit_primary_answer_persists_answer_and_enqueues_follow_up_atomically() -> None:
+    active, attempt, question_run, card = primary_answer_context()
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=uuid4(),
+    )
+    fake_follow_up = FakeFollowUpGenerationService(follow_up)
+    scripted = ScriptedSession(active, attempt, question_run, card, None)
+
+    result = asyncio.run(
+        service(scripted, fake_follow_up=fake_follow_up).submit_primary_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=2,
+            question_id=card.id,
+            content="  I reduced failures by 20%.  ",
+        )
+    )
+
+    assert result.main_answer.content == "I reduced failures by 20%."
+    assert result.main_answer.kind == PracticeAnswerKind.MAIN.value
+    assert result.main_answer.order == 1
+    assert result.main_answer.follow_up_question_id is None
+    assert result.follow_up_generation_run is follow_up
+    assert result.follow_up_decision is None
+    assert result.follow_up_question is None
+    assert active.version == 3
+    assert attempt.status == "answering"
+    assert attempt.updated_at == NOW
+    assert scripted.flush_count == 1
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+    assert fake_follow_up.calls == [
+        {
+            "user_id": active.user_id,
+            "attempt_id": attempt.id,
+            "next_follow_up_order": 1,
+            "interaction_language": "en",
+            "idempotency_key": practice_follow_up_idempotency_key(
+                attempt.id,
+                1,
+            ),
+        }
+    ]
+    assert len(scripted.added) == 1
+    assert isinstance(scripted.added[0], PracticeAnswer)
+
+
+def test_submit_primary_answer_rolls_back_when_follow_up_enqueue_fails() -> None:
+    active, attempt, question_run, card = primary_answer_context()
+    fake_follow_up = FakeFollowUpGenerationService(
+        error=RuntimeError("enqueue failed")
+    )
+    scripted = ScriptedSession(active, attempt, question_run, card, None)
+
+    with pytest.raises(RuntimeError, match="enqueue failed"):
+        asyncio.run(
+            service(
+                scripted,
+                fake_follow_up=fake_follow_up,
+            ).submit_primary_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=2,
+                question_id=card.id,
+                content="A valid answer",
+            )
+        )
+
+    assert active.version == 2
+    assert attempt.status == "answering"
+    assert attempt.updated_at == NOW
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_submit_primary_answer_maps_follow_up_state_errors() -> None:
+    active, attempt, question_run, card = primary_answer_context()
+    fake_follow_up = FakeFollowUpGenerationService(
+        error=FollowUpGenerationStateError(
+            "follow_up_main_answer_not_ready"
+        )
+    )
+    scripted = ScriptedSession(active, attempt, question_run, card, None)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_follow_up=fake_follow_up,
+            ).submit_primary_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=2,
+                question_id=card.id,
+                content="A valid answer",
+            )
+        )
+
+    assert error.value.code == PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+    assert error.value.source_code == "follow_up_main_answer_not_ready"
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ("   ", PRACTICE_SESSION_STATE_CONFLICT),
+        ("x" * 20_001, PRACTICE_SESSION_STATE_CONFLICT),
+    ],
+)
+def test_submit_primary_answer_rejects_invalid_content(
+    content: str,
+    expected: str,
+) -> None:
+    active, attempt, question_run, card = primary_answer_context()
+    scripted = ScriptedSession(active, attempt, question_run, card)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).submit_primary_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=2,
+                question_id=card.id,
+                content=content,
+            )
+        )
+
+    assert error.value.code == expected
+    assert active.version == 2
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_submit_primary_answer_rejects_existing_main_answer_without_overwriting() -> None:
+    active, attempt, question_run, card = primary_answer_context()
+    existing = main_answer(attempt_id=attempt.id, content="Original answer")
+    scripted = ScriptedSession(active, attempt, question_run, card, existing)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).submit_primary_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=2,
+                question_id=card.id,
+                content="Replacement answer",
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert existing.content == "Original answer"
+    assert active.version == 2
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_submit_primary_answer_replays_the_same_answer_and_run() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="I reduced failures by 20%.")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+    )
+
+    result = asyncio.run(
+        service(scripted).submit_primary_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=2,
+            question_id=card.id,
+            content="  I reduced failures by 20%. ",
+        )
+    )
+
+    assert result.main_answer is existing
+    assert result.follow_up_generation_run is follow_up
+    assert result.session.version == 3
+    assert result.attempt.status == "answering"
+    assert scripted.added == []
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda run: run.payload.__setitem__("mainAnswerId", str(uuid4())),
+        lambda run: run.payload.__setitem__("questionCardId", str(uuid4())),
+        lambda run: run.payload.__setitem__("interactionLanguage", "zh-CN"),
+    ],
+)
+def test_submit_primary_answer_replay_mismatch_is_version_conflict(mutate) -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+    )
+    mutate(follow_up)
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).submit_primary_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=2,
+                question_id=card.id,
+                content="Stored answer",
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert active.version == 3
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_submit_primary_answer_rejects_version_gap_greater_than_one() -> None:
+    active, attempt, _, _ = primary_answer_context(version=4)
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).submit_primary_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=2,
+                question_id=uuid4(),
+                content="Stored answer",
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    "run_status",
+    [AgentRunStatus.QUEUED, AgentRunStatus.RUNNING],
+)
+def test_refresh_follow_up_pending_does_not_reconcile(
+    run_status: AgentRunStatus,
+) -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=run_status,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+    )
+
+    result = asyncio.run(
+        service(scripted).refresh_follow_up_generation(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=3,
+        )
+    )
+
+    assert result.main_answer is existing
+    assert result.follow_up_generation_run is follow_up
+    assert result.follow_up_decision is None
+    assert result.follow_up_question is None
+    assert active.version == 3
+    assert attempt.status == "answering"
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_refresh_follow_up_failed_raises_stable_error_without_mutation() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.FAILED,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_follow_up_generation(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=3,
+            )
+        )
+
+    assert error.value.code == PRACTICE_FOLLOW_UP_GENERATION_FAILED
+    assert error.value.source_code == "provider_unavailable"
+    assert active.version == 3
+    assert attempt.status == "answering"
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_refresh_follow_up_ask_reconciles_canonical_question() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        decision,
+        question,
+    )
+
+    result = asyncio.run(
+        service(scripted).refresh_follow_up_generation(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=3,
+        )
+    )
+
+    assert result.follow_up_decision is decision
+    assert result.follow_up_question is question
+    assert result.attempt.status == "answeringFollowUp"
+    assert result.session.version == 4
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_refresh_follow_up_complete_reconciles_to_evaluating_without_question() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        decision,
+        None,
+    )
+
+    result = asyncio.run(
+        service(scripted).refresh_follow_up_generation(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=3,
+        )
+    )
+
+    assert result.follow_up_decision is decision
+    assert result.follow_up_question is None
+    assert result.attempt.status == "evaluating"
+    assert result.session.version == 4
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_refresh_follow_up_requires_decision_and_valid_lineage() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        None,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_follow_up_generation(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=3,
+            )
+        )
+
+    assert error.value.code == PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+    assert active.version == 3
+    assert attempt.status == "answering"
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_refresh_follow_up_replays_ask_without_incrementing_again() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="answeringFollowUp",
+    )
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        decision,
+        question,
+    )
+
+    result = asyncio.run(
+        service(scripted).refresh_follow_up_generation(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=3,
+        )
+    )
+
+    assert result.follow_up_question is question
+    assert result.attempt.status == "answeringFollowUp"
+    assert result.session.version == 4
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_refresh_follow_up_replays_complete_without_incrementing_again() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="evaluating",
+    )
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        decision,
+        None,
+    )
+
+    result = asyncio.run(
+        service(scripted).refresh_follow_up_generation(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=3,
+        )
+    )
+
+    assert result.follow_up_decision is decision
+    assert result.follow_up_question is None
+    assert result.attempt.status == "evaluating"
+    assert result.session.version == 4
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_refresh_follow_up_rejects_wrong_replay_state_as_version_conflict() -> None:
+    active, attempt, _, _ = primary_answer_context(
+        version=4,
+        attempt_status="answering",
+    )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_follow_up_generation(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=3,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert scripted.commit_count == 0
     assert scripted.rollback_count == 1

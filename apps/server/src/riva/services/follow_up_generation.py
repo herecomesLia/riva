@@ -85,6 +85,19 @@ class FollowUpGenerationStateError(RuntimeError):
         super().__init__(self.safe_message)
 
 
+def practice_follow_up_idempotency_key(
+    attempt_id: UUID,
+    order: int,
+) -> str:
+    if (
+        isinstance(order, bool)
+        or not isinstance(order, int)
+        or not 1 <= order <= MAX_PRACTICE_FOLLOW_UPS
+    ):
+        raise ValueError("follow-up order must be a supported integer order")
+    return f"practice-attempt:{attempt_id}:follow-up:{order}"
+
+
 @dataclass(frozen=True)
 class _FollowUpContext:
     attempt: PracticeAttempt
@@ -362,8 +375,6 @@ class FollowUpGenerationService:
             PracticeAttempt.id == attempt_id,
             PracticeAttempt.user_id == user_id,
         )
-        if for_update:
-            attempt_statement = attempt_statement.with_for_update()
         attempt = await self.session.scalar(attempt_statement)
         if attempt is None:
             raise FollowUpGenerationStateError(FOLLOW_UP_ATTEMPT_NOT_FOUND)
@@ -381,6 +392,19 @@ class FollowUpGenerationService:
             raise FollowUpGenerationStateError(
                 FOLLOW_UP_GENERATION_CONTEXT_CONFLICT
             )
+
+        if for_update:
+            attempt_statement = (
+                select(PracticeAttempt)
+                .where(
+                    PracticeAttempt.id == attempt.id,
+                    PracticeAttempt.user_id == user_id,
+                )
+                .with_for_update()
+            )
+            attempt = await self.session.scalar(attempt_statement)
+            if attempt is None:
+                raise FollowUpGenerationStateError(FOLLOW_UP_ATTEMPT_NOT_FOUND)
 
         if attempt.question_card_id is None:
             raise FollowUpGenerationStateError(
@@ -698,5 +722,6 @@ __all__ = [
     "FollowUpGenerationStateError",
     "FollowUpGenerationStateErrorCode",
     "follow_up_output_from_persistence",
+    "practice_follow_up_idempotency_key",
     "validate_follow_up_generation_run",
 ]

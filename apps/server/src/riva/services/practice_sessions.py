@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,17 +14,32 @@ from riva.core.language import InteractionLanguage
 from riva.models import (
     AgentRun,
     AgentRunStatus,
+    PracticeAnswer,
     PracticeAttempt,
+    PracticeFollowUpDecision,
+    PracticeFollowUpQuestion,
     PracticeSession,
     QuestionCard,
     User,
 )
-from riva.prompts import QUESTION_GENERATION_PROMPT
+from riva.prompts import FOLLOW_UP_PROMPT, QUESTION_GENERATION_PROMPT
+from riva.schemas.follow_up import FollowUpRunPayload
+from riva.schemas.practice_interactions import (
+    PracticeAnswerContent,
+    PracticeAnswerKind,
+)
 from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
     PracticeSessionSelection,
 )
 from riva.schemas.question_generation import QuestionGenerationRunPayload
+from riva.services.follow_up_generation import (
+    FollowUpGenerationService,
+    FollowUpGenerationStateError,
+    follow_up_output_from_persistence,
+    practice_follow_up_idempotency_key,
+    validate_follow_up_generation_run,
+)
 from riva.services.question_generation import (
     QuestionGenerationService,
     QuestionGenerationStateError,
@@ -42,6 +58,8 @@ PracticeSessionStateErrorCode = Literal[
     "practice_question_generation_prerequisite_failed",
     "practice_question_generation_failed",
     "practice_question_generation_state_conflict",
+    "practice_follow_up_generation_failed",
+    "practice_follow_up_generation_state_conflict",
 ]
 
 PRACTICE_SESSION_NOT_FOUND: PracticeSessionStateErrorCode = (
@@ -71,6 +89,12 @@ PRACTICE_QUESTION_GENERATION_FAILED: PracticeSessionStateErrorCode = (
 PRACTICE_QUESTION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
     "practice_question_generation_state_conflict"
 )
+PRACTICE_FOLLOW_UP_GENERATION_FAILED: PracticeSessionStateErrorCode = (
+    "practice_follow_up_generation_failed"
+)
+PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+    "practice_follow_up_generation_state_conflict"
+)
 
 
 class PracticeSessionStateError(RuntimeError):
@@ -95,9 +119,24 @@ class PracticeSessionWorkflowContext:
     question_card: QuestionCard | None
 
 
+@dataclass(frozen=True)
+class PracticePrimaryAnswerWorkflowContext:
+    session: PracticeSession
+    attempt: PracticeAttempt
+    question_card: QuestionCard
+    main_answer: PracticeAnswer
+    follow_up_generation_run: AgentRun
+    follow_up_decision: PracticeFollowUpDecision | None
+    follow_up_question: PracticeFollowUpQuestion | None
+
+
 QuestionGenerationServiceFactory = Callable[
     ...,
     QuestionGenerationService,
+]
+FollowUpGenerationServiceFactory = Callable[
+    ...,
+    FollowUpGenerationService,
 ]
 
 
@@ -110,12 +149,18 @@ class PracticeSessionService:
         question_generation_service_factory: QuestionGenerationServiceFactory = (
             QuestionGenerationService
         ),
+        follow_up_generation_service_factory: FollowUpGenerationServiceFactory = (
+            FollowUpGenerationService
+        ),
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.question_generation_service_factory = (
             question_generation_service_factory
+        )
+        self.follow_up_generation_service_factory = (
+            follow_up_generation_service_factory
         )
         self.clock = clock
 
@@ -212,6 +257,255 @@ class PracticeSessionService:
                 attempt=attempt,
                 question_generation_run=run,
                 question_card=None,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def submit_primary_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        content: PracticeAnswerContent | str,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if practice_session.status != "active":
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if attempt is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            if practice_session.version == expected_version + 1:
+                normalized_content = _normalize_answer_content(content)
+                try:
+                    context = await self._load_primary_answer_replay_context(
+                        practice_session=practice_session,
+                        attempt=attempt,
+                        question_id=question_id,
+                        normalized_content=normalized_content,
+                    )
+                except PracticeSessionStateError:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if attempt.status != PracticeAttemptStatus.ANSWERING.value:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            if attempt.question_card_id != question_id:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            normalized_content = _normalize_answer_content(content)
+            question_generation_run, _ = await self._load_generation_run(
+                practice_session,
+                attempt,
+                for_update=True,
+            )
+            if question_generation_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            card = await self._load_card_by_id(
+                practice_session,
+                attempt,
+                question_generation_run,
+                for_update=True,
+            )
+            existing_main_answer = await self._load_main_answer(
+                attempt,
+                for_update=True,
+            )
+            if existing_main_answer is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            main_answer = PracticeAnswer(
+                id=uuid4(),
+                attempt_id=attempt.id,
+                kind=PracticeAnswerKind.MAIN.value,
+                order=1,
+                content=normalized_content,
+                follow_up_question_id=None,
+                submitted_at=now,
+            )
+            self.session.add(main_answer)
+            await self.session.flush()
+
+            follow_up_generation_run = await self._enqueue_follow_up_generation(
+                user_id=user_id,
+                session=practice_session,
+                attempt=attempt,
+            )
+            if follow_up_generation_run.id is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+
+            attempt.updated_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticePrimaryAnswerWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                follow_up_generation_run=follow_up_generation_run,
+                follow_up_decision=None,
+                follow_up_question=None,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def refresh_follow_up_generation(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if practice_session.status != "active":
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if attempt is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            if practice_session.version == expected_version + 1:
+                try:
+                    context = await self._load_follow_up_replay_context(
+                        practice_session,
+                        attempt,
+                    )
+                except PracticeSessionStateError:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if attempt.status != PracticeAttemptStatus.ANSWERING.value:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            (
+                card,
+                main_answer,
+                follow_up_run,
+                _,
+            ) = await self._load_primary_follow_up_records(
+                practice_session,
+                attempt,
+            )
+
+            if follow_up_run.status in (
+                AgentRunStatus.QUEUED,
+                AgentRunStatus.RUNNING,
+            ):
+                await self.session.commit()
+                return PracticePrimaryAnswerWorkflowContext(
+                    session=practice_session,
+                    attempt=attempt,
+                    question_card=card,
+                    main_answer=main_answer,
+                    follow_up_generation_run=follow_up_run,
+                    follow_up_decision=None,
+                    follow_up_question=None,
+                )
+
+            if follow_up_run.status == AgentRunStatus.FAILED:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_FAILED,
+                    source_code=follow_up_run.error_code,
+                )
+            if follow_up_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+
+            decision, question = await self._load_canonical_follow_up_artifact(
+                follow_up_run,
+                attempt=attempt,
+            )
+            now = self.clock()
+            _require_aware_datetime(now)
+            if decision.action == "askFollowUp":
+                attempt.status = PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+            elif decision.action == "complete":
+                attempt.status = PracticeAttemptStatus.EVALUATING.value
+            else:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+            attempt.updated_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticePrimaryAnswerWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                follow_up_generation_run=follow_up_run,
+                follow_up_decision=decision,
+                follow_up_question=question,
             )
         except BaseException:
             await self.session.rollback()
@@ -362,6 +656,348 @@ class PracticeSessionService:
         except BaseException:
             await self.session.rollback()
             raise
+
+    async def _load_primary_answer_replay_context(
+        self,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_id: UUID,
+        normalized_content: str,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        if (
+            attempt.status != PracticeAttemptStatus.ANSWERING.value
+            or attempt.question_card_id != question_id
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        question_generation_run, _ = await self._load_generation_run(
+            practice_session,
+            attempt,
+            for_update=True,
+        )
+        if question_generation_run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        card = await self._load_card_by_id(
+            practice_session,
+            attempt,
+            question_generation_run,
+            for_update=True,
+        )
+        main_answer = await self._load_main_answer(attempt, for_update=True)
+        if main_answer is None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if _normalize_answer_content(main_answer.content) != normalized_content:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        follow_up_run = await self._load_stable_follow_up_run(
+            user_id=practice_session.user_id,
+            attempt_id=attempt.id,
+            order=1,
+            for_update=True,
+        )
+        self._validate_follow_up_run_lineage(
+            follow_up_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            main_answer=main_answer,
+        )
+        return PracticePrimaryAnswerWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            main_answer=main_answer,
+            follow_up_generation_run=follow_up_run,
+            follow_up_decision=None,
+            follow_up_question=None,
+        )
+
+    async def _load_follow_up_replay_context(
+        self,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        if attempt.status not in {
+            PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+            PracticeAttemptStatus.EVALUATING.value,
+        }:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        card, main_answer, follow_up_run, _ = (
+            await self._load_primary_follow_up_records(
+                practice_session,
+                attempt,
+            )
+        )
+        if follow_up_run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        decision, question = await self._load_canonical_follow_up_artifact(
+            follow_up_run,
+            attempt=attempt,
+        )
+        if decision.action == "askFollowUp":
+            expected_status = PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+        elif decision.action == "complete":
+            expected_status = PracticeAttemptStatus.EVALUATING.value
+        else:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        if attempt.status != expected_status:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        return PracticePrimaryAnswerWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            main_answer=main_answer,
+            follow_up_generation_run=follow_up_run,
+            follow_up_decision=decision,
+            follow_up_question=question,
+        )
+
+    async def _load_primary_follow_up_records(
+        self,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+    ) -> tuple[
+        QuestionCard,
+        PracticeAnswer,
+        AgentRun,
+        FollowUpRunPayload,
+    ]:
+        if attempt.question_card_id is None:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        question_generation_run, _ = await self._load_generation_run(
+            practice_session,
+            attempt,
+            for_update=True,
+        )
+        if question_generation_run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        card = await self._load_card_by_id(
+            practice_session,
+            attempt,
+            question_generation_run,
+            for_update=True,
+        )
+        main_answer = await self._load_main_answer(attempt, for_update=True)
+        if main_answer is None:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        try:
+            _normalize_answer_content(main_answer.content)
+        except PracticeSessionStateError:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            ) from None
+        follow_up_run = await self._load_stable_follow_up_run(
+            user_id=practice_session.user_id,
+            attempt_id=attempt.id,
+            order=1,
+            for_update=True,
+        )
+        payload = self._validate_follow_up_run_lineage(
+            follow_up_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            main_answer=main_answer,
+        )
+        return card, main_answer, follow_up_run, payload
+
+    async def _load_canonical_follow_up_artifact(
+        self,
+        run: AgentRun,
+        *,
+        attempt: PracticeAttempt,
+    ) -> tuple[
+        PracticeFollowUpDecision,
+        PracticeFollowUpQuestion | None,
+    ]:
+        if run.id is None:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        decision = await self.session.scalar(
+            select(PracticeFollowUpDecision)
+            .where(PracticeFollowUpDecision.source_agent_run_id == run.id)
+            .with_for_update()
+        )
+        if decision is None:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        question = await self.session.scalar(
+            select(PracticeFollowUpQuestion)
+            .where(PracticeFollowUpQuestion.source_agent_run_id == run.id)
+            .with_for_update()
+        )
+        if (
+            decision.attempt_id != attempt.id
+            or decision.source_agent_run_id != run.id
+            or decision.order != 1
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        if decision.action == "complete":
+            if decision.follow_up_question_id is not None or question is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+            try:
+                follow_up_output_from_persistence(decision)
+            except (TypeError, ValueError, ValidationError):
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                ) from None
+            return decision, None
+        if decision.action != "askFollowUp":
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        if decision.follow_up_question_id is None or question is None:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        if (
+            question.id != decision.follow_up_question_id
+            or question.attempt_id != attempt.id
+            or question.source_agent_run_id != run.id
+            or question.order != 1
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        try:
+            follow_up_output_from_persistence(decision, question)
+        except (TypeError, ValueError, ValidationError):
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            ) from None
+        return decision, question
+
+    async def _load_main_answer(
+        self,
+        attempt: PracticeAttempt,
+        *,
+        for_update: bool,
+    ) -> PracticeAnswer | None:
+        statement = select(PracticeAnswer).where(
+            PracticeAnswer.attempt_id == attempt.id,
+            PracticeAnswer.kind == PracticeAnswerKind.MAIN.value,
+            PracticeAnswer.order == 1,
+            PracticeAnswer.follow_up_question_id.is_(None),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return await self.session.scalar(statement)
+
+    async def _load_stable_follow_up_run(
+        self,
+        *,
+        user_id: UUID,
+        attempt_id: UUID,
+        order: int,
+        for_update: bool,
+    ) -> AgentRun:
+        statement = select(AgentRun).where(
+            AgentRun.user_id == user_id,
+            AgentRun.agent_id == "follow-up-generator",
+            AgentRun.prompt_id == FOLLOW_UP_PROMPT.prompt_id,
+            AgentRun.prompt_version == FOLLOW_UP_PROMPT.version,
+            AgentRun.idempotency_key == practice_follow_up_idempotency_key(
+                attempt_id,
+                order,
+            ),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
+        if run is None:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        return run
+
+    async def _enqueue_follow_up_generation(
+        self,
+        *,
+        user_id: UUID,
+        session: PracticeSession,
+        attempt: PracticeAttempt,
+    ) -> AgentRun:
+        try:
+            return await self._follow_up_generation_service().enqueue_generation_in_transaction(
+                user_id=user_id,
+                attempt_id=attempt.id,
+                next_follow_up_order=1,
+                interaction_language=session.language,
+                idempotency_key=practice_follow_up_idempotency_key(
+                    attempt.id,
+                    1,
+                ),
+            )
+        except FollowUpGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        except ValueError:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
+                source_code="follow_up_generation_unavailable",
+            ) from None
+
+    def _validate_follow_up_run_lineage(
+        self,
+        run: AgentRun,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_card: QuestionCard,
+        main_answer: PracticeAnswer,
+    ) -> FollowUpRunPayload:
+        try:
+            payload = validate_follow_up_generation_run(run)
+        except FollowUpGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        if (
+            run.id is None
+            or run.user_id != practice_session.user_id
+            or run.idempotency_key
+            != practice_follow_up_idempotency_key(attempt.id, 1)
+            or payload.attempt_id != attempt.id
+            or payload.question_card_id != question_card.id
+            or payload.main_answer_id != main_answer.id
+            or payload.interaction_language != practice_session.language
+            or payload.next_follow_up_order != 1
+            or payload.previous_follow_up_question_id is not None
+            or payload.previous_follow_up_answer_id is not None
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        return payload
+
+    def _follow_up_generation_service(self) -> FollowUpGenerationService:
+        return self.follow_up_generation_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
 
     def _generation_service(self) -> QuestionGenerationService:
         return self.question_generation_service_factory(
@@ -710,10 +1346,29 @@ def _require_aware_datetime(value: datetime) -> None:
         raise ValueError("clock must return a timezone-aware datetime")
 
 
+def _valid_expected_version(value: object) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, int)
+        and value >= 1
+    )
+
+
+def _normalize_answer_content(value: object) -> str:
+    try:
+        return TypeAdapter(PracticeAnswerContent).validate_python(value)
+    except (TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(
+            PRACTICE_SESSION_STATE_CONFLICT
+        ) from None
+
+
 __all__ = [
     "PRACTICE_QUESTION_GENERATION_FAILED",
     "PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED",
     "PRACTICE_QUESTION_GENERATION_STATE_CONFLICT",
+    "PRACTICE_FOLLOW_UP_GENERATION_FAILED",
+    "PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT",
     "PRACTICE_SESSION_ALREADY_ACTIVE",
     "PRACTICE_SESSION_NOT_FOUND",
     "PRACTICE_SESSION_SOURCE_UNAVAILABLE",
@@ -723,5 +1378,7 @@ __all__ = [
     "PracticeSessionService",
     "PracticeSessionStateError",
     "PracticeSessionStateErrorCode",
+    "PracticePrimaryAnswerWorkflowContext",
     "PracticeSessionWorkflowContext",
+    "practice_follow_up_idempotency_key",
 ]

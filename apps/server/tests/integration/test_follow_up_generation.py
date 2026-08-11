@@ -24,7 +24,10 @@ from riva.models import (
 )
 from riva.schemas.follow_up import FollowUpGenerationOutput
 from riva.services.agent_runs import AgentRunService
-from riva.services.follow_up_generation import FollowUpGenerationService
+from riva.services.follow_up_generation import (
+    FollowUpGenerationService,
+    practice_follow_up_idempotency_key,
+)
 from riva.workers import AgentHandlerRegistry, AgentWorker, FollowUpHandler
 from tests.helpers.llm import FakeLLMProvider
 
@@ -233,7 +236,7 @@ def test_follow_up_worker_persists_ask_and_complete_canonically() -> None:
                         next_follow_up_order=1,
                         interaction_language="en",
                         idempotency_key=(
-                            f"practice-attempt:{attempt.id}:follow-up:1"
+                            practice_follow_up_idempotency_key(attempt.id, 1)
                         ),
                     )
 
@@ -297,7 +300,7 @@ def test_follow_up_worker_persists_ask_and_complete_canonically() -> None:
                         next_follow_up_order=2,
                         interaction_language="en",
                         idempotency_key=(
-                            f"practice-attempt:{attempt.id}:follow-up:2"
+                            practice_follow_up_idempotency_key(attempt.id, 2)
                         ),
                     )
 
@@ -354,7 +357,7 @@ def test_follow_up_retry_preserves_first_ask_and_complete_decisions() -> None:
                         next_follow_up_order=1,
                         interaction_language="en",
                         idempotency_key=(
-                            f"practice-attempt:{attempt.id}:retry-follow-up"
+                            practice_follow_up_idempotency_key(attempt.id, 1)
                         ),
                     )
                     claimed = await AgentRunService(session).claim_next(
