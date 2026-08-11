@@ -7,6 +7,7 @@ from riva.models import (
     AgentRun,
     PracticeAnswer,
     PracticeAttempt,
+    PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
 )
 
@@ -148,3 +149,80 @@ def test_practice_follow_up_question_table_columns_constraints_and_relationships
     }
     assert forbidden_fields.isdisjoint(set(table.c.keys()))
     assert PracticeFollowUpQuestion.source_agent_run.property.mapper.class_ is AgentRun
+
+
+def test_practice_follow_up_decision_table_constraints_and_relationships() -> None:
+    load_models()
+
+    assert "practice_follow_up_decisions" in Base.metadata.tables
+    table = PracticeFollowUpDecision.__table__
+
+    assert isinstance(table.c.id.type, Uuid)
+    assert table.c.id.primary_key is True
+    assert table.c.attempt_id.index is True
+    assert table.c.attempt_id.nullable is False
+    assert table.c.source_agent_run_id.nullable is False
+    assert table.c.order.nullable is False
+    assert table.c.action.type.length == 16
+    assert table.c.follow_up_question_id.nullable is True
+    assert table.c.created_at.nullable is False
+    assert table.c.created_at.type.timezone is True
+
+    fks = {
+        column.name: next(iter(column.foreign_keys))
+        for column in (
+            table.c.attempt_id,
+            table.c.source_agent_run_id,
+            table.c.follow_up_question_id,
+        )
+    }
+    assert fks["attempt_id"].target_fullname == "practice_attempts.id"
+    assert fks["attempt_id"].ondelete == "CASCADE"
+    assert fks["source_agent_run_id"].target_fullname == "agent_runs.id"
+    assert fks["source_agent_run_id"].ondelete == "CASCADE"
+    assert (
+        fks["follow_up_question_id"].target_fullname
+        == "practice_follow_up_questions.id"
+    )
+    assert fks["follow_up_question_id"].ondelete == "CASCADE"
+
+    checks = {
+        constraint.name: str(constraint.sqltext)
+        for constraint in constraints_by_type(table, CheckConstraint)
+    }
+    assert '"order" >= 1' in checks["ck_practice_follow_up_decisions_order"]
+    assert '"order" <= 2' in checks["ck_practice_follow_up_decisions_order"]
+    assert "action IN ('askFollowUp', 'complete')" in checks[
+        "ck_practice_follow_up_decisions_action"
+    ]
+    invariant = checks["ck_practice_follow_up_decisions_action_question"]
+    assert "action = 'askFollowUp'" in invariant
+    assert "follow_up_question_id IS NOT NULL" in invariant
+    assert "action = 'complete'" in invariant
+    assert "follow_up_question_id IS NULL" in invariant
+
+    unique_columns = {
+        tuple(column.name for column in constraint.columns): constraint.name
+        for constraint in constraints_by_type(table, UniqueConstraint)
+    }
+    assert unique_columns[("source_agent_run_id",)] == (
+        "uq_practice_follow_up_decisions_source_run"
+    )
+    assert unique_columns[("attempt_id", "order")] == (
+        "uq_practice_follow_up_decisions_attempt_order"
+    )
+    assert unique_columns[("follow_up_question_id",)] == (
+        "uq_practice_follow_up_decisions_question"
+    )
+
+    assert PracticeAttempt.follow_up_decisions.property.uselist is True
+    assert PracticeAttempt.follow_up_decisions.property.cascade.delete_orphan is True
+    assert PracticeFollowUpDecision.attempt.property.uselist is False
+    assert PracticeFollowUpDecision.source_agent_run.property.uselist is False
+    assert PracticeFollowUpDecision.follow_up_question.property.uselist is False
+    assert PracticeFollowUpDecision.follow_up_question.property.cascade.delete_orphan is False
+    assert PracticeFollowUpQuestion.decision.property.uselist is False
+    assert PracticeFollowUpQuestion.decision.property.cascade.delete_orphan is False
+
+    forbidden_fields = {"reasoning", "metadata", "score", "evaluation"}
+    assert forbidden_fields.isdisjoint(set(table.c.keys()))

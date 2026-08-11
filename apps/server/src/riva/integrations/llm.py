@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, Literal, Protocol, TypeVar
+from typing import Generic, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from typing_extensions import TypeForm
 
 
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 ResponseT = TypeVar("ResponseT")
+type StructuredOutputSchema[T] = TypeForm[T] | TypeAdapter[T]
 StructuredOutputStage = Literal[
     "json_decode",
     "provider_response",
@@ -94,7 +96,7 @@ class TextGenerationRequest:
 class StructuredGenerationRequest(Generic[StructuredOutputT]):
     model: str
     messages: tuple[LLMMessage, ...]
-    output_schema: object
+    output_schema: StructuredOutputSchema[StructuredOutputT]
     parameters: GenerationParameters | None = None
 
     def __post_init__(self) -> None:
@@ -161,9 +163,9 @@ class LLMProviderConfigurationError(LLMProviderError):
 
 
 def validate_structured_output(
-    output_schema: object,
+    output_schema: StructuredOutputSchema[StructuredOutputT],
     value: object,
-) -> Any:
+) -> StructuredOutputT:
     try:
         if isinstance(output_schema, TypeAdapter):
             validated = output_schema.validate_python(value)

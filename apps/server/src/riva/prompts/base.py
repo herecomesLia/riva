@@ -4,6 +4,7 @@ from string import Formatter
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
+from typing_extensions import TypeForm
 
 
 PromptOutputT = TypeVar("PromptOutputT", bound=BaseModel)
@@ -42,7 +43,7 @@ class PromptDefinition(Generic[PromptOutputT]):
     system_template: str
     user_template: str
     output_schema_id: str
-    output_schema: type[PromptOutputT]
+    output_schema: TypeForm[PromptOutputT]
 
     def __post_init__(self) -> None:
         for field_name in ("prompt_id", "version", "output_schema_id"):

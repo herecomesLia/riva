@@ -162,5 +162,92 @@ class PracticeFollowUpQuestion(Base):
         passive_deletes=True,
     )
 
+    decision: Mapped[PracticeFollowUpDecision | None] = relationship(
+        back_populates="follow_up_question",
+        foreign_keys="PracticeFollowUpDecision.follow_up_question_id",
+        uselist=False,
+        passive_deletes=True,
+    )
 
-__all__ = ["PracticeAnswer", "PracticeFollowUpQuestion"]
+
+class PracticeFollowUpDecision(Base):
+    __tablename__ = "practice_follow_up_decisions"
+    __table_args__ = (
+        CheckConstraint(
+            '"order" >= 1 AND "order" <= 2',
+            name="ck_practice_follow_up_decisions_order",
+        ),
+        CheckConstraint(
+            "action IN ('askFollowUp', 'complete')",
+            name="ck_practice_follow_up_decisions_action",
+        ),
+        CheckConstraint(
+            "((action = 'askFollowUp' AND follow_up_question_id IS NOT NULL) "
+            "OR (action = 'complete' AND follow_up_question_id IS NULL))",
+            name="ck_practice_follow_up_decisions_action_question",
+        ),
+        UniqueConstraint(
+            "source_agent_run_id",
+            name="uq_practice_follow_up_decisions_source_run",
+        ),
+        UniqueConstraint(
+            "attempt_id",
+            "order",
+            name="uq_practice_follow_up_decisions_attempt_order",
+        ),
+        UniqueConstraint(
+            "follow_up_question_id",
+            name="uq_practice_follow_up_decisions_question",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    attempt_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("practice_attempts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_agent_run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    order: Mapped[int] = mapped_column(nullable=False)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    follow_up_question_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("practice_follow_up_questions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    attempt: Mapped[PracticeAttempt] = relationship(
+        back_populates="follow_up_decisions",
+        passive_deletes=True,
+    )
+    source_agent_run: Mapped[AgentRun] = relationship(
+        foreign_keys=[source_agent_run_id],
+        passive_deletes=True,
+    )
+    follow_up_question: Mapped[PracticeFollowUpQuestion | None] = relationship(
+        back_populates="decision",
+        foreign_keys=[follow_up_question_id],
+        uselist=False,
+        passive_deletes=True,
+    )
+
+
+__all__ = [
+    "PracticeAnswer",
+    "PracticeFollowUpDecision",
+    "PracticeFollowUpQuestion",
+]

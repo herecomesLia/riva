@@ -16,6 +16,11 @@ from riva.integrations import (
     TextGenerationRequest,
     validate_structured_output,
 )
+from riva.schemas.follow_up import (
+    FollowUpCompleteOutput,
+    FollowUpGenerationOutput,
+    FollowUpQuestionOutput,
+)
 from tests.helpers.llm import FakeLLMProvider
 
 
@@ -118,6 +123,52 @@ def test_schema_validation_diagnostics_preserve_nested_error_path() -> None:
     )
     assert diagnostics.validation_errors[0].type == "bool_parsing"
     assert "PRIVATE_RESUME_CONTENT" not in repr(diagnostics)
+
+
+def test_follow_up_union_validation_accepts_both_discriminated_branches() -> None:
+    complete = validate_structured_output(
+        FollowUpGenerationOutput,
+        {"action": "complete"},
+    )
+    ask = validate_structured_output(
+        FollowUpGenerationOutput,
+        {
+            "action": "askFollowUp",
+            "prompt": "Ask about the result.",
+            "focus": "Evidence",
+            "answer_hints": ["Metric"],
+            "answer_framework": ["Context", "Result"],
+        },
+    )
+
+    assert isinstance(complete, FollowUpCompleteOutput)
+    assert isinstance(ask, FollowUpQuestionOutput)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"action": "unknown"},
+        {"action": "complete", "prompt": "private prompt"},
+        {
+            "action": "askFollowUp",
+            "prompt": "Question",
+            "focus": "Focus",
+            "answer_hints": [],
+            "answer_framework": [],
+            "reasoning": "private reasoning",
+        },
+    ],
+)
+def test_follow_up_union_validation_rejects_invalid_or_extra_fields(
+    value: dict[str, object],
+) -> None:
+    with pytest.raises(InvalidStructuredOutputError) as exc_info:
+        validate_structured_output(FollowUpGenerationOutput, value)
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics is not None
+    assert "private" not in repr(diagnostics).lower()
 
 
 def test_fake_provider_raises_configured_error() -> None:

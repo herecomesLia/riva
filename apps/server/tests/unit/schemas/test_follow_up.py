@@ -8,8 +8,10 @@ from riva.schemas.follow_up import (
     FollowUpGenerationOutput,
     FollowUpInput,
     FollowUpQuestionOutput,
+    FollowUpRunPayload,
 )
 from riva.schemas.question_cards import QuestionCardQuestionType
+from uuid import uuid4
 
 
 def question_context() -> dict[str, object]:
@@ -187,3 +189,88 @@ def test_follow_up_validation_does_not_mutate_payload() -> None:
     FollowUpInput.model_validate(payload)
 
     assert payload == before
+
+
+def run_payload(*, order: int = 1) -> dict[str, object]:
+    return {
+        "attemptId": str(uuid4()),
+        "questionCardId": str(uuid4()),
+        "mainAnswerId": str(uuid4()),
+        "interactionLanguage": "en",
+        "nextFollowUpOrder": order,
+        "previousFollowUpQuestionId": None,
+        "previousFollowUpAnswerId": None,
+    }
+
+
+def test_follow_up_run_payload_has_exact_camel_case_contract() -> None:
+    raw = run_payload()
+    payload = FollowUpRunPayload.model_validate(raw)
+
+    assert payload.model_dump(mode="json", by_alias=True) == {
+        **raw,
+    }
+    assert set(payload.model_dump(mode="json", by_alias=True)) == {
+        "attemptId",
+        "questionCardId",
+        "mainAnswerId",
+        "interactionLanguage",
+        "nextFollowUpOrder",
+        "previousFollowUpQuestionId",
+        "previousFollowUpAnswerId",
+    }
+    assert "prompt" not in payload.model_dump()
+    assert "answer" not in payload.model_dump()
+
+
+def test_follow_up_run_payload_requires_previous_ids_for_order_two() -> None:
+    question_id = uuid4()
+    answer_id = uuid4()
+    payload = run_payload(order=2)
+    payload["previousFollowUpQuestionId"] = str(question_id)
+    payload["previousFollowUpAnswerId"] = str(answer_id)
+
+    parsed = FollowUpRunPayload.model_validate(payload)
+
+    assert parsed.previous_follow_up_question_id == question_id
+    assert parsed.previous_follow_up_answer_id == answer_id
+
+
+@pytest.mark.parametrize(
+    "payload_update",
+    [
+        {"previousFollowUpQuestionId": str(uuid4())},
+        {"previousFollowUpAnswerId": str(uuid4())},
+    ],
+)
+def test_follow_up_run_payload_rejects_partial_previous_ids(
+    payload_update: dict[str, object],
+) -> None:
+    payload = run_payload(order=2)
+    payload.update(payload_update)
+
+    with pytest.raises(ValidationError):
+        FollowUpRunPayload.model_validate(payload)
+
+
+@pytest.mark.parametrize("order", [0, 3, True, "1"])
+def test_follow_up_run_payload_rejects_invalid_order(order: object) -> None:
+    with pytest.raises(ValidationError):
+        FollowUpRunPayload.model_validate(run_payload(order=order))
+
+
+def test_follow_up_run_payload_rejects_unknown_or_invalid_fields() -> None:
+    extra = run_payload()
+    extra["rawAnswer"] = "private answer"
+    with pytest.raises(ValidationError):
+        FollowUpRunPayload.model_validate(extra)
+
+    invalid_uuid = run_payload()
+    invalid_uuid["attemptId"] = "not-a-uuid"
+    with pytest.raises(ValidationError):
+        FollowUpRunPayload.model_validate(invalid_uuid)
+
+    invalid_language = run_payload()
+    invalid_language["interactionLanguage"] = "fr"
+    with pytest.raises(ValidationError):
+        FollowUpRunPayload.model_validate(invalid_language)

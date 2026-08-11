@@ -1,4 +1,5 @@
 from typing import Annotated, Literal, Self
+from uuid import UUID
 
 from pydantic import (
     AliasChoices,
@@ -21,6 +22,7 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
     QuestionCardTextList,
 )
+from riva.schemas.profile import StandardUUID
 
 
 class _FollowUpModel(BaseModel):
@@ -105,6 +107,57 @@ class FollowUpInput(_FollowUpModel):
         return self
 
 
+class FollowUpRunPayload(_FollowUpModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    attempt_id: StandardUUID = Field(alias="attemptId")
+    question_card_id: StandardUUID = Field(alias="questionCardId")
+    main_answer_id: StandardUUID = Field(alias="mainAnswerId")
+    interaction_language: InteractionLanguage = Field(
+        alias="interactionLanguage"
+    )
+    next_follow_up_order: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=MAX_PRACTICE_FOLLOW_UPS,
+            strict=True,
+        ),
+    ] = Field(alias="nextFollowUpOrder")
+    previous_follow_up_question_id: UUID | None = Field(
+        default=None,
+        alias="previousFollowUpQuestionId",
+    )
+    previous_follow_up_answer_id: UUID | None = Field(
+        default=None,
+        alias="previousFollowUpAnswerId",
+    )
+
+    @model_validator(mode="after")
+    def validate_previous_exchange_ids(self) -> Self:
+        question_id = self.previous_follow_up_question_id
+        answer_id = self.previous_follow_up_answer_id
+        if self.next_follow_up_order == 1:
+            if question_id is not None or answer_id is not None:
+                raise ValueError(
+                    "order one must not include previous follow-up IDs"
+                )
+        elif (question_id is None) != (answer_id is None):
+            raise ValueError(
+                "order two requires both previous follow-up IDs"
+            )
+        elif question_id is None or answer_id is None:
+            raise ValueError(
+                "order two requires both previous follow-up IDs"
+            )
+        return self
+
+
 FollowUpFocus = Annotated[
     str,
     StringConstraints(
@@ -147,5 +200,6 @@ __all__ = [
     "FollowUpPreviousExchange",
     "FollowUpQuestionContext",
     "FollowUpQuestionOutput",
+    "FollowUpRunPayload",
     "MAX_PRACTICE_FOLLOW_UPS",
 ]

@@ -17,11 +17,12 @@ from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
+from riva.schemas.practice_interactions import MAX_PRACTICE_FOLLOW_UPS
 from riva.utils import utc_now
 
 
 AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
-PayloadValue = UUID | str | int
+PayloadValue = UUID | str | int | None
 _ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _QUESTION_TYPES = frozenset(item.value for item in QuestionCardQuestionType)
 _DIFFICULTIES = frozenset(item.value for item in QuestionCardDifficulty)
@@ -397,6 +398,30 @@ def _serialize_payload(
                     "payload.difficulty must be a supported difficulty"
                 )
             serialized[key] = value
+        elif key == "nextFollowUpOrder":
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 1 <= value <= MAX_PRACTICE_FOLLOW_UPS
+            ):
+                raise ValueError(
+                    "payload.nextFollowUpOrder must be an integer follow-up order"
+                )
+            serialized[key] = value
+        elif key in {
+            "previousFollowUpQuestionId",
+            "previousFollowUpAnswerId",
+        }:
+            if value is None:
+                serialized[key] = None
+            elif isinstance(value, UUID):
+                serialized[key] = str(value)
+            elif isinstance(value, str):
+                serialized[key] = _required_text(f"payload.{key}", value, 255)
+            else:
+                raise ValueError(
+                    "payload values must be resource identifiers or versions"
+                )
         elif normalized_key.endswith(("id", "version")):
             if isinstance(value, UUID):
                 serialized[key] = str(value)

@@ -20,6 +20,11 @@ from riva.integrations import (
     TextGenerationRequest,
     build_llm_provider,
 )
+from riva.schemas.follow_up import (
+    FollowUpCompleteOutput,
+    FollowUpGenerationOutput,
+    FollowUpQuestionOutput,
+)
 
 
 TEST_API_KEY = "test-qwen-key"
@@ -101,6 +106,17 @@ def structured_request() -> StructuredGenerationRequest[ExampleOutput]:
             top_p=0.9,
             max_output_tokens=1,
         ),
+    )
+
+
+def follow_up_structured_request() -> StructuredGenerationRequest:
+    return StructuredGenerationRequest(
+        model="qwen-test-model",
+        messages=(
+            LLMMessage(role=MessageRole.SYSTEM, content="Follow-up prompt v1."),
+            LLMMessage(role=MessageRole.USER, content="Frozen answer context."),
+        ),
+        output_schema=FollowUpGenerationOutput,
     )
 
 
@@ -252,6 +268,39 @@ def test_structured_request_adds_schema_without_mutating_business_messages() -> 
     assert result.content == ExampleOutput(name="Python", score=95)
     assert result.usage.input_tokens == 0
     assert result.usage.output_tokens == 0
+
+
+@pytest.mark.parametrize(
+    ("content", "output_type"),
+    [
+        ('{"action":"complete"}', FollowUpCompleteOutput),
+        (
+            '{"action":"askFollowUp","prompt":"How?","focus":"Evidence",'
+            '"answer_hints":["Metric"],"answer_framework":["Result"]}',
+            FollowUpQuestionOutput,
+        ),
+    ],
+)
+def test_qwen_parses_follow_up_discriminated_union_and_sends_schema(
+    content: str,
+    output_type: type[object],
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json=response(content=content))
+
+    result = asyncio.run(
+        provider(handle).generate_structured(follow_up_structured_request())
+    )
+
+    assert isinstance(result.content, output_type)
+    schema_instruction = captured[0]["messages"][1]["content"]
+    assert isinstance(schema_instruction, str)
+    assert '"discriminator"' in schema_instruction
+    assert "FollowUpCompleteOutput" in schema_instruction
+    assert "FollowUpQuestionOutput" in schema_instruction
 
 
 @pytest.mark.parametrize(

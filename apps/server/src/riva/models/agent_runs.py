@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 JSONScalar = str | int | float | bool | None
 JSONValue = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
-AgentRunPayload = dict[str, str | int]
+AgentRunPayload = dict[str, str | int | None]
 AgentRunResult = dict[str, JSONValue]
 
 

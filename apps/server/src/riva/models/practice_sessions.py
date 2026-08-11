@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
     from riva.models.practice_interactions import (
         PracticeAnswer,
+        PracticeFollowUpDecision,
         PracticeFollowUpQuestion,
     )
     from riva.models.question_cards import QuestionCard
@@ -286,6 +287,12 @@ class PracticeAttempt(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="PracticeFollowUpQuestion.order",
+    )
+    follow_up_decisions: Mapped[list[PracticeFollowUpDecision]] = relationship(
+        back_populates="attempt",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PracticeFollowUpDecision.order",
     )
 
 

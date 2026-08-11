@@ -47,6 +47,7 @@ from riva.schemas.follow_up import (
     FollowUpPreviousExchange,
     FollowUpQuestionContext,
     FollowUpQuestionOutput,
+    FollowUpRunPayload,
 )
 from riva.schemas.resume_documents import (
     FailedResumeDocumentResponse,
@@ -171,6 +172,7 @@ __all__ = [
     "FollowUpPreviousExchange",
     "FollowUpQuestionContext",
     "FollowUpQuestionOutput",
+    "FollowUpRunPayload",
     "FailedResumeDocumentResponse",
     "JobDescriptionParsingInput",
     "JobDescriptionParsingOutput",

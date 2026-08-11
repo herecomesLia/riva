@@ -9,6 +9,7 @@ from typing import Any
 import structlog
 
 from riva.agents import (
+    FollowUpAgent,
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
     QuestionGenerationAgent,
@@ -22,6 +23,7 @@ from riva.integrations import (
     build_llm_provider,
 )
 from riva.workers.handlers import AgentHandlerRegistry
+from riva.workers.follow_up import FollowUpHandler
 from riva.workers.job_description_parsing import (
     JobDescriptionParsingHandler,
 )
@@ -39,6 +41,8 @@ MatchingAgentFactory = Callable[..., MatchingAnalysisAgent]
 MatchingHandlerFactory = Callable[..., MatchingAnalysisHandler]
 QuestionGenerationAgentFactory = Callable[..., QuestionGenerationAgent]
 QuestionGenerationHandlerFactory = Callable[..., QuestionGenerationHandler]
+FollowUpAgentFactory = Callable[..., FollowUpAgent]
+FollowUpHandlerFactory = Callable[..., FollowUpHandler]
 ResumeParsingAgentFactory = Callable[..., ResumeParsingAgent]
 ResumeParsingHandlerFactory = Callable[..., ResumeParsingWorkerHandler]
 RegistryFactory = Callable[
@@ -69,6 +73,8 @@ def build_agent_handler_registry(
     question_generation_handler_factory: QuestionGenerationHandlerFactory = (
         QuestionGenerationHandler
     ),
+    follow_up_agent_factory: FollowUpAgentFactory = FollowUpAgent,
+    follow_up_handler_factory: FollowUpHandlerFactory = FollowUpHandler,
     resume_parsing_agent_factory: ResumeParsingAgentFactory = ResumeParsingAgent,
     resume_parsing_handler_factory: ResumeParsingHandlerFactory = (
         ResumeParsingWorkerHandler
@@ -104,6 +110,14 @@ def build_agent_handler_registry(
         session_factory=session_factory,
         agent=question_generation_agent,
     )
+    follow_up_agent = follow_up_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    follow_up_handler = follow_up_handler_factory(
+        session_factory=session_factory,
+        agent=follow_up_agent,
+    )
     resume_parsing_agent = resume_parsing_agent_factory(
         provider=provider,
         model=model,
@@ -115,6 +129,7 @@ def build_agent_handler_registry(
     registry.register(job_description_handler)
     registry.register(matching_handler)
     registry.register(question_generation_handler)
+    registry.register(follow_up_handler)
     registry.register(resume_parsing_handler)
     return registry
 

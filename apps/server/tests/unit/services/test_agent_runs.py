@@ -80,6 +80,38 @@ def test_serialize_payload_accepts_question_generation_invocation_metadata() -> 
     }
 
 
+@pytest.mark.parametrize("order", [1, 2])
+def test_serialize_payload_accepts_follow_up_order_metadata(order: int) -> None:
+    assert _serialize_payload(
+        {
+            "attemptId": uuid4(),
+            "questionCardId": uuid4(),
+            "mainAnswerId": uuid4(),
+            "interactionLanguage": "en",
+            "nextFollowUpOrder": order,
+            "previousFollowUpQuestionId": None,
+            "previousFollowUpAnswerId": None,
+        }
+    )["nextFollowUpOrder"] == order
+
+
+@pytest.mark.parametrize("order", [0, 3, True, "1"])
+def test_serialize_payload_rejects_invalid_follow_up_order(order: object) -> None:
+    with pytest.raises(ValueError):
+        _serialize_payload(
+            {"nextFollowUpOrder": order}  # type: ignore[dict-item]
+        )
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["followUpSomething", "order", "rawAnswer", "prompt"],
+)
+def test_serialize_payload_does_not_widen_follow_up_metadata(key: str) -> None:
+    with pytest.raises(ValueError):
+        _serialize_payload({key: "private value"})  # type: ignore[dict-item]
+
+
 @pytest.mark.parametrize(
     ("key", "value"),
     [
