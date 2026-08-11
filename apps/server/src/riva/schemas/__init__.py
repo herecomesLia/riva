@@ -15,6 +15,13 @@ from riva.schemas.profile import (
     CareerProfilePutResponse,
     CareerProfileResponse,
 )
+from riva.schemas.practice_sessions import (
+    PracticeAttemptStatus,
+    PracticeQuestionSource,
+    PracticeSessionCompletionReason,
+    PracticeSessionSelection,
+    PracticeSessionStatus,
+)
 from riva.schemas.resume_documents import (
     FailedResumeDocumentResponse,
     PendingResumeDocumentResponse,
@@ -141,6 +148,11 @@ __all__ = [
     "MatchingProfileEducation",
     "MatchingProfileProjectExperience",
     "MatchingProfileWorkExperience",
+    "PracticeAttemptStatus",
+    "PracticeQuestionSource",
+    "PracticeSessionCompletionReason",
+    "PracticeSessionSelection",
+    "PracticeSessionStatus",
     "QuestionCardDifficulty",
     "QuestionCardMaterialReference",
     "QuestionCardMaterialType",

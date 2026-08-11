@@ -11,6 +11,7 @@ from riva.models.profile import (
     CareerProfileWorkExperience,
     CareerProfileWorkSkill,
 )
+from riva.models.practice_sessions import PracticeAttempt, PracticeSession
 from riva.models.question_cards import QuestionCard
 from riva.models.resume_documents import ResumeDocument
 from riva.models.resume_import_drafts import ResumeImportDraft
@@ -32,6 +33,8 @@ __all__ = [
     "CurrentTargetRole",
     "JobDescriptionAnalysis",
     "MatchingAnalysis",
+    "PracticeAttempt",
+    "PracticeSession",
     "QuestionCard",
     "ResumeDocument",
     "ResumeImportDraft",

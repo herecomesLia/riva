@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
     from riva.models.job_description_analyses import JobDescriptionAnalysis
     from riva.models.matching_analyses import MatchingAnalysis
+    from riva.models.practice_sessions import PracticeSession
     from riva.models.question_cards import QuestionCard
     from riva.models.user import User
 
@@ -146,6 +147,13 @@ class TargetRole(Base):
         foreign_keys="[QuestionCard.user_id, QuestionCard.target_role_id]",
         passive_deletes=True,
         overlaps="user,question_cards",
+    )
+    practice_sessions: Mapped[list[PracticeSession]] = relationship(
+        back_populates="target_role",
+        cascade="all, delete-orphan",
+        foreign_keys="[PracticeSession.user_id, PracticeSession.target_role_id]",
+        passive_deletes=True,
+        overlaps="user,practice_sessions",
     )
     job_description_parsing_run: Mapped[AgentRun | None] = relationship(
         foreign_keys=[job_description_parsing_run_id],
