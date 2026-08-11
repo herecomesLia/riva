@@ -18,6 +18,8 @@ from riva.integrations.llm import (
     StructuredOutputDiagnostics,
     StructuredOutputStage,
     TextGenerationRequest,
+    _structured_output_json_schema,
+    _structured_output_schema_name,
     validate_structured_output,
 )
 
@@ -84,7 +86,7 @@ class QwenProvider:
         self,
         request: StructuredGenerationRequest[StructuredOutputT],
     ) -> LLMResponse[StructuredOutputT]:
-        schema = request.output_schema.model_json_schema()
+        schema = _structured_output_json_schema(request.output_schema)
         messages = _structured_messages(request.messages, schema)
         body: dict[str, object] = {
             "model": request.model,
@@ -294,12 +296,12 @@ def _response_object(response: httpx.Response) -> dict[str, object]:
 
 
 def _structured_output_diagnostics(
-    output_schema: type[StructuredOutputT],
+    output_schema: object,
     stage: StructuredOutputStage,
 ) -> StructuredOutputDiagnostics:
     return StructuredOutputDiagnostics(
         stage=stage,
-        output_schema=output_schema.__name__,
+        output_schema=_structured_output_schema_name(output_schema),
     )
 
 

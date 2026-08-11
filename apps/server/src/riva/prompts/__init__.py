@@ -6,6 +6,7 @@ from riva.prompts.base import (
     PromptRenderError,
     RenderedPrompt,
 )
+from riva.prompts.follow_up import FOLLOW_UP_PROMPT
 from riva.prompts.job_description_parsing import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.prompts.matching_analysis import MATCHING_ANALYSIS_PROMPT
 from riva.prompts.question_generation import QUESTION_GENERATION_PROMPT
@@ -18,6 +19,7 @@ __all__ = [
     "PromptRegistry",
     "PromptRenderError",
     "RenderedPrompt",
+    "FOLLOW_UP_PROMPT",
     "JOB_DESCRIPTION_PARSING_PROMPT",
     "MATCHING_ANALYSIS_PROMPT",
     "QUESTION_GENERATION_PROMPT",

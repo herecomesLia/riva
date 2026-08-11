@@ -1,4 +1,5 @@
 from riva.agents.base import Agent, AgentResult
+from riva.agents.follow_up import FollowUpAgent
 from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.agents.question_generation import QuestionGenerationAgent
@@ -18,10 +19,14 @@ from riva.schemas.question_generation import (
     QuestionGenerationInput,
     QuestionGenerationOutput,
 )
+from riva.schemas.follow_up import FollowUpInput, FollowUpGenerationOutput
 
 __all__ = [
     "Agent",
     "AgentResult",
+    "FollowUpAgent",
+    "FollowUpGenerationOutput",
+    "FollowUpInput",
     "JobDescriptionParsingAgent",
     "JobDescriptionParsingInput",
     "JobDescriptionParsingOutput",

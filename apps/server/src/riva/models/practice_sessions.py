@@ -20,6 +20,10 @@ from riva.utils import utc_now
 
 if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
+    from riva.models.practice_interactions import (
+        PracticeAnswer,
+        PracticeFollowUpQuestion,
+    )
     from riva.models.question_cards import QuestionCard
     from riva.models.roles import TargetRole
     from riva.models.user import User
@@ -270,6 +274,18 @@ class PracticeAttempt(Base):
     retry_of_attempt: Mapped[PracticeAttempt | None] = relationship(
         foreign_keys=[retry_of_attempt_id],
         remote_side="PracticeAttempt.id",
+    )
+    answers: Mapped[list[PracticeAnswer]] = relationship(
+        back_populates="attempt",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PracticeAnswer.order",
+    )
+    follow_up_questions: Mapped[list[PracticeFollowUpQuestion]] = relationship(
+        back_populates="attempt",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PracticeFollowUpQuestion.order",
     )
 
 

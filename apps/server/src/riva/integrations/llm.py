@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Generic, Literal, Protocol, TypeVar
+from typing import Any, Generic, Literal, Protocol, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
@@ -94,7 +94,7 @@ class TextGenerationRequest:
 class StructuredGenerationRequest(Generic[StructuredOutputT]):
     model: str
     messages: tuple[LLMMessage, ...]
-    output_schema: type[StructuredOutputT]
+    output_schema: object
     parameters: GenerationParameters | None = None
 
     def __post_init__(self) -> None:
@@ -161,20 +161,46 @@ class LLMProviderConfigurationError(LLMProviderError):
 
 
 def validate_structured_output(
-    output_schema: type[StructuredOutputT],
+    output_schema: object,
     value: object,
-) -> StructuredOutputT:
+) -> Any:
     try:
-        validated = output_schema.model_validate(value)
+        if isinstance(output_schema, TypeAdapter):
+            validated = output_schema.validate_python(value)
+        elif isinstance(output_schema, type) and issubclass(output_schema, BaseModel):
+            validated = output_schema.model_validate(value)
+        else:
+            validated = TypeAdapter(output_schema).validate_python(value)
     except ValidationError as error:
         diagnostics = StructuredOutputDiagnostics(
             stage="schema_validation",
-            output_schema=output_schema.__name__,
+            output_schema=_structured_output_schema_name(output_schema),
             validation_errors=_safe_validation_errors(error),
         )
     else:
         return validated
     raise InvalidStructuredOutputError(diagnostics)
+
+
+def _structured_output_json_schema(output_schema: object) -> dict[str, object]:
+    if isinstance(output_schema, TypeAdapter):
+        schema = output_schema.json_schema()
+    else:
+        model_json_schema = getattr(output_schema, "model_json_schema", None)
+        if callable(model_json_schema):
+            schema = model_json_schema()
+        else:
+            schema = TypeAdapter(output_schema).json_schema()
+    if not isinstance(schema, dict):
+        raise TypeError("structured output schema must be a JSON object")
+    return schema
+
+
+def _structured_output_schema_name(output_schema: object) -> str:
+    name = getattr(output_schema, "__name__", None)
+    if isinstance(name, str) and name:
+        return name
+    return str(output_schema)
 
 
 def _safe_validation_errors(

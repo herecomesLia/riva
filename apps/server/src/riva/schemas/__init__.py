@@ -15,6 +15,13 @@ from riva.schemas.profile import (
     CareerProfilePutResponse,
     CareerProfileResponse,
 )
+from riva.schemas.practice_interactions import (
+    MAX_PRACTICE_ANSWER_LENGTH,
+    MAX_PRACTICE_FOLLOW_UPS,
+    PracticeAnswerContent,
+    PracticeAnswerKind,
+    PracticeAnswerSnapshot,
+)
 from riva.schemas.practice_sessions import (
     CurrentPracticeSessionResponse,
     PracticeAttemptStatus,
@@ -31,6 +38,15 @@ from riva.schemas.practice_sessions import (
     PracticeSessionStatus,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
+)
+from riva.schemas.follow_up import (
+    FollowUpCompleteOutput,
+    FollowUpFocus,
+    FollowUpGenerationOutput,
+    FollowUpInput,
+    FollowUpPreviousExchange,
+    FollowUpQuestionContext,
+    FollowUpQuestionOutput,
 )
 from riva.schemas.resume_documents import (
     FailedResumeDocumentResponse,
@@ -143,6 +159,18 @@ __all__ = [
     "CareerProfilePutRequest",
     "CareerProfilePutResponse",
     "CareerProfileResponse",
+    "MAX_PRACTICE_ANSWER_LENGTH",
+    "MAX_PRACTICE_FOLLOW_UPS",
+    "PracticeAnswerContent",
+    "PracticeAnswerKind",
+    "PracticeAnswerSnapshot",
+    "FollowUpCompleteOutput",
+    "FollowUpFocus",
+    "FollowUpGenerationOutput",
+    "FollowUpInput",
+    "FollowUpPreviousExchange",
+    "FollowUpQuestionContext",
+    "FollowUpQuestionOutput",
     "FailedResumeDocumentResponse",
     "JobDescriptionParsingInput",
     "JobDescriptionParsingOutput",
