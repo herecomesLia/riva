@@ -6,24 +6,34 @@ import pytest
 from riva.core.errors import APIError
 from riva.models import AgentRunStatus
 from riva.services.practice_api import (
+    PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PracticeAPIService,
 )
 from riva.services.practice_sessions import (
+    PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
+    PracticePrimaryAnswerWorkflowContext,
     PracticeSessionStateError,
     PracticeSessionWorkflowContext,
 )
 from riva.schemas.practice_sessions import (
     CurrentPracticeSessionResponse,
+    RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
+    SubmitPrimaryAnswerRequest,
 )
 from tests.unit.services.test_practice_sessions import (
+    follow_up_decision,
+    follow_up_question,
+    follow_up_run,
     generation_payload,
     generation_run,
+    main_answer,
+    primary_answer_context,
     practice_attempt,
     practice_session,
     question_card,
@@ -35,7 +45,7 @@ class FakePracticeSessionService:
     def __init__(
         self,
         *,
-        context: PracticeSessionWorkflowContext,
+        context: PracticeSessionWorkflowContext | PracticePrimaryAnswerWorkflowContext,
         error: PracticeSessionStateError | None = None,
     ) -> None:
         self.context = context
@@ -56,6 +66,26 @@ class FakePracticeSessionService:
         self.calls.append(("refresh", kwargs))
         if self.error is not None:
             raise self.error
+        return self.context
+
+    async def submit_primary_answer(
+        self,
+        **kwargs: object,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        self.calls.append(("submit", kwargs))
+        if self.error is not None:
+            raise self.error
+        assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
+        return self.context
+
+    async def refresh_follow_up_generation(
+        self,
+        **kwargs: object,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        self.calls.append(("refresh_follow_up", kwargs))
+        if self.error is not None:
+            raise self.error
+        assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
         return self.context
 
     async def get_session_context(
@@ -104,6 +134,51 @@ def context(*, answering: bool) -> PracticeSessionWorkflowContext:
         question_card_id=card.id if card is not None else None,
     )
     return PracticeSessionWorkflowContext(active, attempt, run, card)
+
+
+def primary_context(
+    *,
+    attempt_status: str = "answering",
+    version: int = 3,
+    action: str | None = None,
+) -> PracticePrimaryAnswerWorkflowContext:
+    active, attempt, question_run, card = primary_answer_context(
+        version=version,
+        attempt_status=attempt_status,
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = None
+    question = None
+    if action == "askFollowUp":
+        question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+        decision = follow_up_decision(
+            attempt_id=attempt.id,
+            run_id=follow_up.id,
+            action=action,
+            question_id=question.id,
+        )
+    elif action == "complete":
+        decision = follow_up_decision(
+            attempt_id=attempt.id,
+            run_id=follow_up.id,
+            action=action,
+        )
+    return PracticePrimaryAnswerWorkflowContext(
+        session=active,
+        attempt=attempt,
+        question_card=card,
+        main_answer=answer,
+        follow_up_generation_run=follow_up,
+        follow_up_decision=decision,
+        follow_up_question=question,
+    )
 
 
 def start_request() -> StartPracticeSessionRequest:
@@ -197,6 +272,186 @@ def test_refresh_and_get_do_not_require_llm_configuration() -> None:
     assert refreshed.status == "answering"
     assert fetched.status == "answering"
     assert [call[0] for call in domain.calls] == ["refresh", "get"]
+
+
+def test_submit_primary_answer_checks_configuration_and_projects_main_answer() -> None:
+    domain = FakePracticeSessionService(context=primary_context())
+    service = PracticeAPIService(
+        object(),
+        llm_provider="QWEN",
+        llm_model="qwen-follow-up",
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    session_id = domain.context.session.id
+    user_id = domain.context.session.user_id
+    question_id = domain.context.question_card.id
+
+    result = asyncio.run(
+        service.submit_primary_answer(
+            user_id=user_id,
+            session_id=session_id,
+            payload=SubmitPrimaryAnswerRequest(
+                version=2,
+                question_id=question_id,
+                content="  Submitted answer  ",
+            ),
+        )
+    )
+
+    assert result.status == "generatingFollowUp"
+    assert result.version == 3
+    assert result.main_answer.content == "Stored answer"
+    assert result.main_answer.id == domain.context.main_answer.id
+    assert result.main_answer.order == 1
+    assert domain.calls == [
+        (
+            "submit",
+            {
+                "user_id": user_id,
+                "session_id": session_id,
+                "expected_version": 2,
+                "question_id": question_id,
+                "content": "Submitted answer",
+            },
+        )
+    ]
+
+
+def test_submit_primary_answer_fails_before_domain_when_follow_up_llm_unavailable() -> None:
+    domain = FakePracticeSessionService(context=primary_context())
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model="model",
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    context_value = domain.context
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service.submit_primary_answer(
+                user_id=context_value.session.user_id,
+                session_id=context_value.session.id,
+                payload=SubmitPrimaryAnswerRequest(
+                    version=2,
+                    question_id=context_value.question_card.id,
+                    content="A valid answer",
+                ),
+            )
+        )
+
+    assert error.value.status_code == 503
+    assert error.value.error == PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE
+    assert domain.calls == []
+
+
+@pytest.mark.parametrize(
+    ("attempt_status", "action", "expected_status", "expected_version"),
+    [
+        ("answering", None, "generatingFollowUp", 3),
+        ("answeringFollowUp", "askFollowUp", "answeringFollowUp", 4),
+        ("evaluating", "complete", "evaluating", 4),
+    ],
+)
+def test_refresh_follow_up_generation_projects_each_public_state_without_config(
+    attempt_status: str,
+    action: str | None,
+    expected_status: str,
+    expected_version: int,
+) -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(
+            attempt_status=attempt_status,
+            version=3 if attempt_status == "answering" else 4,
+            action=action,
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    context_value = domain.context
+
+    result = asyncio.run(
+        service.refresh_follow_up_generation(
+            user_id=context_value.session.user_id,
+            session_id=context_value.session.id,
+            payload=RefreshPracticeFollowUpGenerationRequest(version=3),
+        )
+    )
+
+    assert result.status == expected_status
+    assert result.version == expected_version
+    assert domain.calls[0] == (
+        "refresh_follow_up",
+        {
+            "user_id": context_value.session.user_id,
+            "session_id": context_value.session.id,
+            "expected_version": 3,
+        },
+    )
+    if expected_status == "answeringFollowUp":
+        assert result.current_follow_up.answer is None
+        assert result.follow_up_exchanges == []
+    if expected_status == "evaluating":
+        assert result.follow_up_completion.reason == "noFollowUpRequired"
+        assert result.submitted_at == context_value.attempt.updated_at
+
+
+def test_refresh_follow_up_generation_maps_failure_without_provider_details() -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(),
+        error=PracticeSessionStateError(
+            PRACTICE_FOLLOW_UP_GENERATION_FAILED,
+            source_code="provider_raw_response",
+        ),
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service.refresh_follow_up_generation(
+                user_id=uuid4(),
+                session_id=uuid4(),
+                payload=RefreshPracticeFollowUpGenerationRequest(version=3),
+            )
+        )
+
+    assert error.value.status_code == 409
+    assert error.value.error == PRACTICE_FOLLOW_UP_GENERATION_FAILED
+    assert "provider_raw_response" not in str(error.value)
+
+
+def test_follow_up_question_projection_hides_guidance_focus_and_lineage() -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(
+            attempt_status="answeringFollowUp",
+            version=4,
+            action="askFollowUp",
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(
+        service.get_session(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+        )
+    )
+    serialized = result.model_dump(mode="json")
+    follow_up_question = serialized["currentFollowUp"]["question"]
+
+    assert follow_up_question["answerHints"]["content"] is None
+    assert follow_up_question["answerFramework"]["content"] is None
+    assert follow_up_question["referenceAnswer"]["viewedBeforeSubmission"] is False
+    for field in ("focus", "sourceAgentRunId", "attemptId", "templateId"):
+        assert field not in follow_up_question
 
 
 @pytest.mark.parametrize(

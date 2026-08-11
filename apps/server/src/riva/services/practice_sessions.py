@@ -130,6 +130,11 @@ class PracticePrimaryAnswerWorkflowContext:
     follow_up_question: PracticeFollowUpQuestion | None
 
 
+PracticePublicWorkflowContext = (
+    PracticeSessionWorkflowContext | PracticePrimaryAnswerWorkflowContext
+)
+
+
 QuestionGenerationServiceFactory = Callable[
     ...,
     QuestionGenerationService,
@@ -620,7 +625,7 @@ class PracticeSessionService:
         *,
         user_id: UUID,
         session_id: UUID,
-    ) -> PracticeSessionWorkflowContext:
+    ) -> PracticePublicWorkflowContext:
         try:
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -641,7 +646,7 @@ class PracticeSessionService:
         self,
         *,
         user_id: UUID,
-    ) -> PracticeSessionWorkflowContext | None:
+    ) -> PracticePublicWorkflowContext | None:
         try:
             practice_session = await self._load_active_session(
                 user_id,
@@ -764,6 +769,8 @@ class PracticeSessionService:
         self,
         practice_session: PracticeSession,
         attempt: PracticeAttempt,
+        *,
+        for_update: bool = True,
     ) -> tuple[
         QuestionCard,
         PracticeAnswer,
@@ -777,7 +784,7 @@ class PracticeSessionService:
         question_generation_run, _ = await self._load_generation_run(
             practice_session,
             attempt,
-            for_update=True,
+            for_update=for_update,
         )
         if question_generation_run.status != AgentRunStatus.SUCCEEDED:
             raise PracticeSessionStateError(
@@ -787,9 +794,12 @@ class PracticeSessionService:
             practice_session,
             attempt,
             question_generation_run,
-            for_update=True,
+            for_update=for_update,
         )
-        main_answer = await self._load_main_answer(attempt, for_update=True)
+        main_answer = await self._load_main_answer(
+            attempt,
+            for_update=for_update,
+        )
         if main_answer is None:
             raise PracticeSessionStateError(
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
@@ -804,7 +814,7 @@ class PracticeSessionService:
             user_id=practice_session.user_id,
             attempt_id=attempt.id,
             order=1,
-            for_update=True,
+            for_update=for_update,
         )
         payload = self._validate_follow_up_run_lineage(
             follow_up_run,
@@ -820,6 +830,7 @@ class PracticeSessionService:
         run: AgentRun,
         *,
         attempt: PracticeAttempt,
+        for_update: bool = True,
     ) -> tuple[
         PracticeFollowUpDecision,
         PracticeFollowUpQuestion | None,
@@ -828,20 +839,22 @@ class PracticeSessionService:
             raise PracticeSessionStateError(
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
             )
-        decision = await self.session.scalar(
-            select(PracticeFollowUpDecision)
-            .where(PracticeFollowUpDecision.source_agent_run_id == run.id)
-            .with_for_update()
+        decision_statement = select(PracticeFollowUpDecision).where(
+            PracticeFollowUpDecision.source_agent_run_id == run.id
         )
+        if for_update:
+            decision_statement = decision_statement.with_for_update()
+        decision = await self.session.scalar(decision_statement)
         if decision is None:
             raise PracticeSessionStateError(
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
             )
-        question = await self.session.scalar(
-            select(PracticeFollowUpQuestion)
-            .where(PracticeFollowUpQuestion.source_agent_run_id == run.id)
-            .with_for_update()
+        question_statement = select(PracticeFollowUpQuestion).where(
+            PracticeFollowUpQuestion.source_agent_run_id == run.id
         )
+        if for_update:
+            question_statement = question_statement.with_for_update()
+        question = await self.session.scalar(question_statement)
         if (
             decision.attempt_id != attempt.id
             or decision.source_agent_run_id != run.id
@@ -1124,7 +1137,7 @@ class PracticeSessionService:
         practice_session: PracticeSession,
         *,
         for_update: bool,
-    ) -> PracticeSessionWorkflowContext:
+    ) -> PracticePublicWorkflowContext:
         attempt = await self._load_current_attempt(
             user_id=practice_session.user_id,
             session_id=practice_session.id,
@@ -1135,8 +1148,55 @@ class PracticeSessionService:
         if attempt.status not in {
             PracticeAttemptStatus.GENERATING_QUESTION.value,
             PracticeAttemptStatus.ANSWERING.value,
+            PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+            PracticeAttemptStatus.EVALUATING.value,
         }:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        if attempt.status in {
+            PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+            PracticeAttemptStatus.EVALUATING.value,
+        }:
+            (
+                card,
+                main_answer,
+                follow_up_run,
+                _,
+            ) = await self._load_primary_follow_up_records(
+                practice_session,
+                attempt,
+                for_update=for_update,
+            )
+            if follow_up_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+            decision, question = await self._load_canonical_follow_up_artifact(
+                follow_up_run,
+                attempt=attempt,
+                for_update=for_update,
+            )
+            if attempt.status == PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value:
+                if decision.action != "askFollowUp" or question is None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                    )
+            elif (
+                decision.action != "complete"
+                or question is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+            return PracticePrimaryAnswerWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                follow_up_generation_run=follow_up_run,
+                follow_up_decision=decision,
+                follow_up_question=question,
+            )
 
         run, _ = await self._load_generation_run(
             practice_session,
@@ -1165,11 +1225,39 @@ class PracticeSessionService:
             run,
             for_update=for_update,
         )
-        return PracticeSessionWorkflowContext(
+        main_answer = await self._load_main_answer(
+            attempt,
+            for_update=for_update,
+        )
+        if main_answer is None:
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_generation_run=run,
+                question_card=card,
+            )
+        _normalize_answer_content(main_answer.content)
+        follow_up_run = await self._load_stable_follow_up_run(
+            user_id=practice_session.user_id,
+            attempt_id=attempt.id,
+            order=1,
+            for_update=for_update,
+        )
+        self._validate_follow_up_run_lineage(
+            follow_up_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            main_answer=main_answer,
+        )
+        return PracticePrimaryAnswerWorkflowContext(
             session=practice_session,
             attempt=attempt,
-            question_generation_run=run,
             question_card=card,
+            main_answer=main_answer,
+            follow_up_generation_run=follow_up_run,
+            follow_up_decision=None,
+            follow_up_question=None,
         )
 
     async def _load_completed_generation_replay_context(
@@ -1379,6 +1467,7 @@ __all__ = [
     "PracticeSessionStateError",
     "PracticeSessionStateErrorCode",
     "PracticePrimaryAnswerWorkflowContext",
+    "PracticePublicWorkflowContext",
     "PracticeSessionWorkflowContext",
     "practice_follow_up_idempotency_key",
 ]

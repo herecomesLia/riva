@@ -36,6 +36,7 @@ from riva.services.practice_sessions import (
     PRACTICE_SESSION_STATE_CONFLICT,
     PRACTICE_SESSION_VERSION_CONFLICT,
     PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE,
+    PracticePrimaryAnswerWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
     practice_follow_up_idempotency_key,
@@ -1087,7 +1088,7 @@ def test_get_session_context_returns_answering_snapshot_without_mutation() -> No
         status="answering",
         question_card_id=card.id,
     )
-    scripted = ScriptedSession(active, attempt, run, card)
+    scripted = ScriptedSession(active, attempt, run, card, None)
 
     result = asyncio.run(
         service(scripted).get_session_context(
@@ -1217,7 +1218,7 @@ def test_get_active_session_context_returns_highest_answering_attempt() -> None:
         question_card_id=card.id,
     )
     attempt.attempt_number = 2
-    scripted = ScriptedSession(active, attempt, run, card)
+    scripted = ScriptedSession(active, attempt, run, card, None)
 
     result = asyncio.run(
         service(scripted).get_active_session_context(user_id=user_id)
@@ -1231,6 +1232,236 @@ def test_get_active_session_context_returns_highest_answering_attempt() -> None:
         getattr(statement, "_for_update_arg", None) is None
         for statement in scripted.statements
     )
+
+
+def test_get_answering_with_main_answer_returns_generating_follow_up() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.QUEUED,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+    )
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=active.user_id,
+            session_id=active.id,
+        )
+    )
+
+    assert isinstance(result, PracticePrimaryAnswerWorkflowContext)
+    assert result.main_answer is answer
+    assert result.follow_up_generation_run is follow_up
+    assert result.follow_up_decision is None
+    assert result.follow_up_question is None
+    assert result.attempt.status == "answering"
+    assert active.version == 3
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_succeeded_follow_up_with_persisted_artifacts_stays_pending() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    # The artifacts are durable, but GET must not load or reconcile them while
+    # the attempt remains in the pre-refresh answering state.
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+    )
+
+    result = asyncio.run(
+        service(scripted).get_active_session_context(user_id=active.user_id)
+    )
+
+    assert isinstance(result, PracticePrimaryAnswerWorkflowContext)
+    assert result.follow_up_decision is None
+    assert result.follow_up_question is None
+    assert result.attempt.status == "answering"
+    assert decision.follow_up_question_id == question.id
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_answering_follow_up_recovers_canonical_ask_without_locking() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="answeringFollowUp",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        question,
+    )
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=active.user_id,
+            session_id=active.id,
+        )
+    )
+
+    assert isinstance(result, PracticePrimaryAnswerWorkflowContext)
+    assert result.follow_up_decision is decision
+    assert result.follow_up_question is question
+    assert result.attempt.status == "answeringFollowUp"
+    assert active.version == 4
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_evaluating_recovers_complete_without_a_follow_up_question() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="evaluating",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        None,
+    )
+
+    result = asyncio.run(
+        service(scripted).get_active_session_context(user_id=active.user_id)
+    )
+
+    assert isinstance(result, PracticePrimaryAnswerWorkflowContext)
+    assert result.follow_up_decision is decision
+    assert result.follow_up_question is None
+    assert result.attempt.status == "evaluating"
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+@pytest.mark.parametrize(
+    ("attempt_status", "decision", "question"),
+    [
+        ("answeringFollowUp", None, None),
+        ("evaluating", None, None),
+    ],
+)
+def test_get_final_follow_up_states_require_canonical_artifacts(
+    attempt_status: str,
+    decision: PracticeFollowUpDecision | None,
+    question: PracticeFollowUpQuestion | None,
+) -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    answer = main_answer(attempt_id=attempt.id)
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        question,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).get_session_context(
+                user_id=active.user_id,
+                session_id=active.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
 
 
 def test_get_active_session_context_ignores_completed_session() -> None:

@@ -7,11 +7,18 @@ import pytest
 from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
     PracticeActiveSessionResponse,
+    PracticeAnswerResponse,
+    PracticeAnsweringFollowUpResponse,
     PracticeAnsweringResponse,
+    PracticeEvaluatingResponse,
+    PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     PracticeQuestionResponse,
+    PracticeFollowUpQuestionResponse,
+    RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
+    SubmitPrimaryAnswerRequest,
     PracticeQuestionSource,
     PracticeSessionCompletionReason,
     PracticeSessionSelection,
@@ -180,6 +187,74 @@ def test_refresh_request_requires_positive_version_and_rejects_run_id() -> None:
         )
 
 
+def test_submit_primary_answer_request_uses_camel_case_and_normalizes_content() -> None:
+    question_id = uuid4()
+    request = SubmitPrimaryAnswerRequest.model_validate(
+        {
+            "version": 2,
+            "questionId": str(question_id),
+            "content": "  My answer  ",
+        }
+    )
+
+    assert request.version == 2
+    assert request.question_id == question_id
+    assert request.content == "My answer"
+    assert request.model_dump(mode="json") == {
+        "version": 2,
+        "questionId": str(question_id),
+        "content": "My answer",
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"version": 0, "questionId": str(uuid4()), "content": "answer"},
+        {"version": 1, "questionId": "not-a-uuid", "content": "answer"},
+        {"version": 1, "questionId": str(uuid4()), "content": "   "},
+        {
+            "version": 1,
+            "questionId": str(uuid4()),
+            "content": "x" * 20_001,
+        },
+        {
+            "version": 1,
+            "questionId": str(uuid4()),
+            "content": "answer",
+            "language": "en",
+        },
+        {
+            "version": 1,
+            "questionId": str(uuid4()),
+            "content": "answer",
+            "runId": str(uuid4()),
+        },
+    ],
+)
+def test_submit_primary_answer_request_rejects_invalid_or_internal_fields(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        SubmitPrimaryAnswerRequest.model_validate(payload)
+
+
+def test_refresh_follow_up_request_requires_only_positive_version() -> None:
+    request = RefreshPracticeFollowUpGenerationRequest.model_validate(
+        {"version": 3}
+    )
+
+    assert request.model_dump(mode="json") == {"version": 3}
+    with pytest.raises(ValidationError):
+        RefreshPracticeFollowUpGenerationRequest.model_validate(
+            {"version": 0}
+        )
+    with pytest.raises(ValidationError):
+        RefreshPracticeFollowUpGenerationRequest.model_validate(
+            {"version": 3, "attemptId": str(uuid4())}
+        )
+
+
 def public_session_payload(status: str = "generatingQuestion") -> dict[str, object]:
     payload: dict[str, object] = {
         "status": status,
@@ -191,7 +266,12 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
         "attemptId": str(uuid4()),
         "attemptNumber": 1,
     }
-    if status == "answering":
+    if status in {
+        "answering",
+        "generatingFollowUp",
+        "answeringFollowUp",
+        "evaluating",
+    }:
         payload["question"] = {
             "id": str(uuid4()),
             "prompt": "Tell me about a project.",
@@ -209,6 +289,35 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
             "isSaved": False,
             "isMarkedWeak": True,
         }
+    if status in {"generatingFollowUp", "answeringFollowUp", "evaluating"}:
+        payload["mainAnswer"] = {
+            "id": str(uuid4()),
+            "content": "My answer",
+            "createdAt": datetime(2026, 8, 11, 12, 1, tzinfo=UTC).isoformat(),
+            "order": 1,
+        }
+        payload["followUpExchanges"] = []
+    if status == "answeringFollowUp":
+        payload["currentFollowUp"] = {
+            "status": "awaitingAnswer",
+            "question": {
+                "id": str(uuid4()),
+                "prompt": "What metric changed?",
+                "createdAt": datetime(
+                    2026, 8, 11, 12, 2, tzinfo=UTC
+                ).isoformat(),
+                "order": 1,
+            },
+            "answer": None,
+        }
+    if status == "evaluating":
+        payload["followUpCompletion"] = {
+            "status": "completed",
+            "reason": "noFollowUpRequired",
+        }
+        payload["submittedAt"] = datetime(
+            2026, 8, 11, 12, 3, tzinfo=UTC
+        ).isoformat()
     return payload
 
 
@@ -216,12 +325,86 @@ def test_active_response_union_exposes_only_supported_states() -> None:
     adapter = TypeAdapter(PracticeActiveSessionResponse)
     generating = adapter.validate_python(public_session_payload())
     answering = adapter.validate_python(public_session_payload("answering"))
+    generating_follow_up = adapter.validate_python(
+        public_session_payload("generatingFollowUp")
+    )
+    answering_follow_up = adapter.validate_python(
+        public_session_payload("answeringFollowUp")
+    )
+    evaluating = adapter.validate_python(public_session_payload("evaluating"))
 
     assert isinstance(generating, PracticeGeneratingQuestionResponse)
     assert isinstance(answering, PracticeAnsweringResponse)
     assert isinstance(answering.question, PracticeQuestionResponse)
+    assert isinstance(generating_follow_up, PracticeGeneratingFollowUpResponse)
+    assert isinstance(answering_follow_up, PracticeAnsweringFollowUpResponse)
+    assert isinstance(evaluating, PracticeEvaluatingResponse)
+    assert generating_follow_up.follow_up_exchanges == []
+    assert answering_follow_up.current_follow_up.answer is None
+    assert answering_follow_up.current_follow_up.question.answer_hints.content is None
+    assert evaluating.follow_up_completion.model_dump(mode="json") == {
+        "status": "completed",
+        "reason": "noFollowUpRequired",
+    }
     with pytest.raises(ValidationError):
         adapter.validate_python(public_session_payload("review"))
+
+
+def test_answer_and_follow_up_question_public_projections_are_strict_and_aware() -> None:
+    answer_payload = public_session_payload("generatingFollowUp")["mainAnswer"]
+    question_payload = public_session_payload("answeringFollowUp")[
+        "currentFollowUp"
+    ]["question"]
+    assert isinstance(answer_payload, dict)
+    assert isinstance(question_payload, dict)
+
+    answer = PracticeAnswerResponse.model_validate(answer_payload)
+    question = PracticeFollowUpQuestionResponse.model_validate(question_payload)
+
+    assert answer.created_at.tzinfo is not None
+    assert question.created_at.tzinfo is not None
+    assert question.answer_hints.content is None
+    assert question.answer_framework.content is None
+    assert question.reference_answer.viewed_before_submission is False
+    assert "templateId" not in question.model_dump(mode="json")
+    for field in ("focus", "sourceAgentRunId", "attemptId", "templateId"):
+        with pytest.raises(ValidationError):
+            PracticeFollowUpQuestionResponse.model_validate(
+                {**question_payload, field: "internal"}
+            )
+    with pytest.raises(ValidationError):
+        PracticeAnswerResponse.model_validate(
+            {**answer_payload, "kind": "main"}
+        )
+
+
+def test_follow_up_public_response_rejects_naive_artifact_timestamps_and_history() -> None:
+    payload = public_session_payload("answeringFollowUp")
+    current_follow_up = payload["currentFollowUp"]
+    assert isinstance(current_follow_up, dict)
+    question = current_follow_up["question"]
+    assert isinstance(question, dict)
+    question["createdAt"] = "2026-08-11T12:02:00"
+    with pytest.raises(ValidationError):
+        TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
+
+    payload = public_session_payload("evaluating")
+    payload["submittedAt"] = "2026-08-11T12:03:00"
+    with pytest.raises(ValidationError):
+        TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
+
+    payload = public_session_payload("generatingFollowUp")
+    payload["followUpExchanges"] = [
+        {
+            "status": "awaitingAnswer",
+            "question": public_session_payload("answeringFollowUp")[
+                "currentFollowUp"
+            ]["question"],
+            "answer": None,
+        }
+    ]
+    with pytest.raises(ValidationError):
+        TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
 
 
 def test_question_projection_hides_internal_fields_and_defaults_guidance() -> None:

@@ -7,18 +7,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.errors import APIError
 from riva.core.language import InteractionLanguage
-from riva.models import QuestionCard
+from riva.models import PracticeAnswer, PracticeFollowUpQuestion, QuestionCard
 from riva.schemas.practice_sessions import (
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
+    PracticeAnswerResponse,
+    PracticeAnsweringFollowUpResponse,
     PracticeAnsweringResponse,
+    PracticeAwaitingFollowUpExchangeResponse,
+    PracticeEvaluatingResponse,
+    PracticeFollowUpQuestionResponse,
+    PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     PracticeGuidanceNotRequestedResponse,
+    PracticeNoFollowUpRequiredCompletionResponse,
     PracticeQuestionResponse,
     PracticeReferenceAnswerNotRequestedResponse,
     PracticeSessionSelection,
+    RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
+    SubmitPrimaryAnswerRequest,
 )
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -29,12 +38,17 @@ from riva.services.practice_sessions import (
     PRACTICE_SESSION_STATE_CONFLICT,
     PracticeSessionService,
     PracticeSessionStateError,
+    PracticePrimaryAnswerWorkflowContext,
+    PracticePublicWorkflowContext,
     PracticeSessionWorkflowContext,
 )
 
 
 PRACTICE_QUESTION_GENERATION_UNAVAILABLE = (
     "practice_question_generation_unavailable"
+)
+PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE = (
+    "practice_follow_up_generation_unavailable"
 )
 
 PracticeSessionServiceFactory = Callable[..., PracticeSessionService]
@@ -64,7 +78,9 @@ class PracticeAPIService:
         interaction_language: InteractionLanguage,
     ) -> PracticeActiveSessionResponse:
         try:
-            self._configured_model()
+            self._require_llm_configuration(
+                PRACTICE_QUESTION_GENERATION_UNAVAILABLE
+            )
             context = await self._practice_service().start_session(
                 user_id=user_id,
                 selection=PracticeSessionSelection.model_validate(
@@ -85,6 +101,45 @@ class PracticeAPIService:
     ) -> PracticeActiveSessionResponse:
         try:
             context = await self._practice_service().refresh_question_generation(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def submit_primary_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: SubmitPrimaryAnswerRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            self._require_llm_configuration(
+                PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE
+            )
+            context = await self._practice_service().submit_primary_answer(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                content=payload.content,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def refresh_follow_up_generation(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: RefreshPracticeFollowUpGenerationRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().refresh_follow_up_generation(
                 user_id=user_id,
                 session_id=session_id,
                 expected_version=payload.version,
@@ -133,11 +188,11 @@ class PracticeAPIService:
             llm_model=self.llm_model,
         )
 
-    def _configured_model(self) -> str:
+    def _require_llm_configuration(self, error_code: str) -> str:
         if self.llm_provider != "qwen" or not self.llm_model:
             raise APIError(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
-                PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
+                error_code,
             )
         return self.llm_model
 
@@ -146,8 +201,8 @@ PracticeSessionAPIService = PracticeAPIService
 
 
 def build_practice_session_response(
-    context: PracticeSessionWorkflowContext,
-) -> PracticeGeneratingQuestionResponse | PracticeAnsweringResponse:
+    context: PracticePublicWorkflowContext,
+) -> PracticeActiveSessionResponse:
     try:
         base = {
             "session_id": context.session.id,
@@ -174,11 +229,71 @@ def build_practice_session_response(
         if context.attempt.status == "answering":
             if context.question_card is None:
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if isinstance(context, PracticePrimaryAnswerWorkflowContext):
+                return PracticeGeneratingFollowUpResponse(
+                    status="generatingFollowUp",
+                    question=build_practice_question_response(
+                        context.question_card
+                    ),
+                    main_answer=build_practice_answer_response(context.main_answer),
+                    follow_up_exchanges=[],
+                    **base,
+                )
             return PracticeAnsweringResponse(
                 status="answering",
                 question=build_practice_question_response(context.question_card),
                 **base,
             )
+        if isinstance(context, PracticePrimaryAnswerWorkflowContext):
+            if context.question_card is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            main_answer = build_practice_answer_response(context.main_answer)
+            question = build_practice_question_response(context.question_card)
+            if context.attempt.status == "answeringFollowUp":
+                if (
+                    context.follow_up_decision is None
+                    or context.follow_up_decision.action != "askFollowUp"
+                    or context.follow_up_question is None
+                ):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_STATE_CONFLICT
+                    )
+                current_follow_up = PracticeAwaitingFollowUpExchangeResponse(
+                    status="awaitingAnswer",
+                    question=build_practice_follow_up_question_response(
+                        context.follow_up_question
+                    ),
+                    answer=None,
+                )
+                return PracticeAnsweringFollowUpResponse(
+                    status="answeringFollowUp",
+                    question=question,
+                    main_answer=main_answer,
+                    follow_up_exchanges=[],
+                    current_follow_up=current_follow_up,
+                    **base,
+                )
+            if context.attempt.status == "evaluating":
+                if (
+                    context.follow_up_decision is None
+                    or context.follow_up_decision.action != "complete"
+                    or context.follow_up_question is not None
+                ):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_STATE_CONFLICT
+                    )
+                return PracticeEvaluatingResponse(
+                    status="evaluating",
+                    question=question,
+                    main_answer=main_answer,
+                    follow_up_exchanges=[],
+                    follow_up_completion=PracticeNoFollowUpRequiredCompletionResponse(
+                        status="completed",
+                        reason="noFollowUpRequired",
+                    ),
+                    submitted_at=context.attempt.updated_at,
+                    **base,
+                )
         raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
     except PracticeSessionStateError:
         raise
@@ -213,6 +328,47 @@ def build_practice_question_response(card: QuestionCard) -> PracticeQuestionResp
         raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
+def build_practice_answer_response(
+    answer: PracticeAnswer,
+) -> PracticeAnswerResponse:
+    try:
+        return PracticeAnswerResponse.model_validate(
+            {
+                "id": answer.id,
+                "content": answer.content,
+                "created_at": answer.submitted_at,
+                "order": answer.order,
+            }
+        )
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+
+
+def build_practice_follow_up_question_response(
+    question: PracticeFollowUpQuestion,
+) -> PracticeFollowUpQuestionResponse:
+    try:
+        return PracticeFollowUpQuestionResponse.model_validate(
+            {
+                "id": question.id,
+                "prompt": question.prompt,
+                "created_at": question.created_at,
+                "order": question.order,
+                "answer_hints": PracticeGuidanceNotRequestedResponse(
+                    status="notRequested"
+                ),
+                "answer_framework": PracticeGuidanceNotRequestedResponse(
+                    status="notRequested"
+                ),
+                "reference_answer": PracticeReferenceAnswerNotRequestedResponse(
+                    status="notRequested"
+                ),
+            }
+        )
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+
+
 def practice_session_state_api_error(error: PracticeSessionStateError) -> APIError:
     error_status = (
         status.HTTP_404_NOT_FOUND
@@ -223,10 +379,13 @@ def practice_session_state_api_error(error: PracticeSessionStateError) -> APIErr
 
 
 __all__ = [
+    "PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE",
     "PRACTICE_QUESTION_GENERATION_UNAVAILABLE",
     "PracticeAPIService",
     "PracticeSessionAPIService",
     "build_practice_question_response",
+    "build_practice_answer_response",
+    "build_practice_follow_up_question_response",
     "build_practice_session_response",
     "practice_session_state_api_error",
 ]

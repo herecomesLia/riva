@@ -6,6 +6,7 @@ from pydantic import ConfigDict, Field, field_validator
 
 from riva.core.language import InteractionLanguage
 from riva.schemas.base import APIModel
+from riva.schemas.practice_interactions import PracticeAnswerContent
 from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -64,6 +65,20 @@ class RefreshPracticeQuestionGenerationRequest(APIModel):
     version: Annotated[int, Field(ge=1)]
 
 
+class SubmitPrimaryAnswerRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+    content: PracticeAnswerContent
+
+
+class RefreshPracticeFollowUpGenerationRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+
+
 class PracticeAPIModel(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -105,6 +120,45 @@ class PracticeQuestionResponse(PracticeAPIModel):
     is_marked_weak: bool
 
 
+def _validate_aware_timestamp(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamps must be timezone-aware")
+    return value
+
+
+class PracticeAnswerResponse(PracticeAPIModel):
+    id: StandardUUID
+    content: PracticeAnswerContent
+    created_at: datetime
+    order: Annotated[int, Field(ge=1)]
+
+    _validate_created_at = field_validator("created_at")(_validate_aware_timestamp)
+
+
+class PracticeFollowUpQuestionResponse(PracticeAPIModel):
+    id: StandardUUID
+    prompt: QuestionCardPrompt
+    created_at: datetime
+    order: Annotated[int, Field(ge=1)]
+    answer_hints: PracticeGuidanceNotRequestedResponse = Field(
+        default_factory=lambda: PracticeGuidanceNotRequestedResponse(
+            status="notRequested"
+        )
+    )
+    answer_framework: PracticeGuidanceNotRequestedResponse = Field(
+        default_factory=lambda: PracticeGuidanceNotRequestedResponse(
+            status="notRequested"
+        )
+    )
+    reference_answer: PracticeReferenceAnswerNotRequestedResponse = Field(
+        default_factory=lambda: PracticeReferenceAnswerNotRequestedResponse(
+            status="notRequested"
+        )
+    )
+
+    _validate_created_at = field_validator("created_at")(_validate_aware_timestamp)
+
+
 class PracticeActiveSessionBase(PracticeAPIModel):
     session_id: StandardUUID
     language: InteractionLanguage
@@ -131,8 +185,60 @@ class PracticeAnsweringResponse(PracticeActiveSessionBase):
     question: PracticeQuestionResponse
 
 
+class PracticeAwaitingFollowUpExchangeResponse(PracticeAPIModel):
+    status: Literal["awaitingAnswer"]
+    question: PracticeFollowUpQuestionResponse
+    answer: None = None
+
+
+class PracticeGeneratingFollowUpResponse(PracticeActiveSessionBase):
+    status: Literal["generatingFollowUp"]
+    question: PracticeQuestionResponse
+    main_answer: PracticeAnswerResponse
+    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+        default_factory=list,
+        max_length=0,
+    )
+
+
+class PracticeAnsweringFollowUpResponse(PracticeActiveSessionBase):
+    status: Literal["answeringFollowUp"]
+    question: PracticeQuestionResponse
+    main_answer: PracticeAnswerResponse
+    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+        default_factory=list,
+        max_length=0,
+    )
+    current_follow_up: PracticeAwaitingFollowUpExchangeResponse
+
+
+class PracticeNoFollowUpRequiredCompletionResponse(PracticeAPIModel):
+    status: Literal["completed"]
+    reason: Literal["noFollowUpRequired"]
+
+
+class PracticeEvaluatingResponse(PracticeActiveSessionBase):
+    status: Literal["evaluating"]
+    question: PracticeQuestionResponse
+    main_answer: PracticeAnswerResponse
+    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+        default_factory=list,
+        max_length=0,
+    )
+    follow_up_completion: PracticeNoFollowUpRequiredCompletionResponse
+    submitted_at: datetime
+
+    _validate_submitted_at = field_validator("submitted_at")(
+        _validate_aware_timestamp
+    )
+
+
 PracticeActiveSessionResponse = Annotated[
-    PracticeGeneratingQuestionResponse | PracticeAnsweringResponse,
+    PracticeGeneratingQuestionResponse
+    | PracticeAnsweringResponse
+    | PracticeGeneratingFollowUpResponse
+    | PracticeAnsweringFollowUpResponse
+    | PracticeEvaluatingResponse,
     Field(discriminator="status"),
 ]
 
@@ -145,16 +251,25 @@ __all__ = [
     "PracticeAttemptStatus",
     "PracticeActiveSessionBase",
     "PracticeActiveSessionResponse",
+    "PracticeAnswerResponse",
+    "PracticeAnsweringFollowUpResponse",
     "PracticeAnsweringResponse",
+    "PracticeAwaitingFollowUpExchangeResponse",
+    "PracticeEvaluatingResponse",
+    "PracticeFollowUpQuestionResponse",
+    "PracticeGeneratingFollowUpResponse",
     "PracticeGeneratingQuestionResponse",
     "PracticeGuidanceNotRequestedResponse",
     "PracticeQuestionSource",
     "PracticeQuestionResponse",
     "PracticeReferenceAnswerNotRequestedResponse",
+    "PracticeNoFollowUpRequiredCompletionResponse",
     "CurrentPracticeSessionResponse",
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
     "PracticeSessionStatus",
+    "RefreshPracticeFollowUpGenerationRequest",
     "RefreshPracticeQuestionGenerationRequest",
+    "SubmitPrimaryAnswerRequest",
     "StartPracticeSessionRequest",
 ]

@@ -11,8 +11,10 @@ from riva.models import User
 from riva.schemas.practice_sessions import (
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
+    RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
+    SubmitPrimaryAnswerRequest,
 )
 from riva.services.practice_api import PracticeAPIService
 
@@ -61,6 +63,45 @@ async def refresh_practice_question_generation(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_question_generation(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/answers/main",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def submit_practice_primary_answer(
+    session_id: PracticeSessionId,
+    payload: SubmitPrimaryAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.submit_primary_answer(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/follow-up-generation/refresh",
+    response_model=PracticeActiveSessionResponse,
+)
+async def refresh_practice_follow_up_generation(
+    session_id: PracticeSessionId,
+    payload: RefreshPracticeFollowUpGenerationRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.refresh_follow_up_generation(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,
