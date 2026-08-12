@@ -305,9 +305,82 @@ class PracticeEvaluation(Base):
     )
 
 
+class PracticeReview(Base):
+    __tablename__ = "practice_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "length(trim(overall_performance)) > 0 "
+            "AND length(overall_performance) <= 4000",
+            name="ck_practice_reviews_overall_performance",
+        ),
+        UniqueConstraint(
+            "attempt_id",
+            name="uq_practice_reviews_attempt",
+        ),
+        UniqueConstraint(
+            "source_agent_run_id",
+            name="uq_practice_reviews_source_run",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    attempt_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("practice_attempts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_agent_run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    overall_performance: Mapped[str] = mapped_column(Text, nullable=False)
+    highlights: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    main_issues: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    improvement_suggestions: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    reusable_answer_structure: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    exposed_weaknesses: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    attempt: Mapped[PracticeAttempt] = relationship(
+        back_populates="review",
+        foreign_keys=[attempt_id],
+        passive_deletes=True,
+    )
+    source_agent_run: Mapped[AgentRun] = relationship(
+        foreign_keys=[source_agent_run_id],
+        passive_deletes=True,
+    )
+
+
 __all__ = [
     "PracticeAnswer",
     "PracticeEvaluation",
     "PracticeFollowUpDecision",
     "PracticeFollowUpQuestion",
+    "PracticeReview",
 ]

@@ -16,6 +16,7 @@ from riva.models.practice_interactions import (
     PracticeEvaluation,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
+    PracticeReview,
 )
 from riva.models.practice_sessions import PracticeAttempt, PracticeSession
 from riva.models.question_cards import QuestionCard
@@ -44,6 +45,7 @@ __all__ = [
     "PracticeAttempt",
     "PracticeFollowUpDecision",
     "PracticeFollowUpQuestion",
+    "PracticeReview",
     "PracticeSession",
     "QuestionCard",
     "ResumeDocument",

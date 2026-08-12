@@ -79,6 +79,17 @@ from riva.schemas.evaluation import (
     PracticeFocusAssessmentStatus,
     PracticeFocusIndex,
 )
+from riva.schemas.practice_review import (
+    MAX_PRACTICE_REVIEW_ITEM_LENGTH,
+    MAX_PRACTICE_REVIEW_ITEMS,
+    MAX_PRACTICE_REVIEW_OVERALL_LENGTH,
+    MAX_PRACTICE_REVIEW_WEAKNESS_LENGTH,
+    PracticeReviewInput,
+    PracticeReviewOutput,
+    ReviewItem,
+    ReviewOverallPerformance,
+    ReviewWeakness,
+)
 from riva.schemas.resume_documents import (
     FailedResumeDocumentResponse,
     PendingResumeDocumentResponse,
@@ -222,6 +233,15 @@ __all__ = [
     "PracticeFocusAssessmentExplanation",
     "PracticeFocusAssessmentStatus",
     "PracticeFocusIndex",
+    "MAX_PRACTICE_REVIEW_ITEM_LENGTH",
+    "MAX_PRACTICE_REVIEW_ITEMS",
+    "MAX_PRACTICE_REVIEW_OVERALL_LENGTH",
+    "MAX_PRACTICE_REVIEW_WEAKNESS_LENGTH",
+    "PracticeReviewInput",
+    "PracticeReviewOutput",
+    "ReviewItem",
+    "ReviewOverallPerformance",
+    "ReviewWeakness",
     "FailedResumeDocumentResponse",
     "JobDescriptionParsingInput",
     "JobDescriptionParsingOutput",
