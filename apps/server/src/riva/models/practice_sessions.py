@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
     from riva.models.practice_interactions import (
         PracticeAnswer,
+        PracticeEvaluation,
         PracticeFollowUpDecision,
         PracticeFollowUpQuestion,
     )
@@ -293,6 +294,12 @@ class PracticeAttempt(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="PracticeFollowUpDecision.order",
+    )
+    evaluation: Mapped[PracticeEvaluation | None] = relationship(
+        back_populates="attempt",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
     )
 
 

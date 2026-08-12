@@ -13,6 +13,7 @@ from riva.models.profile import (
 )
 from riva.models.practice_interactions import (
     PracticeAnswer,
+    PracticeEvaluation,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "JobDescriptionAnalysis",
     "MatchingAnalysis",
     "PracticeAnswer",
+    "PracticeEvaluation",
     "PracticeAttempt",
     "PracticeFollowUpDecision",
     "PracticeFollowUpQuestion",

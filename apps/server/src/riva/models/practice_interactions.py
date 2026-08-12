@@ -246,8 +246,68 @@ class PracticeFollowUpDecision(Base):
     )
 
 
+class PracticeEvaluation(Base):
+    __tablename__ = "practice_evaluations"
+    __table_args__ = (
+        CheckConstraint(
+            "overall_score >= 0 AND overall_score <= 100",
+            name="ck_practice_evaluations_overall_score",
+        ),
+        UniqueConstraint(
+            "attempt_id",
+            name="uq_practice_evaluations_attempt",
+        ),
+        UniqueConstraint(
+            "source_agent_run_id",
+            name="uq_practice_evaluations_source_run",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    attempt_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("practice_attempts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_agent_run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    overall_score: Mapped[int] = mapped_column(nullable=False)
+    dimension_scores: Mapped[list[dict[str, object]]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    focus_assessments: Mapped[list[dict[str, object]]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    evaluated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    attempt: Mapped[PracticeAttempt] = relationship(
+        back_populates="evaluation",
+        foreign_keys=[attempt_id],
+        passive_deletes=True,
+    )
+    source_agent_run: Mapped[AgentRun] = relationship(
+        foreign_keys=[source_agent_run_id],
+        passive_deletes=True,
+    )
+
+
 __all__ = [
     "PracticeAnswer",
+    "PracticeEvaluation",
     "PracticeFollowUpDecision",
     "PracticeFollowUpQuestion",
 ]
