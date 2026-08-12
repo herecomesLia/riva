@@ -7,7 +7,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.language import InteractionLanguage
@@ -19,6 +19,8 @@ from riva.models import (
     PracticeEvaluation,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
+    PracticeRecommendation,
+    PracticeReview,
     PracticeSession,
     QuestionCard,
     User,
@@ -26,6 +28,8 @@ from riva.models import (
 from riva.prompts import (
     FOLLOW_UP_PROMPT,
     PRACTICE_EVALUATION_PROMPT,
+    PRACTICE_RECOMMENDATION_PROMPT,
+    PRACTICE_REVIEW_PROMPT,
     QUESTION_GENERATION_PROMPT,
 )
 from riva.schemas.evaluation import (
@@ -41,6 +45,10 @@ from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
     PracticeSessionSelection,
 )
+from riva.schemas.practice_recommendation import (
+    PracticeRecommendationInput,
+    PracticeRecommendationQuestionContext,
+)
 from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.services.follow_up_generation import (
     FollowUpGenerationService,
@@ -55,6 +63,21 @@ from riva.services.evaluation_generation import (
     practice_evaluation_idempotency_key,
     practice_evaluation_output_from_artifact,
     validate_evaluation_generation_run,
+)
+from riva.services.recommendation_generation import (
+    RecommendationGenerationService,
+    RecommendationGenerationStateError,
+    practice_recommendation_idempotency_key,
+    practice_recommendation_output_from_artifact,
+    validate_recommendation_generation_run,
+    validate_recommendation_v1_contract,
+)
+from riva.services.review_generation import (
+    ReviewGenerationService,
+    ReviewGenerationStateError,
+    practice_review_idempotency_key,
+    practice_review_output_from_artifact,
+    validate_review_generation_run,
 )
 from riva.services.question_generation import (
     QuestionGenerationService,
@@ -78,6 +101,13 @@ PracticeSessionStateErrorCode = Literal[
     "practice_follow_up_generation_state_conflict",
     "practice_evaluation_generation_state_conflict",
     "practice_evaluation_generation_unavailable",
+    "practice_evaluation_generation_failed",
+    "practice_review_generation_failed",
+    "practice_review_generation_state_conflict",
+    "practice_review_generation_unavailable",
+    "practice_recommendation_generation_failed",
+    "practice_recommendation_generation_state_conflict",
+    "practice_recommendation_generation_unavailable",
 ]
 
 PRACTICE_SESSION_NOT_FOUND: PracticeSessionStateErrorCode = (
@@ -119,6 +149,27 @@ PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
 PRACTICE_EVALUATION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
     "practice_evaluation_generation_unavailable"
 )
+PRACTICE_EVALUATION_GENERATION_FAILED: PracticeSessionStateErrorCode = (
+    "practice_evaluation_generation_failed"
+)
+PRACTICE_REVIEW_GENERATION_FAILED: PracticeSessionStateErrorCode = (
+    "practice_review_generation_failed"
+)
+PRACTICE_REVIEW_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+    "practice_review_generation_state_conflict"
+)
+PRACTICE_REVIEW_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+    "practice_review_generation_unavailable"
+)
+PRACTICE_RECOMMENDATION_GENERATION_FAILED: PracticeSessionStateErrorCode = (
+    "practice_recommendation_generation_failed"
+)
+PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+    "practice_recommendation_generation_state_conflict"
+)
+PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+    "practice_recommendation_generation_unavailable"
+)
 
 
 class PracticeSessionStateError(RuntimeError):
@@ -158,12 +209,32 @@ class PracticePrimaryAnswerWorkflowContext:
 class PracticeEvaluationWorkflowContext(PracticePrimaryAnswerWorkflowContext):
     evaluation_generation_run: AgentRun
     evaluation: PracticeEvaluation | None
+    review_generation_run: AgentRun | None = None
+    review: PracticeReview | None = None
+    recommendation_generation_run: AgentRun | None = None
+    recommendation: PracticeRecommendation | None = None
+
+
+@dataclass(frozen=True)
+class PracticeReviewWorkflowContext(PracticePrimaryAnswerWorkflowContext):
+    evaluation_generation_run: AgentRun
+    evaluation: PracticeEvaluation
+    review_generation_run: AgentRun
+    review: PracticeReview
+    recommendation_generation_run: AgentRun
+    recommendation: PracticeRecommendation
+
+
+# Kept as a named alias for callers that want to describe the complete
+# evaluation pipeline without depending on the final public-state class.
+PracticeEvaluationPipelineContext = PracticeEvaluationWorkflowContext
 
 
 PracticePublicWorkflowContext = (
     PracticeSessionWorkflowContext
     | PracticePrimaryAnswerWorkflowContext
     | PracticeEvaluationWorkflowContext
+    | PracticeReviewWorkflowContext
 )
 
 
@@ -178,6 +249,14 @@ FollowUpGenerationServiceFactory = Callable[
 EvaluationGenerationServiceFactory = Callable[
     ...,
     EvaluationGenerationService,
+]
+ReviewGenerationServiceFactory = Callable[
+    ...,
+    ReviewGenerationService,
+]
+RecommendationGenerationServiceFactory = Callable[
+    ...,
+    RecommendationGenerationService,
 ]
 
 
@@ -196,6 +275,12 @@ class PracticeSessionService:
         evaluation_generation_service_factory: EvaluationGenerationServiceFactory = (
             EvaluationGenerationService
         ),
+        review_generation_service_factory: ReviewGenerationServiceFactory = (
+            ReviewGenerationService
+        ),
+        recommendation_generation_service_factory: RecommendationGenerationServiceFactory = (
+            RecommendationGenerationService
+        ),
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
@@ -209,6 +294,12 @@ class PracticeSessionService:
         self.evaluation_generation_service_factory = (
             evaluation_generation_service_factory
         )
+        self.review_generation_service_factory = (
+            review_generation_service_factory
+        )
+        self.recommendation_generation_service_factory = (
+            recommendation_generation_service_factory
+        )
         self.clock = clock
 
     async def start_session(
@@ -217,7 +308,7 @@ class PracticeSessionService:
         user_id: UUID,
         selection: PracticeSessionSelection,
         interaction_language: InteractionLanguage,
-    ) -> PracticeSessionWorkflowContext:
+    ) -> PracticePublicWorkflowContext:
         try:
             self._require_supported_selection(selection)
             await self._lock_user(user_id)
@@ -587,6 +678,294 @@ class PracticeSessionService:
                 follow_up_question=question,
                 evaluation_generation_run=evaluation_generation_run,
                 evaluation=None,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def refresh_evaluation_generation(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+    ) -> PracticePublicWorkflowContext:
+        """Poll and reconcile the durable evaluation pipeline.
+
+        Evaluation, review, and recommendation generation all belong to the
+        same public ``evaluating`` state.  Only the final recommendation
+        artifact changes the attempt to ``review`` and advances the session
+        version.
+        """
+
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if practice_session.status != "active":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if attempt is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            # A client may retry a lost response from the final transition.
+            # The complete lineage is required before replaying that response.
+            if (
+                practice_session.version == expected_version + 1
+                and attempt.status == PracticeAttemptStatus.REVIEW.value
+            ):
+                try:
+                    context = await self._load_review_replay_context(
+                        practice_session,
+                        attempt,
+                    )
+                except PracticeSessionStateError:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if attempt.status != PracticeAttemptStatus.EVALUATING.value:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            (
+                card,
+                main_answer,
+                follow_up_run,
+                _,
+            ) = await self._load_primary_follow_up_records(
+                practice_session,
+                attempt,
+            )
+            if follow_up_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+            decision, question = await self._load_canonical_follow_up_artifact(
+                follow_up_run,
+                attempt=attempt,
+            )
+            if decision.action != "complete" or question is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+                )
+
+            evaluation_run = await self._load_stable_evaluation_run(
+                user_id=practice_session.user_id,
+                attempt_id=attempt.id,
+                for_update=True,
+            )
+            self._validate_evaluation_run_lineage(
+                evaluation_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                complete_decision=decision,
+            )
+            evaluation_context = dict(
+                session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                follow_up_generation_run=follow_up_run,
+                follow_up_decision=decision,
+                follow_up_question=None,
+                evaluation_generation_run=evaluation_run,
+                evaluation=None,
+            )
+
+            if evaluation_run.status in {
+                AgentRunStatus.QUEUED,
+                AgentRunStatus.RUNNING,
+            }:
+                await self.session.commit()
+                return PracticeEvaluationWorkflowContext(**evaluation_context)
+            if evaluation_run.status == AgentRunStatus.FAILED:
+                raise PracticeSessionStateError(
+                    PRACTICE_EVALUATION_GENERATION_FAILED,
+                    source_code=evaluation_run.error_code,
+                )
+            if evaluation_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+                )
+
+            evaluation = await self._load_evaluation_artifact(
+                evaluation_run,
+                attempt=attempt,
+                question_card=card,
+                for_update=True,
+            )
+            if evaluation is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+                )
+            evaluation_context["evaluation"] = evaluation
+
+            review_run = await self._load_stable_review_run(
+                user_id=practice_session.user_id,
+                attempt_id=attempt.id,
+                for_update=True,
+                required=False,
+            )
+            if review_run is None:
+                review_run = await self._enqueue_review_generation(
+                    user_id=user_id,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    evaluation=evaluation,
+                )
+                self._validate_review_run_lineage(
+                    review_run,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    evaluation=evaluation,
+                )
+                evaluation_context["review_generation_run"] = review_run
+                await self.session.commit()
+                return PracticeEvaluationWorkflowContext(**evaluation_context)
+
+            self._validate_review_run_lineage(
+                review_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                evaluation=evaluation,
+            )
+            evaluation_context["review_generation_run"] = review_run
+            if review_run.status in {
+                AgentRunStatus.QUEUED,
+                AgentRunStatus.RUNNING,
+            }:
+                await self.session.commit()
+                return PracticeEvaluationWorkflowContext(**evaluation_context)
+            if review_run.status == AgentRunStatus.FAILED:
+                raise PracticeSessionStateError(
+                    PRACTICE_REVIEW_GENERATION_FAILED,
+                    source_code=review_run.error_code,
+                )
+            if review_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+                )
+
+            review = await self._load_review_artifact(
+                review_run,
+                attempt=attempt,
+                evaluation=evaluation,
+                for_update=True,
+            )
+            if review is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+                )
+            evaluation_context["review"] = review
+
+            recommendation_run = await self._load_stable_recommendation_run(
+                user_id=practice_session.user_id,
+                attempt_id=attempt.id,
+                for_update=True,
+                required=False,
+            )
+            if recommendation_run is None:
+                recommendation_run = await self._enqueue_recommendation_generation(
+                    user_id=user_id,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    evaluation=evaluation,
+                    review=review,
+                )
+                self._validate_recommendation_run_lineage(
+                    recommendation_run,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    evaluation=evaluation,
+                    review=review,
+                )
+                evaluation_context["recommendation_generation_run"] = (
+                    recommendation_run
+                )
+                await self.session.commit()
+                return PracticeEvaluationWorkflowContext(**evaluation_context)
+
+            self._validate_recommendation_run_lineage(
+                recommendation_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                evaluation=evaluation,
+                review=review,
+            )
+            evaluation_context["recommendation_generation_run"] = recommendation_run
+            if recommendation_run.status in {
+                AgentRunStatus.QUEUED,
+                AgentRunStatus.RUNNING,
+            }:
+                await self.session.commit()
+                return PracticeEvaluationWorkflowContext(**evaluation_context)
+            if recommendation_run.status == AgentRunStatus.FAILED:
+                raise PracticeSessionStateError(
+                    PRACTICE_RECOMMENDATION_GENERATION_FAILED,
+                    source_code=recommendation_run.error_code,
+                )
+            if recommendation_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                )
+
+            recommendation = await self._load_recommendation_artifact(
+                recommendation_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                evaluation=evaluation,
+                review=review,
+                for_update=True,
+            )
+            if recommendation is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            attempt.status = PracticeAttemptStatus.REVIEW.value
+            attempt.updated_at = now
+            attempt.completed_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeReviewWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                follow_up_generation_run=follow_up_run,
+                follow_up_decision=decision,
+                follow_up_question=None,
+                evaluation_generation_run=evaluation_run,
+                evaluation=evaluation,
+                review_generation_run=review_run,
+                review=review,
+                recommendation_generation_run=recommendation_run,
+                recommendation=recommendation,
             )
         except BaseException:
             await self.session.rollback()
@@ -1075,6 +1454,88 @@ class PracticeSessionService:
             )
         return run
 
+    async def _load_stable_review_run(
+        self,
+        *,
+        user_id: UUID,
+        attempt_id: UUID,
+        for_update: bool,
+        required: bool = True,
+    ) -> AgentRun | None:
+        # The payload arm detects a run whose stable metadata was corrupted;
+        # it must be rejected by lineage validation rather than treated as
+        # absent and replaced.
+        statement = select(AgentRun).where(
+            AgentRun.agent_id == "practice-reviewer",
+            or_(
+                and_(
+                    AgentRun.user_id == user_id,
+                    AgentRun.prompt_id == PRACTICE_REVIEW_PROMPT.prompt_id,
+                    AgentRun.prompt_version == PRACTICE_REVIEW_PROMPT.version,
+                    AgentRun.idempotency_key
+                    == practice_review_idempotency_key(attempt_id),
+                ),
+                AgentRun.payload["attemptId"].as_string() == str(attempt_id),
+            ),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
+        if (
+            run is not None
+            and run.idempotency_key != practice_review_idempotency_key(attempt_id)
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+        if run is None and required:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+        return run
+
+    async def _load_stable_recommendation_run(
+        self,
+        *,
+        user_id: UUID,
+        attempt_id: UUID,
+        for_update: bool,
+        required: bool = True,
+    ) -> AgentRun | None:
+        # See the review lookup: a damaged stable key must surface as a
+        # conflict, never become permission to enqueue a second run.
+        statement = select(AgentRun).where(
+            AgentRun.agent_id == "practice-recommender",
+            or_(
+                and_(
+                    AgentRun.user_id == user_id,
+                    AgentRun.prompt_id
+                    == PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
+                    AgentRun.prompt_version
+                    == PRACTICE_RECOMMENDATION_PROMPT.version,
+                    AgentRun.idempotency_key
+                    == practice_recommendation_idempotency_key(attempt_id),
+                ),
+                AgentRun.payload["attemptId"].as_string() == str(attempt_id),
+            ),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
+        if (
+            run is not None
+            and run.idempotency_key
+            != practice_recommendation_idempotency_key(attempt_id)
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+        if run is None and required:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+        return run
+
     async def _enqueue_follow_up_generation(
         self,
         *,
@@ -1143,6 +1604,76 @@ class PracticeSessionService:
             question_card=question_card,
             main_answer=main_answer,
             complete_decision=complete_decision,
+        )
+        return run
+
+    async def _enqueue_review_generation(
+        self,
+        *,
+        user_id: UUID,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        evaluation: PracticeEvaluation,
+    ) -> AgentRun:
+        try:
+            run = await self._review_generation_service().enqueue_generation_in_transaction(
+                user_id=user_id,
+                attempt_id=attempt.id,
+                interaction_language=practice_session.language,
+                idempotency_key=practice_review_idempotency_key(attempt.id),
+            )
+        except ReviewGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        except ValueError:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
+                source_code="review_generation_unavailable",
+            ) from None
+        self._validate_review_run_lineage(
+            run,
+            practice_session=practice_session,
+            attempt=attempt,
+            evaluation=evaluation,
+        )
+        return run
+
+    async def _enqueue_recommendation_generation(
+        self,
+        *,
+        user_id: UUID,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        evaluation: PracticeEvaluation,
+        review: PracticeReview,
+    ) -> AgentRun:
+        try:
+            run = await self._recommendation_generation_service().enqueue_generation_in_transaction(
+                user_id=user_id,
+                attempt_id=attempt.id,
+                interaction_language=practice_session.language,
+                idempotency_key=practice_recommendation_idempotency_key(
+                    attempt.id
+                ),
+            )
+        except RecommendationGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        except ValueError:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
+                source_code="recommendation_generation_unavailable",
+            ) from None
+        self._validate_recommendation_run_lineage(
+            run,
+            practice_session=practice_session,
+            attempt=attempt,
+            evaluation=evaluation,
+            review=review,
         )
         return run
 
@@ -1225,6 +1756,63 @@ class PracticeSessionService:
             )
         return payload
 
+    def _validate_review_run_lineage(
+        self,
+        run: AgentRun,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        evaluation: PracticeEvaluation,
+    ) -> None:
+        try:
+            payload = validate_review_generation_run(run)
+        except ReviewGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        if (
+            run.id is None
+            or run.user_id != practice_session.user_id
+            or run.idempotency_key != practice_review_idempotency_key(attempt.id)
+            or payload.attempt_id != attempt.id
+            or payload.evaluation_id != evaluation.id
+            or payload.interaction_language != practice_session.language
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+
+    def _validate_recommendation_run_lineage(
+        self,
+        run: AgentRun,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        evaluation: PracticeEvaluation,
+        review: PracticeReview,
+    ) -> None:
+        try:
+            payload = validate_recommendation_generation_run(run)
+        except RecommendationGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        if (
+            run.id is None
+            or run.user_id != practice_session.user_id
+            or run.idempotency_key
+            != practice_recommendation_idempotency_key(attempt.id)
+            or payload.attempt_id != attempt.id
+            or payload.evaluation_id != evaluation.id
+            or payload.review_id != review.id
+            or payload.interaction_language != practice_session.language
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+
     async def _load_evaluation_artifact(
         self,
         run: AgentRun,
@@ -1264,6 +1852,139 @@ class PracticeSessionService:
             ) from None
         return evaluation
 
+    async def _load_review_artifact(
+        self,
+        run: AgentRun,
+        *,
+        attempt: PracticeAttempt,
+        evaluation: PracticeEvaluation,
+        for_update: bool,
+    ) -> PracticeReview | None:
+        if run.status in {
+            AgentRunStatus.QUEUED,
+            AgentRunStatus.RUNNING,
+            AgentRunStatus.FAILED,
+        }:
+            return None
+        if run.status != AgentRunStatus.SUCCEEDED or run.id is None:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+        statement = select(PracticeReview).where(
+            PracticeReview.source_agent_run_id == run.id
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        review = await self.session.scalar(statement)
+        if (
+            review is None
+            or review.attempt_id != attempt.id
+            or review.source_agent_run_id != run.id
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+        try:
+            practice_review_output_from_artifact(review)
+        except (TypeError, ValueError, ValidationError):
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            ) from None
+        if evaluation.attempt_id != attempt.id:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+        return review
+
+    async def _load_recommendation_artifact(
+        self,
+        run: AgentRun,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_card: QuestionCard,
+        evaluation: PracticeEvaluation,
+        review: PracticeReview,
+        for_update: bool,
+    ) -> PracticeRecommendation | None:
+        if run.status in {
+            AgentRunStatus.QUEUED,
+            AgentRunStatus.RUNNING,
+            AgentRunStatus.FAILED,
+        }:
+            return None
+        if run.status != AgentRunStatus.SUCCEEDED or run.id is None:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+        statement = select(PracticeRecommendation).where(
+            PracticeRecommendation.source_agent_run_id == run.id
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        recommendation = await self.session.scalar(statement)
+        if (
+            recommendation is None
+            or recommendation.attempt_id != attempt.id
+            or recommendation.source_agent_run_id != run.id
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+        try:
+            output = practice_recommendation_output_from_artifact(recommendation)
+            recommendation_input = self._recommendation_input(
+                practice_session=practice_session,
+                question_card=question_card,
+                evaluation=evaluation,
+                review=review,
+            )
+            validate_recommendation_v1_contract(output, recommendation_input)
+        except (
+            RecommendationGenerationStateError,
+            TypeError,
+            ValueError,
+            ValidationError,
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            ) from None
+        return recommendation
+
+    @staticmethod
+    def _recommendation_input(
+        *,
+        practice_session: PracticeSession,
+        question_card: QuestionCard,
+        evaluation: PracticeEvaluation,
+        review: PracticeReview,
+    ) -> PracticeRecommendationInput:
+        evaluation_output = practice_evaluation_output_from_artifact(
+            evaluation,
+            scoring_focus_count=len(question_card.scoring_focus),
+        )
+        review_output = practice_review_output_from_artifact(review)
+        question = PracticeRecommendationQuestionContext.model_validate(
+            {
+                "prompt": question_card.prompt,
+                "question_type": question_card.question_type,
+                "difficulty": question_card.difficulty,
+                "assessed_capabilities": list(
+                    question_card.assessed_capabilities
+                ),
+                "scoring_focus": list(question_card.scoring_focus),
+            }
+        )
+        return PracticeRecommendationInput(
+            interaction_language=practice_session.language,
+            question=question,
+            follow_up_completion_reason=(
+                PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+            ),
+            evaluation=evaluation_output,
+            review=review_output,
+        )
+
     def _follow_up_generation_service(self) -> FollowUpGenerationService:
         return self.follow_up_generation_service_factory(
             self.session,
@@ -1272,6 +1993,20 @@ class PracticeSessionService:
 
     def _evaluation_generation_service(self) -> EvaluationGenerationService:
         return self.evaluation_generation_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
+    def _review_generation_service(self) -> ReviewGenerationService:
+        return self.review_generation_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
+    def _recommendation_generation_service(
+        self,
+    ) -> RecommendationGenerationService:
+        return self.recommendation_generation_service_factory(
             self.session,
             llm_model=self.llm_model,
         )
@@ -1347,7 +2082,7 @@ class PracticeSessionService:
     async def _load_active_context(
         self,
         practice_session: PracticeSession,
-    ) -> PracticeSessionWorkflowContext:
+    ) -> PracticePublicWorkflowContext:
         attempt = await self._load_current_attempt(
             user_id=practice_session.user_id,
             session_id=practice_session.id,
@@ -1355,6 +2090,15 @@ class PracticeSessionService:
         )
         if attempt is None:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if attempt.status in {
+            PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+            PracticeAttemptStatus.EVALUATING.value,
+            PracticeAttemptStatus.REVIEW.value,
+        }:
+            return await self._load_public_active_context(
+                practice_session,
+                for_update=True,
+            )
         run, _ = await self._load_generation_run(practice_session, attempt)
         card: QuestionCard | None = None
         if attempt.question_card_id is not None:
@@ -1414,7 +2158,16 @@ class PracticeSessionService:
             PracticeAttemptStatus.ANSWERING.value,
             PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
             PracticeAttemptStatus.EVALUATING.value,
+            PracticeAttemptStatus.REVIEW.value,
         }:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if (
+            attempt.status == PracticeAttemptStatus.REVIEW.value
+            and (
+                attempt.question_card_id is None
+                or attempt.completed_at is None
+            )
+        ):
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
         if attempt.status in {
@@ -1477,16 +2230,128 @@ class PracticeSessionService:
                 question_card=card,
                 for_update=for_update,
             )
-            return PracticeEvaluationWorkflowContext(
+            review_generation_run = await self._load_stable_review_run(
+                user_id=practice_session.user_id,
+                attempt_id=attempt.id,
+                for_update=for_update,
+                required=False,
+            )
+            review: PracticeReview | None = None
+            recommendation_generation_run: AgentRun | None = None
+            recommendation: PracticeRecommendation | None = None
+            if review_generation_run is not None:
+                if evaluation is None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+                    )
+                self._validate_review_run_lineage(
+                    review_generation_run,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    evaluation=evaluation,
+                )
+                if review_generation_run.status not in {
+                    AgentRunStatus.QUEUED,
+                    AgentRunStatus.RUNNING,
+                    AgentRunStatus.FAILED,
+                    AgentRunStatus.SUCCEEDED,
+                }:
+                    raise PracticeSessionStateError(
+                        PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+                    )
+                if review_generation_run.status == AgentRunStatus.SUCCEEDED:
+                    review = await self._load_review_artifact(
+                        review_generation_run,
+                        attempt=attempt,
+                        evaluation=evaluation,
+                        for_update=for_update,
+                    )
+
+            recommendation_generation_run = (
+                await self._load_stable_recommendation_run(
+                    user_id=practice_session.user_id,
+                    attempt_id=attempt.id,
+                    for_update=for_update,
+                    required=False,
+                )
+            )
+            if recommendation_generation_run is not None:
+                if evaluation is None or review is None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                    )
+                self._validate_recommendation_run_lineage(
+                    recommendation_generation_run,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    evaluation=evaluation,
+                    review=review,
+                )
+                if recommendation_generation_run.status not in {
+                    AgentRunStatus.QUEUED,
+                    AgentRunStatus.RUNNING,
+                    AgentRunStatus.FAILED,
+                    AgentRunStatus.SUCCEEDED,
+                }:
+                    raise PracticeSessionStateError(
+                        PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                    )
+                if recommendation_generation_run.status == AgentRunStatus.SUCCEEDED:
+                    recommendation = await self._load_recommendation_artifact(
+                        recommendation_generation_run,
+                        practice_session=practice_session,
+                        attempt=attempt,
+                        question_card=card,
+                        evaluation=evaluation,
+                        review=review,
+                        for_update=for_update,
+                    )
+
+            pipeline_context = PracticeEvaluationWorkflowContext(
                 session=practice_session,
                 attempt=attempt,
                 question_card=card,
                 main_answer=main_answer,
                 follow_up_generation_run=follow_up_run,
                 follow_up_decision=decision,
-                follow_up_question=question,
+                follow_up_question=None,
                 evaluation_generation_run=evaluation_generation_run,
                 evaluation=evaluation,
+                review_generation_run=review_generation_run,
+                review=review,
+                recommendation_generation_run=recommendation_generation_run,
+                recommendation=recommendation,
+            )
+            if attempt.status == PracticeAttemptStatus.EVALUATING.value:
+                return pipeline_context
+
+            if (
+                evaluation_generation_run.status != AgentRunStatus.SUCCEEDED
+                or evaluation is None
+                or review_generation_run is None
+                or review_generation_run.status != AgentRunStatus.SUCCEEDED
+                or review is None
+                or recommendation_generation_run is None
+                or recommendation_generation_run.status != AgentRunStatus.SUCCEEDED
+                or recommendation is None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                )
+            return PracticeReviewWorkflowContext(
+                session=pipeline_context.session,
+                attempt=pipeline_context.attempt,
+                question_card=pipeline_context.question_card,
+                main_answer=pipeline_context.main_answer,
+                follow_up_generation_run=pipeline_context.follow_up_generation_run,
+                follow_up_decision=pipeline_context.follow_up_decision,
+                follow_up_question=pipeline_context.follow_up_question,
+                evaluation_generation_run=evaluation_generation_run,
+                evaluation=evaluation,
+                review_generation_run=review_generation_run,
+                review=review,
+                recommendation_generation_run=recommendation_generation_run,
+                recommendation=recommendation,
             )
 
         run, _ = await self._load_generation_run(
@@ -1549,6 +2414,143 @@ class PracticeSessionService:
             follow_up_generation_run=follow_up_run,
             follow_up_decision=None,
             follow_up_question=None,
+        )
+
+    async def _load_review_replay_context(
+        self,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+    ) -> PracticeReviewWorkflowContext:
+        if (
+            attempt.status != PracticeAttemptStatus.REVIEW.value
+            or attempt.completed_at is None
+            or practice_session.status != "active"
+            or practice_session.completed_at is not None
+            or practice_session.completion_reason is not None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        (
+            card,
+            main_answer,
+            follow_up_run,
+            _,
+        ) = await self._load_primary_follow_up_records(
+            practice_session,
+            attempt,
+            for_update=True,
+        )
+        if follow_up_run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+        decision, question = await self._load_canonical_follow_up_artifact(
+            follow_up_run,
+            attempt=attempt,
+            for_update=True,
+        )
+        if decision.action != "complete" or question is not None:
+            raise PracticeSessionStateError(
+                PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+            )
+
+        evaluation_run = await self._load_stable_evaluation_run(
+            user_id=practice_session.user_id,
+            attempt_id=attempt.id,
+            for_update=True,
+        )
+        self._validate_evaluation_run_lineage(
+            evaluation_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            main_answer=main_answer,
+            complete_decision=decision,
+        )
+        if evaluation_run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+            )
+        evaluation = await self._load_evaluation_artifact(
+            evaluation_run,
+            attempt=attempt,
+            question_card=card,
+            for_update=True,
+        )
+        if evaluation is None:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+            )
+
+        review_run = await self._load_stable_review_run(
+            user_id=practice_session.user_id,
+            attempt_id=attempt.id,
+            for_update=True,
+        )
+        self._validate_review_run_lineage(
+            review_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            evaluation=evaluation,
+        )
+        if review_run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+        review = await self._load_review_artifact(
+            review_run,
+            attempt=attempt,
+            evaluation=evaluation,
+            for_update=True,
+        )
+        if review is None:
+            raise PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+            )
+
+        recommendation_run = await self._load_stable_recommendation_run(
+            user_id=practice_session.user_id,
+            attempt_id=attempt.id,
+            for_update=True,
+        )
+        self._validate_recommendation_run_lineage(
+            recommendation_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            evaluation=evaluation,
+            review=review,
+        )
+        if recommendation_run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+        recommendation = await self._load_recommendation_artifact(
+            recommendation_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            evaluation=evaluation,
+            review=review,
+            for_update=True,
+        )
+        if recommendation is None:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+        return PracticeReviewWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_card=card,
+            main_answer=main_answer,
+            follow_up_generation_run=follow_up_run,
+            follow_up_decision=decision,
+            follow_up_question=None,
+            evaluation_generation_run=evaluation_run,
+            evaluation=evaluation,
+            review_generation_run=review_run,
+            review=review,
+            recommendation_generation_run=recommendation_run,
+            recommendation=recommendation,
         )
 
     async def _load_completed_generation_replay_context(
@@ -1748,8 +2750,15 @@ __all__ = [
     "PRACTICE_QUESTION_GENERATION_STATE_CONFLICT",
     "PRACTICE_FOLLOW_UP_GENERATION_FAILED",
     "PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT",
+    "PRACTICE_EVALUATION_GENERATION_FAILED",
     "PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT",
     "PRACTICE_EVALUATION_GENERATION_UNAVAILABLE",
+    "PRACTICE_REVIEW_GENERATION_FAILED",
+    "PRACTICE_REVIEW_GENERATION_STATE_CONFLICT",
+    "PRACTICE_REVIEW_GENERATION_UNAVAILABLE",
+    "PRACTICE_RECOMMENDATION_GENERATION_FAILED",
+    "PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT",
+    "PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE",
     "PRACTICE_SESSION_ALREADY_ACTIVE",
     "PRACTICE_SESSION_NOT_FOUND",
     "PRACTICE_SESSION_SOURCE_UNAVAILABLE",
@@ -1761,6 +2770,8 @@ __all__ = [
     "PracticeSessionStateErrorCode",
     "PracticePrimaryAnswerWorkflowContext",
     "PracticeEvaluationWorkflowContext",
+    "PracticeEvaluationPipelineContext",
+    "PracticeReviewWorkflowContext",
     "PracticePublicWorkflowContext",
     "PracticeSessionWorkflowContext",
     "practice_follow_up_idempotency_key",

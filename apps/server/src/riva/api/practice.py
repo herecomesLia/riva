@@ -11,6 +11,7 @@ from riva.models import User
 from riva.schemas.practice_sessions import (
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
+    RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
@@ -102,6 +103,25 @@ async def refresh_practice_follow_up_generation(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_follow_up_generation(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/evaluation/refresh",
+    response_model=PracticeActiveSessionResponse,
+)
+async def refresh_practice_evaluation_generation(
+    session_id: PracticeSessionId,
+    payload: RefreshPracticeEvaluationRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.refresh_evaluation(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

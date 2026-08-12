@@ -1529,6 +1529,8 @@ def test_get_evaluating_recovers_complete_without_a_follow_up_question() -> None
         decision,
         None,
         evaluation,
+        None,
+        None,
     )
 
     result = asyncio.run(
@@ -2471,6 +2473,8 @@ def test_get_evaluating_accepts_nonterminal_evaluation_runs(
         decision,
         None,
         evaluation,
+        None,
+        None,
     )
 
     result = asyncio.run(
@@ -2532,6 +2536,8 @@ def test_get_evaluating_loads_only_a_canonical_succeeded_artifact() -> None:
         None,
         evaluation_run_value,
         artifact,
+        None,
+        None,
     )
 
     result = asyncio.run(

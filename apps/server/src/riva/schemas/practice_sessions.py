@@ -6,7 +6,19 @@ from pydantic import ConfigDict, Field, field_validator
 
 from riva.core.language import InteractionLanguage
 from riva.schemas.base import APIModel
+from riva.schemas.evaluation import (
+    MAX_PRACTICE_EVALUATION_DIMENSIONS,
+    PracticeDimensionScore,
+    PracticeEvaluationScore,
+)
 from riva.schemas.practice_interactions import PracticeAnswerContent
+from riva.schemas.practice_recommendation import PracticeRecommendationOutput
+from riva.schemas.practice_review import (
+    MAX_PRACTICE_REVIEW_ITEMS,
+    ReviewItem,
+    ReviewOverallPerformance,
+    ReviewWeakness,
+)
 from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -74,6 +86,12 @@ class SubmitPrimaryAnswerRequest(APIModel):
 
 
 class RefreshPracticeFollowUpGenerationRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+
+
+class RefreshPracticeEvaluationRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
     version: Annotated[int, Field(ge=1)]
@@ -233,12 +251,64 @@ class PracticeEvaluatingResponse(PracticeActiveSessionBase):
     )
 
 
+class PracticeEvaluationResponse(PracticeAPIModel):
+    overall_score: PracticeEvaluationScore
+    dimension_scores: Annotated[
+        list[PracticeDimensionScore],
+        Field(min_length=4, max_length=MAX_PRACTICE_EVALUATION_DIMENSIONS),
+    ]
+    evaluated_at: datetime
+
+    _validate_evaluated_at = field_validator("evaluated_at")(
+        _validate_aware_timestamp
+    )
+
+
+class PracticeReviewContentResponse(PracticeAPIModel):
+    overall_performance: ReviewOverallPerformance
+    highlights: Annotated[
+        list[ReviewItem],
+        Field(max_length=MAX_PRACTICE_REVIEW_ITEMS),
+    ] = Field(default_factory=list)
+    main_issues: Annotated[
+        list[ReviewItem],
+        Field(max_length=MAX_PRACTICE_REVIEW_ITEMS),
+    ] = Field(default_factory=list)
+    improvement_suggestions: Annotated[
+        list[ReviewItem],
+        Field(max_length=MAX_PRACTICE_REVIEW_ITEMS),
+    ] = Field(default_factory=list)
+    reusable_answer_structure: Annotated[
+        list[ReviewItem],
+        Field(max_length=MAX_PRACTICE_REVIEW_ITEMS),
+    ] = Field(default_factory=list)
+    exposed_weaknesses: Annotated[
+        list[ReviewWeakness],
+        Field(max_length=MAX_PRACTICE_REVIEW_ITEMS),
+    ] = Field(default_factory=list)
+    recommendation: PracticeRecommendationOutput
+
+
+class PracticeReviewResponse(PracticeActiveSessionBase):
+    status: Literal["review"]
+    question: PracticeQuestionResponse
+    main_answer: PracticeAnswerResponse
+    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+        default_factory=list,
+        max_length=0,
+    )
+    follow_up_completion: PracticeNoFollowUpRequiredCompletionResponse
+    evaluation: PracticeEvaluationResponse
+    review: PracticeReviewContentResponse
+
+
 PracticeActiveSessionResponse = Annotated[
     PracticeGeneratingQuestionResponse
     | PracticeAnsweringResponse
     | PracticeGeneratingFollowUpResponse
     | PracticeAnsweringFollowUpResponse
-    | PracticeEvaluatingResponse,
+    | PracticeEvaluatingResponse
+    | PracticeReviewResponse,
     Field(discriminator="status"),
 ]
 
@@ -256,6 +326,7 @@ __all__ = [
     "PracticeAnsweringResponse",
     "PracticeAwaitingFollowUpExchangeResponse",
     "PracticeEvaluatingResponse",
+    "PracticeEvaluationResponse",
     "PracticeFollowUpQuestionResponse",
     "PracticeGeneratingFollowUpResponse",
     "PracticeGeneratingQuestionResponse",
@@ -264,11 +335,14 @@ __all__ = [
     "PracticeQuestionResponse",
     "PracticeReferenceAnswerNotRequestedResponse",
     "PracticeNoFollowUpRequiredCompletionResponse",
+    "PracticeReviewContentResponse",
+    "PracticeReviewResponse",
     "CurrentPracticeSessionResponse",
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
     "PracticeSessionStatus",
     "RefreshPracticeFollowUpGenerationRequest",
+    "RefreshPracticeEvaluationRequest",
     "RefreshPracticeQuestionGenerationRequest",
     "SubmitPrimaryAnswerRequest",
     "StartPracticeSessionRequest",

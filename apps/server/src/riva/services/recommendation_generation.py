@@ -312,7 +312,7 @@ class RecommendationGenerationService:
                 return canonical
 
             validated_output = _validate_output(output)
-            _validate_v1_contract(validated_output, context.input)
+            validate_recommendation_v1_contract(validated_output, context.input)
             now = self.clock()
             _require_aware_datetime(now)
 
@@ -548,7 +548,7 @@ class RecommendationGenerationService:
             raise RecommendationGenerationStateError(
                 PRACTICE_RECOMMENDATION_ARTIFACT_CONFLICT
             ) from None
-        _validate_v1_contract(canonical, input)
+        validate_recommendation_v1_contract(canonical, input)
         return canonical
 
     def _require_configuration(self) -> None:
@@ -577,10 +577,12 @@ def _validate_output(output: object) -> (
     return validated
 
 
-def _validate_v1_contract(
+def validate_recommendation_v1_contract(
     output: PracticeRetryCurrentRecommendation | PracticeNextQuestionRecommendation,
     input: PracticeRecommendationInput,
 ) -> None:
+    """Validate the frozen V1 recommendation contract without database access."""
+
     if isinstance(output, PracticeRetryCurrentRecommendation):
         return
     if not isinstance(output, PracticeNextQuestionRecommendation):
@@ -619,5 +621,6 @@ __all__ = [
     "RecommendationGenerationStateErrorCode",
     "practice_recommendation_idempotency_key",
     "practice_recommendation_output_from_artifact",
+    "validate_recommendation_v1_contract",
     "validate_recommendation_generation_run",
 ]
