@@ -1,6 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
@@ -18,13 +18,19 @@ from riva.models import (
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
     PracticeSession,
+    QuestionCard,
     TargetRole,
 )
+from riva.prompts import FOLLOW_UP_PROMPT
+from riva.schemas.follow_up import FollowUpRunPayload
 from riva.services.agent_runs import AgentRunService
 from riva.services.evaluation_generation import (
     EvaluationGenerationService,
+    EvaluationGenerationStateError,
+    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
     practice_evaluation_idempotency_key,
 )
+from riva.services.follow_up_generation import practice_follow_up_idempotency_key
 from riva.workers import AgentHandlerRegistry, AgentWorker, PracticeEvaluationHandler
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_follow_up_generation import (
@@ -64,6 +70,53 @@ def evaluation_response(score: int) -> dict[str, object]:
     }
 
 
+def succeeded_follow_up_run(
+    *,
+    user_id: UUID,
+    session: PracticeSession,
+    attempt: PracticeAttempt,
+    card: QuestionCard,
+    main_answer: PracticeAnswer,
+    order: int,
+    action: str,
+    previous_question: PracticeFollowUpQuestion | None = None,
+    previous_answer: PracticeAnswer | None = None,
+) -> AgentRun:
+    payload = FollowUpRunPayload(
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=main_answer.id,
+        interaction_language=session.language,
+        next_follow_up_order=order,
+        previous_follow_up_question_id=(
+            previous_question.id if previous_question is not None else None
+        ),
+        previous_follow_up_answer_id=(
+            previous_answer.id if previous_answer is not None else None
+        ),
+    )
+    return AgentRun(
+        id=uuid4(),
+        user_id=user_id,
+        agent_id="follow-up-generator",
+        prompt_id=FOLLOW_UP_PROMPT.prompt_id,
+        prompt_version=FOLLOW_UP_PROMPT.version,
+        output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+        status=AgentRunStatus.SUCCEEDED,
+        payload=payload.model_dump(mode="json", by_alias=True),
+        idempotency_key=practice_follow_up_idempotency_key(attempt.id, order),
+        attempt_count=1,
+        max_attempts=3,
+        started_at=START,
+        finished_at=START,
+        provider="follow-up-integration",
+        model="follow-up-integration-model",
+        input_tokens=1,
+        output_tokens=1,
+        result={"action": action},
+    )
+
+
 async def prepare_context(
     database: Database,
     shape: str,
@@ -72,20 +125,35 @@ async def prepare_context(
     async with database.sessionmaker() as session:
         stored_session = await session.get(PracticeSession, practice_session.id)
         stored_attempt = await session.get(PracticeAttempt, attempt.id)
+        stored_card = await session.get(QuestionCard, card.id)
+        main_answer = await session.scalar(
+            select(PracticeAnswer).where(
+                PracticeAnswer.attempt_id == attempt.id,
+                PracticeAnswer.kind == "main",
+            )
+        )
         assert stored_session is not None
         assert stored_attempt is not None
+        assert stored_card is not None
+        assert main_answer is not None
         stored_attempt.status = "evaluating"
 
-        first_decision_run = succeeded_seed_run(owner.id)
-        terminal_decision_run = succeeded_seed_run(owner.id)
-        session.add_all([first_decision_run, terminal_decision_run])
-
         if shape == "none":
+            terminal_run = succeeded_follow_up_run(
+                user_id=owner.id,
+                session=stored_session,
+                attempt=stored_attempt,
+                card=stored_card,
+                main_answer=main_answer,
+                order=1,
+                action="complete",
+            )
+            session.add(terminal_run)
             session.add(
                 PracticeFollowUpDecision(
                     id=uuid4(),
                     attempt_id=stored_attempt.id,
-                    source_agent_run_id=card.source_agent_run_id,
+                    source_agent_run_id=terminal_run.id,
                     order=1,
                     action="complete",
                     follow_up_question_id=None,
@@ -93,7 +161,15 @@ async def prepare_context(
                 )
             )
         else:
-            question_run_1 = succeeded_seed_run(owner.id)
+            question_run_1 = succeeded_follow_up_run(
+                user_id=owner.id,
+                session=stored_session,
+                attempt=stored_attempt,
+                card=stored_card,
+                main_answer=main_answer,
+                order=1,
+                action="askFollowUp",
+            )
             question_1 = PracticeFollowUpQuestion(
                 id=uuid4(),
                 attempt_id=stored_attempt.id,
@@ -119,7 +195,7 @@ async def prepare_context(
                 PracticeFollowUpDecision(
                     id=uuid4(),
                     attempt_id=stored_attempt.id,
-                    source_agent_run_id=first_decision_run.id,
+                    source_agent_run_id=question_run_1.id,
                     order=1,
                     action="askFollowUp",
                     follow_up_question_id=question_1.id,
@@ -129,7 +205,17 @@ async def prepare_context(
 
             terminal_question_id = None
             if shape == "two":
-                question_run_2 = succeeded_seed_run(owner.id)
+                question_run_2 = succeeded_follow_up_run(
+                    user_id=owner.id,
+                    session=stored_session,
+                    attempt=stored_attempt,
+                    card=stored_card,
+                    main_answer=main_answer,
+                    order=2,
+                    action="askFollowUp",
+                    previous_question=question_1,
+                    previous_answer=answer_1,
+                )
                 question_2 = PracticeFollowUpQuestion(
                     id=uuid4(),
                     attempt_id=stored_attempt.id,
@@ -152,12 +238,26 @@ async def prepare_context(
                 )
                 session.add_all([question_run_2, question_2, answer_2])
                 terminal_question_id = question_2.id
+                terminal_run = question_run_2
+            else:
+                terminal_run = succeeded_follow_up_run(
+                    user_id=owner.id,
+                    session=stored_session,
+                    attempt=stored_attempt,
+                    card=stored_card,
+                    main_answer=main_answer,
+                    order=2,
+                    action="complete",
+                    previous_question=question_1,
+                    previous_answer=answer_1,
+                )
+                session.add(terminal_run)
 
             session.add(
                 PracticeFollowUpDecision(
                     id=uuid4(),
                     attempt_id=stored_attempt.id,
-                    source_agent_run_id=terminal_decision_run.id,
+                    source_agent_run_id=terminal_run.id,
                     order=2,
                     action="complete" if shape == "one" else "askFollowUp",
                     follow_up_question_id=terminal_question_id,
@@ -356,6 +456,43 @@ def test_evaluation_retry_preserves_first_canonical_artifact() -> None:
                     assert evaluations[0].overall_score == 55
                     assert stored_run.result is not None
                     assert stored_run.result["overallScore"] == 55
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_evaluation_rejects_seed_agent_follow_up_provenance() -> None:
+    async def run_test() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                owner, _, attempt = await prepare_context(database, "none")
+
+                async with database.sessionmaker() as session:
+                    decision = await session.scalar(
+                        select(PracticeFollowUpDecision).where(
+                            PracticeFollowUpDecision.attempt_id == attempt.id
+                        )
+                    )
+                    assert decision is not None
+                    invalid_source = succeeded_seed_run(owner.id)
+                    session.add(invalid_source)
+                    await session.flush()
+                    decision.source_agent_run_id = invalid_source.id
+                    await session.commit()
+
+                with pytest.raises(EvaluationGenerationStateError) as exc_info:
+                    await enqueue(
+                        database,
+                        owner.id,
+                        attempt.id,
+                        "noFollowUpRequired",
+                    )
+
+                assert exc_info.value.code == (
+                    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+                )
             finally:
                 await database.reset()
 

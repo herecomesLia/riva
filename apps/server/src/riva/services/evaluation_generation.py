@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, cast
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
+    AgentRunStatus,
     PracticeAnswer,
     PracticeAttempt,
     PracticeEvaluation,
@@ -31,12 +32,18 @@ from riva.schemas.evaluation import (
     PracticeEvaluationFollowUpCompletionReason,
     PracticeEvaluationOutput,
 )
+from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerContent,
     PracticeAnswerKind,
 )
 from riva.services.agent_runs import AgentRunService
+from riva.services.follow_up_generation import (
+    FollowUpGenerationStateError,
+    practice_follow_up_idempotency_key,
+    validate_follow_up_generation_run,
+)
 from riva.utils import utc_now
 
 
@@ -100,6 +107,12 @@ class _EvaluationContext:
         tuple[PracticeFollowUpQuestion, PracticeAnswer], ...
     ]
     input: EvaluationInput
+
+
+@dataclass(frozen=True)
+class _ValidatedFollowUpSource:
+    run: AgentRun
+    payload: FollowUpRunPayload
 
 
 def practice_evaluation_idempotency_key(attempt_id: UUID) -> str:
@@ -429,6 +442,15 @@ class EvaluationGenerationService:
             expected_id=main_answer_id,
         )
         main_content = _answer_content(main_answer)
+        follow_up_sources = await self._load_follow_up_sources(
+            attempt=attempt,
+            practice_session=practice_session,
+            question_card=question_card,
+            main_answer=main_answer,
+            questions=questions,
+            decisions=decisions,
+            for_update=for_update,
+        )
 
         terminal_decision = _terminal_decision(
             decisions,
@@ -443,6 +465,7 @@ class EvaluationGenerationService:
             decisions=decisions,
             terminal_decision=terminal_decision,
             payload=payload,
+            follow_up_sources=follow_up_sources,
         )
 
         try:
@@ -475,6 +498,74 @@ class EvaluationGenerationService:
             follow_up_exchanges=tuple(follow_up_exchanges),
             input=evaluation_input,
         )
+
+    async def _load_follow_up_sources(
+        self,
+        *,
+        attempt: PracticeAttempt,
+        practice_session: PracticeSession,
+        question_card: QuestionCard,
+        main_answer: PracticeAnswer,
+        questions: list[PracticeFollowUpQuestion],
+        decisions: list[PracticeFollowUpDecision],
+        for_update: bool,
+    ) -> dict[UUID, _ValidatedFollowUpSource]:
+        source_ids = {
+            decision.source_agent_run_id for decision in decisions
+        }
+        source_ids.update(question.source_agent_run_id for question in questions)
+        source_statement = select(AgentRun).where(AgentRun.id.in_(source_ids))
+        source_runs = await self._scalars(
+            source_statement,
+            for_update=for_update,
+        )
+        source_by_id = {run.id: run for run in source_runs}
+        if len(source_by_id) != len(source_ids):
+            raise EvaluationGenerationStateError(
+                PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+            )
+
+        validated: dict[UUID, _ValidatedFollowUpSource] = {}
+        for source_id in source_ids:
+            source = source_by_id[source_id]
+            validated[source_id] = _validate_follow_up_source(
+                source,
+                attempt=attempt,
+                practice_session=practice_session,
+                question_card=question_card,
+                main_answer=main_answer,
+            )
+
+        for decision in decisions:
+            if decision.attempt_id != attempt.id:
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+                )
+            if decision.source_agent_run_id not in validated:
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+                )
+
+        for question in questions:
+            source = validated.get(question.source_agent_run_id)
+            linked_decisions = [
+                decision
+                for decision in decisions
+                if decision.follow_up_question_id == question.id
+            ]
+            if (
+                question.attempt_id != attempt.id
+                or source is None
+                or source.payload.next_follow_up_order != question.order
+                or len(linked_decisions) != 1
+                or linked_decisions[0].action != "askFollowUp"
+                or linked_decisions[0].source_agent_run_id
+                != question.source_agent_run_id
+            ):
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+                )
+        return validated
 
     async def _all_answers(
         self,
@@ -537,6 +628,46 @@ class EvaluationGenerationService:
     def _require_configuration(self) -> None:
         if not self.llm_model:
             raise ValueError("llm_model must not be empty")
+
+
+def _validate_follow_up_source(
+    run: AgentRun,
+    *,
+    attempt: PracticeAttempt,
+    practice_session: PracticeSession,
+    question_card: QuestionCard,
+    main_answer: PracticeAnswer,
+) -> _ValidatedFollowUpSource:
+    if (
+        run.status != AgentRunStatus.SUCCEEDED
+        or run.user_id != practice_session.user_id
+        or run.user_id != attempt.user_id
+    ):
+        raise EvaluationGenerationStateError(
+            PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+        )
+    try:
+        payload = validate_follow_up_generation_run(run)
+        expected_idempotency_key = practice_follow_up_idempotency_key(
+            attempt.id,
+            payload.next_follow_up_order,
+        )
+    except (FollowUpGenerationStateError, TypeError, ValueError, ValidationError):
+        raise EvaluationGenerationStateError(
+            PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+        ) from None
+
+    if (
+        payload.attempt_id != attempt.id
+        or payload.question_card_id != question_card.id
+        or payload.main_answer_id != main_answer.id
+        or payload.interaction_language != practice_session.language
+        or run.idempotency_key != expected_idempotency_key
+    ):
+        raise EvaluationGenerationStateError(
+            PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+        )
+    return _ValidatedFollowUpSource(run=run, payload=payload)
 
 
 def _completion_reason(
@@ -673,6 +804,7 @@ def _validate_completion_graph(
     decisions: list[PracticeFollowUpDecision],
     terminal_decision: PracticeFollowUpDecision,
     payload: EvaluationRunPayload | None,
+    follow_up_sources: Mapping[UUID, _ValidatedFollowUpSource],
 ) -> list[tuple[PracticeFollowUpQuestion, PracticeAnswer]]:
     follow_up_answers = [
         answer
@@ -710,6 +842,13 @@ def _validate_completion_graph(
             raise EvaluationGenerationStateError(
                 PRACTICE_EVALUATION_COMPLETION_CONFLICT
             )
+        _validate_follow_up_decision_payload(
+            terminal_decision,
+            follow_up_sources=follow_up_sources,
+            expected_order=1,
+            previous_question_id=None,
+            previous_answer_id=None,
+        )
         if payload is not None and any(
             value is not None
             for value in (
@@ -789,8 +928,23 @@ def _validate_completion_graph(
         raise EvaluationGenerationStateError(
             PRACTICE_EVALUATION_COMPLETION_CONFLICT
         )
+    _validate_follow_up_decision_payload(
+        first_decision,
+        follow_up_sources=follow_up_sources,
+        expected_order=1,
+        previous_question_id=None,
+        previous_answer_id=None,
+    )
 
     second_decision = decisions_by_order[2]
+    first_answer = answer_by_question[ordered_questions[0].id]
+    _validate_follow_up_decision_payload(
+        second_decision,
+        follow_up_sources=follow_up_sources,
+        expected_order=2,
+        previous_question_id=ordered_questions[0].id,
+        previous_answer_id=first_answer.id,
+    )
     if len(ordered_questions) == 1:
         valid_terminal = (
             second_decision.action == "complete"
@@ -831,6 +985,32 @@ def _validate_completion_graph(
                 PRACTICE_EVALUATION_CONTEXT_CONFLICT
             )
     return exchanges
+
+
+def _validate_follow_up_decision_payload(
+    decision: PracticeFollowUpDecision,
+    *,
+    follow_up_sources: Mapping[UUID, _ValidatedFollowUpSource],
+    expected_order: int,
+    previous_question_id: UUID | None,
+    previous_answer_id: UUID | None,
+) -> None:
+    source = follow_up_sources.get(decision.source_agent_run_id)
+    if source is None:
+        raise EvaluationGenerationStateError(
+            PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+        )
+    source_payload = source.payload
+    if (
+        decision.order != expected_order
+        or source_payload.next_follow_up_order != expected_order
+        or source_payload.previous_follow_up_question_id
+        != previous_question_id
+        or source_payload.previous_follow_up_answer_id != previous_answer_id
+    ):
+        raise EvaluationGenerationStateError(
+            PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+        )
 
 
 def _question_order(

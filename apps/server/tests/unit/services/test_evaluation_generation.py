@@ -16,18 +16,21 @@ from riva.models import (
     PracticeSession,
     QuestionCard,
 )
-from riva.prompts import PRACTICE_EVALUATION_PROMPT
+from riva.prompts import FOLLOW_UP_PROMPT, PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import (
     EvaluationRunPayload,
     PracticeEvaluationOutput,
 )
+from riva.schemas.follow_up import FollowUpRunPayload
 from riva.services.evaluation_generation import (
     PRACTICE_EVALUATION_ARTIFACT_CONFLICT,
     PRACTICE_EVALUATION_CONTEXT_CONFLICT,
+    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
     EvaluationGenerationService,
     EvaluationGenerationStateError,
     practice_evaluation_idempotency_key,
 )
+from riva.services.follow_up_generation import practice_follow_up_idempotency_key
 
 
 NOW = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
@@ -208,6 +211,8 @@ def context_graph(
                 created_at=NOW,
             )
         )
+        for index, question in enumerate(questions):
+            question.source_agent_run_id = decisions[index].source_agent_run_id
     return (
         session,
         attempt,
@@ -264,6 +269,60 @@ def run_for(
     )
 
 
+def follow_up_source_runs(
+    attempt: PracticeAttempt,
+    session: PracticeSession,
+    card: QuestionCard,
+    main_answer: PracticeAnswer,
+    questions: list[PracticeFollowUpQuestion],
+    follow_up_answers: list[PracticeAnswer],
+    decisions: list[PracticeFollowUpDecision],
+) -> list[AgentRun]:
+    runs: list[AgentRun] = []
+    for decision in decisions:
+        previous_question = questions[0] if decision.order == 2 else None
+        previous_answer = follow_up_answers[0] if decision.order == 2 else None
+        payload = FollowUpRunPayload(
+            attempt_id=attempt.id,
+            question_card_id=card.id,
+            main_answer_id=main_answer.id,
+            interaction_language=session.language,
+            next_follow_up_order=decision.order,
+            previous_follow_up_question_id=(
+                previous_question.id if previous_question is not None else None
+            ),
+            previous_follow_up_answer_id=(
+                previous_answer.id if previous_answer is not None else None
+            ),
+        )
+        runs.append(
+            AgentRun(
+                id=decision.source_agent_run_id,
+                user_id=attempt.user_id,
+                agent_id="follow-up-generator",
+                prompt_id=FOLLOW_UP_PROMPT.prompt_id,
+                prompt_version=FOLLOW_UP_PROMPT.version,
+                output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+                status=AgentRunStatus.SUCCEEDED,
+                payload=payload.model_dump(mode="json", by_alias=True),
+                idempotency_key=practice_follow_up_idempotency_key(
+                    attempt.id,
+                    decision.order,
+                ),
+                attempt_count=1,
+                max_attempts=3,
+                started_at=NOW,
+                finished_at=NOW,
+                provider="fake-follow-up",
+                model="test-model",
+                input_tokens=1,
+                output_tokens=1,
+                result={"action": decision.action},
+            )
+        )
+    return runs
+
+
 def session_for_context(
     attempt: PracticeAttempt,
     practice_session: PracticeSession,
@@ -274,7 +333,18 @@ def session_for_context(
     *,
     for_update: bool = False,
     extra_scalars: list[object] | None = None,
+    source_runs: list[AgentRun] | None = None,
 ) -> ScriptedSession:
+    if source_runs is None:
+        source_runs = follow_up_source_runs(
+            attempt,
+            practice_session,
+            card,
+            answers[0],
+            questions,
+            answers[1:],
+            decisions,
+        )
     scalar_values = [attempt, practice_session]
     if for_update:
         scalar_values.append(attempt)
@@ -285,6 +355,7 @@ def session_for_context(
             answers,
             questions,
             decisions,
+            source_runs,
         ],
     )
 
@@ -346,6 +417,89 @@ def load_context_values(shape: str) -> tuple[AgentRun, tuple[object, ...]]:
         follow_answers,
         decisions,
     )
+
+
+def evaluation_context_with_sources(
+    shape: str,
+) -> tuple[
+    AgentRun,
+    PracticeSession,
+    PracticeAttempt,
+    QuestionCard,
+    PracticeAnswer,
+    list[PracticeFollowUpQuestion],
+    list[PracticeAnswer],
+    list[PracticeFollowUpDecision],
+    list[AgentRun],
+]:
+    run, values = load_context_values(shape)
+    session, attempt, card, main, questions, follow_answers, decisions = values
+    source_runs = follow_up_source_runs(
+        attempt,
+        session,
+        card,
+        main,
+        questions,
+        follow_answers,
+        decisions,
+    )
+    return (
+        run,
+        session,
+        attempt,
+        card,
+        main,
+        questions,
+        follow_answers,
+        decisions,
+        source_runs,
+    )
+
+
+def assert_follow_up_provenance_rejected(
+    shape: str,
+    mutate: Any,
+) -> None:
+    (
+        run,
+        session,
+        attempt,
+        card,
+        main,
+        questions,
+        follow_answers,
+        decisions,
+        source_runs,
+    ) = evaluation_context_with_sources(shape)
+    mutate(
+        run,
+        session,
+        attempt,
+        card,
+        main,
+        questions,
+        follow_answers,
+        decisions,
+        source_runs,
+    )
+    db = session_for_context(
+        attempt,
+        session,
+        card,
+        [main, *follow_answers],
+        questions,
+        decisions,
+        source_runs=source_runs,
+    )
+
+    with pytest.raises(EvaluationGenerationStateError) as exc_info:
+        asyncio.run(
+            EvaluationGenerationService(
+                db  # type: ignore[arg-type]
+            ).load_generation_input(run)
+        )
+
+    assert exc_info.value.code == PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
 
 
 @pytest.mark.parametrize(
@@ -415,6 +569,7 @@ def test_enqueue_freezes_the_complete_evaluation_graph(
         PracticeAnswer,
         PracticeFollowUpQuestion,
         PracticeFollowUpDecision,
+        AgentRun,
     ]
 
 
@@ -656,3 +811,99 @@ def test_malformed_persisted_artifact_is_not_replaced_on_retry() -> None:
         )
 
     assert exc_info.value.code == PRACTICE_EVALUATION_ARTIFACT_CONFLICT
+
+
+def test_follow_up_decision_source_run_must_exist() -> None:
+    assert_follow_up_provenance_rejected(
+        "none",
+        lambda _run, _session, _attempt, _card, _main, _questions, _answers,
+        _decisions, source_runs: source_runs.clear(),
+    )
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["agent_id", "prompt_id", "prompt_version", "output_schema_id"],
+)
+def test_follow_up_source_run_metadata_must_be_canonical(field: str) -> None:
+    def mutate(*args: object) -> None:
+        source_runs = cast(list[AgentRun], args[-1])
+        setattr(source_runs[0], field, "wrong-value")
+
+    assert_follow_up_provenance_rejected("none", mutate)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        AgentRunStatus.QUEUED,
+        AgentRunStatus.RUNNING,
+        AgentRunStatus.FAILED,
+    ],
+)
+def test_follow_up_source_run_must_be_succeeded(status: AgentRunStatus) -> None:
+    def mutate(*args: object) -> None:
+        source_runs = cast(list[AgentRun], args[-1])
+        source_runs[0].status = status
+
+    assert_follow_up_provenance_rejected("none", mutate)
+
+
+@pytest.mark.parametrize("field", ["attemptId", "questionCardId", "mainAnswerId"])
+def test_follow_up_source_payload_must_match_frozen_resources(field: str) -> None:
+    def mutate(*args: object) -> None:
+        source_runs = cast(list[AgentRun], args[-1])
+        source_runs[0].payload[field] = str(uuid4())
+
+    assert_follow_up_provenance_rejected("none", mutate)
+
+
+def test_follow_up_source_payload_language_must_match_session() -> None:
+    def mutate(*args: object) -> None:
+        source_runs = cast(list[AgentRun], args[-1])
+        source_runs[0].payload["interactionLanguage"] = "zh-CN"
+
+    assert_follow_up_provenance_rejected("none", mutate)
+
+
+def test_follow_up_source_run_must_use_stable_idempotency_key() -> None:
+    def mutate(*args: object) -> None:
+        source_runs = cast(list[AgentRun], args[-1])
+        source_runs[0].idempotency_key = "wrong-idempotency-key"
+
+    assert_follow_up_provenance_rejected("none", mutate)
+
+
+def test_order_one_follow_up_source_must_not_contain_previous_ids() -> None:
+    def mutate(*args: object) -> None:
+        source_runs = cast(list[AgentRun], args[-1])
+        source_runs[0].payload["previousFollowUpQuestionId"] = str(uuid4())
+        source_runs[0].payload["previousFollowUpAnswerId"] = str(uuid4())
+
+    assert_follow_up_provenance_rejected("none", mutate)
+
+
+def test_order_two_follow_up_source_previous_ids_must_match_first_exchange() -> None:
+    def mutate(*args: object) -> None:
+        source_runs = cast(list[AgentRun], args[-1])
+        source_runs[1].payload["previousFollowUpQuestionId"] = str(uuid4())
+
+    assert_follow_up_provenance_rejected("one", mutate)
+
+
+def test_follow_up_question_source_must_match_ask_decision_source() -> None:
+    def mutate(*args: object) -> None:
+        questions = cast(list[PracticeFollowUpQuestion], args[5])
+        source_runs = cast(list[AgentRun], args[-1])
+        questions[0].source_agent_run_id = source_runs[1].id
+
+    assert_follow_up_provenance_rejected("two", mutate)
+
+
+def test_two_follow_up_second_question_source_must_match_second_decision() -> None:
+    def mutate(*args: object) -> None:
+        questions = cast(list[PracticeFollowUpQuestion], args[5])
+        source_runs = cast(list[AgentRun], args[-1])
+        questions[1].source_agent_run_id = source_runs[0].id
+
+    assert_follow_up_provenance_rejected("two", mutate)
