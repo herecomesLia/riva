@@ -19,6 +19,7 @@ from riva.schemas.evaluation import (
     PracticeEvaluationFollowUpCompletionReason,
     PracticeEvaluationOutput,
 )
+from riva.schemas.profile import StandardUUID
 from riva.schemas.practice_review import PracticeReviewOutput
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -89,6 +90,22 @@ RecommendationFocusAreaList = Annotated[
 
 class _RecommendationModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class RecommendationRunPayload(_RecommendationModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    attempt_id: StandardUUID = Field(alias="attemptId")
+    evaluation_id: StandardUUID = Field(alias="evaluationId")
+    review_id: StandardUUID = Field(alias="reviewId")
+    interaction_language: InteractionLanguage = Field(
+        alias="interactionLanguage"
+    )
 
 
 class PracticeRetryCurrentRecommendation(_RecommendationModel):
@@ -166,6 +183,7 @@ __all__ = [
     "PracticeRecommendationOutput",
     "PracticeRecommendationQuestionContext",
     "PracticeRetryCurrentRecommendation",
+    "RecommendationRunPayload",
     "RecommendationFocusArea",
     "RecommendationFocusAreaList",
     "RecommendationReason",

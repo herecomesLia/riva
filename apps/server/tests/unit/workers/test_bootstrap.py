@@ -10,6 +10,7 @@ from riva.agents import (
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
     PracticeEvaluationAgent,
+    PracticeRecommendationAgent,
     PracticeReviewAgent,
     QuestionGenerationAgent,
     ResumeParsingAgent,
@@ -23,6 +24,7 @@ from riva.workers import (
     JobDescriptionParsingHandler,
     MatchingAnalysisHandler,
     PracticeEvaluationHandler,
+    PracticeRecommendationHandler,
     PracticeReviewHandler,
     QuestionGenerationHandler,
     ResumeParsingWorkerHandler,
@@ -323,11 +325,17 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(practice_review.agent, PracticeReviewAgent)
     assert practice_review.agent.provider is provider
     assert practice_review.agent.model == "qwen-test-model"
+    practice_recommendation = registry.get("practice-recommender")
+    assert isinstance(practice_recommendation, PracticeRecommendationHandler)
+    assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
+    assert practice_recommendation.agent.provider is provider
+    assert practice_recommendation.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",
+        "practice-recommender",
         "practice-reviewer",
         "question-generator",
         "resume-parser",
@@ -376,11 +384,17 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(practice_review.agent, PracticeReviewAgent)
     assert practice_review.agent.provider is handler.agent.provider
     assert practice_review.agent.model == "qwen-test-model"
+    practice_recommendation = registry.get("practice-recommender")
+    assert isinstance(practice_recommendation, PracticeRecommendationHandler)
+    assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
+    assert practice_recommendation.agent.provider is handler.agent.provider
+    assert practice_recommendation.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",
+        "practice-recommender",
         "practice-reviewer",
         "question-generator",
         "resume-parser",

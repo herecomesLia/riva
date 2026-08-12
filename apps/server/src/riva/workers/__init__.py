@@ -8,6 +8,7 @@ from riva.workers.follow_up import FollowUpHandler
 from riva.workers.job_description_parsing import JobDescriptionParsingHandler
 from riva.workers.matching_analysis import MatchingAnalysisHandler
 from riva.workers.practice_evaluation import PracticeEvaluationHandler
+from riva.workers.practice_recommendation import PracticeRecommendationHandler
 from riva.workers.practice_review import PracticeReviewHandler
 from riva.workers.question_generation import QuestionGenerationHandler
 from riva.workers.resume_parsing import ResumeParsingWorkerHandler
@@ -23,6 +24,7 @@ __all__ = [
     "QuestionGenerationHandler",
     "FollowUpHandler",
     "PracticeEvaluationHandler",
+    "PracticeRecommendationHandler",
     "PracticeReviewHandler",
     "ResumeParsingWorkerHandler",
     "AgentWorker",

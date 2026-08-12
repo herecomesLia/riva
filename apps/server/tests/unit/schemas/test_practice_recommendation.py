@@ -1,4 +1,5 @@
 from copy import deepcopy
+from uuid import uuid4
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -7,6 +8,7 @@ from riva.schemas.practice_recommendation import (
     PracticeNextQuestionPlan,
     PracticeRecommendationInput,
     PracticeRecommendationOutput,
+    RecommendationRunPayload,
     PracticeRetryCurrentRecommendation,
 )
 
@@ -191,6 +193,53 @@ def test_recommendation_output_validation_does_not_mutate_payload() -> None:
     output_adapter().validate_python(payload)
 
     assert payload == before
+
+
+def test_recommendation_run_payload_freezes_only_canonical_artifact_ids() -> None:
+    attempt_id = uuid4()
+    evaluation_id = uuid4()
+    review_id = uuid4()
+    parsed = RecommendationRunPayload.model_validate(
+        {
+            "attemptId": str(attempt_id),
+            "evaluationId": str(evaluation_id),
+            "reviewId": str(review_id),
+            "interactionLanguage": "en",
+        }
+    )
+
+    assert parsed.attempt_id == attempt_id
+    assert parsed.evaluation_id == evaluation_id
+    assert parsed.review_id == review_id
+    assert parsed.model_dump(mode="json", by_alias=True) == {
+        "attemptId": str(attempt_id),
+        "evaluationId": str(evaluation_id),
+        "reviewId": str(review_id),
+        "interactionLanguage": "en",
+    }
+
+    for field in (
+        "questionCardId",
+        "reviewRunId",
+        "evaluationRunId",
+        "mainAnswerId",
+        "answer",
+        "followUpQuestionId",
+        "question",
+        "overallScore",
+        "weaknesses",
+        "action",
+    ):
+        with pytest.raises(ValidationError):
+            RecommendationRunPayload.model_validate(
+                {
+                    "attemptId": str(attempt_id),
+                    "evaluationId": str(evaluation_id),
+                    "reviewId": str(review_id),
+                    "interactionLanguage": "en",
+                    field: {},
+                }
+            )
 
 
 def test_next_question_plan_has_no_extra_fields() -> None:
