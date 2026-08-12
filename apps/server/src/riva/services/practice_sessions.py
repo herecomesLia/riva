@@ -16,13 +16,22 @@ from riva.models import (
     AgentRunStatus,
     PracticeAnswer,
     PracticeAttempt,
+    PracticeEvaluation,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
     PracticeSession,
     QuestionCard,
     User,
 )
-from riva.prompts import FOLLOW_UP_PROMPT, QUESTION_GENERATION_PROMPT
+from riva.prompts import (
+    FOLLOW_UP_PROMPT,
+    PRACTICE_EVALUATION_PROMPT,
+    QUESTION_GENERATION_PROMPT,
+)
+from riva.schemas.evaluation import (
+    EvaluationRunPayload,
+    PracticeEvaluationFollowUpCompletionReason,
+)
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import (
     PracticeAnswerContent,
@@ -39,6 +48,13 @@ from riva.services.follow_up_generation import (
     follow_up_output_from_persistence,
     practice_follow_up_idempotency_key,
     validate_follow_up_generation_run,
+)
+from riva.services.evaluation_generation import (
+    EvaluationGenerationService,
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+    practice_evaluation_output_from_artifact,
+    validate_evaluation_generation_run,
 )
 from riva.services.question_generation import (
     QuestionGenerationService,
@@ -60,6 +76,8 @@ PracticeSessionStateErrorCode = Literal[
     "practice_question_generation_state_conflict",
     "practice_follow_up_generation_failed",
     "practice_follow_up_generation_state_conflict",
+    "practice_evaluation_generation_state_conflict",
+    "practice_evaluation_generation_unavailable",
 ]
 
 PRACTICE_SESSION_NOT_FOUND: PracticeSessionStateErrorCode = (
@@ -94,6 +112,12 @@ PRACTICE_FOLLOW_UP_GENERATION_FAILED: PracticeSessionStateErrorCode = (
 )
 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
     "practice_follow_up_generation_state_conflict"
+)
+PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+    "practice_evaluation_generation_state_conflict"
+)
+PRACTICE_EVALUATION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+    "practice_evaluation_generation_unavailable"
 )
 
 
@@ -130,8 +154,16 @@ class PracticePrimaryAnswerWorkflowContext:
     follow_up_question: PracticeFollowUpQuestion | None
 
 
+@dataclass(frozen=True)
+class PracticeEvaluationWorkflowContext(PracticePrimaryAnswerWorkflowContext):
+    evaluation_generation_run: AgentRun
+    evaluation: PracticeEvaluation | None
+
+
 PracticePublicWorkflowContext = (
-    PracticeSessionWorkflowContext | PracticePrimaryAnswerWorkflowContext
+    PracticeSessionWorkflowContext
+    | PracticePrimaryAnswerWorkflowContext
+    | PracticeEvaluationWorkflowContext
 )
 
 
@@ -142,6 +174,10 @@ QuestionGenerationServiceFactory = Callable[
 FollowUpGenerationServiceFactory = Callable[
     ...,
     FollowUpGenerationService,
+]
+EvaluationGenerationServiceFactory = Callable[
+    ...,
+    EvaluationGenerationService,
 ]
 
 
@@ -157,6 +193,9 @@ class PracticeSessionService:
         follow_up_generation_service_factory: FollowUpGenerationServiceFactory = (
             FollowUpGenerationService
         ),
+        evaluation_generation_service_factory: EvaluationGenerationServiceFactory = (
+            EvaluationGenerationService
+        ),
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
@@ -166,6 +205,9 @@ class PracticeSessionService:
         )
         self.follow_up_generation_service_factory = (
             follow_up_generation_service_factory
+        )
+        self.evaluation_generation_service_factory = (
+            evaluation_generation_service_factory
         )
         self.clock = clock
 
@@ -493,17 +535,49 @@ class PracticeSessionService:
             _require_aware_datetime(now)
             if decision.action == "askFollowUp":
                 attempt.status = PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
-            elif decision.action == "complete":
-                attempt.status = PracticeAttemptStatus.EVALUATING.value
-            else:
+                attempt.updated_at = now
+                practice_session.version += 1
+                practice_session.updated_at = now
+                await self.session.commit()
+                return PracticePrimaryAnswerWorkflowContext(
+                    session=practice_session,
+                    attempt=attempt,
+                    question_card=card,
+                    main_answer=main_answer,
+                    follow_up_generation_run=follow_up_run,
+                    follow_up_decision=decision,
+                    follow_up_question=question,
+                )
+            if decision.action != "complete":
                 raise PracticeSessionStateError(
                     PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
                 )
+
+            previous_attempt_status = attempt.status
+            previous_attempt_updated_at = attempt.updated_at
+            attempt.status = PracticeAttemptStatus.EVALUATING.value
             attempt.updated_at = now
+            try:
+                await self.session.flush()
+                evaluation_generation_run = (
+                    await self._enqueue_evaluation_generation(
+                        user_id=user_id,
+                        practice_session=practice_session,
+                        attempt=attempt,
+                        question_card=card,
+                        main_answer=main_answer,
+                        complete_decision=decision,
+                    )
+                )
+            except BaseException:
+                attempt.status = previous_attempt_status
+                attempt.updated_at = previous_attempt_updated_at
+                raise
+
             practice_session.version += 1
             practice_session.updated_at = now
             await self.session.commit()
-            return PracticePrimaryAnswerWorkflowContext(
+            return PracticeEvaluationWorkflowContext(
                 session=practice_session,
                 attempt=attempt,
                 question_card=card,
@@ -511,6 +585,8 @@ class PracticeSessionService:
                 follow_up_generation_run=follow_up_run,
                 follow_up_decision=decision,
                 follow_up_question=question,
+                evaluation_generation_run=evaluation_generation_run,
+                evaluation=None,
             )
         except BaseException:
             await self.session.rollback()
@@ -755,6 +831,37 @@ class PracticeSessionService:
             raise PracticeSessionStateError(
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
             )
+        if decision.action == "complete":
+            evaluation_generation_run = await self._load_stable_evaluation_run(
+                user_id=practice_session.user_id,
+                attempt_id=attempt.id,
+                for_update=True,
+            )
+            self._validate_evaluation_run_lineage(
+                evaluation_generation_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                complete_decision=decision,
+            )
+            evaluation = await self._load_evaluation_artifact(
+                evaluation_generation_run,
+                attempt=attempt,
+                question_card=card,
+                for_update=True,
+            )
+            return PracticeEvaluationWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                follow_up_generation_run=follow_up_run,
+                follow_up_decision=decision,
+                follow_up_question=question,
+                evaluation_generation_run=evaluation_generation_run,
+                evaluation=evaluation,
+            )
         return PracticePrimaryAnswerWorkflowContext(
             session=practice_session,
             attempt=attempt,
@@ -943,6 +1050,31 @@ class PracticeSessionService:
             )
         return run
 
+    async def _load_stable_evaluation_run(
+        self,
+        *,
+        user_id: UUID,
+        attempt_id: UUID,
+        for_update: bool,
+    ) -> AgentRun:
+        statement = select(AgentRun).where(
+            AgentRun.user_id == user_id,
+            AgentRun.agent_id == "practice-evaluator",
+            AgentRun.prompt_id == PRACTICE_EVALUATION_PROMPT.prompt_id,
+            AgentRun.prompt_version == PRACTICE_EVALUATION_PROMPT.version,
+            AgentRun.idempotency_key == practice_evaluation_idempotency_key(
+                attempt_id
+            ),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
+        if run is None:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+            )
+        return run
+
     async def _enqueue_follow_up_generation(
         self,
         *,
@@ -971,6 +1103,48 @@ class PracticeSessionService:
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
                 source_code="follow_up_generation_unavailable",
             ) from None
+
+    async def _enqueue_evaluation_generation(
+        self,
+        *,
+        user_id: UUID,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_card: QuestionCard,
+        main_answer: PracticeAnswer,
+        complete_decision: PracticeFollowUpDecision,
+    ) -> AgentRun:
+        try:
+            run = await self._evaluation_generation_service().enqueue_generation_in_transaction(
+                user_id=user_id,
+                attempt_id=attempt.id,
+                interaction_language=practice_session.language,
+                follow_up_completion_reason=(
+                    PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+                ),
+                idempotency_key=practice_evaluation_idempotency_key(
+                    attempt.id
+                ),
+            )
+        except EvaluationGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        except ValueError:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
+                source_code="evaluation_generation_unavailable",
+            ) from None
+        self._validate_evaluation_run_lineage(
+            run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=question_card,
+            main_answer=main_answer,
+            complete_decision=complete_decision,
+        )
+        return run
 
     def _validate_follow_up_run_lineage(
         self,
@@ -1006,8 +1180,98 @@ class PracticeSessionService:
             )
         return payload
 
+    def _validate_evaluation_run_lineage(
+        self,
+        run: AgentRun,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_card: QuestionCard,
+        main_answer: PracticeAnswer,
+        complete_decision: PracticeFollowUpDecision,
+    ) -> EvaluationRunPayload:
+        try:
+            payload = validate_evaluation_generation_run(run)
+        except EvaluationGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        if (
+            run.id is None
+            or run.user_id != practice_session.user_id
+            or run.idempotency_key != practice_evaluation_idempotency_key(
+                attempt.id
+            )
+            or payload.attempt_id != attempt.id
+            or payload.question_card_id != question_card.id
+            or payload.main_answer_id != main_answer.id
+            or payload.interaction_language != practice_session.language
+            or payload.follow_up_completion_reason
+            != PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+            or payload.terminal_follow_up_decision_id != complete_decision.id
+            or any(
+                value is not None
+                for value in (
+                    payload.follow_up_question_1_id,
+                    payload.follow_up_answer_1_id,
+                    payload.follow_up_question_2_id,
+                    payload.follow_up_answer_2_id,
+                )
+            )
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+            )
+        return payload
+
+    async def _load_evaluation_artifact(
+        self,
+        run: AgentRun,
+        *,
+        attempt: PracticeAttempt,
+        question_card: QuestionCard,
+        for_update: bool,
+    ) -> PracticeEvaluation | None:
+        if run.status in {
+            AgentRunStatus.QUEUED,
+            AgentRunStatus.RUNNING,
+            AgentRunStatus.FAILED,
+        }:
+            return None
+        if run.status != AgentRunStatus.SUCCEEDED or run.id is None:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+            )
+        statement = select(PracticeEvaluation).where(
+            PracticeEvaluation.source_agent_run_id == run.id
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        evaluation = await self.session.scalar(statement)
+        if evaluation is None or evaluation.attempt_id != attempt.id:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+            )
+        try:
+            practice_evaluation_output_from_artifact(
+                evaluation,
+                scoring_focus_count=len(question_card.scoring_focus),
+            )
+        except (TypeError, ValueError):
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+            ) from None
+        return evaluation
+
     def _follow_up_generation_service(self) -> FollowUpGenerationService:
         return self.follow_up_generation_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
+    def _evaluation_generation_service(self) -> EvaluationGenerationService:
+        return self.evaluation_generation_service_factory(
             self.session,
             llm_model=self.llm_model,
         )
@@ -1181,14 +1445,39 @@ class PracticeSessionService:
                     raise PracticeSessionStateError(
                         PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
                     )
-            elif (
-                decision.action != "complete"
-                or question is not None
-            ):
+                return PracticePrimaryAnswerWorkflowContext(
+                    session=practice_session,
+                    attempt=attempt,
+                    question_card=card,
+                    main_answer=main_answer,
+                    follow_up_generation_run=follow_up_run,
+                    follow_up_decision=decision,
+                    follow_up_question=question,
+                )
+            if decision.action != "complete" or question is not None:
                 raise PracticeSessionStateError(
                     PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
                 )
-            return PracticePrimaryAnswerWorkflowContext(
+            evaluation_generation_run = await self._load_stable_evaluation_run(
+                user_id=practice_session.user_id,
+                attempt_id=attempt.id,
+                for_update=for_update,
+            )
+            self._validate_evaluation_run_lineage(
+                evaluation_generation_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                question_card=card,
+                main_answer=main_answer,
+                complete_decision=decision,
+            )
+            evaluation = await self._load_evaluation_artifact(
+                evaluation_generation_run,
+                attempt=attempt,
+                question_card=card,
+                for_update=for_update,
+            )
+            return PracticeEvaluationWorkflowContext(
                 session=practice_session,
                 attempt=attempt,
                 question_card=card,
@@ -1196,6 +1485,8 @@ class PracticeSessionService:
                 follow_up_generation_run=follow_up_run,
                 follow_up_decision=decision,
                 follow_up_question=question,
+                evaluation_generation_run=evaluation_generation_run,
+                evaluation=evaluation,
             )
 
         run, _ = await self._load_generation_run(
@@ -1457,6 +1748,8 @@ __all__ = [
     "PRACTICE_QUESTION_GENERATION_STATE_CONFLICT",
     "PRACTICE_FOLLOW_UP_GENERATION_FAILED",
     "PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT",
+    "PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT",
+    "PRACTICE_EVALUATION_GENERATION_UNAVAILABLE",
     "PRACTICE_SESSION_ALREADY_ACTIVE",
     "PRACTICE_SESSION_NOT_FOUND",
     "PRACTICE_SESSION_SOURCE_UNAVAILABLE",
@@ -1467,6 +1760,7 @@ __all__ = [
     "PracticeSessionStateError",
     "PracticeSessionStateErrorCode",
     "PracticePrimaryAnswerWorkflowContext",
+    "PracticeEvaluationWorkflowContext",
     "PracticePublicWorkflowContext",
     "PracticeSessionWorkflowContext",
     "practice_follow_up_idempotency_key",

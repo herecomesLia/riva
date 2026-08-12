@@ -10,12 +10,21 @@ from riva.models import (
     AgentRunStatus,
     PracticeAnswer,
     PracticeAttempt,
+    PracticeEvaluation,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
     PracticeSession,
     QuestionCard,
 )
-from riva.prompts import FOLLOW_UP_PROMPT, QUESTION_GENERATION_PROMPT
+from riva.prompts import (
+    FOLLOW_UP_PROMPT,
+    PRACTICE_EVALUATION_PROMPT,
+    QUESTION_GENERATION_PROMPT,
+)
+from riva.schemas.evaluation import (
+    EvaluationRunPayload,
+    PracticeEvaluationFollowUpCompletionReason,
+)
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import PracticeAnswerKind
 from riva.schemas.practice_sessions import PracticeSessionSelection
@@ -27,6 +36,8 @@ from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
+    PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
+    PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
     PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
@@ -37,9 +48,14 @@ from riva.services.practice_sessions import (
     PRACTICE_SESSION_VERSION_CONFLICT,
     PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE,
     PracticePrimaryAnswerWorkflowContext,
+    PracticeEvaluationWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
     practice_follow_up_idempotency_key,
+)
+from riva.services.evaluation_generation import (
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
 )
 from riva.services.follow_up_generation import FollowUpGenerationStateError
 from riva.services.question_generation import QuestionGenerationStateError
@@ -101,6 +117,27 @@ class FakeGenerationService:
 
 
 class FakeFollowUpGenerationService:
+    def __init__(
+        self,
+        run: AgentRun | None = None,
+        error: BaseException | None = None,
+    ) -> None:
+        self.run = run
+        self.error = error
+        self.calls: list[dict[str, object]] = []
+
+    async def enqueue_generation_in_transaction(
+        self,
+        **kwargs: object,
+    ) -> AgentRun:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        assert self.run is not None
+        return self.run
+
+
+class FakeEvaluationGenerationService:
     def __init__(
         self,
         run: AgentRun | None = None,
@@ -413,18 +450,104 @@ def follow_up_question(
     )
 
 
+def evaluation_run(
+    *,
+    user_id: UUID,
+    attempt_id: UUID,
+    question_card_id: UUID,
+    main_answer_id: UUID,
+    decision_id: UUID,
+    status: AgentRunStatus = AgentRunStatus.QUEUED,
+) -> AgentRun:
+    payload = EvaluationRunPayload(
+        attempt_id=attempt_id,
+        question_card_id=question_card_id,
+        main_answer_id=main_answer_id,
+        interaction_language="en",
+        follow_up_completion_reason=(
+            PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+        ),
+        terminal_follow_up_decision_id=decision_id,
+    )
+    return AgentRun(
+        id=uuid4(),
+        user_id=user_id,
+        agent_id="practice-evaluator",
+        prompt_id=PRACTICE_EVALUATION_PROMPT.prompt_id,
+        prompt_version=PRACTICE_EVALUATION_PROMPT.version,
+        output_schema_id=PRACTICE_EVALUATION_PROMPT.output_schema_id,
+        status=status,
+        payload=payload.model_dump(mode="json", by_alias=True),
+        idempotency_key=practice_evaluation_idempotency_key(attempt_id),
+        attempt_count=0 if status is AgentRunStatus.QUEUED else 1,
+        max_attempts=3,
+        available_at=NOW,
+        started_at=None if status is AgentRunStatus.QUEUED else NOW,
+        finished_at=(
+            NOW
+            if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
+            else None
+        ),
+        provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
+        model="test-model",
+        input_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        output_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        result={"overallScore": 80}
+        if status is AgentRunStatus.SUCCEEDED
+        else None,
+        error_code="provider_unavailable" if status is AgentRunStatus.FAILED else None,
+    )
+
+
+def evaluation_artifact(
+    *,
+    attempt_id: UUID,
+    run_id: UUID,
+) -> PracticeEvaluation:
+    return PracticeEvaluation(
+        id=uuid4(),
+        attempt_id=attempt_id,
+        source_agent_run_id=run_id,
+        overall_score=80,
+        dimension_scores=[
+            {
+                "dimension": dimension,
+                "score": 80,
+                "explanation": f"Evidence supports {dimension}.",
+            }
+            for dimension in (
+                "relevance",
+                "structure",
+                "specificity",
+                "communication",
+            )
+        ],
+        focus_assessments=[
+            {
+                "focusIndex": 0,
+                "status": "demonstrated",
+                "explanation": "The answer provides evidence.",
+            }
+        ],
+        evaluated_at=NOW,
+    )
+
+
 def service(
     session: ScriptedSession,
     fake_generation: FakeGenerationService | None = None,
     fake_follow_up: FakeFollowUpGenerationService | None = None,
+    fake_evaluation: FakeEvaluationGenerationService | None = None,
 ) -> PracticeSessionService:
     fake_generation = fake_generation or FakeGenerationService()
     fake_follow_up = fake_follow_up or FakeFollowUpGenerationService()
+    fake_evaluation = fake_evaluation or FakeEvaluationGenerationService()
     return PracticeSessionService(
         session,  # type: ignore[arg-type]
         llm_model="test-model",
         question_generation_service_factory=lambda _session, **kwargs: fake_generation,  # type: ignore[arg-type]
         follow_up_generation_service_factory=lambda _session, **kwargs: fake_follow_up,  # type: ignore[arg-type]
+        evaluation_generation_service_factory=lambda _session, **kwargs: fake_evaluation,  # type: ignore[arg-type]
         clock=lambda: NOW,
     )
 
@@ -1389,6 +1512,13 @@ def test_get_evaluating_recovers_complete_without_a_follow_up_question() -> None
         run_id=follow_up.id,
         action="complete",
     )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+    )
     scripted = ScriptedSession(
         active,
         attempt,
@@ -1398,13 +1528,14 @@ def test_get_evaluating_recovers_complete_without_a_follow_up_question() -> None
         follow_up,
         decision,
         None,
+        evaluation,
     )
 
     result = asyncio.run(
         service(scripted).get_active_session_context(user_id=active.user_id)
     )
 
-    assert isinstance(result, PracticePrimaryAnswerWorkflowContext)
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
     assert result.follow_up_decision is decision
     assert result.follow_up_question is None
     assert result.attempt.status == "evaluating"
@@ -1900,9 +2031,13 @@ def test_refresh_follow_up_ask_reconciles_canonical_question() -> None:
         decision,
         question,
     )
+    fake_evaluation = FakeEvaluationGenerationService()
 
     result = asyncio.run(
-        service(scripted).refresh_follow_up_generation(
+        service(
+            scripted,
+            fake_evaluation=fake_evaluation,
+        ).refresh_follow_up_generation(
             user_id=active.user_id,
             session_id=active.id,
             expected_version=3,
@@ -1913,6 +2048,7 @@ def test_refresh_follow_up_ask_reconciles_canonical_question() -> None:
     assert result.follow_up_question is question
     assert result.attempt.status == "answeringFollowUp"
     assert result.session.version == 4
+    assert fake_evaluation.calls == []
     assert scripted.commit_count == 1
     assert scripted.rollback_count == 0
 
@@ -1932,6 +2068,13 @@ def test_refresh_follow_up_complete_reconciles_to_evaluating_without_question() 
         run_id=follow_up.id,
         action="complete",
     )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        decision_id=decision.id,
+    )
     scripted = ScriptedSession(
         active,
         attempt,
@@ -1944,13 +2087,17 @@ def test_refresh_follow_up_complete_reconciles_to_evaluating_without_question() 
     )
 
     result = asyncio.run(
-        service(scripted).refresh_follow_up_generation(
+        service(
+            scripted,
+            fake_evaluation=FakeEvaluationGenerationService(evaluation),
+        ).refresh_follow_up_generation(
             user_id=active.user_id,
             session_id=active.id,
             expected_version=3,
         )
     )
 
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
     assert result.follow_up_decision is decision
     assert result.follow_up_question is None
     assert result.attempt.status == "evaluating"
@@ -2059,6 +2206,13 @@ def test_refresh_follow_up_replays_complete_without_incrementing_again() -> None
         run_id=follow_up.id,
         action="complete",
     )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        decision_id=decision.id,
+    )
     scripted = ScriptedSession(
         active,
         attempt,
@@ -2068,6 +2222,7 @@ def test_refresh_follow_up_replays_complete_without_incrementing_again() -> None
         follow_up,
         decision,
         None,
+        evaluation,
     )
 
     result = asyncio.run(
@@ -2103,5 +2258,358 @@ def test_refresh_follow_up_rejects_wrong_replay_state_as_version_conflict() -> N
         )
 
     assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_refresh_follow_up_complete_enqueues_evaluation_in_same_transaction() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        decision_id=decision.id,
+    )
+    fake_evaluation = FakeEvaluationGenerationService(evaluation)
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        decision,
+        None,
+    )
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_evaluation=fake_evaluation,
+        ).refresh_follow_up_generation(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=3,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.evaluation_generation_run is evaluation
+    assert result.evaluation is None
+    assert result.attempt.status == "evaluating"
+    assert result.session.version == 4
+    assert scripted.flush_count == 1
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+    assert fake_evaluation.calls == [
+        {
+            "user_id": active.user_id,
+            "attempt_id": attempt.id,
+            "interaction_language": "en",
+            "follow_up_completion_reason": (
+                PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+            ),
+            "idempotency_key": practice_evaluation_idempotency_key(attempt.id),
+        }
+    ]
+
+
+def test_refresh_follow_up_evaluation_unavailable_rolls_back_state() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    fake_evaluation = FakeEvaluationGenerationService(
+        error=ValueError("missing evaluation model")
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        decision,
+        None,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_evaluation=fake_evaluation,
+            ).refresh_follow_up_generation(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=3,
+            )
+        )
+
+    assert error.value.code == PRACTICE_EVALUATION_GENERATION_UNAVAILABLE
+    assert attempt.status == "answering"
+    assert active.version == 3
+    assert scripted.flush_count == 1
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_refresh_follow_up_evaluation_state_error_maps_without_leaking_source() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=3)
+    existing = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=existing.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    fake_evaluation = FakeEvaluationGenerationService(
+        error=EvaluationGenerationStateError(
+            "practice_evaluation_context_conflict"
+        )
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        existing,
+        follow_up,
+        decision,
+        None,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_evaluation=fake_evaluation,
+            ).refresh_follow_up_generation(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=3,
+            )
+        )
+
+    assert error.value.code == PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+    assert error.value.source_code == "practice_evaluation_context_conflict"
+    assert "context_conflict" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        AgentRunStatus.QUEUED,
+        AgentRunStatus.RUNNING,
+        AgentRunStatus.FAILED,
+    ],
+)
+def test_get_evaluating_accepts_nonterminal_evaluation_runs(
+    status: AgentRunStatus,
+) -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="evaluating",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+        status=status,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        None,
+        evaluation,
+    )
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=active.user_id,
+            session_id=active.id,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.evaluation_generation_run is evaluation
+    assert result.evaluation is None
+    assert active.version == 4
+    assert scripted.commit_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_evaluating_loads_only_a_canonical_succeeded_artifact() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="evaluating",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    evaluation_run_value = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    artifact = evaluation_artifact(
+        attempt_id=attempt.id,
+        run_id=evaluation_run_value.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        None,
+        evaluation_run_value,
+        artifact,
+    )
+
+    result = asyncio.run(
+        service(scripted).get_active_session_context(
+            user_id=active.user_id,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.evaluation is artifact
+    assert result.evaluation_generation_run is evaluation_run_value
+    assert active.version == 4
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda run: setattr(run, "agent_id", "wrong-agent"),
+        lambda run: setattr(run, "payload", {"invalid": "payload"}),
+        lambda run: run.payload.update(
+            {"terminalFollowUpDecisionId": str(uuid4())}
+        ),
+        lambda run: run.payload.update({"interactionLanguage": "zh-CN"}),
+        lambda run: run.payload.update(
+            {"followUpQuestion1Id": str(uuid4())}
+        ),
+    ],
+)
+def test_get_evaluating_rejects_corrupt_evaluation_lineage(mutate) -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="evaluating",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+    )
+    mutate(evaluation)
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        None,
+        evaluation,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).get_session_context(
+                user_id=active.user_id,
+                session_id=active.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+    assert active.version == 4
+    assert attempt.status == "evaluating"
     assert scripted.commit_count == 0
     assert scripted.rollback_count == 1

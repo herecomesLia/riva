@@ -50,6 +50,9 @@ PRACTICE_QUESTION_GENERATION_UNAVAILABLE = (
 PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE = (
     "practice_follow_up_generation_unavailable"
 )
+PRACTICE_EVALUATION_GENERATION_UNAVAILABLE = (
+    "practice_evaluation_generation_unavailable"
+)
 
 PracticeSessionServiceFactory = Callable[..., PracticeSessionService]
 
@@ -373,6 +376,8 @@ def practice_session_state_api_error(error: PracticeSessionStateError) -> APIErr
     error_status = (
         status.HTTP_404_NOT_FOUND
         if error.code == PRACTICE_SESSION_NOT_FOUND
+        else status.HTTP_503_SERVICE_UNAVAILABLE
+        if error.code == PRACTICE_EVALUATION_GENERATION_UNAVAILABLE
         else status.HTTP_409_CONFLICT
     )
     return APIError(error_status, error.code)
@@ -380,6 +385,7 @@ def practice_session_state_api_error(error: PracticeSessionStateError) -> APIErr
 
 __all__ = [
     "PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE",
+    "PRACTICE_EVALUATION_GENERATION_UNAVAILABLE",
     "PRACTICE_QUESTION_GENERATION_UNAVAILABLE",
     "PracticeAPIService",
     "PracticeSessionAPIService",

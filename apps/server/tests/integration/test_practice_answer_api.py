@@ -6,17 +6,31 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from riva.agents import FollowUpAgent, QuestionGenerationAgent
+from riva.agents import (
+    FollowUpAgent,
+    PracticeEvaluationAgent,
+    QuestionGenerationAgent,
+)
 from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMUsage
-from riva.models import PracticeAttempt
+from riva.models import (
+    AgentRun,
+    AgentRunStatus,
+    PracticeAttempt,
+    PracticeEvaluation,
+    PracticeFollowUpDecision,
+)
+from riva.prompts import PRACTICE_EVALUATION_PROMPT
+from riva.schemas.evaluation import EvaluationRunPayload
+from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.workers import (
     AgentHandlerRegistry,
     AgentWorker,
     FollowUpHandler,
+    PracticeEvaluationHandler,
     QuestionGenerationHandler,
 )
 from tests.helpers.llm import FakeLLMProvider
@@ -45,7 +59,7 @@ def settings(url: str) -> Settings:
 def build_worker(
     database: Database,
     *,
-    agent: QuestionGenerationAgent | FollowUpAgent,
+    agent: QuestionGenerationAgent | FollowUpAgent | PracticeEvaluationAgent,
 ) -> AgentWorker:
     if isinstance(agent, QuestionGenerationAgent):
         handler = QuestionGenerationHandler(
@@ -53,12 +67,18 @@ def build_worker(
             agent=agent,
         )
         worker_id = "practice-answer-question-worker"
-    else:
+    elif isinstance(agent, FollowUpAgent):
         handler = FollowUpHandler(
             session_factory=database.sessionmaker,
             agent=agent,
         )
         worker_id = "practice-answer-follow-up-worker"
+    else:
+        handler = PracticeEvaluationHandler(
+            session_factory=database.sessionmaker,
+            agent=agent,
+        )
+        worker_id = "practice-answer-evaluation-worker"
     registry = AgentHandlerRegistry()
     registry.register(handler)
     return AgentWorker(
@@ -103,6 +123,32 @@ def ask_output() -> dict[str, object]:
         "focus": "Attribution evidence",
         "answer_hints": ["Name the baseline and result."],
         "answer_framework": ["Baseline", "Result"],
+    }
+
+
+def evaluation_output() -> dict[str, object]:
+    return {
+        "overallScore": 82,
+        "dimensionScores": [
+            {
+                "dimension": dimension,
+                "score": 82,
+                "explanation": f"Evidence supports {dimension}.",
+            }
+            for dimension in (
+                "relevance",
+                "structure",
+                "specificity",
+                "communication",
+            )
+        ],
+        "focusAssessments": [
+            {
+                "focusIndex": 0,
+                "status": "demonstrated",
+                "explanation": "The answer provides evidence.",
+            }
+        ],
     }
 
 
@@ -380,10 +426,47 @@ def test_practice_answer_api_exposes_evaluating_completion_and_replay() -> None:
                                 PracticeAttempt.session_id == UUID(session_id)
                             )
                         )
-                    assert persisted_attempt is not None
-                    assert datetime.fromisoformat(body["submittedAt"]) == (
-                        persisted_attempt.updated_at
-                    )
+                        assert persisted_attempt is not None
+                        decision = await session.scalar(
+                            select(PracticeFollowUpDecision).where(
+                                PracticeFollowUpDecision.attempt_id
+                                == persisted_attempt.id
+                            )
+                        )
+                        assert decision is not None
+                        assert datetime.fromisoformat(body["submittedAt"]) == (
+                            persisted_attempt.updated_at
+                        )
+                        evaluation_runs = list(
+                            (
+                                await session.scalars(
+                                    select(AgentRun).where(
+                                        AgentRun.user_id == owner.id,
+                                        AgentRun.agent_id == "practice-evaluator",
+                                        AgentRun.idempotency_key
+                                        == practice_evaluation_idempotency_key(
+                                            persisted_attempt.id
+                                        ),
+                                    )
+                                )
+                            ).all()
+                        )
+                        assert len(evaluation_runs) == 1
+                        evaluation_run = evaluation_runs[0]
+                        assert evaluation_run.status is AgentRunStatus.QUEUED
+                        assert evaluation_run.prompt_id == (
+                            PRACTICE_EVALUATION_PROMPT.prompt_id
+                        )
+                        evaluation_payload = EvaluationRunPayload.model_validate(
+                            evaluation_run.payload
+                        )
+                        assert (
+                            evaluation_payload.follow_up_completion_reason.value
+                            == "noFollowUpRequired"
+                        )
+                        assert evaluation_payload.terminal_follow_up_decision_id == (
+                            decision.id
+                        )
 
                     replay = client.post(
                         f"/api/practice/sessions/{session_id}/"
@@ -397,6 +480,43 @@ def test_practice_answer_api_exposes_evaluating_completion_and_replay() -> None:
                     current = client.get("/api/practice/sessions/current")
                     assert current.status_code == 200
                     assert current.json()["session"] == body
+
+                    evaluation_provider = FakeLLMProvider(
+                        [evaluation_output()],
+                        provider="fake-evaluation-provider",
+                        usage=LLMUsage(input_tokens=20, output_tokens=10),
+                    )
+                    assert await build_worker(
+                        database,
+                        agent=PracticeEvaluationAgent(
+                            evaluation_provider,
+                            model="fake-practice-model",
+                        ),
+                    ).process_one()
+
+                    async with database.sessionmaker() as session:
+                        stored_evaluation = await session.scalar(
+                            select(PracticeEvaluation).where(
+                                PracticeEvaluation.attempt_id
+                                == persisted_attempt.id
+                            )
+                        )
+                        stored_run = await session.get(
+                            AgentRun,
+                            evaluation_run.id,
+                        )
+                        assert stored_evaluation is not None
+                        assert stored_run is not None
+                        assert stored_run.status is AgentRunStatus.SUCCEEDED
+
+                    after_worker = client.get(
+                        "/api/practice/sessions/current"
+                    )
+                    assert after_worker.status_code == 200
+                    assert after_worker.json()["session"]["status"] == (
+                        "evaluating"
+                    )
+                    assert after_worker.json()["session"]["version"] == 4
             finally:
                 await database.reset()
 

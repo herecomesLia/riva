@@ -5,7 +5,11 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import func, select
 
-from riva.agents import FollowUpAgent, QuestionGenerationAgent
+from riva.agents import (
+    FollowUpAgent,
+    PracticeEvaluationAgent,
+    QuestionGenerationAgent,
+)
 from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import (
@@ -15,6 +19,7 @@ from riva.models import (
     PracticeAttempt,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
+    PracticeEvaluation,
     PracticeSession,
     QuestionCard,
     User,
@@ -23,17 +28,21 @@ from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
+from riva.schemas.evaluation import EvaluationRunPayload
+from riva.prompts import PRACTICE_EVALUATION_PROMPT
 from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PracticeSessionService,
     PracticeSessionStateError,
     practice_follow_up_idempotency_key,
 )
+from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.services.question_generation import QuestionGenerationService
 from riva.workers import (
     AgentHandlerRegistry,
     AgentWorker,
     FollowUpHandler,
+    PracticeEvaluationHandler,
     QuestionGenerationHandler,
 )
 from tests.helpers.llm import FakeLLMProvider
@@ -123,6 +132,60 @@ def build_follow_up_worker(
         retry_max_delay=timedelta(minutes=2),
         logger=SilentLogger(),
     )
+
+
+def build_evaluation_worker(
+    database: Database,
+    provider: FakeLLMProvider,
+) -> AgentWorker:
+    registry = AgentHandlerRegistry()
+    registry.register(
+        PracticeEvaluationHandler(
+            session_factory=database.sessionmaker,
+            agent=PracticeEvaluationAgent(
+                provider,
+                model="fake-evaluation-model",
+            ),
+        )
+    )
+    return AgentWorker(
+        worker_id="practice-answer-evaluation-worker",
+        session_factory=database.sessionmaker,
+        registry=registry,
+        lease_duration=timedelta(minutes=10),
+        heartbeat_interval=timedelta(minutes=2),
+        poll_interval=timedelta(seconds=1),
+        requeue_interval=timedelta(minutes=1),
+        retry_base_delay=timedelta(seconds=1),
+        retry_max_delay=timedelta(minutes=2),
+        logger=SilentLogger(),
+    )
+
+
+def evaluation_response() -> dict[str, object]:
+    return {
+        "overallScore": 80,
+        "dimensionScores": [
+            {
+                "dimension": dimension,
+                "score": 80,
+                "explanation": f"Evidence supports {dimension}.",
+            }
+            for dimension in (
+                "relevance",
+                "structure",
+                "specificity",
+                "communication",
+            )
+        ],
+        "focusAssessments": [
+            {
+                "focusIndex": 0,
+                "status": "demonstrated",
+                "explanation": "The answer provides evidence.",
+            }
+        ],
+    }
 
 
 async def seed_answering_session(
@@ -321,6 +384,7 @@ def test_practice_follow_up_refresh_reconciles_canonical_result(
                 async with database.sessionmaker() as session:
                     refreshed = await PracticeSessionService(
                         session,
+                        llm_model="fake-evaluation-model",
                         clock=lambda: START,
                     ).refresh_follow_up_generation(
                         user_id=owner.id,
@@ -352,6 +416,119 @@ def test_practice_follow_up_refresh_reconciles_canonical_result(
                         assert decision.action == "complete"
                         assert question is None
                         assert refreshed.follow_up_question is None
+                    evaluation_runs = list(
+                        (
+                            await session.scalars(
+                                select(AgentRun).where(
+                                    AgentRun.user_id == owner.id,
+                                    AgentRun.agent_id == "practice-evaluator",
+                                    AgentRun.idempotency_key
+                                    == practice_evaluation_idempotency_key(
+                                        refreshed.attempt.id
+                                    ),
+                                )
+                            )
+                        ).all()
+                    )
+                    if response["action"] == "askFollowUp":
+                        assert evaluation_runs == []
+                    else:
+                        assert len(evaluation_runs) == 1
+                        evaluation_run = evaluation_runs[0]
+                        assert evaluation_run.status is AgentRunStatus.QUEUED
+                        assert evaluation_run.prompt_id == (
+                            PRACTICE_EVALUATION_PROMPT.prompt_id
+                        )
+                        assert EvaluationRunPayload.model_validate(
+                            evaluation_run.payload
+                        ).follow_up_completion_reason.value == (
+                            "noFollowUpRequired"
+                        )
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_practice_complete_refresh_runs_evaluation_and_get_stays_evaluating() -> None:
+    async def run_test() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                owner, practice_session, _, card = (
+                    await seed_answering_session(database)
+                )
+                _, _, follow_up_run = await submit_answer(
+                    database,
+                    owner_id=owner.id,
+                    practice_session=practice_session,
+                    card=card,
+                )
+                assert await build_follow_up_worker(
+                    database,
+                    FakeLLMProvider([{"action": "complete"}]),
+                ).process_one()
+
+                async with database.sessionmaker() as session:
+                    refreshed = await PracticeSessionService(
+                        session,
+                        llm_model="fake-evaluation-model",
+                        clock=lambda: START,
+                    ).refresh_follow_up_generation(
+                        user_id=owner.id,
+                        session_id=practice_session.id,
+                        expected_version=3,
+                    )
+                    assert refreshed.attempt.status == "evaluating"
+                    assert refreshed.session.version == 4
+                    evaluation_run_id = (
+                        refreshed.evaluation_generation_run.id
+                    )  # type: ignore[attr-defined]
+
+                async with database.sessionmaker() as session:
+                    current = await PracticeSessionService(
+                        session,
+                    ).get_session_context(
+                        user_id=owner.id,
+                        session_id=practice_session.id,
+                    )
+                    assert current.attempt.status == "evaluating"
+                    assert current.session.version == 4
+                    assert current.evaluation_generation_run.id == evaluation_run_id  # type: ignore[attr-defined]
+                    assert current.evaluation is None  # type: ignore[attr-defined]
+
+                assert await build_evaluation_worker(
+                    database,
+                    FakeLLMProvider([evaluation_response()]),
+                ).process_one()
+
+                async with database.sessionmaker() as session:
+                    evaluation = await session.scalar(
+                        select(PracticeEvaluation).where(
+                            PracticeEvaluation.attempt_id
+                            == refreshed.attempt.id
+                        )
+                    )
+                    stored_run = await session.get(
+                        AgentRun,
+                        evaluation_run_id,
+                    )
+                    assert evaluation is not None
+                    assert stored_run is not None
+                    assert stored_run.status is AgentRunStatus.SUCCEEDED
+
+                    replay = await PracticeSessionService(
+                        session,
+                        llm_model="fake-evaluation-model",
+                    ).refresh_follow_up_generation(
+                        user_id=owner.id,
+                        session_id=practice_session.id,
+                        expected_version=3,
+                    )
+                    assert replay.session.version == 4
+                    assert replay.attempt.status == "evaluating"
+                    assert replay.evaluation_generation_run.id == evaluation_run_id  # type: ignore[attr-defined]
+                    assert replay.evaluation is evaluation  # type: ignore[attr-defined]
             finally:
                 await database.reset()
 
@@ -390,6 +567,7 @@ def test_practice_follow_up_refresh_replays_without_second_version_increment() -
                 async with database.sessionmaker() as session:
                     first = await PracticeSessionService(
                         session,
+                        llm_model="fake-evaluation-model",
                         clock=lambda: START,
                     ).refresh_follow_up_generation(
                         user_id=owner.id,
@@ -402,6 +580,7 @@ def test_practice_follow_up_refresh_replays_without_second_version_increment() -
                 async with database.sessionmaker() as session:
                     replay = await PracticeSessionService(
                         session,
+                        llm_model="fake-evaluation-model",
                         clock=lambda: START,
                     ).refresh_follow_up_generation(
                         user_id=owner.id,
@@ -482,6 +661,80 @@ def test_practice_primary_answer_rolls_back_against_real_database() -> None:
                         .where(
                             AgentRun.user_id == owner.id,
                             AgentRun.agent_id == "follow-up-generator",
+                        )
+                    ) == 0
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_practice_evaluation_enqueue_rolls_back_without_removing_follow_up() -> None:
+    async def run_test() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            try:
+                owner, practice_session, attempt, card = (
+                    await seed_answering_session(database)
+                )
+                _, _, follow_up_run = await submit_answer(
+                    database,
+                    owner_id=owner.id,
+                    practice_session=practice_session,
+                    card=card,
+                )
+                assert await build_follow_up_worker(
+                    database,
+                    FakeLLMProvider([{"action": "complete"}]),
+                ).process_one()
+
+                class FailingEvaluationService:
+                    async def enqueue_generation_in_transaction(
+                        self,
+                        **kwargs: object,
+                    ) -> AgentRun:
+                        raise RuntimeError("evaluation enqueue failed")
+
+                with pytest.raises(RuntimeError, match="evaluation enqueue failed"):
+                    async with database.sessionmaker() as session:
+                        await PracticeSessionService(
+                            session,
+                            llm_model="fake-evaluation-model",
+                            evaluation_generation_service_factory=lambda _session, **kwargs: FailingEvaluationService(),  # type: ignore[arg-type]
+                            clock=lambda: START,
+                        ).refresh_follow_up_generation(
+                            user_id=owner.id,
+                            session_id=practice_session.id,
+                            expected_version=3,
+                        )
+
+                async with database.sessionmaker() as session:
+                    stored_session = await session.get(
+                        PracticeSession,
+                        practice_session.id,
+                    )
+                    stored_attempt = await session.get(
+                        PracticeAttempt,
+                        attempt.id,
+                    )
+                    assert stored_session is not None
+                    assert stored_session.version == 3
+                    assert stored_attempt is not None
+                    assert stored_attempt.status == "answering"
+                    assert await session.scalar(
+                        select(func.count())
+                        .select_from(PracticeFollowUpDecision)
+                        .where(
+                            PracticeFollowUpDecision.source_agent_run_id
+                            == follow_up_run.id
+                        )
+                    ) == 1
+                    assert await session.scalar(
+                        select(func.count())
+                        .select_from(AgentRun)
+                        .where(
+                            AgentRun.user_id == owner.id,
+                            AgentRun.agent_id == "practice-evaluator",
                         )
                     ) == 0
             finally:

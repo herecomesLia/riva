@@ -6,11 +6,13 @@ import pytest
 from riva.core.errors import APIError
 from riva.models import AgentRunStatus
 from riva.services.practice_api import (
+    PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PracticeAPIService,
 )
 from riva.services.practice_sessions import (
+    PRACTICE_EVALUATION_GENERATION_UNAVAILABLE as PRACTICE_EVALUATION_STATE_UNAVAILABLE,
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_SESSION_NOT_FOUND,
@@ -469,6 +471,14 @@ def test_follow_up_question_projection_hides_guidance_focus_and_lineage() -> Non
             ),
             409,
             PRACTICE_QUESTION_GENERATION_FAILED,
+        ),
+        (
+            PracticeSessionStateError(
+                PRACTICE_EVALUATION_STATE_UNAVAILABLE,
+                source_code="missing_model",
+            ),
+            503,
+            PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
         ),
     ],
 )
