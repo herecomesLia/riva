@@ -2,6 +2,7 @@ from riva.agents.base import Agent, AgentResult
 from riva.agents.follow_up import FollowUpAgent
 from riva.agents.evaluation import PracticeEvaluationAgent
 from riva.agents.practice_review import PracticeReviewAgent
+from riva.agents.practice_recommendation import PracticeRecommendationAgent
 from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.agents.question_generation import QuestionGenerationAgent
@@ -39,6 +40,7 @@ __all__ = [
     "MatchingAnalysisOutput",
     "PracticeEvaluationAgent",
     "PracticeReviewAgent",
+    "PracticeRecommendationAgent",
     "PracticeEvaluationOutput",
     "QuestionGenerationAgent",
     "QuestionGenerationInput",

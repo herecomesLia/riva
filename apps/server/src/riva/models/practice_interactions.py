@@ -377,10 +377,97 @@ class PracticeReview(Base):
     )
 
 
+class PracticeRecommendation(Base):
+    __tablename__ = "practice_recommendations"
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('retryCurrent', 'nextQuestion')",
+            name="ck_practice_recommendations_action",
+        ),
+        CheckConstraint(
+            "((action = 'retryCurrent' AND next_question_type IS NULL "
+            "AND next_difficulty IS NULL) OR "
+            "(action = 'nextQuestion' AND next_question_type IS NOT NULL "
+            "AND next_difficulty IS NOT NULL))",
+            name="ck_practice_recommendations_action_plan",
+        ),
+        CheckConstraint(
+            "next_question_type IS NULL OR next_question_type IN ("
+            "'projectDeepDive', 'behavioral', 'businessUnderstanding', "
+            "'motivation', 'technicalFoundation'"
+            ")",
+            name="ck_practice_recommendations_question_type",
+        ),
+        CheckConstraint(
+            "next_difficulty IS NULL OR next_difficulty IN ('basic', 'pressure')",
+            name="ck_practice_recommendations_difficulty",
+        ),
+        CheckConstraint(
+            "length(trim(reason)) > 0 AND length(reason) <= 2000",
+            name="ck_practice_recommendations_reason",
+        ),
+        UniqueConstraint(
+            "attempt_id",
+            name="uq_practice_recommendations_attempt",
+        ),
+        UniqueConstraint(
+            "source_agent_run_id",
+            name="uq_practice_recommendations_source_run",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    attempt_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("practice_attempts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_agent_run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    next_question_type: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+    next_difficulty: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+    focus_areas: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    recommended_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    attempt: Mapped[PracticeAttempt] = relationship(
+        back_populates="recommendation",
+        foreign_keys=[attempt_id],
+        passive_deletes=True,
+    )
+    source_agent_run: Mapped[AgentRun] = relationship(
+        foreign_keys=[source_agent_run_id],
+        passive_deletes=True,
+    )
+
+
 __all__ = [
     "PracticeAnswer",
     "PracticeEvaluation",
     "PracticeFollowUpDecision",
     "PracticeFollowUpQuestion",
+    "PracticeRecommendation",
     "PracticeReview",
 ]

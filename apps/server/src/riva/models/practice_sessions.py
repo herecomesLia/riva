@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         PracticeEvaluation,
         PracticeFollowUpDecision,
         PracticeFollowUpQuestion,
+        PracticeRecommendation,
         PracticeReview,
     )
     from riva.models.question_cards import QuestionCard
@@ -303,6 +304,12 @@ class PracticeAttempt(Base):
         uselist=False,
     )
     review: Mapped[PracticeReview | None] = relationship(
+        back_populates="attempt",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+    recommendation: Mapped[PracticeRecommendation | None] = relationship(
         back_populates="attempt",
         cascade="all, delete-orphan",
         passive_deletes=True,
