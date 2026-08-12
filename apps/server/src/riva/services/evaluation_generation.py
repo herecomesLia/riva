@@ -254,20 +254,31 @@ class EvaluationGenerationService:
         run: AgentRun,
     ) -> EvaluationInput:
         try:
-            payload = validate_evaluation_generation_run(run)
-            context = await self._load_context(
-                user_id=run.user_id,
-                attempt_id=payload.attempt_id,
-                interaction_language=payload.interaction_language,
-                follow_up_completion_reason=payload.follow_up_completion_reason,
-                payload=payload,
-                for_update=False,
+            evaluation_input = await self.load_generation_input_in_transaction(
+                run
             )
             await self.session.commit()
-            return context.input
+            return evaluation_input
         except Exception:
             await self.session.rollback()
             raise
+
+    async def load_generation_input_in_transaction(
+        self,
+        run: AgentRun,
+    ) -> EvaluationInput:
+        """Load the frozen evaluation input without changing the transaction."""
+
+        payload = validate_evaluation_generation_run(run)
+        context = await self._load_context(
+            user_id=run.user_id,
+            attempt_id=payload.attempt_id,
+            interaction_language=payload.interaction_language,
+            follow_up_completion_reason=payload.follow_up_completion_reason,
+            payload=payload,
+            for_update=False,
+        )
+        return context.input
 
     async def persist_success(
         self,

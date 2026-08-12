@@ -12,6 +12,7 @@ from riva.schemas.question_cards import (
 )
 from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.schemas.resume_parsing import ResumeParsingRunPayload
+from riva.schemas.practice_review import ReviewRunPayload
 from riva.services.agent_runs import AgentRunService, _serialize_payload
 
 
@@ -183,6 +184,16 @@ def test_current_agent_payloads_are_accepted_after_alias_serialization() -> None
 
     for payload in payloads:
         assert _serialize_payload(payload) == payload
+
+
+def test_review_run_payload_is_accepted_without_widening_metadata() -> None:
+    payload = ReviewRunPayload(
+        attempt_id=uuid4(),
+        evaluation_id=uuid4(),
+        interaction_language="en",
+    ).model_dump(mode="json", by_alias=True)
+
+    assert _serialize_payload(payload) == payload
 
 
 def test_question_generation_run_payload_is_strict_and_camel_case() -> None:

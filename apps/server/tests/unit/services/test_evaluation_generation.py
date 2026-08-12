@@ -637,6 +637,31 @@ def test_load_rebuilds_input_from_frozen_ids() -> None:
     assert db.commit_count == 1
 
 
+def test_load_in_transaction_rebuilds_without_commit_or_rollback() -> None:
+    run, values = load_context_values("one")
+    session, attempt, card, main, questions, follow_answers, decisions = values
+    db = session_for_context(
+        attempt,
+        session,
+        card,
+        [main, *follow_answers],
+        questions,
+        decisions,
+        for_update=False,
+    )
+
+    result = asyncio.run(
+        EvaluationGenerationService(
+            db  # type: ignore[arg-type]
+        ).load_generation_input_in_transaction(run)
+    )
+
+    assert result.main_answer.content == main.content
+    assert result.follow_up_exchanges[0].answer == follow_answers[0].content
+    assert db.commit_count == 0
+    assert db.rollback_count == 0
+
+
 def test_persist_success_writes_one_canonical_artifact_without_status_mutation(
 ) -> None:
     run, values = load_context_values("none")

@@ -1,4 +1,5 @@
 from copy import deepcopy
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -6,6 +7,7 @@ from pydantic import ValidationError
 from riva.schemas.practice_review import (
     PracticeReviewInput,
     PracticeReviewOutput,
+    ReviewRunPayload,
 )
 
 
@@ -281,3 +283,73 @@ def test_review_input_requires_language_and_rejects_extra_fields() -> None:
     extra["profile"] = {"secret": True}
     with pytest.raises(ValidationError):
         PracticeReviewInput.model_validate(extra)
+
+
+@pytest.mark.parametrize("language", ["zh-CN", "en"])
+def test_review_run_payload_is_small_canonical_camel_case_contract(
+    language: str,
+) -> None:
+    attempt_id = uuid4()
+    evaluation_id = uuid4()
+
+    payload = ReviewRunPayload.model_validate(
+        {
+            "attemptId": str(attempt_id),
+            "evaluationId": str(evaluation_id),
+            "interactionLanguage": language,
+        }
+    )
+
+    assert payload.attempt_id == attempt_id
+    assert payload.evaluation_id == evaluation_id
+    assert payload.interaction_language == language
+    assert payload.model_dump(mode="json", by_alias=True) == {
+        "attemptId": str(attempt_id),
+        "evaluationId": str(evaluation_id),
+        "interactionLanguage": language,
+    }
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "questionCardId",
+        "mainAnswerId",
+        "followUpQuestionIds",
+        "followUpAnswerIds",
+        "evaluationRunId",
+        "rawAnswer",
+        "question",
+        "reviewInput",
+    ],
+)
+def test_review_run_payload_rejects_answer_chain_and_context_fields(
+    field: str,
+) -> None:
+    payload = {
+        "attemptId": str(uuid4()),
+        "evaluationId": str(uuid4()),
+        "interactionLanguage": "en",
+        field: "not allowed",
+    }
+
+    with pytest.raises(ValidationError):
+        ReviewRunPayload.model_validate(payload)
+
+
+def test_review_run_payload_rejects_non_standard_ids_and_extra_fields() -> None:
+    valid = {
+        "attemptId": str(uuid4()),
+        "evaluationId": str(uuid4()),
+        "interactionLanguage": "en",
+    }
+
+    compact_uuid = dict(valid)
+    compact_uuid["attemptId"] = str(uuid4()).replace("-", "")
+    with pytest.raises(ValidationError):
+        ReviewRunPayload.model_validate(compact_uuid)
+
+    extra = dict(valid)
+    extra["requestId"] = str(uuid4())
+    with pytest.raises(ValidationError):
+        ReviewRunPayload.model_validate(extra)

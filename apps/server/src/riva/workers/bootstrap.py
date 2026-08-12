@@ -13,6 +13,7 @@ from riva.agents import (
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
     PracticeEvaluationAgent,
+    PracticeReviewAgent,
     QuestionGenerationAgent,
     ResumeParsingAgent,
 )
@@ -30,6 +31,7 @@ from riva.workers.job_description_parsing import (
 )
 from riva.workers.matching_analysis import MatchingAnalysisHandler
 from riva.workers.practice_evaluation import PracticeEvaluationHandler
+from riva.workers.practice_review import PracticeReviewHandler
 from riva.workers.question_generation import QuestionGenerationHandler
 from riva.workers.resume_parsing import ResumeParsingWorkerHandler
 from riva.workers.runtime import AgentWorker, SessionFactory
@@ -47,6 +49,8 @@ FollowUpAgentFactory = Callable[..., FollowUpAgent]
 FollowUpHandlerFactory = Callable[..., FollowUpHandler]
 PracticeEvaluationAgentFactory = Callable[..., PracticeEvaluationAgent]
 PracticeEvaluationHandlerFactory = Callable[..., PracticeEvaluationHandler]
+PracticeReviewAgentFactory = Callable[..., PracticeReviewAgent]
+PracticeReviewHandlerFactory = Callable[..., PracticeReviewHandler]
 ResumeParsingAgentFactory = Callable[..., ResumeParsingAgent]
 ResumeParsingHandlerFactory = Callable[..., ResumeParsingWorkerHandler]
 RegistryFactory = Callable[
@@ -84,6 +88,10 @@ def build_agent_handler_registry(
     ),
     practice_evaluation_handler_factory: PracticeEvaluationHandlerFactory = (
         PracticeEvaluationHandler
+    ),
+    practice_review_agent_factory: PracticeReviewAgentFactory = PracticeReviewAgent,
+    practice_review_handler_factory: PracticeReviewHandlerFactory = (
+        PracticeReviewHandler
     ),
     resume_parsing_agent_factory: ResumeParsingAgentFactory = ResumeParsingAgent,
     resume_parsing_handler_factory: ResumeParsingHandlerFactory = (
@@ -136,6 +144,14 @@ def build_agent_handler_registry(
         session_factory=session_factory,
         agent=practice_evaluation_agent,
     )
+    practice_review_agent = practice_review_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    practice_review_handler = practice_review_handler_factory(
+        session_factory=session_factory,
+        agent=practice_review_agent,
+    )
     resume_parsing_agent = resume_parsing_agent_factory(
         provider=provider,
         model=model,
@@ -149,6 +165,7 @@ def build_agent_handler_registry(
     registry.register(question_generation_handler)
     registry.register(follow_up_handler)
     registry.register(practice_evaluation_handler)
+    registry.register(practice_review_handler)
     registry.register(resume_parsing_handler)
     return registry
 

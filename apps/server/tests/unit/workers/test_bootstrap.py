@@ -10,6 +10,7 @@ from riva.agents import (
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
     PracticeEvaluationAgent,
+    PracticeReviewAgent,
     QuestionGenerationAgent,
     ResumeParsingAgent,
 )
@@ -22,6 +23,7 @@ from riva.workers import (
     JobDescriptionParsingHandler,
     MatchingAnalysisHandler,
     PracticeEvaluationHandler,
+    PracticeReviewHandler,
     QuestionGenerationHandler,
     ResumeParsingWorkerHandler,
 )
@@ -316,11 +318,17 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)
     assert practice_evaluation.agent.provider is provider
     assert practice_evaluation.agent.model == "qwen-test-model"
+    practice_review = registry.get("practice-reviewer")
+    assert isinstance(practice_review, PracticeReviewHandler)
+    assert isinstance(practice_review.agent, PracticeReviewAgent)
+    assert practice_review.agent.provider is provider
+    assert practice_review.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",
+        "practice-reviewer",
         "question-generator",
         "resume-parser",
     )
@@ -363,11 +371,17 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)
     assert practice_evaluation.agent.provider is handler.agent.provider
     assert practice_evaluation.agent.model == "qwen-test-model"
+    practice_review = registry.get("practice-reviewer")
+    assert isinstance(practice_review, PracticeReviewHandler)
+    assert isinstance(practice_review.agent, PracticeReviewAgent)
+    assert practice_review.agent.provider is handler.agent.provider
+    assert practice_review.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",
+        "practice-reviewer",
         "question-generator",
         "resume-parser",
     )
