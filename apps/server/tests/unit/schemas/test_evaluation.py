@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from riva.schemas.evaluation import (
     EvaluationInput,
+    EvaluationRunPayload,
     PracticeEvaluationDimension,
     PracticeEvaluationFollowUpCompletionReason,
     PracticeEvaluationOutput,
@@ -316,3 +317,120 @@ def test_input_validation_does_not_mutate_payload() -> None:
     EvaluationInput.model_validate(payload)
 
     assert payload == before
+
+
+def evaluation_run_payload(
+    *,
+    reason: str = "noFollowUpRequired",
+    include_first: bool = False,
+    include_second: bool = False,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "attemptId": "00000000-0000-4000-8000-000000000001",
+        "questionCardId": "00000000-0000-4000-8000-000000000002",
+        "mainAnswerId": "00000000-0000-4000-8000-000000000003",
+        "interactionLanguage": "en",
+        "followUpCompletionReason": reason,
+        "terminalFollowUpDecisionId": "00000000-0000-4000-8000-000000000004",
+    }
+    if include_first:
+        payload.update(
+            {
+                "followUpQuestion1Id": "00000000-0000-4000-8000-000000000011",
+                "followUpAnswer1Id": "00000000-0000-4000-8000-000000000012",
+            }
+        )
+    if include_second:
+        payload.update(
+            {
+                "followUpQuestion2Id": "00000000-0000-4000-8000-000000000021",
+                "followUpAnswer2Id": "00000000-0000-4000-8000-000000000022",
+            }
+        )
+    return payload
+
+
+def test_evaluation_run_payload_is_camel_case_and_excludes_absent_follow_ups() -> None:
+    parsed = EvaluationRunPayload.model_validate(evaluation_run_payload())
+
+    assert parsed.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    ) == evaluation_run_payload()
+
+
+@pytest.mark.parametrize(
+    ("reason", "include_first", "include_second"),
+    [
+        ("noFollowUpRequired", False, False),
+        ("allAnswered", True, False),
+        ("allAnswered", True, True),
+    ],
+)
+def test_evaluation_run_payload_accepts_frozen_completion_shapes(
+    reason: str,
+    include_first: bool,
+    include_second: bool,
+) -> None:
+    parsed = EvaluationRunPayload.model_validate(
+        evaluation_run_payload(
+            reason=reason,
+            include_first=include_first,
+            include_second=include_second,
+        )
+    )
+
+    assert parsed.follow_up_completion_reason.value == reason
+    assert (parsed.follow_up_question_1_id is not None) is include_first
+    assert (parsed.follow_up_question_2_id is not None) is include_second
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        evaluation_run_payload(
+            reason="noFollowUpRequired",
+            include_first=True,
+        ),
+        {
+            **evaluation_run_payload(reason="allAnswered"),
+            "followUpQuestion1Id": "00000000-0000-4000-8000-000000000011",
+        },
+        {
+            **evaluation_run_payload(reason="allAnswered", include_first=True),
+            "followUpAnswer1Id": None,
+        },
+        {
+            **evaluation_run_payload(reason="allAnswered"),
+            "followUpQuestion2Id": "00000000-0000-4000-8000-000000000021",
+            "followUpAnswer2Id": "00000000-0000-4000-8000-000000000022",
+        },
+        {**evaluation_run_payload(), "answerText": "raw answer"},
+    ],
+)
+def test_evaluation_run_payload_rejects_unfrozen_or_content_fields(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        EvaluationRunPayload.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("attemptId", "not-a-uuid"),
+        ("interactionLanguage", "fr"),
+        ("followUpCompletionReason", "complete"),
+        ("terminalFollowUpDecisionId", None),
+    ],
+)
+def test_evaluation_run_payload_rejects_invalid_controls(
+    field: str,
+    value: object,
+) -> None:
+    payload = evaluation_run_payload()
+    payload[field] = value
+
+    with pytest.raises(ValidationError):
+        EvaluationRunPayload.model_validate(payload)

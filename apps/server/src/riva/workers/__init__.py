@@ -7,6 +7,7 @@ from riva.workers.handlers import AgentHandlerRegistry, AgentRunHandler
 from riva.workers.follow_up import FollowUpHandler
 from riva.workers.job_description_parsing import JobDescriptionParsingHandler
 from riva.workers.matching_analysis import MatchingAnalysisHandler
+from riva.workers.practice_evaluation import PracticeEvaluationHandler
 from riva.workers.question_generation import QuestionGenerationHandler
 from riva.workers.resume_parsing import ResumeParsingWorkerHandler
 from riva.workers.runtime import AgentWorker
@@ -20,6 +21,7 @@ __all__ = [
     "MatchingAnalysisHandler",
     "QuestionGenerationHandler",
     "FollowUpHandler",
+    "PracticeEvaluationHandler",
     "ResumeParsingWorkerHandler",
     "AgentWorker",
     "DuplicateAgentHandlerError",

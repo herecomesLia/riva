@@ -1,5 +1,6 @@
 from enum import StrEnum
 from typing import Any, Annotated, Self
+from uuid import UUID
 
 from pydantic import (
     AliasChoices,
@@ -23,6 +24,7 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
     QuestionCardTextList,
 )
+from riva.schemas.profile import StandardUUID
 
 
 MAX_PRACTICE_EVALUATION_DIMENSIONS = 8
@@ -106,6 +108,73 @@ class EvaluationQuestionContext(_EvaluationModel):
     scoring_focus: QuestionCardTextList = _alias(
         "scoring_focus", "scoringFocus"
     )
+
+
+class EvaluationRunPayload(_EvaluationModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    attempt_id: StandardUUID = Field(alias="attemptId")
+    question_card_id: StandardUUID = Field(alias="questionCardId")
+    main_answer_id: StandardUUID = Field(alias="mainAnswerId")
+    interaction_language: InteractionLanguage = Field(
+        alias="interactionLanguage"
+    )
+    follow_up_completion_reason: PracticeEvaluationFollowUpCompletionReason = Field(
+        alias="followUpCompletionReason"
+    )
+    terminal_follow_up_decision_id: StandardUUID = Field(
+        alias="terminalFollowUpDecisionId"
+    )
+    follow_up_question_1_id: UUID | None = Field(
+        default=None,
+        alias="followUpQuestion1Id",
+    )
+    follow_up_answer_1_id: UUID | None = Field(
+        default=None,
+        alias="followUpAnswer1Id",
+    )
+    follow_up_question_2_id: UUID | None = Field(
+        default=None,
+        alias="followUpQuestion2Id",
+    )
+    follow_up_answer_2_id: UUID | None = Field(
+        default=None,
+        alias="followUpAnswer2Id",
+    )
+
+    @model_validator(mode="after")
+    def validate_follow_up_snapshot(self) -> Self:
+        first_pair = (
+            self.follow_up_question_1_id,
+            self.follow_up_answer_1_id,
+        )
+        second_pair = (
+            self.follow_up_question_2_id,
+            self.follow_up_answer_2_id,
+        )
+        if (first_pair[0] is None) != (first_pair[1] is None):
+            raise ValueError("follow-up question and answer one must be paired")
+        if (second_pair[0] is None) != (second_pair[1] is None):
+            raise ValueError("follow-up question and answer two must be paired")
+        if second_pair[0] is not None and first_pair[0] is None:
+            raise ValueError("follow-up order two requires order one")
+
+        if (
+            self.follow_up_completion_reason
+            == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+        ):
+            if any(value is not None for value in (*first_pair, *second_pair)):
+                raise ValueError(
+                    "noFollowUpRequired must not include follow-up IDs"
+                )
+        elif first_pair[0] is None:
+            raise ValueError("allAnswered requires the first follow-up pair")
+        return self
 
 
 class EvaluationMainAnswer(_EvaluationModel):
@@ -213,6 +282,7 @@ __all__ = [
     "EvaluationInput",
     "EvaluationMainAnswer",
     "EvaluationQuestionContext",
+    "EvaluationRunPayload",
     "MAX_PRACTICE_EVALUATION_DIMENSIONS",
     "MAX_PRACTICE_EVALUATION_EXPLANATION_LENGTH",
     "MAX_PRACTICE_FOCUS_EXPLANATION_LENGTH",

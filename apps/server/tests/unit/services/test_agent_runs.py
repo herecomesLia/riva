@@ -80,6 +80,34 @@ def test_serialize_payload_accepts_question_generation_invocation_metadata() -> 
     }
 
 
+@pytest.mark.parametrize("reason", ["noFollowUpRequired", "allAnswered"])
+def test_serialize_payload_accepts_only_evaluation_completion_reason(
+    reason: str,
+) -> None:
+    assert _serialize_payload(
+        {"followUpCompletionReason": reason}
+    ) == {"followUpCompletionReason": reason}
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "followUpCompletionReason",
+        "completionReason",
+        "evaluationMode",
+        "rawAnswer",
+        "answerText",
+    ],
+)
+def test_serialize_payload_rejects_unapproved_evaluation_metadata(
+    key: str,
+) -> None:
+    value = "unsupported" if key != "followUpCompletionReason" else "complete"
+
+    with pytest.raises(ValueError):
+        _serialize_payload({key: value})  # type: ignore[dict-item]
+
+
 @pytest.mark.parametrize("order", [1, 2])
 def test_serialize_payload_accepts_follow_up_order_metadata(order: int) -> None:
     assert _serialize_payload(

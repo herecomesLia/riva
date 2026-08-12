@@ -18,6 +18,10 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.schemas.practice_interactions import MAX_PRACTICE_FOLLOW_UPS
+from riva.schemas.evaluation import (
+    PracticeEvaluationFollowUpCompletionReason,
+    PracticeEvaluationOutput,
+)
 from riva.utils import utc_now
 
 
@@ -26,6 +30,9 @@ PayloadValue = UUID | str | int | None
 _ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _QUESTION_TYPES = frozenset(item.value for item in QuestionCardQuestionType)
 _DIFFICULTIES = frozenset(item.value for item in QuestionCardDifficulty)
+_PRACTICE_EVALUATION_COMPLETION_REASONS = frozenset(
+    item.value for item in PracticeEvaluationFollowUpCompletionReason
+)
 
 
 class AgentRunLeaseError(RuntimeError):
@@ -215,7 +222,10 @@ class AgentRunService:
             run.status = AgentRunStatus.SUCCEEDED
             run.result = cast(
                 AgentRunResult,
-                result.output.model_dump(mode="json"),
+                result.output.model_dump(
+                    mode="json",
+                    by_alias=isinstance(result.output, PracticeEvaluationOutput),
+                ),
             )
             run.provider = provider
             run.model = model
@@ -396,6 +406,16 @@ def _serialize_payload(
             if not isinstance(value, str) or value not in _DIFFICULTIES:
                 raise ValueError(
                     "payload.difficulty must be a supported difficulty"
+                )
+            serialized[key] = value
+        elif key == "followUpCompletionReason":
+            if (
+                not isinstance(value, str)
+                or value not in _PRACTICE_EVALUATION_COMPLETION_REASONS
+            ):
+                raise ValueError(
+                    "payload.followUpCompletionReason must be a supported "
+                    "practice evaluation completion reason"
                 )
             serialized[key] = value
         elif key == "nextFollowUpOrder":
