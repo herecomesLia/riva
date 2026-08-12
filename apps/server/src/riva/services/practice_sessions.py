@@ -2173,6 +2173,7 @@ class PracticeSessionService:
         if attempt.status in {
             PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
             PracticeAttemptStatus.EVALUATING.value,
+            PracticeAttemptStatus.REVIEW.value,
         }:
             (
                 card,

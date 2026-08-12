@@ -8,21 +8,28 @@ from riva.models import AgentRunStatus
 from riva.services.practice_api import (
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
+    PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
+    PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PracticeAPIService,
 )
 from riva.services.practice_sessions import (
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE as PRACTICE_EVALUATION_STATE_UNAVAILABLE,
+    PRACTICE_EVALUATION_GENERATION_FAILED,
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
+    PRACTICE_RECOMMENDATION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_FAILED,
+    PRACTICE_REVIEW_GENERATION_FAILED,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
     PracticePrimaryAnswerWorkflowContext,
+    PracticeReviewWorkflowContext,
     PracticeSessionStateError,
     PracticeSessionWorkflowContext,
 )
 from riva.schemas.practice_sessions import (
     CurrentPracticeSessionResponse,
+    RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
@@ -40,6 +47,12 @@ from tests.unit.services.test_practice_sessions import (
     practice_session,
     question_card,
     selection,
+    evaluation_artifact,
+    evaluation_run,
+    recommendation_artifact,
+    recommendation_run,
+    review_artifact,
+    review_run,
 )
 
 
@@ -88,6 +101,15 @@ class FakePracticeSessionService:
         if self.error is not None:
             raise self.error
         assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
+        return self.context
+
+    async def refresh_evaluation_generation(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext:
+        self.calls.append(("refresh_evaluation", kwargs))
+        if self.error is not None:
+            raise self.error
         return self.context
 
     async def get_session_context(
@@ -183,6 +205,67 @@ def primary_context(
     )
 
 
+def review_context(
+    *,
+    action: str = "retryCurrent",
+) -> PracticeReviewWorkflowContext:
+    primary = primary_context(
+        attempt_status="review",
+        version=5,
+        action="complete",
+    )
+    evaluation_run_value = evaluation_run(
+        user_id=primary.session.user_id,
+        attempt_id=primary.attempt.id,
+        question_card_id=primary.question_card.id,
+        main_answer_id=primary.main_answer.id,
+        decision_id=primary.follow_up_decision.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    evaluation = evaluation_artifact(
+        attempt_id=primary.attempt.id,
+        run_id=evaluation_run_value.id,
+    )
+    review_run_value = review_run(
+        user_id=primary.session.user_id,
+        attempt_id=primary.attempt.id,
+        evaluation_id=evaluation.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    review = review_artifact(
+        attempt_id=primary.attempt.id,
+        run_id=review_run_value.id,
+    )
+    recommendation_run_value = recommendation_run(
+        user_id=primary.session.user_id,
+        attempt_id=primary.attempt.id,
+        evaluation_id=evaluation.id,
+        review_id=review.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    recommendation = recommendation_artifact(
+        attempt_id=primary.attempt.id,
+        run_id=recommendation_run_value.id,
+        action=action,
+    )
+    primary.attempt.completed_at = primary.session.updated_at
+    return PracticeReviewWorkflowContext(
+        session=primary.session,
+        attempt=primary.attempt,
+        question_card=primary.question_card,
+        main_answer=primary.main_answer,
+        follow_up_generation_run=primary.follow_up_generation_run,
+        follow_up_decision=primary.follow_up_decision,
+        follow_up_question=None,
+        evaluation_generation_run=evaluation_run_value,
+        evaluation=evaluation,
+        review_generation_run=review_run_value,
+        review=review,
+        recommendation_generation_run=recommendation_run_value,
+        recommendation=recommendation,
+    )
+
+
 def start_request() -> StartPracticeSessionRequest:
     return StartPracticeSessionRequest.model_validate(
         selection(target_role_id=uuid4()).model_dump(mode="json")
@@ -274,6 +357,172 @@ def test_refresh_and_get_do_not_require_llm_configuration() -> None:
     assert refreshed.status == "answering"
     assert fetched.status == "answering"
     assert [call[0] for call in domain.calls] == ["refresh", "get"]
+
+
+def test_refresh_evaluation_forwards_version_without_llm_precheck() -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(
+            attempt_status="evaluating",
+            version=4,
+            action="complete",
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(
+        service.refresh_evaluation(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=RefreshPracticeEvaluationRequest(version=4),
+        )
+    )
+
+    assert result.status == "evaluating"
+    assert result.version == 4
+    assert domain.calls == [
+        (
+            "refresh_evaluation",
+            {
+                "user_id": domain.context.session.user_id,
+                "session_id": domain.context.session.id,
+                "expected_version": 4,
+            },
+        )
+    ]
+
+
+@pytest.mark.parametrize("action", ["retryCurrent", "nextQuestion"])
+def test_final_review_projection_contains_only_public_lineage_free_fields(
+    action: str,
+) -> None:
+    domain = FakePracticeSessionService(context=review_context(action=action))
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(
+        service.refresh_evaluation(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=RefreshPracticeEvaluationRequest(version=4),
+        )
+    )
+    serialized = result.model_dump(mode="json", by_alias=True)
+
+    assert result.status == "review"
+    assert result.version == 5
+    assert set(serialized["evaluation"]) == {
+        "overallScore",
+        "dimensionScores",
+        "evaluatedAt",
+    }
+    assert set(serialized["review"]) == {
+        "overallPerformance",
+        "highlights",
+        "mainIssues",
+        "improvementSuggestions",
+        "reusableAnswerStructure",
+        "exposedWeaknesses",
+        "recommendation",
+    }
+    assert serialized["review"]["recommendation"]["action"] == action
+    if action == "retryCurrent":
+        assert "nextQuestion" not in serialized["review"]["recommendation"]
+    else:
+        assert "nextQuestion" in serialized["review"]["recommendation"]
+    assert "completedAt" not in serialized
+    dumped = str(serialized)
+    for field in (
+        "focusAssessments",
+        "evaluationRunId",
+        "reviewRunId",
+        "recommendationRunId",
+        "sourceAgentRunId",
+        "provider",
+        "model",
+    ):
+        assert field not in dumped
+
+
+@pytest.mark.parametrize(
+    ("domain_error", "status_code", "error_code"),
+    [
+        (
+            PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
+                source_code="missing_review_model",
+            ),
+            503,
+            PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
+        ),
+        (
+            PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
+                source_code="missing_recommendation_model",
+            ),
+            503,
+            PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
+        ),
+        (
+            PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_FAILED,
+                source_code="provider_details",
+            ),
+            409,
+            PRACTICE_EVALUATION_GENERATION_FAILED,
+        ),
+        (
+            PracticeSessionStateError(
+                PRACTICE_REVIEW_GENERATION_FAILED,
+                source_code="provider_details",
+            ),
+            409,
+            PRACTICE_REVIEW_GENERATION_FAILED,
+        ),
+        (
+            PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_FAILED,
+                source_code="provider_details",
+            ),
+            409,
+            PRACTICE_RECOMMENDATION_GENERATION_FAILED,
+        ),
+    ],
+)
+def test_refresh_evaluation_maps_downstream_errors_to_safe_codes(
+    domain_error: PracticeSessionStateError,
+    status_code: int,
+    error_code: str,
+) -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(
+            attempt_status="evaluating",
+            version=4,
+            action="complete",
+        ),
+        error=domain_error,
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service.refresh_evaluation(
+                user_id=uuid4(),
+                session_id=uuid4(),
+                payload=RefreshPracticeEvaluationRequest(version=4),
+            )
+        )
+
+    assert error.value.status_code == status_code
+    assert error.value.error == error_code
+    assert "provider_details" not in str(error.value)
 
 
 def test_submit_primary_answer_checks_configuration_and_projects_main_answer() -> None:

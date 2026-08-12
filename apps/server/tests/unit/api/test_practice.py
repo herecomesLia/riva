@@ -11,6 +11,7 @@ from riva.schemas.practice_sessions import (
     PracticeAnswerResponse,
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
+    RefreshPracticeEvaluationRequest,
     PracticeSessionSelection,
 )
 
@@ -87,6 +88,7 @@ class FakePracticeAPIService:
         self.result = response()
         self.submit_result = follow_up_response()
         self.refresh_follow_up_result = self.submit_result
+        self.refresh_evaluation_result = self.result
         self.current_result = CurrentPracticeSessionResponse(session=self.result)
         self.calls: list[tuple[str, dict[str, object]]] = []
 
@@ -105,6 +107,10 @@ class FakePracticeAPIService:
     async def refresh_follow_up_generation(self, **kwargs: object):
         self.calls.append(("refresh_follow_up", kwargs))
         return self.refresh_follow_up_result
+
+    async def refresh_evaluation(self, **kwargs: object):
+        self.calls.append(("refresh_evaluation", kwargs))
+        return self.refresh_evaluation_result
 
     async def get_session(self, **kwargs: object):
         self.calls.append(("get", kwargs))
@@ -284,6 +290,55 @@ def test_refresh_follow_up_generation_returns_200_and_forwards_version(app) -> N
     }
 
 
+def test_refresh_evaluation_returns_200_and_forwards_version(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/evaluation/refresh",
+        json={"version": 4},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "generatingQuestion"
+    assert service.calls[0][0] == "refresh_evaluation"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(
+        service.calls[0][1]["payload"], RefreshPracticeEvaluationRequest
+    )
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == {
+        "version": 4
+    }
+
+
+def test_refresh_evaluation_requires_csrf_and_forbids_extra_fields(app) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/evaluation/refresh",
+        json={"version": 4},
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/evaluation/refresh",
+        json={"version": 4, "runId": str(uuid4())},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert service.calls == []
+
+
 def test_new_practice_mutations_require_authentication(app) -> None:
     service = FakePracticeAPIService()
 
@@ -316,9 +371,17 @@ def test_new_practice_mutations_require_authentication(app) -> None:
         json={"version": 3},
         headers={"Origin": TRUSTED_ORIGIN},
     )
+    evaluation_refresh = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/evaluation/refresh",
+        json={"version": 4},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
 
     assert submit.status_code == 401
     assert refresh.status_code == 401
+    assert evaluation_refresh.status_code == 401
     assert service.calls == []
 
 
@@ -385,6 +448,7 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
         "/api/practice/sessions/{sessionId}/follow-up-generation/refresh"
         in paths
     )
+    assert "/api/practice/sessions/{sessionId}/evaluation/refresh" in paths
     assert "202" in paths["/api/practice/sessions"]["post"]["responses"]
     assert "200" in paths["/api/practice/sessions/{sessionId}"]["get"]["responses"]
     response_schema = paths["/api/practice/sessions"]["post"]["responses"]["202"][

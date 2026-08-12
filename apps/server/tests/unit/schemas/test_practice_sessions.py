@@ -11,11 +11,14 @@ from riva.schemas.practice_sessions import (
     PracticeAnsweringFollowUpResponse,
     PracticeAnsweringResponse,
     PracticeEvaluatingResponse,
+    PracticeEvaluationResponse,
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     PracticeQuestionResponse,
+    PracticeReviewResponse,
     PracticeFollowUpQuestionResponse,
     RefreshPracticeFollowUpGenerationRequest,
+    RefreshPracticeEvaluationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
     SubmitPrimaryAnswerRequest,
@@ -255,6 +258,17 @@ def test_refresh_follow_up_request_requires_only_positive_version() -> None:
         )
 
 
+def test_refresh_evaluation_request_requires_positive_version_and_forbids_internal_fields() -> None:
+    request = RefreshPracticeEvaluationRequest.model_validate({"version": 4})
+    assert request.model_dump(mode="json") == {"version": 4}
+    with pytest.raises(ValidationError):
+        RefreshPracticeEvaluationRequest.model_validate({"version": 0})
+    with pytest.raises(ValidationError):
+        RefreshPracticeEvaluationRequest.model_validate(
+            {"version": 4, "runId": str(uuid4())}
+        )
+
+
 def public_session_payload(status: str = "generatingQuestion") -> dict[str, object]:
     payload: dict[str, object] = {
         "status": status,
@@ -271,6 +285,7 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
         "generatingFollowUp",
         "answeringFollowUp",
         "evaluating",
+        "review",
     }:
         payload["question"] = {
             "id": str(uuid4()),
@@ -289,7 +304,12 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
             "isSaved": False,
             "isMarkedWeak": True,
         }
-    if status in {"generatingFollowUp", "answeringFollowUp", "evaluating"}:
+    if status in {
+        "generatingFollowUp",
+        "answeringFollowUp",
+        "evaluating",
+        "review",
+    }:
         payload["mainAnswer"] = {
             "id": str(uuid4()),
             "content": "My answer",
@@ -318,6 +338,42 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
         payload["submittedAt"] = datetime(
             2026, 8, 11, 12, 3, tzinfo=UTC
         ).isoformat()
+    if status == "review":
+        payload["followUpCompletion"] = {
+            "status": "completed",
+            "reason": "noFollowUpRequired",
+        }
+        payload["evaluation"] = {
+            "overallScore": 82,
+            "dimensionScores": [
+                {
+                    "dimension": dimension,
+                    "score": 82,
+                    "explanation": f"Supports {dimension}.",
+                }
+                for dimension in (
+                    "relevance",
+                    "structure",
+                    "specificity",
+                    "communication",
+                )
+            ],
+            "evaluatedAt": datetime(
+                2026, 8, 11, 12, 3, tzinfo=UTC
+            ).isoformat(),
+        }
+        payload["review"] = {
+            "overallPerformance": "Strong answer.",
+            "highlights": ["Shows ownership."],
+            "mainIssues": ["Attribution evidence is brief."],
+            "improvementSuggestions": ["Name the baseline."],
+            "reusableAnswerStructure": ["Context", "Evidence", "Result"],
+            "exposedWeaknesses": ["Attribution evidence"],
+            "recommendation": {
+                "action": "retryCurrent",
+                "reason": "Practice the current question again.",
+            },
+        }
     return payload
 
 
@@ -346,8 +402,10 @@ def test_active_response_union_exposes_only_supported_states() -> None:
         "status": "completed",
         "reason": "noFollowUpRequired",
     }
-    with pytest.raises(ValidationError):
-        adapter.validate_python(public_session_payload("review"))
+    review = adapter.validate_python(public_session_payload("review"))
+    assert isinstance(review, PracticeReviewResponse)
+    assert review.evaluation.overall_score == 82
+    assert review.review.recommendation.action == "retryCurrent"
 
 
 def test_answer_and_follow_up_question_public_projections_are_strict_and_aware() -> None:
@@ -446,3 +504,88 @@ def test_active_response_rejects_naive_timestamp_and_unknown_fields() -> None:
     payload["unexpected"] = True
     with pytest.raises(ValidationError):
         TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
+
+
+def test_public_evaluation_response_is_strict_aware_and_hides_focus_assessments() -> None:
+    payload = public_session_payload("review")["evaluation"]
+    assert isinstance(payload, dict)
+    evaluation = PracticeEvaluationResponse.model_validate(payload)
+
+    assert evaluation.overall_score == 82
+    assert len(evaluation.dimension_scores) == 4
+    assert evaluation.evaluated_at.tzinfo is not None
+    with pytest.raises(ValidationError):
+        PracticeEvaluationResponse.model_validate(
+            {**payload, "overallScore": "82"}
+        )
+    with pytest.raises(ValidationError):
+        PracticeEvaluationResponse.model_validate(
+            {**payload, "dimensionScores": [{"score": 82}] * 4}
+        )
+    with pytest.raises(ValidationError):
+        PracticeEvaluationResponse.model_validate(
+            {**payload, "evaluatedAt": "2026-08-11T12:03:00"}
+        )
+    with pytest.raises(ValidationError):
+        PracticeEvaluationResponse.model_validate(
+            {**payload, "focusAssessments": []}
+        )
+
+
+@pytest.mark.parametrize("action", ["retryCurrent", "nextQuestion"])
+def test_public_review_response_validates_both_recommendation_branches(
+    action: str,
+) -> None:
+    payload = public_session_payload("review")
+    review = payload["review"]
+    assert isinstance(review, dict)
+    recommendation = review["recommendation"]
+    assert isinstance(recommendation, dict)
+    if action == "nextQuestion":
+        recommendation.update(
+            {
+                "action": action,
+                "nextQuestion": {
+                    "questionType": "projectDeepDive",
+                    "difficulty": "basic",
+                    "focusAreas": ["Attribution evidence"],
+                },
+            }
+        )
+    else:
+        recommendation["action"] = action
+    parsed = PracticeReviewResponse.model_validate(payload)
+    assert parsed.review.recommendation.action == action
+    if action == "nextQuestion":
+        assert parsed.review.recommendation.next_question.focus_areas == [
+            "Attribution evidence"
+        ]
+    else:
+        assert "nextQuestion" not in parsed.model_dump(mode="json", by_alias=True)[
+            "review"
+        ]["recommendation"]
+
+
+def test_public_review_response_rejects_mixed_recommendation_union_and_missing_sections() -> None:
+    payload = public_session_payload("review")
+    review = payload["review"]
+    assert isinstance(review, dict)
+    recommendation = review["recommendation"]
+    assert isinstance(recommendation, dict)
+    recommendation["nextQuestion"] = {
+        "questionType": "projectDeepDive",
+        "difficulty": "basic",
+        "focusAreas": [],
+    }
+    with pytest.raises(ValidationError):
+        PracticeReviewResponse.model_validate(payload)
+
+    payload = public_session_payload("review")
+    payload.pop("evaluation")
+    with pytest.raises(ValidationError):
+        PracticeReviewResponse.model_validate(payload)
+
+    payload = public_session_payload("review")
+    payload.pop("review")
+    with pytest.raises(ValidationError):
+        PracticeReviewResponse.model_validate(payload)

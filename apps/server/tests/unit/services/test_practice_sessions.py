@@ -13,12 +13,16 @@ from riva.models import (
     PracticeEvaluation,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
+    PracticeRecommendation,
+    PracticeReview,
     PracticeSession,
     QuestionCard,
 )
 from riva.prompts import (
     FOLLOW_UP_PROMPT,
     PRACTICE_EVALUATION_PROMPT,
+    PRACTICE_RECOMMENDATION_PROMPT,
+    PRACTICE_REVIEW_PROMPT,
     QUESTION_GENERATION_PROMPT,
 )
 from riva.schemas.evaluation import (
@@ -27,6 +31,8 @@ from riva.schemas.evaluation import (
 )
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import PracticeAnswerKind
+from riva.schemas.practice_recommendation import RecommendationRunPayload
+from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.practice_sessions import PracticeSessionSelection
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -38,6 +44,10 @@ from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
     PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
+    PRACTICE_EVALUATION_GENERATION_FAILED,
+    PRACTICE_RECOMMENDATION_GENERATION_FAILED,
+    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
+    PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
     PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
@@ -46,9 +56,13 @@ from riva.services.practice_sessions import (
     PRACTICE_SESSION_SOURCE_UNAVAILABLE,
     PRACTICE_SESSION_STATE_CONFLICT,
     PRACTICE_SESSION_VERSION_CONFLICT,
+    PRACTICE_REVIEW_GENERATION_FAILED,
+    PRACTICE_REVIEW_GENERATION_STATE_CONFLICT,
+    PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE,
     PracticePrimaryAnswerWorkflowContext,
     PracticeEvaluationWorkflowContext,
+    PracticeReviewWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
     practice_follow_up_idempotency_key,
@@ -58,6 +72,10 @@ from riva.services.evaluation_generation import (
     practice_evaluation_idempotency_key,
 )
 from riva.services.follow_up_generation import FollowUpGenerationStateError
+from riva.services.recommendation_generation import (
+    practice_recommendation_idempotency_key,
+)
+from riva.services.review_generation import practice_review_idempotency_key
 from riva.services.question_generation import QuestionGenerationStateError
 
 
@@ -138,6 +156,48 @@ class FakeFollowUpGenerationService:
 
 
 class FakeEvaluationGenerationService:
+    def __init__(
+        self,
+        run: AgentRun | None = None,
+        error: BaseException | None = None,
+    ) -> None:
+        self.run = run
+        self.error = error
+        self.calls: list[dict[str, object]] = []
+
+    async def enqueue_generation_in_transaction(
+        self,
+        **kwargs: object,
+    ) -> AgentRun:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        assert self.run is not None
+        return self.run
+
+
+class FakeReviewGenerationService:
+    def __init__(
+        self,
+        run: AgentRun | None = None,
+        error: BaseException | None = None,
+    ) -> None:
+        self.run = run
+        self.error = error
+        self.calls: list[dict[str, object]] = []
+
+    async def enqueue_generation_in_transaction(
+        self,
+        **kwargs: object,
+    ) -> AgentRun:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        assert self.run is not None
+        return self.run
+
+
+class FakeRecommendationGenerationService:
     def __init__(
         self,
         run: AgentRun | None = None,
@@ -533,23 +593,296 @@ def evaluation_artifact(
     )
 
 
+def review_run(
+    *,
+    user_id: UUID,
+    attempt_id: UUID,
+    evaluation_id: UUID,
+    status: AgentRunStatus = AgentRunStatus.QUEUED,
+    language: str = "en",
+    idempotency_key: str | None = None,
+) -> AgentRun:
+    payload = ReviewRunPayload(
+        attempt_id=attempt_id,
+        evaluation_id=evaluation_id,
+        interaction_language=language,
+    )
+    return AgentRun(
+        id=uuid4(),
+        user_id=user_id,
+        agent_id="practice-reviewer",
+        prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
+        prompt_version=PRACTICE_REVIEW_PROMPT.version,
+        output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+        status=status,
+        payload=payload.model_dump(mode="json", by_alias=True),
+        idempotency_key=idempotency_key
+        or practice_review_idempotency_key(attempt_id),
+        attempt_count=0 if status is AgentRunStatus.QUEUED else 1,
+        max_attempts=3,
+        available_at=NOW,
+        started_at=None if status is AgentRunStatus.QUEUED else NOW,
+        finished_at=(
+            NOW
+            if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
+            else None
+        ),
+        provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
+        model="test-model",
+        input_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        output_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        result={"overallPerformance": "Strong answer."}
+        if status is AgentRunStatus.SUCCEEDED
+        else None,
+        error_code="provider_unavailable" if status is AgentRunStatus.FAILED else None,
+    )
+
+
+def review_artifact(
+    *,
+    attempt_id: UUID,
+    run_id: UUID,
+    weaknesses: list[str] | None = None,
+) -> PracticeReview:
+    return PracticeReview(
+        id=uuid4(),
+        attempt_id=attempt_id,
+        source_agent_run_id=run_id,
+        overall_performance="Strong answer with a clear result.",
+        highlights=["Shows ownership."],
+        main_issues=["Attribution evidence is brief."],
+        improvement_suggestions=["Name the baseline and result."],
+        reusable_answer_structure=["Context", "Evidence", "Result"],
+        exposed_weaknesses=weaknesses or ["Attribution evidence"],
+        reviewed_at=NOW,
+    )
+
+
+def recommendation_run(
+    *,
+    user_id: UUID,
+    attempt_id: UUID,
+    evaluation_id: UUID,
+    review_id: UUID,
+    status: AgentRunStatus = AgentRunStatus.QUEUED,
+    language: str = "en",
+    idempotency_key: str | None = None,
+) -> AgentRun:
+    payload = RecommendationRunPayload(
+        attempt_id=attempt_id,
+        evaluation_id=evaluation_id,
+        review_id=review_id,
+        interaction_language=language,
+    )
+    return AgentRun(
+        id=uuid4(),
+        user_id=user_id,
+        agent_id="practice-recommender",
+        prompt_id=PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
+        prompt_version=PRACTICE_RECOMMENDATION_PROMPT.version,
+        output_schema_id=PRACTICE_RECOMMENDATION_PROMPT.output_schema_id,
+        status=status,
+        payload=payload.model_dump(mode="json", by_alias=True),
+        idempotency_key=idempotency_key
+        or practice_recommendation_idempotency_key(attempt_id),
+        attempt_count=0 if status is AgentRunStatus.QUEUED else 1,
+        max_attempts=3,
+        available_at=NOW,
+        started_at=None if status is AgentRunStatus.QUEUED else NOW,
+        finished_at=(
+            NOW
+            if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
+            else None
+        ),
+        provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
+        model="test-model",
+        input_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        output_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
+        result={"action": "retryCurrent"}
+        if status is AgentRunStatus.SUCCEEDED
+        else None,
+        error_code="provider_unavailable" if status is AgentRunStatus.FAILED else None,
+    )
+
+
+def recommendation_artifact(
+    *,
+    attempt_id: UUID,
+    run_id: UUID,
+    action: str = "retryCurrent",
+) -> PracticeRecommendation:
+    if action == "retryCurrent":
+        return PracticeRecommendation(
+            id=uuid4(),
+            attempt_id=attempt_id,
+            source_agent_run_id=run_id,
+            action=action,
+            reason="Practice the current question again.",
+            next_question_type=None,
+            next_difficulty=None,
+            focus_areas=[],
+            recommended_at=NOW,
+        )
+    return PracticeRecommendation(
+        id=uuid4(),
+        attempt_id=attempt_id,
+        source_agent_run_id=run_id,
+        action=action,
+        reason="Move to the next focused question.",
+        next_question_type="projectDeepDive",
+        next_difficulty="basic",
+        focus_areas=["Attribution evidence"],
+        recommended_at=NOW,
+    )
+
+
 def service(
     session: ScriptedSession,
     fake_generation: FakeGenerationService | None = None,
     fake_follow_up: FakeFollowUpGenerationService | None = None,
     fake_evaluation: FakeEvaluationGenerationService | None = None,
+    fake_review: FakeReviewGenerationService | None = None,
+    fake_recommendation: FakeRecommendationGenerationService | None = None,
 ) -> PracticeSessionService:
     fake_generation = fake_generation or FakeGenerationService()
     fake_follow_up = fake_follow_up or FakeFollowUpGenerationService()
     fake_evaluation = fake_evaluation or FakeEvaluationGenerationService()
+    fake_review = fake_review or FakeReviewGenerationService()
+    fake_recommendation = fake_recommendation or FakeRecommendationGenerationService()
     return PracticeSessionService(
         session,  # type: ignore[arg-type]
         llm_model="test-model",
         question_generation_service_factory=lambda _session, **kwargs: fake_generation,  # type: ignore[arg-type]
         follow_up_generation_service_factory=lambda _session, **kwargs: fake_follow_up,  # type: ignore[arg-type]
         evaluation_generation_service_factory=lambda _session, **kwargs: fake_evaluation,  # type: ignore[arg-type]
+        review_generation_service_factory=lambda _session, **kwargs: fake_review,  # type: ignore[arg-type]
+        recommendation_generation_service_factory=lambda _session, **kwargs: fake_recommendation,  # type: ignore[arg-type]
         clock=lambda: NOW,
     )
+
+
+def evaluation_pipeline(
+    *,
+    evaluation_status: AgentRunStatus = AgentRunStatus.SUCCEEDED,
+    evaluation_artifact_present: bool = True,
+    review_status: AgentRunStatus | None = None,
+    review_artifact_present: bool = True,
+    recommendation_status: AgentRunStatus | None = None,
+    recommendation_artifact_present: bool = True,
+    recommendation_action: str = "retryCurrent",
+    attempt_status: str = "evaluating",
+) -> dict[str, object]:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+        status=evaluation_status,
+    )
+    evaluation_value = (
+        evaluation_artifact(
+            attempt_id=attempt.id,
+            run_id=evaluation.id,
+        )
+        if evaluation_artifact_present
+        and evaluation_status is AgentRunStatus.SUCCEEDED
+        else None
+    )
+    review = None
+    review_value = None
+    if review_status is not None:
+        review = review_run(
+            user_id=active.user_id,
+            attempt_id=attempt.id,
+            evaluation_id=evaluation_value.id
+            if evaluation_value is not None
+            else uuid4(),
+            status=review_status,
+        )
+        if review_artifact_present and review_status is AgentRunStatus.SUCCEEDED:
+            review_value = review_artifact(
+                attempt_id=attempt.id,
+                run_id=review.id,
+            )
+    recommendation = None
+    recommendation_value = None
+    if recommendation_status is not None:
+        recommendation = recommendation_run(
+            user_id=active.user_id,
+            attempt_id=attempt.id,
+            evaluation_id=evaluation_value.id
+            if evaluation_value is not None
+            else uuid4(),
+            review_id=review_value.id if review_value is not None else uuid4(),
+            status=recommendation_status,
+        )
+        if (
+            recommendation_artifact_present
+            and recommendation_status is AgentRunStatus.SUCCEEDED
+        ):
+            recommendation_value = recommendation_artifact(
+                attempt_id=attempt.id,
+                run_id=recommendation.id,
+                action=recommendation_action,
+            )
+
+    scalar_values: list[object] = [
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        None,
+        evaluation,
+    ]
+    if evaluation_status is AgentRunStatus.SUCCEEDED:
+        scalar_values.append(evaluation_value)
+        scalar_values.append(review)
+        if review is not None and review_status is AgentRunStatus.SUCCEEDED:
+            scalar_values.append(review_value)
+        scalar_values.append(recommendation)
+        if (
+            recommendation is not None
+            and recommendation_status is AgentRunStatus.SUCCEEDED
+        ):
+            scalar_values.append(recommendation_value)
+
+    return {
+        "active": active,
+        "attempt": attempt,
+        "question_run": question_run,
+        "card": card,
+        "answer": answer,
+        "follow_up": follow_up,
+        "decision": decision,
+        "evaluation": evaluation,
+        "evaluation_value": evaluation_value,
+        "review": review,
+        "review_value": review_value,
+        "recommendation": recommendation,
+        "recommendation_value": recommendation_value,
+        "scalar_values": scalar_values,
+    }
 
 
 def test_start_session_creates_session_attempt_and_run_in_one_outer_commit() -> None:
@@ -2619,3 +2952,682 @@ def test_get_evaluating_rejects_corrupt_evaluation_lineage(mutate) -> None:
     assert attempt.status == "evaluating"
     assert scripted.commit_count == 0
     assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    "status",
+    [AgentRunStatus.QUEUED, AgentRunStatus.RUNNING],
+)
+def test_refresh_evaluation_keeps_pending_evaluation_in_evaluating(
+    status: AgentRunStatus,
+) -> None:
+    records = evaluation_pipeline(evaluation_status=status)
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.evaluation_generation_run is records["evaluation"]
+    assert result.evaluation is None
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_refresh_evaluation_enqueues_review_once_and_keeps_version() -> None:
+    records = evaluation_pipeline()
+    evaluation = records["evaluation_value"]
+    assert isinstance(evaluation, PracticeEvaluation)
+    review = review_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+        attempt_id=records["attempt"].id,  # type: ignore[union-attr]
+        evaluation_id=evaluation.id,
+    )
+    fake_review = FakeReviewGenerationService(review)
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted, fake_review=fake_review).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.review_generation_run is review
+    assert result.review is None
+    assert result.recommendation_generation_run is None
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert fake_review.calls == [
+        {
+            "user_id": records["active"].user_id,  # type: ignore[union-attr]
+            "attempt_id": records["attempt"].id,  # type: ignore[union-attr]
+            "interaction_language": "en",
+            "idempotency_key": practice_review_idempotency_key(
+                records["attempt"].id  # type: ignore[union-attr]
+            ),
+        }
+    ]
+    assert scripted.commit_count == 1
+
+
+@pytest.mark.parametrize(
+    "status",
+    [AgentRunStatus.QUEUED, AgentRunStatus.RUNNING],
+)
+def test_refresh_evaluation_keeps_pending_review_in_evaluating(
+    status: AgentRunStatus,
+) -> None:
+    records = evaluation_pipeline(review_status=status)
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.evaluation is records["evaluation_value"]
+    assert result.review_generation_run is records["review"]
+    assert result.review is None
+    assert result.recommendation_generation_run is None
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert scripted.commit_count == 1
+
+
+def test_refresh_evaluation_enqueues_recommendation_once_and_keeps_version() -> None:
+    records = evaluation_pipeline(review_status=AgentRunStatus.SUCCEEDED)
+    evaluation = records["evaluation_value"]
+    review = records["review_value"]
+    assert isinstance(evaluation, PracticeEvaluation)
+    assert isinstance(review, PracticeReview)
+    recommendation = recommendation_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+        attempt_id=records["attempt"].id,  # type: ignore[union-attr]
+        evaluation_id=evaluation.id,
+        review_id=review.id,
+    )
+    fake_recommendation = FakeRecommendationGenerationService(recommendation)
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_recommendation=fake_recommendation,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.review is review
+    assert result.recommendation_generation_run is recommendation
+    assert result.recommendation is None
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert fake_recommendation.calls[0]["idempotency_key"] == (
+        practice_recommendation_idempotency_key(records["attempt"].id)  # type: ignore[union-attr]
+    )
+    assert scripted.commit_count == 1
+
+
+@pytest.mark.parametrize(
+    "status",
+    [AgentRunStatus.QUEUED, AgentRunStatus.RUNNING],
+)
+def test_refresh_evaluation_keeps_pending_recommendation_in_evaluating(
+    status: AgentRunStatus,
+) -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=status,
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.recommendation_generation_run is records["recommendation"]
+    assert result.recommendation is None
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert scripted.commit_count == 1
+
+
+@pytest.mark.parametrize(
+    ("phase", "status", "expected_code"),
+    [
+        (
+            "evaluation",
+            AgentRunStatus.FAILED,
+            PRACTICE_EVALUATION_GENERATION_FAILED,
+        ),
+        (
+            "review",
+            AgentRunStatus.FAILED,
+            PRACTICE_REVIEW_GENERATION_FAILED,
+        ),
+        (
+            "recommendation",
+            AgentRunStatus.FAILED,
+            PRACTICE_RECOMMENDATION_GENERATION_FAILED,
+        ),
+    ],
+)
+def test_refresh_evaluation_maps_each_failed_phase_without_advancing(
+    phase: str,
+    status: AgentRunStatus,
+    expected_code: str,
+) -> None:
+    records = evaluation_pipeline(
+        evaluation_status=status if phase == "evaluation" else AgentRunStatus.SUCCEEDED,
+        review_status=(
+            status
+            if phase == "review"
+            else AgentRunStatus.SUCCEEDED
+            if phase == "recommendation"
+            else None
+        ),
+        recommendation_status=status if phase == "recommendation" else None,
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == expected_code
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "evaluating"  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    ("phase", "expected_code"),
+    [
+        ("evaluation", PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT),
+        ("review", PRACTICE_REVIEW_GENERATION_STATE_CONFLICT),
+        (
+            "recommendation",
+            PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
+        ),
+    ],
+)
+def test_refresh_evaluation_rejects_succeeded_run_without_canonical_artifact(
+    phase: str,
+    expected_code: str,
+) -> None:
+    records = evaluation_pipeline(
+        evaluation_artifact_present=phase != "evaluation",
+        review_status=AgentRunStatus.SUCCEEDED if phase != "evaluation" else None,
+        review_artifact_present=phase == "recommendation",
+        recommendation_status=(
+            AgentRunStatus.SUCCEEDED if phase == "recommendation" else None
+        ),
+        recommendation_artifact_present=False,
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == expected_code
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "evaluating"  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_refresh_evaluation_finalizes_only_after_recommendation_artifact() -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+        recommendation_action="retryCurrent",
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert result.attempt.status == "review"
+    assert result.attempt.completed_at == NOW
+    assert result.session.status == "active"
+    assert result.session.version == 5
+    assert result.session.completed_at is None
+    assert result.session.completion_reason is None
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda run: run.payload.update({"attemptId": str(uuid4())}),
+        lambda run: run.payload.update({"evaluationId": str(uuid4())}),
+        lambda run: run.payload.update({"interactionLanguage": "zh-CN"}),
+        lambda run: setattr(run, "idempotency_key", "corrupt-review-key"),
+    ],
+)
+def test_refresh_evaluation_rejects_corrupt_review_lineage_without_reenqueue(
+    mutate,
+) -> None:
+    records = evaluation_pipeline()
+    evaluation = records["evaluation_value"]
+    assert isinstance(evaluation, PracticeEvaluation)
+    corrupt_review = review_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+        attempt_id=records["attempt"].id,  # type: ignore[union-attr]
+        evaluation_id=evaluation.id,
+    )
+    mutate(corrupt_review)
+    records["scalar_values"][-2] = corrupt_review
+    fake_review = FakeReviewGenerationService()
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted, fake_review=fake_review).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
+    assert fake_review.calls == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda run: run.payload.update({"attemptId": str(uuid4())}),
+        lambda run: run.payload.update({"evaluationId": str(uuid4())}),
+        lambda run: run.payload.update({"reviewId": str(uuid4())}),
+        lambda run: run.payload.update({"interactionLanguage": "zh-CN"}),
+        lambda run: setattr(run, "idempotency_key", "corrupt-recommendation-key"),
+    ],
+)
+def test_refresh_evaluation_rejects_corrupt_recommendation_lineage_without_reenqueue(
+    mutate,
+) -> None:
+    records = evaluation_pipeline(review_status=AgentRunStatus.SUCCEEDED)
+    evaluation = records["evaluation_value"]
+    review = records["review_value"]
+    assert isinstance(evaluation, PracticeEvaluation)
+    assert isinstance(review, PracticeReview)
+    corrupt_recommendation = recommendation_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+        attempt_id=records["attempt"].id,  # type: ignore[union-attr]
+        evaluation_id=evaluation.id,
+        review_id=review.id,
+    )
+    mutate(corrupt_recommendation)
+    records["scalar_values"][-1] = corrupt_recommendation
+    fake_recommendation = FakeRecommendationGenerationService()
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_recommendation=fake_recommendation,
+            ).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+    assert fake_recommendation.calls == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    ("factory", "expected_code"),
+    [
+        ("review", PRACTICE_REVIEW_GENERATION_UNAVAILABLE),
+        ("recommendation", PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE),
+    ],
+)
+def test_downstream_enqueue_failure_rolls_back_without_advancing(
+    factory: str,
+    expected_code: str,
+) -> None:
+    if factory == "review":
+        records = evaluation_pipeline()
+        fake_review = FakeReviewGenerationService(error=ValueError("no model"))
+        fake_recommendation = None
+    else:
+        records = evaluation_pipeline(review_status=AgentRunStatus.SUCCEEDED)
+        fake_review = None
+        fake_recommendation = FakeRecommendationGenerationService(
+            error=ValueError("no model")
+        )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_review=fake_review,
+                fake_recommendation=fake_recommendation,
+            ).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == expected_code
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "evaluating"  # type: ignore[union-attr]
+    assert records["evaluation_value"] is not None
+    if factory == "recommendation":
+        assert records["review_value"] is not None
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_get_evaluating_does_not_reconcile_review_or_recommendation() -> None:
+    records = evaluation_pipeline()
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert result.review_generation_run is None
+    assert result.recommendation_generation_run is None
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_evaluating_recovers_review_succeeded_without_recommendation() -> None:
+    records = evaluation_pipeline(review_status=AgentRunStatus.SUCCEEDED)
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.review is records["review_value"]
+    assert result.recommendation_generation_run is None
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert scripted.commit_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_evaluating_does_not_finalize_succeeded_recommendation() -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.recommendation is records["recommendation_value"]
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert records["attempt"].completed_at is None  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_get_review_requires_complete_canonical_lineage_without_writes() -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+        attempt_status="review",
+    )
+    records["attempt"].completed_at = NOW  # type: ignore[union-attr]
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+        )
+    )
+
+    assert result.attempt.status == "review"
+    assert result.session.version == 4
+    assert scripted.commit_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+@pytest.mark.parametrize(
+    "missing", ["evaluation_run", "evaluation_artifact", "review_run", "review_artifact", "recommendation_run", "recommendation_artifact"],
+)
+def test_final_replay_rejects_incomplete_lineage_as_version_conflict(
+    missing: str,
+) -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+        attempt_status="review",
+    )
+    records["attempt"].completed_at = NOW  # type: ignore[union-attr]
+    if missing == "evaluation_run":
+        records["scalar_values"][8] = None
+    elif missing == "evaluation_artifact":
+        records["scalar_values"][9] = None
+    elif missing == "review_run":
+        records["scalar_values"][10] = None
+    elif missing == "review_artifact":
+        records["scalar_values"][11] = None
+    elif missing == "recommendation_run":
+        records["scalar_values"][12] = None
+    else:
+        records["scalar_values"][13] = None
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "review"  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize("corruption", ["evaluationId", "reviewId", "language"])
+def test_final_replay_rejects_corrupt_lineage_as_version_conflict(
+    corruption: str,
+) -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+        attempt_status="review",
+    )
+    records["attempt"].completed_at = NOW  # type: ignore[union-attr]
+    if corruption == "evaluationId":
+        records["scalar_values"][10].payload["evaluationId"] = str(uuid4())
+    elif corruption == "reviewId":
+        records["scalar_values"][12].payload["reviewId"] = str(uuid4())
+    else:
+        records["scalar_values"][12].payload["interactionLanguage"] = "zh-CN"
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "review"  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "evaluation_run",
+        "evaluation_artifact",
+        "review_run",
+        "review_artifact",
+        "recommendation_run",
+        "recommendation_artifact",
+        "wrong_evaluation_id",
+        "wrong_review_id",
+        "wrong_language",
+    ],
+)
+def test_get_review_rejects_incomplete_or_corrupt_lineage(
+    corruption: str,
+) -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+        attempt_status="review",
+    )
+    records["attempt"].completed_at = NOW  # type: ignore[union-attr]
+    if corruption == "evaluation_run":
+        records["scalar_values"][8] = None
+    elif corruption == "evaluation_artifact":
+        records["scalar_values"][9] = None
+    elif corruption == "review_run":
+        records["scalar_values"][10] = None
+        records["scalar_values"][11] = None
+    elif corruption == "review_artifact":
+        records["scalar_values"][11] = None
+    elif corruption == "recommendation_run":
+        records["scalar_values"][12] = None
+    elif corruption == "recommendation_artifact":
+        records["scalar_values"][13] = None
+    elif corruption == "wrong_evaluation_id":
+        records["scalar_values"][10].payload["evaluationId"] = str(uuid4())
+    elif corruption == "wrong_review_id":
+        records["scalar_values"][12].payload["reviewId"] = str(uuid4())
+    else:
+        records["scalar_values"][12].payload["interactionLanguage"] = "zh-CN"
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).get_session_context(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+            )
+        )
+
+    assert error.value.code in {
+        PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
+        PRACTICE_REVIEW_GENERATION_STATE_CONFLICT,
+        PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
+    }
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "review"  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_get_active_review_uses_no_write_locks_or_commit() -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+        attempt_status="review",
+    )
+    records["attempt"].completed_at = NOW  # type: ignore[union-attr]
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).get_active_session_context(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext | PracticeReviewWorkflowContext)
+    assert result.attempt.status == "review"
+    assert result.session.version == 4
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
