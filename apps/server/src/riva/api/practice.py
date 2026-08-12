@@ -14,6 +14,7 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    SubmitFollowUpAnswerRequest,
     StartPracticeSessionRequest,
     SubmitPrimaryAnswerRequest,
 )
@@ -84,6 +85,26 @@ async def submit_practice_primary_answer(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.submit_primary_answer(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/answers/follow-up",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def submit_practice_follow_up_answer(
+    session_id: PracticeSessionId,
+    payload: SubmitFollowUpAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.submit_follow_up_answer(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

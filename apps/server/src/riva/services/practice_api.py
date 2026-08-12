@@ -8,13 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.core.errors import APIError
 from riva.core.language import InteractionLanguage
 from riva.models import PracticeAnswer, PracticeFollowUpQuestion, QuestionCard
+from riva.schemas.evaluation import PracticeEvaluationFollowUpCompletionReason
 from riva.schemas.practice_sessions import (
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
     PracticeAnswerResponse,
+    PracticeAnsweredFollowUpExchangeResponse,
     PracticeAnsweringFollowUpResponse,
     PracticeAnsweringResponse,
+    PracticeAllAnsweredCompletionResponse,
     PracticeAwaitingFollowUpExchangeResponse,
+    PracticeCompletedFollowUpCompletionResponse,
     PracticeEvaluationResponse,
     PracticeEvaluatingResponse,
     PracticeFollowUpQuestionResponse,
@@ -31,6 +35,7 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
+    SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
 )
 from riva.schemas.question_cards import (
@@ -38,10 +43,12 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.services.practice_sessions import (
+    PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
     PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
+    PracticeAnsweredFollowUpExchangeContext,
     PracticeSessionService,
     PracticeSessionStateError,
     PracticePrimaryAnswerWorkflowContext,
@@ -60,9 +67,6 @@ from riva.services.review_generation import practice_review_output_from_artifact
 
 PRACTICE_QUESTION_GENERATION_UNAVAILABLE = (
     "practice_question_generation_unavailable"
-)
-PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE = (
-    "practice_follow_up_generation_unavailable"
 )
 PRACTICE_EVALUATION_GENERATION_UNAVAILABLE = (
     "practice_evaluation_generation_unavailable"
@@ -142,6 +146,26 @@ class PracticeAPIService:
                 session_id=session_id,
                 expected_version=payload.version,
                 question_id=payload.question_id,
+                content=payload.content,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def submit_follow_up_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: SubmitFollowUpAnswerRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().submit_follow_up_answer(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                follow_up_question_id=payload.follow_up_question_id,
                 content=payload.content,
             )
             return build_practice_session_response(context)
@@ -264,7 +288,6 @@ def build_practice_session_response(
             if (
                 context.attempt.status != "review"
                 or context.follow_up_decision is None
-                or context.follow_up_decision.action != "complete"
                 or context.follow_up_question is not None
             ):
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
@@ -276,15 +299,18 @@ def build_practice_session_response(
             recommendation_output = practice_recommendation_output_from_artifact(
                 context.recommendation
             )
+            follow_up_exchanges = _build_practice_answered_follow_up_exchanges(
+                context.follow_up_exchanges
+            )
+            follow_up_completion = build_practice_follow_up_completion_response(
+                context.follow_up_completion_reason
+            )
             return PracticeReviewResponse(
                 status="review",
                 question=build_practice_question_response(context.question_card),
                 main_answer=build_practice_answer_response(context.main_answer),
-                follow_up_exchanges=[],
-                follow_up_completion=PracticeNoFollowUpRequiredCompletionResponse(
-                    status="completed",
-                    reason="noFollowUpRequired",
-                ),
+                follow_up_exchanges=follow_up_exchanges,
+                follow_up_completion=follow_up_completion,
                 evaluation=PracticeEvaluationResponse(
                     overall_score=evaluation_output.overall_score,
                     dimension_scores=evaluation_output.dimension_scores,
@@ -311,7 +337,9 @@ def build_practice_session_response(
                         context.question_card
                     ),
                     main_answer=build_practice_answer_response(context.main_answer),
-                    follow_up_exchanges=[],
+                    follow_up_exchanges=_build_practice_answered_follow_up_exchanges(
+                        context.follow_up_exchanges
+                    ),
                     **base,
                 )
             return PracticeAnsweringResponse(
@@ -344,14 +372,15 @@ def build_practice_session_response(
                     status="answeringFollowUp",
                     question=question,
                     main_answer=main_answer,
-                    follow_up_exchanges=[],
+                    follow_up_exchanges=_build_practice_answered_follow_up_exchanges(
+                        context.follow_up_exchanges
+                    ),
                     current_follow_up=current_follow_up,
                     **base,
                 )
             if context.attempt.status == "evaluating":
                 if (
                     context.follow_up_decision is None
-                    or context.follow_up_decision.action != "complete"
                     or context.follow_up_question is not None
                 ):
                     raise PracticeSessionStateError(
@@ -361,10 +390,11 @@ def build_practice_session_response(
                     status="evaluating",
                     question=question,
                     main_answer=main_answer,
-                    follow_up_exchanges=[],
-                    follow_up_completion=PracticeNoFollowUpRequiredCompletionResponse(
-                        status="completed",
-                        reason="noFollowUpRequired",
+                    follow_up_exchanges=_build_practice_answered_follow_up_exchanges(
+                        context.follow_up_exchanges
+                    ),
+                    follow_up_completion=build_practice_follow_up_completion_response(
+                        context.follow_up_completion_reason
                     ),
                     submitted_at=context.attempt.updated_at,
                     **base,
@@ -444,6 +474,44 @@ def build_practice_follow_up_question_response(
         raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
+def build_practice_answered_follow_up_exchange_response(
+    exchange: PracticeAnsweredFollowUpExchangeContext,
+) -> PracticeAnsweredFollowUpExchangeResponse:
+    try:
+        return PracticeAnsweredFollowUpExchangeResponse(
+            status="answered",
+            question=build_practice_follow_up_question_response(exchange.question),
+            answer=build_practice_answer_response(exchange.answer),
+        )
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+
+
+def _build_practice_answered_follow_up_exchanges(
+    exchanges: tuple[PracticeAnsweredFollowUpExchangeContext, ...],
+) -> list[PracticeAnsweredFollowUpExchangeResponse]:
+    return [
+        build_practice_answered_follow_up_exchange_response(exchange)
+        for exchange in exchanges
+    ]
+
+
+def build_practice_follow_up_completion_response(
+    reason: PracticeEvaluationFollowUpCompletionReason | None,
+) -> PracticeCompletedFollowUpCompletionResponse:
+    if reason == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED:
+        return PracticeNoFollowUpRequiredCompletionResponse(
+            status="completed",
+            reason="noFollowUpRequired",
+        )
+    if reason == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED:
+        return PracticeAllAnsweredCompletionResponse(
+            status="completed",
+            reason="allAnswered",
+        )
+    raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+
 def practice_session_state_api_error(error: PracticeSessionStateError) -> APIError:
     error_status = (
         status.HTTP_404_NOT_FOUND
@@ -451,6 +519,7 @@ def practice_session_state_api_error(error: PracticeSessionStateError) -> APIErr
         else status.HTTP_503_SERVICE_UNAVAILABLE
         if error.code
         in {
+            PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
             PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
             PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
             PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
@@ -470,7 +539,9 @@ __all__ = [
     "PracticeSessionAPIService",
     "build_practice_question_response",
     "build_practice_answer_response",
+    "build_practice_answered_follow_up_exchange_response",
     "build_practice_follow_up_question_response",
+    "build_practice_follow_up_completion_response",
     "build_practice_session_response",
     "practice_session_state_api_error",
 ]

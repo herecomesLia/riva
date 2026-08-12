@@ -1,10 +1,12 @@
 import asyncio
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
 
 from riva.core.errors import APIError
-from riva.models import AgentRunStatus
+from riva.models import AgentRunStatus, PracticeAnswer
+from riva.schemas.evaluation import PracticeEvaluationFollowUpCompletionReason
 from riva.services.practice_api import (
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
@@ -22,6 +24,7 @@ from riva.services.practice_sessions import (
     PRACTICE_REVIEW_GENERATION_FAILED,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
+    PracticeAnsweredFollowUpExchangeContext,
     PracticePrimaryAnswerWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionStateError,
@@ -33,6 +36,7 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     StartPracticeSessionRequest,
+    SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
 )
 from tests.unit.services.test_practice_sessions import (
@@ -88,6 +92,16 @@ class FakePracticeSessionService:
         **kwargs: object,
     ) -> PracticePrimaryAnswerWorkflowContext:
         self.calls.append(("submit", kwargs))
+        if self.error is not None:
+            raise self.error
+        assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
+        return self.context
+
+    async def submit_follow_up_answer(
+        self,
+        **kwargs: object,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        self.calls.append(("submit_follow_up", kwargs))
         if self.error is not None:
             raise self.error
         assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
@@ -202,6 +216,84 @@ def primary_context(
         follow_up_generation_run=follow_up,
         follow_up_decision=decision,
         follow_up_question=question,
+        follow_up_completion_reason=(
+            PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+            if action == "complete"
+            else None
+        ),
+    )
+
+
+def context_with_answered_exchanges(
+    *,
+    attempt_status: str,
+    version: int,
+    exchange_count: int,
+    current_order: int | None = None,
+) -> PracticePrimaryAnswerWorkflowContext:
+    primary = primary_context(
+        attempt_status=attempt_status,
+        version=version,
+        action=None,
+    )
+    exchanges: list[PracticeAnsweredFollowUpExchangeContext] = []
+    questions = []
+    for order in range(1, exchange_count + 1):
+        question = follow_up_question(
+            attempt_id=primary.attempt.id,
+            run_id=primary.follow_up_generation_run.id,
+            order=order,
+        )
+        answer = PracticeAnswer(
+            id=uuid4(),
+            attempt_id=primary.attempt.id,
+            kind="followUp",
+            order=order + 1,
+            content=f"Follow-up answer {order}",
+            follow_up_question_id=question.id,
+            submitted_at=primary.session.updated_at,
+        )
+        questions.append(question)
+        exchanges.append(
+            PracticeAnsweredFollowUpExchangeContext(
+                question=question,
+                answer=answer,
+            )
+        )
+
+    current_question = None
+    current_decision = None
+    completion_reason = None
+    if current_order is not None:
+        current_question = follow_up_question(
+            attempt_id=primary.attempt.id,
+            run_id=primary.follow_up_generation_run.id,
+            order=current_order,
+        )
+        current_decision = follow_up_decision(
+            attempt_id=primary.attempt.id,
+            run_id=primary.follow_up_generation_run.id,
+            action="askFollowUp",
+            question_id=current_question.id,
+            order=current_order,
+        )
+    elif exchange_count:
+        completion_reason = PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED
+        terminal_question = questions[-1] if exchange_count == 2 else None
+        current_decision = follow_up_decision(
+            attempt_id=primary.attempt.id,
+            run_id=primary.follow_up_generation_run.id,
+            action="askFollowUp" if exchange_count == 2 else "complete",
+            question_id=terminal_question.id if terminal_question else None,
+            order=2,
+        )
+
+    return replace(
+        primary,
+        follow_up_decision=current_decision,
+        follow_up_question=current_question,
+        follow_up_exchanges=tuple(exchanges),
+        follow_up_completion_reason=completion_reason,
     )
 
 
@@ -257,6 +349,9 @@ def review_context(
         follow_up_generation_run=primary.follow_up_generation_run,
         follow_up_decision=primary.follow_up_decision,
         follow_up_question=None,
+        follow_up_completion_reason=(
+            PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+        ),
         evaluation_generation_run=evaluation_run_value,
         evaluation=evaluation,
         review_generation_run=review_run_value,
@@ -594,6 +689,183 @@ def test_submit_primary_answer_fails_before_domain_when_follow_up_llm_unavailabl
     assert error.value.status_code == 503
     assert error.value.error == PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE
     assert domain.calls == []
+
+
+def test_submit_follow_up_answer_forwards_exact_args_without_llm_precheck() -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(
+            attempt_status="answering",
+            version=5,
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model="model",
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    context_value = domain.context
+    follow_up_question_id = uuid4()
+
+    result = asyncio.run(
+        service.submit_follow_up_answer(
+            user_id=context_value.session.user_id,
+            session_id=context_value.session.id,
+            payload=SubmitFollowUpAnswerRequest(
+                version=4,
+                question_id=context_value.question_card.id,
+                follow_up_question_id=follow_up_question_id,
+                content="  Follow-up answer  ",
+            ),
+        )
+    )
+
+    assert result.status == "generatingFollowUp"
+    assert domain.calls == [
+        (
+            "submit_follow_up",
+            {
+                "user_id": context_value.session.user_id,
+                "session_id": context_value.session.id,
+                "expected_version": 4,
+                "question_id": context_value.question_card.id,
+                "follow_up_question_id": follow_up_question_id,
+                "content": "Follow-up answer",
+            },
+        )
+    ]
+
+
+def test_submit_follow_up_answer_maps_domain_unavailable_to_503() -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(),
+        error=PracticeSessionStateError(
+            PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
+            source_code="missing_model",
+        ),
+    )
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model="model",
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service.submit_follow_up_answer(
+                user_id=domain.context.session.user_id,
+                session_id=domain.context.session.id,
+                payload=SubmitFollowUpAnswerRequest(
+                    version=4,
+                    question_id=domain.context.question_card.id,
+                    follow_up_question_id=uuid4(),
+                    content="Follow-up answer",
+                ),
+            )
+        )
+
+    assert error.value.status_code == 503
+    assert error.value.error == PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE
+
+
+def test_follow_up_public_projection_separates_answered_and_current_questions() -> None:
+    domain = FakePracticeSessionService(
+        context=context_with_answered_exchanges(
+            attempt_status="answeringFollowUp",
+            version=6,
+            exchange_count=1,
+            current_order=2,
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(
+        service.get_session(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+        )
+    )
+
+    assert result.status == "answeringFollowUp"
+    assert len(result.follow_up_exchanges) == 1
+    assert result.follow_up_exchanges[0].status == "answered"
+    assert result.follow_up_exchanges[0].question.order == 1
+    assert result.follow_up_exchanges[0].answer.order == 2
+    assert result.current_follow_up.question.order == 2
+    assert result.current_follow_up.answer is None
+
+
+@pytest.mark.parametrize("exchange_count", [1, 2])
+def test_evaluating_public_projection_preserves_all_answered_reason_and_order(
+    exchange_count: int,
+) -> None:
+    domain = FakePracticeSessionService(
+        context=context_with_answered_exchanges(
+            attempt_status="evaluating",
+            version=7,
+            exchange_count=exchange_count,
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(
+        service.refresh_evaluation(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=RefreshPracticeEvaluationRequest(version=7),
+        )
+    )
+
+    assert result.status == "evaluating"
+    assert result.follow_up_completion.reason == "allAnswered"
+    assert [item.question.order for item in result.follow_up_exchanges] == list(
+        range(1, exchange_count + 1)
+    )
+    assert [item.answer.order for item in result.follow_up_exchanges] == [
+        order + 1 for order in range(1, exchange_count + 1)
+    ]
+
+
+@pytest.mark.parametrize("exchange_count", [1, 2])
+def test_review_public_projection_preserves_all_answered_reason_and_exchanges(
+    exchange_count: int,
+) -> None:
+    primary = context_with_answered_exchanges(
+        attempt_status="review",
+        version=5,
+        exchange_count=exchange_count,
+    )
+    domain = FakePracticeSessionService(
+        context=replace(
+            review_context(),
+            follow_up_decision=primary.follow_up_decision,
+            follow_up_exchanges=primary.follow_up_exchanges,
+            follow_up_completion_reason=primary.follow_up_completion_reason,
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(
+        service.refresh_evaluation(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=RefreshPracticeEvaluationRequest(version=4),
+        )
+    )
+
+    assert result.status == "review"
+    assert result.follow_up_completion.reason == "allAnswered"
+    assert len(result.follow_up_exchanges) == exchange_count
 
 
 @pytest.mark.parametrize(

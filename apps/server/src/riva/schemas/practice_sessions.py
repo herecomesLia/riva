@@ -11,7 +11,10 @@ from riva.schemas.evaluation import (
     PracticeDimensionScore,
     PracticeEvaluationScore,
 )
-from riva.schemas.practice_interactions import PracticeAnswerContent
+from riva.schemas.practice_interactions import (
+    MAX_PRACTICE_FOLLOW_UPS,
+    PracticeAnswerContent,
+)
 from riva.schemas.practice_recommendation import PracticeRecommendationOutput
 from riva.schemas.practice_review import (
     MAX_PRACTICE_REVIEW_ITEMS,
@@ -82,6 +85,15 @@ class SubmitPrimaryAnswerRequest(APIModel):
 
     version: Annotated[int, Field(ge=1)]
     question_id: StandardUUID
+    content: PracticeAnswerContent
+
+
+class SubmitFollowUpAnswerRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+    follow_up_question_id: StandardUUID
     content: PracticeAnswerContent
 
 
@@ -157,7 +169,10 @@ class PracticeFollowUpQuestionResponse(PracticeAPIModel):
     id: StandardUUID
     prompt: QuestionCardPrompt
     created_at: datetime
-    order: Annotated[int, Field(ge=1)]
+    order: Annotated[
+        int,
+        Field(ge=1, le=MAX_PRACTICE_FOLLOW_UPS),
+    ]
     answer_hints: PracticeGuidanceNotRequestedResponse = Field(
         default_factory=lambda: PracticeGuidanceNotRequestedResponse(
             status="notRequested"
@@ -209,25 +224,92 @@ class PracticeAwaitingFollowUpExchangeResponse(PracticeAPIModel):
     answer: None = None
 
 
+class PracticeAnsweredFollowUpExchangeResponse(PracticeAPIModel):
+    status: Literal["answered"]
+    question: PracticeFollowUpQuestionResponse
+    answer: PracticeAnswerResponse
+
+    @field_validator("answer")
+    @classmethod
+    def validate_answer_order(
+        cls,
+        answer: PracticeAnswerResponse,
+        info,
+    ) -> PracticeAnswerResponse:
+        question = info.data.get("question")
+        if question is not None and answer.order != question.order + 1:
+            raise ValueError("answered follow-up exchange order is invalid")
+        return answer
+
+
+def _validate_answered_exchange_orders(
+    exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
+) -> None:
+    if [exchange.question.order for exchange in exchanges] != list(
+        range(1, len(exchanges) + 1)
+    ) or len({exchange.question.id for exchange in exchanges}) != len(
+        exchanges
+    ) or len({exchange.answer.id for exchange in exchanges}) != len(exchanges):
+        raise ValueError("follow-up exchanges must be ordered and contiguous")
+
+
 class PracticeGeneratingFollowUpResponse(PracticeActiveSessionBase):
     status: Literal["generatingFollowUp"]
     question: PracticeQuestionResponse
     main_answer: PracticeAnswerResponse
-    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+    follow_up_exchanges: list[PracticeAnsweredFollowUpExchangeResponse] = Field(
         default_factory=list,
-        max_length=0,
+        max_length=MAX_PRACTICE_FOLLOW_UPS,
     )
+
+    @field_validator("follow_up_exchanges")
+    @classmethod
+    def validate_follow_up_exchanges(
+        cls,
+        exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
+    ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
+        _validate_answered_exchange_orders(exchanges)
+        if len(exchanges) > 1:
+            raise ValueError(
+                "generating follow-up may only contain the first exchange"
+            )
+        return exchanges
 
 
 class PracticeAnsweringFollowUpResponse(PracticeActiveSessionBase):
     status: Literal["answeringFollowUp"]
     question: PracticeQuestionResponse
     main_answer: PracticeAnswerResponse
-    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+    follow_up_exchanges: list[PracticeAnsweredFollowUpExchangeResponse] = Field(
         default_factory=list,
-        max_length=0,
+        max_length=MAX_PRACTICE_FOLLOW_UPS,
     )
     current_follow_up: PracticeAwaitingFollowUpExchangeResponse
+
+    @field_validator("follow_up_exchanges")
+    @classmethod
+    def validate_follow_up_exchanges(
+        cls,
+        exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
+    ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
+        _validate_answered_exchange_orders(exchanges)
+        if len(exchanges) > 1:
+            raise ValueError(
+                "answering follow-up may only contain the first exchange"
+            )
+        return exchanges
+
+    @field_validator("current_follow_up")
+    @classmethod
+    def validate_current_follow_up_order(
+        cls,
+        current_follow_up: PracticeAwaitingFollowUpExchangeResponse,
+        info,
+    ) -> PracticeAwaitingFollowUpExchangeResponse:
+        exchanges = info.data.get("follow_up_exchanges", [])
+        if current_follow_up.question.order != len(exchanges) + 1:
+            raise ValueError("current follow-up order is invalid")
+        return current_follow_up
 
 
 class PracticeNoFollowUpRequiredCompletionResponse(PracticeAPIModel):
@@ -235,20 +317,55 @@ class PracticeNoFollowUpRequiredCompletionResponse(PracticeAPIModel):
     reason: Literal["noFollowUpRequired"]
 
 
+class PracticeAllAnsweredCompletionResponse(PracticeAPIModel):
+    status: Literal["completed"]
+    reason: Literal["allAnswered"]
+
+
+PracticeCompletedFollowUpCompletionResponse = Annotated[
+    PracticeNoFollowUpRequiredCompletionResponse
+    | PracticeAllAnsweredCompletionResponse,
+    Field(discriminator="reason"),
+]
+
+
 class PracticeEvaluatingResponse(PracticeActiveSessionBase):
     status: Literal["evaluating"]
     question: PracticeQuestionResponse
     main_answer: PracticeAnswerResponse
-    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+    follow_up_exchanges: list[PracticeAnsweredFollowUpExchangeResponse] = Field(
         default_factory=list,
-        max_length=0,
+        max_length=MAX_PRACTICE_FOLLOW_UPS,
     )
-    follow_up_completion: PracticeNoFollowUpRequiredCompletionResponse
+    follow_up_completion: PracticeCompletedFollowUpCompletionResponse
     submitted_at: datetime
 
     _validate_submitted_at = field_validator("submitted_at")(
         _validate_aware_timestamp
     )
+
+    @field_validator("follow_up_exchanges")
+    @classmethod
+    def validate_follow_up_exchanges(
+        cls,
+        exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
+    ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
+        _validate_answered_exchange_orders(exchanges)
+        return exchanges
+
+    @field_validator("follow_up_completion")
+    @classmethod
+    def validate_follow_up_completion(
+        cls,
+        completion: PracticeCompletedFollowUpCompletionResponse,
+        info,
+    ) -> PracticeCompletedFollowUpCompletionResponse:
+        exchanges = info.data.get("follow_up_exchanges", [])
+        if completion.reason == "noFollowUpRequired" and exchanges:
+            raise ValueError("no-follow-up completion must have no exchanges")
+        if completion.reason == "allAnswered" and len(exchanges) not in (1, 2):
+            raise ValueError("all-answered completion must have one or two exchanges")
+        return completion
 
 
 class PracticeEvaluationResponse(PracticeAPIModel):
@@ -293,13 +410,36 @@ class PracticeReviewResponse(PracticeActiveSessionBase):
     status: Literal["review"]
     question: PracticeQuestionResponse
     main_answer: PracticeAnswerResponse
-    follow_up_exchanges: list[PracticeAwaitingFollowUpExchangeResponse] = Field(
+    follow_up_exchanges: list[PracticeAnsweredFollowUpExchangeResponse] = Field(
         default_factory=list,
-        max_length=0,
+        max_length=MAX_PRACTICE_FOLLOW_UPS,
     )
-    follow_up_completion: PracticeNoFollowUpRequiredCompletionResponse
+    follow_up_completion: PracticeCompletedFollowUpCompletionResponse
     evaluation: PracticeEvaluationResponse
     review: PracticeReviewContentResponse
+
+    @field_validator("follow_up_exchanges")
+    @classmethod
+    def validate_follow_up_exchanges(
+        cls,
+        exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
+    ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
+        _validate_answered_exchange_orders(exchanges)
+        return exchanges
+
+    @field_validator("follow_up_completion")
+    @classmethod
+    def validate_follow_up_completion(
+        cls,
+        completion: PracticeCompletedFollowUpCompletionResponse,
+        info,
+    ) -> PracticeCompletedFollowUpCompletionResponse:
+        exchanges = info.data.get("follow_up_exchanges", [])
+        if completion.reason == "noFollowUpRequired" and exchanges:
+            raise ValueError("no-follow-up completion must have no exchanges")
+        if completion.reason == "allAnswered" and len(exchanges) not in (1, 2):
+            raise ValueError("all-answered completion must have one or two exchanges")
+        return completion
 
 
 PracticeActiveSessionResponse = Annotated[
@@ -322,6 +462,7 @@ __all__ = [
     "PracticeActiveSessionBase",
     "PracticeActiveSessionResponse",
     "PracticeAnswerResponse",
+    "PracticeAnsweredFollowUpExchangeResponse",
     "PracticeAnsweringFollowUpResponse",
     "PracticeAnsweringResponse",
     "PracticeAwaitingFollowUpExchangeResponse",
@@ -335,6 +476,8 @@ __all__ = [
     "PracticeQuestionResponse",
     "PracticeReferenceAnswerNotRequestedResponse",
     "PracticeNoFollowUpRequiredCompletionResponse",
+    "PracticeAllAnsweredCompletionResponse",
+    "PracticeCompletedFollowUpCompletionResponse",
     "PracticeReviewContentResponse",
     "PracticeReviewResponse",
     "CurrentPracticeSessionResponse",
@@ -345,5 +488,6 @@ __all__ = [
     "RefreshPracticeEvaluationRequest",
     "RefreshPracticeQuestionGenerationRequest",
     "SubmitPrimaryAnswerRequest",
+    "SubmitFollowUpAnswerRequest",
     "StartPracticeSessionRequest",
 ]

@@ -104,6 +104,10 @@ class FakePracticeAPIService:
         self.calls.append(("submit", kwargs))
         return self.submit_result
 
+    async def submit_follow_up_answer(self, **kwargs: object):
+        self.calls.append(("submit_follow_up", kwargs))
+        return self.submit_result
+
     async def refresh_follow_up_generation(self, **kwargs: object):
         self.calls.append(("refresh_follow_up", kwargs))
         return self.refresh_follow_up_result
@@ -267,6 +271,62 @@ def test_submit_primary_answer_requires_csrf_and_forbids_extra_body_fields(app) 
     assert service.calls == []
 
 
+def test_submit_follow_up_answer_returns_202_and_forwards_exact_body(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    payload = {
+        "version": 4,
+        "questionId": str(service.submit_result.question.id),
+        "followUpQuestionId": str(uuid4()),
+        "content": "My follow-up answer",
+    }
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/answers/follow-up",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 202
+    assert result.json()["status"] == "generatingFollowUp"
+    assert service.calls[0][0] == "submit_follow_up"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+
+
+def test_submit_follow_up_answer_requires_csrf_and_forbids_extra_fields(app) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+    payload = {
+        "version": 4,
+        "questionId": str(service.submit_result.question.id),
+        "followUpQuestionId": str(uuid4()),
+        "content": "My follow-up answer",
+    }
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/answers/follow-up",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/answers/follow-up",
+        json={**payload, "order": 2},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert service.calls == []
+
+
 def test_refresh_follow_up_generation_returns_200_and_forwards_version(app) -> None:
     service = FakePracticeAPIService()
     current_user = user()
@@ -378,10 +438,23 @@ def test_new_practice_mutations_require_authentication(app) -> None:
         json={"version": 4},
         headers={"Origin": TRUSTED_ORIGIN},
     )
+    follow_up_submit = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/answers/follow-up",
+        json={
+            "version": 4,
+            "questionId": str(service.submit_result.question.id),
+            "followUpQuestionId": str(uuid4()),
+            "content": "My follow-up answer",
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
 
     assert submit.status_code == 401
     assert refresh.status_code == 401
     assert evaluation_refresh.status_code == 401
+    assert follow_up_submit.status_code == 401
     assert service.calls == []
 
 
@@ -444,6 +517,7 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
         in paths
     )
     assert "/api/practice/sessions/{sessionId}/answers/main" in paths
+    assert "/api/practice/sessions/{sessionId}/answers/follow-up" in paths
     assert (
         "/api/practice/sessions/{sessionId}/follow-up-generation/refresh"
         in paths
@@ -459,6 +533,10 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
         "/api/practice/sessions/{sessionId}/answers/main"
     ]["post"]["responses"]["202"]["content"]["application/json"]["schema"]
     assert submit_schema["discriminator"]["propertyName"] == "status"
+    follow_up_submit_schema = paths[
+        "/api/practice/sessions/{sessionId}/answers/follow-up"
+    ]["post"]["responses"]["202"]["content"]["application/json"]["schema"]
+    assert follow_up_submit_schema["discriminator"]["propertyName"] == "status"
     current_schema = paths["/api/practice/sessions/current"]["get"]["responses"][
         "200"
     ]["content"]["application/json"]["schema"]
