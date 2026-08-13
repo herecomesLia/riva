@@ -324,6 +324,7 @@ def evaluation_run_payload(
     reason: str = "noFollowUpRequired",
     include_first: bool = False,
     include_second: bool = False,
+    unanswered_question: bool = False,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "attemptId": "00000000-0000-4000-8000-000000000001",
@@ -333,6 +334,10 @@ def evaluation_run_payload(
         "followUpCompletionReason": reason,
         "terminalFollowUpDecisionId": "00000000-0000-4000-8000-000000000004",
     }
+    if unanswered_question:
+        payload["unansweredFollowUpQuestionId"] = (
+            "00000000-0000-4000-8000-000000000031"
+        )
     if include_first:
         payload.update(
             {
@@ -366,6 +371,8 @@ def test_evaluation_run_payload_is_camel_case_and_excludes_absent_follow_ups() -
         ("noFollowUpRequired", False, False),
         ("allAnswered", True, False),
         ("allAnswered", True, True),
+        ("endedEarly", False, False),
+        ("endedEarly", True, False),
     ],
 )
 def test_evaluation_run_payload_accepts_frozen_completion_shapes(
@@ -378,6 +385,7 @@ def test_evaluation_run_payload_accepts_frozen_completion_shapes(
             reason=reason,
             include_first=include_first,
             include_second=include_second,
+            unanswered_question=reason == "endedEarly",
         )
     )
 
@@ -393,6 +401,29 @@ def test_evaluation_run_payload_accepts_frozen_completion_shapes(
             reason="noFollowUpRequired",
             include_first=True,
         ),
+        evaluation_run_payload(
+            reason="endedEarly",
+            unanswered_question=False,
+        ),
+        evaluation_run_payload(
+            reason="endedEarly",
+            include_first=True,
+            include_second=True,
+            unanswered_question=True,
+        ),
+        {
+            **evaluation_run_payload(
+                reason="noFollowUpRequired",
+                unanswered_question=True,
+            ),
+        },
+        {
+            **evaluation_run_payload(
+                reason="allAnswered",
+                include_first=True,
+                unanswered_question=True,
+            ),
+        },
         {
             **evaluation_run_payload(reason="allAnswered"),
             "followUpQuestion1Id": "00000000-0000-4000-8000-000000000011",
@@ -414,6 +445,43 @@ def test_evaluation_run_payload_rejects_unfrozen_or_content_fields(
 ) -> None:
     with pytest.raises(ValidationError):
         EvaluationRunPayload.model_validate(payload)
+
+
+def test_ended_early_payload_freezes_the_unanswered_question() -> None:
+    first = EvaluationRunPayload.model_validate(
+        evaluation_run_payload(
+            reason="endedEarly",
+            unanswered_question=True,
+        )
+    )
+    second = EvaluationRunPayload.model_validate(
+        evaluation_run_payload(
+            reason="endedEarly",
+            include_first=True,
+            unanswered_question=True,
+        )
+    )
+
+    assert first.unanswered_follow_up_question_id is not None
+    assert first.follow_up_question_1_id is None
+    assert second.unanswered_follow_up_question_id is not None
+    assert second.follow_up_question_1_id is not None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        input_payload(
+            completion_reason="endedEarly",
+            exchanges=[follow_up_exchange(1), follow_up_exchange(2)],
+        ),
+    ],
+)
+def test_ended_early_input_rejects_two_completed_follow_ups(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        EvaluationInput.model_validate(payload)
 
 
 @pytest.mark.parametrize(

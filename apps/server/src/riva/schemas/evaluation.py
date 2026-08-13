@@ -46,6 +46,7 @@ class PracticeEvaluationDimension(StrEnum):
 class PracticeEvaluationFollowUpCompletionReason(StrEnum):
     NO_FOLLOW_UP_REQUIRED = "noFollowUpRequired"
     ALL_ANSWERED = "allAnswered"
+    ENDED_EARLY = "endedEarly"
 
 
 class PracticeFocusAssessmentStatus(StrEnum):
@@ -130,6 +131,10 @@ class EvaluationRunPayload(_EvaluationModel):
     terminal_follow_up_decision_id: StandardUUID = Field(
         alias="terminalFollowUpDecisionId"
     )
+    unanswered_follow_up_question_id: UUID | None = Field(
+        default=None,
+        alias="unansweredFollowUpQuestionId",
+    )
     follow_up_question_1_id: UUID | None = Field(
         default=None,
         alias="followUpQuestion1Id",
@@ -164,16 +169,39 @@ class EvaluationRunPayload(_EvaluationModel):
         if second_pair[0] is not None and first_pair[0] is None:
             raise ValueError("follow-up order two requires order one")
 
-        if (
-            self.follow_up_completion_reason
-            == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
-        ):
+        reason = self.follow_up_completion_reason
+        if reason == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED:
+            if self.unanswered_follow_up_question_id is not None:
+                raise ValueError(
+                    "noFollowUpRequired must not include an unanswered question"
+                )
             if any(value is not None for value in (*first_pair, *second_pair)):
                 raise ValueError(
                     "noFollowUpRequired must not include follow-up IDs"
                 )
-        elif first_pair[0] is None:
-            raise ValueError("allAnswered requires the first follow-up pair")
+        elif reason == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED:
+            if self.unanswered_follow_up_question_id is not None:
+                raise ValueError(
+                    "allAnswered must not include an unanswered question"
+                )
+            if first_pair[0] is None:
+                raise ValueError("allAnswered requires the first follow-up pair")
+        elif reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
+            if self.unanswered_follow_up_question_id is None:
+                raise ValueError(
+                    "endedEarly requires an unanswered follow-up question"
+                )
+            if second_pair[0] is not None:
+                raise ValueError(
+                    "endedEarly permits at most one completed follow-up pair"
+                )
+            if self.unanswered_follow_up_question_id in {
+                first_pair[0],
+                first_pair[1],
+            }:
+                raise ValueError(
+                    "unanswered question must not be a completed follow-up"
+                )
         return self
 
 
@@ -274,6 +302,14 @@ class EvaluationInput(_EvaluationModel):
             and not self.follow_up_exchanges
         ):
             raise ValueError("allAnswered requires completed follow-up exchanges")
+        if (
+            self.follow_up_completion_reason
+            == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+            and len(self.follow_up_exchanges) > 1
+        ):
+            raise ValueError(
+                "endedEarly permits at most one completed follow-up exchange"
+            )
         return self
 
 

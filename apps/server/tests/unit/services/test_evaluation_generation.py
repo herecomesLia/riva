@@ -24,6 +24,7 @@ from riva.schemas.evaluation import (
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.services.evaluation_generation import (
     PRACTICE_EVALUATION_ARTIFACT_CONFLICT,
+    PRACTICE_EVALUATION_COMPLETION_CONFLICT,
     PRACTICE_EVALUATION_CONTEXT_CONFLICT,
     PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
     EvaluationGenerationService,
@@ -234,9 +235,18 @@ def run_for(
     decisions: list[PracticeFollowUpDecision],
     *,
     reason: str,
+    unanswered_question_id: UUID | None = None,
 ) -> AgentRun:
-    first = (questions[0], follow_up_answers[0]) if questions else None
-    second = (questions[1], follow_up_answers[1]) if len(questions) > 1 else None
+    first = (
+        (questions[0], follow_up_answers[0])
+        if follow_up_answers
+        else None
+    )
+    second = (
+        (questions[1], follow_up_answers[1])
+        if len(follow_up_answers) > 1
+        else None
+    )
     payload = EvaluationRunPayload(
         attempt_id=attempt.id,
         question_card_id=card.id,
@@ -244,6 +254,7 @@ def run_for(
         interaction_language=session.language,
         follow_up_completion_reason=reason,
         terminal_follow_up_decision_id=decisions[-1].id,
+        unanswered_follow_up_question_id=unanswered_question_id,
         follow_up_question_1_id=first[0].id if first else None,
         follow_up_answer_1_id=first[1].id if first else None,
         follow_up_question_2_id=second[0].id if second else None,
@@ -407,6 +418,41 @@ def load_context_values(shape: str) -> tuple[AgentRun, tuple[object, ...]]:
         follow_answers,
         decisions,
         reason=reason,
+    )
+    return run, (
+        session,
+        attempt,
+        card,
+        main,
+        questions,
+        follow_answers,
+        decisions,
+    )
+
+
+def ended_context_values(
+    *,
+    completed_first_follow_up: bool,
+) -> tuple[AgentRun, tuple[object, ...]]:
+    shape = "two" if completed_first_follow_up else "one"
+    session, attempt, card, main, questions, follow_answers, decisions = (
+        context_graph(shape)
+    )
+    if completed_first_follow_up:
+        follow_answers = follow_answers[:1]
+    else:
+        follow_answers = []
+        decisions = decisions[:1]
+    run = run_for(
+        session,
+        attempt,
+        card,
+        main,
+        questions,
+        follow_answers,
+        decisions,
+        reason="endedEarly",
+        unanswered_question_id=questions[-1].id,
     )
     return run, (
         session,
@@ -660,6 +706,107 @@ def test_load_in_transaction_rebuilds_without_commit_or_rollback() -> None:
     assert result.follow_up_exchanges[0].answer == follow_answers[0].content
     assert db.commit_count == 0
     assert db.rollback_count == 0
+
+
+@pytest.mark.parametrize("completed_first_follow_up", [False, True])
+def test_ended_early_freezes_only_the_unanswered_follow_up(
+    completed_first_follow_up: bool,
+) -> None:
+    run, values = ended_context_values(
+        completed_first_follow_up=completed_first_follow_up
+    )
+    session, attempt, card, main, questions, follow_answers, decisions = values
+    db = session_for_context(
+        attempt,
+        session,
+        card,
+        [main, *follow_answers],
+        questions,
+        decisions,
+        for_update=False,
+    )
+
+    evaluation_input = asyncio.run(
+        EvaluationGenerationService(
+            db  # type: ignore[arg-type]
+        ).load_generation_input(run)
+    )
+
+    assert evaluation_input.follow_up_completion_reason.value == "endedEarly"
+    assert len(evaluation_input.follow_up_exchanges) == (
+        1 if completed_first_follow_up else 0
+    )
+    payload = EvaluationRunPayload.model_validate(run.payload)
+    assert payload.unanswered_follow_up_question_id == questions[-1].id
+    assert payload.follow_up_question_1_id == (
+        questions[0].id if completed_first_follow_up else None
+    )
+    assert payload.follow_up_answer_1_id == (
+        follow_answers[0].id if completed_first_follow_up else None
+    )
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["unansweredFollowUpQuestionId", "terminalFollowUpDecisionId"],
+)
+def test_ended_early_rejects_wrong_frozen_lineage(field: str) -> None:
+    run, values = ended_context_values(completed_first_follow_up=False)
+    session, attempt, card, main, questions, follow_answers, decisions = values
+    run.payload[field] = str(uuid4())
+    db = session_for_context(
+        attempt,
+        session,
+        card,
+        [main],
+        questions,
+        decisions,
+        for_update=False,
+    )
+
+    with pytest.raises(EvaluationGenerationStateError) as error:
+        asyncio.run(
+            EvaluationGenerationService(
+                db  # type: ignore[arg-type]
+            ).load_generation_input(
+                run
+            )
+        )
+    assert error.value.code == PRACTICE_EVALUATION_CONTEXT_CONFLICT
+
+
+def test_ended_early_rejects_an_answer_added_to_the_pending_question() -> None:
+    run, values = ended_context_values(completed_first_follow_up=False)
+    session, attempt, card, main, questions, _follow_answers, decisions = values
+    pending_answer = PracticeAnswer(
+        id=uuid4(),
+        attempt_id=attempt.id,
+        kind="followUp",
+        order=questions[-1].order + 1,
+        content="An answer that was added after the stop.",
+        follow_up_question_id=questions[-1].id,
+        submitted_at=NOW,
+    )
+    db = session_for_context(
+        attempt,
+        session,
+        card,
+        [main, pending_answer],
+        questions,
+        decisions,
+        for_update=True,
+    )
+
+    with pytest.raises(EvaluationGenerationStateError) as error:
+        asyncio.run(
+            EvaluationGenerationService(db).persist_success(  # type: ignore[arg-type]
+                run,
+                valid_output(),
+            )
+        )
+
+    assert error.value.code == PRACTICE_EVALUATION_COMPLETION_CONFLICT
+    assert db.added == []
 
 
 def test_persist_success_writes_one_canonical_artifact_without_status_mutation(

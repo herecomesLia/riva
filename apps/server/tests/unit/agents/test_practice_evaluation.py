@@ -149,6 +149,23 @@ def test_agent_includes_complete_follow_up_chain_as_untrusted_context() -> None:
     assert "allAnswered" in rendered.user
 
 
+def test_agent_accepts_ended_early_without_inventing_an_unanswered_answer() -> None:
+    input = evaluation_input(
+        language="en",
+        completion_reason="endedEarly",
+    )
+    agent = PracticeEvaluationAgent(
+        FakeLLMProvider([valid_output()]), model="test-model"
+    )
+
+    values = agent.prompt_values(input)
+
+    assert values["follow_up_completion_reason"] == "endedEarly"
+    assert json.loads(str(values["follow_up_exchanges"])) == []
+    assert "unanswered" not in values
+    assert "endedEarly" in agent.prompt.render(values).user
+
+
 def test_agent_accepts_optional_dimensions() -> None:
     input = evaluation_input(scoring_focus=[])
     agent = PracticeEvaluationAgent(

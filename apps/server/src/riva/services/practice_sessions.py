@@ -1262,6 +1262,145 @@ class PracticeSessionService:
             await self.session.rollback()
             raise
 
+    async def end_follow_ups(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        follow_up_question_id: UUID,
+    ) -> PracticeEvaluationWorkflowContext:
+        """Stop the current follow-up chain and start evaluation atomically."""
+
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if practice_session.status != PracticeSessionStatus.ACTIVE.value:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if attempt is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            if practice_session.version == expected_version + 1:
+                try:
+                    context = await self._load_ended_follow_up_replay_context(
+                        practice_session=practice_session,
+                        attempt=attempt,
+                        question_id=question_id,
+                        follow_up_question_id=follow_up_question_id,
+                    )
+                except (
+                    AttributeError,
+                    PracticeSessionStateError,
+                    TypeError,
+                    ValueError,
+                    ValidationError,
+                ):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if (
+                practice_session.completed_at is not None
+                or practice_session.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if (
+                attempt.status != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if attempt.question_card_id != question_id:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            chain = await self._load_follow_up_chain(
+                practice_session,
+                attempt,
+                for_update=True,
+            )
+            pending_question = chain.follow_up_question
+            if (
+                chain.follow_up_generation_run.status
+                != AgentRunStatus.SUCCEEDED
+                or chain.follow_up_decision is None
+                or chain.follow_up_decision.action != "askFollowUp"
+                or pending_question is None
+                or pending_question.id != follow_up_question_id
+                or chain.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            previous_attempt_status = attempt.status
+            previous_attempt_updated_at = attempt.updated_at
+            previous_session_version = practice_session.version
+            previous_session_updated_at = practice_session.updated_at
+            attempt.status = PracticeAttemptStatus.EVALUATING.value
+            attempt.updated_at = now
+            try:
+                await self.session.flush()
+                evaluation_generation_run = await self._enqueue_evaluation_generation(
+                    user_id=user_id,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    question_card=chain.card,
+                    main_answer=chain.main_answer,
+                    complete_decision=chain.follow_up_decision,
+                    follow_up_completion_reason=(
+                        PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+                    ),
+                    follow_up_exchanges=chain.follow_up_exchanges,
+                    unanswered_follow_up_question=pending_question,
+                )
+            except BaseException:
+                attempt.status = previous_attempt_status
+                attempt.updated_at = previous_attempt_updated_at
+                practice_session.version = previous_session_version
+                practice_session.updated_at = previous_session_updated_at
+                raise
+
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeEvaluationWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_card=chain.card,
+                main_answer=chain.main_answer,
+                follow_up_generation_run=chain.follow_up_generation_run,
+                follow_up_decision=chain.follow_up_decision,
+                follow_up_question=pending_question,
+                follow_up_exchanges=chain.follow_up_exchanges,
+                follow_up_completion_reason=(
+                    PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+                ),
+                evaluation_generation_run=evaluation_generation_run,
+                evaluation=None,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
     async def refresh_follow_up_generation(
         self,
         *,
@@ -1494,10 +1633,7 @@ class PracticeSessionService:
                 raise PracticeSessionStateError(
                     PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
                 )
-            if (
-                chain.completion_reason is None
-                or chain.follow_up_decision is None
-            ):
+            if chain.follow_up_decision is None:
                 raise PracticeSessionStateError(
                     PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
                 )
@@ -1507,15 +1643,13 @@ class PracticeSessionService:
                 attempt_id=attempt.id,
                 for_update=True,
             )
-            self._validate_evaluation_run_lineage(
-                evaluation_run,
-                practice_session=practice_session,
-                attempt=attempt,
-                question_card=chain.card,
-                main_answer=chain.main_answer,
-                complete_decision=chain.follow_up_decision,
-                follow_up_completion_reason=chain.completion_reason,
-                follow_up_exchanges=chain.follow_up_exchanges,
+            follow_up_completion_reason, unanswered_question = (
+                self._resolve_evaluation_follow_up_snapshot(
+                    evaluation_run=evaluation_run,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    chain=chain,
+                )
             )
             evaluation_context = dict(
                 session=practice_session,
@@ -1524,9 +1658,9 @@ class PracticeSessionService:
                 main_answer=chain.main_answer,
                 follow_up_generation_run=chain.follow_up_generation_run,
                 follow_up_decision=chain.follow_up_decision,
-                follow_up_question=None,
+                follow_up_question=unanswered_question,
                 follow_up_exchanges=chain.follow_up_exchanges,
-                follow_up_completion_reason=chain.completion_reason,
+                follow_up_completion_reason=follow_up_completion_reason,
                 evaluation_generation_run=evaluation_run,
                 evaluation=None,
             )
@@ -1675,7 +1809,7 @@ class PracticeSessionService:
                 question_card=chain.card,
                 evaluation=evaluation,
                 review=review,
-                follow_up_completion_reason=chain.completion_reason,
+                follow_up_completion_reason=follow_up_completion_reason,
                 for_update=True,
             )
             if recommendation is None:
@@ -1698,9 +1832,9 @@ class PracticeSessionService:
                 main_answer=chain.main_answer,
                 follow_up_generation_run=chain.follow_up_generation_run,
                 follow_up_decision=chain.follow_up_decision,
-                follow_up_question=None,
+                follow_up_question=unanswered_question,
                 follow_up_exchanges=chain.follow_up_exchanges,
-                follow_up_completion_reason=chain.completion_reason,
+                follow_up_completion_reason=follow_up_completion_reason,
                 evaluation_generation_run=evaluation_run,
                 evaluation=evaluation,
                 review_generation_run=review_run,
@@ -2173,6 +2307,80 @@ class PracticeSessionService:
             )
         raise PracticeSessionStateError(
             PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
+        )
+
+    async def _load_ended_follow_up_replay_context(
+        self,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_id: UUID,
+        follow_up_question_id: UUID,
+    ) -> PracticeEvaluationWorkflowContext:
+        if (
+            practice_session.status != PracticeSessionStatus.ACTIVE.value
+            or practice_session.completed_at is not None
+            or practice_session.completion_reason is not None
+            or attempt.status != PracticeAttemptStatus.EVALUATING.value
+            or attempt.question_card_id != question_id
+            or attempt.completed_at is not None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        chain = await self._load_follow_up_chain(
+            practice_session,
+            attempt,
+            for_update=True,
+        )
+        pending_question = chain.follow_up_question
+        if (
+            chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
+            or chain.follow_up_decision is None
+            or chain.follow_up_decision.action != "askFollowUp"
+            or pending_question is None
+            or pending_question.id != follow_up_question_id
+            or chain.completion_reason is not None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        evaluation_generation_run = await self._load_stable_evaluation_run(
+            user_id=practice_session.user_id,
+            attempt_id=attempt.id,
+            for_update=True,
+        )
+        self._validate_evaluation_run_lineage(
+            evaluation_generation_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=chain.card,
+            main_answer=chain.main_answer,
+            complete_decision=chain.follow_up_decision,
+            follow_up_completion_reason=(
+                PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+            ),
+            follow_up_exchanges=chain.follow_up_exchanges,
+            unanswered_follow_up_question=pending_question,
+        )
+        evaluation = await self._load_evaluation_artifact(
+            evaluation_generation_run,
+            attempt=attempt,
+            question_card=chain.card,
+            for_update=True,
+        )
+        return PracticeEvaluationWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_card=chain.card,
+            main_answer=chain.main_answer,
+            follow_up_generation_run=chain.follow_up_generation_run,
+            follow_up_decision=chain.follow_up_decision,
+            follow_up_question=pending_question,
+            follow_up_exchanges=chain.follow_up_exchanges,
+            follow_up_completion_reason=(
+                PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+            ),
+            evaluation_generation_run=evaluation_generation_run,
+            evaluation=evaluation,
         )
 
     @staticmethod
@@ -3518,6 +3726,7 @@ class PracticeSessionService:
         follow_up_exchanges: tuple[
             PracticeAnsweredFollowUpExchangeContext, ...
         ] = (),
+        unanswered_follow_up_question: PracticeFollowUpQuestion | None = None,
     ) -> AgentRun:
         try:
             run = await self._evaluation_generation_service().enqueue_generation_in_transaction(
@@ -3548,6 +3757,7 @@ class PracticeSessionService:
             complete_decision=complete_decision,
             follow_up_completion_reason=follow_up_completion_reason,
             follow_up_exchanges=follow_up_exchanges,
+            unanswered_follow_up_question=unanswered_follow_up_question,
         )
         return run
 
@@ -3673,6 +3883,7 @@ class PracticeSessionService:
         follow_up_exchanges: tuple[
             PracticeAnsweredFollowUpExchangeContext, ...
         ] = (),
+        unanswered_follow_up_question: PracticeFollowUpQuestion | None = None,
     ) -> EvaluationRunPayload:
         try:
             payload = validate_evaluation_generation_run(run)
@@ -3700,33 +3911,55 @@ class PracticeSessionService:
             for index, exchange in enumerate(follow_up_exchanges, start=1)
         )
         terminal_shape_valid = False
-        if not follow_up_exchanges:
+        if (
+            follow_up_completion_reason
+            == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+        ):
             terminal_shape_valid = (
-                follow_up_completion_reason
-                == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
+                not follow_up_exchanges
+                and unanswered_follow_up_question is None
                 and complete_decision.attempt_id == attempt.id
                 and complete_decision.order == 1
                 and complete_decision.action == "complete"
                 and complete_decision.follow_up_question_id is None
             )
-        elif len(follow_up_exchanges) == 1:
+        elif (
+            follow_up_completion_reason
+            == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED
+        ):
+            if len(follow_up_exchanges) == 1:
+                terminal_shape_valid = (
+                    unanswered_follow_up_question is None
+                    and complete_decision.attempt_id == attempt.id
+                    and complete_decision.order == 2
+                    and complete_decision.action == "complete"
+                    and complete_decision.follow_up_question_id is None
+                )
+            elif len(follow_up_exchanges) == 2:
+                terminal_shape_valid = (
+                    unanswered_follow_up_question is None
+                    and complete_decision.attempt_id == attempt.id
+                    and complete_decision.order == 2
+                    and complete_decision.action == "askFollowUp"
+                    and complete_decision.follow_up_question_id
+                    == follow_up_exchanges[1].question.id
+                )
+        elif (
+            follow_up_completion_reason
+            == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+        ):
             terminal_shape_valid = (
-                follow_up_completion_reason
-                == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED
+                unanswered_follow_up_question is not None
+                and len(follow_up_exchanges) in (0, 1)
+                and unanswered_follow_up_question.attempt_id == attempt.id
+                and unanswered_follow_up_question.order
+                == len(follow_up_exchanges) + 1
                 and complete_decision.attempt_id == attempt.id
-                and complete_decision.order == 2
-                and complete_decision.action == "complete"
-                and complete_decision.follow_up_question_id is None
-            )
-        elif len(follow_up_exchanges) == 2:
-            terminal_shape_valid = (
-                follow_up_completion_reason
-                == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED
-                and complete_decision.attempt_id == attempt.id
-                and complete_decision.order == 2
+                and complete_decision.order
+                == len(follow_up_exchanges) + 1
                 and complete_decision.action == "askFollowUp"
                 and complete_decision.follow_up_question_id
-                == follow_up_exchanges[1].question.id
+                == unanswered_follow_up_question.id
             )
         if (
             run.id is None
@@ -3740,6 +3973,12 @@ class PracticeSessionService:
             or payload.interaction_language != practice_session.language
             or payload.follow_up_completion_reason != follow_up_completion_reason
             or payload.terminal_follow_up_decision_id != complete_decision.id
+            or payload.unanswered_follow_up_question_id
+            != (
+                unanswered_follow_up_question.id
+                if unanswered_follow_up_question is not None
+                else None
+            )
             or any(
                 (question_id is None) != (answer_id is None)
                 for question_id, answer_id in payload_pairs
@@ -4148,6 +4387,61 @@ class PracticeSessionService:
             statement = statement.with_for_update()
         return await self.session.scalar(statement)
 
+    def _resolve_evaluation_follow_up_snapshot(
+        self,
+        *,
+        evaluation_run: AgentRun,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        chain: _PracticeFollowUpChain,
+    ) -> tuple[
+        PracticeEvaluationFollowUpCompletionReason,
+        PracticeFollowUpQuestion | None,
+    ]:
+        try:
+            payload = validate_evaluation_generation_run(evaluation_run)
+        except EvaluationGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+
+        if chain.completion_reason is None:
+            if (
+                payload.follow_up_completion_reason
+                != PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+                or chain.follow_up_decision is None
+                or chain.follow_up_decision.action != "askFollowUp"
+                or chain.follow_up_question is None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+                )
+            completion_reason = (
+                PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+            )
+            unanswered_question = chain.follow_up_question
+        else:
+            if chain.follow_up_question is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
+                )
+            completion_reason = chain.completion_reason
+            unanswered_question = None
+
+        self._validate_evaluation_run_lineage(
+            evaluation_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            question_card=chain.card,
+            main_answer=chain.main_answer,
+            complete_decision=chain.follow_up_decision,
+            follow_up_completion_reason=completion_reason,
+            follow_up_exchanges=chain.follow_up_exchanges,
+            unanswered_follow_up_question=unanswered_question,
+        )
+        return completion_reason, unanswered_question
+
     async def _load_active_context(
         self,
         practice_session: PracticeSession,
@@ -4266,7 +4560,6 @@ class PracticeSessionService:
             )
         if (
             chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
-            or chain.completion_reason is None
             or chain.follow_up_decision is None
         ):
             raise PracticeSessionStateError(
@@ -4277,15 +4570,13 @@ class PracticeSessionService:
             attempt_id=attempt.id,
             for_update=for_update,
         )
-        self._validate_evaluation_run_lineage(
-            evaluation_generation_run,
-            practice_session=practice_session,
-            attempt=attempt,
-            question_card=chain.card,
-            main_answer=chain.main_answer,
-            complete_decision=chain.follow_up_decision,
-            follow_up_completion_reason=chain.completion_reason,
-            follow_up_exchanges=chain.follow_up_exchanges,
+        follow_up_completion_reason, unanswered_question = (
+            self._resolve_evaluation_follow_up_snapshot(
+                evaluation_run=evaluation_generation_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                chain=chain,
+            )
         )
         evaluation = await self._load_evaluation_artifact(
             evaluation_generation_run,
@@ -4365,7 +4656,7 @@ class PracticeSessionService:
                     question_card=chain.card,
                     evaluation=evaluation,
                     review=review,
-                    follow_up_completion_reason=chain.completion_reason,
+                    follow_up_completion_reason=follow_up_completion_reason,
                     for_update=for_update,
                 )
 
@@ -4376,9 +4667,9 @@ class PracticeSessionService:
             main_answer=chain.main_answer,
             follow_up_generation_run=chain.follow_up_generation_run,
             follow_up_decision=chain.follow_up_decision,
-            follow_up_question=None,
+            follow_up_question=unanswered_question,
             follow_up_exchanges=chain.follow_up_exchanges,
-            follow_up_completion_reason=chain.completion_reason,
+            follow_up_completion_reason=follow_up_completion_reason,
             evaluation_generation_run=evaluation_generation_run,
             evaluation=evaluation,
             review_generation_run=review_generation_run,
@@ -4476,7 +4767,6 @@ class PracticeSessionService:
         )
         if (
             chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
-            or chain.completion_reason is None
             or chain.follow_up_decision is None
         ):
             raise PracticeSessionStateError(
@@ -4488,15 +4778,13 @@ class PracticeSessionService:
             attempt_id=attempt.id,
             for_update=for_update,
         )
-        self._validate_evaluation_run_lineage(
-            evaluation_run,
-            practice_session=practice_session,
-            attempt=attempt,
-            question_card=chain.card,
-            main_answer=chain.main_answer,
-            complete_decision=chain.follow_up_decision,
-            follow_up_completion_reason=chain.completion_reason,
-            follow_up_exchanges=chain.follow_up_exchanges,
+        follow_up_completion_reason, unanswered_question = (
+            self._resolve_evaluation_follow_up_snapshot(
+                evaluation_run=evaluation_run,
+                practice_session=practice_session,
+                attempt=attempt,
+                chain=chain,
+            )
         )
         if evaluation_run.status != AgentRunStatus.SUCCEEDED:
             raise PracticeSessionStateError(
@@ -4562,7 +4850,7 @@ class PracticeSessionService:
             question_card=chain.card,
             evaluation=evaluation,
             review=review,
-            follow_up_completion_reason=chain.completion_reason,
+            follow_up_completion_reason=follow_up_completion_reason,
             for_update=for_update,
         )
         if recommendation is None:
@@ -4576,9 +4864,9 @@ class PracticeSessionService:
             main_answer=chain.main_answer,
             follow_up_generation_run=chain.follow_up_generation_run,
             follow_up_decision=chain.follow_up_decision,
-            follow_up_question=None,
+            follow_up_question=unanswered_question,
             follow_up_exchanges=chain.follow_up_exchanges,
-            follow_up_completion_reason=chain.completion_reason,
+            follow_up_completion_reason=follow_up_completion_reason,
             evaluation_generation_run=evaluation_run,
             evaluation=evaluation,
             review_generation_run=review_run,

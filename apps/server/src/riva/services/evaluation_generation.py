@@ -106,6 +106,7 @@ class _EvaluationContext:
     follow_up_exchanges: tuple[
         tuple[PracticeFollowUpQuestion, PracticeAnswer], ...
     ]
+    unanswered_follow_up_question: PracticeFollowUpQuestion | None
     input: EvaluationInput
 
 
@@ -113,6 +114,16 @@ class _EvaluationContext:
 class _ValidatedFollowUpSource:
     run: AgentRun
     payload: FollowUpRunPayload
+
+
+@dataclass(frozen=True)
+class _ValidatedEvaluationFollowUpSnapshot:
+    terminal_decision: PracticeFollowUpDecision
+    completed_exchanges: tuple[
+        tuple[PracticeFollowUpQuestion, PracticeAnswer], ...
+    ]
+    unanswered_question: PracticeFollowUpQuestion | None
+    completion_reason: PracticeEvaluationFollowUpCompletionReason
 
 
 def practice_evaluation_idempotency_key(attempt_id: UUID) -> str:
@@ -469,7 +480,7 @@ class EvaluationGenerationService:
             if payload is not None
             else None,
         )
-        follow_up_exchanges = _validate_completion_graph(
+        follow_up_snapshot = _validate_completion_graph(
             reason=reason,
             questions=questions,
             answers=answers,
@@ -491,7 +502,7 @@ class EvaluationGenerationService:
                         focus=question.focus,
                         answer=_answer_content(answer),
                     )
-                    for question, answer in follow_up_exchanges
+                    for question, answer in follow_up_snapshot.completed_exchanges
                 ],
                 follow_up_completion_reason=reason,
             )
@@ -505,8 +516,9 @@ class EvaluationGenerationService:
             session=practice_session,
             question_card=question_card,
             main_answer=main_answer,
-            terminal_decision=terminal_decision,
-            follow_up_exchanges=tuple(follow_up_exchanges),
+            terminal_decision=follow_up_snapshot.terminal_decision,
+            follow_up_exchanges=follow_up_snapshot.completed_exchanges,
+            unanswered_follow_up_question=follow_up_snapshot.unanswered_question,
             input=evaluation_input,
         )
 
@@ -706,6 +718,11 @@ def _payload_from_context(context: _EvaluationContext) -> EvaluationRunPayload:
         interaction_language=context.session.language,
         follow_up_completion_reason=context.input.follow_up_completion_reason,
         terminal_follow_up_decision_id=context.terminal_decision.id,
+        unanswered_follow_up_question_id=(
+            context.unanswered_follow_up_question.id
+            if context.unanswered_follow_up_question is not None
+            else None
+        ),
         follow_up_question_1_id=first[0].id if first is not None else None,
         follow_up_answer_1_id=first[1].id if first is not None else None,
         follow_up_question_2_id=second[0].id if second is not None else None,
@@ -816,7 +833,7 @@ def _validate_completion_graph(
     terminal_decision: PracticeFollowUpDecision,
     payload: EvaluationRunPayload | None,
     follow_up_sources: Mapping[UUID, _ValidatedFollowUpSource],
-) -> list[tuple[PracticeFollowUpQuestion, PracticeAnswer]]:
+) -> _ValidatedEvaluationFollowUpSnapshot:
     follow_up_answers = [
         answer
         for answer in answers
@@ -860,25 +877,29 @@ def _validate_completion_graph(
             previous_question_id=None,
             previous_answer_id=None,
         )
-        if payload is not None and any(
-            value is not None
-            for value in (
-                payload.follow_up_question_1_id,
-                payload.follow_up_answer_1_id,
-                payload.follow_up_question_2_id,
-                payload.follow_up_answer_2_id,
+        if payload is not None and (
+            payload.unanswered_follow_up_question_id is not None
+            or any(
+                value is not None
+                for value in (
+                    payload.follow_up_question_1_id,
+                    payload.follow_up_answer_1_id,
+                    payload.follow_up_question_2_id,
+                    payload.follow_up_answer_2_id,
+                )
             )
         ):
             raise EvaluationGenerationStateError(
                 PRACTICE_EVALUATION_CONTEXT_CONFLICT
             )
-        return []
+        return _ValidatedEvaluationFollowUpSnapshot(
+            terminal_decision=terminal_decision,
+            completed_exchanges=(),
+            unanswered_question=None,
+            completion_reason=reason,
+        )
 
     if not ordered_questions or len(ordered_questions) not in (1, 2):
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
-    if len(follow_up_answers) != len(ordered_questions):
         raise EvaluationGenerationStateError(
             PRACTICE_EVALUATION_COMPLETION_CONFLICT
         )
@@ -898,42 +919,44 @@ def _validate_completion_graph(
             )
         answer_by_question[answer.follow_up_question_id] = answer
 
-    exchanges: list[tuple[PracticeFollowUpQuestion, PracticeAnswer]] = []
-    for question in ordered_questions:
-        answer = answer_by_question.get(question.id)
-        if answer is None:
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_COMPLETION_CONFLICT
-            )
-        try:
-            answer_content = _answer_content(
-                answer,
-                PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
-            )
-            EvaluationFollowUpExchange(
-                order=question.order,
-                prompt=question.prompt,
-                focus=question.focus,
-                answer=answer_content,
-            )
-        except (TypeError, ValueError, ValidationError):
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
-            ) from None
-        exchanges.append((question, answer))
+    def build_exchanges(
+        exchange_questions: list[PracticeFollowUpQuestion],
+    ) -> list[tuple[PracticeFollowUpQuestion, PracticeAnswer]]:
+        exchanges: list[tuple[PracticeFollowUpQuestion, PracticeAnswer]] = []
+        for question in exchange_questions:
+            answer = answer_by_question.get(question.id)
+            if answer is None:
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_COMPLETION_CONFLICT
+                )
+            try:
+                answer_content = _answer_content(
+                    answer,
+                    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
+                )
+                EvaluationFollowUpExchange(
+                    order=question.order,
+                    prompt=question.prompt,
+                    focus=question.focus,
+                    answer=answer_content,
+                )
+            except (TypeError, ValueError, ValidationError):
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
+                ) from None
+            exchanges.append((question, answer))
+        return exchanges
 
-    if len(decisions) != 2:
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
     decisions_by_order = {decision.order: decision for decision in decisions}
-    if len(decisions_by_order) != 2 or set(decisions_by_order) != {1, 2}:
+    if len(decisions_by_order) != len(decisions):
         raise EvaluationGenerationStateError(
             PRACTICE_EVALUATION_COMPLETION_CONFLICT
         )
-    first_decision = decisions_by_order[1]
+
+    first_decision = decisions_by_order.get(1)
     if (
-        first_decision.action != "askFollowUp"
+        first_decision is None
+        or first_decision.action != "askFollowUp"
         or first_decision.follow_up_question_id != ordered_questions[0].id
     ):
         raise EvaluationGenerationStateError(
@@ -947,8 +970,99 @@ def _validate_completion_graph(
         previous_answer_id=None,
     )
 
-    second_decision = decisions_by_order[2]
-    first_answer = answer_by_question[ordered_questions[0].id]
+    if reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
+        requested_terminal_decision = terminal_decision
+        if len(decisions) != len(ordered_questions):
+            raise EvaluationGenerationStateError(
+                PRACTICE_EVALUATION_COMPLETION_CONFLICT
+            )
+        unanswered_question = ordered_questions[-1]
+        completed_questions = ordered_questions[:-1]
+        if len(follow_up_answers) != len(completed_questions):
+            raise EvaluationGenerationStateError(
+                PRACTICE_EVALUATION_COMPLETION_CONFLICT
+            )
+        if unanswered_question.id in answer_by_question:
+            raise EvaluationGenerationStateError(
+                PRACTICE_EVALUATION_COMPLETION_CONFLICT
+            )
+        exchanges = build_exchanges(completed_questions)
+        terminal_decision = first_decision
+        if len(ordered_questions) == 2:
+            second_decision = decisions_by_order.get(2)
+            first_answer = answer_by_question.get(ordered_questions[0].id)
+            if second_decision is None or first_answer is None:
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_COMPLETION_CONFLICT
+                )
+            _validate_follow_up_decision_payload(
+                second_decision,
+                follow_up_sources=follow_up_sources,
+                expected_order=2,
+                previous_question_id=ordered_questions[0].id,
+                previous_answer_id=first_answer.id,
+            )
+            if (
+                second_decision.action != "askFollowUp"
+                or second_decision.follow_up_question_id
+                != unanswered_question.id
+            ):
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_COMPLETION_CONFLICT
+                )
+            terminal_decision = second_decision
+        if terminal_decision.follow_up_question_id != unanswered_question.id:
+            raise EvaluationGenerationStateError(
+                PRACTICE_EVALUATION_COMPLETION_CONFLICT
+            )
+        if requested_terminal_decision.id != terminal_decision.id:
+            raise EvaluationGenerationStateError(
+                PRACTICE_EVALUATION_CONTEXT_CONFLICT
+            )
+        if payload is not None:
+            expected_pairs = [
+                (question_id, answer_id)
+                for question_id, answer_id in (
+                    (
+                        payload.follow_up_question_1_id,
+                        payload.follow_up_answer_1_id,
+                    ),
+                    (
+                        payload.follow_up_question_2_id,
+                        payload.follow_up_answer_2_id,
+                    ),
+                )
+                if question_id is not None
+            ]
+            actual_pairs = [
+                (question.id, answer.id) for question, answer in exchanges
+            ]
+            if (
+                payload.unanswered_follow_up_question_id
+                != unanswered_question.id
+                or expected_pairs != actual_pairs
+            ):
+                raise EvaluationGenerationStateError(
+                    PRACTICE_EVALUATION_CONTEXT_CONFLICT
+                )
+        return _ValidatedEvaluationFollowUpSnapshot(
+            terminal_decision=terminal_decision,
+            completed_exchanges=tuple(exchanges),
+            unanswered_question=unanswered_question,
+            completion_reason=reason,
+        )
+
+    if len(follow_up_answers) != len(ordered_questions) or len(decisions) != 2:
+        raise EvaluationGenerationStateError(
+            PRACTICE_EVALUATION_COMPLETION_CONFLICT
+        )
+    exchanges = build_exchanges(ordered_questions)
+    second_decision = decisions_by_order.get(2)
+    first_answer = answer_by_question.get(ordered_questions[0].id)
+    if second_decision is None or first_answer is None:
+        raise EvaluationGenerationStateError(
+            PRACTICE_EVALUATION_COMPLETION_CONFLICT
+        )
     _validate_follow_up_decision_payload(
         second_decision,
         follow_up_sources=follow_up_sources,
@@ -991,11 +1105,19 @@ def _validate_completion_graph(
             if question_id is not None
         ]
         actual_pairs = [(question.id, answer.id) for question, answer in exchanges]
-        if expected_pairs != actual_pairs:
+        if (
+            payload.unanswered_follow_up_question_id is not None
+            or expected_pairs != actual_pairs
+        ):
             raise EvaluationGenerationStateError(
                 PRACTICE_EVALUATION_CONTEXT_CONFLICT
             )
-    return exchanges
+    return _ValidatedEvaluationFollowUpSnapshot(
+        terminal_decision=second_decision,
+        completed_exchanges=tuple(exchanges),
+        unanswered_question=None,
+        completion_reason=reason,
+    )
 
 
 def _validate_follow_up_decision_payload(

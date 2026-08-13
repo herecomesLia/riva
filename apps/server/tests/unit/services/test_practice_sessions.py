@@ -574,6 +574,7 @@ def evaluation_run(
     follow_up_answer_1_id: UUID | None = None,
     follow_up_question_2_id: UUID | None = None,
     follow_up_answer_2_id: UUID | None = None,
+    unanswered_follow_up_question_id: UUID | None = None,
 ) -> AgentRun:
     payload = EvaluationRunPayload(
         attempt_id=attempt_id,
@@ -584,6 +585,7 @@ def evaluation_run(
             follow_up_completion_reason
         ),
         terminal_follow_up_decision_id=decision_id,
+        unanswered_follow_up_question_id=unanswered_follow_up_question_id,
         follow_up_question_1_id=follow_up_question_1_id,
         follow_up_answer_1_id=follow_up_answer_1_id,
         follow_up_question_2_id=follow_up_question_2_id,
@@ -4229,6 +4231,296 @@ def test_submit_follow_up_answer_order2_evaluation_failure_rolls_back() -> None:
     assert scripted.commit_count == 0
     assert scripted.rollback_count == 1
     assert len(scripted.added) == 1
+
+
+def test_end_follow_ups_order1_starts_ended_early_evaluation() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="answeringFollowUp",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+        follow_up_completion_reason=(
+            PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+        ),
+        unanswered_follow_up_question_id=question.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        question,
+    )
+    fake_evaluation = FakeEvaluationGenerationService(evaluation)
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_evaluation=fake_evaluation,
+        ).end_follow_ups(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            follow_up_question_id=question.id,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.attempt.status == "evaluating"
+    assert result.session.version == 5
+    assert result.follow_up_completion_reason == (
+        PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+    )
+    assert result.follow_up_question is question
+    assert result.follow_up_exchanges == ()
+    assert result.follow_up_decision is decision
+    assert result.evaluation_generation_run is evaluation
+    assert scripted.added == []
+    assert fake_evaluation.calls[0]["follow_up_completion_reason"] == (
+        PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+    )
+    assert fake_evaluation.calls[0]["idempotency_key"] == (
+        practice_evaluation_idempotency_key(attempt.id)
+    )
+
+
+def test_end_follow_ups_order2_freezes_q1_a1_and_pending_q2() -> None:
+    records = _order2_refresh_records(
+        attempt_status="answeringFollowUp",
+        order2_status=AgentRunStatus.SUCCEEDED,
+        order2_action="askFollowUp",
+        include_order2_question=True,
+    )
+    evaluation = evaluation_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+        attempt_id=records["attempt"].id,  # type: ignore[union-attr]
+        question_card_id=records["card"].id,  # type: ignore[union-attr]
+        main_answer_id=records["answer"].id,  # type: ignore[union-attr]
+        decision_id=records["decision_2"].id,  # type: ignore[union-attr]
+        follow_up_completion_reason=(
+            PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+        ),
+        follow_up_question_1_id=records["question_1"].id,  # type: ignore[union-attr]
+        follow_up_answer_1_id=records["answer_1"].id,  # type: ignore[union-attr]
+        unanswered_follow_up_question_id=(
+            records["question_2"].id  # type: ignore[union-attr]
+        ),
+    )
+    scripted = ScriptedSession(*records["scripted_values"])
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_evaluation=FakeEvaluationGenerationService(evaluation),
+        ).end_follow_ups(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=5,
+            question_id=records["card"].id,  # type: ignore[union-attr]
+            follow_up_question_id=records["question_2"].id,  # type: ignore[union-attr]
+        )
+    )
+
+    assert result.attempt.status == "evaluating"
+    assert result.session.version == 6
+    assert result.follow_up_question is records["question_2"]
+    assert len(result.follow_up_exchanges) == 1
+    assert result.follow_up_exchanges[0].question is records["question_1"]
+    assert result.follow_up_exchanges[0].answer is records["answer_1"]
+    assert result.follow_up_completion_reason == (
+        PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+    )
+    assert len(scripted.added) == 0
+
+
+def test_end_follow_ups_replays_the_same_ended_early_evaluation_run() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=5,
+        attempt_status="evaluating",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+        follow_up_completion_reason=(
+            PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+        ),
+        unanswered_follow_up_question_id=question.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        question,
+        evaluation,
+    )
+
+    result = asyncio.run(
+        service(scripted).end_follow_ups(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            follow_up_question_id=question.id,
+        )
+    )
+
+    assert result.evaluation_generation_run is evaluation
+    assert result.session.version == 5
+    assert result.attempt.status == "evaluating"
+    assert result.follow_up_question is question
+    assert scripted.commit_count == 1
+    assert scripted.added == []
+
+
+@pytest.mark.parametrize(
+    "attempt_status",
+    ["generatingQuestion", "evaluating", "review"],
+)
+def test_end_follow_ups_rejects_invalid_attempt_status(
+    attempt_status: str,
+) -> None:
+    active, attempt, _question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).end_follow_ups(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+                follow_up_question_id=uuid4(),
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+
+
+def test_end_follow_ups_rejects_non_answering_follow_up_state() -> None:
+    active, attempt, _question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="answering",
+    )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).end_follow_ups(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+                follow_up_question_id=uuid4(),
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert active.version == 4
+    assert attempt.status == "answering"
+    assert scripted.commit_count == 0
+
+
+def test_end_follow_ups_rolls_back_when_evaluation_is_unavailable() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="answeringFollowUp",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(attempt_id=attempt.id, run_id=follow_up.id)
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    scripted = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up,
+        decision,
+        question,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_evaluation=FakeEvaluationGenerationService(
+                    error=ValueError("missing evaluation model")
+                ),
+            ).end_follow_ups(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+                follow_up_question_id=question.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_EVALUATION_GENERATION_UNAVAILABLE
+    assert active.version == 4
+    assert attempt.status == "answeringFollowUp"
+    assert scripted.flush_count == 1
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
 
 
 def test_submit_follow_up_answer_order2_replays_evaluating_snapshot() -> None:
