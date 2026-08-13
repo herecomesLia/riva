@@ -13,6 +13,7 @@ from riva.schemas.practice_sessions import (
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     RefreshPracticeEvaluationRequest,
+    RetryPracticeQuestionRequest,
     PracticeSessionSelection,
 )
 
@@ -104,6 +105,10 @@ class FakePracticeAPIService:
     async def continue_to_next_question(self, **kwargs: object):
         self.calls.append(("continue", kwargs))
         return self.result
+
+    async def retry_current_question(self, **kwargs: object):
+        self.calls.append(("retry", kwargs))
+        return self.submit_result
 
     async def submit_primary_answer(self, **kwargs: object):
         self.calls.append(("submit", kwargs))
@@ -264,6 +269,59 @@ def test_continue_to_next_question_requires_csrf_and_forbids_internal_fields(app
         "POST",
         f"/api/practice/sessions/{SESSION_ID}/questions/next",
         json={**payload, "attemptId": str(uuid4())},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert service.calls == []
+
+
+def test_retry_current_question_returns_200_and_forwards_only_public_body(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    payload = {
+        "version": 5,
+        "questionId": str(service.submit_result.question.id),
+    }
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/retry",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "generatingFollowUp"
+    assert service.calls[0][0] == "retry"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(service.calls[0][1]["payload"], RetryPracticeQuestionRequest)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+
+
+def test_retry_current_question_requires_csrf_and_forbids_internal_fields(app) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+    payload = {
+        "version": 5,
+        "questionId": str(service.submit_result.question.id),
+    }
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/retry",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/retry",
+        json={**payload, "retryOfAttemptId": str(uuid4())},
         headers={"Origin": TRUSTED_ORIGIN},
     )
 
@@ -515,12 +573,23 @@ def test_new_practice_mutations_require_authentication(app) -> None:
         json={"version": 5, "questionId": str(uuid4())},
         headers={"Origin": TRUSTED_ORIGIN},
     )
+    retry_question = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/retry",
+        json={
+            "version": 5,
+            "questionId": str(service.submit_result.question.id),
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
 
     assert submit.status_code == 401
     assert refresh.status_code == 401
     assert evaluation_refresh.status_code == 401
     assert follow_up_submit.status_code == 401
     assert next_question.status_code == 401
+    assert retry_question.status_code == 401
     assert service.calls == []
 
 

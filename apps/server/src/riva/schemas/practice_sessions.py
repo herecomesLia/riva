@@ -81,6 +81,13 @@ class ContinuePracticeQuestionRequest(APIModel):
     question_id: StandardUUID
 
 
+class RetryPracticeQuestionRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+
+
 class RefreshPracticeQuestionGenerationRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -491,6 +498,7 @@ __all__ = [
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
     "PracticeSessionStatus",
+    "RetryPracticeQuestionRequest",
     "RefreshPracticeFollowUpGenerationRequest",
     "RefreshPracticeEvaluationRequest",
     "RefreshPracticeQuestionGenerationRequest",

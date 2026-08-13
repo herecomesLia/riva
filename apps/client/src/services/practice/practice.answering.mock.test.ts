@@ -110,12 +110,14 @@ describe("practice stateful mock service: answering", () => {
     if (revealedResponse.session.status !== "answering") throw new Error("Expected answering.")
     const review = await context.finishCurrentAttempt(revealedResponse.session)
     const original = review.question.referenceAnswer
-    const retried = await context.settle(
-      context.retryCurrentPracticeQuestion({
-        sessionId: review.sessionId,
-        version: review.version,
-        questionId: review.question.id,
-      }),
+    const retried = context.requireMockPageResponse(
+      await context.settle(
+        context.retryCurrentPracticeQuestion({
+          sessionId: review.sessionId,
+          version: review.version,
+          questionId: review.question.id,
+        }),
+      ),
     )
     if (retried.session.status !== "answering") throw new Error("Expected retry answering.")
     expect(context.isCurrentPracticeAttemptRetry(retried.session)).toBe(true)

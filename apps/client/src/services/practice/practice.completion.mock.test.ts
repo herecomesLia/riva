@@ -53,12 +53,14 @@ describe("practice stateful mock service: completion", () => {
     const firstReview = await context.completeQuestionToReview("behavioral", {
       endFollowUpsEarly: true,
     })
-    const retried = await context.settle(
-      context.retryCurrentPracticeQuestion({
-        sessionId: firstReview.sessionId,
-        version: firstReview.version,
-        questionId: firstReview.question.id,
-      }),
+    const retried = context.requireMockPageResponse(
+      await context.settle(
+        context.retryCurrentPracticeQuestion({
+          sessionId: firstReview.sessionId,
+          version: firstReview.version,
+          questionId: firstReview.question.id,
+        }),
+      ),
     )
     if (retried.session.status !== "answering") throw new Error("Expected retry answering state.")
     expect(retried.session.sessionId).toBe(firstReview.sessionId)
@@ -180,12 +182,14 @@ describe("practice stateful mock service: completion", () => {
   })
   it("preserves a reviewed attempt when retrying and completes a session with records", async () => {
     const review = await context.completeQuestionToReview("behavioral")
-    const retried = await context.settle(
-      context.retryCurrentPracticeQuestion({
-        sessionId: review.sessionId,
-        version: review.version,
-        questionId: review.question.id,
-      }),
+    const retried = context.requireMockPageResponse(
+      await context.settle(
+        context.retryCurrentPracticeQuestion({
+          sessionId: review.sessionId,
+          version: review.version,
+          questionId: review.question.id,
+        }),
+      ),
     )
     expect(retried.session.status).toBe("answering")
     if (retried.session.status !== "answering") return

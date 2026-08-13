@@ -37,6 +37,7 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RetryPracticeQuestionRequest,
     StartPracticeSessionRequest,
     SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
@@ -94,6 +95,15 @@ class FakePracticeSessionService:
         **kwargs: object,
     ) -> PracticeSessionWorkflowContext:
         self.calls.append(("continue", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def retry_current_question(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext:
+        self.calls.append(("retry", kwargs))
         if self.error is not None:
             raise self.error
         return self.context
@@ -562,6 +572,82 @@ def test_continue_to_next_question_maps_state_errors(
                 payload=ContinuePracticeQuestionRequest(
                     version=5,
                     question_id=uuid4(),
+                ),
+            )
+        )
+
+    assert error.value.status_code == status_code
+    assert error.value.error == code
+
+
+def test_retry_current_question_forwards_public_provenance_without_llm_precheck() -> None:
+    domain = FakePracticeSessionService(context=context(answering=True))
+    domain.context.session.version = 6
+    domain.context.attempt.attempt_number = 2
+    assert domain.context.question_card is not None
+    question_id = domain.context.question_card.id
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model=None,
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    result = asyncio.run(
+        service.retry_current_question(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=RetryPracticeQuestionRequest(
+                version=5,
+                question_id=question_id,
+            ),
+        )
+    )
+
+    assert result.status == "answering"
+    assert result.version == 6
+    assert result.attempt_number == 2
+    assert result.attempt_id == domain.context.attempt.id
+    assert result.question.id == question_id
+    assert domain.calls == [
+        (
+            "retry",
+            {
+                "user_id": domain.context.session.user_id,
+                "session_id": domain.context.session.id,
+                "expected_version": 5,
+                "question_id": question_id,
+            },
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("code", "status_code"),
+    [
+        ("practice_session_version_conflict", 409),
+        (PRACTICE_SESSION_STATE_CONFLICT, 409),
+        (PRACTICE_SESSION_NOT_FOUND, 404),
+    ],
+)
+def test_retry_current_question_maps_state_errors(code: str, status_code: int) -> None:
+    domain = FakePracticeSessionService(
+        context=context(answering=True),
+        error=PracticeSessionStateError(code),
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service.retry_current_question(
+                user_id=domain.context.session.user_id,
+                session_id=domain.context.session.id,
+                payload=RetryPracticeQuestionRequest(
+                    version=5,
+                    question_id=domain.context.question_card.id,
                 ),
             )
         )

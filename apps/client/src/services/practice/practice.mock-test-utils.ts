@@ -312,12 +312,14 @@ export async function completeRetriedQuestionWithFinalFlags(
     firstFlags,
   )
   const firstReview = await finishCurrentAttempt(firstAnswering)
-  const retried = await settle(
-    retryCurrentPracticeQuestion({
-      sessionId: firstReview.sessionId,
-      version: firstReview.version,
-      questionId: firstReview.question.id,
-    }),
+  const retried = requireMockPageResponse(
+    await settle(
+      retryCurrentPracticeQuestion({
+        sessionId: firstReview.sessionId,
+        version: firstReview.version,
+        questionId: firstReview.question.id,
+      }),
+    ),
   )
   if (retried.session.status !== "answering") {
     throw new Error("Retrying a reviewed question must return an answering session.")

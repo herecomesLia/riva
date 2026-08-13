@@ -15,6 +15,7 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RetryPracticeQuestionRequest,
     SubmitFollowUpAnswerRequest,
     StartPracticeSessionRequest,
     SubmitPrimaryAnswerRequest,
@@ -67,6 +68,26 @@ async def continue_to_next_practice_question(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.continue_to_next_question(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/questions/retry",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def retry_current_practice_question(
+    session_id: PracticeSessionId,
+    payload: RetryPracticeQuestionRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.retry_current_question(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

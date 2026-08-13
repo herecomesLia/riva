@@ -419,6 +419,90 @@ describe("PracticePage real API workflow", () => {
     ).toBe(true)
   })
 
+  it("retries from review into the same question and submits a new answer without question polling", async () => {
+    const user = userEvent.setup()
+    const current = review(8)
+    const retried = {
+      ...base(9),
+      attemptId: nextAttemptId,
+      attemptNumber: 2,
+      question,
+      status: "answering" as const,
+    }
+    const submitted = {
+      ...session("generatingFollowUp", 10),
+      attemptId: nextAttemptId,
+      attemptNumber: 2,
+      mainAnswer: { ...mainAnswer, content: "重答中的新行动与结果。" },
+      question,
+    }
+    const followUpReady = {
+      ...session("answeringFollowUp", 11),
+      attemptId: nextAttemptId,
+      attemptNumber: 2,
+      mainAnswer: { ...mainAnswer, content: "重答中的新行动与结果。" },
+      question,
+    }
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/retry`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 8, questionId })
+        return jsonResponse(retried)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/answers/main`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          content: "重答中的新行动与结果。",
+          questionId,
+          version: 9,
+        })
+        return jsonResponse(submitted)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/follow-up-generation/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 10 })
+        return jsonResponse(followUpReady)
+      }
+      throw new Error(`Unexpected request during retry workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await testing.screen.findByTestId("practice-review-state")
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.review.retryCurrent"),
+      }),
+    )
+
+    const answering = await testing.screen.findByTestId("practice-answering-state")
+    expect(answering).toHaveTextContent(question.prompt)
+    const answerInput = await testing.screen.findByLabelText(i18n.t("practice.answer.label"))
+    expect(answerInput).toHaveValue("")
+    expect(answering).not.toHaveTextContent(mainAnswer.content)
+    expect(retried.attemptId).toBe(nextAttemptId)
+    expect(retried.attemptId).not.toBe(current.attemptId)
+    expect(retried.question.id).toBe(current.question.id)
+
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("questions/retry"))).toBe(
+      true,
+    )
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).endsWith("question-generation/refresh")),
+    ).toBe(false)
+
+    await user.type(answerInput, "重答中的新行动与结果。")
+    await user.click(testing.screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+    expect(await testing.screen.findByTestId("practice-generating-follow-up-state")).toBeVisible()
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).endsWith("question-generation/refresh")),
+    ).toBe(false)
+  })
+
   it.each(["generatingFollowUp", "evaluating", "review"] as const)(
     "recovers a browser refresh directly in %s",
     async (status) => {

@@ -10,6 +10,7 @@ import {
   getPracticePage,
   getQuestionGenerationStatus,
   continueToNextPracticeQuestion,
+  retryCurrentPracticeQuestion,
   startPracticeSession,
   submitFollowUpAnswer,
   submitPrimaryAnswer,
@@ -368,6 +369,38 @@ describe("practice service API", () => {
     expect(session).toMatchObject({
       attemptNumber: 2,
       status: "generatingQuestion",
+      version: 6,
+    })
+  })
+
+  it("retries the current question with only the version and question ID", async () => {
+    const response = createActiveSession("answering", {
+      attemptNumber: 2,
+      version: 6,
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+    const session = requireActiveSession(
+      await retryCurrentPracticeQuestion({
+        questionId,
+        sessionId,
+        version: 5,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/retry`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 5, questionId })
+    expect(requestJson(fetchMock)).not.toHaveProperty("attemptId")
+    expect(requestJson(fetchMock)).not.toHaveProperty("retryOfAttemptId")
+    expect(requestJson(fetchMock)).not.toHaveProperty("questionType")
+    expect(requestJson(fetchMock)).not.toHaveProperty("recommendation")
+    expect(session).toMatchObject({
+      attemptNumber: 2,
+      question: { id: questionId },
+      status: "answering",
       version: 6,
     })
   })

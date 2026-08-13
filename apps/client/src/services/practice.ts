@@ -156,8 +156,18 @@ export function retryPracticeEvaluation(
 
 export function retryCurrentPracticeQuestion(
   input: RetryCurrentPracticeQuestionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.retryCurrentPracticeQuestion(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.retryCurrentPracticeQuestion(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/retry`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function continueToNextPracticeQuestion(

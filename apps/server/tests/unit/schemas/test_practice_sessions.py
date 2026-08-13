@@ -24,6 +24,7 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RetryPracticeQuestionRequest,
     StartPracticeSessionRequest,
     SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
@@ -220,6 +221,39 @@ def test_continue_question_request_uses_only_public_provenance() -> None:
     ):
         with pytest.raises(ValidationError):
             ContinuePracticeQuestionRequest.model_validate(payload)
+
+
+def test_retry_question_request_uses_only_public_provenance() -> None:
+    question_id = uuid4()
+    request = RetryPracticeQuestionRequest.model_validate(
+        {"version": 5, "questionId": str(question_id)}
+    )
+
+    assert request.version == 5
+    assert request.question_id == question_id
+    assert request.model_dump(mode="json") == {
+        "version": 5,
+        "questionId": str(question_id),
+    }
+
+    for payload in (
+        {"questionId": str(question_id)},
+        {"version": 0, "questionId": str(question_id)},
+        {"version": 5, "questionId": "not-a-uuid"},
+        {
+            "version": 5,
+            "questionId": str(question_id),
+            "retryOfAttemptId": str(uuid4()),
+        },
+        {"version": 5, "questionId": str(question_id), "attemptId": str(uuid4())},
+        {
+            "version": 5,
+            "questionId": str(question_id),
+            "questionType": "projectDeepDive",
+        },
+    ):
+        with pytest.raises(ValidationError):
+            RetryPracticeQuestionRequest.model_validate(payload)
 
 
 def test_submit_primary_answer_request_uses_camel_case_and_normalizes_content() -> None:
