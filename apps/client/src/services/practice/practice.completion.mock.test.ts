@@ -36,8 +36,10 @@ describe("practice stateful mock service: completion", () => {
     const review = await context.finishCurrentAttempt(
       await context.generateQuestion("projectDeepDive"),
     )
-    const completed = await context.settle(
-      context.endPracticeSession({ sessionId: review.sessionId, version: review.version }),
+    const completed = context.requireMockPageResponse(
+      await context.settle(
+        context.endPracticeSession({ sessionId: review.sessionId, version: review.version }),
+      ),
     )
     if (completed.session.status !== "completed") throw new Error("Expected completed session.")
 
@@ -78,11 +80,13 @@ describe("practice stateful mock service: completion", () => {
     await staleRetryAssertion
 
     const secondReview = await context.finishCurrentAttempt(retried.session)
-    const completed = await context.settle(
-      context.endPracticeSession({
-        sessionId: secondReview.sessionId,
-        version: secondReview.version,
-      }),
+    const completed = context.requireMockPageResponse(
+      await context.settle(
+        context.endPracticeSession({
+          sessionId: secondReview.sessionId,
+          version: secondReview.version,
+        }),
+      ),
     )
     if (completed.session.status !== "completed") throw new Error("Expected completed session.")
     expect(completed.session.attemptRecords).toHaveLength(2)
@@ -128,11 +132,13 @@ describe("practice stateful mock service: completion", () => {
     )
 
     const secondReview = await context.finishCurrentAttempt(next.session)
-    const completed = await context.settle(
-      context.endPracticeSession({
-        sessionId: secondReview.sessionId,
-        version: secondReview.version,
-      }),
+    const completed = context.requireMockPageResponse(
+      await context.settle(
+        context.endPracticeSession({
+          sessionId: secondReview.sessionId,
+          version: secondReview.version,
+        }),
+      ),
     )
     if (completed.session.status !== "completed") throw new Error("Expected completed session.")
 
@@ -164,12 +170,14 @@ describe("practice stateful mock service: completion", () => {
     await context.settle(context.getQuestionGenerationStatus(input))
     const next = await context.settle(context.getQuestionGenerationStatus(input))
     if (next.session.status !== "answering") throw new Error("Expected answering next question.")
-    const completed = await context.settle(
-      context.requestEndPracticeSession({
-        sessionId: next.session.sessionId,
-        version: next.session.version,
-        questionId: next.session.question.id,
-      }),
+    const completed = context.requireMockPageResponse(
+      await context.settle(
+        context.requestEndPracticeSession({
+          sessionId: next.session.sessionId,
+          version: next.session.version,
+          questionId: next.session.question.id,
+        }),
+      ),
     )
     if (completed.session.status !== "completed") throw new Error("Expected completed session.")
     expect(completed.session.attemptRecords).toHaveLength(1)
@@ -198,8 +206,13 @@ describe("practice stateful mock service: completion", () => {
     expect(retried.session.attemptRecords[0]?.attemptId).toBe(review.attemptId)
 
     const nextReview = await context.completeQuestionToReview("motivation")
-    const completed = await context.settle(
-      context.endPracticeSession({ sessionId: nextReview.sessionId, version: nextReview.version }),
+    const completed = context.requireMockPageResponse(
+      await context.settle(
+        context.endPracticeSession({
+          sessionId: nextReview.sessionId,
+          version: nextReview.version,
+        }),
+      ),
     )
     expect(completed.session.status).toBe("completed")
     if (completed.session.status !== "completed") return

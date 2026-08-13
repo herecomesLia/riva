@@ -85,13 +85,13 @@ def question_output(project_id: UUID, *, prompt: str) -> dict[str, object]:
     }
 
 
-def evaluation_output() -> dict[str, object]:
+def evaluation_output(*, overall_score: int = 82) -> dict[str, object]:
     return {
-        "overallScore": 82,
+        "overallScore": overall_score,
         "dimensionScores": [
             {
                 "dimension": dimension,
-                "score": 82,
+                "score": overall_score,
                 "explanation": f"Evidence supports {dimension}.",
             }
             for dimension in (

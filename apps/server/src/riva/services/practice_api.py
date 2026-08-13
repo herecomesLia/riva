@@ -10,6 +10,7 @@ from riva.core.language import InteractionLanguage
 from riva.models import PracticeAnswer, PracticeFollowUpQuestion, QuestionCard
 from riva.schemas.evaluation import PracticeEvaluationFollowUpCompletionReason
 from riva.schemas.practice_sessions import (
+    CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
@@ -18,6 +19,7 @@ from riva.schemas.practice_sessions import (
     PracticeAnsweringFollowUpResponse,
     PracticeAnsweringResponse,
     PracticeAllAnsweredCompletionResponse,
+    PracticeCompletedSessionResponse,
     PracticeAwaitingFollowUpExchangeResponse,
     PracticeCompletedFollowUpCompletionResponse,
     PracticeEvaluationResponse,
@@ -32,6 +34,7 @@ from riva.schemas.practice_sessions import (
     PracticeReviewContentResponse,
     PracticeReviewResponse,
     PracticeSessionSelection,
+    PracticeSessionResponse,
     RetryPracticeQuestionRequest,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
@@ -52,6 +55,7 @@ from riva.services.practice_sessions import (
     PRACTICE_SESSION_STATE_CONFLICT,
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PracticeAnsweredFollowUpExchangeContext,
+    PracticeCompletedSessionWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
     PracticePrimaryAnswerWorkflowContext,
@@ -247,13 +251,30 @@ class PracticeAPIService:
         *,
         user_id: UUID,
         session_id: UUID,
-    ) -> PracticeActiveSessionResponse:
+    ) -> PracticeSessionResponse:
         try:
             context = await self._practice_service().get_session_context(
                 user_id=user_id,
                 session_id=session_id,
             )
             return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def complete_session(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: CompletePracticeSessionRequest,
+    ) -> PracticeCompletedSessionResponse:
+        try:
+            context = await self._practice_service().complete_session_after_review(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+            )
+            return build_practice_completed_session_response(context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -295,9 +316,11 @@ PracticeSessionAPIService = PracticeAPIService
 
 
 def build_practice_session_response(
-    context: PracticePublicWorkflowContext,
-) -> PracticeActiveSessionResponse:
+    context: PracticePublicWorkflowContext | PracticeCompletedSessionWorkflowContext,
+) -> PracticeSessionResponse:
     try:
+        if isinstance(context, PracticeCompletedSessionWorkflowContext):
+            return build_practice_completed_session_response(context)
         base = {
             "session_id": context.session.id,
             "language": context.session.language,
@@ -442,6 +465,71 @@ def build_practice_session_response(
         raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
+def build_practice_completed_session_response(
+    context: PracticeCompletedSessionWorkflowContext,
+) -> PracticeCompletedSessionResponse:
+    try:
+        review_contexts = context.attempt_review_contexts
+        if not review_contexts:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        final_context_by_question: dict[UUID, PracticeReviewWorkflowContext] = {}
+        for review_context in review_contexts:
+            final_context_by_question[review_context.question_card.id] = review_context
+
+        final_attempts = list(final_context_by_question.values())
+        score_total = sum(
+            review_context.evaluation.overall_score
+            for review_context in final_attempts
+        )
+        score_count = len(final_attempts)
+        average_score = (score_total * 2 + score_count) // (2 * score_count)
+        final_review_context = review_contexts[-1]
+        final_attempt = final_review_context.attempt
+        if final_attempt.id != context.final_attempt.id:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        return PracticeCompletedSessionResponse(
+            status="completed",
+            session_id=context.session.id,
+            language=context.session.language,
+            version=context.session.version,
+            selection=PracticeSessionSelection(
+                target_role_id=context.session.target_role_id,
+                question_type=QuestionCardQuestionType(
+                    final_attempt.question_type
+                ),
+                difficulty=QuestionCardDifficulty(final_attempt.difficulty),
+                source=context.session.source,
+                prioritize_weaknesses=context.session.prioritize_weaknesses,
+            ),
+            started_at=context.session.started_at,
+            attempt_id=final_attempt.id,
+            attempt_number=final_attempt.attempt_number,
+            completion_reason="reviewCompleted",
+            completed_at=context.session.completed_at,
+            questions_completed=len(final_context_by_question),
+            retry_count=sum(
+                review_context.attempt.retry_of_attempt_id is not None
+                for review_context in review_contexts
+            ),
+            saved_question_count=sum(
+                review_context.question_card.is_saved
+                for review_context in final_attempts
+            ),
+            marked_weak_question_count=sum(
+                review_context.question_card.is_marked_weak
+                for review_context in final_attempts
+            ),
+            final_attempt_average_score=average_score,
+            next_step_suggestion=final_review_context.recommendation.reason,
+        )
+    except PracticeSessionStateError:
+        raise
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+
+
 def build_practice_question_response(card: QuestionCard) -> PracticeQuestionResponse:
     try:
         return PracticeQuestionResponse.model_validate(
@@ -580,5 +668,6 @@ __all__ = [
     "build_practice_follow_up_question_response",
     "build_practice_follow_up_completion_response",
     "build_practice_session_response",
+    "build_practice_completed_session_response",
     "practice_session_state_api_error",
 ]

@@ -258,6 +258,10 @@ class PracticeCompletedSessionWorkflowContext:
     session: PracticeSession
     final_attempt: PracticeAttempt
     final_review_context: PracticeReviewWorkflowContext
+    attempt_review_contexts: tuple[PracticeReviewWorkflowContext, ...] = field(
+        default_factory=tuple,
+        kw_only=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -848,16 +852,23 @@ class PracticeSessionService:
                         allow_completed=True,
                         allow_completed_session=True,
                     )
-                except (PracticeSessionStateError, ValueError):
+                    completed_context = await self._load_completed_session_context(
+                        practice_session,
+                        for_update=True,
+                        prevalidated_context=final_review_context,
+                    )
+                except (
+                    AttributeError,
+                    PracticeSessionStateError,
+                    TypeError,
+                    ValueError,
+                    ValidationError,
+                ):
                     raise PracticeSessionStateError(
                         PRACTICE_SESSION_VERSION_CONFLICT
                     ) from None
                 await self.session.commit()
-                return PracticeCompletedSessionWorkflowContext(
-                    session=practice_session,
-                    final_attempt=current_attempt,
-                    final_review_context=final_review_context,
-                )
+                return completed_context
 
             if practice_session.version != expected_version:
                 raise PracticeSessionStateError(
@@ -898,12 +909,13 @@ class PracticeSessionService:
             practice_session.completed_at = now
             practice_session.version += 1
             practice_session.updated_at = now
-            await self.session.commit()
-            return PracticeCompletedSessionWorkflowContext(
-                session=practice_session,
-                final_attempt=current_attempt,
-                final_review_context=final_review_context,
+            completed_context = await self._load_completed_session_context(
+                practice_session,
+                for_update=True,
+                prevalidated_context=final_review_context,
             )
+            await self.session.commit()
+            return completed_context
         except BaseException:
             if current_attempt is not None and previous_attempt_status is not None:
                 current_attempt.status = previous_attempt_status
@@ -1799,14 +1811,19 @@ class PracticeSessionService:
         *,
         user_id: UUID,
         session_id: UUID,
-    ) -> PracticePublicWorkflowContext:
+    ) -> PracticePublicWorkflowContext | PracticeCompletedSessionWorkflowContext:
         try:
             practice_session = await self._load_session(
                 user_id=user_id,
                 session_id=session_id,
                 for_update=False,
             )
-            if practice_session.status != "active":
+            if practice_session.status == PracticeSessionStatus.COMPLETED.value:
+                return await self._load_completed_session_context(
+                    practice_session,
+                    for_update=False,
+                )
+            if practice_session.status != PracticeSessionStatus.ACTIVE.value:
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             return await self._load_public_active_context(
                 practice_session,
@@ -1815,6 +1832,118 @@ class PracticeSessionService:
         except BaseException:
             await self.session.rollback()
             raise
+
+    async def get_completed_session_context(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+    ) -> PracticeCompletedSessionWorkflowContext:
+        try:
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=False,
+            )
+            if practice_session.status != PracticeSessionStatus.COMPLETED.value:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return await self._load_completed_session_context(
+                practice_session,
+                for_update=False,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def _load_completed_session_context(
+        self,
+        practice_session: PracticeSession,
+        *,
+        for_update: bool,
+        prevalidated_context: PracticeReviewWorkflowContext | None = None,
+    ) -> PracticeCompletedSessionWorkflowContext:
+        try:
+            return await self._load_completed_session_context_unchecked(
+                practice_session,
+                for_update=for_update,
+                prevalidated_context=prevalidated_context,
+            )
+        except PracticeSessionStateError:
+            raise
+        except (AttributeError, TypeError, ValueError, ValidationError):
+            raise PracticeSessionStateError(
+                PRACTICE_SESSION_STATE_CONFLICT
+            ) from None
+
+    async def _load_completed_session_context_unchecked(
+        self,
+        practice_session: PracticeSession,
+        *,
+        for_update: bool,
+        prevalidated_context: PracticeReviewWorkflowContext | None = None,
+    ) -> PracticeCompletedSessionWorkflowContext:
+        if (
+            practice_session.status != PracticeSessionStatus.COMPLETED.value
+            or practice_session.completion_reason
+            != PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+            or practice_session.completed_at is None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        _require_aware_datetime(practice_session.completed_at)
+
+        statement = (
+            select(PracticeAttempt)
+            .where(
+                PracticeAttempt.user_id == practice_session.user_id,
+                PracticeAttempt.session_id == practice_session.id,
+            )
+            .order_by(PracticeAttempt.attempt_number.asc())
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        attempts = sorted(
+            (await self.session.scalars(statement)).all(),
+            key=lambda attempt: attempt.attempt_number,
+        )
+        if [attempt.attempt_number for attempt in attempts] != list(
+            range(1, len(attempts) + 1)
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        review_contexts: list[PracticeReviewWorkflowContext] = []
+        for attempt in attempts:
+            if (
+                attempt.user_id != practice_session.user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status != PracticeAttemptStatus.COMPLETED.value
+                or attempt.completed_at is None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            _require_aware_datetime(attempt.completed_at)
+            if (
+                prevalidated_context is not None
+                and attempt.id == prevalidated_context.attempt.id
+            ):
+                review_context = prevalidated_context
+            else:
+                review_context = await self._load_review_replay_context(
+                    practice_session,
+                    attempt,
+                    allow_completed=True,
+                    allow_completed_session=True,
+                    for_update=for_update,
+                )
+            review_contexts.append(review_context)
+
+        if not review_contexts:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        final_review_context = review_contexts[-1]
+        return PracticeCompletedSessionWorkflowContext(
+            session=practice_session,
+            final_attempt=final_review_context.attempt,
+            final_review_context=final_review_context,
+            attempt_review_contexts=tuple(review_contexts),
+        )
 
     async def get_active_session_context(
         self,
@@ -3925,6 +4054,7 @@ class PracticeSessionService:
         *,
         allow_completed: bool = False,
         allow_completed_session: bool = False,
+        for_update: bool = True,
     ) -> PracticeReviewWorkflowContext:
         attempt_state_valid = (
             attempt.status
@@ -3962,7 +4092,7 @@ class PracticeSessionService:
         chain = await self._load_follow_up_chain(
             practice_session,
             attempt,
-            for_update=True,
+            for_update=for_update,
         )
         if (
             chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
@@ -3976,7 +4106,7 @@ class PracticeSessionService:
         evaluation_run = await self._load_stable_evaluation_run(
             user_id=practice_session.user_id,
             attempt_id=attempt.id,
-            for_update=True,
+            for_update=for_update,
         )
         self._validate_evaluation_run_lineage(
             evaluation_run,
@@ -3996,7 +4126,7 @@ class PracticeSessionService:
             evaluation_run,
             attempt=attempt,
             question_card=chain.card,
-            for_update=True,
+            for_update=for_update,
         )
         if evaluation is None:
             raise PracticeSessionStateError(
@@ -4006,7 +4136,7 @@ class PracticeSessionService:
         review_run = await self._load_stable_review_run(
             user_id=practice_session.user_id,
             attempt_id=attempt.id,
-            for_update=True,
+            for_update=for_update,
         )
         self._validate_review_run_lineage(
             review_run,
@@ -4022,7 +4152,7 @@ class PracticeSessionService:
             review_run,
             attempt=attempt,
             evaluation=evaluation,
-            for_update=True,
+            for_update=for_update,
         )
         if review is None:
             raise PracticeSessionStateError(
@@ -4032,7 +4162,7 @@ class PracticeSessionService:
         recommendation_run = await self._load_stable_recommendation_run(
             user_id=practice_session.user_id,
             attempt_id=attempt.id,
-            for_update=True,
+            for_update=for_update,
         )
         self._validate_recommendation_run_lineage(
             recommendation_run,
@@ -4053,7 +4183,7 @@ class PracticeSessionService:
             evaluation=evaluation,
             review=review,
             follow_up_completion_reason=chain.completion_reason,
-            for_update=True,
+            for_update=for_update,
         )
         if recommendation is None:
             raise PracticeSessionStateError(

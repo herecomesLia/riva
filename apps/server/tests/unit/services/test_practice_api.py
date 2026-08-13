@@ -14,6 +14,7 @@ from riva.services.practice_api import (
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PracticeAPIService,
+    build_practice_completed_session_response,
 )
 from riva.services.practice_sessions import (
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE as PRACTICE_EVALUATION_STATE_UNAVAILABLE,
@@ -26,6 +27,7 @@ from riva.services.practice_sessions import (
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
     PracticeAnsweredFollowUpExchangeContext,
+    PracticeCompletedSessionWorkflowContext,
     PracticePrimaryAnswerWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionStateError,
@@ -1304,3 +1306,48 @@ def test_current_session_wraps_active_context(answering: bool) -> None:
     if answering:
         assert result.session.question.answer_hints.content is None
         assert result.session.question.reference_answer.status == "notRequested"
+
+
+def test_completed_projection_deduplicates_retry_and_uses_final_artifacts() -> None:
+    first = review_context(action="retryCurrent")
+    second = review_context(action="nextQuestion")
+    second.attempt.user_id = first.attempt.user_id
+    second.attempt.session_id = first.attempt.session_id
+    second.attempt.attempt_number = 2
+    second.attempt.retry_of_attempt_id = first.attempt.id
+    second.attempt.question_card_id = first.question_card.id
+    second.attempt.status = "completed"
+    second = replace(
+        second,
+        session=first.session,
+        question_card=first.question_card,
+    )
+    first.session.status = "completed"
+    first.session.completion_reason = "reviewCompleted"
+    first.session.completed_at = first.session.updated_at
+    first.session.version = 6
+    first.attempt.status = "completed"
+    first.question_card.is_saved = True
+    first.question_card.is_marked_weak = True
+    first.evaluation.overall_score = 60
+    second.evaluation.overall_score = 80
+    second.recommendation.reason = "Use stronger measured evidence next time."
+
+    context = PracticeCompletedSessionWorkflowContext(
+        session=first.session,
+        final_attempt=second.attempt,
+        final_review_context=second,
+        attempt_review_contexts=(first, second),
+    )
+
+    result = build_practice_completed_session_response(context)
+
+    assert result.questions_completed == 1
+    assert result.retry_count == 1
+    assert result.saved_question_count == 1
+    assert result.marked_weak_question_count == 1
+    assert result.final_attempt_average_score == 80
+    assert result.attempt_id == second.attempt.id
+    assert result.attempt_number == 2
+    assert result.next_step_suggestion == "Use stronger measured evidence next time."
+    assert "retryOfAttemptId" not in result.model_dump(mode="json")

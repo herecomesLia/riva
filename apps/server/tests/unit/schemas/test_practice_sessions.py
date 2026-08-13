@@ -5,9 +5,11 @@ from pydantic import TypeAdapter, ValidationError
 import pytest
 
 from riva.schemas.practice_sessions import (
+    CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     PracticeAttemptStatus,
     PracticeActiveSessionResponse,
+    PracticeCompletedSessionResponse,
     PracticeAnswerResponse,
     PracticeAnsweredFollowUpExchangeResponse,
     PracticeAnsweringFollowUpResponse,
@@ -31,6 +33,7 @@ from riva.schemas.practice_sessions import (
     PracticeQuestionSource,
     PracticeSessionCompletionReason,
     PracticeSessionSelection,
+    PracticeSessionResponse,
     PracticeSessionStatus,
 )
 from riva.schemas.question_cards import (
@@ -129,6 +132,70 @@ def test_practice_session_selection_uses_camel_case_and_standard_uuid() -> None:
         "prioritizeWeaknesses",
     }
     assert selection.model_dump(mode="json")["targetRoleId"] == str(role_id)
+
+
+def completed_session_payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "status": "completed",
+        "sessionId": str(uuid4()),
+        "language": "en",
+        "version": 6,
+        "selection": selection_payload(),
+        "startedAt": "2026-08-11T12:00:00+00:00",
+        "attemptId": str(uuid4()),
+        "attemptNumber": 2,
+        "completionReason": "reviewCompleted",
+        "completedAt": "2026-08-11T12:10:00+00:00",
+        "questionsCompleted": 1,
+        "retryCount": 1,
+        "savedQuestionCount": 1,
+        "markedWeakQuestionCount": 0,
+        "finalAttemptAverageScore": 85,
+        "nextStepSuggestion": "Practice the final answer structure.",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_completed_session_request_and_response_are_strict() -> None:
+    request = CompletePracticeSessionRequest.model_validate({"version": 5})
+    assert request.version == 5
+
+    with pytest.raises(ValidationError):
+        CompletePracticeSessionRequest.model_validate(
+            {"version": 5, "questionId": str(uuid4())}
+        )
+    with pytest.raises(ValidationError):
+        CompletePracticeSessionRequest.model_validate({"version": 0})
+
+    response = PracticeCompletedSessionResponse.model_validate(
+        completed_session_payload()
+    )
+    assert response.completion_reason == "reviewCompleted"
+    assert response.completed_at.tzinfo is not None
+    assert TypeAdapter(PracticeSessionResponse).validate_python(
+        completed_session_payload()
+    ).status == "completed"
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("completedAt", "2026-08-11T12:10:00"),
+        ("completionReason", "userEndedEarly"),
+        ("finalAttemptAverageScore", 85.5),
+        ("finalAttemptAverageScore", "85"),
+        ("savedQuestionCount", 2),
+        ("sourceAgentRunId", str(uuid4())),
+    ],
+)
+def test_completed_session_response_rejects_invalid_or_internal_fields(
+    field: str,
+    value: object,
+) -> None:
+    payload = completed_session_payload(**{field: value})
+    with pytest.raises(ValidationError):
+        PracticeCompletedSessionResponse.model_validate(payload)
 
 
 def test_practice_session_selection_rejects_invalid_uuid_and_unknown_fields() -> None:

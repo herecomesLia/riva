@@ -10,6 +10,8 @@ import {
   getPracticePage,
   getQuestionGenerationStatus,
   continueToNextPracticeQuestion,
+  endPracticeSession,
+  prepareNextPracticeSession,
   retryCurrentPracticeQuestion,
   startPracticeSession,
   submitFollowUpAnswer,
@@ -113,6 +115,28 @@ function createActiveSession(
   return status === "answering"
     ? { ...base, question: createQuestion(), ...overrides }
     : { ...base, ...overrides }
+}
+
+function createCompletedSession(overrides: Record<string, unknown> = {}) {
+  return {
+    attemptId,
+    attemptNumber: 1,
+    completedAt: "2026-08-11T08:05:00.000Z",
+    completionReason: "reviewCompleted" as const,
+    finalAttemptAverageScore: 82,
+    language: "en" as const,
+    markedWeakQuestionCount: 0,
+    nextStepSuggestion: "Move to the next focused question.",
+    questionsCompleted: 1,
+    retryCount: 0,
+    savedQuestionCount: 0,
+    selection,
+    sessionId,
+    startedAt: "2026-08-11T08:00:00.000Z",
+    status: "completed" as const,
+    version: 6,
+    ...overrides,
+  }
 }
 
 function createAnswer(id: string, order: number) {
@@ -242,7 +266,7 @@ function requestJson(fetchMock: ReturnType<typeof vi.fn<typeof fetch>>, index = 
 }
 
 function requireActiveSession(response: PracticeServiceResponse): PracticeActiveSessionState {
-  if ("status" in response) return response
+  if ("status" in response && response.status !== "completed") return response
   throw new Error("The real practice API must return an active session.")
 }
 
@@ -344,6 +368,50 @@ describe("practice service API", () => {
     expect(requestJson(fetchMock)).not.toHaveProperty("language")
     expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Accept-Language")).toBe("zh-CN")
     expect(session).toMatchObject({ language: "en", status: "generatingQuestion" })
+  })
+
+  it("ends a review through the real complete endpoint with only the version", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(createCompletedSession()))
+
+    const session = await endPracticeSession({ sessionId, version: 5 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/complete`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 5 })
+    expect(session).toMatchObject({
+      attemptRecords: [],
+      completionReason: "reviewCompleted",
+      finalAttemptAverageScore: 82,
+      nextStepSuggestion: "Move to the next focused question.",
+      status: "completed",
+      unfinishedAttempt: null,
+      version: 6,
+    })
+  })
+
+  it("prepares the next real round by validating completion then loading current setup", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === `/api/practice/sessions/${encodeURIComponent(sessionId)}`) {
+        return jsonResponse(createCompletedSession())
+      }
+      if (input === "/api/roles") return jsonResponse(createRolesResponse())
+      if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const page = await prepareNextPracticeSession({ sessionId, version: 6 })
+
+    expect(page.session.status).toBe("setup")
+    expect(fetchMock.mock.calls.map(([input]) => input)).toEqual(
+      expect.arrayContaining([
+        `/api/practice/sessions/${encodeURIComponent(sessionId)}`,
+        "/api/roles",
+        "/api/practice/sessions/current",
+      ]),
+    )
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false)
   })
 
   it("continues to the next question with only the version and question ID", async () => {

@@ -52,6 +52,7 @@ async function completePractice() {
     sessionId: current.session.sessionId,
     version: current.session.version,
   })
+  if (!("session" in response)) throw new Error("Expected a mock page response.")
   if (response.session.status !== "completed") throw new Error("Expected practice completion.")
   return { ...response, session: response.session }
 }

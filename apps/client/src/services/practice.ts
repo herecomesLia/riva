@@ -3,6 +3,7 @@ import * as practiceMockService from "@/mocks/services/practice"
 import { buildPracticeSetupContext, createDefaultPracticeSelection } from "@/models/practice-setup"
 import type {
   PracticeActiveSessionState,
+  PracticeCompletedState,
   GetQuestionGenerationStatusInput,
   GetFollowUpGenerationStatusInput,
   GetPracticeEvaluationStatusInput,
@@ -29,10 +30,15 @@ import type {
   SubmitFollowUpAnswerInput,
   SubmitPrimaryAnswerInput,
 } from "@/models/practice"
-import type { PracticeActiveSessionWire } from "@/schemas/practice"
+import type {
+  PracticeActiveSessionWire,
+  PracticeCompletedSessionWire,
+  PracticeSessionResponseWire,
+} from "@/schemas/practice"
 import {
   currentPracticeSessionResponseSchema,
   practiceActiveSessionResponseSchema,
+  practiceSessionResponseSchema,
 } from "@/schemas/practice"
 import { getRolesPage } from "@/services/roles"
 import { apiRequest } from "@/services/api"
@@ -59,6 +65,14 @@ async function requestPracticeActiveSession(
     await apiRequest<unknown>(path, options),
   )
   return toPracticeActiveSessionState(response)
+}
+
+async function requestPracticeSession(
+  path: string,
+  options?: Parameters<typeof apiRequest>[1],
+): Promise<PracticeActiveSessionState | PracticeCompletedState> {
+  const response = practiceSessionResponseSchema.parse(await apiRequest<unknown>(path, options))
+  return toPracticeSessionState(response)
 }
 
 export async function getPracticePage(): Promise<PracticePageResponse> {
@@ -93,10 +107,22 @@ export async function startPracticeSession(
   })
 }
 
-export function prepareNextPracticeSession(
+export async function prepareNextPracticeSession(
   input: PrepareNextPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.prepareNextPracticeSession(input) : realApiUnavailable()
+): Promise<PracticePageResponse> {
+  if (env.mock) return practiceMockService.prepareNextPracticeSession(input)
+
+  const completedSession = await requestPracticeSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}`,
+  )
+  if (
+    completedSession.status !== "completed" ||
+    completedSession.sessionId !== input.sessionId ||
+    completedSession.version !== input.version
+  ) {
+    throw new Error("The practice session is not the expected completed session.")
+  }
+  return getPracticePage()
 }
 
 export function preparePracticeTrainingEntry(
@@ -188,8 +214,20 @@ export function continueToNextPracticeQuestion(
 
 export function endPracticeSession(
   input: EndPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.endPracticeSession(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.endPracticeSession(input)
+  return requestPracticeSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/complete`,
+    {
+      json: { version: input.version },
+      method: "POST",
+    },
+  ).then((response) => {
+    if (response.status !== "completed") {
+      throw new Error("The complete endpoint must return a completed session.")
+    }
+    return response
+  })
 }
 
 export function requestPracticeHint(
@@ -365,11 +403,48 @@ export function toPracticeActiveSessionState(
   }
 }
 
+export function toPracticeCompletedSessionState(
+  session: PracticeCompletedSessionWire,
+): PracticeCompletedState {
+  return {
+    attemptId: session.attemptId,
+    attemptNumber: session.attemptNumber,
+    attemptRecords: [],
+    completedAt: session.completedAt,
+    completionReason: session.completionReason,
+    finalAttemptAverageScore: session.finalAttemptAverageScore,
+    language: session.language,
+    markedWeakQuestionCount: session.markedWeakQuestionCount,
+    nextStepSuggestion: session.nextStepSuggestion,
+    questionsCompleted: session.questionsCompleted,
+    retryCount: session.retryCount,
+    savedQuestionCount: session.savedQuestionCount,
+    selection: session.selection,
+    sessionId: session.sessionId,
+    startedAt: session.startedAt,
+    status: "completed",
+    unfinishedAttempt: null,
+    version: session.version,
+  }
+}
+
+export function toPracticeSessionState(
+  session: PracticeSessionResponseWire,
+): PracticeActiveSessionState | PracticeCompletedState {
+  return session.status === "completed"
+    ? toPracticeCompletedSessionState(session)
+    : toPracticeActiveSessionState(session)
+}
+
 function requireActivePracticeSession(
   response: PracticeServiceResponse,
 ): PracticeActiveSessionState {
   if (isActivePracticeSessionState(response)) return response
-  if (response.session.status !== "setup" && response.session.status !== "completed") {
+  if (
+    "session" in response &&
+    response.session.status !== "setup" &&
+    response.session.status !== "completed"
+  ) {
     return response.session
   }
   throw new Error("The practice session response is not active.")

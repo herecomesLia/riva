@@ -4322,6 +4322,15 @@ def _retry_final_review_records() -> dict[str, object]:
     original = records["attempt"]
     question_run = records["question_run"]
     card = records["card"]
+    original_answer = records["answer"]
+    original_follow_up = records["follow_up"]
+    original_decision = records["decision"]
+    original_evaluation = records["evaluation"]
+    original_evaluation_value = records["evaluation_value"]
+    original_review = records["review"]
+    original_review_value = records["review_value"]
+    original_recommendation = records["recommendation"]
+    original_recommendation_value = records["recommendation_value"]
     assert isinstance(active, PracticeSession)
     assert isinstance(original, PracticeAttempt)
     assert isinstance(question_run, AgentRun)
@@ -4425,6 +4434,20 @@ def _retry_final_review_records() -> dict[str, object]:
             review_value,
             recommendation,
             recommendation_value,
+        ],
+        "completed_loader_scalar_values": [
+            question_run,
+            card,
+            original_answer,
+            original_follow_up,
+            original_decision,
+            None,
+            original_evaluation,
+            original_evaluation_value,
+            original_review,
+            original_review_value,
+            original_recommendation,
+            original_recommendation_value,
         ],
     }
 
@@ -5515,13 +5538,12 @@ def test_get_active_session_context_ignores_completed_session_after_completion()
     assert scripted.rollback_count == 0
 
 
-def test_complete_session_after_review_accepts_a_new_question_final_attempt() -> None:
+def test_complete_session_after_review_accepts_a_single_completed_attempt() -> None:
     records = _continue_review_records("nextQuestion")
     active = records["active"]
     attempt = records["attempt"]
     assert isinstance(active, PracticeSession)
     assert isinstance(attempt, PracticeAttempt)
-    attempt.attempt_number = 2
     scripted = ScriptedSession(*records["scalar_values"])
 
     result = asyncio.run(
@@ -5533,10 +5555,61 @@ def test_complete_session_after_review_accepts_a_new_question_final_attempt() ->
     )
 
     assert result.final_attempt is attempt
-    assert result.final_attempt.attempt_number == 2
+    assert result.final_attempt.attempt_number == 1
     assert result.final_attempt.status == PracticeAttemptStatus.COMPLETED.value
     assert result.session.status == "completed"
     assert result.session.version == 5
+
+
+class _RetryFinalCompletionSession(ScriptedSession):
+    def __init__(
+        self,
+        scalar_values: list[object],
+        completed_loader_scalar_values: list[object],
+        original_attempt_id: UUID,
+    ) -> None:
+        super().__init__(*scalar_values)
+        self.completed_loader_scalar_values = completed_loader_scalar_values
+        self.original_attempt_id = original_attempt_id
+        self.completed_loader_started = False
+
+    async def scalars(self, statement: Any) -> Any:
+        if (
+            statement.column_descriptions[0].get("entity") is PracticeAttempt
+            and not self.completed_loader_started
+        ):
+            self.scalar_values.extend(self.completed_loader_scalar_values)
+            self.completed_loader_started = True
+        result = await super().scalars(statement)
+        if (
+            self.completed_loader_started
+            and statement.column_descriptions[0].get("entity")
+            in {
+                AgentRun,
+                PracticeAnswer,
+                PracticeFollowUpDecision,
+                PracticeFollowUpQuestion,
+            }
+        ):
+            values = [
+                value
+                for value in result.all()
+                if (
+                    str(
+                        value.payload.get("attemptId")
+                        if isinstance(value, AgentRun)
+                        else value.attempt_id
+                    )
+                    == str(self.original_attempt_id)
+                )
+            ]
+
+            class Result:
+                def all(self) -> list[object]:
+                    return values
+
+            return Result()
+        return result
 
 
 def test_complete_session_after_review_accepts_retry_final_attempt_without_run_id() -> None:
@@ -5547,7 +5620,11 @@ def test_complete_session_after_review_accepts_retry_final_attempt_without_run_i
     assert isinstance(active, PracticeSession)
     assert isinstance(original, PracticeAttempt)
     assert isinstance(retry_attempt, PracticeAttempt)
-    scripted = ScriptedSession(*records["scalar_values"])
+    scripted = _RetryFinalCompletionSession(
+        records["scalar_values"],  # type: ignore[arg-type]
+        records["completed_loader_scalar_values"],  # type: ignore[arg-type]
+        original.id,
+    )
 
     result = asyncio.run(
         service(scripted).complete_session_after_review(

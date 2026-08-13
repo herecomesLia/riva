@@ -199,6 +199,27 @@ function review(version: number) {
   }
 }
 
+function completed(version: number) {
+  return {
+    attemptId,
+    attemptNumber: 1,
+    completedAt: "2026-08-12T08:06:00.000Z",
+    completionReason: "reviewCompleted" as const,
+    finalAttemptAverageScore: 91,
+    language: "zh-CN" as const,
+    markedWeakQuestionCount: 1,
+    nextStepSuggestion: "下一轮继续量化风险控制结果。",
+    questionsCompleted: 2,
+    retryCount: 1,
+    savedQuestionCount: 1,
+    selection,
+    sessionId,
+    startedAt: "2026-08-12T08:00:00.000Z",
+    status: "completed" as const,
+    version,
+  }
+}
+
 function rolesResponse() {
   return {
     currentRoleId: roleId,
@@ -417,6 +438,44 @@ describe("PracticePage real API workflow", () => {
     expect(
       fetchMock.mock.calls.some(([input]) => String(input).endsWith("question-generation/refresh")),
     ).toBe(true)
+  })
+
+  it("ends review through the real complete API and renders the backend completed summary", async () => {
+    const user = userEvent.setup()
+    const current = review(8)
+    const finished = completed(9)
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/complete`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 8 })
+        return jsonResponse(finished)
+      }
+      throw new Error(`Unexpected request during completion workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await testing.screen.findByTestId("practice-review-state")
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("practice.review.endSession") }),
+    )
+    await user.click(
+      testing.screen.getAllByRole("button", { name: i18n.t("practice.review.endSession") }).at(-1)!,
+    )
+
+    const completedState = await testing.screen.findByTestId("practice-completed-state")
+    expect(completedState).toHaveTextContent("完成题数：2")
+    expect(completedState).toHaveTextContent("重练次数：1")
+    expect(completedState).toHaveTextContent("收藏题数：1")
+    expect(completedState).toHaveTextContent("标记薄弱题数：1")
+    expect(completedState).toHaveTextContent("最终作答平均分：91 分")
+    expect(completedState).toHaveTextContent(finished.nextStepSuggestion)
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/complete"))).toBe(true)
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("refresh"))).toBe(false)
   })
 
   it("retries from review into the same question and submits a new answer without question polling", async () => {

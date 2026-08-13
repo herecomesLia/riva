@@ -8,11 +8,13 @@ import {
   practiceCompletedFollowUpCompletionSchema,
   practiceEvaluationSchema,
   practiceActiveSessionResponseSchema,
+  practiceCompletedSessionResponseSchema,
   practiceFollowUpQuestionSchema,
   practiceQuestionSchema,
   practiceRecommendationSchema,
   practiceReviewSchema,
   practiceSessionSelectionSchema,
+  practiceSessionResponseSchema,
 } from "./practice"
 
 const roleId = "11111111-1111-4111-8111-111111111111"
@@ -174,6 +176,27 @@ function createFollowUpSession(
   }
 }
 
+function createCompletedSession() {
+  return {
+    attemptId,
+    attemptNumber: 1,
+    completedAt: "2026-08-11T08:05:00.000Z",
+    completionReason: "reviewCompleted" as const,
+    finalAttemptAverageScore: 80,
+    language: "zh-CN" as const,
+    markedWeakQuestionCount: 0,
+    nextStepSuggestion: "继续练习结果表达。",
+    questionsCompleted: 1,
+    retryCount: 0,
+    savedQuestionCount: 0,
+    selection,
+    sessionId,
+    startedAt: "2026-08-11T08:00:00.000Z",
+    status: "completed" as const,
+    version: 4,
+  }
+}
+
 describe("practice wire schemas", () => {
   it("accepts setup selection and both active session states", () => {
     expect(practiceSessionSelectionSchema.parse(selection)).toEqual(selection)
@@ -184,6 +207,41 @@ describe("practice wire schemas", () => {
       status: "answering",
       question,
     })
+  })
+
+  it("accepts completed sessions only in the full session union", () => {
+    const completed = createCompletedSession()
+    expect(practiceCompletedSessionResponseSchema.parse(completed)).toEqual(completed)
+    expect(practiceSessionResponseSchema.parse(completed)).toEqual(completed)
+    expect(() => practiceActiveSessionResponseSchema.parse(completed)).toThrow()
+  })
+
+  it("rejects completed wire fields outside the public contract", () => {
+    const completed = createCompletedSession()
+    expect(() =>
+      practiceCompletedSessionResponseSchema.parse({
+        ...completed,
+        completionReason: "userEndedEarly",
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceCompletedSessionResponseSchema.parse({
+        ...completed,
+        finalAttemptAverageScore: 80.5,
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceCompletedSessionResponseSchema.parse({
+        ...completed,
+        sourceAgentRunId: "internal-run",
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceCompletedSessionResponseSchema.parse({
+        ...completed,
+        completedAt: "2026-08-11T08:05:00",
+      }),
+    ).toThrow()
   })
 
   it("accepts all six backend active session states", () => {

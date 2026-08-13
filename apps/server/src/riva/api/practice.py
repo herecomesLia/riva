@@ -9,9 +9,12 @@ from riva.core.language import normalize_interaction_language
 from riva.core.practice import get_practice_api_service
 from riva.models import User
 from riva.schemas.practice_sessions import (
+    CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
+    PracticeCompletedSessionResponse,
+    PracticeSessionResponse,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
@@ -208,7 +211,7 @@ async def get_current_practice_session(
 
 @router.get(
     "/sessions/{sessionId}",
-    response_model=PracticeActiveSessionResponse,
+    response_model=PracticeSessionResponse,
 )
 async def get_practice_session(
     session_id: PracticeSessionId,
@@ -216,10 +219,30 @@ async def get_practice_session(
     practice_api_service: PracticeAPIService = Depends(
         get_practice_api_service
     ),
-) -> PracticeActiveSessionResponse:
+) -> PracticeSessionResponse:
     return await practice_api_service.get_session(
         user_id=current_user.id,
         session_id=session_id,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/complete",
+    response_model=PracticeCompletedSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def complete_practice_session(
+    session_id: PracticeSessionId,
+    payload: CompletePracticeSessionRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeCompletedSessionResponse:
+    return await practice_api_service.complete_session(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
     )
 
 

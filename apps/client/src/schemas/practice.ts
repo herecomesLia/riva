@@ -362,6 +362,53 @@ export const practiceActiveSessionResponseSchema = z.discriminatedUnion("status"
   practiceReviewSessionSchema,
 ])
 
+export const practiceCompletedSessionResponseSchema = z
+  .object({
+    attemptId: uuidSchema,
+    attemptNumber: z.number().int().positive(),
+    completedAt: dateTimeSchema,
+    completionReason: z.literal("reviewCompleted"),
+    finalAttemptAverageScore: z.number().int().min(0).max(100),
+    language: interactionLanguageSchema,
+    markedWeakQuestionCount: z.number().int().nonnegative(),
+    nextStepSuggestion: z.string().min(1),
+    questionsCompleted: z.number().int().positive(),
+    retryCount: z.number().int().nonnegative(),
+    savedQuestionCount: z.number().int().nonnegative(),
+    selection: practiceSessionSelectionSchema,
+    sessionId: uuidSchema,
+    startedAt: dateTimeSchema,
+    status: z.literal("completed"),
+    version: versionSchema,
+  })
+  .strict()
+  .superRefine((session, context) => {
+    if (session.savedQuestionCount > session.questionsCompleted) {
+      context.addIssue({
+        code: "custom",
+        message: "saved question count exceeds completed questions",
+        path: ["savedQuestionCount"],
+      })
+    }
+    if (session.markedWeakQuestionCount > session.questionsCompleted) {
+      context.addIssue({
+        code: "custom",
+        message: "marked-weak question count exceeds completed questions",
+        path: ["markedWeakQuestionCount"],
+      })
+    }
+  })
+
+export const practiceSessionResponseSchema = z.discriminatedUnion("status", [
+  practiceGeneratingQuestionSchema,
+  practiceAnsweringSchema,
+  practiceGeneratingFollowUpSchema,
+  practiceAnsweringFollowUpSchema,
+  practiceEvaluatingSchema,
+  practiceReviewSessionSchema,
+  practiceCompletedSessionResponseSchema,
+])
+
 export const currentPracticeSessionResponseSchema = z
   .object({
     session: practiceActiveSessionResponseSchema.nullable(),
@@ -392,6 +439,8 @@ export type PracticeAnsweringFollowUpWire = z.infer<typeof practiceAnsweringFoll
 export type PracticeEvaluatingWire = z.infer<typeof practiceEvaluatingSchema>
 export type PracticeReviewWireSession = z.infer<typeof practiceReviewSessionSchema>
 export type PracticeActiveSessionWire = z.infer<typeof practiceActiveSessionResponseSchema>
+export type PracticeCompletedSessionWire = z.infer<typeof practiceCompletedSessionResponseSchema>
+export type PracticeSessionResponseWire = z.infer<typeof practiceSessionResponseSchema>
 export type CurrentPracticeSessionResponseWire = z.infer<
   typeof currentPracticeSessionResponseSchema
 >

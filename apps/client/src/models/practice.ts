@@ -326,8 +326,9 @@ export type PracticePageResponse = {
 /** Mock service mutations continue to expose the complete page snapshot. */
 export type PracticeMutationResponse = PracticePageResponse
 
-/** Real mutations and polling may return an active session without setup context. */
-export type PracticeServiceResponse = PracticePageResponse | PracticeActiveSessionState
+/** Real mutations and polling may return a session without setup context. */
+export type PracticeServiceResponse =
+  PracticePageResponse | PracticeActiveSessionState | PracticeCompletedState
 
 export type StartPracticeSessionInput = ActivePracticeSelection
 

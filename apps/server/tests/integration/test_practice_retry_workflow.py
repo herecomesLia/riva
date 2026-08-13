@@ -46,6 +46,7 @@ async def _complete_retry_review(
     question_id,
     expected_version: int,
     provider_prefix: str,
+    evaluation_score: int = 82,
 ) -> int:
     async with database.sessionmaker() as session:
         submitted = await PracticeSessionService(
@@ -86,7 +87,7 @@ async def _complete_retry_review(
         database,
         PracticeEvaluationAgent(
             FakeLLMProvider(
-                [evaluation_output()],
+                [evaluation_output(overall_score=evaluation_score)],
                 provider=f"{provider_prefix}-evaluation",
                 usage=LLMUsage(input_tokens=20, output_tokens=10),
             ),

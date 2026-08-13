@@ -1,8 +1,8 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from riva.core.language import InteractionLanguage
 from riva.schemas.base import APIModel
@@ -15,7 +15,10 @@ from riva.schemas.practice_interactions import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerContent,
 )
-from riva.schemas.practice_recommendation import PracticeRecommendationOutput
+from riva.schemas.practice_recommendation import (
+    PracticeRecommendationOutput,
+    RecommendationReason,
+)
 from riva.schemas.practice_review import (
     MAX_PRACTICE_REVIEW_ITEMS,
     ReviewItem,
@@ -118,6 +121,12 @@ class RefreshPracticeFollowUpGenerationRequest(APIModel):
 
 
 class RefreshPracticeEvaluationRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+
+
+class CompletePracticeSessionRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
     version: Annotated[int, Field(ge=1)]
@@ -467,6 +476,48 @@ PracticeActiveSessionResponse = Annotated[
 ]
 
 
+class PracticeCompletedSessionResponse(PracticeAPIModel):
+    status: Literal["completed"]
+    session_id: StandardUUID
+    language: InteractionLanguage
+    version: Annotated[int, Field(ge=1)]
+    selection: PracticeSessionSelection
+    started_at: datetime
+    attempt_id: StandardUUID
+    attempt_number: Annotated[int, Field(ge=1)]
+    completion_reason: Literal["reviewCompleted"]
+    completed_at: datetime
+    questions_completed: Annotated[int, Field(ge=1)]
+    retry_count: Annotated[int, Field(ge=0)]
+    saved_question_count: Annotated[int, Field(ge=0)]
+    marked_weak_question_count: Annotated[int, Field(ge=0)]
+    final_attempt_average_score: Annotated[
+        int,
+        Field(strict=True, ge=0, le=100),
+    ]
+    next_step_suggestion: RecommendationReason
+
+    _validate_aware_completed_at = field_validator("completed_at")(
+        _validate_aware_timestamp
+    )
+
+    @model_validator(mode="after")
+    def validate_summary_counts(self) -> Self:
+        if self.saved_question_count > self.questions_completed:
+            raise ValueError("saved question count exceeds completed questions")
+        if self.marked_weak_question_count > self.questions_completed:
+            raise ValueError(
+                "marked-weak question count exceeds completed questions"
+            )
+        return self
+
+
+PracticeSessionResponse = Annotated[
+    PracticeActiveSessionResponse | PracticeCompletedSessionResponse,
+    Field(discriminator="status"),
+]
+
+
 class CurrentPracticeSessionResponse(PracticeAPIModel):
     session: PracticeActiveSessionResponse | None
 
@@ -475,6 +526,7 @@ __all__ = [
     "PracticeAttemptStatus",
     "PracticeActiveSessionBase",
     "PracticeActiveSessionResponse",
+    "PracticeCompletedSessionResponse",
     "PracticeAnswerResponse",
     "PracticeAnsweredFollowUpExchangeResponse",
     "PracticeAnsweringFollowUpResponse",
@@ -495,9 +547,11 @@ __all__ = [
     "PracticeReviewContentResponse",
     "PracticeReviewResponse",
     "CurrentPracticeSessionResponse",
+    "PracticeSessionResponse",
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
     "PracticeSessionStatus",
+    "CompletePracticeSessionRequest",
     "RetryPracticeQuestionRequest",
     "RefreshPracticeFollowUpGenerationRequest",
     "RefreshPracticeEvaluationRequest",

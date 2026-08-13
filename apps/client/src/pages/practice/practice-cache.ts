@@ -146,7 +146,7 @@ export function synchronizeFollowUpGenerationResponse(
 
 export function synchronizePracticeEvaluationResponse(
   current: PracticePageResponse | undefined,
-  response: PracticePageResponse | PracticeActiveSessionState,
+  response: PracticeServiceResponse,
   request: GetPracticeEvaluationStatusInput,
 ) {
   if (
@@ -212,6 +212,8 @@ function currentMatchesMutation(
   kind: Exclude<PracticeMutationKind, "startSession" | "prepareNextSession">,
   request: PracticeQuestionMutationInput | EndPracticeSessionInput,
 ) {
+  if (session.status === "completed") return false
+
   switch (kind) {
     case "questionUpdate":
     case "skipQuestion":
@@ -268,8 +270,13 @@ function responseMatchesMutation(
     case "continueToNextQuestion":
       return session.status === "generatingQuestion"
     case "endQuestionSession":
-    case "endReviewSession":
       return session.status === "completed"
+    case "endReviewSession":
+      return (
+        session.status === "completed" &&
+        session.attemptId === currentSession.attemptId &&
+        session.attemptNumber === currentSession.attemptNumber
+      )
     case "followUpUpdate":
       return (
         session.status === "answeringFollowUp" &&
@@ -321,19 +328,19 @@ function sameSelection(selection: StartPracticeSessionInput, request: StartPract
 }
 
 function isActivePracticeSessionState(
-  response: PracticePageResponse | PracticeActiveSessionState,
+  response: PracticeServiceResponse,
 ): response is PracticeActiveSessionState {
-  return "status" in response
+  return "status" in response && response.status !== "completed"
 }
 
 function isPracticePageResponse(
-  response: PracticePageResponse | PracticeActiveSessionState,
+  response: PracticeServiceResponse,
 ): response is PracticePageResponse {
   return "setupContext" in response && "session" in response
 }
 
 export function getPracticeResponseSession(
-  response: PracticePageResponse | PracticeActiveSessionState,
+  response: PracticeServiceResponse,
 ): PracticePageResponse["session"] {
   return isPracticePageResponse(response) ? response.session : response
 }

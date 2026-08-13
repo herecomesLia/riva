@@ -7,9 +7,11 @@ from riva.core.auth import get_auth_service, require_current_user
 from riva.core.practice import get_practice_api_service
 from riva.models import User
 from riva.schemas.practice_sessions import (
+    CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     PracticeAnswerResponse,
+    PracticeCompletedSessionResponse,
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     RefreshPracticeEvaluationRequest,
@@ -85,12 +87,35 @@ def follow_up_response() -> PracticeGeneratingFollowUpResponse:
     )
 
 
+def completed_response() -> PracticeCompletedSessionResponse:
+    return PracticeCompletedSessionResponse(
+        status="completed",
+        session_id=SESSION_ID,
+        language="en",
+        version=6,
+        selection=selection(),
+        started_at=datetime(2026, 8, 11, 12, 0, tzinfo=UTC),
+        attempt_id=uuid4(),
+        attempt_number=1,
+        completion_reason="reviewCompleted",
+        completed_at=datetime(2026, 8, 11, 12, 5, tzinfo=UTC),
+        questions_completed=1,
+        retry_count=0,
+        saved_question_count=0,
+        marked_weak_question_count=0,
+        final_attempt_average_score=82,
+        next_step_suggestion="Move to the next focused question.",
+    )
+
+
 class FakePracticeAPIService:
     def __init__(self) -> None:
         self.result = response()
         self.submit_result = follow_up_response()
         self.refresh_follow_up_result = self.submit_result
         self.refresh_evaluation_result = self.result
+        self.completed_result = completed_response()
+        self.completed_get_result = self.result
         self.current_result = CurrentPracticeSessionResponse(session=self.result)
         self.calls: list[tuple[str, dict[str, object]]] = []
 
@@ -128,7 +153,11 @@ class FakePracticeAPIService:
 
     async def get_session(self, **kwargs: object):
         self.calls.append(("get", kwargs))
-        return self.result
+        return self.completed_get_result
+
+    async def complete_session(self, **kwargs: object):
+        self.calls.append(("complete", kwargs))
+        return self.completed_result
 
     async def get_current_session(self, **kwargs: object):
         self.calls.append(("current", kwargs))
@@ -222,6 +251,43 @@ def test_refresh_uses_session_id_and_version_and_get_is_safe(app) -> None:
     assert [call[0] for call in service.calls] == ["refresh", "get"]
     assert service.calls[0][1]["session_id"] == SESSION_ID
     assert service.calls[0][1]["payload"].version == 1
+
+
+def test_complete_returns_completed_summary_and_forwards_only_version(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/complete",
+        json={"version": 5},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "completed"
+    assert result.json()["version"] == 6
+    assert service.calls[0][0] == "complete"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(service.calls[0][1]["payload"], CompletePracticeSessionRequest)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == {
+        "version": 5
+    }
+
+
+def test_completed_get_uses_public_session_union(app) -> None:
+    service = FakePracticeAPIService()
+    service.completed_get_result = service.completed_result
+    install_service(app, service, user())
+
+    result = request(app, "GET", f"/api/practice/sessions/{SESSION_ID}")
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "completed"
+    assert result.json()["completionReason"] == "reviewCompleted"
 
 
 def test_continue_to_next_question_returns_202_and_forwards_only_public_body(app) -> None:

@@ -326,8 +326,10 @@ export async function completeRetriedQuestionWithFinalFlags(
   }
   const secondAnswering = await setCurrentQuestionFlags(retried.session, secondFlags)
   const secondReview = await finishCurrentAttempt(secondAnswering)
-  const completed = await settle(
-    endPracticeSession({ sessionId: secondReview.sessionId, version: secondReview.version }),
+  const completed = requireMockPageResponse(
+    await settle(
+      endPracticeSession({ sessionId: secondReview.sessionId, version: secondReview.version }),
+    ),
   )
   if (completed.session.status !== "completed") {
     throw new Error("Finishing the retried question must complete the session.")
