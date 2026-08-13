@@ -265,6 +265,16 @@ class PracticeCompletedSessionWorkflowContext:
 
 
 @dataclass(frozen=True)
+class PracticeEndedEarlySessionWorkflowContext:
+    session: PracticeSession
+    unfinished_attempt: PracticeAttempt
+    question_context: PracticeSessionWorkflowContext
+    completed_attempt_review_contexts: tuple[
+        PracticeReviewWorkflowContext, ...
+    ] = field(default_factory=tuple, kw_only=True)
+
+
+@dataclass(frozen=True)
 class _PracticeFollowUpChain:
     card: QuestionCard
     main_answer: PracticeAnswer
@@ -2326,7 +2336,7 @@ class PracticeSessionService:
             for_update=True,
             require_succeeded=True,
         )
-        await self._ensure_retry_attempt_has_no_artifacts(
+        await self._ensure_attempt_has_no_response_artifacts(
             practice_session,
             attempt,
         )
@@ -2337,7 +2347,300 @@ class PracticeSessionService:
             question_card=source.question_card,
         )
 
-    async def _ensure_retry_attempt_has_no_artifacts(
+    async def end_session_early(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeEndedEarlySessionWorkflowContext:
+        """Complete an active session before its current question is answered."""
+
+        practice_session: PracticeSession | None = None
+        current_attempt: PracticeAttempt | None = None
+        previous_attempt_status: str | None = None
+        previous_attempt_updated_at: datetime | None = None
+        previous_attempt_completed_at: datetime | None = None
+        previous_session_status: str | None = None
+        previous_session_version: int | None = None
+        previous_session_updated_at: datetime | None = None
+        previous_session_completed_at: datetime | None = None
+        previous_session_completion_reason: str | None = None
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            current_attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if current_attempt is None or (
+                current_attempt.user_id != user_id
+                or current_attempt.session_id != practice_session.id
+            ):
+                if practice_session.version == expected_version + 1:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            if practice_session.version == expected_version + 1:
+                try:
+                    context = await self._load_ended_early_replay_context(
+                        practice_session=practice_session,
+                        attempt=current_attempt,
+                        question_id=question_id,
+                    )
+                except (
+                    AttributeError,
+                    PracticeSessionStateError,
+                    TypeError,
+                    ValueError,
+                    ValidationError,
+                ):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if (
+                practice_session.status != PracticeSessionStatus.ACTIVE.value
+                or practice_session.completed_at is not None
+                or practice_session.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            attempts = await self._load_session_attempts(
+                practice_session,
+                for_update=True,
+            )
+            if (
+                not attempts
+                or attempts[-1].id != current_attempt.id
+                or current_attempt.status
+                != PracticeAttemptStatus.ANSWERING.value
+                or current_attempt.question_card_id != question_id
+                or current_attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            completed_review_contexts = (
+                await self._load_early_end_previous_review_contexts(
+                    practice_session,
+                    attempts,
+                )
+            )
+            question_context = await self._load_early_end_question_context(
+                practice_session=practice_session,
+                attempt=current_attempt,
+                question_id=question_id,
+            )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            previous_attempt_status = current_attempt.status
+            previous_attempt_updated_at = current_attempt.updated_at
+            previous_attempt_completed_at = current_attempt.completed_at
+            previous_session_status = practice_session.status
+            previous_session_version = practice_session.version
+            previous_session_updated_at = practice_session.updated_at
+            previous_session_completed_at = practice_session.completed_at
+            previous_session_completion_reason = practice_session.completion_reason
+
+            current_attempt.status = PracticeAttemptStatus.ENDED_EARLY.value
+            current_attempt.updated_at = now
+            current_attempt.completed_at = now
+            practice_session.status = PracticeSessionStatus.COMPLETED.value
+            practice_session.completion_reason = (
+                PracticeSessionCompletionReason.USER_ENDED_EARLY.value
+            )
+            practice_session.completed_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeEndedEarlySessionWorkflowContext(
+                session=practice_session,
+                unfinished_attempt=current_attempt,
+                question_context=question_context,
+                completed_attempt_review_contexts=tuple(
+                    completed_review_contexts
+                ),
+            )
+        except BaseException:
+            if current_attempt is not None and previous_attempt_status is not None:
+                current_attempt.status = previous_attempt_status
+                current_attempt.updated_at = previous_attempt_updated_at
+                current_attempt.completed_at = previous_attempt_completed_at
+            if practice_session is not None and previous_session_version is not None:
+                if previous_session_status is not None:
+                    practice_session.status = previous_session_status
+                practice_session.version = previous_session_version
+                if previous_session_updated_at is not None:
+                    practice_session.updated_at = previous_session_updated_at
+                practice_session.completed_at = previous_session_completed_at
+                practice_session.completion_reason = (
+                    previous_session_completion_reason
+                )
+            await self.session.rollback()
+            raise
+
+    async def _load_ended_early_replay_context(
+        self,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_id: UUID,
+    ) -> PracticeEndedEarlySessionWorkflowContext:
+        if (
+            practice_session.status
+            != PracticeSessionStatus.COMPLETED.value
+            or practice_session.completion_reason
+            != PracticeSessionCompletionReason.USER_ENDED_EARLY.value
+            or practice_session.completed_at is None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        _require_aware_datetime(practice_session.completed_at)
+
+        attempts = await self._load_session_attempts(
+            practice_session,
+            for_update=True,
+        )
+        if not attempts or attempts[-1].id != attempt.id:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if (
+            attempt.status != PracticeAttemptStatus.ENDED_EARLY.value
+            or attempt.question_card_id != question_id
+            or attempt.completed_at is None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        _require_aware_datetime(attempt.completed_at)
+
+        completed_review_contexts = (
+            await self._load_early_end_previous_review_contexts(
+                practice_session,
+                attempts,
+                allow_user_ended_early_session=True,
+            )
+        )
+        question_context = await self._load_early_end_question_context(
+            practice_session=practice_session,
+            attempt=attempt,
+            question_id=question_id,
+        )
+        return PracticeEndedEarlySessionWorkflowContext(
+            session=practice_session,
+            unfinished_attempt=attempt,
+            question_context=question_context,
+            completed_attempt_review_contexts=tuple(completed_review_contexts),
+        )
+
+    async def _load_early_end_previous_review_contexts(
+        self,
+        practice_session: PracticeSession,
+        attempts: list[PracticeAttempt],
+        *,
+        allow_user_ended_early_session: bool = False,
+    ) -> list[PracticeReviewWorkflowContext]:
+        if [attempt.attempt_number for attempt in attempts] != list(
+            range(1, len(attempts) + 1)
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        contexts: list[PracticeReviewWorkflowContext] = []
+        for attempt in attempts[:-1]:
+            if (
+                attempt.user_id != practice_session.user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status != PracticeAttemptStatus.COMPLETED.value
+                or attempt.completed_at is None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            _require_aware_datetime(attempt.completed_at)
+            contexts.append(
+                await self._load_review_replay_context(
+                    practice_session,
+                    attempt,
+                    allow_completed=True,
+                    allow_completed_session=allow_user_ended_early_session,
+                    allow_user_ended_early_session=allow_user_ended_early_session,
+                    for_update=True,
+                )
+            )
+        return contexts
+
+    async def _load_early_end_question_context(
+        self,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        if (
+            attempt.user_id != practice_session.user_id
+            or attempt.session_id != practice_session.id
+            or attempt.question_card_id != question_id
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        source = await self._load_question_source(
+            practice_session,
+            attempt,
+            for_update=True,
+            require_succeeded=True,
+        )
+        if source.question_card.id != question_id:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        if await self._load_main_answer(attempt, for_update=True) is not None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        await self._ensure_attempt_has_no_response_artifacts(
+            practice_session,
+            attempt,
+        )
+        return PracticeSessionWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_generation_run=source.generation_run,
+            question_card=source.question_card,
+        )
+
+    async def _load_session_attempts(
+        self,
+        practice_session: PracticeSession,
+        *,
+        for_update: bool,
+    ) -> list[PracticeAttempt]:
+        statement = (
+            select(PracticeAttempt)
+            .where(
+                PracticeAttempt.user_id == practice_session.user_id,
+                PracticeAttempt.session_id == practice_session.id,
+            )
+            .order_by(PracticeAttempt.attempt_number.asc())
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return sorted(
+            (await self.session.scalars(statement)).all(),
+            key=lambda attempt: attempt.attempt_number,
+        )
+
+    async def _ensure_attempt_has_no_response_artifacts(
         self,
         practice_session: PracticeSession,
         attempt: PracticeAttempt,
@@ -4054,6 +4357,7 @@ class PracticeSessionService:
         *,
         allow_completed: bool = False,
         allow_completed_session: bool = False,
+        allow_user_ended_early_session: bool = False,
         for_update: bool = True,
     ) -> PracticeReviewWorkflowContext:
         attempt_state_valid = (
@@ -4066,12 +4370,18 @@ class PracticeSessionService:
             else attempt.status == PracticeAttemptStatus.REVIEW.value
         )
         if allow_completed_session:
+            allowed_completion_reasons = {
+                PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+            }
+            if allow_user_ended_early_session:
+                allowed_completion_reasons.add(
+                    PracticeSessionCompletionReason.USER_ENDED_EARLY.value
+                )
             session_state_valid = (
                 practice_session.status
                 == PracticeSessionStatus.COMPLETED.value
                 and practice_session.completed_at is not None
-                and practice_session.completion_reason
-                == PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+                and practice_session.completion_reason in allowed_completion_reasons
             )
         else:
             session_state_valid = (
@@ -4589,6 +4899,7 @@ __all__ = [
     "PracticeSessionStateErrorCode",
     "PracticeAnsweredFollowUpExchangeContext",
     "PracticeCompletedSessionWorkflowContext",
+    "PracticeEndedEarlySessionWorkflowContext",
     "PracticePrimaryAnswerWorkflowContext",
     "PracticeEvaluationWorkflowContext",
     "PracticeEvaluationPipelineContext",

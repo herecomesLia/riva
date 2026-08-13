@@ -37,6 +37,7 @@ from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
     PracticeSessionCompletionReason,
     PracticeSessionSelection,
+    PracticeSessionStatus,
 )
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -68,6 +69,7 @@ from riva.services.practice_sessions import (
     PracticePrimaryAnswerWorkflowContext,
     PracticeEvaluationWorkflowContext,
     PracticeCompletedSessionWorkflowContext,
+    PracticeEndedEarlySessionWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
@@ -4874,6 +4876,261 @@ def _next_question_run_factory(kwargs: dict[str, object]) -> AgentRun:
     )
     run.idempotency_key = idempotency_key
     return run
+
+
+def _early_end_scalar_values(
+    active: PracticeSession,
+    attempt: PracticeAttempt,
+    question_run: AgentRun,
+    card: QuestionCard,
+    *extra: object,
+) -> list[object]:
+    question_run.idempotency_key = practice_question_generation_idempotency_key(
+        active.id,
+        attempt.id,
+    )
+    return [active, attempt, question_run, card, *extra, *([None] * 8)]
+
+
+def test_end_session_early_ends_unanswered_question_without_artifacts() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=PracticeAttemptStatus.ANSWERING.value,
+    )
+    scripted = ScriptedSession(
+        *_early_end_scalar_values(active, attempt, question_run, card)
+    )
+    fake_generation = FakeGenerationService()
+    fake_follow_up = FakeFollowUpGenerationService()
+    fake_evaluation = FakeEvaluationGenerationService()
+    fake_review = FakeReviewGenerationService()
+    fake_recommendation = FakeRecommendationGenerationService()
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_generation=fake_generation,
+            fake_follow_up=fake_follow_up,
+            fake_evaluation=fake_evaluation,
+            fake_review=fake_review,
+            fake_recommendation=fake_recommendation,
+        ).end_session_early(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=active.version,
+            question_id=card.id,
+        )
+    )
+
+    assert isinstance(result, PracticeEndedEarlySessionWorkflowContext)
+    assert result.session is active
+    assert result.unfinished_attempt is attempt
+    assert result.question_context.attempt is attempt
+    assert result.question_context.question_card is card
+    assert result.question_context.question_generation_run is question_run
+    assert result.completed_attempt_review_contexts == ()
+    assert active.status == PracticeSessionStatus.COMPLETED.value
+    assert active.completion_reason == PracticeSessionCompletionReason.USER_ENDED_EARLY.value
+    assert active.completed_at == NOW
+    assert active.version == 5
+    assert attempt.status == PracticeAttemptStatus.ENDED_EARLY.value
+    assert attempt.completed_at == NOW
+    assert attempt.updated_at == NOW
+    assert scripted.added == []
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+    assert fake_generation.calls == []
+    assert fake_follow_up.calls == []
+    assert fake_evaluation.calls == []
+    assert fake_review.calls == []
+    assert fake_recommendation.calls == []
+
+
+def test_end_session_early_rejects_db_answering_with_main_answer_and_follow_up_run() -> None:
+    records = evaluation_pipeline(attempt_status=PracticeAttemptStatus.ANSWERING.value)
+    active = records["active"]
+    attempt = records["attempt"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(card, QuestionCard)
+    question_run = records["question_run"]
+    assert isinstance(question_run, AgentRun)
+    question_run.idempotency_key = practice_question_generation_idempotency_key(
+        active.id,
+        attempt.id,
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+    fake_follow_up = FakeFollowUpGenerationService()
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted, fake_follow_up=fake_follow_up).end_session_early(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=active.version,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert active.status == PracticeSessionStatus.ACTIVE.value
+    assert active.version == 4
+    assert active.completed_at is None
+    assert active.completion_reason is None
+    assert attempt.status == PracticeAttemptStatus.ANSWERING.value
+    assert attempt.completed_at is None
+    assert scripted.added == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+    assert fake_follow_up.calls == []
+
+
+@pytest.mark.parametrize(
+    ("session_status", "attempt_status", "question_matches"),
+    [
+        (PracticeSessionStatus.ACTIVE.value, "generatingQuestion", True),
+        (PracticeSessionStatus.ACTIVE.value, "answeringFollowUp", True),
+        (PracticeSessionStatus.ACTIVE.value, "evaluating", True),
+        (PracticeSessionStatus.ACTIVE.value, "review", True),
+        (PracticeSessionStatus.COMPLETED.value, "answering", True),
+        (PracticeSessionStatus.ACTIVE.value, "answering", False),
+    ],
+)
+def test_end_session_early_rejects_non_answering_or_invalid_session_state(
+    session_status: str,
+    attempt_status: str,
+    question_matches: bool,
+) -> None:
+    active, attempt, _question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    active.status = session_status
+    if session_status == PracticeSessionStatus.COMPLETED.value:
+        active.completed_at = NOW
+        active.completion_reason = (
+            PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+        )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).end_session_early(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=active.version,
+                question_id=card.id if question_matches else uuid4(),
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert active.version == 4
+    assert attempt.status == attempt_status
+    assert scripted.added == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_end_session_early_replays_without_version_or_timestamp_changes() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=PracticeAttemptStatus.ANSWERING.value,
+    )
+    first_scripted = ScriptedSession(
+        *_early_end_scalar_values(active, attempt, question_run, card)
+    )
+    first = asyncio.run(
+        service(first_scripted).end_session_early(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+    session_completed_at = first.session.completed_at
+    session_updated_at = first.session.updated_at
+    attempt_completed_at = first.unfinished_attempt.completed_at
+    attempt_updated_at = first.unfinished_attempt.updated_at
+
+    replay_scripted = ScriptedSession(
+        *_early_end_scalar_values(active, attempt, question_run, card)
+    )
+    clock_calls = 0
+
+    def clock() -> datetime:
+        nonlocal clock_calls
+        clock_calls += 1
+        return NOW + timedelta(minutes=1)
+
+    replay = asyncio.run(
+        PracticeSessionService(
+            replay_scripted,
+            clock=clock,
+        ).end_session_early(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    assert replay.unfinished_attempt is attempt
+    assert replay.question_context.question_card is card
+    assert replay.session.version == 5
+    assert replay.session.completed_at == session_completed_at
+    assert replay.session.updated_at == session_updated_at
+    assert replay.unfinished_attempt.completed_at == attempt_completed_at
+    assert replay.unfinished_attempt.updated_at == attempt_updated_at
+    assert clock_calls == 0
+    assert replay_scripted.added == []
+    assert replay_scripted.commit_count == 1
+    assert replay_scripted.rollback_count == 0
+
+
+def test_end_session_early_replay_rejects_wrong_question_or_new_response_artifact() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=PracticeAttemptStatus.ANSWERING.value,
+    )
+    first_scripted = ScriptedSession(
+        *_early_end_scalar_values(active, attempt, question_run, card)
+    )
+    asyncio.run(
+        service(first_scripted).end_session_early(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    for question_id, extra in (
+        (uuid4(), ()),
+        (card.id, (main_answer(attempt_id=attempt.id),)),
+    ):
+        replay_scripted = ScriptedSession(
+            *_early_end_scalar_values(
+                active,
+                attempt,
+                question_run,
+                card,
+                *extra,
+            )
+        )
+        with pytest.raises(PracticeSessionStateError) as error:
+            asyncio.run(
+                service(replay_scripted).end_session_early(
+                    user_id=active.user_id,
+                    session_id=active.id,
+                    expected_version=4,
+                    question_id=question_id,
+                )
+            )
+        assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+        assert replay_scripted.added == []
+        assert replay_scripted.commit_count == 0
+        assert replay_scripted.rollback_count == 1
 
 
 @pytest.mark.parametrize("recommendation_action", ["nextQuestion", "retryCurrent"])
