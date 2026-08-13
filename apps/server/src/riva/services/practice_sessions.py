@@ -262,6 +262,16 @@ class _PracticeFollowUpChain:
     completion_reason: PracticeEvaluationFollowUpCompletionReason | None
 
 
+@dataclass(frozen=True)
+class _PracticeQuestionSource:
+    """The immutable question provenance shared by original and retry attempts."""
+
+    attempt: PracticeAttempt
+    generation_run: AgentRun
+    generation_payload: QuestionGenerationRunPayload
+    question_card: QuestionCard
+
+
 # Kept as a named alias for callers that want to describe the complete
 # evaluation pipeline without depending on the final public-state class.
 PracticeEvaluationPipelineContext = PracticeEvaluationWorkflowContext
@@ -609,6 +619,151 @@ class PracticeSessionService:
                 practice_session.version = previous_version
                 if previous_session_updated_at is not None:
                     practice_session.updated_at = previous_session_updated_at
+            await self.session.rollback()
+            raise
+
+    async def retry_current_question(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        """Create an answering retry that reuses the canonical question card."""
+
+        practice_session: PracticeSession | None = None
+        previous_attempt: PracticeAttempt | None = None
+        previous_status: str | None = None
+        previous_updated_at: datetime | None = None
+        previous_version: int | None = None
+        previous_session_updated_at: datetime | None = None
+        previous_session_completed_at: datetime | None = None
+        previous_session_completion_reason: str | None = None
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if practice_session.status != "active":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            current_attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if current_attempt is None or (
+                current_attempt.user_id != user_id
+                or current_attempt.session_id != practice_session.id
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            if practice_session.version == expected_version + 1:
+                try:
+                    context = await self._load_retry_current_question_replay_context(
+                        practice_session=practice_session,
+                        attempt=current_attempt,
+                        question_id=question_id,
+                    )
+                except PracticeSessionStateError:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if (
+                current_attempt.status != PracticeAttemptStatus.REVIEW.value
+                or current_attempt.question_card_id != question_id
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            review_context = await self._load_review_replay_context(
+                practice_session,
+                current_attempt,
+            )
+            source = await self._load_question_source(
+                practice_session,
+                current_attempt,
+                for_update=True,
+                require_succeeded=True,
+            )
+            if review_context.question_card.id != source.question_card.id:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+
+            if current_attempt.question_card_id is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            previous_attempt = current_attempt
+            previous_status = current_attempt.status
+            previous_updated_at = current_attempt.updated_at
+            previous_version = practice_session.version
+            previous_session_updated_at = practice_session.updated_at
+            previous_session_completed_at = practice_session.completed_at
+            previous_session_completion_reason = (
+                practice_session.completion_reason
+            )
+
+            retry_attempt = PracticeAttempt(
+                id=uuid4(),
+                user_id=user_id,
+                session_id=practice_session.id,
+                attempt_number=current_attempt.attempt_number + 1,
+                question_type=current_attempt.question_type,
+                difficulty=current_attempt.difficulty,
+                status=PracticeAttemptStatus.ANSWERING.value,
+                question_generation_run_id=None,
+                question_card_id=current_attempt.question_card_id,
+                retry_of_attempt_id=current_attempt.id,
+                created_at=now,
+                updated_at=now,
+                completed_at=None,
+            )
+            retry_attempt.question_card = source.question_card
+            self.session.add(retry_attempt)
+
+            current_attempt.status = PracticeAttemptStatus.COMPLETED.value
+            current_attempt.updated_at = now
+            practice_session.status = "active"
+            practice_session.completed_at = None
+            practice_session.completion_reason = None
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=retry_attempt,
+                question_generation_run=source.generation_run,
+                question_card=source.question_card,
+            )
+        except BaseException:
+            if previous_attempt is not None and previous_status is not None:
+                previous_attempt.status = previous_status
+                if previous_updated_at is not None:
+                    previous_attempt.updated_at = previous_updated_at
+            if practice_session is not None and previous_version is not None:
+                practice_session.version = previous_version
+                if previous_session_updated_at is not None:
+                    practice_session.updated_at = previous_session_updated_at
+                practice_session.completed_at = previous_session_completed_at
+                practice_session.completion_reason = (
+                    previous_session_completion_reason
+                )
             await self.session.rollback()
             raise
 
@@ -1840,6 +1995,121 @@ class PracticeSessionService:
             question_generation_run=question_generation_run,
             question_card=None,
         )
+
+    async def _load_retry_current_question_replay_context(
+        self,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        if (
+            attempt.status != PracticeAttemptStatus.ANSWERING.value
+            or attempt.attempt_number <= 1
+            or attempt.retry_of_attempt_id is None
+            or attempt.question_generation_run_id is not None
+            or attempt.question_card_id != question_id
+            or attempt.completed_at is not None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        previous_attempt = await self._load_attempt_by_id(
+            user_id=practice_session.user_id,
+            session_id=practice_session.id,
+            attempt_id=attempt.retry_of_attempt_id,
+            for_update=True,
+        )
+        if previous_attempt is None or previous_attempt.completed_at is None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if (
+            previous_attempt.status != PracticeAttemptStatus.COMPLETED.value
+            or previous_attempt.question_card_id != question_id
+            or previous_attempt.question_type != attempt.question_type
+            or previous_attempt.difficulty != attempt.difficulty
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        # The parent must still be a complete, canonical review snapshot.  In
+        # particular, this prevents a malformed retry from being replayed just
+        # because its row happens to have the expected status and version.
+        await self._load_review_replay_context(
+            practice_session,
+            previous_attempt,
+            allow_completed=True,
+        )
+        source = await self._load_question_source(
+            practice_session,
+            attempt,
+            for_update=True,
+            require_succeeded=True,
+        )
+        await self._ensure_retry_attempt_has_no_artifacts(
+            practice_session,
+            attempt,
+        )
+        return PracticeSessionWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_generation_run=source.generation_run,
+            question_card=source.question_card,
+        )
+
+    async def _ensure_retry_attempt_has_no_artifacts(
+        self,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+    ) -> None:
+        questions, answers, decisions = await self._load_follow_up_rows(
+            attempt,
+            for_update=True,
+        )
+        if questions or answers or decisions:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        for artifact_model in (
+            PracticeEvaluation,
+            PracticeReview,
+            PracticeRecommendation,
+        ):
+            statement = select(artifact_model.id).where(
+                artifact_model.attempt_id == attempt.id
+            ).with_for_update()
+            if await self.session.scalar(statement) is not None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        for agent_id, idempotency_key in (
+            (
+                "follow-up-generator",
+                practice_follow_up_idempotency_key(attempt.id, 1),
+            ),
+            (
+                "practice-evaluator",
+                practice_evaluation_idempotency_key(attempt.id),
+            ),
+            (
+                "practice-reviewer",
+                practice_review_idempotency_key(attempt.id),
+            ),
+            (
+                "practice-recommender",
+                practice_recommendation_idempotency_key(attempt.id),
+            ),
+        ):
+            statement = (
+                select(AgentRun.id)
+                .where(
+                    AgentRun.user_id == practice_session.user_id,
+                    AgentRun.agent_id == agent_id,
+                    or_(
+                        AgentRun.idempotency_key == idempotency_key,
+                        AgentRun.payload["attemptId"].as_string()
+                        == str(attempt.id),
+                    ),
+                )
+                .with_for_update()
+            )
+            if await self.session.scalar(statement) is not None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
     async def _load_follow_up_chain(
         self,
@@ -3134,6 +3404,23 @@ class PracticeSessionService:
             statement = statement.with_for_update()
         return await self.session.scalar(statement)
 
+    async def _load_attempt_by_id(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        attempt_id: UUID,
+        for_update: bool,
+    ) -> PracticeAttempt | None:
+        statement = select(PracticeAttempt).where(
+            PracticeAttempt.id == attempt_id,
+            PracticeAttempt.user_id == user_id,
+            PracticeAttempt.session_id == session_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return await self.session.scalar(statement)
+
     async def _load_session(
         self,
         *,
@@ -3686,6 +3973,129 @@ class PracticeSessionService:
             )
         return payload
 
+    async def _resolve_question_source_attempt(
+        self,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        for_update: bool,
+    ) -> PracticeAttempt:
+        """Walk retry edges to the attempt that owns question provenance."""
+
+        current = attempt
+        visited: set[UUID] = set()
+        while True:
+            if current.id in visited:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+            visited.add(current.id)
+            if (
+                current.user_id != practice_session.user_id
+                or current.session_id != practice_session.id
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+
+            if current.retry_of_attempt_id is None:
+                if current.question_generation_run_id is None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                    )
+                return current
+
+            if current.question_generation_run_id is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+            parent = await self._load_attempt_by_id(
+                user_id=practice_session.user_id,
+                session_id=practice_session.id,
+                attempt_id=current.retry_of_attempt_id,
+                for_update=for_update,
+            )
+            if parent is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+            if (
+                parent.user_id != practice_session.user_id
+                or parent.session_id != practice_session.id
+                or parent.id != current.retry_of_attempt_id
+                or parent.attempt_number + 1 != current.attempt_number
+                or parent.attempt_number >= current.attempt_number
+                or parent.status != PracticeAttemptStatus.COMPLETED.value
+                or parent.completed_at is None
+                or current.question_card_id != parent.question_card_id
+                or current.question_type != parent.question_type
+                or current.difficulty != parent.difficulty
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+            current = parent
+
+    async def _load_question_source(
+        self,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        *,
+        for_update: bool,
+        require_succeeded: bool,
+    ) -> _PracticeQuestionSource:
+        source_attempt = await self._resolve_question_source_attempt(
+            practice_session=practice_session,
+            attempt=attempt,
+            for_update=for_update,
+        )
+        if (
+            source_attempt.question_generation_run_id is None
+            or source_attempt.question_card_id is None
+            or attempt.question_card_id != source_attempt.question_card_id
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+
+        statement = select(AgentRun).where(
+            AgentRun.id == source_attempt.question_generation_run_id,
+            AgentRun.user_id == practice_session.user_id,
+            AgentRun.agent_id == "question-generator",
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
+        if run is None:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        payload = self._validate_question_generation_run_lineage(
+            run,
+            practice_session=practice_session,
+            attempt=source_attempt,
+            idempotency_key=practice_question_generation_idempotency_key(
+                practice_session.id,
+                source_attempt.id,
+            ),
+        )
+        if require_succeeded and run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        card = await self._load_card_by_id(
+            practice_session,
+            attempt,
+            run,
+            for_update=for_update,
+        )
+        return _PracticeQuestionSource(
+            attempt=source_attempt,
+            generation_run=run,
+            generation_payload=payload,
+            question_card=card,
+        )
+
     async def _load_generation_run(
         self,
         practice_session: PracticeSession,
@@ -3693,6 +4103,15 @@ class PracticeSessionService:
         *,
         for_update: bool = True,
     ) -> tuple[AgentRun, QuestionGenerationRunPayload]:
+        if attempt.retry_of_attempt_id is not None:
+            source = await self._load_question_source(
+                practice_session,
+                attempt,
+                for_update=for_update,
+                require_succeeded=True,
+            )
+            return source.generation_run, source.generation_payload
+
         if attempt.question_generation_run_id is None:
             raise PracticeSessionStateError(
                 PRACTICE_QUESTION_GENERATION_STATE_CONFLICT

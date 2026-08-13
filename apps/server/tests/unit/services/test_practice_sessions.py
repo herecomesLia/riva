@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -66,6 +66,7 @@ from riva.services.practice_sessions import (
     PracticeReviewWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
+    PracticeSessionWorkflowContext,
     practice_follow_up_idempotency_key,
     practice_question_generation_idempotency_key,
 )
@@ -4291,6 +4292,424 @@ def _continue_review_records(action: str) -> dict[str, object]:
     assert isinstance(attempt, PracticeAttempt)
     attempt.completed_at = NOW
     return records
+
+
+def _retry_review_records(action: str) -> dict[str, object]:
+    records = _continue_review_records(action)
+    active = records["active"]
+    attempt = records["attempt"]
+    question_run = records["question_run"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    active.version = 4
+    attempt.completed_at = NOW - timedelta(minutes=5)
+    question_run.idempotency_key = practice_question_generation_idempotency_key(
+        active.id,
+        attempt.id,
+    )
+    return records
+
+
+@pytest.mark.parametrize("recommendation_action", ["retryCurrent", "nextQuestion"])
+def test_retry_current_question_reuses_reviewed_question_without_generation(
+    recommendation_action: str,
+) -> None:
+    records = _retry_review_records(recommendation_action)
+    active = records["active"]
+    attempt = records["attempt"]
+    question_run = records["question_run"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    assert isinstance(card, QuestionCard)
+    completed_at = attempt.completed_at
+    scripted = ScriptedSession(
+        *records["scalar_values"],
+        question_run,
+        card,
+    )
+    fake_generation = FakeGenerationService()
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_generation=fake_generation,
+        ).retry_current_question(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=active.version,
+            question_id=card.id,
+        )
+    )
+
+    assert attempt.status == "completed"
+    assert attempt.completed_at == completed_at
+    assert result.attempt.attempt_number == 2
+    assert result.attempt.status == "answering"
+    assert result.attempt.question_card_id == card.id
+    assert result.attempt.question_generation_run_id is None
+    assert result.attempt.retry_of_attempt_id == attempt.id
+    assert result.attempt.question_type == attempt.question_type
+    assert result.attempt.difficulty == attempt.difficulty
+    assert result.question_card is card
+    assert result.question_generation_run is question_run
+    assert active.status == "active"
+    assert active.version == 5
+    assert active.completed_at is None
+    assert active.completion_reason is None
+    assert fake_generation.calls == []
+    assert scripted.added == [result.attempt]
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def _retry_source_records() -> tuple[
+    PracticeSession,
+    PracticeAttempt,
+    PracticeAttempt,
+    PracticeAttempt,
+    AgentRun,
+    QuestionCard,
+]:
+    active, original, question_run, card = primary_answer_context(
+        version=5,
+        attempt_status="completed",
+    )
+    original.completed_at = NOW - timedelta(minutes=10)
+    question_run.status = AgentRunStatus.SUCCEEDED
+    question_run.idempotency_key = practice_question_generation_idempotency_key(
+        active.id,
+        original.id,
+    )
+    retry_one = PracticeAttempt(
+        id=uuid4(),
+        user_id=active.user_id,
+        session_id=active.id,
+        attempt_number=2,
+        question_type=original.question_type,
+        difficulty=original.difficulty,
+        status="completed",
+        question_generation_run_id=None,
+        question_card_id=card.id,
+        retry_of_attempt_id=original.id,
+        created_at=NOW,
+        updated_at=NOW,
+        completed_at=NOW - timedelta(minutes=5),
+    )
+    retry_two = PracticeAttempt(
+        id=uuid4(),
+        user_id=active.user_id,
+        session_id=active.id,
+        attempt_number=3,
+        question_type=original.question_type,
+        difficulty=original.difficulty,
+        status="answering",
+        question_generation_run_id=None,
+        question_card_id=card.id,
+        retry_of_attempt_id=retry_one.id,
+        created_at=NOW,
+        updated_at=NOW,
+        completed_at=None,
+    )
+    return active, original, retry_one, retry_two, question_run, card
+
+
+def test_retry_question_source_resolver_reaches_original_source_and_stable_key() -> None:
+    active, original, retry_one, retry_two, question_run, card = (
+        _retry_source_records()
+    )
+    scripted = ScriptedSession(retry_one, original, question_run, card)
+
+    source = asyncio.run(
+        service(scripted)._load_question_source(
+            active,
+            retry_two,
+            for_update=False,
+            require_succeeded=True,
+        )
+    )
+
+    assert source.attempt is original
+    assert source.generation_run is question_run
+    assert source.question_card is card
+    assert question_run.idempotency_key == (
+        practice_question_generation_idempotency_key(active.id, original.id)
+    )
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "parent_missing",
+        "parent_user",
+        "parent_session",
+        "wrong_number",
+        "wrong_card",
+        "wrong_type",
+        "wrong_difficulty",
+        "child_generation_run",
+        "source_not_succeeded",
+        "source_key",
+        "source_role",
+        "source_language",
+        "source_question_type",
+        "source_difficulty",
+        "card_source_run",
+        "cycle",
+    ],
+)
+def test_retry_question_source_resolver_rejects_corruption(
+    corruption: str,
+) -> None:
+    active, original, retry_one, retry_two, question_run, card = (
+        _retry_source_records()
+    )
+    scalar_values: list[object]
+    if corruption == "parent_missing":
+        scalar_values = [None]
+    elif corruption == "parent_user":
+        retry_one.user_id = uuid4()
+        scalar_values = [retry_one]
+    elif corruption == "parent_session":
+        retry_one.session_id = uuid4()
+        scalar_values = [retry_one]
+    elif corruption == "wrong_number":
+        retry_two.attempt_number = 4
+        scalar_values = [retry_one]
+    elif corruption == "wrong_card":
+        retry_one.question_card_id = uuid4()
+        scalar_values = [retry_one]
+    elif corruption == "wrong_type":
+        retry_one.question_type = "behavioral"
+        scalar_values = [retry_one]
+    elif corruption == "wrong_difficulty":
+        retry_one.difficulty = "pressure"
+        scalar_values = [retry_one]
+    elif corruption == "child_generation_run":
+        retry_two.question_generation_run_id = question_run.id
+        scalar_values = []
+    elif corruption == "source_not_succeeded":
+        question_run.status = AgentRunStatus.QUEUED
+        scalar_values = [retry_one, original, question_run, card]
+    elif corruption == "source_key":
+        question_run.idempotency_key = "wrong-source-key"
+        scalar_values = [retry_one, original, question_run, card]
+    elif corruption == "source_role":
+        question_run.payload["roleId"] = str(uuid4())
+        scalar_values = [retry_one, original, question_run, card]
+    elif corruption == "source_language":
+        question_run.payload["interactionLanguage"] = "zh-CN"
+        scalar_values = [retry_one, original, question_run, card]
+    elif corruption == "source_question_type":
+        question_run.payload["questionType"] = "behavioral"
+        scalar_values = [retry_one, original, question_run, card]
+    elif corruption == "source_difficulty":
+        question_run.payload["difficulty"] = "pressure"
+        scalar_values = [retry_one, original, question_run, card]
+    elif corruption == "card_source_run":
+        card.source_agent_run_id = uuid4()
+        scalar_values = [retry_one, original, question_run, card]
+    elif corruption == "cycle":
+        retry_one.retry_of_attempt_id = retry_two.id
+        scalar_values = [retry_one, retry_two]
+    else:
+        raise AssertionError(f"unexpected corruption: {corruption}")
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(ScriptedSession(*scalar_values))._load_question_source(
+                active,
+                retry_two,
+                for_update=False,
+                require_succeeded=True,
+            )
+        )
+
+    assert error.value.code == PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+
+
+def test_retry_current_question_replays_without_duplicate_attempt_or_version() -> None:
+    records = _retry_review_records("nextQuestion")
+    active = records["active"]
+    original = records["attempt"]
+    question_run = records["question_run"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(original, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    assert isinstance(card, QuestionCard)
+    original.status = "completed"
+    original.completed_at = NOW - timedelta(minutes=5)
+    retry_attempt = PracticeAttempt(
+        id=uuid4(),
+        user_id=active.user_id,
+        session_id=active.id,
+        attempt_number=2,
+        question_type=original.question_type,
+        difficulty=original.difficulty,
+        status="answering",
+        question_generation_run_id=None,
+        question_card_id=card.id,
+        retry_of_attempt_id=original.id,
+        created_at=NOW,
+        updated_at=NOW,
+        completed_at=None,
+    )
+    active.version = 5
+    scalar_values = [
+        active,
+        retry_attempt,
+        original,
+        records["question_run"],
+        records["card"],
+        records["answer"],
+        records["follow_up"],
+        records["decision"],
+        None,
+        records["evaluation"],
+        records["evaluation_value"],
+        records["review"],
+        records["review_value"],
+        records["recommendation"],
+        records["recommendation_value"],
+        original,
+        question_run,
+        card,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ]
+
+    class ReplayScriptedSession(ScriptedSession):
+        def __init__(self, *values: object) -> None:
+            super().__init__(*values)
+            self._scalars_calls = 0
+
+        async def scalars(self, statement: Any) -> Any:
+            self._scalars_calls += 1
+            if self._scalars_calls > 4:
+                self.statements.append(statement)
+
+                class EmptyResult:
+                    def all(self) -> list[object]:
+                        return []
+
+                return EmptyResult()
+            return await super().scalars(statement)
+
+    scripted = ReplayScriptedSession(*scalar_values)
+    result = asyncio.run(
+        service(scripted).retry_current_question(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    assert result.attempt is retry_attempt
+    assert result.question_generation_run is question_run
+    assert result.question_card is card
+    assert active.version == 5
+    assert scripted.added == []
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_get_retry_question_is_a_pure_read_and_returns_canonical_source() -> None:
+    active, original, _retry_one, retry_two, question_run, card = (
+        _retry_source_records()
+    )
+    retry_two.attempt_number = 2
+    retry_two.retry_of_attempt_id = original.id
+    original.status = "completed"
+    scripted = ScriptedSession(
+        active,
+        retry_two,
+        original,
+        question_run,
+        card,
+        card,
+        None,
+    )
+
+    result = asyncio.run(
+        service(scripted).get_session_context(
+            user_id=active.user_id,
+            session_id=active.id,
+        )
+    )
+
+    assert isinstance(result, PracticeSessionWorkflowContext)
+    assert result.attempt is retry_two
+    assert result.question_card is card
+    assert result.question_generation_run is question_run
+    assert active.version == 5
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert all(
+        getattr(statement, "_for_update_arg", None) is None
+        for statement in scripted.statements
+    )
+
+
+def test_submit_primary_answer_on_retry_uses_retry_attempt_and_new_follow_up_key() -> None:
+    active, original, _retry_one, retry_attempt, question_run, card = (
+        _retry_source_records()
+    )
+    retry_attempt.attempt_number = 2
+    retry_attempt.retry_of_attempt_id = original.id
+    original.status = "completed"
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=retry_attempt.id,
+        question_card_id=card.id,
+        main_answer_id=uuid4(),
+    )
+    scripted = ScriptedSession(
+        active,
+        retry_attempt,
+        original,
+        question_run,
+        card,
+        card,
+        None,
+    )
+    fake_follow_up = FakeFollowUpGenerationService(follow_up)
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_follow_up=fake_follow_up,
+        ).submit_primary_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=5,
+            question_id=card.id,
+            content="The retry answer has new evidence.",
+        )
+    )
+
+    assert result.attempt is retry_attempt
+    assert result.main_answer.attempt_id == retry_attempt.id
+    assert result.follow_up_generation_run is follow_up
+    assert fake_follow_up.calls[0]["attempt_id"] == retry_attempt.id
+    assert fake_follow_up.calls[0]["idempotency_key"] == (
+        practice_follow_up_idempotency_key(retry_attempt.id, 1)
+    )
+    assert active.version == 6
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
 
 
 def _next_question_run_factory(kwargs: dict[str, object]) -> AgentRun:
