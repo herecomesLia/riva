@@ -51,6 +51,7 @@ from riva.services.practice_sessions import (
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
     PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
+    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PRACTICE_SESSION_ALREADY_ACTIVE,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_SOURCE_UNAVAILABLE,
@@ -66,6 +67,7 @@ from riva.services.practice_sessions import (
     PracticeSessionService,
     PracticeSessionStateError,
     practice_follow_up_idempotency_key,
+    practice_question_generation_idempotency_key,
 )
 from riva.services.evaluation_generation import (
     EvaluationGenerationStateError,
@@ -142,9 +144,11 @@ class FakeGenerationService:
         self,
         run: AgentRun | None = None,
         error: QuestionGenerationStateError | None = None,
+        run_factory: Any | None = None,
     ) -> None:
         self.run = run
         self.error = error
+        self.run_factory = run_factory
         self.calls: list[dict[str, object]] = []
 
     async def enqueue_generation_in_transaction(
@@ -154,6 +158,8 @@ class FakeGenerationService:
         self.calls.append(kwargs)
         if self.error is not None:
             raise self.error
+        if self.run_factory is not None:
+            self.run = self.run_factory(kwargs)
         assert self.run is not None
         return self.run
 
@@ -4272,3 +4278,410 @@ def test_submit_follow_up_answer_order2_replays_evaluating_snapshot() -> None:
     assert result.attempt.status == "evaluating"
     assert result.session.version == 6
     assert scripted.added == []
+
+
+def _continue_review_records(action: str) -> dict[str, object]:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+        recommendation_action=action,
+        attempt_status="review",
+    )
+    attempt = records["attempt"]
+    assert isinstance(attempt, PracticeAttempt)
+    attempt.completed_at = NOW
+    return records
+
+
+def _next_question_run_factory(kwargs: dict[str, object]) -> AgentRun:
+    user_id = kwargs["user_id"]
+    role_id = kwargs["target_role_id"]
+    question_type = kwargs["question_type"]
+    difficulty = kwargs["difficulty"]
+    idempotency_key = kwargs["idempotency_key"]
+    assert isinstance(user_id, UUID)
+    assert isinstance(role_id, UUID)
+    assert isinstance(question_type, QuestionCardQuestionType)
+    assert isinstance(difficulty, QuestionCardDifficulty)
+    assert isinstance(idempotency_key, str)
+    run = generation_run(
+        user_id=user_id,
+        payload=generation_payload(
+            role_id=role_id,
+            question_type=question_type,
+            difficulty=difficulty,
+        ),
+    )
+    run.idempotency_key = idempotency_key
+    return run
+
+
+@pytest.mark.parametrize("recommendation_action", ["nextQuestion", "retryCurrent"])
+def test_continue_to_next_question_completes_review_and_enqueues_new_attempt(
+    recommendation_action: str,
+) -> None:
+    records = _continue_review_records(recommendation_action)
+    active = records["active"]
+    attempt = records["attempt"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(card, QuestionCard)
+    completed_at = attempt.completed_at
+    fake_generation = FakeGenerationService(run_factory=_next_question_run_factory)
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted, fake_generation=fake_generation).continue_to_next_question(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=active.version,
+            question_id=card.id,
+        )
+    )
+
+    assert result.session is active
+    assert result.session.status == "active"
+    assert result.session.version == 5
+    assert result.session.completed_at is None
+    assert result.session.completion_reason is None
+    assert attempt.status == "completed"
+    assert attempt.completed_at == completed_at
+    assert result.attempt.attempt_number == 2
+    assert result.attempt.status == "generatingQuestion"
+    assert result.attempt.question_type == "projectDeepDive"
+    assert result.attempt.difficulty == "basic"
+    assert result.attempt.retry_of_attempt_id is None
+    assert result.attempt.question_generation_run_id == result.question_generation_run.id
+    assert result.attempt.completed_at is None
+    assert result.question_card is None
+    assert fake_generation.calls[0] == {
+        "user_id": active.user_id,
+        "target_role_id": active.target_role_id,
+        "question_type": QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+        "difficulty": QuestionCardDifficulty.BASIC,
+        "interaction_language": active.language,
+        "idempotency_key": practice_question_generation_idempotency_key(
+            active.id,
+            result.attempt.id,
+        ),
+    }
+    assert scripted.flush_count == 1
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_continue_to_next_question_replays_lost_response_without_new_attempt() -> None:
+    records = _continue_review_records("nextQuestion")
+    active = records["active"]
+    old_attempt = records["attempt"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(old_attempt, PracticeAttempt)
+    assert isinstance(card, QuestionCard)
+    first_scripted = ScriptedSession(*records["scalar_values"])
+    first = asyncio.run(
+        service(
+            first_scripted,
+            fake_generation=FakeGenerationService(
+                run_factory=_next_question_run_factory,
+            ),
+        ).continue_to_next_question(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+    new_attempt = first.attempt
+    new_run = first.question_generation_run
+
+    replay_scripted = ScriptedSession(
+        active,
+        new_attempt,
+        old_attempt,
+        records["question_run"],
+        records["card"],
+        records["answer"],
+        records["follow_up"],
+        records["decision"],
+        None,
+        records["evaluation"],
+        records["evaluation_value"],
+        records["review"],
+        records["review_value"],
+        records["recommendation"],
+        records["recommendation_value"],
+        new_run,
+    )
+    replay = asyncio.run(
+        service(replay_scripted).continue_to_next_question(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    assert replay.attempt is new_attempt
+    assert replay.question_generation_run is new_run
+    assert replay.session.version == 5
+    assert replay_scripted.added == []
+    assert replay_scripted.commit_count == 1
+    assert replay_scripted.rollback_count == 0
+
+
+def test_continue_to_next_question_enqueue_failure_rolls_back_review_transition() -> None:
+    records = _continue_review_records("retryCurrent")
+    active = records["active"]
+    attempt = records["attempt"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(card, QuestionCard)
+    scripted = ScriptedSession(*records["scalar_values"])
+    fake_generation = FakeGenerationService(error=ValueError("missing model"))
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_generation=fake_generation,
+            ).continue_to_next_question(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_QUESTION_GENERATION_UNAVAILABLE
+    assert error.value.source_code == "question_generation_unavailable"
+    assert active.version == 4
+    assert attempt.status == "review"
+    assert attempt.completed_at == NOW
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    ("session_status", "attempt_status", "question_matches"),
+    [
+        ("completed", "review", True),
+        ("active", "answering", True),
+        ("active", "review", False),
+    ],
+)
+def test_continue_to_next_question_rejects_invalid_entry_state(
+    session_status: str,
+    attempt_status: str,
+    question_matches: bool,
+) -> None:
+    active, attempt, _question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    active.status = session_status
+    attempt.completed_at = NOW
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).continue_to_next_question(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id if question_matches else uuid4(),
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert scripted.added == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_continue_to_next_question_maps_generation_prerequisite_failure() -> None:
+    records = _continue_review_records("nextQuestion")
+    active = records["active"]
+    attempt = records["attempt"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(card, QuestionCard)
+    scripted = ScriptedSession(*records["scalar_values"])
+    fake_generation = FakeGenerationService(
+        error=QuestionGenerationStateError(
+            "question_generation_matching_analysis_stale"
+        )
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_generation=fake_generation,
+            ).continue_to_next_question(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED
+    assert error.value.source_code == "question_generation_matching_analysis_stale"
+    assert active.version == 4
+    assert attempt.status == "review"
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_continue_to_next_question_maps_empty_llm_configuration() -> None:
+    records = _continue_review_records("nextQuestion")
+    active = records["active"]
+    attempt = records["attempt"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(card, QuestionCard)
+    scripted = ScriptedSession(*records["scalar_values"])
+    domain = PracticeSessionService(
+        scripted,  # type: ignore[arg-type]
+        llm_model="",
+        clock=lambda: NOW,
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            domain.continue_to_next_question(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_QUESTION_GENERATION_UNAVAILABLE
+    assert error.value.source_code == "question_generation_unavailable"
+    assert active.version == 4
+    assert attempt.status == "review"
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def _continue_replay_scripted_session(
+    records: dict[str, object],
+    *,
+    active: PracticeSession,
+    previous_attempt: PracticeAttempt,
+    next_attempt: PracticeAttempt,
+    next_run: AgentRun,
+) -> ScriptedSession:
+    return ScriptedSession(
+        active,
+        next_attempt,
+        previous_attempt,
+        records["question_run"],
+        records["card"],
+        records["answer"],
+        records["follow_up"],
+        records["decision"],
+        None,
+        records["evaluation"],
+        records["evaluation_value"],
+        records["review"],
+        records["review_value"],
+        records["recommendation"],
+        records["recommendation_value"],
+        next_run,
+    )
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "wrong_number",
+        "retry_of",
+        "wrong_type",
+        "wrong_difficulty",
+        "missing_run",
+        "wrong_run_key",
+        "wrong_run_payload",
+        "old_not_completed",
+        "old_question_mismatch",
+    ],
+)
+def test_continue_to_next_question_rejects_corrupt_replay(
+    corruption: str,
+) -> None:
+    records = _continue_review_records("nextQuestion")
+    active = records["active"]
+    previous_attempt = records["attempt"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(previous_attempt, PracticeAttempt)
+    assert isinstance(card, QuestionCard)
+    first_scripted = ScriptedSession(*records["scalar_values"])
+    first = asyncio.run(
+        service(
+            first_scripted,
+            fake_generation=FakeGenerationService(
+                run_factory=_next_question_run_factory,
+            ),
+        ).continue_to_next_question(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+    next_attempt = first.attempt
+    next_run = first.question_generation_run
+    question_id = card.id
+    if corruption == "wrong_number":
+        next_attempt.attempt_number = 3
+    elif corruption == "retry_of":
+        next_attempt.retry_of_attempt_id = uuid4()
+    elif corruption == "wrong_type":
+        next_attempt.question_type = "behavioral"
+    elif corruption == "wrong_difficulty":
+        next_attempt.difficulty = "advanced"
+    elif corruption == "missing_run":
+        next_attempt.question_generation_run_id = None
+    elif corruption == "wrong_run_key":
+        next_run.idempotency_key = "wrong-key"
+    elif corruption == "wrong_run_payload":
+        next_run.payload = {
+            **next_run.payload,
+            "roleId": str(uuid4()),
+        }
+    elif corruption == "old_not_completed":
+        previous_attempt.status = "review"
+    elif corruption == "old_question_mismatch":
+        question_id = uuid4()
+    else:
+        raise AssertionError(f"unexpected corruption: {corruption}")
+
+    replay_scripted = _continue_replay_scripted_session(
+        records,
+        active=active,
+        previous_attempt=previous_attempt,
+        next_attempt=next_attempt,
+        next_run=next_run,
+    )
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(replay_scripted).continue_to_next_question(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=question_id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert active.version == 5
+    assert replay_scripted.added == []
+    assert replay_scripted.commit_count == 0
+    assert replay_scripted.rollback_count == 1

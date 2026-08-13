@@ -27,12 +27,15 @@ from riva.models import (
     PracticeRecommendation,
     PracticeReview,
     PracticeSession,
+    QuestionCard,
 )
 from riva.services.practice_sessions import (
     PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
+    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PracticeSessionService,
     PracticeSessionStateError,
+    practice_question_generation_idempotency_key,
 )
 from riva.workers import (
     AgentHandlerRegistry,
@@ -656,6 +659,192 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                                 ).all()
                             )
                         ) == 1
+
+                    old_question_id = UUID(final_body["question"]["id"])
+                    async with database.sessionmaker() as session:
+                        with pytest.raises(PracticeSessionStateError) as error:
+                            await PracticeSessionService(
+                                session,
+                                llm_model="fake-practice-model",
+                                question_generation_service_factory=(
+                                    lambda _session, **_kwargs: FailingEnqueueService()
+                                ),
+                            ).continue_to_next_question(
+                                user_id=owner.id,
+                                session_id=UUID(session_id),
+                                expected_version=5,
+                                question_id=old_question_id,
+                            )
+                    assert error.value.code == (
+                        PRACTICE_QUESTION_GENERATION_UNAVAILABLE
+                    )
+
+                    async with database.sessionmaker() as session:
+                        persisted_attempts = list(
+                            (
+                                await session.scalars(
+                                    select(PracticeAttempt).where(
+                                        PracticeAttempt.session_id
+                                        == UUID(session_id)
+                                    )
+                                )
+                            ).all()
+                        )
+                        question_generation_runs = list(
+                            (
+                                await session.scalars(
+                                    select(AgentRun).where(
+                                        AgentRun.user_id == owner.id,
+                                        AgentRun.agent_id == "question-generator",
+                                    )
+                                )
+                            ).all()
+                        )
+                        persisted_attempt = await session.get(
+                            PracticeAttempt,
+                            attempt_id,
+                        )
+                        persisted_session = await session.get(
+                            PracticeSession,
+                            UUID(session_id),
+                        )
+                        assert len(persisted_attempts) == 1
+                        assert len(question_generation_runs) == 1
+                        assert persisted_attempt is not None
+                        assert persisted_session is not None
+                        assert persisted_attempt.status == "review"
+                        assert persisted_attempt.completed_at == completed_at
+                        assert persisted_session.version == 5
+
+                    async with database.sessionmaker() as session:
+                        continued = await PracticeSessionService(
+                            session,
+                            llm_model="fake-practice-model",
+                        ).continue_to_next_question(
+                            user_id=owner.id,
+                            session_id=UUID(session_id),
+                            expected_version=5,
+                            question_id=old_question_id,
+                        )
+                        assert continued.session.status == "active"
+                        assert continued.session.version == 6
+                        assert continued.attempt.attempt_number == 2
+                        assert continued.attempt.status == "generatingQuestion"
+                        assert continued.attempt.retry_of_attempt_id is None
+                        assert continued.attempt.question_card_id is None
+                        assert continued.attempt.completed_at is None
+                        assert continued.question_generation_run.status is AgentRunStatus.QUEUED
+                        assert continued.question_generation_run.id is not None
+                        assert continued.question_generation_run.idempotency_key == (
+                            practice_question_generation_idempotency_key(
+                                UUID(session_id),
+                                continued.attempt.id,
+                            )
+                        )
+                        next_attempt_id = continued.attempt.id
+                        next_run_id = continued.question_generation_run.id
+
+                    async with database.sessionmaker() as session:
+                        old_attempt = await session.get(PracticeAttempt, attempt_id)
+                        next_attempt = await session.get(
+                            PracticeAttempt,
+                            next_attempt_id,
+                        )
+                        persisted_session = await session.get(
+                            PracticeSession,
+                            UUID(session_id),
+                        )
+                        assert old_attempt is not None
+                        assert next_attempt is not None
+                        assert persisted_session is not None
+                        assert old_attempt.status == "completed"
+                        assert old_attempt.completed_at == completed_at
+                        assert next_attempt.status == "generatingQuestion"
+                        assert next_attempt.completed_at is None
+                        assert persisted_session.version == 6
+                        assert len(
+                            list(
+                                (
+                                    await session.scalars(
+                                        select(PracticeAttempt).where(
+                                            PracticeAttempt.session_id
+                                            == UUID(session_id)
+                                        )
+                                    )
+                                ).all()
+                            )
+                        ) == 2
+
+                    async with database.sessionmaker() as session:
+                        replay = await PracticeSessionService(
+                            session,
+                            llm_model="fake-practice-model",
+                        ).continue_to_next_question(
+                            user_id=owner.id,
+                            session_id=UUID(session_id),
+                            expected_version=5,
+                            question_id=old_question_id,
+                        )
+                    assert replay.session.version == 6
+                    assert replay.attempt.id == next_attempt_id
+                    assert replay.question_generation_run.id == next_run_id
+
+                    current_generating = client.get(
+                        "/api/practice/sessions/current"
+                    )
+                    assert current_generating.status_code == 200
+                    assert current_generating.json()["session"]["status"] == (
+                        "generatingQuestion"
+                    )
+                    assert current_generating.json()["session"]["version"] == 6
+
+                    assert await build_worker(
+                        database,
+                        QuestionGenerationAgent(
+                            FakeLLMProvider(
+                                [question_output(project_id)],
+                                provider="fake-next-question-provider",
+                                usage=LLMUsage(input_tokens=20, output_tokens=10),
+                            ),
+                            model="fake-practice-model",
+                        ),
+                    ).process_one()
+                    next_answering = client.post(
+                        f"/api/practice/sessions/{session_id}/question-generation/refresh",
+                        json={"version": 6},
+                        headers={"Origin": TRUSTED_ORIGIN},
+                    )
+                    assert next_answering.status_code == 200
+                    next_answering_body = next_answering.json()
+                    assert next_answering_body["status"] == "answering"
+                    assert next_answering_body["version"] == 7
+                    assert UUID(next_answering_body["attemptId"]) == next_attempt_id
+
+                    async with database.sessionmaker() as session:
+                        old_attempt = await session.get(PracticeAttempt, attempt_id)
+                        next_attempt = await session.get(
+                            PracticeAttempt,
+                            next_attempt_id,
+                        )
+                        next_card = await session.get(
+                            QuestionCard,
+                            UUID(next_answering_body["question"]["id"]),
+                        )
+                        question_runs = await runs_for(
+                            database,
+                            user_id=owner.id,
+                            agent_id="question-generator",
+                            attempt_id=next_attempt_id,
+                        )
+                        assert old_attempt is not None
+                        assert next_attempt is not None
+                        assert next_card is not None
+                        assert old_attempt.status == "completed"
+                        assert next_attempt.status == "answering"
+                        assert next_attempt.question_card_id == next_card.id
+                        assert next_attempt.question_generation_run_id == next_run_id
+                        assert old_attempt.question_card_id != next_card.id
+                        assert len(question_runs) == 1
             finally:
                 await database.reset()
 

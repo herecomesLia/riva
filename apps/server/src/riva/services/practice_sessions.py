@@ -50,6 +50,10 @@ from riva.schemas.practice_recommendation import (
     PracticeRecommendationInput,
     PracticeRecommendationQuestionContext,
 )
+from riva.schemas.question_cards import (
+    QuestionCardDifficulty,
+    QuestionCardQuestionType,
+)
 from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.services.follow_up_generation import (
     FollowUpGenerationService,
@@ -96,6 +100,7 @@ PracticeSessionStateErrorCode = Literal[
     "practice_session_source_unavailable",
     "practice_weakness_prioritization_unavailable",
     "practice_question_generation_prerequisite_failed",
+    "practice_question_generation_unavailable",
     "practice_question_generation_failed",
     "practice_question_generation_state_conflict",
     "practice_follow_up_generation_failed",
@@ -132,6 +137,9 @@ PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
 )
 PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED: PracticeSessionStateErrorCode = (
     "practice_question_generation_prerequisite_failed"
+)
+PRACTICE_QUESTION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+    "practice_question_generation_unavailable"
 )
 PRACTICE_QUESTION_GENERATION_FAILED: PracticeSessionStateErrorCode = (
     "practice_question_generation_failed"
@@ -271,6 +279,16 @@ QuestionGenerationServiceFactory = Callable[
     ...,
     QuestionGenerationService,
 ]
+
+
+def practice_question_generation_idempotency_key(
+    session_id: UUID,
+    attempt_id: UUID,
+) -> str:
+    return (
+        f"practice-session:{session_id}:"
+        f"attempt:{attempt_id}:question-generation"
+    )
 FollowUpGenerationServiceFactory = Callable[
     ...,
     FollowUpGenerationService,
@@ -401,9 +419,9 @@ class PracticeSessionService:
                     question_type=selection.question_type,
                     difficulty=selection.difficulty,
                     interaction_language=practice_session.language,
-                    idempotency_key=(
-                        f"practice-session:{practice_session.id}:"
-                        f"attempt:{attempt.id}:question-generation"
+                    idempotency_key=practice_question_generation_idempotency_key(
+                        practice_session.id,
+                        attempt.id,
                     ),
                 )
             except QuestionGenerationStateError as error:
@@ -426,6 +444,171 @@ class PracticeSessionService:
                 question_card=None,
             )
         except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def continue_to_next_question(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        """Leave the current review and enqueue the next attempt atomically."""
+
+        practice_session: PracticeSession | None = None
+        previous_attempt: PracticeAttempt | None = None
+        previous_status: str | None = None
+        previous_updated_at: datetime | None = None
+        previous_version: int | None = None
+        previous_session_updated_at: datetime | None = None
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if practice_session.status != "active":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            current_attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if current_attempt is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if (
+                current_attempt.user_id != user_id
+                or current_attempt.session_id != practice_session.id
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            if practice_session.version == expected_version + 1:
+                try:
+                    context = await self._load_continue_next_question_replay_context(
+                        practice_session=practice_session,
+                        attempt=current_attempt,
+                        question_id=question_id,
+                    )
+                except PracticeSessionStateError:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return context
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if current_attempt.status != PracticeAttemptStatus.REVIEW.value:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if current_attempt.question_card_id != question_id:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            review_context = await self._load_review_replay_context(
+                practice_session,
+                current_attempt,
+            )
+            recommendation = review_context.recommendation
+            if recommendation is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                )
+            next_question_type, next_difficulty = self._next_question_selection(
+                current_attempt,
+                recommendation,
+            )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            previous_attempt = current_attempt
+            previous_status = current_attempt.status
+            previous_updated_at = current_attempt.updated_at
+            previous_version = practice_session.version
+            previous_session_updated_at = practice_session.updated_at
+
+            next_attempt = PracticeAttempt(
+                id=uuid4(),
+                user_id=user_id,
+                session_id=practice_session.id,
+                attempt_number=current_attempt.attempt_number + 1,
+                question_type=next_question_type.value,
+                difficulty=next_difficulty.value,
+                status=PracticeAttemptStatus.GENERATING_QUESTION.value,
+                question_generation_run_id=None,
+                question_card_id=None,
+                retry_of_attempt_id=None,
+                created_at=now,
+                updated_at=now,
+                completed_at=None,
+            )
+            self.session.add(next_attempt)
+            await self.session.flush()
+
+            idempotency_key = practice_question_generation_idempotency_key(
+                practice_session.id,
+                next_attempt.id,
+            )
+            try:
+                question_generation_run = (
+                    await self._generation_service().enqueue_generation_in_transaction(
+                        user_id=user_id,
+                        target_role_id=practice_session.target_role_id,
+                        question_type=next_question_type,
+                        difficulty=next_difficulty,
+                        interaction_language=practice_session.language,
+                        idempotency_key=idempotency_key,
+                    )
+                )
+            except QuestionGenerationStateError as error:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
+                    source_code=error.code,
+                ) from None
+            except ValueError:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
+                    source_code="question_generation_unavailable",
+                ) from None
+
+            self._validate_question_generation_run_lineage(
+                question_generation_run,
+                practice_session=practice_session,
+                attempt=next_attempt,
+                idempotency_key=idempotency_key,
+            )
+            assert question_generation_run.id is not None
+            next_attempt.question_generation_run_id = question_generation_run.id
+            next_attempt.question_generation_run = question_generation_run
+
+            current_attempt.status = PracticeAttemptStatus.COMPLETED.value
+            current_attempt.updated_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=next_attempt,
+                question_generation_run=question_generation_run,
+                question_card=None,
+            )
+        except BaseException:
+            if previous_attempt is not None and previous_status is not None:
+                previous_attempt.status = previous_status
+                if previous_updated_at is not None:
+                    previous_attempt.updated_at = previous_updated_at
+            if practice_session is not None and previous_version is not None:
+                practice_session.version = previous_version
+                if previous_session_updated_at is not None:
+                    practice_session.updated_at = previous_session_updated_at
             await self.session.rollback()
             raise
 
@@ -1580,6 +1763,82 @@ class PracticeSessionService:
             follow_up_completion_reason=chain.completion_reason,
             evaluation_generation_run=evaluation_generation_run,
             evaluation=evaluation,
+        )
+
+    async def _load_continue_next_question_replay_context(
+        self,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        if (
+            attempt.status != PracticeAttemptStatus.GENERATING_QUESTION.value
+            or attempt.attempt_number <= 1
+            or attempt.retry_of_attempt_id is not None
+            or attempt.question_card_id is not None
+            or attempt.question_generation_run_id is None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        previous_attempt = await self._load_attempt_by_number(
+            user_id=practice_session.user_id,
+            session_id=practice_session.id,
+            attempt_number=attempt.attempt_number - 1,
+            for_update=True,
+        )
+        if (
+            previous_attempt is None
+            or previous_attempt.user_id != practice_session.user_id
+            or previous_attempt.session_id != practice_session.id
+            or previous_attempt.status != PracticeAttemptStatus.COMPLETED.value
+            or previous_attempt.question_card_id != question_id
+            or previous_attempt.completed_at is None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        review_context = await self._load_review_replay_context(
+            practice_session,
+            previous_attempt,
+            allow_completed=True,
+        )
+        recommendation = review_context.recommendation
+        if recommendation is None:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+        next_question_type, next_difficulty = self._next_question_selection(
+            previous_attempt,
+            recommendation,
+        )
+        if (
+            attempt.user_id != practice_session.user_id
+            or attempt.session_id != practice_session.id
+            or attempt.attempt_number != previous_attempt.attempt_number + 1
+            or attempt.question_type != next_question_type.value
+            or attempt.difficulty != next_difficulty.value
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        question_generation_run, _ = await self._load_generation_run(
+            practice_session,
+            attempt,
+            for_update=True,
+        )
+        self._validate_question_generation_run_lineage(
+            question_generation_run,
+            practice_session=practice_session,
+            attempt=attempt,
+            idempotency_key=practice_question_generation_idempotency_key(
+                practice_session.id,
+                attempt.id,
+            ),
+        )
+        return PracticeSessionWorkflowContext(
+            session=practice_session,
+            attempt=attempt,
+            question_generation_run=question_generation_run,
+            question_card=None,
         )
 
     async def _load_follow_up_chain(
@@ -2858,6 +3117,23 @@ class PracticeSessionService:
             return None
         return practice_session
 
+    async def _load_attempt_by_number(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        attempt_number: int,
+        for_update: bool,
+    ) -> PracticeAttempt | None:
+        statement = select(PracticeAttempt).where(
+            PracticeAttempt.user_id == user_id,
+            PracticeAttempt.session_id == session_id,
+            PracticeAttempt.attempt_number == attempt_number,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return await self.session.scalar(statement)
+
     async def _load_session(
         self,
         *,
@@ -2875,6 +3151,39 @@ class PracticeSessionService:
         if practice_session is None:
             raise PracticeSessionStateError(PRACTICE_SESSION_NOT_FOUND)
         return practice_session
+
+    @staticmethod
+    def _next_question_selection(
+        attempt: PracticeAttempt,
+        recommendation: PracticeRecommendation,
+    ) -> tuple[QuestionCardQuestionType, QuestionCardDifficulty]:
+        if recommendation.action == "nextQuestion":
+            if (
+                recommendation.next_question_type is None
+                or recommendation.next_difficulty is None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                )
+            question_type_value = recommendation.next_question_type
+            difficulty_value = recommendation.next_difficulty
+        elif recommendation.action == "retryCurrent":
+            question_type_value = attempt.question_type
+            difficulty_value = attempt.difficulty
+        else:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            )
+
+        try:
+            return (
+                QuestionCardQuestionType(question_type_value),
+                QuestionCardDifficulty(difficulty_value),
+            )
+        except ValueError:
+            raise PracticeSessionStateError(
+                PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+            ) from None
 
     async def _load_current_attempt(
         self,
@@ -3172,9 +3481,19 @@ class PracticeSessionService:
         self,
         practice_session: PracticeSession,
         attempt: PracticeAttempt,
+        *,
+        allow_completed: bool = False,
     ) -> PracticeReviewWorkflowContext:
         if (
-            attempt.status != PracticeAttemptStatus.REVIEW.value
+            (
+                attempt.status
+                not in {
+                    PracticeAttemptStatus.REVIEW.value,
+                    PracticeAttemptStatus.COMPLETED.value,
+                }
+                if allow_completed
+                else attempt.status != PracticeAttemptStatus.REVIEW.value
+            )
             or attempt.completed_at is None
             or practice_session.status != "active"
             or practice_session.completed_at is not None
@@ -3336,6 +3655,37 @@ class PracticeSessionService:
             question_card=card,
         )
 
+    @staticmethod
+    def _validate_question_generation_run_lineage(
+        run: AgentRun,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        idempotency_key: str,
+    ) -> QuestionGenerationRunPayload:
+        try:
+            payload = validate_question_generation_run(run)
+        except QuestionGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        if (
+            run.id is None
+            or run.user_id != practice_session.user_id
+            or attempt.user_id != practice_session.user_id
+            or attempt.session_id != practice_session.id
+            or run.idempotency_key != idempotency_key
+            or payload.role_id != practice_session.target_role_id
+            or payload.interaction_language != practice_session.language
+            or payload.question_type.value != attempt.question_type
+            or payload.difficulty.value != attempt.difficulty
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        return payload
+
     async def _load_generation_run(
         self,
         practice_session: PracticeSession,
@@ -3494,6 +3844,7 @@ def _normalize_answer_content(value: object) -> str:
 __all__ = [
     "PRACTICE_QUESTION_GENERATION_FAILED",
     "PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED",
+    "PRACTICE_QUESTION_GENERATION_UNAVAILABLE",
     "PRACTICE_QUESTION_GENERATION_STATE_CONFLICT",
     "PRACTICE_FOLLOW_UP_GENERATION_FAILED",
     "PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT",
@@ -3524,4 +3875,5 @@ __all__ = [
     "PracticePublicWorkflowContext",
     "PracticeSessionWorkflowContext",
     "practice_follow_up_idempotency_key",
+    "practice_question_generation_idempotency_key",
 ]

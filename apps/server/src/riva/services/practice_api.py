@@ -48,6 +48,7 @@ from riva.services.practice_sessions import (
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
+    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PracticeAnsweredFollowUpExchangeContext,
     PracticeSessionService,
     PracticeSessionStateError,
@@ -65,9 +66,6 @@ from riva.services.recommendation_generation import (
 from riva.services.review_generation import practice_review_output_from_artifact
 
 
-PRACTICE_QUESTION_GENERATION_UNAVAILABLE = (
-    "practice_question_generation_unavailable"
-)
 PRACTICE_EVALUATION_GENERATION_UNAVAILABLE = (
     "practice_evaluation_generation_unavailable"
 )
@@ -519,6 +517,7 @@ def practice_session_state_api_error(error: PracticeSessionStateError) -> APIErr
         else status.HTTP_503_SERVICE_UNAVAILABLE
         if error.code
         in {
+            PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
             PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
             PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
             PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
