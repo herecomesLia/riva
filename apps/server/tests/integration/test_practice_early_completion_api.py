@@ -1,5 +1,5 @@
 import asyncio
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 import pytest
@@ -11,7 +11,13 @@ from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMUsage
-from riva.models import AgentRun, PracticeAttempt, PracticeSession, User
+from riva.models import (
+    AgentRun,
+    PracticeAnswer,
+    PracticeAttempt,
+    PracticeSession,
+    User,
+)
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_practice_early_completion_workflow import (
@@ -22,7 +28,7 @@ from tests.integration.test_practice_next_question_workflow import (
     produce_first_review,
     question_output,
 )
-from tests.integration.test_question_generation import database_url
+from tests.integration.test_question_generation import database_url, seed_context
 
 
 pytestmark = pytest.mark.integration
@@ -38,6 +44,159 @@ def settings(url: str) -> Settings:
         session_digest_key="practice-early-completion-api-test-key",
         session_cookie_secure=False,
     )
+
+
+def test_practice_early_completion_public_api_rejects_generating_follow_up() -> None:
+    async def run_test() -> None:
+        url = database_url()
+        async with Database(url) as database:
+            await database.reset()
+            try:
+                owner, role, _profile, project_id = await seed_context(database)
+                app = create_app(settings(url))
+                app.dependency_overrides[require_current_user] = lambda: owner
+                headers = {
+                    "Origin": TRUSTED_ORIGIN,
+                    "Accept-Language": "en-US",
+                }
+
+                with TestClient(app) as client:
+                    started = client.post(
+                        "/api/practice/sessions",
+                        json={
+                            "targetRoleId": str(role.id),
+                            "questionType": "projectDeepDive",
+                            "difficulty": "basic",
+                            "source": "personalized",
+                            "prioritizeWeaknesses": False,
+                        },
+                        headers=headers,
+                    )
+                    assert started.status_code == 202
+                    started_body = started.json()
+                    session_id = UUID(started_body["sessionId"])
+                    attempt_id = UUID(started_body["attemptId"])
+                    assert started_body["status"] == "generatingQuestion"
+                    assert started_body["version"] == 1
+
+                    assert await build_worker(
+                        database,
+                        QuestionGenerationAgent(
+                            FakeLLMProvider(
+                                [
+                                    question_output(
+                                        project_id,
+                                        prompt=(
+                                            "Explain how you improved the payment "
+                                            "workflow."
+                                        ),
+                                    )
+                                ],
+                                provider=(
+                                    "practice-early-completion-generating-follow-up-"
+                                    "provider"
+                                ),
+                                usage=LLMUsage(input_tokens=20, output_tokens=10),
+                            ),
+                            model="fake-practice-model",
+                        ),
+                    ).process_one()
+
+                    refreshed = client.post(
+                        f"/api/practice/sessions/{session_id}/"
+                        "question-generation/refresh",
+                        json={"version": started_body["version"]},
+                        headers=headers,
+                    )
+                    assert refreshed.status_code == 200
+                    answering = refreshed.json()
+                    assert answering["status"] == "answering"
+                    assert answering["version"] == 2
+                    question_id = answering["question"]["id"]
+
+                    submitted = client.post(
+                        f"/api/practice/sessions/{session_id}/answers/main",
+                        json={
+                            "version": answering["version"],
+                            "questionId": question_id,
+                            "content": "A valid submitted answer.",
+                        },
+                        headers=headers,
+                    )
+                    assert submitted.status_code == 202
+                    generating_follow_up = submitted.json()
+                    assert generating_follow_up["status"] == "generatingFollowUp"
+                    generating_follow_up_version = generating_follow_up["version"]
+
+                    ended = client.post(
+                        f"/api/practice/sessions/{session_id}/end",
+                        json={
+                            "version": generating_follow_up_version,
+                            "questionId": question_id,
+                        },
+                        headers=headers,
+                    )
+                    assert ended.status_code == 409
+                    assert ended.json() == {
+                        "error": "practice_session_state_conflict"
+                    }
+
+                    async with database.sessionmaker() as session:
+                        persisted_session = await session.get(
+                            PracticeSession,
+                            session_id,
+                        )
+                        persisted_attempt = await session.get(
+                            PracticeAttempt,
+                            attempt_id,
+                        )
+                        main_answers = list(
+                            (
+                                await session.scalars(
+                                    select(PracticeAnswer).where(
+                                        PracticeAnswer.attempt_id == attempt_id,
+                                        PracticeAnswer.kind == "main",
+                                    )
+                                )
+                            ).all()
+                        )
+                        follow_up_runs = list(
+                            (
+                                await session.scalars(
+                                    select(AgentRun).where(
+                                        AgentRun.user_id == owner.id,
+                                        AgentRun.agent_id == "follow-up-generator",
+                                        AgentRun.payload["attemptId"].as_string()
+                                        == str(attempt_id),
+                                    )
+                                )
+                            ).all()
+                        )
+
+                        assert persisted_session is not None
+                        assert persisted_session.status == "active"
+                        assert persisted_session.completion_reason is None
+                        assert persisted_session.completed_at is None
+                        assert persisted_session.version == generating_follow_up_version
+                        assert persisted_attempt is not None
+                        assert persisted_attempt.status == "answering"
+                        assert persisted_attempt.completed_at is None
+                        assert len(main_answers) == 1
+                        assert main_answers[0].content == (
+                            "A valid submitted answer."
+                        )
+                        assert len(follow_up_runs) == 1
+                        assert follow_up_runs[0].agent_id == "follow-up-generator"
+
+                    current = client.get("/api/practice/sessions/current")
+                    assert current.status_code == 200
+                    current_body = current.json()["session"]
+                    assert current_body["status"] == "generatingFollowUp"
+                    assert current_body["version"] == generating_follow_up_version
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
 
 
 def test_practice_early_completion_public_api_replay_get_and_current_release() -> None:
