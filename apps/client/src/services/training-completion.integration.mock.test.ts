@@ -349,6 +349,7 @@ describe("training completion to history mock integration", () => {
       version: current.session.version,
       questionId: current.session.question.id,
     })
+    if (!("session" in ended)) throw new Error("Expected a mock page response.")
     if (ended.session.status !== "completed") throw new Error("Expected completion.")
     const zeroDetail = await settle(
       getTargetedPracticeRecord(`targeted-practice-record-${ended.session.sessionId}`),

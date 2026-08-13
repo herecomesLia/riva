@@ -193,6 +193,7 @@ function createCompletedSession() {
     sessionId,
     startedAt: "2026-08-11T08:00:00.000Z",
     status: "completed" as const,
+    unfinishedAttempt: null,
     version: 4,
   }
 }
@@ -214,6 +215,38 @@ describe("practice wire schemas", () => {
     expect(practiceCompletedSessionResponseSchema.parse(completed)).toEqual(completed)
     expect(practiceSessionResponseSchema.parse(completed)).toEqual(completed)
     expect(() => practiceActiveSessionResponseSchema.parse(completed)).toThrow()
+  })
+
+  it("accepts an early-completed session with its unfinished question", () => {
+    const early = {
+      ...createCompletedSession(),
+      completionReason: "userEndedEarly" as const,
+      finalAttemptAverageScore: 0,
+      nextStepSuggestion: null,
+      questionsCompleted: 0,
+      unfinishedAttempt: {
+        attemptId,
+        attemptNumber: 1,
+        question,
+        selection,
+      },
+    }
+
+    expect(practiceCompletedSessionResponseSchema.parse(early)).toEqual(early)
+    expect(practiceSessionResponseSchema.parse(early)).toEqual(early)
+    expect(() =>
+      practiceCompletedSessionResponseSchema.parse({
+        ...early,
+        questionsCompleted: 1,
+        nextStepSuggestion: null,
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceCompletedSessionResponseSchema.parse({
+        ...early,
+        attemptNumber: 2,
+      }),
+    ).toThrow()
   })
 
   it("rejects completed wire fields outside the public contract", () => {

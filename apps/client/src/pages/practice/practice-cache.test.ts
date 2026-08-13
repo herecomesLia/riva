@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { createPracticeMockResponse } from "@/mocks/data/practice"
+import type { PracticeCompletedEarlyState } from "@/models/practice"
 
 import {
   synchronizeFollowUpGenerationResponse,
@@ -318,6 +319,60 @@ describe("practice mutation cache contract", () => {
       synchronizePracticeMutationResponse(current, completed, {
         kind: "endReviewSession",
         input: request,
+      }),
+    ).toBe(current)
+  })
+
+  it("accepts only an early-completed snapshot that preserves the unanswered attempt", () => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    const response = createPracticeMockResponse("completedSession")
+    if (current.session.status !== "answering" || response.session.status !== "completed") return
+
+    const earlySession: PracticeCompletedEarlyState = {
+      ...response.session,
+      attemptId: current.session.attemptId,
+      attemptNumber: current.session.attemptNumber,
+      completionReason: "userEndedEarly",
+      finalAttemptAverageScore: 0,
+      markedWeakQuestionCount: 0,
+      nextStepSuggestion: null,
+      questionsCompleted: 0,
+      retryCount: 0,
+      savedQuestionCount: 0,
+      selection: structuredClone(current.session.selection),
+      unfinishedAttempt: {
+        attemptId: current.session.attemptId,
+        attemptNumber: current.session.attemptNumber,
+        question: structuredClone(current.session.question),
+        selection: structuredClone(current.session.selection),
+      },
+      version: current.session.version + 1,
+    }
+    response.session = earlySession
+    const input = {
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+
+    expect(
+      synchronizePracticeMutationResponse(current, response, {
+        kind: "endQuestionSession",
+        input,
+      }),
+    ).toBe(response)
+
+    response.session = {
+      ...earlySession,
+      unfinishedAttempt: {
+        ...earlySession.unfinishedAttempt,
+        question: { ...earlySession.unfinishedAttempt.question, id: "another-question" },
+      },
+    }
+    expect(
+      synchronizePracticeMutationResponse(current, response, {
+        kind: "endQuestionSession",
+        input,
       }),
     ).toBe(current)
   })

@@ -12,6 +12,7 @@ from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
+    EndPracticeSessionEarlyRequest,
     PracticeActiveSessionResponse,
     PracticeCompletedSessionResponse,
     PracticeSessionResponse,
@@ -240,6 +241,26 @@ async def complete_practice_session(
     ),
 ) -> PracticeCompletedSessionResponse:
     return await practice_api_service.complete_session(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/end",
+    response_model=PracticeCompletedSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def end_practice_session_early(
+    session_id: PracticeSessionId,
+    payload: EndPracticeSessionEarlyRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeCompletedSessionResponse:
+    return await practice_api_service.end_session_early(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

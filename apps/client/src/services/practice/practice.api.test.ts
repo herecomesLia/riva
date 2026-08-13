@@ -11,6 +11,7 @@ import {
   getQuestionGenerationStatus,
   continueToNextPracticeQuestion,
   endPracticeSession,
+  requestEndPracticeSession,
   prepareNextPracticeSession,
   retryCurrentPracticeQuestion,
   startPracticeSession,
@@ -134,6 +135,7 @@ function createCompletedSession(overrides: Record<string, unknown> = {}) {
     sessionId,
     startedAt: "2026-08-11T08:00:00.000Z",
     status: "completed" as const,
+    unfinishedAttempt: null,
     version: 6,
     ...overrides,
   }
@@ -387,6 +389,52 @@ describe("practice service API", () => {
       nextStepSuggestion: "Move to the next focused question.",
       status: "completed",
       unfinishedAttempt: null,
+      version: 6,
+    })
+  })
+
+  it("ends an unanswered question through the real end endpoint with only version and question", async () => {
+    const unfinishedQuestion = createQuestion()
+    const earlyCompleted = createCompletedSession({
+      attemptNumber: 1,
+      completionReason: "userEndedEarly",
+      finalAttemptAverageScore: 0,
+      markedWeakQuestionCount: 0,
+      nextStepSuggestion: null,
+      questionsCompleted: 0,
+      retryCount: 0,
+      savedQuestionCount: 0,
+      unfinishedAttempt: {
+        attemptId,
+        attemptNumber: 1,
+        question: unfinishedQuestion,
+        selection,
+      },
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(earlyCompleted))
+
+    const session = await requestEndPracticeSession({
+      questionId,
+      sessionId,
+      version: 5,
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/end`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 5, questionId })
+    expect(session).toMatchObject({
+      attemptId,
+      completionReason: "userEndedEarly",
+      nextStepSuggestion: null,
+      questionsCompleted: 0,
+      status: "completed",
+      unfinishedAttempt: {
+        attemptId,
+        attemptNumber: 1,
+        question: { id: questionId },
+      },
       version: 6,
     })
   })

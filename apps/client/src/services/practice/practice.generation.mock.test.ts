@@ -174,6 +174,7 @@ describe("practice stateful mock service: generation", () => {
         questionId: ending.session.question.id,
       }),
     )
+    if (!("session" in ended)) throw new Error("Expected a mock page response.")
     expect(ended.session).toMatchObject({
       status: "completed",
       sessionId: ending.session.sessionId,

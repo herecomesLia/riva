@@ -362,17 +362,24 @@ export const practiceActiveSessionResponseSchema = z.discriminatedUnion("status"
   practiceReviewSessionSchema,
 ])
 
-export const practiceCompletedSessionResponseSchema = z
+export const practiceUnfinishedAttemptSchema = z
+  .object({
+    attemptId: uuidSchema,
+    attemptNumber: z.number().int().positive(),
+    question: practiceQuestionSchema,
+    selection: practiceSessionSelectionSchema,
+  })
+  .strict()
+
+const practiceCompletedSessionBaseSchema = z
   .object({
     attemptId: uuidSchema,
     attemptNumber: z.number().int().positive(),
     completedAt: dateTimeSchema,
-    completionReason: z.literal("reviewCompleted"),
     finalAttemptAverageScore: z.number().int().min(0).max(100),
     language: interactionLanguageSchema,
     markedWeakQuestionCount: z.number().int().nonnegative(),
-    nextStepSuggestion: z.string().min(1),
-    questionsCompleted: z.number().int().positive(),
+    questionsCompleted: z.number().int().nonnegative(),
     retryCount: z.number().int().nonnegative(),
     savedQuestionCount: z.number().int().nonnegative(),
     selection: practiceSessionSelectionSchema,
@@ -382,30 +389,110 @@ export const practiceCompletedSessionResponseSchema = z
     version: versionSchema,
   })
   .strict()
+
+function validateCompletedSummaryCounts(
+  session: {
+    markedWeakQuestionCount: number
+    questionsCompleted: number
+    savedQuestionCount: number
+  },
+  context: z.RefinementCtx,
+) {
+  if (session.savedQuestionCount > session.questionsCompleted) {
+    context.addIssue({
+      code: "custom",
+      message: "saved question count exceeds completed questions",
+      path: ["savedQuestionCount"],
+    })
+  }
+  if (session.markedWeakQuestionCount > session.questionsCompleted) {
+    context.addIssue({
+      code: "custom",
+      message: "marked-weak question count exceeds completed questions",
+      path: ["markedWeakQuestionCount"],
+    })
+  }
+}
+
+export const practiceCompletedReviewSessionSchema = practiceCompletedSessionBaseSchema
+  .extend({
+    completionReason: z.literal("reviewCompleted"),
+    nextStepSuggestion: z.string().min(1),
+    unfinishedAttempt: z.null(),
+  })
+  .strict()
   .superRefine((session, context) => {
-    if (session.savedQuestionCount > session.questionsCompleted) {
+    validateCompletedSummaryCounts(session, context)
+    if (session.questionsCompleted < 1) {
       context.addIssue({
         code: "custom",
-        message: "saved question count exceeds completed questions",
-        path: ["savedQuestionCount"],
-      })
-    }
-    if (session.markedWeakQuestionCount > session.questionsCompleted) {
-      context.addIssue({
-        code: "custom",
-        message: "marked-weak question count exceeds completed questions",
-        path: ["markedWeakQuestionCount"],
+        message: "review-completed session must have completed questions",
+        path: ["questionsCompleted"],
       })
     }
   })
 
-export const practiceSessionResponseSchema = z.discriminatedUnion("status", [
-  practiceGeneratingQuestionSchema,
-  practiceAnsweringSchema,
-  practiceGeneratingFollowUpSchema,
-  practiceAnsweringFollowUpSchema,
-  practiceEvaluatingSchema,
-  practiceReviewSessionSchema,
+export const practiceCompletedEarlySessionSchema = practiceCompletedSessionBaseSchema
+  .extend({
+    completionReason: z.literal("userEndedEarly"),
+    nextStepSuggestion: z.string().min(1).nullable(),
+    unfinishedAttempt: practiceUnfinishedAttemptSchema,
+  })
+  .strict()
+  .superRefine((session, context) => {
+    validateCompletedSummaryCounts(session, context)
+    if (session.attemptId !== session.unfinishedAttempt.attemptId) {
+      context.addIssue({
+        code: "custom",
+        message: "completed attempt identity must match unfinished attempt",
+        path: ["attemptId"],
+      })
+    }
+    if (session.attemptNumber !== session.unfinishedAttempt.attemptNumber) {
+      context.addIssue({
+        code: "custom",
+        message: "completed attempt number must match unfinished attempt",
+        path: ["attemptNumber"],
+      })
+    }
+    const selection = session.selection
+    const unfinishedSelection = session.unfinishedAttempt.selection
+    if (
+      selection.targetRoleId !== unfinishedSelection.targetRoleId ||
+      selection.questionType !== unfinishedSelection.questionType ||
+      selection.difficulty !== unfinishedSelection.difficulty ||
+      selection.source !== unfinishedSelection.source ||
+      selection.prioritizeWeaknesses !== unfinishedSelection.prioritizeWeaknesses
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "completed selection must match unfinished attempt selection",
+        path: ["selection"],
+      })
+    }
+    if (session.questionsCompleted === 0 && session.nextStepSuggestion !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "a session with no completed questions cannot have a suggestion",
+        path: ["nextStepSuggestion"],
+      })
+    }
+    if (session.questionsCompleted > 0 && session.nextStepSuggestion === null) {
+      context.addIssue({
+        code: "custom",
+        message: "a session with completed questions must have a suggestion",
+        path: ["nextStepSuggestion"],
+      })
+    }
+  })
+
+export const practiceCompletedSessionResponseSchema = z.union([
+  practiceCompletedReviewSessionSchema,
+  practiceCompletedEarlySessionSchema,
+])
+
+export const practiceSessionResponseSchema = z.union([
+  practiceActiveSessionResponseSchema,
   practiceCompletedSessionResponseSchema,
 ])
 
@@ -439,6 +526,7 @@ export type PracticeAnsweringFollowUpWire = z.infer<typeof practiceAnsweringFoll
 export type PracticeEvaluatingWire = z.infer<typeof practiceEvaluatingSchema>
 export type PracticeReviewWireSession = z.infer<typeof practiceReviewSessionSchema>
 export type PracticeActiveSessionWire = z.infer<typeof practiceActiveSessionResponseSchema>
+export type PracticeUnfinishedAttemptWire = z.infer<typeof practiceUnfinishedAttemptSchema>
 export type PracticeCompletedSessionWire = z.infer<typeof practiceCompletedSessionResponseSchema>
 export type PracticeSessionResponseWire = z.infer<typeof practiceSessionResponseSchema>
 export type CurrentPracticeSessionResponseWire = z.infer<

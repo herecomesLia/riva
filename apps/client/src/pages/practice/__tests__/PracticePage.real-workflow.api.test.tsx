@@ -216,6 +216,34 @@ function completed(version: number) {
     sessionId,
     startedAt: "2026-08-12T08:00:00.000Z",
     status: "completed" as const,
+    unfinishedAttempt: null,
+    version,
+  }
+}
+
+function earlyCompleted(version: number) {
+  return {
+    attemptId,
+    attemptNumber: 1,
+    completedAt: "2026-08-12T08:06:00.000Z",
+    completionReason: "userEndedEarly" as const,
+    finalAttemptAverageScore: 0,
+    language: "zh-CN" as const,
+    markedWeakQuestionCount: 0,
+    nextStepSuggestion: null,
+    questionsCompleted: 0,
+    retryCount: 0,
+    savedQuestionCount: 0,
+    selection,
+    sessionId,
+    startedAt: "2026-08-12T08:00:00.000Z",
+    status: "completed" as const,
+    unfinishedAttempt: {
+      attemptId,
+      attemptNumber: 1,
+      question,
+      selection,
+    },
     version,
   }
 }
@@ -475,6 +503,44 @@ describe("PracticePage real API workflow", () => {
     expect(completedState).toHaveTextContent("最终作答平均分：91 分")
     expect(completedState).toHaveTextContent(finished.nextStepSuggestion)
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/complete"))).toBe(true)
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("refresh"))).toBe(false)
+  })
+
+  it("ends an unanswered question through the real end API and renders zero completed-question stats", async () => {
+    const user = userEvent.setup()
+    const current = session("answering", 2)
+    const finished = earlyCompleted(3)
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/end`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 2, questionId })
+        return jsonResponse(finished)
+      }
+      throw new Error(`Unexpected request during early completion workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await testing.screen.findByTestId("practice-answering-state")
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.end") }),
+    )
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("practice.dialog.confirmEnd") }),
+    )
+
+    const completedState = await testing.screen.findByTestId("practice-completed-state")
+    expect(completedState).toHaveTextContent("完成题数：0")
+    expect(completedState).toHaveTextContent("重练次数：0")
+    expect(completedState).toHaveTextContent("收藏题数：0")
+    expect(completedState).toHaveTextContent("标记薄弱题数：0")
+    expect(completedState).toHaveTextContent("最终作答平均分：0 分")
+    expect(completedState.querySelector("p.text-muted-foreground")).toBeNull()
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/end"))).toBe(true)
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("refresh"))).toBe(false)
   })
 

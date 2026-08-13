@@ -646,7 +646,9 @@ function PracticeCompletedView({
             score: session.finalAttemptAverageScore,
           })}
         </p>
-        <p className="text-muted-foreground">{session.nextStepSuggestion}</p>
+        {session.nextStepSuggestion ? (
+          <p className="text-muted-foreground">{session.nextStepSuggestion}</p>
+        ) : null}
         {error && (
           <Alert variant="destructive">
             <AlertTitle>{t("practice.errors.prepareNextRoundTitle")}</AlertTitle>

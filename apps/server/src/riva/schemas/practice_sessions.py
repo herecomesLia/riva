@@ -132,6 +132,13 @@ class CompletePracticeSessionRequest(APIModel):
     version: Annotated[int, Field(ge=1)]
 
 
+class EndPracticeSessionEarlyRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+
+
 class PracticeAPIModel(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -476,6 +483,13 @@ PracticeActiveSessionResponse = Annotated[
 ]
 
 
+class PracticeUnfinishedAttemptResponse(PracticeAPIModel):
+    attempt_id: StandardUUID
+    attempt_number: Annotated[int, Field(ge=1)]
+    selection: PracticeSessionSelection
+    question: PracticeQuestionResponse
+
+
 class PracticeCompletedSessionResponse(PracticeAPIModel):
     status: Literal["completed"]
     session_id: StandardUUID
@@ -485,9 +499,9 @@ class PracticeCompletedSessionResponse(PracticeAPIModel):
     started_at: datetime
     attempt_id: StandardUUID
     attempt_number: Annotated[int, Field(ge=1)]
-    completion_reason: Literal["reviewCompleted"]
+    completion_reason: Literal["reviewCompleted", "userEndedEarly"]
     completed_at: datetime
-    questions_completed: Annotated[int, Field(ge=1)]
+    questions_completed: Annotated[int, Field(ge=0)]
     retry_count: Annotated[int, Field(ge=0)]
     saved_question_count: Annotated[int, Field(ge=0)]
     marked_weak_question_count: Annotated[int, Field(ge=0)]
@@ -495,7 +509,8 @@ class PracticeCompletedSessionResponse(PracticeAPIModel):
         int,
         Field(strict=True, ge=0, le=100),
     ]
-    next_step_suggestion: RecommendationReason
+    next_step_suggestion: RecommendationReason | None
+    unfinished_attempt: PracticeUnfinishedAttemptResponse | None
 
     _validate_aware_completed_at = field_validator("completed_at")(
         _validate_aware_timestamp
@@ -508,6 +523,44 @@ class PracticeCompletedSessionResponse(PracticeAPIModel):
         if self.marked_weak_question_count > self.questions_completed:
             raise ValueError(
                 "marked-weak question count exceeds completed questions"
+            )
+        if self.completion_reason == "reviewCompleted":
+            if self.questions_completed < 1:
+                raise ValueError(
+                    "review-completed session must have completed questions"
+                )
+            if self.unfinished_attempt is not None:
+                raise ValueError(
+                    "review-completed session cannot have an unfinished attempt"
+                )
+            if self.next_step_suggestion is None:
+                raise ValueError(
+                    "review-completed session must have a next-step suggestion"
+                )
+        else:
+            if self.unfinished_attempt is None:
+                raise ValueError(
+                    "early-completed session must have an unfinished attempt"
+                )
+            if self.attempt_id != self.unfinished_attempt.attempt_id:
+                raise ValueError(
+                    "completed attempt identity must match unfinished attempt"
+                )
+            if self.attempt_number != self.unfinished_attempt.attempt_number:
+                raise ValueError(
+                    "completed attempt number must match unfinished attempt"
+                )
+            if self.selection != self.unfinished_attempt.selection:
+                raise ValueError(
+                    "completed selection must match unfinished attempt selection"
+                )
+        if self.questions_completed == 0 and self.next_step_suggestion is not None:
+            raise ValueError(
+                "a session with no completed questions cannot have a suggestion"
+            )
+        if self.questions_completed > 0 and self.next_step_suggestion is None:
+            raise ValueError(
+                "a session with completed questions must have a suggestion"
             )
         return self
 
@@ -527,6 +580,7 @@ __all__ = [
     "PracticeActiveSessionBase",
     "PracticeActiveSessionResponse",
     "PracticeCompletedSessionResponse",
+    "PracticeUnfinishedAttemptResponse",
     "PracticeAnswerResponse",
     "PracticeAnsweredFollowUpExchangeResponse",
     "PracticeAnsweringFollowUpResponse",
@@ -552,6 +606,7 @@ __all__ = [
     "PracticeSessionSelection",
     "PracticeSessionStatus",
     "CompletePracticeSessionRequest",
+    "EndPracticeSessionEarlyRequest",
     "RetryPracticeQuestionRequest",
     "RefreshPracticeFollowUpGenerationRequest",
     "RefreshPracticeEvaluationRequest",

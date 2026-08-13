@@ -295,18 +295,29 @@ export type PracticeReviewState = PracticeSubmittedAnswerRecord & {
   review: PracticeReview
 }
 
-export type PracticeCompletedState = PracticeActiveSessionBase & {
+type PracticeCompletedSessionBase = PracticeActiveSessionBase & {
   status: "completed"
-  completionReason: "reviewCompleted" | "userEndedEarly"
-  unfinishedAttempt: UnfinishedPracticeAttempt | null
   completedAt: string
   questionsCompleted: number
   retryCount: number
   savedQuestionCount: number
   markedWeakQuestionCount: number
   finalAttemptAverageScore: number
-  nextStepSuggestion: string
 }
+
+export type PracticeCompletedReviewState = PracticeCompletedSessionBase & {
+  completionReason: "reviewCompleted"
+  nextStepSuggestion: string
+  unfinishedAttempt: null
+}
+
+export type PracticeCompletedEarlyState = PracticeCompletedSessionBase & {
+  completionReason: "userEndedEarly"
+  nextStepSuggestion: string | null
+  unfinishedAttempt: UnfinishedPracticeAttempt
+}
+
+export type PracticeCompletedState = PracticeCompletedReviewState | PracticeCompletedEarlyState
 
 export type PracticeSessionState =
   | PracticeSetupState

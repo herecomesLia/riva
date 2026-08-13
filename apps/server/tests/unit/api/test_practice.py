@@ -10,6 +10,7 @@ from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
+    EndPracticeSessionEarlyRequest,
     PracticeAnswerResponse,
     PracticeCompletedSessionResponse,
     PracticeGeneratingFollowUpResponse,
@@ -105,6 +106,7 @@ def completed_response() -> PracticeCompletedSessionResponse:
         marked_weak_question_count=0,
         final_attempt_average_score=82,
         next_step_suggestion="Move to the next focused question.",
+        unfinished_attempt=None,
     )
 
 
@@ -157,6 +159,10 @@ class FakePracticeAPIService:
 
     async def complete_session(self, **kwargs: object):
         self.calls.append(("complete", kwargs))
+        return self.completed_result
+
+    async def end_session_early(self, **kwargs: object):
+        self.calls.append(("end", kwargs))
         return self.completed_result
 
     async def get_current_session(self, **kwargs: object):
@@ -276,6 +282,29 @@ def test_complete_returns_completed_summary_and_forwards_only_version(app) -> No
     assert service.calls[0][1]["payload"].model_dump(mode="json") == {
         "version": 5
     }
+
+
+def test_end_returns_completed_summary_and_forwards_only_public_early_body(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    payload = {"version": 5, "questionId": str(uuid4())}
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/end",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "completed"
+    assert service.calls[0][0] == "end"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(service.calls[0][1]["payload"], EndPracticeSessionEarlyRequest)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
 
 
 def test_completed_get_uses_public_session_union(app) -> None:
@@ -724,6 +753,7 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
         in paths
     )
     assert "/api/practice/sessions/{sessionId}/evaluation/refresh" in paths
+    assert "/api/practice/sessions/{sessionId}/end" in paths
     assert "202" in paths["/api/practice/sessions"]["post"]["responses"]
     assert "200" in paths["/api/practice/sessions/{sessionId}"]["get"]["responses"]
     response_schema = paths["/api/practice/sessions"]["post"]["responses"]["202"][

@@ -183,7 +183,7 @@ function unfinishedPracticeQuestion(
 function practiceRecommendation(session: PracticeCompletedState): TrainingRecordRecommendation {
   const latest = session.attemptRecords.at(-1)
   if (latest === undefined) {
-    return { action: "none", reason: session.nextStepSuggestion }
+    return { action: "none", reason: session.nextStepSuggestion ?? "" }
   }
   if (latest.review.recommendation.action === "retryCurrent") {
     return {

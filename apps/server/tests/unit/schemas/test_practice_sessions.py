@@ -7,6 +7,7 @@ import pytest
 from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
+    EndPracticeSessionEarlyRequest,
     PracticeAttemptStatus,
     PracticeActiveSessionResponse,
     PracticeCompletedSessionResponse,
@@ -152,6 +153,7 @@ def completed_session_payload(**overrides: object) -> dict[str, object]:
         "markedWeakQuestionCount": 0,
         "finalAttemptAverageScore": 85,
         "nextStepSuggestion": "Practice the final answer structure.",
+        "unfinishedAttempt": None,
     }
     payload.update(overrides)
     return payload
@@ -168,6 +170,15 @@ def test_completed_session_request_and_response_are_strict() -> None:
     with pytest.raises(ValidationError):
         CompletePracticeSessionRequest.model_validate({"version": 0})
 
+    end_request = EndPracticeSessionEarlyRequest.model_validate(
+        {"version": 5, "questionId": str(uuid4())}
+    )
+    assert end_request.version == 5
+    with pytest.raises(ValidationError):
+        EndPracticeSessionEarlyRequest.model_validate(
+            {"version": 5, "questionId": str(uuid4()), "attemptId": str(uuid4())}
+        )
+
     response = PracticeCompletedSessionResponse.model_validate(
         completed_session_payload()
     )
@@ -176,6 +187,51 @@ def test_completed_session_request_and_response_are_strict() -> None:
     assert TypeAdapter(PracticeSessionResponse).validate_python(
         completed_session_payload()
     ).status == "completed"
+
+
+def test_early_completed_response_requires_the_unfinished_attempt_contract() -> None:
+    session_id = uuid4()
+    attempt_id = uuid4()
+    question_id = uuid4()
+    selection = PracticeSessionSelection.model_validate(selection_payload())
+    unfinished = {
+        "attemptId": str(attempt_id),
+        "attemptNumber": 2,
+        "selection": selection.model_dump(mode="json"),
+        "question": {
+            "id": str(question_id),
+            "prompt": "Tell me about the project.",
+            "questionType": "projectDeepDive",
+            "difficulty": "basic",
+            "assessedCapabilities": [],
+            "recommendedMaterials": [],
+            "isSaved": False,
+            "isMarkedWeak": False,
+        },
+    }
+    payload = completed_session_payload(
+        sessionId=str(session_id),
+        attemptId=str(attempt_id),
+        attemptNumber=2,
+        completionReason="userEndedEarly",
+        questionsCompleted=0,
+        retryCount=0,
+        savedQuestionCount=0,
+        markedWeakQuestionCount=0,
+        finalAttemptAverageScore=0,
+        nextStepSuggestion=None,
+        selection=selection.model_dump(mode="json"),
+        unfinishedAttempt=unfinished,
+    )
+    response = PracticeCompletedSessionResponse.model_validate(payload)
+    assert response.completion_reason == "userEndedEarly"
+    assert response.unfinished_attempt is not None
+    assert response.unfinished_attempt.question.id == question_id
+
+    with pytest.raises(ValidationError):
+        PracticeCompletedSessionResponse.model_validate(
+            {**payload, "attemptId": str(uuid4())}
+        )
 
 
 @pytest.mark.parametrize(

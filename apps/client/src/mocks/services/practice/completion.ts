@@ -39,31 +39,34 @@ type PracticeCompletionBase = Pick<
   "sessionId" | "language" | "version" | "selection" | "startedAt" | "attemptId" | "attemptNumber"
 >
 
-function createCompletedPracticeSession({
-  session,
-  records,
-  completedAt,
-  completionReason,
-  nextStepSuggestion,
-  unfinishedAttempt,
-}: {
-  session: PracticeCompletionBase
-  records: PracticeAttemptRecord[]
-  completedAt: string
-  completionReason: PracticeCompletedState["completionReason"]
-  nextStepSuggestion: string
-  unfinishedAttempt: PracticeCompletedState["unfinishedAttempt"]
-}): PracticeCompletedState {
+type PracticeCompletionDetails =
+  | {
+      completionReason: "reviewCompleted"
+      nextStepSuggestion: string
+      unfinishedAttempt: null
+    }
+  | {
+      completionReason: "userEndedEarly"
+      nextStepSuggestion: string | null
+      unfinishedAttempt: NonNullable<PracticeCompletedState["unfinishedAttempt"]>
+    }
+
+function createCompletedPracticeSession(
+  input: {
+    session: PracticeCompletionBase
+    records: PracticeAttemptRecord[]
+    completedAt: string
+  } & PracticeCompletionDetails,
+): PracticeCompletedState {
+  const { records, session } = input
   const latestByQuestion = new Map<string, PracticeAttemptRecord>()
   for (const record of records) latestByQuestion.set(record.question.id, record)
   const uniqueRecords = [...latestByQuestion.values()]
-  return {
+  const common = {
     ...session,
-    status: "completed",
-    completionReason,
-    unfinishedAttempt: copyPracticeState(unfinishedAttempt),
+    status: "completed" as const,
     attemptRecords: copyPracticeState(records),
-    completedAt,
+    completedAt: input.completedAt,
     questionsCompleted: uniqueRecords.length,
     retryCount: records.length - uniqueRecords.length,
     savedQuestionCount: uniqueRecords.filter((record) => record.question.isSaved).length,
@@ -75,7 +78,20 @@ function createCompletedPracticeSession({
             uniqueRecords.reduce((total, record) => total + record.evaluation.overallScore, 0) /
               uniqueRecords.length,
           ),
-    nextStepSuggestion,
+  }
+  if (input.completionReason === "reviewCompleted") {
+    return {
+      ...common,
+      completionReason: input.completionReason,
+      nextStepSuggestion: input.nextStepSuggestion,
+      unfinishedAttempt: null,
+    }
+  }
+  return {
+    ...common,
+    completionReason: input.completionReason,
+    nextStepSuggestion: input.nextStepSuggestion,
+    unfinishedAttempt: copyPracticeState(input.unfinishedAttempt),
   }
 }
 

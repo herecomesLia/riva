@@ -331,8 +331,20 @@ export function skipPracticeQuestion(
 
 export function requestEndPracticeSession(
   input: RequestEndPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestEndPracticeSession(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.requestEndPracticeSession(input)
+  return requestPracticeSession(`/practice/sessions/${encodeURIComponent(input.sessionId)}/end`, {
+    json: {
+      version: input.version,
+      questionId: input.questionId,
+    },
+    method: "POST",
+  }).then((response) => {
+    if (response.status !== "completed" || response.completionReason !== "userEndedEarly") {
+      throw new Error("The end endpoint must return an early-completed session.")
+    }
+    return response
+  })
 }
 
 export function toPracticeActiveSessionState(
@@ -406,7 +418,7 @@ export function toPracticeActiveSessionState(
 export function toPracticeCompletedSessionState(
   session: PracticeCompletedSessionWire,
 ): PracticeCompletedState {
-  return {
+  const base = {
     attemptId: session.attemptId,
     attemptNumber: session.attemptNumber,
     attemptRecords: [],
@@ -422,9 +434,22 @@ export function toPracticeCompletedSessionState(
     selection: session.selection,
     sessionId: session.sessionId,
     startedAt: session.startedAt,
-    status: "completed",
-    unfinishedAttempt: null,
+    status: "completed" as const,
     version: session.version,
+  }
+  if (session.completionReason === "reviewCompleted") {
+    return {
+      ...base,
+      completionReason: session.completionReason,
+      nextStepSuggestion: session.nextStepSuggestion,
+      unfinishedAttempt: null,
+    }
+  }
+  return {
+    ...base,
+    completionReason: session.completionReason,
+    nextStepSuggestion: session.nextStepSuggestion,
+    unfinishedAttempt: session.unfinishedAttempt,
   }
 }
 

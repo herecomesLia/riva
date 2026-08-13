@@ -13,6 +13,7 @@ from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
+    EndPracticeSessionEarlyRequest,
     PracticeActiveSessionResponse,
     PracticeAnswerResponse,
     PracticeAnsweredFollowUpExchangeResponse,
@@ -20,6 +21,7 @@ from riva.schemas.practice_sessions import (
     PracticeAnsweringResponse,
     PracticeAllAnsweredCompletionResponse,
     PracticeCompletedSessionResponse,
+    PracticeUnfinishedAttemptResponse,
     PracticeAwaitingFollowUpExchangeResponse,
     PracticeCompletedFollowUpCompletionResponse,
     PracticeEvaluationResponse,
@@ -56,6 +58,7 @@ from riva.services.practice_sessions import (
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PracticeAnsweredFollowUpExchangeContext,
     PracticeCompletedSessionWorkflowContext,
+    PracticeEndedEarlySessionWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
     PracticePrimaryAnswerWorkflowContext,
@@ -278,6 +281,24 @@ class PracticeAPIService:
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
+    async def end_session_early(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: EndPracticeSessionEarlyRequest,
+    ) -> PracticeCompletedSessionResponse:
+        try:
+            context = await self._practice_service().end_session_early(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+            )
+            return build_practice_completed_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
     async def get_current_session(
         self,
         *,
@@ -316,10 +337,16 @@ PracticeSessionAPIService = PracticeAPIService
 
 
 def build_practice_session_response(
-    context: PracticePublicWorkflowContext | PracticeCompletedSessionWorkflowContext,
+    context: (
+        PracticePublicWorkflowContext
+        | PracticeCompletedSessionWorkflowContext
+        | PracticeEndedEarlySessionWorkflowContext
+    ),
 ) -> PracticeSessionResponse:
     try:
         if isinstance(context, PracticeCompletedSessionWorkflowContext):
+            return build_practice_completed_session_response(context)
+        if isinstance(context, PracticeEndedEarlySessionWorkflowContext):
             return build_practice_completed_session_response(context)
         base = {
             "session_id": context.session.id,
@@ -466,9 +493,13 @@ def build_practice_session_response(
 
 
 def build_practice_completed_session_response(
-    context: PracticeCompletedSessionWorkflowContext,
+    context: PracticeCompletedSessionWorkflowContext
+    | PracticeEndedEarlySessionWorkflowContext,
 ) -> PracticeCompletedSessionResponse:
     try:
+        if isinstance(context, PracticeEndedEarlySessionWorkflowContext):
+            return _build_practice_ended_early_session_response(context)
+
         review_contexts = context.attempt_review_contexts
         if not review_contexts:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
@@ -523,6 +554,85 @@ def build_practice_completed_session_response(
             ),
             final_attempt_average_score=average_score,
             next_step_suggestion=final_review_context.recommendation.reason,
+            unfinished_attempt=None,
+        )
+    except PracticeSessionStateError:
+        raise
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+
+
+def _build_practice_ended_early_session_response(
+    context: PracticeEndedEarlySessionWorkflowContext,
+) -> PracticeCompletedSessionResponse:
+    try:
+        review_contexts = context.completed_attempt_review_contexts
+        final_context_by_question: dict[UUID, PracticeReviewWorkflowContext] = {}
+        for review_context in review_contexts:
+            final_context_by_question[review_context.question_card.id] = review_context
+
+        final_attempts = list(final_context_by_question.values())
+        score_count = len(final_attempts)
+        score_total = sum(
+            review_context.evaluation.overall_score
+            for review_context in final_attempts
+        )
+        average_score = (
+            0
+            if score_count == 0
+            else (score_total * 2 + score_count) // (2 * score_count)
+        )
+        unfinished_attempt = context.unfinished_attempt
+        unfinished_question = context.question_context.question_card
+        if unfinished_question is None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        unfinished_selection = PracticeSessionSelection(
+            target_role_id=context.session.target_role_id,
+            question_type=QuestionCardQuestionType(
+                unfinished_attempt.question_type
+            ),
+            difficulty=QuestionCardDifficulty(unfinished_attempt.difficulty),
+            source=context.session.source,
+            prioritize_weaknesses=context.session.prioritize_weaknesses,
+        )
+        suggestion = (
+            review_contexts[-1].recommendation.reason
+            if review_contexts
+            else None
+        )
+        return PracticeCompletedSessionResponse(
+            status="completed",
+            session_id=context.session.id,
+            language=context.session.language,
+            version=context.session.version,
+            selection=unfinished_selection,
+            started_at=context.session.started_at,
+            attempt_id=unfinished_attempt.id,
+            attempt_number=unfinished_attempt.attempt_number,
+            completion_reason="userEndedEarly",
+            completed_at=context.session.completed_at,
+            questions_completed=len(final_context_by_question),
+            retry_count=sum(
+                review_context.attempt.retry_of_attempt_id is not None
+                for review_context in review_contexts
+            ),
+            saved_question_count=sum(
+                review_context.question_card.is_saved
+                for review_context in final_attempts
+            ),
+            marked_weak_question_count=sum(
+                review_context.question_card.is_marked_weak
+                for review_context in final_attempts
+            ),
+            final_attempt_average_score=average_score,
+            next_step_suggestion=suggestion,
+            unfinished_attempt=PracticeUnfinishedAttemptResponse(
+                attempt_id=unfinished_attempt.id,
+                attempt_number=unfinished_attempt.attempt_number,
+                selection=unfinished_selection,
+                question=build_practice_question_response(unfinished_question),
+            ),
         )
     except PracticeSessionStateError:
         raise

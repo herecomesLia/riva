@@ -270,10 +270,22 @@ function responseMatchesMutation(
     case "continueToNextQuestion":
       return session.status === "generatingQuestion"
     case "endQuestionSession":
-      return session.status === "completed"
+      return (
+        session.status === "completed" &&
+        session.completionReason === "userEndedEarly" &&
+        session.attemptId === currentSession.attemptId &&
+        session.attemptNumber === currentSession.attemptNumber &&
+        session.unfinishedAttempt !== null &&
+        session.unfinishedAttempt.attemptId === currentSession.attemptId &&
+        session.unfinishedAttempt.attemptNumber === currentSession.attemptNumber &&
+        "questionId" in request &&
+        session.unfinishedAttempt.question.id === request.questionId
+      )
     case "endReviewSession":
       return (
         session.status === "completed" &&
+        session.completionReason === "reviewCompleted" &&
+        session.unfinishedAttempt === null &&
         session.attemptId === currentSession.attemptId &&
         session.attemptNumber === currentSession.attemptNumber
       )
