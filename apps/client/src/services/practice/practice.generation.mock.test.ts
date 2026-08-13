@@ -5,12 +5,14 @@ import * as context from "./practice.mock-test-utils"
 describe("practice stateful mock service: generation", () => {
   it("moves a reviewed attempt into deterministic next-question generation", async () => {
     const review = await context.completeQuestionToReview("motivation")
-    const generating = await context.settle(
-      context.continueToNextPracticeQuestion({
-        sessionId: review.sessionId,
-        version: review.version,
-        questionId: review.question.id,
-      }),
+    const generating = context.requireMockPageResponse(
+      await context.settle(
+        context.continueToNextPracticeQuestion({
+          sessionId: review.sessionId,
+          version: review.version,
+          questionId: review.question.id,
+        }),
+      ),
     )
     expect(generating.session).toMatchObject({
       status: "generatingQuestion",

@@ -9,6 +9,7 @@ from riva.core.language import normalize_interaction_language
 from riva.core.practice import get_practice_api_service
 from riva.models import User
 from riva.schemas.practice_sessions import (
+    ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
     RefreshPracticeEvaluationRequest,
@@ -49,6 +50,26 @@ async def start_practice_session(
         interaction_language=normalize_interaction_language(
             request.headers.get("accept-language")
         ),
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/questions/next",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def continue_to_next_practice_question(
+    session_id: PracticeSessionId,
+    payload: ContinuePracticeQuestionRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.continue_to_next_question(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
     )
 
 

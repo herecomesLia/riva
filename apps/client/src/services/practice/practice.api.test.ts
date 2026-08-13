@@ -9,6 +9,7 @@ import {
   getPracticeEvaluationStatus,
   getPracticePage,
   getQuestionGenerationStatus,
+  continueToNextPracticeQuestion,
   startPracticeSession,
   submitFollowUpAnswer,
   submitPrimaryAnswer,
@@ -342,6 +343,33 @@ describe("practice service API", () => {
     expect(requestJson(fetchMock)).not.toHaveProperty("language")
     expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Accept-Language")).toBe("zh-CN")
     expect(session).toMatchObject({ language: "en", status: "generatingQuestion" })
+  })
+
+  it("continues to the next question with only the version and question ID", async () => {
+    const response = createActiveSession("generatingQuestion", {
+      attemptNumber: 2,
+      version: 6,
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response, 202))
+
+    const session = requireActiveSession(
+      await continueToNextPracticeQuestion({
+        questionId,
+        sessionId,
+        version: 5,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/next`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 5, questionId })
+    expect(session).toMatchObject({
+      attemptNumber: 2,
+      status: "generatingQuestion",
+      version: 6,
+    })
   })
 
   it("polls the encoded session refresh endpoint with only the requested version", async () => {

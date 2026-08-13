@@ -65,7 +65,7 @@ export async function settle<T>(promise: Promise<T>) {
   return promise
 }
 
-function requireMockPageResponse(response: PracticeServiceResponse): PracticePageResponse {
+export function requireMockPageResponse(response: PracticeServiceResponse): PracticePageResponse {
   if ("session" in response) return response
   throw new Error("The mock practice service must return a page response.")
 }
@@ -223,12 +223,14 @@ export async function continueToSecondQuestion(
   questionType: PracticeQuestionType,
 ): Promise<PracticeAnsweringState> {
   const firstReview = await finishCurrentAttempt(await generateQuestion(questionType))
-  const generating = await settle(
-    continueToNextPracticeQuestion({
-      sessionId: firstReview.sessionId,
-      version: firstReview.version,
-      questionId: firstReview.question.id,
-    }),
+  const generating = requireMockPageResponse(
+    await settle(
+      continueToNextPracticeQuestion({
+        sessionId: firstReview.sessionId,
+        version: firstReview.version,
+        questionId: firstReview.question.id,
+      }),
+    ),
   )
   if (generating.session.status !== "generatingQuestion") throw new Error("Expected generation.")
   const input = { sessionId: generating.session.sessionId, version: generating.session.version }

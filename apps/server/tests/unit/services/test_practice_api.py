@@ -21,6 +21,7 @@ from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PRACTICE_RECOMMENDATION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_FAILED,
+    PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
     PRACTICE_REVIEW_GENERATION_FAILED,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
@@ -31,6 +32,7 @@ from riva.services.practice_sessions import (
     PracticeSessionWorkflowContext,
 )
 from riva.schemas.practice_sessions import (
+    ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
@@ -83,6 +85,15 @@ class FakePracticeSessionService:
         **kwargs: object,
     ) -> PracticeSessionWorkflowContext:
         self.calls.append(("refresh", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def continue_to_next_question(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext:
+        self.calls.append(("continue", kwargs))
         if self.error is not None:
             raise self.error
         return self.context
@@ -452,6 +463,111 @@ def test_refresh_and_get_do_not_require_llm_configuration() -> None:
     assert refreshed.status == "answering"
     assert fetched.status == "answering"
     assert [call[0] for call in domain.calls] == ["refresh", "get"]
+
+
+def test_continue_to_next_question_forwards_public_provenance_without_llm_precheck() -> None:
+    domain = FakePracticeSessionService(context=context(answering=False))
+    domain.context.session.version = 6
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model=None,
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    session_id = domain.context.session.id
+    user_id = domain.context.session.user_id
+    question_id = uuid4()
+
+    result = asyncio.run(
+        service.continue_to_next_question(
+            user_id=user_id,
+            session_id=session_id,
+            payload=ContinuePracticeQuestionRequest(
+                version=5,
+                question_id=question_id,
+            ),
+        )
+    )
+
+    assert result.status == "generatingQuestion"
+    assert result.version == 6
+    assert domain.calls == [
+        (
+            "continue",
+            {
+                "user_id": user_id,
+                "session_id": session_id,
+                "expected_version": 5,
+                "question_id": question_id,
+            },
+        )
+    ]
+
+
+def test_continue_to_next_question_maps_generation_unavailable_to_503() -> None:
+    domain = FakePracticeSessionService(
+        context=context(answering=False),
+        error=PracticeSessionStateError(
+            PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
+            source_code="missing_model",
+        ),
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service.continue_to_next_question(
+                user_id=domain.context.session.user_id,
+                session_id=domain.context.session.id,
+                payload=ContinuePracticeQuestionRequest(
+                    version=5,
+                    question_id=uuid4(),
+                ),
+            )
+        )
+
+    assert error.value.status_code == 503
+    assert error.value.error == PRACTICE_QUESTION_GENERATION_UNAVAILABLE
+
+
+@pytest.mark.parametrize(
+    ("code", "status_code"),
+    [
+        (PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED, 409),
+        ("practice_session_version_conflict", 409),
+        (PRACTICE_SESSION_NOT_FOUND, 404),
+    ],
+)
+def test_continue_to_next_question_maps_state_errors(
+    code: str,
+    status_code: int,
+) -> None:
+    domain = FakePracticeSessionService(
+        context=context(answering=False),
+        error=PracticeSessionStateError(code),
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            service.continue_to_next_question(
+                user_id=domain.context.session.user_id,
+                session_id=domain.context.session.id,
+                payload=ContinuePracticeQuestionRequest(
+                    version=5,
+                    question_id=uuid4(),
+                ),
+            )
+        )
+
+    assert error.value.status_code == status_code
+    assert error.value.error == code
 
 
 def test_refresh_evaluation_forwards_version_without_llm_precheck() -> None:

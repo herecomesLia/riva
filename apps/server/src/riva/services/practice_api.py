@@ -10,6 +10,7 @@ from riva.core.language import InteractionLanguage
 from riva.models import PracticeAnswer, PracticeFollowUpQuestion, QuestionCard
 from riva.schemas.evaluation import PracticeEvaluationFollowUpCompletionReason
 from riva.schemas.practice_sessions import (
+    ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     PracticeActiveSessionResponse,
     PracticeAnswerResponse,
@@ -123,6 +124,24 @@ class PracticeAPIService:
                 user_id=user_id,
                 session_id=session_id,
                 expected_version=payload.version,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def continue_to_next_question(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: ContinuePracticeQuestionRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().continue_to_next_question(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
             )
             return build_practice_session_response(context)
         except PracticeSessionStateError as error:

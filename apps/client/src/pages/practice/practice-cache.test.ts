@@ -33,6 +33,73 @@ describe("practice mutation cache contract", () => {
     expect(next?.setupContext).toBe(current.setupContext)
   })
 
+  it("accepts only the exact review-to-generating-next-question transition", () => {
+    const current = createPracticeMockResponse("reviewBalanced")
+    const response = createPracticeMockResponse("generatingQuestion")
+    if (current.session.status !== "review" || response.session.status !== "generatingQuestion")
+      return
+
+    const input = {
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+    response.session.sessionId = input.sessionId
+    response.session.version = input.version + 1
+
+    const next = synchronizePracticeMutationResponse(current, response.session, {
+      kind: "continueToNextQuestion",
+      input,
+    })
+    expect(next?.session).toBe(response.session)
+    expect(next?.setupContext).toBe(current.setupContext)
+
+    const wrongStatus = structuredClone(current.session)
+    wrongStatus.version = input.version + 1
+    expect(
+      synchronizePracticeMutationResponse(current, wrongStatus, {
+        kind: "continueToNextQuestion",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongVersion = structuredClone(response.session)
+    wrongVersion.version = input.version + 2
+    expect(
+      synchronizePracticeMutationResponse(current, wrongVersion, {
+        kind: "continueToNextQuestion",
+        input,
+      }),
+    ).toBe(current)
+
+    const sameVersion = structuredClone(response.session)
+    sameVersion.version = input.version
+    expect(
+      synchronizePracticeMutationResponse(current, sameVersion, {
+        kind: "continueToNextQuestion",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongSession = structuredClone(response.session)
+    wrongSession.sessionId = "another-session"
+    expect(
+      synchronizePracticeMutationResponse(current, wrongSession, {
+        kind: "continueToNextQuestion",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongQuestion = structuredClone(input)
+    wrongQuestion.questionId = "another-question"
+    expect(
+      synchronizePracticeMutationResponse(current, response.session, {
+        kind: "continueToNextQuestion",
+        input: wrongQuestion,
+      }),
+    ).toBe(current)
+  })
+
   it("accepts a start response from setup with a self-consistent requested selection", () => {
     const current = createPracticeMockResponse("setupReady")
     const response = createPracticeMockResponse("generatingQuestion")

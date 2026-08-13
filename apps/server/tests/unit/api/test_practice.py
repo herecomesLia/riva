@@ -7,6 +7,7 @@ from riva.core.auth import get_auth_service, require_current_user
 from riva.core.practice import get_practice_api_service
 from riva.models import User
 from riva.schemas.practice_sessions import (
+    ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     PracticeAnswerResponse,
     PracticeGeneratingFollowUpResponse,
@@ -98,6 +99,10 @@ class FakePracticeAPIService:
 
     async def refresh_question_generation(self, **kwargs: object):
         self.calls.append(("refresh", kwargs))
+        return self.result
+
+    async def continue_to_next_question(self, **kwargs: object):
+        self.calls.append(("continue", kwargs))
         return self.result
 
     async def submit_primary_answer(self, **kwargs: object):
@@ -212,6 +217,59 @@ def test_refresh_uses_session_id_and_version_and_get_is_safe(app) -> None:
     assert [call[0] for call in service.calls] == ["refresh", "get"]
     assert service.calls[0][1]["session_id"] == SESSION_ID
     assert service.calls[0][1]["payload"].version == 1
+
+
+def test_continue_to_next_question_returns_202_and_forwards_only_public_body(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    payload = {
+        "version": 5,
+        "questionId": str(uuid4()),
+    }
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/next",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 202
+    assert result.json()["status"] == "generatingQuestion"
+    assert service.calls[0][0] == "continue"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(service.calls[0][1]["payload"], ContinuePracticeQuestionRequest)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+
+
+def test_continue_to_next_question_requires_csrf_and_forbids_internal_fields(app) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+    payload = {
+        "version": 5,
+        "questionId": str(uuid4()),
+    }
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/next",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/next",
+        json={**payload, "attemptId": str(uuid4())},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert service.calls == []
 
 
 def test_submit_primary_answer_returns_202_and_forwards_exact_body(app) -> None:
@@ -450,11 +508,19 @@ def test_new_practice_mutations_require_authentication(app) -> None:
         },
         headers={"Origin": TRUSTED_ORIGIN},
     )
+    next_question = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/next",
+        json={"version": 5, "questionId": str(uuid4())},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
 
     assert submit.status_code == 401
     assert refresh.status_code == 401
     assert evaluation_refresh.status_code == 401
     assert follow_up_submit.status_code == 401
+    assert next_question.status_code == 401
     assert service.calls == []
 
 

@@ -5,6 +5,7 @@ from pydantic import TypeAdapter, ValidationError
 import pytest
 
 from riva.schemas.practice_sessions import (
+    ContinuePracticeQuestionRequest,
     PracticeAttemptStatus,
     PracticeActiveSessionResponse,
     PracticeAnswerResponse,
@@ -192,6 +193,33 @@ def test_refresh_request_requires_positive_version_and_rejects_run_id() -> None:
         RefreshPracticeQuestionGenerationRequest.model_validate(
             {"version": 1, "runId": str(uuid4())}
         )
+
+
+def test_continue_question_request_uses_only_public_provenance() -> None:
+    question_id = uuid4()
+    request = ContinuePracticeQuestionRequest.model_validate(
+        {"version": 5, "questionId": str(question_id)}
+    )
+
+    assert request.version == 5
+    assert request.question_id == question_id
+    assert request.model_dump(mode="json") == {
+        "version": 5,
+        "questionId": str(question_id),
+    }
+
+    for payload in (
+        {"questionId": str(question_id)},
+        {"version": 0, "questionId": str(question_id)},
+        {"version": 5, "questionId": "not-a-uuid"},
+        {"version": 5, "questionId": str(question_id), "attemptId": str(uuid4())},
+        {"version": 5, "questionId": str(question_id), "runId": str(uuid4())},
+        {"version": 5, "questionId": str(question_id), "questionType": "projectDeepDive"},
+        {"version": 5, "questionId": str(question_id), "recommendation": "nextQuestion"},
+        {"version": 5, "questionId": str(question_id), "focusAreas": ["evidence"]},
+    ):
+        with pytest.raises(ValidationError):
+            ContinuePracticeQuestionRequest.model_validate(payload)
 
 
 def test_submit_primary_answer_request_uses_camel_case_and_normalizes_content() -> None:

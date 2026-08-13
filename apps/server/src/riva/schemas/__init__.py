@@ -23,6 +23,7 @@ from riva.schemas.practice_interactions import (
     PracticeAnswerSnapshot,
 )
 from riva.schemas.practice_sessions import (
+    ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
     PracticeAttemptStatus,
     PracticeActiveSessionBase,
@@ -316,6 +317,7 @@ __all__ = [
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
     "PracticeSessionStatus",
+    "ContinuePracticeQuestionRequest",
     "RefreshPracticeFollowUpGenerationRequest",
     "RefreshPracticeEvaluationRequest",
     "RefreshPracticeQuestionGenerationRequest",

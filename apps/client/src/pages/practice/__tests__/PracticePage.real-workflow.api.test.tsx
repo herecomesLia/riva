@@ -9,7 +9,9 @@ import { PracticePage } from "@/pages/practice/PracticePage"
 const roleId = "11111111-1111-4111-8111-111111111111"
 const sessionId = "22222222-2222-4222-8222-222222222222"
 const attemptId = "33333333-3333-4333-8333-333333333333"
+const nextAttemptId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 const questionId = "44444444-4444-4444-8444-444444444444"
+const nextQuestionId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 const materialId = "55555555-5555-4555-8555-555555555555"
 const followUpQuestionOneId = "66666666-6666-4666-8666-666666666666"
 const followUpQuestionTwoId = "77777777-7777-4777-8777-777777777777"
@@ -48,6 +50,12 @@ const question = {
     status: "notRequested" as const,
     viewedBeforeSubmission: false,
   },
+}
+
+const nextQuestion = {
+  ...question,
+  id: nextQuestionId,
+  prompt: "请介绍另一个你主导的复杂项目。",
 }
 
 const mainAnswer = {
@@ -143,6 +151,17 @@ function evaluating(version: number) {
     status: "evaluating" as const,
     submittedAt: "2026-08-12T08:04:00.000Z",
   }
+}
+
+function nextQuestionSession(status: "generatingQuestion" | "answering", version: number) {
+  const nextBase = {
+    ...base(version),
+    attemptId: nextAttemptId,
+    attemptNumber: 2,
+  }
+  return status === "generatingQuestion"
+    ? { ...nextBase, status }
+    : { ...nextBase, question: nextQuestion, status }
 }
 
 function review(version: number) {
@@ -347,6 +366,57 @@ describe("PracticePage real API workflow", () => {
       expect(requestBody([input, init])).toEqual({ version: 7 })
       expect(requestBody([input, init])).not.toHaveProperty("questionId")
     }
+  })
+
+  it("continues from review through the real next-question generation poll", async () => {
+    const user = userEvent.setup()
+    const current = review(8)
+    const nextGenerating = nextQuestionSession("generatingQuestion", 9)
+    const nextAnswering = nextQuestionSession("answering", 10)
+    let generationRefreshCount = 0
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/next`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 8, questionId })
+        return jsonResponse(nextGenerating)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/question-generation/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 9 })
+        generationRefreshCount += 1
+        return jsonResponse(generationRefreshCount === 1 ? nextGenerating : nextAnswering)
+      }
+      throw new Error(`Unexpected request during next-question workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await testing.screen.findByTestId("practice-review-state")
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.review.nextQuestion"),
+      }),
+    )
+
+    expect(await testing.screen.findByTestId("practice-generating-state")).toBeVisible()
+    const answering = await testing.screen.findByTestId(
+      "practice-answering-state",
+      {},
+      {
+        timeout: 4_000,
+      },
+    )
+    expect(answering).toHaveTextContent(nextQuestion.prompt)
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("questions/next"))).toBe(
+      true,
+    )
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).endsWith("question-generation/refresh")),
+    ).toBe(true)
   })
 
   it.each(["generatingFollowUp", "evaluating", "review"] as const)(

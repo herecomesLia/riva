@@ -135,12 +135,14 @@ describe("practice stateful mock service: answering", () => {
 
     context.resetPracticeMockState()
     const nextReview = await context.completeQuestionToReview("motivation")
-    const generating = await context.settle(
-      context.continueToNextPracticeQuestion({
-        sessionId: nextReview.sessionId,
-        version: nextReview.version,
-        questionId: nextReview.question.id,
-      }),
+    const generating = context.requireMockPageResponse(
+      await context.settle(
+        context.continueToNextPracticeQuestion({
+          sessionId: nextReview.sessionId,
+          version: nextReview.version,
+          questionId: nextReview.question.id,
+        }),
+      ),
     )
     if (generating.session.status !== "generatingQuestion") throw new Error("Expected generating.")
     const generationInput = {

@@ -74,6 +74,13 @@ class StartPracticeSessionRequest(PracticeSessionSelection):
     model_config = ConfigDict(extra="forbid")
 
 
+class ContinuePracticeQuestionRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+
+
 class RefreshPracticeQuestionGenerationRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 

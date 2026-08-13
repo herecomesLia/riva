@@ -99,12 +99,14 @@ describe("practice stateful mock service: completion", () => {
     if (firstReview.review.recommendation.action !== "nextQuestion") {
       throw new Error("Expected the completed motivation attempt to recommend the next question.")
     }
-    const generating = await context.settle(
-      context.continueToNextPracticeQuestion({
-        sessionId: firstReview.sessionId,
-        version: firstReview.version,
-        questionId: firstReview.question.id,
-      }),
+    const generating = context.requireMockPageResponse(
+      await context.settle(
+        context.continueToNextPracticeQuestion({
+          sessionId: firstReview.sessionId,
+          version: firstReview.version,
+          questionId: firstReview.question.id,
+        }),
+      ),
     )
     if (generating.session.status !== "generatingQuestion") throw new Error("Expected generation.")
     const input = { sessionId: generating.session.sessionId, version: generating.session.version }
@@ -146,12 +148,14 @@ describe("practice stateful mock service: completion", () => {
     const firstReview = await context.finishCurrentAttempt(
       await context.generateQuestion("motivation"),
     )
-    const generating = await context.settle(
-      context.continueToNextPracticeQuestion({
-        sessionId: firstReview.sessionId,
-        version: firstReview.version,
-        questionId: firstReview.question.id,
-      }),
+    const generating = context.requireMockPageResponse(
+      await context.settle(
+        context.continueToNextPracticeQuestion({
+          sessionId: firstReview.sessionId,
+          version: firstReview.version,
+          questionId: firstReview.question.id,
+        }),
+      ),
     )
     if (generating.session.status !== "generatingQuestion") throw new Error("Expected generation.")
     const input = { sessionId: generating.session.sessionId, version: generating.session.version }
