@@ -33,7 +33,11 @@ from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import PracticeAnswerKind
 from riva.schemas.practice_recommendation import RecommendationRunPayload
 from riva.schemas.practice_review import ReviewRunPayload
-from riva.schemas.practice_sessions import PracticeSessionSelection
+from riva.schemas.practice_sessions import (
+    PracticeAttemptStatus,
+    PracticeSessionCompletionReason,
+    PracticeSessionSelection,
+)
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
@@ -63,6 +67,7 @@ from riva.services.practice_sessions import (
     PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE,
     PracticePrimaryAnswerWorkflowContext,
     PracticeEvaluationWorkflowContext,
+    PracticeCompletedSessionWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
@@ -4311,6 +4316,119 @@ def _retry_review_records(action: str) -> dict[str, object]:
     return records
 
 
+def _retry_final_review_records() -> dict[str, object]:
+    records = _retry_review_records("nextQuestion")
+    active = records["active"]
+    original = records["attempt"]
+    question_run = records["question_run"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(original, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    assert isinstance(card, QuestionCard)
+    original.status = PracticeAttemptStatus.COMPLETED.value
+
+    retry_attempt = PracticeAttempt(
+        id=uuid4(),
+        user_id=active.user_id,
+        session_id=active.id,
+        attempt_number=2,
+        question_type=original.question_type,
+        difficulty=original.difficulty,
+        status=PracticeAttemptStatus.REVIEW.value,
+        question_generation_run_id=None,
+        question_card_id=card.id,
+        retry_of_attempt_id=original.id,
+        created_at=NOW,
+        updated_at=NOW,
+        completed_at=NOW,
+    )
+    answer = main_answer(
+        attempt_id=retry_attempt.id,
+        content="The retry answer is canonical.",
+    )
+    follow_up = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=retry_attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    decision = follow_up_decision(
+        attempt_id=retry_attempt.id,
+        run_id=follow_up.id,
+        action="complete",
+    )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=retry_attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=decision.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    evaluation_value = evaluation_artifact(
+        attempt_id=retry_attempt.id,
+        run_id=evaluation.id,
+    )
+    review = review_run(
+        user_id=active.user_id,
+        attempt_id=retry_attempt.id,
+        evaluation_id=evaluation_value.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    review_value = review_artifact(
+        attempt_id=retry_attempt.id,
+        run_id=review.id,
+    )
+    recommendation = recommendation_run(
+        user_id=active.user_id,
+        attempt_id=retry_attempt.id,
+        evaluation_id=evaluation_value.id,
+        review_id=review_value.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    recommendation_value = recommendation_artifact(
+        attempt_id=retry_attempt.id,
+        run_id=recommendation.id,
+        action="nextQuestion",
+    )
+    return {
+        "active": active,
+        "attempt": retry_attempt,
+        "original": original,
+        "question_run": question_run,
+        "card": card,
+        "answer": answer,
+        "follow_up": follow_up,
+        "decision": decision,
+        "evaluation": evaluation,
+        "evaluation_value": evaluation_value,
+        "review": review,
+        "review_value": review_value,
+        "recommendation": recommendation,
+        "recommendation_value": recommendation_value,
+        "scalar_values": [
+            active,
+            retry_attempt,
+            original,
+            question_run,
+            card,
+            card,
+            answer,
+            follow_up,
+            decision,
+            None,
+            evaluation,
+            evaluation_value,
+            review,
+            review_value,
+            recommendation,
+            recommendation_value,
+        ],
+    }
+
+
 @pytest.mark.parametrize("recommendation_action", ["retryCurrent", "nextQuestion"])
 def test_retry_current_question_reuses_reviewed_question_without_generation(
     recommendation_action: str,
@@ -5104,3 +5222,345 @@ def test_continue_to_next_question_rejects_corrupt_replay(
     assert replay_scripted.added == []
     assert replay_scripted.commit_count == 0
     assert replay_scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize("recommendation_action", ["retryCurrent", "nextQuestion"])
+def test_complete_session_after_review_completes_canonical_review(
+    recommendation_action: str,
+) -> None:
+    records = _continue_review_records(recommendation_action)
+    active = records["active"]
+    attempt = records["attempt"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    previous_attempt_completed_at = attempt.completed_at
+    fake_generation = FakeGenerationService()
+    fake_follow_up = FakeFollowUpGenerationService()
+    fake_evaluation = FakeEvaluationGenerationService()
+    fake_review = FakeReviewGenerationService()
+    fake_recommendation = FakeRecommendationGenerationService()
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_generation=fake_generation,
+            fake_follow_up=fake_follow_up,
+            fake_evaluation=fake_evaluation,
+            fake_review=fake_review,
+            fake_recommendation=fake_recommendation,
+        ).complete_session_after_review(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=active.version,
+        )
+    )
+
+    assert isinstance(result, PracticeCompletedSessionWorkflowContext)
+    assert result.session is active
+    assert result.final_attempt is attempt
+    assert result.final_review_context.attempt is attempt
+    assert result.session.status == "completed"
+    assert result.session.completion_reason == (
+        PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+    )
+    assert result.session.completed_at == NOW
+    assert result.session.version == 5
+    assert result.final_attempt.status == "completed"
+    assert result.final_attempt.completed_at == previous_attempt_completed_at
+    assert result.final_attempt.updated_at == NOW
+    assert scripted.added == []
+    assert scripted.flush_count == 0
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+    assert fake_generation.calls == []
+    assert fake_follow_up.calls == []
+    assert fake_evaluation.calls == []
+    assert fake_review.calls == []
+    assert fake_recommendation.calls == []
+
+
+@pytest.mark.parametrize(
+    ("session_status", "attempt_status"),
+    [
+        ("completed", "review"),
+        ("active", "generatingQuestion"),
+        ("active", "answering"),
+        ("active", "answeringFollowUp"),
+        ("active", "evaluating"),
+    ],
+)
+def test_complete_session_after_review_rejects_invalid_entry_state(
+    session_status: str,
+    attempt_status: str,
+) -> None:
+    active, attempt, _question_run, _card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    active.status = session_status
+    if session_status == "completed":
+        active.completed_at = NOW
+        active.completion_reason = (
+            PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+        )
+    attempt.completed_at = NOW
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).complete_session_after_review(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert active.status == session_status
+    assert active.version == 4
+    assert attempt.status == attempt_status
+    assert scripted.added == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    ["missing_evaluation", "missing_review", "missing_recommendation", "wrong_source"],
+)
+def test_complete_session_after_review_rejects_corrupt_pipeline_without_mutation(
+    corruption: str,
+) -> None:
+    records = _continue_review_records("nextQuestion")
+    active = records["active"]
+    attempt = records["attempt"]
+    question_run = records["question_run"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    scalar_values = list(records["scalar_values"])  # type: ignore[arg-type]
+    if corruption == "missing_evaluation":
+        scalar_values[9] = None
+    elif corruption == "missing_review":
+        scalar_values[11] = None
+    elif corruption == "missing_recommendation":
+        scalar_values[13] = None
+    elif corruption == "wrong_source":
+        question_run.payload = {
+            **question_run.payload,
+            "roleId": str(uuid4()),
+        }
+    else:
+        raise AssertionError(f"unexpected corruption: {corruption}")
+    scripted = ScriptedSession(*scalar_values)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).complete_session_after_review(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code in {
+        PRACTICE_SESSION_STATE_CONFLICT,
+        PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
+        PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
+        PRACTICE_REVIEW_GENERATION_STATE_CONFLICT,
+        PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
+    }
+    assert active.status == "active"
+    assert active.version == 4
+    assert active.completed_at is None
+    assert active.completion_reason is None
+    assert attempt.status == "review"
+    assert attempt.completed_at == NOW
+    assert scripted.added == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_complete_session_after_review_replays_canonical_completed_session() -> None:
+    records = _continue_review_records("retryCurrent")
+    active = records["active"]
+    attempt = records["attempt"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    active.status = "completed"
+    active.version = 5
+    active.completed_at = NOW + timedelta(minutes=1)
+    active.completion_reason = PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+    previous_session_completed_at = active.completed_at
+    previous_session_updated_at = active.updated_at
+    previous_attempt_completed_at = attempt.completed_at
+    attempt.status = "completed"
+    clock_calls = 0
+
+    def clock() -> datetime:
+        nonlocal clock_calls
+        clock_calls += 1
+        return NOW + timedelta(minutes=2)
+
+    scripted = ScriptedSession(*records["scalar_values"])
+    result = asyncio.run(
+        PracticeSessionService(
+            scripted,  # type: ignore[arg-type]
+            clock=clock,
+        ).complete_session_after_review(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+        )
+    )
+
+    assert result.session is active
+    assert result.final_attempt is attempt
+    assert result.session.status == "completed"
+    assert result.session.version == 5
+    assert result.session.completed_at == previous_session_completed_at
+    assert result.session.updated_at == previous_session_updated_at
+    assert result.final_attempt.status == "completed"
+    assert result.final_attempt.completed_at == previous_attempt_completed_at
+    assert clock_calls == 0
+    assert scripted.added == []
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "wrong_reason",
+        "completed_at_null",
+        "naive_completed_at",
+        "wrong_version",
+        "final_attempt_status",
+        "final_attempt_completed_at_null",
+        "missing_evaluation",
+        "missing_review",
+        "missing_recommendation",
+        "wrong_source",
+    ],
+)
+def test_complete_session_after_review_rejects_corrupt_replay(
+    corruption: str,
+) -> None:
+    records = _continue_review_records("nextQuestion")
+    active = records["active"]
+    attempt = records["attempt"]
+    question_run = records["question_run"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    active.status = "completed"
+    active.version = 5
+    active.completed_at = NOW + timedelta(minutes=1)
+    active.completion_reason = PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+    attempt.status = "completed"
+    scalar_values = list(records["scalar_values"])  # type: ignore[arg-type]
+    if corruption == "wrong_reason":
+        active.completion_reason = "userEndedEarly"
+    elif corruption == "completed_at_null":
+        active.completed_at = None
+    elif corruption == "naive_completed_at":
+        active.completed_at = datetime(2026, 8, 10, 10, 1)
+    elif corruption == "wrong_version":
+        active.version = 7
+    elif corruption == "final_attempt_status":
+        attempt.status = "review"
+    elif corruption == "final_attempt_completed_at_null":
+        attempt.completed_at = None
+    elif corruption == "missing_evaluation":
+        scalar_values[9] = None
+    elif corruption == "missing_review":
+        scalar_values[11] = None
+    elif corruption == "missing_recommendation":
+        scalar_values[13] = None
+    elif corruption == "wrong_source":
+        question_run.payload = {
+            **question_run.payload,
+            "roleId": str(uuid4()),
+        }
+    else:
+        raise AssertionError(f"unexpected corruption: {corruption}")
+    scripted = ScriptedSession(*scalar_values)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).complete_session_after_review(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert active.version in {5, 7}
+    assert attempt.status in {"completed", "review"}
+    assert scripted.added == []
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_get_active_session_context_ignores_completed_session_after_completion() -> None:
+    scripted = ScriptedSession(None)
+    result = asyncio.run(
+        service(scripted).get_active_session_context(user_id=uuid4())
+    )
+
+    assert result is None
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+
+
+def test_complete_session_after_review_accepts_a_new_question_final_attempt() -> None:
+    records = _continue_review_records("nextQuestion")
+    active = records["active"]
+    attempt = records["attempt"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    attempt.attempt_number = 2
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).complete_session_after_review(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+        )
+    )
+
+    assert result.final_attempt is attempt
+    assert result.final_attempt.attempt_number == 2
+    assert result.final_attempt.status == PracticeAttemptStatus.COMPLETED.value
+    assert result.session.status == "completed"
+    assert result.session.version == 5
+
+
+def test_complete_session_after_review_accepts_retry_final_attempt_without_run_id() -> None:
+    records = _retry_final_review_records()
+    active = records["active"]
+    original = records["original"]
+    retry_attempt = records["attempt"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(original, PracticeAttempt)
+    assert isinstance(retry_attempt, PracticeAttempt)
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(scripted).complete_session_after_review(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+        )
+    )
+
+    assert result.final_attempt is retry_attempt
+    assert result.final_attempt.retry_of_attempt_id == original.id
+    assert result.final_attempt.question_generation_run_id is None
+    assert result.final_attempt.status == PracticeAttemptStatus.COMPLETED.value
+    assert original.status == PracticeAttemptStatus.COMPLETED.value
+    assert result.session.status == "completed"
+    assert result.session.version == 5

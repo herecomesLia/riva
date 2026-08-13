@@ -44,7 +44,9 @@ from riva.schemas.practice_interactions import (
 )
 from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
+    PracticeSessionCompletionReason,
     PracticeSessionSelection,
+    PracticeSessionStatus,
 )
 from riva.schemas.practice_recommendation import (
     PracticeRecommendationInput,
@@ -249,6 +251,13 @@ class PracticeReviewWorkflowContext(PracticePrimaryAnswerWorkflowContext):
     review: PracticeReview
     recommendation_generation_run: AgentRun
     recommendation: PracticeRecommendation
+
+
+@dataclass(frozen=True)
+class PracticeCompletedSessionWorkflowContext:
+    session: PracticeSession
+    final_attempt: PracticeAttempt
+    final_review_context: PracticeReviewWorkflowContext
 
 
 @dataclass(frozen=True)
@@ -758,6 +767,151 @@ class PracticeSessionService:
                     previous_attempt.updated_at = previous_updated_at
             if practice_session is not None and previous_version is not None:
                 practice_session.version = previous_version
+                if previous_session_updated_at is not None:
+                    practice_session.updated_at = previous_session_updated_at
+                practice_session.completed_at = previous_session_completed_at
+                practice_session.completion_reason = (
+                    previous_session_completion_reason
+                )
+            await self.session.rollback()
+            raise
+
+    async def complete_session_after_review(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+    ) -> PracticeCompletedSessionWorkflowContext:
+        """Complete an active session whose latest attempt is in final review."""
+
+        practice_session: PracticeSession | None = None
+        current_attempt: PracticeAttempt | None = None
+        previous_attempt_status: str | None = None
+        previous_attempt_updated_at: datetime | None = None
+        previous_session_status: str | None = None
+        previous_session_version: int | None = None
+        previous_session_updated_at: datetime | None = None
+        previous_session_completed_at: datetime | None = None
+        previous_session_completion_reason: str | None = None
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            # Lock the session before looking up the latest attempt so this
+            # transition serializes with the other review actions.
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            current_attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if current_attempt is None or (
+                current_attempt.user_id != user_id
+                or current_attempt.session_id != practice_session.id
+            ):
+                if practice_session.version != expected_version:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            if practice_session.version == expected_version + 1:
+                if (
+                    practice_session.status
+                    != PracticeSessionStatus.COMPLETED.value
+                    or practice_session.completion_reason
+                    != PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+                    or practice_session.completed_at is None
+                ):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    )
+                if (
+                    current_attempt.status
+                    != PracticeAttemptStatus.COMPLETED.value
+                    or current_attempt.completed_at is None
+                ):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    )
+                try:
+                    final_review_context = await self._load_review_replay_context(
+                        practice_session,
+                        current_attempt,
+                        allow_completed=True,
+                        allow_completed_session=True,
+                    )
+                except (PracticeSessionStateError, ValueError):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_VERSION_CONFLICT
+                    ) from None
+                await self.session.commit()
+                return PracticeCompletedSessionWorkflowContext(
+                    session=practice_session,
+                    final_attempt=current_attempt,
+                    final_review_context=final_review_context,
+                )
+
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if (
+                practice_session.status != PracticeSessionStatus.ACTIVE.value
+                or practice_session.completed_at is not None
+                or practice_session.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if current_attempt.status != PracticeAttemptStatus.REVIEW.value:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if current_attempt.completed_at is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            final_review_context = await self._load_review_replay_context(
+                practice_session,
+                current_attempt,
+            )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            previous_attempt_status = current_attempt.status
+            previous_attempt_updated_at = current_attempt.updated_at
+            previous_session_status = practice_session.status
+            previous_session_version = practice_session.version
+            previous_session_updated_at = practice_session.updated_at
+            previous_session_completed_at = practice_session.completed_at
+            previous_session_completion_reason = practice_session.completion_reason
+
+            current_attempt.status = PracticeAttemptStatus.COMPLETED.value
+            current_attempt.updated_at = now
+            practice_session.status = PracticeSessionStatus.COMPLETED.value
+            practice_session.completion_reason = (
+                PracticeSessionCompletionReason.REVIEW_COMPLETED.value
+            )
+            practice_session.completed_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeCompletedSessionWorkflowContext(
+                session=practice_session,
+                final_attempt=current_attempt,
+                final_review_context=final_review_context,
+            )
+        except BaseException:
+            if current_attempt is not None and previous_attempt_status is not None:
+                current_attempt.status = previous_attempt_status
+                current_attempt.updated_at = previous_attempt_updated_at
+            if practice_session is not None and previous_session_version is not None:
+                if previous_session_status is not None:
+                    practice_session.status = previous_session_status
+                practice_session.version = previous_session_version
                 if previous_session_updated_at is not None:
                     practice_session.updated_at = previous_session_updated_at
                 practice_session.completed_at = previous_session_completed_at
@@ -3770,23 +3924,40 @@ class PracticeSessionService:
         attempt: PracticeAttempt,
         *,
         allow_completed: bool = False,
+        allow_completed_session: bool = False,
     ) -> PracticeReviewWorkflowContext:
-        if (
-            (
-                attempt.status
-                not in {
-                    PracticeAttemptStatus.REVIEW.value,
-                    PracticeAttemptStatus.COMPLETED.value,
-                }
-                if allow_completed
-                else attempt.status != PracticeAttemptStatus.REVIEW.value
+        attempt_state_valid = (
+            attempt.status
+            in {
+                PracticeAttemptStatus.REVIEW.value,
+                PracticeAttemptStatus.COMPLETED.value,
+            }
+            if allow_completed
+            else attempt.status == PracticeAttemptStatus.REVIEW.value
+        )
+        if allow_completed_session:
+            session_state_valid = (
+                practice_session.status
+                == PracticeSessionStatus.COMPLETED.value
+                and practice_session.completed_at is not None
+                and practice_session.completion_reason
+                == PracticeSessionCompletionReason.REVIEW_COMPLETED.value
             )
-            or attempt.completed_at is None
-            or practice_session.status != "active"
-            or practice_session.completed_at is not None
-            or practice_session.completion_reason is not None
-        ):
+        else:
+            session_state_valid = (
+                practice_session.status == PracticeSessionStatus.ACTIVE.value
+                and practice_session.completed_at is None
+                and practice_session.completion_reason is None
+            )
+        if not attempt_state_valid or attempt.completed_at is None:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if not session_state_valid:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if allow_completed_session:
+            completed_at = practice_session.completed_at
+            if completed_at is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            _require_aware_datetime(completed_at)
 
         chain = await self._load_follow_up_chain(
             practice_session,
@@ -4287,6 +4458,7 @@ __all__ = [
     "PracticeSessionStateError",
     "PracticeSessionStateErrorCode",
     "PracticeAnsweredFollowUpExchangeContext",
+    "PracticeCompletedSessionWorkflowContext",
     "PracticePrimaryAnswerWorkflowContext",
     "PracticeEvaluationWorkflowContext",
     "PracticeEvaluationPipelineContext",
