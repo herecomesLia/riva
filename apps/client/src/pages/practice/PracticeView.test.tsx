@@ -134,6 +134,9 @@ function renderReadyView(
     answeringPending?: PracticeAnsweringPending
     followUpActions?: PracticeFollowUpActions
     followUpPending?: PracticeFollowUpPending
+    followUpGenerationError?: boolean
+    isFollowUpGenerationRetrying?: boolean
+    onRetryFollowUpGeneration?: () => void
     reviewActions?: PracticeReviewActions
     reviewPending?: PracticeReviewPending
     completedActions?: PracticeCompletedActions
@@ -156,6 +159,8 @@ function renderReadyView(
       completedPending={options.completedPending ?? false}
       followUpActions={followUpActions}
       followUpPending={options.followUpPending ?? followUpPending}
+      followUpGenerationError={options.followUpGenerationError ?? false}
+      isFollowUpGenerationRetrying={options.isFollowUpGenerationRetrying ?? false}
       reviewActions={options.reviewActions ?? createReviewActions()}
       reviewPending={options.reviewPending ?? reviewPending}
       content={{ status: "ready", data: viewData }}
@@ -165,6 +170,7 @@ function renderReadyView(
       isGenerationRetrying={options.isGenerationRetrying ?? false}
       isStarting={options.isStarting ?? false}
       onRetryGeneration={options.onRetryGeneration ?? vi.fn()}
+      onRetryFollowUpGeneration={options.onRetryFollowUpGeneration ?? vi.fn()}
       onRetryEvaluation={options.onRetryEvaluation ?? vi.fn()}
       onStart={onStart}
       variant="default"
@@ -214,6 +220,10 @@ const sessionStateCases = {
     testId: "practice-generating-state",
   },
   answering: { scenario: "answeringQuestion", testId: "practice-answering-state" },
+  generatingFollowUp: {
+    scenario: "answeringFirstFollowUp",
+    testId: "practice-generating-follow-up-state",
+  },
   answeringFollowUp: {
     scenario: "answeringFirstFollowUp",
     testId: "practice-answering-follow-up-state",
@@ -233,7 +243,11 @@ describe("PracticeView", () => {
   it.each(Object.entries(sessionStateCases))(
     "renders the explicit %s session branch",
     async (status, { scenario, testId }) => {
-      const data = createPracticeMockResponse(scenario)
+      const source = createPracticeMockResponse(scenario)
+      const data =
+        status === "generatingFollowUp" && source.session.status === "answeringFollowUp"
+          ? { ...source, session: { ...source.session, status: "generatingFollowUp" as const } }
+          : source
       expect(data.session.status).toBe(status)
 
       renderReadyView(data)
@@ -510,11 +524,14 @@ describe("PracticeView", () => {
         evaluationError={false}
         followUpActions={followUpActions}
         followUpPending={followUpPending}
+        followUpGenerationError={false}
+        isFollowUpGenerationRetrying={false}
         generationError={false}
         isEvaluationRetrying={false}
         isGenerationRetrying={false}
         isStarting={false}
         onRetryEvaluation={vi.fn()}
+        onRetryFollowUpGeneration={vi.fn()}
         onRetryGeneration={vi.fn()}
         onStart={vi.fn(async () => undefined)}
         reviewActions={reviewActions}
@@ -536,11 +553,14 @@ describe("PracticeView", () => {
         evaluationError={false}
         followUpActions={followUpActions}
         followUpPending={followUpPending}
+        followUpGenerationError={false}
+        isFollowUpGenerationRetrying={false}
         generationError={false}
         isEvaluationRetrying={false}
         isGenerationRetrying={false}
         isStarting={false}
         onRetryEvaluation={vi.fn()}
+        onRetryFollowUpGeneration={vi.fn()}
         onRetryGeneration={vi.fn()}
         onStart={vi.fn(async () => undefined)}
         reviewActions={reviewActions}
@@ -1185,6 +1205,46 @@ describe("PracticeView", () => {
       composer.compareDocumentPosition(assistance) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
+  })
+
+  it("renders generating follow-up as a read-only processing state", async () => {
+    const response = createPracticeMockResponse("answeringFirstFollowUp")
+    if (response.session.status !== "answeringFollowUp") return
+    const generating = {
+      ...response,
+      session: { ...response.session, status: "generatingFollowUp" as const },
+    }
+
+    renderReadyView(generating)
+
+    expect(await screen.findByTestId("practice-generating-follow-up-state")).toBeInTheDocument()
+    expect(screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
+      response.session.mainAnswer.content,
+    )
+    expect(screen.getByText(i18n.t("practice.followUp.processing"))).toBeInTheDocument()
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+  })
+
+  it("keeps the generating follow-up timeline visible when polling fails", async () => {
+    const response = createPracticeMockResponse("answeringFirstFollowUp")
+    if (response.session.status !== "answeringFollowUp") return
+    const onRetry = vi.fn()
+    const generating = {
+      ...response,
+      session: { ...response.session, status: "generatingFollowUp" as const },
+    }
+
+    renderReadyView(generating, {
+      followUpGenerationError: true,
+      onRetryFollowUpGeneration: onRetry,
+    })
+
+    expect(await screen.findByTestId("practice-generating-follow-up-error")).toBeInTheDocument()
+    expect(screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
+      response.session.mainAnswer.content,
+    )
+    screen.getByRole("button", { name: i18n.t("practice.followUp.retryProcessing") }).click()
+    expect(onRetry).toHaveBeenCalledOnce()
   })
 
   it("renders a service-provided follow-up with an unknown template ID", async () => {

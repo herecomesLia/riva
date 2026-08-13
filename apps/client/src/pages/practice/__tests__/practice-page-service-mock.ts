@@ -4,6 +4,7 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/practice")>()),
   getPracticePage: vi.fn(),
   getPracticeEvaluationStatus: vi.fn(),
+  getFollowUpGenerationStatus: vi.fn(),
   getQuestionGenerationStatus: vi.fn(),
   endPracticeFollowUps: vi.fn(),
   requestAnswerFramework: vi.fn(),

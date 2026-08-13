@@ -11,7 +11,7 @@ import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   endPracticeFollowUps,
   getPracticePage,
-  getPracticeEvaluationStatus,
+  getPracticeEvaluationStatus as requestPracticeEvaluationStatus,
   getQuestionGenerationStatus as requestQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
@@ -30,8 +30,8 @@ import {
   setQuestionWeak,
   skipPracticeQuestion,
   startPracticeSession as requestStartPracticeSession,
-  submitFollowUpAnswer,
-  submitPrimaryAnswer,
+  submitFollowUpAnswer as requestSubmitFollowUpAnswer,
+  submitPrimaryAnswer as requestSubmitPrimaryAnswer,
 } from "@/services/practice"
 import {
   createTargetRole,
@@ -42,9 +42,11 @@ import {
 } from "@/services/roles"
 import type {
   PracticeAnsweringState,
+  PracticePageResponse,
   PracticeQuestionType,
   PracticeReferenceAnswer,
   PracticeReviewState,
+  PracticeServiceResponse,
 } from "@/models/practice"
 import { isCurrentPracticeAttemptRetry } from "@/pages/practice/practice-attempt"
 
@@ -61,6 +63,25 @@ afterEach(() => {
 export async function settle<T>(promise: Promise<T>) {
   await vi.runAllTimersAsync()
   return promise
+}
+
+function requireMockPageResponse(response: PracticeServiceResponse): PracticePageResponse {
+  if ("session" in response) return response
+  throw new Error("The mock practice service must return a page response.")
+}
+
+async function getPracticeEvaluationStatus(
+  input: Parameters<typeof requestPracticeEvaluationStatus>[0],
+) {
+  return requireMockPageResponse(await requestPracticeEvaluationStatus(input))
+}
+
+async function submitPrimaryAnswer(input: Parameters<typeof requestSubmitPrimaryAnswer>[0]) {
+  return requireMockPageResponse(await requestSubmitPrimaryAnswer(input))
+}
+
+async function submitFollowUpAnswer(input: Parameters<typeof requestSubmitFollowUpAnswer>[0]) {
+  return requireMockPageResponse(await requestSubmitFollowUpAnswer(input))
 }
 
 export async function generateQuestion(

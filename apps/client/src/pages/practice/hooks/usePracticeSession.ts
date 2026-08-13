@@ -5,7 +5,7 @@ import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { toPracticeEntryParameters, type PracticeEntrySearch } from "@/app/training-entry-search"
 import type {
-  PracticeMutationResponse,
+  PracticeServiceResponse,
   PracticePageResponse,
   PrepareNextPracticeSessionInput,
   StartPracticeSessionInput,
@@ -21,6 +21,7 @@ import {
 import {
   type PracticeMutationInputFor,
   type PracticeMutationKind,
+  getPracticeResponseSession,
   synchronizePracticeMutationResponse,
 } from "../practice-cache"
 
@@ -144,7 +145,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
 export function usePracticeMutation<
   TKind extends PracticeMutationKind,
   TInput extends PracticeMutationInputFor<TKind>,
->(kind: TKind, mutationFn: (input: TInput) => Promise<PracticeMutationResponse>) {
+>(kind: TKind, mutationFn: (input: TInput) => Promise<PracticeServiceResponse>) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -153,7 +154,7 @@ export function usePracticeMutation<
       queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
         synchronizePracticeMutationResponse(current, response, { kind, input }),
       )
-      if (response.session.status === "completed") {
+      if (getPracticeResponseSession(response).status === "completed") {
         void queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all })
         void queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all })
       }

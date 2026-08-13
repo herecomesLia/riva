@@ -38,14 +38,11 @@ describe("PracticePage: evaluation", () => {
     }
     const retried = structuredClone(evaluating)
     if (retried.session.status !== "evaluating") return
-    retried.session.version += 1
     const nextPoll = context.createDeferred<import("@/models/practice").PracticePageResponse>()
-    const retryAttempt = context.createDeferred<import("@/models/practice").PracticePageResponse>()
     vi.mocked(api.getPracticePage).mockResolvedValue(evaluating)
     vi.mocked(api.getPracticeEvaluationStatus)
       .mockRejectedValueOnce(new Error("unsafe evaluation prompt and stack"))
       .mockReturnValueOnce(nextPoll.promise)
-    vi.mocked(api.retryPracticeEvaluation).mockReturnValue(retryAttempt.promise)
 
     context.renderPracticePage()
 
@@ -67,15 +64,15 @@ describe("PracticePage: evaluation", () => {
       name: i18n.t("practice.evaluating.retrying"),
     })
     expect(retryingButton).toBeDisabled()
-    expect(api.retryPracticeEvaluation).toHaveBeenCalledOnce()
-    expect(vi.mocked(api.retryPracticeEvaluation).mock.calls[0]?.[0]).toEqual({
+    expect(api.retryPracticeEvaluation).not.toHaveBeenCalled()
+    expect(vi.mocked(api.getPracticeEvaluationStatus).mock.calls[1]?.[0]).toEqual({
       sessionId: evaluating.session.sessionId,
       version: evaluating.session.version,
       questionId: evaluating.session.question.id,
     })
     await testing.act(async () => {
-      retryAttempt.resolve(retried)
-      await retryAttempt.promise
+      nextPoll.resolve(retried)
+      await nextPoll.promise
     })
     await testing.waitFor(() => expect(api.getPracticeEvaluationStatus).toHaveBeenCalledTimes(2))
     expect(vi.mocked(api.getPracticeEvaluationStatus).mock.calls[1]?.[0]).toEqual({

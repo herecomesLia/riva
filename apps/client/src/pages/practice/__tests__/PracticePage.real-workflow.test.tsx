@@ -65,4 +65,134 @@ describe("PracticePage: active session workflow", () => {
     expect(api.startPracticeSession).not.toHaveBeenCalled()
     expect(api.getQuestionGenerationStatus).not.toHaveBeenCalled()
   })
+
+  it("runs the real-shaped main and follow-up workflow through evaluation", async () => {
+    const user = userEvent.setup()
+    const initial = api.createPracticeMockResponse("answeringQuestion")
+    const firstFollowUp = api.createPracticeMockResponse("answeringFirstFollowUp")
+    const secondFollowUp = api.createPracticeMockResponse("answeringFollowUp")
+    const evaluating = api.createPracticeMockResponse("evaluatingAnswer")
+    const review = api.createPracticeMockResponse("reviewBalanced")
+    if (
+      initial.session.status !== "answering" ||
+      firstFollowUp.session.status !== "answeringFollowUp" ||
+      secondFollowUp.session.status !== "answeringFollowUp" ||
+      evaluating.session.status !== "evaluating" ||
+      review.session.status !== "review"
+    ) {
+      throw new Error("The complete practice workflow fixtures are required.")
+    }
+
+    const initialSession = initial.session
+    const firstFollowUpSession = firstFollowUp.session
+    const secondFollowUpSession = secondFollowUp.session
+    if (
+      initialSession.status !== "answering" ||
+      firstFollowUpSession.status !== "answeringFollowUp" ||
+      secondFollowUpSession.status !== "answeringFollowUp"
+    ) {
+      throw new Error("The answering workflow fixtures are required.")
+    }
+
+    const sessionId = initialSession.sessionId
+    const questionId = initialSession.question.id
+    const makeGeneratingFollowUp = (source: typeof firstFollowUpSession, version: number) => {
+      const { currentFollowUp: _currentFollowUp, ...withoutCurrentFollowUp } = source
+      return {
+        ...withoutCurrentFollowUp,
+        question: initialSession.question,
+        sessionId,
+        status: "generatingFollowUp" as const,
+        version,
+      }
+    }
+
+    const firstGenerating = makeGeneratingFollowUp(firstFollowUpSession, initialSession.version + 1)
+    const firstAnswering = {
+      ...firstFollowUpSession,
+      question: initialSession.question,
+      sessionId,
+      version: firstGenerating.version + 1,
+    }
+    const secondGenerating = makeGeneratingFollowUp(
+      secondFollowUpSession,
+      firstAnswering.version + 1,
+    )
+    const secondAnswering = {
+      ...secondFollowUpSession,
+      question: initialSession.question,
+      sessionId,
+      version: secondGenerating.version + 1,
+    }
+    const evaluatingPending = {
+      ...evaluating.session,
+      question: initialSession.question,
+      sessionId,
+      version: secondAnswering.version + 1,
+    }
+    const finalReview = {
+      ...review.session,
+      followUpCompletion: { status: "completed" as const, reason: "allAnswered" as const },
+      followUpExchanges: secondAnswering.followUpExchanges,
+      question: initialSession.question,
+      sessionId,
+      version: evaluatingPending.version + 1,
+    }
+
+    vi.mocked(api.getPracticePage).mockResolvedValue(initial)
+    vi.mocked(api.submitPrimaryAnswer).mockResolvedValue(firstGenerating)
+    vi.mocked(api.getFollowUpGenerationStatus)
+      .mockResolvedValueOnce(firstAnswering)
+      .mockResolvedValueOnce(secondAnswering)
+    vi.mocked(api.submitFollowUpAnswer)
+      .mockResolvedValueOnce(secondGenerating)
+      .mockResolvedValueOnce(evaluatingPending)
+    vi.mocked(api.getPracticeEvaluationStatus)
+      .mockResolvedValueOnce(evaluatingPending)
+      .mockResolvedValueOnce(finalReview)
+
+    context.renderPracticePage()
+
+    await user.type(
+      await testing.screen.findByLabelText(i18n.t("practice.answer.label")),
+      "主回答中的个人行动与结果。",
+    )
+    await user.click(testing.screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+    expect(await testing.screen.findByTestId("practice-generating-follow-up-state")).toBeVisible()
+    expect(await testing.screen.findByTestId("practice-answering-follow-up-state")).toBeVisible()
+
+    await user.type(
+      testing.screen.getByLabelText(i18n.t("practice.followUp.answerLabel")),
+      "第一轮追问的证据。",
+    )
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("practice.followUp.submit") }),
+    )
+    expect(await testing.screen.findByTestId("practice-generating-follow-up-state")).toBeVisible()
+    expect(await testing.screen.findByTestId("practice-answering-follow-up-state")).toBeVisible()
+
+    await user.type(
+      testing.screen.getByLabelText(i18n.t("practice.followUp.answerLabel")),
+      "第二轮追问的风险控制。",
+    )
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("practice.followUp.submit") }),
+    )
+    expect(await testing.screen.findByTestId("practice-evaluating-state")).toBeVisible()
+    expect(
+      await testing.screen.findByTestId("practice-review-state", {}, { timeout: 3_000 }),
+    ).toHaveTextContent(String(finalReview.evaluation.overallScore))
+    expect(testing.screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
+      secondAnswering.followUpExchanges[0]?.answer.content ?? "",
+    )
+    expect(api.getFollowUpGenerationStatus).toHaveBeenCalledTimes(2)
+    expect(api.getPracticeEvaluationStatus).toHaveBeenCalledTimes(2)
+    expect(api.retryPracticeEvaluation).not.toHaveBeenCalled()
+    expect(vi.mocked(api.submitPrimaryAnswer).mock.calls[0]?.[0]).toEqual({
+      content: "主回答中的个人行动与结果。",
+      questionId,
+      sessionId,
+      version: initialSession.version,
+    })
+  })
 })

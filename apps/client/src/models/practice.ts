@@ -122,7 +122,8 @@ export type PracticeFollowUpReferenceAnswerState =
 
 export type PracticeFollowUpQuestion = {
   id: string
-  templateId: PracticeFollowUpTemplateId
+  /** Mock-only catalog metadata. The real API does not expose this field. */
+  templateId?: PracticeFollowUpTemplateId
   prompt: string
   createdAt: string
   order: number
@@ -262,7 +263,19 @@ export type PracticeAnsweringState = PracticeQuestionSessionBase & {
   status: "answering"
 }
 
-export type PracticeActiveSessionState = PracticeGeneratingQuestionState | PracticeAnsweringState
+export type PracticeGeneratingFollowUpState = PracticeQuestionSessionBase & {
+  status: "generatingFollowUp"
+  mainAnswer: PracticeAnswer
+  followUpExchanges: AnsweredPracticeFollowUpExchange[]
+}
+
+export type PracticeActiveSessionState =
+  | PracticeGeneratingQuestionState
+  | PracticeAnsweringState
+  | PracticeGeneratingFollowUpState
+  | PracticeAnsweringFollowUpState
+  | PracticeEvaluatingState
+  | PracticeReviewState
 
 export type PracticeAnsweringFollowUpState = PracticeQuestionSessionBase & {
   status: "answeringFollowUp"
@@ -299,6 +312,7 @@ export type PracticeSessionState =
   | PracticeSetupState
   | PracticeGeneratingQuestionState
   | PracticeAnsweringState
+  | PracticeGeneratingFollowUpState
   | PracticeAnsweringFollowUpState
   | PracticeEvaluatingState
   | PracticeReviewState
@@ -309,15 +323,20 @@ export type PracticePageResponse = {
   session: PracticeSessionState
 }
 
-/**
- * Practice mutations beyond session start return the complete authoritative page snapshot.
- * Clients must validate their requested identity, exact next version, and state transition.
- */
+/** Mock service mutations continue to expose the complete page snapshot. */
 export type PracticeMutationResponse = PracticePageResponse
+
+/** Real mutations and polling may return an active session without setup context. */
+export type PracticeServiceResponse = PracticePageResponse | PracticeActiveSessionState
 
 export type StartPracticeSessionInput = ActivePracticeSelection
 
 export type GetQuestionGenerationStatusInput = {
+  sessionId: string
+  version: number
+}
+
+export type GetFollowUpGenerationStatusInput = {
   sessionId: string
   version: number
 }

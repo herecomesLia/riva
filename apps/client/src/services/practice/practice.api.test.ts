@@ -2,11 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ZodError } from "zod"
 
 import { i18n } from "@/i18n/i18n"
+import type { PracticeActiveSessionState, PracticeServiceResponse } from "@/models/practice"
 import type { RolesPageResponseDto, TargetRoleApiDto } from "@/models/roles"
 import {
+  getFollowUpGenerationStatus,
+  getPracticeEvaluationStatus,
   getPracticePage,
   getQuestionGenerationStatus,
   startPracticeSession,
+  submitFollowUpAnswer,
+  submitPrimaryAnswer,
 } from "@/services/practice"
 
 const roleId = "11111111-1111-4111-8111-111111111111"
@@ -15,6 +20,10 @@ const sessionId = "22222222-2222-4222-8222-222222222222"
 const attemptId = "33333333-3333-4333-8333-333333333333"
 const questionId = "44444444-4444-4444-8444-444444444444"
 const materialId = "55555555-5555-4555-8555-555555555555"
+const followUpQuestionId = "77777777-7777-4777-8777-777777777777"
+const secondFollowUpQuestionId = "88888888-8888-4888-8888-888888888888"
+const answerId = "99999999-9999-4999-8999-999999999999"
+const secondAnswerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
 const selection = {
   difficulty: "basic" as const,
@@ -104,6 +113,119 @@ function createActiveSession(
     : { ...base, ...overrides }
 }
 
+function createAnswer(id: string, order: number) {
+  return {
+    id,
+    content: order === 1 ? "主回答内容" : `追问回答 ${order - 1}`,
+    createdAt: "2026-08-11T08:01:00.000Z",
+    order,
+  }
+}
+
+function createFollowUpQuestion(id: string, order: number) {
+  return {
+    answerFramework: { content: null, status: "notRequested" as const },
+    answerHints: { content: null, status: "notRequested" as const },
+    createdAt: "2026-08-11T08:01:00.000Z",
+    id,
+    order,
+    prompt: `请补充追问 ${order}。`,
+    referenceAnswer: {
+      content: null,
+      status: "notRequested" as const,
+      viewedBeforeSubmission: false,
+    },
+  }
+}
+
+function createFollowUpExchange(order = 1) {
+  return {
+    answer: createAnswer(order === 1 ? answerId : secondAnswerId, order + 1),
+    question: createFollowUpQuestion(
+      order === 1 ? followUpQuestionId : secondFollowUpQuestionId,
+      order,
+    ),
+    status: "answered" as const,
+  }
+}
+
+function createFollowUpSession(
+  status: "generatingFollowUp" | "answeringFollowUp" | "evaluating" | "review",
+  overrides: Record<string, unknown> = {},
+) {
+  const base = createActiveSession("answering", { version: 3 })
+  const exchange = createFollowUpExchange()
+  const common = {
+    ...base,
+    mainAnswer: createAnswer(answerId, 1),
+    question: createQuestion(),
+    status,
+    followUpExchanges: status === "generatingFollowUp" ? [] : [exchange],
+    ...overrides,
+  }
+  if (status === "generatingFollowUp") return common
+  if (status === "answeringFollowUp") {
+    return {
+      ...common,
+      followUpExchanges: overrides.followUpExchanges ?? [],
+      currentFollowUp: {
+        answer: null,
+        question: createFollowUpQuestion(followUpQuestionId, 1),
+        status: "awaitingAnswer" as const,
+      },
+    }
+  }
+  const evaluation = {
+    dimensionScores: [
+      {
+        dimension: "relevance" as const,
+        explanation: "与问题相关。",
+        score: 80,
+      },
+      {
+        dimension: "structure" as const,
+        explanation: "结构清晰。",
+        score: 80,
+      },
+      {
+        dimension: "specificity" as const,
+        explanation: "细节充分。",
+        score: 80,
+      },
+      {
+        dimension: "personalContribution" as const,
+        explanation: "个人贡献明确。",
+        score: 80,
+      },
+    ],
+    evaluatedAt: "2026-08-11T08:02:00.000Z",
+    overallScore: 80,
+  }
+  const review = {
+    exposedWeaknesses: [],
+    highlights: ["表达清晰"],
+    improvementSuggestions: ["补充证据"],
+    mainIssues: [],
+    overallPerformance: "表现稳定。",
+    recommendation: { action: "retryCurrent" as const, reason: "继续打磨。" },
+    reusableAnswerStructure: ["背景、行动、结果"],
+  }
+  return status === "evaluating"
+    ? {
+        ...common,
+        followUpCompletion: { reason: "allAnswered" as const, status: "completed" as const },
+        submittedAt: "2026-08-11T08:02:00.000Z",
+        ...overrides,
+      }
+    : {
+        ...common,
+        evaluation,
+        followUpCompletion: { reason: "allAnswered" as const, status: "completed" as const },
+        review,
+        ...overrides,
+      }
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
@@ -115,6 +237,11 @@ function requestJson(fetchMock: ReturnType<typeof vi.fn<typeof fetch>>, index = 
   const body = fetchMock.mock.calls[index]?.[1]?.body
   if (typeof body !== "string") throw new TypeError("Expected a JSON request body.")
   return JSON.parse(body) as unknown
+}
+
+function requireActiveSession(response: PracticeServiceResponse): PracticeActiveSessionState {
+  if ("status" in response) return response
+  throw new Error("The real practice API must return an active session.")
 }
 
 describe("practice service API", () => {
@@ -188,6 +315,19 @@ describe("practice service API", () => {
     },
   )
 
+  it.each(["generatingFollowUp", "answeringFollowUp", "evaluating", "review"] as const)(
+    "restores a real %s current session",
+    async (status) => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(createRolesResponse()))
+        .mockResolvedValueOnce(jsonResponse({ session: createFollowUpSession(status) }))
+
+      const page = await getPracticePage()
+
+      expect(page.session).toMatchObject({ attemptRecords: [], status })
+    },
+  )
+
   it("starts with exactly the selection body and keeps server language authoritative", async () => {
     const input = { ...selection, prioritizeWeaknesses: true }
     fetchMock.mockResolvedValueOnce(jsonResponse(createActiveSession("generatingQuestion")))
@@ -216,6 +356,94 @@ describe("practice service API", () => {
     )
     expect(requestJson(fetchMock)).toEqual({ version: 1 })
     expect(session).toMatchObject({ status: "answering", version: 2 })
+  })
+
+  it("submits the main answer to the real endpoint without mock-only fields", async () => {
+    const response = createFollowUpSession("generatingFollowUp", { version: 3 })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+    const session = requireActiveSession(
+      await submitPrimaryAnswer({
+        content: "主回答内容",
+        questionId,
+        sessionId,
+        version: 2,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${sessionId}/answers/main`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({
+      content: "主回答内容",
+      questionId,
+      version: 2,
+    })
+    expect(session.status).toBe("generatingFollowUp")
+  })
+
+  it("refreshes follow-up generation with only the requested version", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(createFollowUpSession("answeringFollowUp")))
+
+    const session = await getFollowUpGenerationStatus({ sessionId, version: 3 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${sessionId}/follow-up-generation/refresh`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 3 })
+    expect(session.status).toBe("answeringFollowUp")
+  })
+
+  it.each([
+    ["generatingFollowUp", createFollowUpSession("generatingFollowUp", { version: 4 })],
+    ["evaluating", createFollowUpSession("evaluating", { version: 5 })],
+  ] as const)("submits a follow-up answer and accepts %s", async (_status, response) => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+    const session = requireActiveSession(
+      await submitFollowUpAnswer({
+        content: "追问回答内容",
+        followUpQuestionId,
+        questionId,
+        sessionId,
+        version: response.version - 1,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${sessionId}/answers/follow-up`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({
+      content: "追问回答内容",
+      followUpQuestionId,
+      questionId,
+      version: response.version - 1,
+    })
+    expect(session.status).toBe(_status)
+  })
+
+  it("refreshes evaluation with only version and never sends questionId", async () => {
+    const response = createFollowUpSession("review", { version: 4 })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+    const session = requireActiveSession(
+      await getPracticeEvaluationStatus({
+        sessionId,
+        questionId,
+        version: 3,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${sessionId}/evaluation/refresh`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 3 })
+    expect(requestJson(fetchMock)).not.toHaveProperty("questionId")
+    expect(session.status).toBe("review")
   })
 
   it("fails closed when the backend sends a non-contract question payload", async () => {

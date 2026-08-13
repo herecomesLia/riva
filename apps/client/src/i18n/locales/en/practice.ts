@@ -80,6 +80,9 @@ export const practice = {
     endDescription: "Your practice session is still active. Please try again.",
     followUpSubmitTitle: "Follow-up answer not submitted",
     followUpSubmitDescription: "Your follow-up draft is still here. Please try again.",
+    followUpGenerationTitle: "Follow-up generation did not complete",
+    followUpGenerationDescription:
+      "Your submitted answer is preserved. You can safely retry the next decision.",
     endFollowUpDescription: "The follow-up is still active. Please try again.",
     evaluationTitle: "Unable to generate the evaluation",
     evaluationDescription: "Your complete conversation is preserved. You can safely retry.",
@@ -131,6 +134,8 @@ export const practice = {
     submitting: "Submitting follow-up answer",
     processing: "Riva is reviewing your answer and preparing the next step…",
     processingDescription: "Your answer was sent. Riva is deciding whether to follow up again.",
+    retryProcessing: "Analyze again",
+    retryingProcessing: "Analyzing again",
     endAnswering: "End this question",
     endDialogTitle: "End the current follow-up?",
     endDialogDescription:

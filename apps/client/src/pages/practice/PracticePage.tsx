@@ -8,6 +8,7 @@ import {
 } from "./hooks/usePracticeAnsweringActions"
 import { usePracticeEvaluationPolling } from "./hooks/usePracticeEvaluationPolling"
 import { usePracticeFollowUpActions } from "./hooks/usePracticeFollowUpActions"
+import { usePracticeFollowUpGenerationPolling } from "./hooks/usePracticeFollowUpGenerationPolling"
 import { usePracticeGenerationPolling } from "./hooks/usePracticeGenerationPolling"
 import { usePracticeReviewActions } from "./hooks/usePracticeReviewActions"
 import { usePracticeSession } from "./hooks/usePracticeSession"
@@ -26,6 +27,7 @@ export function PracticePage() {
     retryHistoryEntry,
   } = usePracticeSession(entrySearch)
   const generation = usePracticeGenerationPolling(practiceQuery.data)
+  const followUpGeneration = usePracticeFollowUpGenerationPolling(practiceQuery.data)
   const evaluation = usePracticeEvaluationPolling(practiceQuery.data)
   const runAction = usePracticeActionLock()
   const answering = usePracticeAnsweringActions(runAction)
@@ -56,12 +58,15 @@ export function PracticePage() {
         evaluationError={evaluation.evaluationError}
         followUpActions={followUp.actions}
         followUpPending={followUp.pending}
+        followUpGenerationError={followUpGeneration.followUpGenerationError}
+        isFollowUpGenerationRetrying={followUpGeneration.isFollowUpGenerationRetrying}
         generationError={generation.generationError}
         isEvaluationRetrying={evaluation.isEvaluationRetrying}
         isGenerationRetrying={generation.isGenerationRetrying}
         isStarting={isStarting}
         historyEntryResolution={historyEntryResolution}
         onRetryEvaluation={evaluation.retryEvaluation}
+        onRetryFollowUpGeneration={followUpGeneration.retryFollowUpGeneration}
         onRetryGeneration={generation.retryGeneration}
         onStart={start}
         reviewActions={review.actions}

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef } from "react"
 
+import { env } from "@/app/env"
 import type {
   GetPracticeEvaluationStatusInput,
   PracticePageResponse,
@@ -8,7 +9,10 @@ import type {
 } from "@/models/practice"
 import { getPracticeEvaluationStatus, retryPracticeEvaluation } from "@/services/practice"
 
-import { synchronizePracticeEvaluationResponse } from "../practice-cache"
+import {
+  getPracticeResponseSession,
+  synchronizePracticeEvaluationResponse,
+} from "../practice-cache"
 import { usePracticeMutation, PRACTICE_QUERY_KEY } from "./usePracticeSession"
 
 export function usePracticeEvaluationPolling(data: PracticePageResponse | undefined) {
@@ -28,7 +32,10 @@ export function usePracticeEvaluationPolling(data: PracticePageResponse | undefi
       return getPracticeEvaluationStatus({ sessionId, version, questionId })
     },
     queryKey: [...PRACTICE_QUERY_KEY, "evaluation", sessionId, version, questionId],
-    refetchInterval: (query) => (query.state.data?.session.status === "evaluating" ? 500 : false),
+    refetchInterval: (query) =>
+      query.state.data && getPracticeResponseSession(query.state.data).status === "evaluating"
+        ? 500
+        : false,
     retry: false,
   })
 
@@ -43,6 +50,14 @@ export function usePracticeEvaluationPolling(data: PracticePageResponse | undefi
 
   function retryEvaluation() {
     if (evaluationSession === null || retryMutation.isPending || retryLock.current) return
+
+    if (!env.mock) {
+      retryLock.current = true
+      void evaluationQuery.refetch().finally(() => {
+        retryLock.current = false
+      })
+      return
+    }
 
     const input: RetryPracticeEvaluationInput = {
       sessionId: evaluationSession.sessionId,
@@ -63,7 +78,7 @@ export function usePracticeEvaluationPolling(data: PracticePageResponse | undefi
       evaluationQuery.isError ||
       evaluationQuery.errorUpdatedAt > evaluationQuery.dataUpdatedAt ||
       retryMutation.isError,
-    isEvaluationRetrying: retryMutation.isPending,
+    isEvaluationRetrying: env.mock ? retryMutation.isPending : evaluationQuery.isFetching,
     retryEvaluation,
   }
 }

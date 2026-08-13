@@ -275,10 +275,12 @@ export function createPracticeFollowUpReferenceAnswer({
   targetRoleTitle: string
 }): PracticeFollowUpReferenceAnswer {
   const templateId = getMockQuestionTemplateId(mainQuestion)
-  const template = getPracticeFollowUpPlan(templateId).find(
-    ({ id }) => id === currentFollowUp.templateId,
-  )
-  if (!template || !currentFollowUp.templateId.startsWith(`${templateId}.`)) {
+  const followUpTemplateId = currentFollowUp.templateId
+  if (!followUpTemplateId) {
+    throw new Error("Practice follow-up template metadata is required in mock mode.")
+  }
+  const template = getPracticeFollowUpPlan(templateId).find(({ id }) => id === followUpTemplateId)
+  if (!template || !followUpTemplateId.startsWith(`${templateId}.`)) {
     throw new Error("Practice follow-up template does not match its main question.")
   }
 

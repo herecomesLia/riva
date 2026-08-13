@@ -8,6 +8,7 @@ export {
   continueToNextPracticeQuestion,
   endPracticeFollowUps,
   endPracticeSession,
+  getFollowUpGenerationStatus,
   getPracticeEvaluationStatus,
   getPracticePage,
   getQuestionGenerationStatus,

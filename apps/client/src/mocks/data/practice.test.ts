@@ -142,6 +142,7 @@ function expectFollowUpQuestionMatchesPlan(
   expect(followUp.order).toBeGreaterThan(0)
   expect(followUp.order).toBeLessThanOrEqual(templates.length)
   expect(followUp.prompt).toBe(templates[followUp.order - 1]?.prompt)
+  if (!followUp.templateId) throw new Error("Mock follow-up template metadata is required.")
   expect(followUp.templateId).toBe(templates[followUp.order - 1]?.id)
   expect(followUp.id).toBe(`${question.id}_follow_up_${followUp.order}`)
   expect(followUp.templateId.startsWith(`${templateId}.`)).toBe(true)

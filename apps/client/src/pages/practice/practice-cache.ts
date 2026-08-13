@@ -1,14 +1,19 @@
 import type {
   EndPracticeFollowUpsInput,
   EndPracticeSessionInput,
+  GetFollowUpGenerationStatusInput,
   GetQuestionGenerationStatusInput,
   GetPracticeEvaluationStatusInput,
+  AnsweredPracticeFollowUpExchange,
   PracticeFollowUpMutationInput,
   PracticeActiveSessionState,
   PracticePageResponse,
   PracticeQuestionMutationInput,
+  PracticeServiceResponse,
   PrepareNextPracticeSessionInput,
   StartPracticeSessionInput,
+  SubmitFollowUpAnswerInput,
+  SubmitPrimaryAnswerInput,
 } from "@/models/practice"
 
 type PracticeMutationInputByKind = {
@@ -24,8 +29,8 @@ type PracticeMutationInputByKind = {
   retryEvaluation: PracticeQuestionMutationInput
   skipQuestion: PracticeQuestionMutationInput
   startSession: StartPracticeSessionInput
-  submitFollowUpAnswer: PracticeFollowUpMutationInput
-  submitPrimaryAnswer: PracticeQuestionMutationInput
+  submitFollowUpAnswer: SubmitFollowUpAnswerInput
+  submitPrimaryAnswer: SubmitPrimaryAnswerInput
 }
 
 export type PracticeMutationKind = keyof PracticeMutationInputByKind
@@ -34,7 +39,7 @@ export type PracticeMutationInputFor<TKind extends PracticeMutationKind> =
 
 export function synchronizePracticeMutationResponse<TKind extends PracticeMutationKind>(
   current: PracticePageResponse | undefined,
-  response: PracticePageResponse | PracticeActiveSessionState,
+  response: PracticeServiceResponse,
   mutation: {
     kind: TKind
     input: PracticeMutationInputFor<TKind>
@@ -44,8 +49,8 @@ export function synchronizePracticeMutationResponse<TKind extends PracticeMutati
     if (!isActivePracticeSessionState(response)) return current
     return synchronizeStartResponse(current, response, mutation.input as StartPracticeSessionInput)
   }
-  if (!isPracticePageResponse(response)) return current
   if (mutation.kind === "prepareNextSession") {
+    if (!isPracticePageResponse(response)) return current
     return synchronizePrepareNextResponse(
       current,
       response,
@@ -65,7 +70,7 @@ export function synchronizePracticeMutationResponse<TKind extends PracticeMutati
     return current
   }
 
-  const responseSession = response.session
+  const responseSession = getPracticeResponseSession(response)
   if (
     !isVersionedSession(responseSession) ||
     responseSession.sessionId !== request.sessionId ||
@@ -75,7 +80,7 @@ export function synchronizePracticeMutationResponse<TKind extends PracticeMutati
     return current
   }
 
-  return response
+  return isPracticePageResponse(response) ? response : { ...current, session: responseSession }
 }
 
 export function synchronizeQuestionGenerationResponse(
@@ -107,9 +112,41 @@ export function synchronizeQuestionGenerationResponse(
   return { ...current, session: responseSession }
 }
 
+export function synchronizeFollowUpGenerationResponse(
+  current: PracticePageResponse | undefined,
+  response: PracticeActiveSessionState,
+  request: GetFollowUpGenerationStatusInput,
+) {
+  const currentSession = current?.session
+  if (
+    !currentSession ||
+    currentSession.status !== "generatingFollowUp" ||
+    currentSession.sessionId !== request.sessionId ||
+    currentSession.version !== request.version
+  ) {
+    return current
+  }
+
+  const isPendingSnapshot =
+    response.status === "generatingFollowUp" && response.version === request.version
+  const isCompletedSnapshot =
+    (response.status === "answeringFollowUp" || response.status === "evaluating") &&
+    response.version === request.version + 1
+  if (
+    (!isPendingSnapshot && !isCompletedSnapshot) ||
+    response.sessionId !== request.sessionId ||
+    response.question.id !== currentSession.question.id ||
+    !sameAnsweredFollowUpChain(response.followUpExchanges, currentSession.followUpExchanges)
+  ) {
+    return current
+  }
+
+  return { ...current, session: response }
+}
+
 export function synchronizePracticeEvaluationResponse(
   current: PracticePageResponse | undefined,
-  response: PracticePageResponse,
+  response: PracticePageResponse | PracticeActiveSessionState,
   request: GetPracticeEvaluationStatusInput,
 ) {
   if (
@@ -121,7 +158,7 @@ export function synchronizePracticeEvaluationResponse(
     return current
   }
 
-  const responseSession = response.session
+  const responseSession = getPracticeResponseSession(response)
   const isPendingSnapshot =
     responseSession.status === "evaluating" && responseSession.version === request.version
   const isCompletedSnapshot =
@@ -135,7 +172,7 @@ export function synchronizePracticeEvaluationResponse(
     return current
   }
 
-  return response
+  return isPracticePageResponse(response) ? response : { ...current, session: responseSession }
 }
 
 function synchronizeStartResponse(
@@ -222,7 +259,9 @@ function responseMatchesMutation(
       )
     case "submitPrimaryAnswer":
       return (
-        (session.status === "answeringFollowUp" || session.status === "evaluating") &&
+        (session.status === "generatingFollowUp" ||
+          session.status === "answeringFollowUp" ||
+          session.status === "evaluating") &&
         questionMatches(session, request)
       )
     case "skipQuestion":
@@ -240,7 +279,9 @@ function responseMatchesMutation(
       )
     case "submitFollowUpAnswer":
       return (
-        (session.status === "answeringFollowUp" || session.status === "evaluating") &&
+        (session.status === "generatingFollowUp" ||
+          session.status === "answeringFollowUp" ||
+          session.status === "evaluating") &&
         questionMatches(session, request)
       )
     case "endFollowUps":
@@ -289,6 +330,31 @@ function isPracticePageResponse(
   response: PracticePageResponse | PracticeActiveSessionState,
 ): response is PracticePageResponse {
   return "setupContext" in response && "session" in response
+}
+
+export function getPracticeResponseSession(
+  response: PracticePageResponse | PracticeActiveSessionState,
+): PracticePageResponse["session"] {
+  return isPracticePageResponse(response) ? response.session : response
+}
+
+function sameAnsweredFollowUpChain(
+  left: AnsweredPracticeFollowUpExchange[],
+  right: AnsweredPracticeFollowUpExchange[],
+) {
+  return (
+    left.length === right.length &&
+    left.every((exchange, index) => {
+      const other = right[index]
+      return (
+        other !== undefined &&
+        exchange.question.id === other.question.id &&
+        exchange.question.order === other.question.order &&
+        exchange.answer.id === other.answer.id &&
+        exchange.answer.order === other.answer.order
+      )
+    })
+  )
 }
 
 function isSelfConsistentActiveSession(session: PracticeActiveSessionState): boolean {

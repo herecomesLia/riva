@@ -31,6 +31,7 @@ import type {
   PracticeAnsweringFollowUpState,
   PracticeAnsweringState,
   PracticeEvaluatingState,
+  PracticeGeneratingFollowUpState,
   PracticePageResponse,
   PracticeReviewState,
   PracticeCompletedState,
@@ -176,6 +177,8 @@ type PracticeViewProps =
       answeringPending: PracticeAnsweringPending
       followUpActions: PracticeFollowUpActions
       followUpPending: PracticeFollowUpPending
+      followUpGenerationError: boolean
+      isFollowUpGenerationRetrying: boolean
       reviewActions: PracticeReviewActions
       reviewPending: PracticeReviewPending
       evaluationError: boolean
@@ -184,6 +187,7 @@ type PracticeViewProps =
       isGenerationRetrying: boolean
       isStarting: boolean
       onRetryGeneration: () => void
+      onRetryFollowUpGeneration: () => void
       onRetryEvaluation: () => void
       onStart: (input: ActivePracticeSelection) => Promise<void>
       historyEntryResolution?: PracticeTrainingEntryResolution
@@ -317,6 +321,17 @@ function PracticeViewContent(props: PracticeViewProps) {
         />
       )
 
+    case "generatingFollowUp":
+      return (
+        <PracticeGeneratingFollowUpView
+          context={setupContext}
+          isRetrying={props.isFollowUpGenerationRetrying}
+          onRetry={props.onRetryFollowUpGeneration}
+          session={session}
+          showError={props.followUpGenerationError}
+        />
+      )
+
     case "answeringFollowUp":
       return (
         <PracticeFollowUpView
@@ -359,6 +374,63 @@ function PracticeViewContent(props: PracticeViewProps) {
   }
 
   return assertNever(session)
+}
+
+function PracticeGeneratingFollowUpView({
+  context,
+  isRetrying,
+  onRetry,
+  session,
+  showError,
+}: {
+  context: PracticePageResponse["setupContext"]
+  isRetrying: boolean
+  onRetry: () => void
+  session: PracticeGeneratingFollowUpState
+  showError: boolean
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex flex-col gap-5" data-testid="practice-generating-follow-up-state">
+      <PracticeSessionHeader context={context} selection={session.selection} />
+      <PracticeConversationTimeline
+        followUpExchanges={session.followUpExchanges}
+        mainAnswer={session.mainAnswer}
+        question={session.question}
+      />
+      {showError ? (
+        <Card data-testid="practice-generating-follow-up-error">
+          <CardContent className="pt-6">
+            <Alert variant="destructive">
+              <AlertTitle>{t("practice.errors.followUpGenerationTitle")}</AlertTitle>
+              <AlertDescription>
+                {t("practice.errors.followUpGenerationDescription")}
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+          <CardFooter>
+            <Button disabled={isRetrying} onClick={onRetry}>
+              {isRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
+              {isRetrying
+                ? t("practice.followUp.retryingProcessing")
+                : t("practice.followUp.retryProcessing")}
+            </Button>
+          </CardFooter>
+        </Card>
+      ) : (
+        <Card aria-busy="true" aria-live="polite">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Spinner aria-hidden="true" />
+              {t("practice.followUp.processing")}
+            </CardTitle>
+            <CardDescription>{t("practice.followUp.processingDescription")}</CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+    </div>
+  )
 }
 
 function PracticeFollowUpView({

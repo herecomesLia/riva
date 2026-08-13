@@ -3,12 +3,36 @@ import { describe, expect, it } from "vitest"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
 
 import {
+  synchronizeFollowUpGenerationResponse,
   synchronizePracticeEvaluationResponse,
   synchronizePracticeMutationResponse,
   synchronizeQuestionGenerationResponse,
 } from "./practice-cache"
 
 describe("practice mutation cache contract", () => {
+  it("merges an active-only real mutation response while preserving setup context", () => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    const followUp = createPracticeMockResponse("answeringFirstFollowUp").session
+    if (current.session.status !== "answering" || followUp.status !== "answeringFollowUp") return
+    const response = { ...structuredClone(followUp), status: "generatingFollowUp" as const }
+    response.sessionId = current.session.sessionId
+    response.question.id = current.session.question.id
+    response.version = current.session.version + 1
+
+    const next = synchronizePracticeMutationResponse(current, response, {
+      kind: "submitPrimaryAnswer",
+      input: {
+        content: "主回答",
+        questionId: current.session.question.id,
+        sessionId: current.session.sessionId,
+        version: current.session.version,
+      },
+    })
+
+    expect(next?.session).toBe(response)
+    expect(next?.setupContext).toBe(current.setupContext)
+  })
+
   it("accepts a start response from setup with a self-consistent requested selection", () => {
     const current = createPracticeMockResponse("setupReady")
     const response = createPracticeMockResponse("generatingQuestion")
@@ -304,5 +328,96 @@ describe("practice polling cache contract", () => {
     expect(synchronizePracticeEvaluationResponse(current, illegal, request)).toBe(current)
     review.session.version = request.version + 2
     expect(synchronizePracticeEvaluationResponse(current, review, request)).toBe(current)
+  })
+
+  it("merges active-only evaluation polling responses into the page cache", () => {
+    const current = createPracticeMockResponse("evaluatingAnswer")
+    const response = createPracticeMockResponse("reviewBalanced").session
+    if (current.session.status !== "evaluating" || response.status !== "review") return
+    response.sessionId = current.session.sessionId
+    response.version = current.session.version + 1
+    response.question.id = current.session.question.id
+
+    const next = synchronizePracticeEvaluationResponse(current, response, {
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    })
+
+    expect(next?.session).toBe(response)
+    expect(next?.setupContext).toBe(current.setupContext)
+  })
+
+  it("accepts the complete follow-up generation transition chain", () => {
+    const current = createPracticeMockResponse("answeringFirstFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    const generating = {
+      ...structuredClone(current.session),
+      status: "generatingFollowUp" as const,
+      version: current.session.version + 1,
+    }
+    const currentGeneratingPage = { ...current, session: generating }
+    const request = {
+      sessionId: generating.sessionId,
+      version: generating.version,
+    }
+    const pending = synchronizeFollowUpGenerationResponse(
+      currentGeneratingPage,
+      generating,
+      request,
+    )
+    expect(pending?.session).toBe(generating)
+
+    const answering = structuredClone(current.session)
+    answering.version = generating.version + 1
+    const answeringNext = synchronizeFollowUpGenerationResponse(
+      currentGeneratingPage,
+      answering,
+      request,
+    )
+    expect(answeringNext?.session).toBe(answering)
+
+    const evaluating = createPracticeMockResponse("evaluatingAnswer").session
+    if (evaluating.status !== "evaluating") return
+    evaluating.sessionId = generating.sessionId
+    evaluating.question.id = generating.question.id
+    evaluating.version = generating.version + 1
+    evaluating.followUpExchanges = generating.followUpExchanges
+    const evaluatingNext = synchronizeFollowUpGenerationResponse(
+      currentGeneratingPage,
+      evaluating,
+      request,
+    )
+    expect(evaluatingNext?.session).toBe(evaluating)
+  })
+
+  it("rejects stale, jumped, or cross-question follow-up generation responses", () => {
+    const current = createPracticeMockResponse("answeringFirstFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    const generating = {
+      ...structuredClone(current.session),
+      status: "generatingFollowUp" as const,
+      version: current.session.version + 1,
+    }
+    const currentGeneratingPage = { ...current, session: generating }
+    const request = { sessionId: generating.sessionId, version: generating.version }
+    const response = structuredClone(current.session)
+    response.version = request.version + 2
+
+    expect(synchronizeFollowUpGenerationResponse(currentGeneratingPage, response, request)).toBe(
+      currentGeneratingPage,
+    )
+
+    const wrongQuestion = structuredClone(response)
+    wrongQuestion.question.id = "another_question"
+    expect(
+      synchronizeFollowUpGenerationResponse(currentGeneratingPage, wrongQuestion, request),
+    ).toBe(currentGeneratingPage)
+
+    const wrongSession = structuredClone(response)
+    wrongSession.sessionId = "another_session"
+    expect(
+      synchronizeFollowUpGenerationResponse(currentGeneratingPage, wrongSession, request),
+    ).toBe(currentGeneratingPage)
   })
 })

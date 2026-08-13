@@ -13,6 +13,7 @@ import {
   endPracticeFollowUps,
   getPracticePage,
   getPracticeEvaluationStatus,
+  getFollowUpGenerationStatus,
   getQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
@@ -56,6 +57,7 @@ beforeEach(async () => {
   await i18n.changeLanguage(defaultLanguage)
   vi.mocked(getPracticePage).mockReset()
   vi.mocked(getPracticeEvaluationStatus).mockReset()
+  vi.mocked(getFollowUpGenerationStatus).mockReset()
   vi.mocked(getQuestionGenerationStatus).mockReset()
   vi.mocked(endPracticeFollowUps).mockReset()
   vi.mocked(requestAnswerFramework).mockReset()
@@ -86,6 +88,7 @@ export {
   getPracticeFollowUpPlan,
   getPracticePage,
   getPracticeEvaluationStatus,
+  getFollowUpGenerationStatus,
   getQuestionGenerationStatus,
   endPracticeFollowUps,
   requestAnswerFramework,

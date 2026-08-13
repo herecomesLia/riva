@@ -6,7 +6,7 @@ import {
   createPracticeReferenceAnswer,
   getMockQuestionTemplateId,
 } from "@/mocks/data/practice"
-import type { PracticeReviewState } from "@/models/practice"
+import type { PracticeGeneratingFollowUpState, PracticeReviewState } from "@/models/practice"
 
 export type PracticeReviewStoryVariant =
   | "balanced"
@@ -138,6 +138,8 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
       referenceAnswer: false,
       submit: false,
     },
+    followUpGenerationError: false,
+    isFollowUpGenerationRetrying: false,
     reviewActions: {
       onEndSession: fn(async () => "executed" as const),
       onNextQuestion: fn(async () => "executed" as const),
@@ -160,9 +162,39 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
     isGenerationRetrying: false,
     isStarting: false,
     onRetryGeneration: fn(),
+    onRetryFollowUpGeneration: fn(),
     onRetryEvaluation: fn(),
     onStart: fn(async () => undefined),
     variant: "default" as const,
+  }
+}
+
+export function createGeneratingFollowUpStoryFixture(
+  order: 1 | 2,
+): PracticeGeneratingFollowUpState {
+  const response = createPracticeMockResponse(
+    order === 1 ? "answeringFirstFollowUp" : "answeringFollowUp",
+  )
+  if (response.session.status !== "answeringFollowUp") {
+    throw new Error("Answering follow-up fixture required.")
+  }
+  const { currentFollowUp: _currentFollowUp, ...withoutCurrentFollowUp } = response.session
+
+  return {
+    ...withoutCurrentFollowUp,
+    status: "generatingFollowUp",
+  }
+}
+
+export function createGeneratingFollowUpStoryArgs(order: 1 | 2) {
+  const args = createPracticeViewArgs(order === 1 ? "answeringFirstFollowUp" : "answeringFollowUp")
+  const session = createGeneratingFollowUpStoryFixture(order)
+  return {
+    ...args,
+    content: {
+      ...args.content,
+      data: { ...args.content.data, session },
+    },
   }
 }
 

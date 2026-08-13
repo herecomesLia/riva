@@ -69,6 +69,172 @@ export const practiceQuestionSchema = z
   })
   .strict()
 
+export const practiceAnswerSchema = z
+  .object({
+    id: uuidSchema,
+    content: z.string(),
+    createdAt: dateTimeSchema,
+    order: z.number().int().positive(),
+  })
+  .strict()
+
+export const practiceFollowUpQuestionSchema = z
+  .object({
+    id: uuidSchema,
+    prompt: z.string(),
+    createdAt: dateTimeSchema,
+    order: z.number().int().min(1).max(2),
+    answerHints: practiceGuidanceNotRequestedSchema,
+    answerFramework: practiceGuidanceNotRequestedSchema,
+    referenceAnswer: practiceReferenceAnswerNotRequestedSchema,
+  })
+  .strict()
+
+export const practiceAnsweredFollowUpExchangeSchema = z
+  .object({
+    status: z.literal("answered"),
+    question: practiceFollowUpQuestionSchema,
+    answer: practiceAnswerSchema,
+  })
+  .strict()
+  .superRefine((exchange, context) => {
+    if (exchange.answer.order !== exchange.question.order + 1) {
+      context.addIssue({
+        code: "custom",
+        message: "answered follow-up exchange order is invalid",
+        path: ["answer", "order"],
+      })
+    }
+  })
+
+export const practiceAwaitingFollowUpExchangeSchema = z
+  .object({
+    status: z.literal("awaitingAnswer"),
+    question: practiceFollowUpQuestionSchema,
+    answer: z.null(),
+  })
+  .strict()
+
+function validateAnsweredExchangeOrders(
+  exchanges: Array<z.infer<typeof practiceAnsweredFollowUpExchangeSchema>>,
+  context: z.RefinementCtx,
+) {
+  const expectedOrders = exchanges.map((_, index) => index + 1)
+  const actualOrders = exchanges.map((exchange) => exchange.question.order)
+  if (actualOrders.some((order, index) => order !== expectedOrders[index])) {
+    context.addIssue({
+      code: "custom",
+      message: "follow-up exchanges must be ordered and contiguous",
+      path: [],
+    })
+  }
+  if (new Set(exchanges.map((exchange) => exchange.question.id)).size !== exchanges.length) {
+    context.addIssue({
+      code: "custom",
+      message: "follow-up question identities must be unique",
+      path: [],
+    })
+  }
+  if (new Set(exchanges.map((exchange) => exchange.answer.id)).size !== exchanges.length) {
+    context.addIssue({
+      code: "custom",
+      message: "follow-up answer identities must be unique",
+      path: [],
+    })
+  }
+}
+
+const answeredFollowUpExchangesUpToOneSchema = z
+  .array(practiceAnsweredFollowUpExchangeSchema)
+  .max(1)
+  .superRefine(validateAnsweredExchangeOrders)
+
+const answeredFollowUpExchangesUpToTwoSchema = z
+  .array(practiceAnsweredFollowUpExchangeSchema)
+  .max(2)
+  .superRefine(validateAnsweredExchangeOrders)
+
+export const practiceCompletedFollowUpCompletionSchema = z.discriminatedUnion("reason", [
+  z
+    .object({
+      status: z.literal("completed"),
+      reason: z.literal("noFollowUpRequired"),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("completed"),
+      reason: z.literal("allAnswered"),
+    })
+    .strict(),
+])
+
+export const practiceEvaluationSchema = z
+  .object({
+    overallScore: z.number().int().min(0).max(100),
+    dimensionScores: z
+      .array(
+        z
+          .object({
+            dimension: z.enum([
+              "relevance",
+              "structure",
+              "specificity",
+              "personalContribution",
+              "resultsAndEvidence",
+              "roleAlignment",
+              "communication",
+              "riskControl",
+            ]),
+            score: z.number().int().min(0).max(100),
+            explanation: z.string(),
+          })
+          .strict(),
+      )
+      .min(4)
+      .max(8),
+    evaluatedAt: dateTimeSchema,
+  })
+  .strict()
+
+const practiceRetryCurrentRecommendationSchema = z
+  .object({
+    action: z.literal("retryCurrent"),
+    reason: z.string(),
+  })
+  .strict()
+
+const practiceNextQuestionRecommendationSchema = z
+  .object({
+    action: z.literal("nextQuestion"),
+    reason: z.string(),
+    nextQuestion: z
+      .object({
+        questionType: practiceQuestionTypeSchema,
+        difficulty: practiceDifficultySchema,
+        focusAreas: z.array(z.string()).max(3),
+      })
+      .strict(),
+  })
+  .strict()
+
+export const practiceRecommendationSchema = z.discriminatedUnion("action", [
+  practiceRetryCurrentRecommendationSchema,
+  practiceNextQuestionRecommendationSchema,
+])
+
+export const practiceReviewSchema = z
+  .object({
+    overallPerformance: z.string(),
+    highlights: z.array(z.string()),
+    mainIssues: z.array(z.string()),
+    improvementSuggestions: z.array(z.string()),
+    reusableAnswerStructure: z.array(z.string()),
+    exposedWeaknesses: z.array(z.string()),
+    recommendation: practiceRecommendationSchema,
+  })
+  .strict()
+
 const practiceActiveSessionBaseSchema = z
   .object({
     attemptId: uuidSchema,
@@ -92,9 +258,108 @@ export const practiceAnsweringSchema = practiceActiveSessionBaseSchema
   })
   .strict()
 
+export const practiceGeneratingFollowUpSchema = practiceActiveSessionBaseSchema
+  .extend({
+    status: z.literal("generatingFollowUp"),
+    question: practiceQuestionSchema,
+    mainAnswer: practiceAnswerSchema,
+    followUpExchanges: answeredFollowUpExchangesUpToOneSchema,
+  })
+  .strict()
+
+export const practiceAnsweringFollowUpSchema = practiceActiveSessionBaseSchema
+  .extend({
+    status: z.literal("answeringFollowUp"),
+    question: practiceQuestionSchema,
+    mainAnswer: practiceAnswerSchema,
+    followUpExchanges: answeredFollowUpExchangesUpToOneSchema,
+    currentFollowUp: practiceAwaitingFollowUpExchangeSchema,
+  })
+  .strict()
+  .superRefine((session, context) => {
+    if (session.currentFollowUp.question.order !== session.followUpExchanges.length + 1) {
+      context.addIssue({
+        code: "custom",
+        message: "current follow-up order is invalid",
+        path: ["currentFollowUp", "question", "order"],
+      })
+    }
+  })
+
+export const practiceEvaluatingSchema = practiceActiveSessionBaseSchema
+  .extend({
+    status: z.literal("evaluating"),
+    question: practiceQuestionSchema,
+    mainAnswer: practiceAnswerSchema,
+    followUpExchanges: answeredFollowUpExchangesUpToTwoSchema,
+    followUpCompletion: practiceCompletedFollowUpCompletionSchema,
+    submittedAt: dateTimeSchema,
+  })
+  .strict()
+  .superRefine((session, context) => {
+    if (
+      session.followUpCompletion.reason === "noFollowUpRequired" &&
+      session.followUpExchanges.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "no-follow-up completion must have no exchanges",
+        path: ["followUpCompletion", "reason"],
+      })
+    }
+    if (
+      session.followUpCompletion.reason === "allAnswered" &&
+      ![1, 2].includes(session.followUpExchanges.length)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "all-answered completion must have one or two exchanges",
+        path: ["followUpCompletion", "reason"],
+      })
+    }
+  })
+
+export const practiceReviewSessionSchema = practiceActiveSessionBaseSchema
+  .extend({
+    status: z.literal("review"),
+    question: practiceQuestionSchema,
+    mainAnswer: practiceAnswerSchema,
+    followUpExchanges: answeredFollowUpExchangesUpToTwoSchema,
+    followUpCompletion: practiceCompletedFollowUpCompletionSchema,
+    evaluation: practiceEvaluationSchema,
+    review: practiceReviewSchema,
+  })
+  .strict()
+  .superRefine((session, context) => {
+    if (
+      session.followUpCompletion.reason === "noFollowUpRequired" &&
+      session.followUpExchanges.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "no-follow-up completion must have no exchanges",
+        path: ["followUpCompletion", "reason"],
+      })
+    }
+    if (
+      session.followUpCompletion.reason === "allAnswered" &&
+      ![1, 2].includes(session.followUpExchanges.length)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "all-answered completion must have one or two exchanges",
+        path: ["followUpCompletion", "reason"],
+      })
+    }
+  })
+
 export const practiceActiveSessionResponseSchema = z.discriminatedUnion("status", [
   practiceGeneratingQuestionSchema,
   practiceAnsweringSchema,
+  practiceGeneratingFollowUpSchema,
+  practiceAnsweringFollowUpSchema,
+  practiceEvaluatingSchema,
+  practiceReviewSessionSchema,
 ])
 
 export const currentPracticeSessionResponseSchema = z
@@ -106,8 +371,26 @@ export const currentPracticeSessionResponseSchema = z
 export type PracticeMaterialReferenceWire = z.infer<typeof practiceMaterialReferenceSchema>
 export type PracticeSessionSelectionWire = z.infer<typeof practiceSessionSelectionSchema>
 export type PracticeQuestionWire = z.infer<typeof practiceQuestionSchema>
+export type PracticeAnswerWire = z.infer<typeof practiceAnswerSchema>
+export type PracticeFollowUpQuestionWire = z.infer<typeof practiceFollowUpQuestionSchema>
+export type PracticeAnsweredFollowUpExchangeWire = z.infer<
+  typeof practiceAnsweredFollowUpExchangeSchema
+>
+export type PracticeAwaitingFollowUpExchangeWire = z.infer<
+  typeof practiceAwaitingFollowUpExchangeSchema
+>
+export type PracticeCompletedFollowUpCompletionWire = z.infer<
+  typeof practiceCompletedFollowUpCompletionSchema
+>
+export type PracticeEvaluationWire = z.infer<typeof practiceEvaluationSchema>
+export type PracticeRecommendationWire = z.infer<typeof practiceRecommendationSchema>
+export type PracticeReviewWire = z.infer<typeof practiceReviewSchema>
 export type PracticeGeneratingQuestionWire = z.infer<typeof practiceGeneratingQuestionSchema>
 export type PracticeAnsweringWire = z.infer<typeof practiceAnsweringSchema>
+export type PracticeGeneratingFollowUpWire = z.infer<typeof practiceGeneratingFollowUpSchema>
+export type PracticeAnsweringFollowUpWire = z.infer<typeof practiceAnsweringFollowUpSchema>
+export type PracticeEvaluatingWire = z.infer<typeof practiceEvaluatingSchema>
+export type PracticeReviewWireSession = z.infer<typeof practiceReviewSessionSchema>
 export type PracticeActiveSessionWire = z.infer<typeof practiceActiveSessionResponseSchema>
 export type CurrentPracticeSessionResponseWire = z.infer<
   typeof currentPracticeSessionResponseSchema
