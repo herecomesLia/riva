@@ -273,13 +273,15 @@ export async function setCurrentQuestionFlags(
   let session = initial
 
   if (session.question.isSaved !== flags.isSaved) {
-    const response = await settle(
-      setQuestionSaved({
-        sessionId: session.sessionId,
-        version: session.version,
-        questionId: session.question.id,
-        isSaved: flags.isSaved,
-      }),
+    const response = requireMockPageResponse(
+      await settle(
+        setQuestionSaved({
+          sessionId: session.sessionId,
+          version: session.version,
+          questionId: session.question.id,
+          isSaved: flags.isSaved,
+        }),
+      ),
     )
     if (response.session.status !== "answering") {
       throw new Error("Saving a current question must preserve the answering session.")
@@ -288,13 +290,15 @@ export async function setCurrentQuestionFlags(
   }
 
   if (session.question.isMarkedWeak !== flags.isMarkedWeak) {
-    const response = await settle(
-      setQuestionWeak({
-        sessionId: session.sessionId,
-        version: session.version,
-        questionId: session.question.id,
-        isMarkedWeak: flags.isMarkedWeak,
-      }),
+    const response = requireMockPageResponse(
+      await settle(
+        setQuestionWeak({
+          sessionId: session.sessionId,
+          version: session.version,
+          questionId: session.question.id,
+          isMarkedWeak: flags.isMarkedWeak,
+        }),
+      ),
     )
     if (response.session.status !== "answering") {
       throw new Error("Marking a current question weak must preserve the answering session.")

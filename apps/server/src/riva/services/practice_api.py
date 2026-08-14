@@ -43,6 +43,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    SetPracticeQuestionSavedRequest,
+    SetPracticeQuestionWeakRequest,
     StartPracticeSessionRequest,
     SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
@@ -170,6 +172,44 @@ class PracticeAPIService:
                 session_id=session_id,
                 expected_version=payload.version,
                 question_id=payload.question_id,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def set_question_saved(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: SetPracticeQuestionSavedRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().set_question_saved(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                is_saved=payload.is_saved,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def set_question_weak(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: SetPracticeQuestionWeakRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().set_question_weak(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                is_marked_weak=payload.is_marked_weak,
             )
             return build_practice_session_response(context)
         except PracticeSessionStateError as error:

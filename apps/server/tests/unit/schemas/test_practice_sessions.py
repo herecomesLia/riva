@@ -30,6 +30,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeQuestionGenerationRequest,
     RetryPracticeQuestionRequest,
+    SetPracticeQuestionSavedRequest,
+    SetPracticeQuestionWeakRequest,
     StartPracticeSessionRequest,
     SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
@@ -189,6 +191,47 @@ def test_completed_session_request_and_response_are_strict() -> None:
     assert TypeAdapter(PracticeSessionResponse).validate_python(
         completed_session_payload()
     ).status == "completed"
+
+
+@pytest.mark.parametrize(
+    "request_type, flag_name",
+    [
+        (SetPracticeQuestionSavedRequest, "isSaved"),
+        (SetPracticeQuestionWeakRequest, "isMarkedWeak"),
+    ],
+)
+def test_question_flag_requests_are_strict_and_forbid_other_session_fields(
+    request_type,
+    flag_name: str,
+) -> None:
+    question_id = str(uuid4())
+    request = request_type.model_validate(
+        {"version": 4, "questionId": question_id, flag_name: True}
+    )
+
+    assert request.version == 4
+    assert request.question_id == UUID(question_id)
+    assert request.model_dump(mode="json", by_alias=True) == {
+        "version": 4,
+        "questionId": question_id,
+        flag_name: True,
+    }
+
+    for invalid in (
+        {},
+        {"version": 0, "questionId": question_id, flag_name: True},
+        {"version": 4, "questionId": "not-a-uuid", flag_name: True},
+        {"version": 4, "questionId": question_id, flag_name: 1},
+        {"version": 4, "questionId": question_id, flag_name: "true"},
+        {
+            "version": 4,
+            "questionId": question_id,
+            flag_name: True,
+            "attemptId": str(uuid4()),
+        },
+    ):
+        with pytest.raises(ValidationError):
+            request_type.model_validate(invalid)
 
 
 def test_early_completed_response_requires_the_unfinished_attempt_contract() -> None:

@@ -15,6 +15,8 @@ import {
   requestEndPracticeSession,
   prepareNextPracticeSession,
   retryCurrentPracticeQuestion,
+  setQuestionSaved,
+  setQuestionWeak,
   startPracticeSession,
   submitFollowUpAnswer,
   submitPrimaryAnswer,
@@ -520,6 +522,56 @@ describe("practice service API", () => {
       status: "answering",
       version: 6,
     })
+  })
+
+  it("sets saved state through the real endpoint with only the saved flag", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(createActiveSession("answering", { version: 6 })))
+
+    const session = requireActiveSession(
+      await setQuestionSaved({
+        questionId,
+        sessionId,
+        version: 5,
+        isSaved: true,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/saved`,
+      expect.objectContaining({ credentials: "include", method: "PATCH" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({
+      version: 5,
+      questionId,
+      isSaved: true,
+    })
+    expect(requestJson(fetchMock)).not.toHaveProperty("isMarkedWeak")
+    expect(session).toMatchObject({ status: "answering", version: 6 })
+  })
+
+  it("sets weak state through the real endpoint with only the weak flag", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(createActiveSession("answering", { version: 6 })))
+
+    const session = requireActiveSession(
+      await setQuestionWeak({
+        questionId,
+        sessionId,
+        version: 5,
+        isMarkedWeak: true,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/weak`,
+      expect.objectContaining({ credentials: "include", method: "PATCH" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({
+      version: 5,
+      questionId,
+      isMarkedWeak: true,
+    })
+    expect(requestJson(fetchMock)).not.toHaveProperty("isSaved")
+    expect(session).toMatchObject({ status: "answering", version: 6 })
   })
 
   it("polls the encoded session refresh endpoint with only the requested version", async () => {

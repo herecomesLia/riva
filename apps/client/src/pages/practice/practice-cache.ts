@@ -1,4 +1,5 @@
 import type {
+  ActivePracticeSelection,
   EndPracticeFollowUpsInput,
   EndPracticeSessionInput,
   GetFollowUpGenerationStatusInput,
@@ -10,7 +11,9 @@ import type {
   PracticePageResponse,
   PracticeAnswer,
   PracticeEvaluatingState,
+  PracticeQuestionCard,
   PracticeQuestionMutationInput,
+  PracticeQuestionFlagMutationInput,
   PracticeServiceResponse,
   PrepareNextPracticeSessionInput,
   StartPracticeSessionInput,
@@ -26,7 +29,7 @@ type PracticeMutationInputByKind = {
   followUpUpdate: PracticeFollowUpMutationInput
   prepareNextSession: PrepareNextPracticeSessionInput
   questionUpdate: PracticeQuestionMutationInput
-  questionFlagUpdate: PracticeQuestionMutationInput
+  questionFlagUpdate: PracticeQuestionFlagMutationInput
   retryCurrentQuestion: PracticeQuestionMutationInput
   retryEvaluation: PracticeQuestionMutationInput
   skipQuestion: PracticeQuestionMutationInput
@@ -264,7 +267,15 @@ function responseMatchesMutation(
       return (
         (session.status === "answering" || session.status === "review") &&
         session.status === currentSession.status &&
-        questionMatches(session, request)
+        currentSession.attemptId === session.attemptId &&
+        currentSession.attemptNumber === session.attemptNumber &&
+        samePracticeSelection(session.selection, currentSession.selection) &&
+        questionMatches(session, request) &&
+        isQuestionFlagMutationResponseValid(
+          session,
+          currentSession,
+          request as PracticeQuestionFlagMutationInput,
+        )
       )
     case "submitPrimaryAnswer":
       return (
@@ -355,6 +366,69 @@ function questionMatches(
 ) {
   return (
     "question" in session && "questionId" in request && session.question.id === request.questionId
+  )
+}
+
+function samePracticeSelection(left: ActivePracticeSelection, right: ActivePracticeSelection) {
+  return (
+    left.targetRoleId === right.targetRoleId &&
+    left.questionType === right.questionType &&
+    left.difficulty === right.difficulty &&
+    left.source === right.source &&
+    left.prioritizeWeaknesses === right.prioritizeWeaknesses
+  )
+}
+
+function isQuestionFlagMutationResponseValid(
+  response: VersionedPracticeSession,
+  current: VersionedPracticeSession,
+  request: PracticeQuestionFlagMutationInput,
+) {
+  if (
+    !("question" in response) ||
+    !("question" in current) ||
+    !samePracticeQuestionSnapshotExceptFlags(response.question, current.question)
+  ) {
+    return false
+  }
+
+  if ("isSaved" in request) {
+    return (
+      response.question.isSaved === request.isSaved &&
+      response.question.isMarkedWeak === current.question.isMarkedWeak &&
+      (current.status !== "review" || samePracticeReviewSnapshot(current, response))
+    )
+  }
+
+  return (
+    response.question.isMarkedWeak === request.isMarkedWeak &&
+    response.question.isSaved === current.question.isSaved &&
+    (current.status !== "review" || samePracticeReviewSnapshot(current, response))
+  )
+}
+
+function samePracticeQuestionSnapshotExceptFlags(
+  left: PracticeQuestionCard,
+  right: PracticeQuestionCard,
+) {
+  const { isMarkedWeak: _leftMarkedWeak, isSaved: _leftSaved, ...leftWithoutFlags } = left
+  const { isMarkedWeak: _rightMarkedWeak, isSaved: _rightSaved, ...rightWithoutFlags } = right
+  return JSON.stringify(leftWithoutFlags) === JSON.stringify(rightWithoutFlags)
+}
+
+function samePracticeReviewSnapshot(
+  left: Extract<VersionedPracticeSession, { status: "review" }>,
+  right: VersionedPracticeSession,
+) {
+  if (right.status !== "review") return false
+  return (
+    samePracticeSubmittedAnswerSnapshot(left, right) &&
+    samePracticeFollowUpCompletionSnapshot(left.followUpCompletion, right.followUpCompletion) &&
+    JSON.stringify(left.mainAnswer) === JSON.stringify(right.mainAnswer) &&
+    JSON.stringify(left.followUpExchanges) === JSON.stringify(right.followUpExchanges) &&
+    JSON.stringify(left.followUpCompletion) === JSON.stringify(right.followUpCompletion) &&
+    JSON.stringify(left.evaluation) === JSON.stringify(right.evaluation) &&
+    JSON.stringify(left.review) === JSON.stringify(right.review)
   )
 }
 

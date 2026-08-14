@@ -120,14 +120,18 @@ describe("practice stateful mock service: review", () => {
       questionId: initial.session.question.id,
     }
 
-    const saved = await context.settle(context.setQuestionSaved({ ...input, isSaved: true }))
+    const saved = context.requireMockPageResponse(
+      await context.settle(context.setQuestionSaved({ ...input, isSaved: true })),
+    )
     if (saved.session.status !== "review") return
-    const weak = await context.settle(
-      context.setQuestionWeak({
-        ...input,
-        version: saved.session.version,
-        isMarkedWeak: true,
-      }),
+    const weak = context.requireMockPageResponse(
+      await context.settle(
+        context.setQuestionWeak({
+          ...input,
+          version: saved.session.version,
+          isMarkedWeak: true,
+        }),
+      ),
     )
 
     expect(saved.session.question.isSaved).toBe(true)

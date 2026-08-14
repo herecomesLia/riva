@@ -395,6 +395,64 @@ describe("practice mutation cache contract", () => {
     expect(current.session.question.isSaved).toBe(false)
   })
 
+  it("accepts a review weak-flag response only when the review snapshot is unchanged", () => {
+    const current = createPracticeMockResponse("reviewBalanced")
+    if (current.session.status !== "review") return
+    const input = {
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+      questionId: current.session.question.id,
+      isMarkedWeak: true,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "review") return
+    response.session.version = input.version + 1
+    response.session.question.isMarkedWeak = true
+
+    expect(
+      synchronizePracticeMutationResponse(current, response.session, {
+        kind: "questionFlagUpdate",
+        input,
+      }),
+    ).toMatchObject({ session: response.session })
+    expect(
+      synchronizePracticeMutationResponse(current, response.session, {
+        kind: "questionFlagUpdate",
+        input,
+      })?.session,
+    ).toBe(response.session)
+
+    const changedEvaluation = structuredClone(response)
+    if (changedEvaluation.session.status !== "review") return
+    changedEvaluation.session.evaluation.overallScore += 1
+    expect(
+      synchronizePracticeMutationResponse(current, changedEvaluation.session, {
+        kind: "questionFlagUpdate",
+        input,
+      }),
+    ).toBe(current)
+
+    const changedNonTargetFlag = structuredClone(response)
+    if (changedNonTargetFlag.session.status !== "review") return
+    changedNonTargetFlag.session.question.isSaved = true
+    expect(
+      synchronizePracticeMutationResponse(current, changedNonTargetFlag.session, {
+        kind: "questionFlagUpdate",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongTarget = structuredClone(response)
+    if (wrongTarget.session.status !== "review") return
+    wrongTarget.session.question.isMarkedWeak = false
+    expect(
+      synchronizePracticeMutationResponse(current, wrongTarget.session, {
+        kind: "questionFlagUpdate",
+        input,
+      }),
+    ).toBe(current)
+  })
+
   it("accepts only the exact next completed snapshot for a review-ending mutation", () => {
     const current = createPracticeMockResponse("reviewBalanced")
     const completed = createPracticeMockResponse("completedSession")

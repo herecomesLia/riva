@@ -520,6 +520,283 @@ def primary_answer_context(
     return active, attempt, question_run, card
 
 
+def test_set_question_saved_updates_only_the_flag_and_session_snapshot() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    mutation_time = NOW + timedelta(minutes=1)
+    original_attempt_status = attempt.status
+    original_attempt_updated_at = attempt.updated_at
+    original_attempt_completed_at = attempt.completed_at
+
+    result = asyncio.run(
+        PracticeSessionService(
+            ScriptedSession(active, attempt, question_run, card, None),
+            clock=lambda: mutation_time,
+        ).set_question_saved(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            is_saved=True,
+        )
+    )
+
+    assert result.attempt is attempt
+    assert card.is_saved is True
+    assert card.is_marked_weak is False
+    assert card.updated_at == mutation_time
+    assert active.version == 5
+    assert active.updated_at == mutation_time
+    assert attempt.status == original_attempt_status
+    assert attempt.updated_at == original_attempt_updated_at
+    assert attempt.completed_at == original_attempt_completed_at
+
+
+def test_set_question_saved_can_clear_an_existing_flag() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=5)
+    card.is_saved = True
+    mutation_time = NOW + timedelta(minutes=4)
+
+    result = asyncio.run(
+        PracticeSessionService(
+            ScriptedSession(active, attempt, question_run, card, None),
+            clock=lambda: mutation_time,
+        ).set_question_saved(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=5,
+            question_id=card.id,
+            is_saved=False,
+        )
+    )
+
+    assert result.question_card is card
+    assert card.is_saved is False
+    assert card.is_marked_weak is False
+    assert active.version == 6
+    assert card.updated_at == mutation_time
+
+
+def test_set_question_weak_same_value_still_advances_the_session_version() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=7)
+    card.is_marked_weak = True
+    mutation_time = NOW + timedelta(minutes=2)
+    scripted = ScriptedSession(active, attempt, question_run, card, None)
+
+    result = asyncio.run(
+        PracticeSessionService(
+            scripted,
+            clock=lambda: mutation_time,
+        ).set_question_weak(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=7,
+            question_id=card.id,
+            is_marked_weak=True,
+        )
+    )
+
+    assert result.question_card is card
+    assert card.is_saved is False
+    assert card.is_marked_weak is True
+    assert active.version == 8
+    assert active.updated_at == mutation_time
+    assert card.updated_at == mutation_time
+    assert scripted.commit_count == 1
+
+
+def test_set_question_weak_can_clear_an_existing_flag_in_review() -> None:
+    records = _continue_review_records("retryCurrent")
+    active = records["active"]
+    scalar_values = records["scalar_values"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(scalar_values, list)
+    assert isinstance(card, QuestionCard)
+    card.is_marked_weak = True
+
+    mutation_time = NOW + timedelta(minutes=5)
+    result = asyncio.run(
+        PracticeSessionService(
+            ScriptedSession(active, *scalar_values[1:]),
+            clock=lambda: mutation_time,
+        ).set_question_weak(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            is_marked_weak=False,
+        )
+    )
+
+    assert isinstance(result, PracticeReviewWorkflowContext)
+    assert result.question_card is card
+    assert card.is_saved is False
+    assert card.is_marked_weak is False
+    assert active.version == 5
+    assert card.updated_at == mutation_time
+
+
+def test_set_question_saved_preserves_the_review_workflow_snapshot() -> None:
+    records = _continue_review_records("retryCurrent")
+    active = records["active"]
+    attempt = records["attempt"]
+    scalar_values = records["scalar_values"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(attempt, PracticeAttempt)
+    assert isinstance(scalar_values, list)
+    card = records["card"]
+    assert isinstance(card, QuestionCard)
+    original_attempt_updated_at = attempt.updated_at
+
+    scripted = ScriptedSession(active, *scalar_values[1:])
+    mutation_time = NOW + timedelta(minutes=3)
+    result = asyncio.run(
+        PracticeSessionService(
+            scripted,
+            clock=lambda: mutation_time,
+        ).set_question_saved(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            is_saved=True,
+        )
+    )
+
+    assert isinstance(result, PracticeReviewWorkflowContext)
+    assert result.attempt is attempt
+    assert result.question_card is card
+    assert result.attempt.status == PracticeAttemptStatus.REVIEW.value
+    assert result.session.version == 5
+    assert card.is_saved is True
+    assert card.is_marked_weak is False
+    assert card.updated_at == mutation_time
+    assert attempt.updated_at == original_attempt_updated_at
+    assert scripted.commit_count == 1
+
+
+@pytest.mark.parametrize("method", ["set_question_saved", "set_question_weak"])
+def test_question_flag_rejects_old_version_without_mutating_state(method: str) -> None:
+    active, attempt, question_run, card = primary_answer_context(version=5)
+    original_card_saved = card.is_saved
+    original_card_weak = card.is_marked_weak
+    scripted = ScriptedSession(active)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            getattr(
+                PracticeSessionService(scripted),
+                method,
+            )(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+                **(
+                    {"is_saved": True}
+                    if method == "set_question_saved"
+                    else {"is_marked_weak": True}
+                ),
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert card.is_saved is original_card_saved
+    assert card.is_marked_weak is original_card_weak
+    assert active.version == 5
+    assert scripted.commit_count == 0
+
+
+@pytest.mark.parametrize(
+    "attempt_status",
+    [
+        PracticeAttemptStatus.GENERATING_QUESTION.value,
+        PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+        PracticeAttemptStatus.EVALUATING.value,
+    ],
+)
+def test_question_flag_rejects_non_public_attempt_states(
+    attempt_status: str,
+) -> None:
+    active, attempt, _question_run, card = primary_answer_context(
+        version=1,
+        attempt_status=attempt_status,
+    )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            PracticeSessionService(scripted).set_question_saved(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=active.version,
+                question_id=card.id,
+                is_saved=True,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert card.is_saved is False
+    assert active.version == 1
+    assert scripted.commit_count == 0
+
+
+def test_question_flag_rejects_completed_session_and_wrong_owner() -> None:
+    active, _attempt, _question_run, card = primary_answer_context()
+    active.status = PracticeSessionStatus.COMPLETED.value
+    completed_session = ScriptedSession(active)
+
+    with pytest.raises(PracticeSessionStateError) as completed_error:
+        asyncio.run(
+            PracticeSessionService(completed_session).set_question_saved(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=active.version,
+                question_id=card.id,
+                is_saved=True,
+            )
+        )
+    assert completed_error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert card.is_saved is False
+    assert completed_session.commit_count == 0
+
+    owner_session = ScriptedSession(None)
+    with pytest.raises(PracticeSessionStateError) as owner_error:
+        asyncio.run(
+            PracticeSessionService(owner_session).set_question_saved(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=active.version,
+                question_id=card.id,
+                is_saved=True,
+            )
+        )
+    assert owner_error.value.code == PRACTICE_SESSION_NOT_FOUND
+    assert card.is_saved is False
+    assert owner_session.commit_count == 0
+
+
+def test_question_flag_rejects_a_non_current_question_without_mutation() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=1)
+    scripted = ScriptedSession(active, attempt, question_run, card, None)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            PracticeSessionService(scripted).set_question_saved(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=active.version,
+                question_id=uuid4(),
+                is_saved=True,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert card.is_saved is False
+    assert active.version == 1
+    assert scripted.commit_count == 0
+
+
 def follow_up_decision(
     *,
     attempt_id: UUID,

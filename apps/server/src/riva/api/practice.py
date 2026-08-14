@@ -21,6 +21,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     RetryPracticeQuestionRequest,
+    SetPracticeQuestionSavedRequest,
+    SetPracticeQuestionWeakRequest,
     SubmitFollowUpAnswerRequest,
     StartPracticeSessionRequest,
     SubmitPrimaryAnswerRequest,
@@ -93,6 +95,46 @@ async def retry_current_practice_question(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.retry_current_question(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.patch(
+    "/sessions/{sessionId}/questions/saved",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def set_practice_question_saved(
+    session_id: PracticeSessionId,
+    payload: SetPracticeQuestionSavedRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.set_question_saved(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.patch(
+    "/sessions/{sessionId}/questions/weak",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def set_practice_question_weak(
+    session_id: PracticeSessionId,
+    payload: SetPracticeQuestionWeakRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.set_question_weak(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

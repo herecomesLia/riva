@@ -272,14 +272,36 @@ export function requestPracticeFollowUpReferenceAnswer(
 
 export function setQuestionSaved(
   input: SetPracticeQuestionSavedInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.setQuestionSaved(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.setQuestionSaved(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/saved`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+        isSaved: input.isSaved,
+      },
+      method: "PATCH",
+    },
+  )
 }
 
 export function setQuestionWeak(
   input: SetPracticeQuestionWeakInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.setQuestionWeak(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.setQuestionWeak(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/weak`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+        isMarkedWeak: input.isMarkedWeak,
+      },
+      method: "PATCH",
+    },
+  )
 }
 
 export function submitPrimaryAnswer(

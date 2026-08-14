@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import httpx
+import pytest
 from riva.core.auth import get_auth_service, require_current_user
 from riva.core.practice import get_practice_api_service
 from riva.models import User
@@ -21,6 +22,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RetryPracticeQuestionRequest,
     PracticeSessionSelection,
+    SetPracticeQuestionSavedRequest,
+    SetPracticeQuestionWeakRequest,
 )
 
 
@@ -166,6 +169,14 @@ class FakePracticeAPIService:
 
     async def retry_current_question(self, **kwargs: object):
         self.calls.append(("retry", kwargs))
+        return self.submit_result
+
+    async def set_question_saved(self, **kwargs: object):
+        self.calls.append(("set_saved", kwargs))
+        return self.submit_result
+
+    async def set_question_weak(self, **kwargs: object):
+        self.calls.append(("set_weak", kwargs))
         return self.submit_result
 
     async def submit_primary_answer(self, **kwargs: object):
@@ -452,6 +463,88 @@ def test_retry_current_question_requires_csrf_and_forbids_internal_fields(app) -
         "POST",
         f"/api/practice/sessions/{SESSION_ID}/questions/retry",
         json={**payload, "retryOfAttemptId": str(uuid4())},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert service.calls == []
+
+
+@pytest.mark.parametrize(
+    ("path", "method_name", "payload_type", "flag_name"),
+    [
+        (
+            "saved",
+            "set_saved",
+            SetPracticeQuestionSavedRequest,
+            "isSaved",
+        ),
+        (
+            "weak",
+            "set_weak",
+            SetPracticeQuestionWeakRequest,
+            "isMarkedWeak",
+        ),
+    ],
+)
+def test_question_flag_routes_return_200_and_forward_exact_body(
+    app,
+    path: str,
+    method_name: str,
+    payload_type,
+    flag_name: str,
+) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    payload = {
+        "version": 5,
+        "questionId": str(service.submit_result.question.id),
+        flag_name: True,
+    }
+
+    result = request(
+        app,
+        "PATCH",
+        f"/api/practice/sessions/{SESSION_ID}/questions/{path}",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "generatingFollowUp"
+    assert service.calls[0][0] == method_name
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(service.calls[0][1]["payload"], payload_type)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+
+
+@pytest.mark.parametrize("path", ["saved", "weak"])
+def test_question_flag_routes_require_csrf_and_reject_extra_fields(
+    app,
+    path: str,
+) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+    payload = {
+        "version": 5,
+        "questionId": str(service.submit_result.question.id),
+        "isSaved" if path == "saved" else "isMarkedWeak": True,
+    }
+
+    csrf = request(
+        app,
+        "PATCH",
+        f"/api/practice/sessions/{SESSION_ID}/questions/{path}",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "PATCH",
+        f"/api/practice/sessions/{SESSION_ID}/questions/{path}",
+        json={**payload, "attemptId": str(uuid4())},
         headers={"Origin": TRUSTED_ORIGIN},
     )
 
@@ -786,6 +879,28 @@ def test_new_practice_mutations_require_authentication(app) -> None:
         },
         headers={"Origin": TRUSTED_ORIGIN},
     )
+    saved_question = request(
+        app,
+        "PATCH",
+        f"/api/practice/sessions/{SESSION_ID}/questions/saved",
+        json={
+            "version": 5,
+            "questionId": str(service.submit_result.question.id),
+            "isSaved": True,
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+    weak_question = request(
+        app,
+        "PATCH",
+        f"/api/practice/sessions/{SESSION_ID}/questions/weak",
+        json={
+            "version": 5,
+            "questionId": str(service.submit_result.question.id),
+            "isMarkedWeak": True,
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
 
     assert submit.status_code == 401
     assert refresh.status_code == 401
@@ -794,6 +909,8 @@ def test_new_practice_mutations_require_authentication(app) -> None:
     assert end_follow_ups.status_code == 401
     assert next_question.status_code == 401
     assert retry_question.status_code == 401
+    assert saved_question.status_code == 401
+    assert weak_question.status_code == 401
     assert service.calls == []
 
 

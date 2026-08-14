@@ -42,6 +42,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
     RetryPracticeQuestionRequest,
+    SetPracticeQuestionSavedRequest,
+    SetPracticeQuestionWeakRequest,
     StartPracticeSessionRequest,
     SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
@@ -108,6 +110,18 @@ class FakePracticeSessionService:
         **kwargs: object,
     ) -> PracticeSessionWorkflowContext:
         self.calls.append(("retry", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def set_question_saved(self, **kwargs: object):
+        self.calls.append(("set_saved", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def set_question_weak(self, **kwargs: object):
+        self.calls.append(("set_weak", kwargs))
         if self.error is not None:
             raise self.error
         return self.context
@@ -677,6 +691,99 @@ def test_retry_current_question_forwards_public_provenance_without_llm_precheck(
                 "session_id": domain.context.session.id,
                 "expected_version": 5,
                 "question_id": question_id,
+            },
+        )
+    ]
+
+
+def test_question_flag_mutations_forward_exact_args_without_llm_precheck() -> None:
+    domain = FakePracticeSessionService(context=context(answering=True))
+    domain.context.session.version = 4
+    assert domain.context.question_card is not None
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model=None,
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    saved = asyncio.run(
+        service.set_question_saved(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=SetPracticeQuestionSavedRequest(
+                version=4,
+                question_id=domain.context.question_card.id,
+                is_saved=True,
+            ),
+        )
+    )
+    weak = asyncio.run(
+        service.set_question_weak(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=SetPracticeQuestionWeakRequest(
+                version=4,
+                question_id=domain.context.question_card.id,
+                is_marked_weak=True,
+            ),
+        )
+    )
+
+    assert saved.status == "answering"
+    assert weak.status == "answering"
+    assert domain.calls == [
+        (
+            "set_saved",
+            {
+                "user_id": domain.context.session.user_id,
+                "session_id": domain.context.session.id,
+                "expected_version": 4,
+                "question_id": domain.context.question_card.id,
+                "is_saved": True,
+            },
+        ),
+        (
+            "set_weak",
+            {
+                "user_id": domain.context.session.user_id,
+                "session_id": domain.context.session.id,
+                "expected_version": 4,
+                "question_id": domain.context.question_card.id,
+                "is_marked_weak": True,
+            },
+        ),
+    ]
+
+    review_domain = FakePracticeSessionService(context=review_context())
+    review_service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model=None,
+        practice_service_factory=lambda *_args, **_kwargs: review_domain,
+    )
+    review_response = asyncio.run(
+        review_service.set_question_weak(
+            user_id=review_domain.context.session.user_id,
+            session_id=review_domain.context.session.id,
+            payload=SetPracticeQuestionWeakRequest(
+                version=5,
+                question_id=review_domain.context.question_card.id,
+                is_marked_weak=True,
+            ),
+        )
+    )
+
+    assert review_response.status == "review"
+    assert review_domain.calls == [
+        (
+            "set_weak",
+            {
+                "user_id": review_domain.context.session.user_id,
+                "session_id": review_domain.context.session.id,
+                "expected_version": 5,
+                "question_id": review_domain.context.question_card.id,
+                "is_marked_weak": True,
             },
         )
     ]

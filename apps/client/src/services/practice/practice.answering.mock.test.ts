@@ -388,20 +388,24 @@ describe("practice stateful mock service: answering", () => {
     if (framed.session.status !== "answering") return
     expect(framed.session.question.answerFramework.status).toBe("revealed")
 
-    const saved = await context.settle(
-      context.setQuestionSaved({
-        ...questionInput,
-        version: framed.session.version,
-        isSaved: true,
-      }),
+    const saved = context.requireMockPageResponse(
+      await context.settle(
+        context.setQuestionSaved({
+          ...questionInput,
+          version: framed.session.version,
+          isSaved: true,
+        }),
+      ),
     )
     if (saved.session.status !== "answering") return
-    const weak = await context.settle(
-      context.setQuestionWeak({
-        ...questionInput,
-        version: saved.session.version,
-        isMarkedWeak: true,
-      }),
+    const weak = context.requireMockPageResponse(
+      await context.settle(
+        context.setQuestionWeak({
+          ...questionInput,
+          version: saved.session.version,
+          isMarkedWeak: true,
+        }),
+      ),
     )
     if (weak.session.status !== "answering") return
 

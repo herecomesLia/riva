@@ -494,6 +494,105 @@ describe("PracticePage real API workflow", () => {
     ).toBe(true)
   })
 
+  it("updates saved state through the real API and uses the latest version to unsave", async () => {
+    const user = userEvent.setup()
+    const current = session("answering", 2)
+    let saved = false
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/saved`) {
+        expect(init?.method).toBe("PATCH")
+        const body = requestBody([input, init])
+        expect(body).toEqual({
+          version: saved ? 3 : 2,
+          questionId,
+          isSaved: !saved,
+        })
+        saved = !saved
+        return jsonResponse({
+          ...current,
+          question: { ...question, isSaved: saved },
+          version: saved ? 3 : 4,
+        })
+      }
+      throw new Error(`Unexpected request during saved-flag workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.questionActions.save"),
+      }),
+    )
+    expect(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.questionActions.unsave"),
+      }),
+    ).toHaveAttribute("aria-pressed", "true")
+
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.questionActions.unsave"),
+      }),
+    )
+    expect(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.questionActions.save"),
+      }),
+    ).toHaveAttribute("aria-pressed", "false")
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/questions/saved")),
+    ).toHaveLength(2)
+  })
+
+  it("keeps review content visible while marking the question weak through the real API", async () => {
+    const user = userEvent.setup()
+    const current = review(8)
+    const markedWeak = {
+      ...current,
+      question: { ...question, isMarkedWeak: true },
+      version: 9,
+    }
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/weak`) {
+        expect(init?.method).toBe("PATCH")
+        expect(requestBody([input, init])).toEqual({
+          version: 8,
+          questionId,
+          isMarkedWeak: true,
+        })
+        return jsonResponse(markedWeak)
+      }
+      throw new Error(`Unexpected request during weak-flag workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    const reviewState = await testing.screen.findByTestId("practice-review-state")
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.questionActions.markWeak"),
+      }),
+    )
+
+    expect(await testing.screen.findByTestId("practice-review-state")).toBe(reviewState)
+    expect(reviewState).toHaveTextContent("86")
+    expect(reviewState).toHaveTextContent("回答结构清晰，证据完整。")
+    expect(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.questionActions.unmarkWeak"),
+      }),
+    ).toHaveAttribute("aria-pressed", "true")
+  })
+
   it("ends review through the real complete API and renders the backend completed summary", async () => {
     const user = userEvent.setup()
     const current = review(8)

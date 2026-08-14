@@ -790,6 +790,128 @@ class PracticeSessionService:
             await self.session.rollback()
             raise
 
+    async def set_question_saved(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        is_saved: bool,
+    ) -> PracticePublicWorkflowContext:
+        return await self._set_question_flag(
+            user_id=user_id,
+            session_id=session_id,
+            expected_version=expected_version,
+            question_id=question_id,
+            flag="is_saved",
+            value=is_saved,
+        )
+
+    async def set_question_weak(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        is_marked_weak: bool,
+    ) -> PracticePublicWorkflowContext:
+        return await self._set_question_flag(
+            user_id=user_id,
+            session_id=session_id,
+            expected_version=expected_version,
+            question_id=question_id,
+            flag="is_marked_weak",
+            value=is_marked_weak,
+        )
+
+    async def _set_question_flag(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        flag: Literal["is_saved", "is_marked_weak"],
+        value: bool,
+    ) -> PracticePublicWorkflowContext:
+        try:
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if not isinstance(value, bool):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if (
+                practice_session.status != PracticeSessionStatus.ACTIVE.value
+                or practice_session.completed_at is not None
+                or practice_session.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            current_attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if current_attempt is None or current_attempt.status not in {
+                PracticeAttemptStatus.ANSWERING.value,
+                PracticeAttemptStatus.REVIEW.value,
+            }:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            context = await self._load_public_active_context(
+                practice_session,
+                for_update=True,
+                current_attempt=current_attempt,
+            )
+            if context.attempt.status == PracticeAttemptStatus.ANSWERING.value:
+                if not isinstance(context, PracticeSessionWorkflowContext):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_STATE_CONFLICT
+                    )
+            elif context.attempt.status == PracticeAttemptStatus.REVIEW.value:
+                if not isinstance(context, PracticeReviewWorkflowContext):
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_STATE_CONFLICT
+                    )
+            else:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            question_card = context.question_card
+            if (
+                question_card is None
+                or context.attempt.question_card_id != question_id
+                or question_card.id != question_id
+                or question_card.user_id != user_id
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            if flag == "is_saved":
+                question_card.is_saved = value
+            else:
+                question_card.is_marked_weak = value
+            question_card.updated_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return context
+        except BaseException:
+            await self.session.rollback()
+            raise
+
     async def complete_session_after_review(
         self,
         *,
@@ -4456,12 +4578,15 @@ class PracticeSessionService:
         practice_session: PracticeSession,
         *,
         for_update: bool,
+        current_attempt: PracticeAttempt | None = None,
     ) -> PracticePublicWorkflowContext:
-        attempt = await self._load_current_attempt(
-            user_id=practice_session.user_id,
-            session_id=practice_session.id,
-            for_update=for_update,
-        )
+        attempt = current_attempt
+        if attempt is None:
+            attempt = await self._load_current_attempt(
+                user_id=practice_session.user_id,
+                session_id=practice_session.id,
+                for_update=for_update,
+            )
         if attempt is None:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
         if attempt.status not in {

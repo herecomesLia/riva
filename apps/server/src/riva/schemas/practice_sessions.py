@@ -91,6 +91,22 @@ class RetryPracticeQuestionRequest(APIModel):
     question_id: StandardUUID
 
 
+class SetPracticeQuestionSavedRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+    is_saved: Annotated[bool, Field(strict=True)]
+
+
+class SetPracticeQuestionWeakRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+    is_marked_weak: Annotated[bool, Field(strict=True)]
+
+
 class RefreshPracticeQuestionGenerationRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -658,6 +674,8 @@ __all__ = [
     "EndPracticeSessionEarlyRequest",
     "EndPracticeFollowUpsRequest",
     "RetryPracticeQuestionRequest",
+    "SetPracticeQuestionSavedRequest",
+    "SetPracticeQuestionWeakRequest",
     "RefreshPracticeFollowUpGenerationRequest",
     "RefreshPracticeEvaluationRequest",
     "RefreshPracticeQuestionGenerationRequest",

@@ -395,6 +395,9 @@ export type SetPracticeQuestionWeakInput = PracticeQuestionMutationInput & {
   isMarkedWeak: boolean
 }
 
+export type PracticeQuestionFlagMutationInput =
+  SetPracticeQuestionSavedInput | SetPracticeQuestionWeakInput
+
 export type RequestPracticeHintInput = PracticeQuestionMutationInput
 
 export type RequestAnswerFrameworkInput = PracticeQuestionMutationInput
