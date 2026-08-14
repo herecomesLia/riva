@@ -1,7 +1,7 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import cast
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -30,6 +30,7 @@ from riva.services.reference_answer_generation import (
     REFERENCE_ANSWER_ARTIFACT_CONFLICT,
     REFERENCE_ANSWER_CONTEXT_CONFLICT,
     REFERENCE_ANSWER_OUTPUT_MISMATCH,
+    PracticeReferenceAnswerLifecycleStatus,
     ReferenceAnswerGenerationService,
     ReferenceAnswerGenerationStateError,
     practice_follow_up_reference_answer_idempotency_key,
@@ -154,6 +155,216 @@ def main_output() -> PracticeMainReferenceAnswerOutput:
         keyPoints=["State the decision.", "Explain the evidence."],
         commonMistakes=["Inventing a metric."],
     )
+
+
+def main_artifact(
+    *,
+    card: QuestionCard,
+    run: AgentRun,
+    generated_at: datetime = NOW,
+) -> PracticeReferenceAnswerArtifact:
+    output = main_output()
+    return PracticeReferenceAnswerArtifact(
+        id=uuid4(),
+        question_card_id=card.id,
+        source_agent_run_id=run.id,
+        target_type=output.target_type.value,
+        kind=output.kind.value,
+        answer=output.answer,
+        key_points=output.key_points,
+        common_mistakes=output.common_mistakes,
+        generated_at=generated_at,
+    )
+
+
+def test_reference_answer_generation_state_is_not_requested_without_a_run() -> None:
+    owner, card, _qg_run, _context = main_graph()
+    session = ScriptedSession(None, None, None)
+
+    state = asyncio.run(
+        ReferenceAnswerGenerationService(session).get_main_generation_state(
+            user_id=owner.id,
+            question_card_id=card.id,
+            submitted_at=None,
+        )
+    )
+
+    assert state.status is PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED
+    assert state.generation_run is None
+    assert state.artifact is None
+    assert state.output is None
+    assert state.viewed_before_submission is False
+    assert session.commit_count == 0
+
+
+@pytest.mark.parametrize(
+    "status",
+    [AgentRunStatus.QUEUED, AgentRunStatus.RUNNING],
+)
+def test_reference_answer_generation_state_maps_active_runs_to_generating(
+    status: AgentRunStatus,
+) -> None:
+    owner, card, qg_run, context = main_graph()
+    run = main_run(owner, card, context, status=status)
+    session = ScriptedSession(run, None, card, qg_run, context, None)
+
+    state = asyncio.run(
+        ReferenceAnswerGenerationService(session).get_main_generation_state(
+            user_id=owner.id,
+            question_card_id=card.id,
+            submitted_at=None,
+        )
+    )
+
+    assert state.status is PracticeReferenceAnswerLifecycleStatus.GENERATING
+    assert state.generation_run is run
+    assert state.artifact is None
+    assert state.output is None
+
+
+def test_reference_answer_generation_state_maps_failed_run_to_unavailable() -> None:
+    owner, card, qg_run, context = main_graph()
+    run = main_run(owner, card, context, status=AgentRunStatus.FAILED)
+    session = ScriptedSession(run, None, card, qg_run, context, None)
+
+    state = asyncio.run(
+        ReferenceAnswerGenerationService(session).get_main_generation_state(
+            user_id=owner.id,
+            question_card_id=card.id,
+            submitted_at=None,
+        )
+    )
+
+    assert state.status is PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE
+    assert state.generation_run is run
+    assert state.artifact is None
+    assert state.output is None
+
+
+@pytest.mark.parametrize(
+    ("submitted_at", "expected"),
+    [
+        (None, True),
+        (NOW, True),
+        (NOW.replace(microsecond=0) - timedelta(microseconds=1), False),
+    ],
+)
+def test_reference_answer_generation_state_reveals_canonical_artifact_and_timing(
+    submitted_at: datetime | None,
+    expected: bool,
+) -> None:
+    owner, card, qg_run, context = main_graph()
+    run = main_run(owner, card, context, status=AgentRunStatus.SUCCEEDED)
+    artifact = main_artifact(card=card, run=run)
+    session = ScriptedSession(run, artifact, card, qg_run, context, artifact)
+
+    state = asyncio.run(
+        ReferenceAnswerGenerationService(session).get_main_generation_state(
+            user_id=owner.id,
+            question_card_id=card.id,
+            submitted_at=submitted_at,
+        )
+    )
+
+    assert state.status is PracticeReferenceAnswerLifecycleStatus.REVEALED
+    assert state.generation_run is run
+    assert state.artifact is artifact
+    assert state.output == main_output()
+    assert state.viewed_before_submission is expected
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "succeeded_without_artifact",
+        "failed_with_artifact",
+        "queued_with_artifact",
+        "source_mismatch",
+        "target_mismatch",
+        "payload_target_mismatch",
+        "wrong_stable_key",
+        "malformed_frozen_context",
+    ],
+)
+def test_reference_answer_generation_state_rejects_corrupt_lifecycle(
+    case: str,
+) -> None:
+    owner, card, qg_run, context = main_graph()
+    run = main_run(
+        owner,
+        card,
+        context,
+        status=(
+            AgentRunStatus.SUCCEEDED
+            if case == "succeeded_without_artifact"
+            else AgentRunStatus.FAILED
+            if case == "failed_with_artifact"
+            else AgentRunStatus.QUEUED
+            if case == "queued_with_artifact"
+            else AgentRunStatus.RUNNING
+        ),
+    )
+    artifact = main_artifact(card=card, run=run)
+    scalar_values: list[object]
+    if case == "succeeded_without_artifact":
+        scalar_values = [run, None, card, qg_run, context, None]
+    elif case in {"failed_with_artifact", "queued_with_artifact"}:
+        scalar_values = [run, artifact, card, qg_run, context, None]
+    elif case == "source_mismatch":
+        mismatched_source = main_run(owner, card, context)
+        mismatched_artifact = main_artifact(card=card, run=mismatched_source)
+        scalar_values = [run, mismatched_artifact, card, qg_run, context, None]
+    elif case == "target_mismatch":
+        mismatched_target = main_artifact(card=card, run=run)
+        mismatched_target.follow_up_question_id = uuid4()
+        scalar_values = [run, None, card, qg_run, context, mismatched_target]
+    elif case == "payload_target_mismatch":
+        run.payload["questionCardId"] = str(uuid4())
+        scalar_values = [run]
+    elif case == "wrong_stable_key":
+        run.idempotency_key = "wrong-stable-key"
+        scalar_values = [None, run]
+    else:
+        context.frozen_context = {"invalid": True}
+        scalar_values = [run, None, card, qg_run, context]
+
+    with pytest.raises(ReferenceAnswerGenerationStateError) as error:
+        asyncio.run(
+            ReferenceAnswerGenerationService(
+                ScriptedSession(*scalar_values)  # type: ignore[arg-type]
+            ).get_main_generation_state(
+                user_id=owner.id,
+                question_card_id=card.id,
+                submitted_at=None,
+            )
+        )
+
+    assert error.value.code == (
+        REFERENCE_ANSWER_CONTEXT_CONFLICT
+        if case in {
+            "payload_target_mismatch",
+            "wrong_stable_key",
+            "malformed_frozen_context",
+        }
+        else REFERENCE_ANSWER_ARTIFACT_CONFLICT
+    )
+
+
+def test_reference_answer_generation_state_rejects_malformed_payload() -> None:
+    owner, card, _qg_run, _context = main_graph()
+    run = main_run(owner, card, _context)
+    run.payload = {"invalid": True}
+
+    with pytest.raises(ReferenceAnswerGenerationStateError) as error:
+        asyncio.run(
+            ReferenceAnswerGenerationService(ScriptedSession(run)).get_main_generation_state(
+                user_id=owner.id,
+                question_card_id=card.id,
+                submitted_at=None,
+            )
+        )
+
+    assert error.value.code == INVALID_REFERENCE_ANSWER_GENERATION_RUN
 
 
 def test_main_enqueue_freezes_card_context_and_uses_stable_key() -> None:

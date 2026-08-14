@@ -23,6 +23,7 @@ from riva.prompts import (
     PRACTICE_EVALUATION_PROMPT,
     PRACTICE_RECOMMENDATION_PROMPT,
     PRACTICE_REVIEW_PROMPT,
+    PRACTICE_REFERENCE_ANSWER_PROMPT,
     QUESTION_GENERATION_PROMPT,
 )
 from riva.schemas.evaluation import (
@@ -31,6 +32,7 @@ from riva.schemas.evaluation import (
 )
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import PracticeAnswerKind
+from riva.schemas.practice_reference_answer import PracticeReferenceAnswerTargetType
 from riva.schemas.practice_recommendation import RecommendationRunPayload
 from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.practice_sessions import (
@@ -53,6 +55,7 @@ from riva.services.practice_sessions import (
     PRACTICE_RECOMMENDATION_GENERATION_FAILED,
     PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
     PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
+    PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
     PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
@@ -87,6 +90,12 @@ from riva.services.recommendation_generation import (
 )
 from riva.services.review_generation import practice_review_idempotency_key
 from riva.services.question_generation import QuestionGenerationStateError
+from riva.services.reference_answer_generation import (
+    PracticeReferenceAnswerLifecycleStatus,
+    PracticeReferenceAnswerWorkflowState,
+    practice_follow_up_reference_answer_idempotency_key,
+    practice_main_reference_answer_idempotency_key,
+)
 
 
 NOW = datetime(2026, 8, 10, 10, 0, tzinfo=UTC)
@@ -262,6 +271,89 @@ class FakeRecommendationGenerationService:
             raise self.error
         assert self.run is not None
         return self.run
+
+
+class FakeReferenceAnswerGenerationService:
+    def __init__(
+        self,
+        run: AgentRun | None = None,
+        state: PracticeReferenceAnswerWorkflowState | None = None,
+        error: BaseException | None = None,
+    ) -> None:
+        self.run = run
+        self.state = state
+        self.error = error
+        self.main_calls: list[dict[str, object]] = []
+        self.follow_up_calls: list[dict[str, object]] = []
+
+    async def enqueue_main_generation_in_transaction(
+        self,
+        **kwargs: object,
+    ) -> AgentRun:
+        self.main_calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        assert self.run is not None
+        return self.run
+
+    async def enqueue_follow_up_generation_in_transaction(
+        self,
+        **kwargs: object,
+    ) -> AgentRun:
+        self.follow_up_calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        assert self.run is not None
+        return self.run
+
+    async def get_main_generation_state(
+        self,
+        **kwargs: object,
+    ) -> PracticeReferenceAnswerWorkflowState:
+        assert kwargs["submitted_at"] is None
+        assert self.state is not None
+        return self.state
+
+    async def get_follow_up_generation_state(
+        self,
+        **kwargs: object,
+    ) -> PracticeReferenceAnswerWorkflowState:
+        assert kwargs["submitted_at"] is None
+        assert self.state is not None
+        return self.state
+
+
+def reference_answer_run(*, user_id: UUID) -> AgentRun:
+    return AgentRun(
+        id=uuid4(),
+        user_id=user_id,
+        agent_id="practice-reference-answer-generator",
+        prompt_id=PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
+        prompt_version=PRACTICE_REFERENCE_ANSWER_PROMPT.version,
+        output_schema_id=PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+        status=AgentRunStatus.QUEUED,
+        payload={},
+        idempotency_key=f"reference:{uuid4()}",
+        attempt_count=0,
+        max_attempts=3,
+        available_at=NOW,
+        model="test-model",
+    )
+
+
+def reference_answer_state(
+    run: AgentRun,
+    status: PracticeReferenceAnswerLifecycleStatus = (
+        PracticeReferenceAnswerLifecycleStatus.GENERATING
+    ),
+) -> PracticeReferenceAnswerWorkflowState:
+    return PracticeReferenceAnswerWorkflowState(
+        status=status,
+        generation_run=run,
+        artifact=None,
+        output=None,
+        viewed_before_submission=False,
+    )
 
 
 def selection(
@@ -1562,12 +1654,14 @@ def service(
     fake_evaluation: FakeEvaluationGenerationService | None = None,
     fake_review: FakeReviewGenerationService | None = None,
     fake_recommendation: FakeRecommendationGenerationService | None = None,
+    fake_reference: FakeReferenceAnswerGenerationService | None = None,
 ) -> PracticeSessionService:
     fake_generation = fake_generation or FakeGenerationService()
     fake_follow_up = fake_follow_up or FakeFollowUpGenerationService()
     fake_evaluation = fake_evaluation or FakeEvaluationGenerationService()
     fake_review = fake_review or FakeReviewGenerationService()
     fake_recommendation = fake_recommendation or FakeRecommendationGenerationService()
+    fake_reference = fake_reference or FakeReferenceAnswerGenerationService()
     return PracticeSessionService(
         session,  # type: ignore[arg-type]
         llm_model="test-model",
@@ -1576,8 +1670,475 @@ def service(
         evaluation_generation_service_factory=lambda _session, **kwargs: fake_evaluation,  # type: ignore[arg-type]
         review_generation_service_factory=lambda _session, **kwargs: fake_review,  # type: ignore[arg-type]
         recommendation_generation_service_factory=lambda _session, **kwargs: fake_recommendation,  # type: ignore[arg-type]
+        reference_answer_generation_service_factory=lambda _session, **kwargs: fake_reference,  # type: ignore[arg-type]
         clock=lambda: NOW,
     )
+
+
+def main_reference_request_values(
+    active: PracticeSession,
+    attempt: PracticeAttempt,
+    question_run: AgentRun,
+    card: QuestionCard,
+) -> list[object]:
+    question_run.idempotency_key = practice_question_generation_idempotency_key(
+        active.id,
+        attempt.id,
+    )
+    return [active, attempt, question_run, card, None, *([None] * 7)]
+
+
+def follow_up_reference_request_values(
+    active: PracticeSession,
+    attempt: PracticeAttempt,
+    question_run: AgentRun,
+    card: QuestionCard,
+    main: PracticeAnswer,
+    follow_up_generation_run: AgentRun,
+    decision: PracticeFollowUpDecision,
+    question: PracticeFollowUpQuestion,
+) -> list[object]:
+    return [
+        active,
+        attempt,
+        question_run,
+        card,
+        main,
+        follow_up_generation_run,
+        decision,
+        question,
+    ]
+
+
+def test_request_question_reference_answer_enqueues_and_advances_only_session_version() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    original_attempt_updated_at = attempt.updated_at
+    reference_run = reference_answer_run(user_id=active.user_id)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(reference_run),
+    )
+    scripted = ScriptedSession(
+        *main_reference_request_values(active, attempt, question_run, card)
+    )
+
+    result = asyncio.run(
+        service(scripted, fake_reference=fake_reference).request_question_reference_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    assert result.target_type is PracticeReferenceAnswerTargetType.MAIN
+    assert result.follow_up_question is None
+    assert result.generation_state.status is (
+        PracticeReferenceAnswerLifecycleStatus.GENERATING
+    )
+    assert result.generation_state.generation_run is reference_run
+    assert active.version == 5
+    assert attempt.status == PracticeAttemptStatus.ANSWERING.value
+    assert attempt.updated_at == original_attempt_updated_at
+    assert fake_reference.main_calls == [
+        {
+            "user_id": active.user_id,
+            "question_card_id": card.id,
+            "idempotency_key": practice_main_reference_answer_idempotency_key(
+                card.id
+            ),
+        }
+    ]
+    assert scripted.commit_count == 1
+    assert scripted.rollback_count == 0
+
+
+def test_request_question_reference_answer_reuses_stable_run_with_latest_version() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    reference_run = reference_answer_run(user_id=active.user_id)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(reference_run),
+    )
+
+    first_session = ScriptedSession(
+        *main_reference_request_values(active, attempt, question_run, card)
+    )
+    first = asyncio.run(
+        service(
+            first_session,
+            fake_reference=fake_reference,
+        ).request_question_reference_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+    second_session = ScriptedSession(
+        *main_reference_request_values(active, attempt, question_run, card)
+    )
+    second = asyncio.run(
+        service(
+            second_session,
+            fake_reference=fake_reference,
+        ).request_question_reference_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=5,
+            question_id=card.id,
+        )
+    )
+
+    assert first.generation_state.generation_run is reference_run
+    assert second.generation_state.generation_run is reference_run
+    assert active.version == 6
+    assert len(fake_reference.main_calls) == 2
+    assert first_session.commit_count == 1
+    assert second_session.commit_count == 1
+
+
+def test_request_question_reference_answer_rejects_stale_version_and_unavailable_enqueue_rolls_back() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    reference_run = reference_answer_run(user_id=active.user_id)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(reference_run),
+        error=ValueError("reference model is unavailable"),
+    )
+    scripted = ScriptedSession(
+        *main_reference_request_values(active, attempt, question_run, card)
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_reference=fake_reference,
+            ).request_question_reference_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE
+    assert active.version == 4
+    assert active.updated_at == NOW
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+    stale_session = ScriptedSession(active)
+    with pytest.raises(PracticeSessionStateError) as stale_error:
+        asyncio.run(
+            service(
+                stale_session,
+                fake_reference=FakeReferenceAnswerGenerationService(
+                    run=reference_run,
+                    state=reference_answer_state(reference_run),
+                ),
+            ).request_question_reference_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=3,
+                question_id=card.id,
+            )
+        )
+    assert stale_error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert stale_session.rollback_count == 1
+
+
+def test_refresh_question_reference_answer_is_read_like_and_preserves_version() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    reference_run = reference_answer_run(user_id=active.user_id)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(reference_run),
+    )
+    scripted = ScriptedSession(
+        *main_reference_request_values(active, attempt, question_run, card)
+    )
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).refresh_question_reference_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    assert result.generation_state.status is (
+        PracticeReferenceAnswerLifecycleStatus.GENERATING
+    )
+    assert active.version == 4
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 0
+    assert fake_reference.main_calls == []
+
+
+def test_request_question_reference_answer_rejects_existing_main_answer() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    answer = main_answer(attempt_id=attempt.id)
+    question_run.idempotency_key = practice_question_generation_idempotency_key(
+        active.id,
+        attempt.id,
+    )
+    scripted = ScriptedSession(active, attempt, question_run, card, answer)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_answer_run(user_id=active.user_id),
+    )
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_reference=fake_reference,
+            ).request_question_reference_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert fake_reference.main_calls == []
+    assert active.version == 4
+
+
+def test_request_follow_up_reference_answer_enqueues_only_current_pending_question() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+    )
+    main = main_answer(attempt_id=attempt.id)
+    follow_up_generation_run = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=main.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(
+        attempt_id=attempt.id,
+        run_id=follow_up_generation_run.id,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up_generation_run.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    reference_run = reference_answer_run(user_id=active.user_id)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(reference_run),
+    )
+    scripted = ScriptedSession(
+        *follow_up_reference_request_values(
+            active,
+            attempt,
+            question_run,
+            card,
+            main,
+            follow_up_generation_run,
+            decision,
+            question,
+        )
+    )
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).request_follow_up_reference_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            follow_up_question_id=question.id,
+        )
+    )
+
+    assert result.target_type is PracticeReferenceAnswerTargetType.FOLLOW_UP
+    assert result.follow_up_question is question
+    assert active.version == 5
+    assert attempt.status == PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+    assert fake_reference.follow_up_calls == [
+        {
+            "user_id": active.user_id,
+            "question_card_id": card.id,
+            "follow_up_question_id": question.id,
+            "idempotency_key": practice_follow_up_reference_answer_idempotency_key(
+                question.id
+            ),
+        }
+    ]
+    assert scripted.commit_count == 1
+
+
+def test_refresh_follow_up_reference_answer_preserves_version_and_rejects_wrong_question() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+    )
+    main = main_answer(attempt_id=attempt.id)
+    follow_up_generation_run = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=main.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    question = follow_up_question(
+        attempt_id=attempt.id,
+        run_id=follow_up_generation_run.id,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up_generation_run.id,
+        action="askFollowUp",
+        question_id=question.id,
+    )
+    reference_run = reference_answer_run(user_id=active.user_id)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(reference_run),
+    )
+    scripted = ScriptedSession(
+        *follow_up_reference_request_values(
+            active,
+            attempt,
+            question_run,
+            card,
+            main,
+            follow_up_generation_run,
+            decision,
+            question,
+        )
+    )
+
+    refreshed = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).refresh_follow_up_reference_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            follow_up_question_id=question.id,
+        )
+    )
+
+    assert refreshed.generation_state.status is (
+        PracticeReferenceAnswerLifecycleStatus.GENERATING
+    )
+    assert active.version == 4
+    assert scripted.commit_count == 0
+    assert fake_reference.follow_up_calls == []
+
+    wrong_session = ScriptedSession(
+        *follow_up_reference_request_values(
+            active,
+            attempt,
+            question_run,
+            card,
+            main,
+            follow_up_generation_run,
+            decision,
+            question,
+        )
+    )
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                wrong_session,
+                fake_reference=fake_reference,
+            ).request_follow_up_reference_answer(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+                follow_up_question_id=uuid4(),
+            )
+        )
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+
+
+def test_request_question_reference_answer_on_retry_reuses_question_card_target() -> None:
+    records = _retry_review_records("retryCurrent")
+    active = records["active"]
+    original = records["attempt"]
+    question_run = records["question_run"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(original, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    assert isinstance(card, QuestionCard)
+    original.status = PracticeAttemptStatus.COMPLETED.value
+    original.completed_at = NOW - timedelta(minutes=1)
+    question_run.idempotency_key = practice_question_generation_idempotency_key(
+        active.id,
+        original.id,
+    )
+    retry = PracticeAttempt(
+        id=uuid4(),
+        user_id=active.user_id,
+        session_id=active.id,
+        attempt_number=original.attempt_number + 1,
+        question_type=original.question_type,
+        difficulty=original.difficulty,
+        status=PracticeAttemptStatus.ANSWERING.value,
+        question_generation_run_id=None,
+        question_card_id=card.id,
+        retry_of_attempt_id=original.id,
+        created_at=NOW,
+        updated_at=NOW,
+        completed_at=None,
+    )
+    reference_run = reference_answer_run(user_id=active.user_id)
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(
+            reference_run,
+            PracticeReferenceAnswerLifecycleStatus.REVEALED,
+        ),
+    )
+    scripted = ScriptedSession(
+        active,
+        retry,
+        original,
+        question_run,
+        card,
+        None,
+        *([None] * 7),
+    )
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).request_question_reference_answer(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=active.version,
+            question_id=card.id,
+        )
+    )
+
+    assert result.question_card is card
+    assert result.attempt is retry
+    assert result.generation_state.status is (
+        PracticeReferenceAnswerLifecycleStatus.REVEALED
+    )
+    assert fake_reference.main_calls[0]["question_card_id"] == card.id
+    assert active.version == 5
 
 
 def evaluation_pipeline(

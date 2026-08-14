@@ -42,6 +42,7 @@ from riva.schemas.practice_interactions import (
     PracticeAnswerContent,
     PracticeAnswerKind,
 )
+from riva.schemas.practice_reference_answer import PracticeReferenceAnswerTargetType
 from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
     PracticeSessionCompletionReason,
@@ -91,6 +92,13 @@ from riva.services.question_generation import (
     QuestionGenerationStateError,
     validate_question_generation_run,
 )
+from riva.services.reference_answer_generation import (
+    PracticeReferenceAnswerWorkflowState,
+    ReferenceAnswerGenerationService,
+    ReferenceAnswerGenerationStateError,
+    practice_follow_up_reference_answer_idempotency_key,
+    practice_main_reference_answer_idempotency_key,
+)
 from riva.utils import utc_now
 
 
@@ -117,6 +125,7 @@ PracticeSessionStateErrorCode = Literal[
     "practice_recommendation_generation_failed",
     "practice_recommendation_generation_state_conflict",
     "practice_recommendation_generation_unavailable",
+    "practice_reference_answer_generation_unavailable",
 ]
 
 PRACTICE_SESSION_NOT_FOUND: PracticeSessionStateErrorCode = (
@@ -185,6 +194,9 @@ PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode
 PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
     "practice_recommendation_generation_unavailable"
 )
+PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+    "practice_reference_answer_generation_unavailable"
+)
 
 
 class PracticeSessionStateError(RuntimeError):
@@ -231,6 +243,16 @@ class PracticePrimaryAnswerWorkflowContext:
     follow_up_completion_reason: (
         PracticeEvaluationFollowUpCompletionReason | None
     ) = field(default=None, kw_only=True)
+
+
+@dataclass(frozen=True)
+class PracticeReferenceAnswerRequestContext:
+    target_type: PracticeReferenceAnswerTargetType
+    session: PracticeSession
+    attempt: PracticeAttempt
+    question_card: QuestionCard
+    follow_up_question: PracticeFollowUpQuestion | None
+    generation_state: PracticeReferenceAnswerWorkflowState
 
 
 @dataclass(frozen=True)
@@ -338,6 +360,10 @@ RecommendationGenerationServiceFactory = Callable[
     ...,
     RecommendationGenerationService,
 ]
+ReferenceAnswerGenerationServiceFactory = Callable[
+    ...,
+    ReferenceAnswerGenerationService,
+]
 
 
 class PracticeSessionService:
@@ -361,6 +387,9 @@ class PracticeSessionService:
         recommendation_generation_service_factory: RecommendationGenerationServiceFactory = (
             RecommendationGenerationService
         ),
+        reference_answer_generation_service_factory: ReferenceAnswerGenerationServiceFactory = (
+            ReferenceAnswerGenerationService
+        ),
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
@@ -379,6 +408,9 @@ class PracticeSessionService:
         )
         self.recommendation_generation_service_factory = (
             recommendation_generation_service_factory
+        )
+        self.reference_answer_generation_service_factory = (
+            reference_answer_generation_service_factory
         )
         self.clock = clock
 
@@ -787,6 +819,404 @@ class PracticeSessionService:
                 practice_session.completion_reason = (
                     previous_session_completion_reason
                 )
+            await self.session.rollback()
+            raise
+
+    async def request_question_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeReferenceAnswerRequestContext:
+        practice_session: PracticeSession | None = None
+        previous_version: int | None = None
+        previous_updated_at: datetime | None = None
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            self._require_active_session_version(
+                practice_session,
+                expected_version=expected_version,
+            )
+            previous_version = practice_session.version
+            previous_updated_at = practice_session.updated_at
+
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if (
+                attempt is None
+                or attempt.user_id != user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status != PracticeAttemptStatus.ANSWERING.value
+                or attempt.question_card_id != question_id
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            source = await self._load_question_source(
+                practice_session,
+                attempt,
+                for_update=True,
+                require_succeeded=True,
+            )
+            if source.question_card.id != question_id:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            if await self._load_main_answer(attempt, for_update=True) is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            await self._ensure_attempt_has_no_response_artifacts(
+                practice_session,
+                attempt,
+            )
+
+            try:
+                generation_service = self._reference_answer_generation_service()
+                run = await generation_service.enqueue_main_generation_in_transaction(
+                    user_id=user_id,
+                    question_card_id=source.question_card.id,
+                    idempotency_key=practice_main_reference_answer_idempotency_key(
+                        source.question_card.id
+                    ),
+                )
+                generation_state = await generation_service.get_main_generation_state(
+                    user_id=user_id,
+                    question_card_id=source.question_card.id,
+                    submitted_at=None,
+                    for_update=True,
+                )
+            except ReferenceAnswerGenerationStateError as error:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT,
+                    source_code=error.code,
+                ) from None
+            except ValueError as error:
+                raise PracticeSessionStateError(
+                    PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+                    source_code="reference_answer_generation_unavailable",
+                ) from error
+
+            if (
+                run.id is None
+                or generation_state.generation_run is None
+                or generation_state.generation_run.id != run.id
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeReferenceAnswerRequestContext(
+                target_type=PracticeReferenceAnswerTargetType.MAIN,
+                session=practice_session,
+                attempt=attempt,
+                question_card=source.question_card,
+                follow_up_question=None,
+                generation_state=generation_state,
+            )
+        except BaseException:
+            if practice_session is not None and previous_version is not None:
+                practice_session.version = previous_version
+                practice_session.updated_at = previous_updated_at
+            await self.session.rollback()
+            raise
+
+    async def request_follow_up_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        follow_up_question_id: UUID,
+    ) -> PracticeReferenceAnswerRequestContext:
+        practice_session: PracticeSession | None = None
+        previous_version: int | None = None
+        previous_updated_at: datetime | None = None
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            self._require_active_session_version(
+                practice_session,
+                expected_version=expected_version,
+            )
+            previous_version = practice_session.version
+            previous_updated_at = practice_session.updated_at
+
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if (
+                attempt is None
+                or attempt.user_id != user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status
+                != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+                or attempt.question_card_id != question_id
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            chain = await self._load_follow_up_chain(
+                practice_session,
+                attempt,
+                for_update=True,
+            )
+            pending_question = chain.follow_up_question
+            if (
+                chain.card.id != question_id
+                or chain.follow_up_generation_run.status
+                != AgentRunStatus.SUCCEEDED
+                or chain.follow_up_decision is None
+                or chain.follow_up_decision.action != "askFollowUp"
+                or pending_question is None
+                or pending_question.id != follow_up_question_id
+                or chain.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            try:
+                generation_service = self._reference_answer_generation_service()
+                run = await generation_service.enqueue_follow_up_generation_in_transaction(
+                    user_id=user_id,
+                    question_card_id=chain.card.id,
+                    follow_up_question_id=pending_question.id,
+                    idempotency_key=practice_follow_up_reference_answer_idempotency_key(
+                        pending_question.id
+                    ),
+                )
+                generation_state = await generation_service.get_follow_up_generation_state(
+                    user_id=user_id,
+                    question_card_id=chain.card.id,
+                    follow_up_question_id=pending_question.id,
+                    submitted_at=None,
+                    for_update=True,
+                )
+            except ReferenceAnswerGenerationStateError as error:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT,
+                    source_code=error.code,
+                ) from None
+            except ValueError as error:
+                raise PracticeSessionStateError(
+                    PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+                    source_code="reference_answer_generation_unavailable",
+                ) from error
+
+            if (
+                run.id is None
+                or generation_state.generation_run is None
+                or generation_state.generation_run.id != run.id
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeReferenceAnswerRequestContext(
+                target_type=PracticeReferenceAnswerTargetType.FOLLOW_UP,
+                session=practice_session,
+                attempt=attempt,
+                question_card=chain.card,
+                follow_up_question=pending_question,
+                generation_state=generation_state,
+            )
+        except BaseException:
+            if practice_session is not None and previous_version is not None:
+                practice_session.version = previous_version
+                practice_session.updated_at = previous_updated_at
+            await self.session.rollback()
+            raise
+
+    async def refresh_question_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeReferenceAnswerRequestContext:
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=False,
+            )
+            self._require_active_session_version(
+                practice_session,
+                expected_version=expected_version,
+            )
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=False,
+            )
+            if (
+                attempt is None
+                or attempt.user_id != user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status != PracticeAttemptStatus.ANSWERING.value
+                or attempt.question_card_id != question_id
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            source = await self._load_question_source(
+                practice_session,
+                attempt,
+                for_update=False,
+                require_succeeded=True,
+            )
+            if source.question_card.id != question_id:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            if await self._load_main_answer(attempt, for_update=False) is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            await self._ensure_attempt_has_no_response_artifacts(
+                practice_session,
+                attempt,
+                for_update=False,
+            )
+            generation_state = await self._reference_answer_generation_service().get_main_generation_state(
+                user_id=user_id,
+                question_card_id=source.question_card.id,
+                submitted_at=None,
+                for_update=False,
+            )
+            return PracticeReferenceAnswerRequestContext(
+                target_type=PracticeReferenceAnswerTargetType.MAIN,
+                session=practice_session,
+                attempt=attempt,
+                question_card=source.question_card,
+                follow_up_question=None,
+                generation_state=generation_state,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def refresh_follow_up_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        follow_up_question_id: UUID,
+    ) -> PracticeReferenceAnswerRequestContext:
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=False,
+            )
+            self._require_active_session_version(
+                practice_session,
+                expected_version=expected_version,
+            )
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=False,
+            )
+            if (
+                attempt is None
+                or attempt.user_id != user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status
+                != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+                or attempt.question_card_id != question_id
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            chain = await self._load_follow_up_chain(
+                practice_session,
+                attempt,
+                for_update=False,
+            )
+            pending_question = chain.follow_up_question
+            if (
+                chain.card.id != question_id
+                or chain.follow_up_generation_run.status
+                != AgentRunStatus.SUCCEEDED
+                or chain.follow_up_decision is None
+                or chain.follow_up_decision.action != "askFollowUp"
+                or pending_question is None
+                or pending_question.id != follow_up_question_id
+                or chain.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            generation_state = await self._reference_answer_generation_service().get_follow_up_generation_state(
+                user_id=user_id,
+                question_card_id=chain.card.id,
+                follow_up_question_id=pending_question.id,
+                submitted_at=None,
+                for_update=False,
+            )
+            return PracticeReferenceAnswerRequestContext(
+                target_type=PracticeReferenceAnswerTargetType.FOLLOW_UP,
+                session=practice_session,
+                attempt=attempt,
+                question_card=chain.card,
+                follow_up_question=pending_question,
+                generation_state=generation_state,
+            )
+        except BaseException:
             await self.session.rollback()
             raise
 
@@ -4626,6 +5056,14 @@ class PracticeSessionService:
             llm_model=self.llm_model,
         )
 
+    def _reference_answer_generation_service(
+        self,
+    ) -> ReferenceAnswerGenerationService:
+        return self.reference_answer_generation_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
     def _generation_service(self) -> QuestionGenerationService:
         return self.question_generation_service_factory(
             self.session,
@@ -5623,6 +6061,7 @@ __all__ = [
     "PRACTICE_RECOMMENDATION_GENERATION_FAILED",
     "PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT",
     "PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE",
+    "PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE",
     "PRACTICE_SESSION_ALREADY_ACTIVE",
     "PRACTICE_SESSION_NOT_FOUND",
     "PRACTICE_SESSION_SOURCE_UNAVAILABLE",
@@ -5636,6 +6075,7 @@ __all__ = [
     "PracticeCompletedSessionWorkflowContext",
     "PracticeEndedEarlySessionWorkflowContext",
     "PracticePrimaryAnswerWorkflowContext",
+    "PracticeReferenceAnswerRequestContext",
     "PracticeEvaluationWorkflowContext",
     "PracticeEvaluationPipelineContext",
     "PracticeReviewWorkflowContext",

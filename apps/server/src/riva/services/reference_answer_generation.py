@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal, cast
 from uuid import UUID, uuid4
 
 from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.language import InteractionLanguage
@@ -104,6 +105,22 @@ class ReferenceAnswerGenerationStateError(RuntimeError):
     def __init__(self, code: ReferenceAnswerGenerationStateErrorCode) -> None:
         self.code = code
         super().__init__(self.safe_message)
+
+
+class PracticeReferenceAnswerLifecycleStatus(StrEnum):
+    NOT_REQUESTED = "notRequested"
+    GENERATING = "generating"
+    REVEALED = "revealed"
+    UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class PracticeReferenceAnswerWorkflowState:
+    status: PracticeReferenceAnswerLifecycleStatus
+    generation_run: AgentRun | None
+    artifact: PracticeReferenceAnswerArtifact | None
+    output: PracticeReferenceAnswerOutput | None
+    viewed_before_submission: bool
 
 
 def practice_main_reference_answer_idempotency_key(question_card_id: UUID) -> str:
@@ -320,6 +337,297 @@ class ReferenceAnswerGenerationService:
             idempotency_key=idempotency_key,
             max_attempts=3,
         )
+
+    async def get_main_generation_state(
+        self,
+        *,
+        user_id: UUID,
+        question_card_id: UUID,
+        submitted_at: datetime | None,
+        for_update: bool = False,
+    ) -> PracticeReferenceAnswerWorkflowState:
+        return await self._get_generation_state(
+            user_id=user_id,
+            question_card_id=question_card_id,
+            follow_up_question_id=None,
+            submitted_at=submitted_at,
+            for_update=for_update,
+        )
+
+    async def get_follow_up_generation_state(
+        self,
+        *,
+        user_id: UUID,
+        question_card_id: UUID,
+        follow_up_question_id: UUID,
+        submitted_at: datetime | None,
+        for_update: bool = False,
+    ) -> PracticeReferenceAnswerWorkflowState:
+        return await self._get_generation_state(
+            user_id=user_id,
+            question_card_id=question_card_id,
+            follow_up_question_id=follow_up_question_id,
+            submitted_at=submitted_at,
+            for_update=for_update,
+        )
+
+    async def _get_generation_state(
+        self,
+        *,
+        user_id: UUID,
+        question_card_id: UUID,
+        follow_up_question_id: UUID | None,
+        submitted_at: datetime | None,
+        for_update: bool,
+    ) -> PracticeReferenceAnswerWorkflowState:
+        target_type = (
+            PracticeReferenceAnswerTargetType.FOLLOW_UP
+            if follow_up_question_id is not None
+            else PracticeReferenceAnswerTargetType.MAIN
+        )
+        idempotency_key = (
+            practice_follow_up_reference_answer_idempotency_key(
+                follow_up_question_id
+            )
+            if follow_up_question_id is not None
+            else practice_main_reference_answer_idempotency_key(question_card_id)
+        )
+        run = await self._load_canonical_reference_run(
+            user_id=user_id,
+            question_card_id=question_card_id,
+            follow_up_question_id=follow_up_question_id,
+            idempotency_key=idempotency_key,
+            for_update=for_update,
+        )
+        if run is None:
+            target_artifact = await self._load_reference_artifact(
+                question_card_id=question_card_id,
+                follow_up_question_id=follow_up_question_id,
+                for_update=for_update,
+            )
+            if target_artifact is not None:
+                raise ReferenceAnswerGenerationStateError(
+                    REFERENCE_ANSWER_ARTIFACT_CONFLICT
+                )
+            return PracticeReferenceAnswerWorkflowState(
+                status=PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+                generation_run=None,
+                artifact=None,
+                output=None,
+                viewed_before_submission=False,
+            )
+
+        payload = validate_reference_answer_generation_run(run)
+        if (
+            payload.target_type != target_type
+            or payload.question_card_id != question_card_id
+            or (
+                follow_up_question_id is not None
+                and (
+                    not isinstance(payload, PracticeFollowUpReferenceAnswerRunPayload)
+                    or payload.follow_up_question_id != follow_up_question_id
+                )
+            )
+            or (
+                follow_up_question_id is None
+                and not isinstance(payload, PracticeMainReferenceAnswerRunPayload)
+            )
+        ):
+            raise ReferenceAnswerGenerationStateError(
+                REFERENCE_ANSWER_CONTEXT_CONFLICT
+            )
+
+        target_artifact = await self._load_reference_artifact(
+            question_card_id=question_card_id,
+            follow_up_question_id=follow_up_question_id,
+            for_update=for_update,
+        )
+
+        if isinstance(payload, PracticeMainReferenceAnswerRunPayload):
+            await self._load_main_context_for_run(
+                run,
+                payload,
+                for_update=for_update,
+            )
+        else:
+            await self._load_follow_up_context_for_run(
+                run,
+                payload,
+                for_update=for_update,
+            )
+
+        source_artifact = await self._load_source_artifact(
+            run.id,
+            for_update=for_update,
+        )
+        if source_artifact is not None:
+            if target_artifact is None or source_artifact.id != target_artifact.id:
+                raise ReferenceAnswerGenerationStateError(
+                    REFERENCE_ANSWER_ARTIFACT_CONFLICT
+                )
+        if target_artifact is not None and target_artifact.source_agent_run_id != run.id:
+            raise ReferenceAnswerGenerationStateError(
+                REFERENCE_ANSWER_ARTIFACT_CONFLICT
+            )
+
+        if run.status in {AgentRunStatus.QUEUED, AgentRunStatus.RUNNING}:
+            if target_artifact is not None or source_artifact is not None:
+                raise ReferenceAnswerGenerationStateError(
+                    REFERENCE_ANSWER_ARTIFACT_CONFLICT
+                )
+            return PracticeReferenceAnswerWorkflowState(
+                status=PracticeReferenceAnswerLifecycleStatus.GENERATING,
+                generation_run=run,
+                artifact=None,
+                output=None,
+                viewed_before_submission=False,
+            )
+
+        if run.status == AgentRunStatus.FAILED:
+            if target_artifact is not None or source_artifact is not None:
+                raise ReferenceAnswerGenerationStateError(
+                    REFERENCE_ANSWER_ARTIFACT_CONFLICT
+                )
+            return PracticeReferenceAnswerWorkflowState(
+                status=PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE,
+                generation_run=run,
+                artifact=None,
+                output=None,
+                viewed_before_submission=False,
+            )
+
+        if run.status != AgentRunStatus.SUCCEEDED or target_artifact is None:
+            raise ReferenceAnswerGenerationStateError(
+                REFERENCE_ANSWER_ARTIFACT_CONFLICT
+            )
+
+        try:
+            output = practice_reference_answer_output_from_artifact(
+                target_artifact
+            )
+        except ReferenceAnswerGenerationStateError:
+            raise
+        if (
+            output.target_type != payload.target_type
+            or output.kind != payload.expected_kind
+        ):
+            raise ReferenceAnswerGenerationStateError(
+                REFERENCE_ANSWER_ARTIFACT_CONFLICT
+            )
+        if not _artifact_matches(
+            target_artifact,
+            output,
+            question_card_id=question_card_id,
+            follow_up_question_id=follow_up_question_id,
+            source_agent_run_id=run.id,
+        ):
+            raise ReferenceAnswerGenerationStateError(
+                REFERENCE_ANSWER_ARTIFACT_CONFLICT
+            )
+        return PracticeReferenceAnswerWorkflowState(
+            status=PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            generation_run=run,
+            artifact=target_artifact,
+            output=output,
+            viewed_before_submission=_viewed_before_submission(
+                target_artifact,
+                submitted_at,
+            ),
+        )
+
+    async def _load_canonical_reference_run(
+        self,
+        *,
+        user_id: UUID,
+        question_card_id: UUID,
+        follow_up_question_id: UUID | None,
+        idempotency_key: str,
+        for_update: bool,
+    ) -> AgentRun | None:
+        statement = select(AgentRun).where(
+            AgentRun.user_id == user_id,
+            AgentRun.agent_id == "practice-reference-answer-generator",
+            AgentRun.prompt_id == PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
+            AgentRun.prompt_version == PRACTICE_REFERENCE_ANSWER_PROMPT.version,
+            AgentRun.output_schema_id
+            == PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+            AgentRun.idempotency_key == idempotency_key,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
+        if run is not None:
+            return run
+
+        target_field = (
+            AgentRun.payload["followUpQuestionId"].as_string()
+            if follow_up_question_id is not None
+            else AgentRun.payload["questionCardId"].as_string()
+        )
+        target_id = (
+            follow_up_question_id
+            if follow_up_question_id is not None
+            else question_card_id
+        )
+        candidate_statement = select(AgentRun).where(
+            AgentRun.user_id == user_id,
+            AgentRun.agent_id == "practice-reference-answer-generator",
+            or_(
+                target_field == str(target_id),
+                AgentRun.idempotency_key == idempotency_key,
+            ),
+        )
+        if for_update:
+            candidate_statement = candidate_statement.with_for_update()
+        candidate = await self.session.scalar(candidate_statement)
+        if candidate is not None:
+            raise ReferenceAnswerGenerationStateError(
+                REFERENCE_ANSWER_CONTEXT_CONFLICT
+            )
+        return None
+
+    async def _load_reference_artifact(
+        self,
+        *,
+        question_card_id: UUID,
+        follow_up_question_id: UUID | None,
+        for_update: bool,
+    ) -> PracticeReferenceAnswerArtifact | None:
+        statement = select(PracticeReferenceAnswerArtifact).where(
+            PracticeReferenceAnswerArtifact.question_card_id == question_card_id,
+            PracticeReferenceAnswerArtifact.target_type
+            == (
+                PracticeReferenceAnswerTargetType.FOLLOW_UP.value
+                if follow_up_question_id is not None
+                else PracticeReferenceAnswerTargetType.MAIN.value
+            ),
+        )
+        if follow_up_question_id is None:
+            statement = statement.where(
+                PracticeReferenceAnswerArtifact.follow_up_question_id.is_(None)
+            )
+        else:
+            statement = statement.where(
+                PracticeReferenceAnswerArtifact.follow_up_question_id
+                == follow_up_question_id
+            )
+        if for_update:
+            statement = statement.with_for_update()
+        return await self.session.scalar(statement)
+
+    async def _load_source_artifact(
+        self,
+        source_agent_run_id: UUID,
+        *,
+        for_update: bool,
+    ) -> PracticeReferenceAnswerArtifact | None:
+        statement = select(PracticeReferenceAnswerArtifact).where(
+            PracticeReferenceAnswerArtifact.source_agent_run_id
+            == source_agent_run_id
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return await self.session.scalar(statement)
 
     async def load_generation_input(
         self,
@@ -1057,6 +1365,22 @@ def _require_aware_datetime(value: datetime) -> None:
         raise ValueError("clock must return a timezone-aware datetime")
 
 
+def _viewed_before_submission(
+    artifact: PracticeReferenceAnswerArtifact,
+    submitted_at: datetime | None,
+) -> bool:
+    if submitted_at is None:
+        return True
+    try:
+        _require_aware_datetime(artifact.generated_at)
+        _require_aware_datetime(submitted_at)
+    except (AttributeError, TypeError, ValueError):
+        raise ReferenceAnswerGenerationStateError(
+            REFERENCE_ANSWER_CONTEXT_CONFLICT
+        ) from None
+    return artifact.generated_at <= submitted_at
+
+
 __all__ = [
     "INVALID_REFERENCE_ANSWER_GENERATION_RUN",
     "REFERENCE_ANSWER_ARTIFACT_CONFLICT",
@@ -1066,6 +1390,8 @@ __all__ = [
     "REFERENCE_ANSWER_OUTPUT_MISMATCH",
     "REFERENCE_ANSWER_PREVIOUS_EXCHANGE_NOT_READY",
     "REFERENCE_ANSWER_QUESTION_CARD_NOT_READY",
+    "PracticeReferenceAnswerLifecycleStatus",
+    "PracticeReferenceAnswerWorkflowState",
     "ReferenceAnswerGenerationService",
     "ReferenceAnswerGenerationStateError",
     "ReferenceAnswerGenerationStateErrorCode",
