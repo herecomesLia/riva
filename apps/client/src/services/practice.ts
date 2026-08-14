@@ -319,8 +319,19 @@ export function submitFollowUpAnswer(
 
 export function endPracticeFollowUps(
   input: EndPracticeFollowUpsInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.endPracticeFollowUps(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.endPracticeFollowUps(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-ups/end`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+        followUpQuestionId: input.followUpQuestionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function skipPracticeQuestion(

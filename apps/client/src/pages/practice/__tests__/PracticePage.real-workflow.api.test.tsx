@@ -199,6 +199,32 @@ function review(version: number) {
   }
 }
 
+function endedEarlyEvaluating(version: number) {
+  return {
+    ...base(version),
+    followUpCompletion: {
+      status: "endedEarly" as const,
+      unansweredQuestion: firstQuestion,
+    },
+    followUpExchanges: [],
+    mainAnswer,
+    question,
+    status: "evaluating" as const,
+    submittedAt: "2026-08-12T08:04:00.000Z",
+  }
+}
+
+function endedEarlyReview(version: number) {
+  return {
+    ...review(version),
+    followUpCompletion: {
+      status: "endedEarly" as const,
+      unansweredQuestion: firstQuestion,
+    },
+    followUpExchanges: [],
+  }
+}
+
 function completed(version: number) {
   return {
     attemptId,
@@ -542,6 +568,65 @@ describe("PracticePage real API workflow", () => {
     expect(completedState.querySelector("p.text-muted-foreground")).toBeNull()
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/end"))).toBe(true)
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("refresh"))).toBe(false)
+  })
+
+  it("ends the current follow-up through the real API and lets evaluation polling reach ended-early review", async () => {
+    const user = userEvent.setup()
+    const current = session("answeringFollowUp", 4)
+    const stopped = endedEarlyEvaluating(5)
+    const finalReview = endedEarlyReview(6)
+    let evaluationRefreshCount = 0
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/follow-ups/end`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          followUpQuestionId: followUpQuestionOneId,
+          questionId,
+          version: 4,
+        })
+        return jsonResponse(stopped)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/evaluation/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 5 })
+        evaluationRefreshCount += 1
+        return jsonResponse(evaluationRefreshCount === 1 ? stopped : finalReview)
+      }
+      throw new Error(`Unexpected request during follow-up stop workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await testing.screen.findByTestId("practice-answering-follow-up-state")
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("practice.followUp.endAnswering") }),
+    )
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("practice.followUp.confirmEnd") }),
+    )
+
+    expect(await testing.screen.findByTestId("practice-evaluating-state")).toBeVisible()
+    const reviewState = await testing.screen.findByTestId(
+      "practice-review-state",
+      {},
+      { timeout: 4_000 },
+    )
+    expect(reviewState).toBeVisible()
+    expect(reviewState).toHaveTextContent(firstQuestion.prompt)
+    expect(reviewState).toHaveTextContent(i18n.t("practice.followUp.endedEarly"))
+    expect(evaluationRefreshCount).toBe(2)
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes("follow-up-generation/refresh"),
+      ),
+    ).toBe(false)
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).includes("answers/follow-up")),
+    ).toBe(false)
   })
 
   it("retries from review into the same question and submits a new answer without question polling", async () => {

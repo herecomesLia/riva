@@ -143,13 +143,15 @@ export async function completeQuestionToReview(
   while (response.session.status === "answeringFollowUp") {
     const session = response.session
     if (options.endFollowUpsEarly) {
-      response = await settle(
-        endPracticeFollowUps({
-          sessionId: session.sessionId,
-          version: session.version,
-          questionId: session.question.id,
-          followUpQuestionId: session.currentFollowUp.question.id,
-        }),
+      response = requireMockPageResponse(
+        await settle(
+          endPracticeFollowUps({
+            sessionId: session.sessionId,
+            version: session.version,
+            questionId: session.question.id,
+            followUpQuestionId: session.currentFollowUp.question.id,
+          }),
+        ),
       )
       break
     }

@@ -250,13 +250,15 @@ describe("practice stateful mock service: followUp", () => {
     const initial = await context.settle(context.getPracticePage())
     if (initial.session.status !== "answeringFollowUp") return
 
-    const completed = await context.settle(
-      context.endPracticeFollowUps({
-        sessionId: initial.session.sessionId,
-        version: initial.session.version,
-        questionId: initial.session.question.id,
-        followUpQuestionId: initial.session.currentFollowUp.question.id,
-      }),
+    const completed = context.requireMockPageResponse(
+      await context.settle(
+        context.endPracticeFollowUps({
+          sessionId: initial.session.sessionId,
+          version: initial.session.version,
+          questionId: initial.session.question.id,
+          followUpQuestionId: initial.session.currentFollowUp.question.id,
+        }),
+      ),
     )
 
     expect(completed.session.status).toBe("evaluating")

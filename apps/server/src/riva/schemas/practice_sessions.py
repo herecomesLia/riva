@@ -120,6 +120,14 @@ class RefreshPracticeFollowUpGenerationRequest(APIModel):
     version: Annotated[int, Field(ge=1)]
 
 
+class EndPracticeFollowUpsRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+    follow_up_question_id: StandardUUID
+
+
 class RefreshPracticeEvaluationRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -359,6 +367,17 @@ PracticeCompletedFollowUpCompletionResponse = Annotated[
 ]
 
 
+class PracticeEndedEarlyFollowUpCompletionResponse(PracticeAPIModel):
+    status: Literal["endedEarly"]
+    unanswered_question: PracticeFollowUpQuestionResponse
+
+
+PracticeFollowUpCompletionResponse = (
+    PracticeCompletedFollowUpCompletionResponse
+    | PracticeEndedEarlyFollowUpCompletionResponse
+)
+
+
 class PracticeEvaluatingResponse(PracticeActiveSessionBase):
     status: Literal["evaluating"]
     question: PracticeQuestionResponse
@@ -367,7 +386,7 @@ class PracticeEvaluatingResponse(PracticeActiveSessionBase):
         default_factory=list,
         max_length=MAX_PRACTICE_FOLLOW_UPS,
     )
-    follow_up_completion: PracticeCompletedFollowUpCompletionResponse
+    follow_up_completion: PracticeFollowUpCompletionResponse
     submitted_at: datetime
 
     _validate_submitted_at = field_validator("submitted_at")(
@@ -387,10 +406,24 @@ class PracticeEvaluatingResponse(PracticeActiveSessionBase):
     @classmethod
     def validate_follow_up_completion(
         cls,
-        completion: PracticeCompletedFollowUpCompletionResponse,
+        completion: PracticeFollowUpCompletionResponse,
         info,
-    ) -> PracticeCompletedFollowUpCompletionResponse:
+    ) -> PracticeFollowUpCompletionResponse:
         exchanges = info.data.get("follow_up_exchanges", [])
+        if completion.status == "endedEarly":
+            if len(exchanges) not in (0, 1):
+                raise ValueError(
+                    "ended-early completion must have zero or one exchange"
+                )
+            if completion.unanswered_question.order != len(exchanges) + 1:
+                raise ValueError("unanswered follow-up question order is invalid")
+            if completion.unanswered_question.id in {
+                exchange.question.id for exchange in exchanges
+            }:
+                raise ValueError(
+                    "unanswered follow-up question must not be answered"
+                )
+            return completion
         if completion.reason == "noFollowUpRequired" and exchanges:
             raise ValueError("no-follow-up completion must have no exchanges")
         if completion.reason == "allAnswered" and len(exchanges) not in (1, 2):
@@ -444,7 +477,7 @@ class PracticeReviewResponse(PracticeActiveSessionBase):
         default_factory=list,
         max_length=MAX_PRACTICE_FOLLOW_UPS,
     )
-    follow_up_completion: PracticeCompletedFollowUpCompletionResponse
+    follow_up_completion: PracticeFollowUpCompletionResponse
     evaluation: PracticeEvaluationResponse
     review: PracticeReviewContentResponse
 
@@ -461,10 +494,24 @@ class PracticeReviewResponse(PracticeActiveSessionBase):
     @classmethod
     def validate_follow_up_completion(
         cls,
-        completion: PracticeCompletedFollowUpCompletionResponse,
+        completion: PracticeFollowUpCompletionResponse,
         info,
-    ) -> PracticeCompletedFollowUpCompletionResponse:
+    ) -> PracticeFollowUpCompletionResponse:
         exchanges = info.data.get("follow_up_exchanges", [])
+        if completion.status == "endedEarly":
+            if len(exchanges) not in (0, 1):
+                raise ValueError(
+                    "ended-early completion must have zero or one exchange"
+                )
+            if completion.unanswered_question.order != len(exchanges) + 1:
+                raise ValueError("unanswered follow-up question order is invalid")
+            if completion.unanswered_question.id in {
+                exchange.question.id for exchange in exchanges
+            }:
+                raise ValueError(
+                    "unanswered follow-up question must not be answered"
+                )
+            return completion
         if completion.reason == "noFollowUpRequired" and exchanges:
             raise ValueError("no-follow-up completion must have no exchanges")
         if completion.reason == "allAnswered" and len(exchanges) not in (1, 2):
@@ -598,6 +645,8 @@ __all__ = [
     "PracticeNoFollowUpRequiredCompletionResponse",
     "PracticeAllAnsweredCompletionResponse",
     "PracticeCompletedFollowUpCompletionResponse",
+    "PracticeEndedEarlyFollowUpCompletionResponse",
+    "PracticeFollowUpCompletionResponse",
     "PracticeReviewContentResponse",
     "PracticeReviewResponse",
     "CurrentPracticeSessionResponse",
@@ -607,6 +656,7 @@ __all__ = [
     "PracticeSessionStatus",
     "CompletePracticeSessionRequest",
     "EndPracticeSessionEarlyRequest",
+    "EndPracticeFollowUpsRequest",
     "RetryPracticeQuestionRequest",
     "RefreshPracticeFollowUpGenerationRequest",
     "RefreshPracticeEvaluationRequest",

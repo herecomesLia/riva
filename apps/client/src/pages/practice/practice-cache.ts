@@ -8,6 +8,8 @@ import type {
   PracticeFollowUpMutationInput,
   PracticeActiveSessionState,
   PracticePageResponse,
+  PracticeAnswer,
+  PracticeEvaluatingState,
   PracticeQuestionMutationInput,
   PracticeServiceResponse,
   PrepareNextPracticeSessionInput,
@@ -167,6 +169,11 @@ export function synchronizePracticeEvaluationResponse(
     (responseSession.status !== "evaluating" && responseSession.status !== "review") ||
     responseSession.sessionId !== request.sessionId ||
     responseSession.question.id !== request.questionId ||
+    !samePracticeSubmittedAnswerSnapshot(current.session, responseSession) ||
+    !samePracticeFollowUpCompletionSnapshot(
+      current.session.followUpCompletion,
+      responseSession.followUpCompletion,
+    ) ||
     (!isPendingSnapshot && !isCompletedSnapshot)
   ) {
     return current
@@ -304,7 +311,21 @@ function responseMatchesMutation(
         questionMatches(session, request)
       )
     case "endFollowUps":
-      return session.status === "evaluating" && questionMatches(session, request)
+      if (
+        session.status !== "evaluating" ||
+        currentSession.status !== "answeringFollowUp" ||
+        !questionMatches(session, request) ||
+        !("followUpQuestionId" in request) ||
+        !samePracticeSubmittedAnswerSnapshot(currentSession, session) ||
+        session.followUpCompletion.status !== "endedEarly"
+      ) {
+        return false
+      }
+      return (
+        session.followUpCompletion.unansweredQuestion.id === request.followUpQuestionId &&
+        session.followUpCompletion.unansweredQuestion.order ===
+          currentSession.currentFollowUp.question.order
+      )
     case "retryEvaluation":
       return session.status === "evaluating" && questionMatches(session, request)
     case "retryCurrentQuestion":
@@ -313,6 +334,14 @@ function responseMatchesMutation(
 }
 
 type VersionedPracticeSession = Exclude<PracticePageResponse["session"], { status: "setup" }>
+
+type PracticeSubmittedAnswerSnapshot = {
+  attemptId: string
+  attemptNumber: number
+  question: { id: string }
+  mainAnswer: Pick<PracticeAnswer, "id" | "order">
+  followUpExchanges: AnsweredPracticeFollowUpExchange[]
+}
 
 function isVersionedSession(
   session: PracticePageResponse["session"],
@@ -374,6 +403,37 @@ function sameAnsweredFollowUpChain(
       )
     })
   )
+}
+
+function samePracticeSubmittedAnswerSnapshot(
+  left: PracticeSubmittedAnswerSnapshot,
+  right: PracticeSubmittedAnswerSnapshot,
+) {
+  return (
+    left.attemptId === right.attemptId &&
+    left.attemptNumber === right.attemptNumber &&
+    left.question.id === right.question.id &&
+    left.mainAnswer.id === right.mainAnswer.id &&
+    left.mainAnswer.order === right.mainAnswer.order &&
+    sameAnsweredFollowUpChain(left.followUpExchanges, right.followUpExchanges)
+  )
+}
+
+function samePracticeFollowUpCompletionSnapshot(
+  left: PracticeEvaluatingState["followUpCompletion"],
+  right: PracticeEvaluatingState["followUpCompletion"],
+) {
+  if (left.status !== right.status) return false
+  if (left.status === "endedEarly" && right.status === "endedEarly") {
+    return (
+      left.unansweredQuestion.id === right.unansweredQuestion.id &&
+      left.unansweredQuestion.order === right.unansweredQuestion.order
+    )
+  }
+  if (left.status === "completed" && right.status === "completed") {
+    return left.reason === right.reason
+  }
+  return false
 }
 
 function isSelfConsistentActiveSession(session: PracticeActiveSessionState): boolean {

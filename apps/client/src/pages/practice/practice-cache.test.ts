@@ -34,6 +34,109 @@ describe("practice mutation cache contract", () => {
     expect(next?.setupContext).toBe(current.setupContext)
   })
 
+  it("accepts only an ended-early follow-up stop response with the same submitted snapshot", () => {
+    const current = createPracticeMockResponse("answeringFirstFollowUp")
+    const response = createPracticeMockResponse("evaluatingFollowUpEndedEarly")
+    if (
+      current.session.status !== "answeringFollowUp" ||
+      response.session.status !== "evaluating"
+    ) {
+      return
+    }
+
+    const input = {
+      followUpQuestionId: current.session.currentFollowUp.question.id,
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+    response.session.sessionId = input.sessionId
+    response.session.version = input.version + 1
+    response.session.attemptId = current.session.attemptId
+    response.session.attemptNumber = current.session.attemptNumber
+    response.session.question = structuredClone(current.session.question)
+    response.session.mainAnswer = structuredClone(current.session.mainAnswer)
+    response.session.followUpExchanges = structuredClone(current.session.followUpExchanges)
+    response.session.followUpCompletion = {
+      status: "endedEarly",
+      unansweredQuestion: structuredClone(current.session.currentFollowUp.question),
+    }
+
+    const next = synchronizePracticeMutationResponse(current, response.session, {
+      kind: "endFollowUps",
+      input,
+    })
+    expect(next?.session).toBe(response.session)
+
+    const wrongVersion = structuredClone(response.session)
+    wrongVersion.version = input.version + 2
+    expect(
+      synchronizePracticeMutationResponse(current, wrongVersion, {
+        kind: "endFollowUps",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongAttempt = structuredClone(response.session)
+    wrongAttempt.attemptId = "another-attempt"
+    expect(
+      synchronizePracticeMutationResponse(current, wrongAttempt, {
+        kind: "endFollowUps",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongQuestion = structuredClone(response.session)
+    wrongQuestion.question.id = "another-question"
+    expect(
+      synchronizePracticeMutationResponse(current, wrongQuestion, {
+        kind: "endFollowUps",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongMainAnswer = structuredClone(response.session)
+    wrongMainAnswer.mainAnswer.id = "another-main-answer"
+    expect(
+      synchronizePracticeMutationResponse(current, wrongMainAnswer, {
+        kind: "endFollowUps",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongCompletion = structuredClone(response.session)
+    wrongCompletion.followUpCompletion = {
+      status: "completed",
+      reason: "allAnswered",
+    }
+    expect(
+      synchronizePracticeMutationResponse(current, wrongCompletion, {
+        kind: "endFollowUps",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongUnansweredId = structuredClone(response.session)
+    if (wrongUnansweredId.followUpCompletion.status !== "endedEarly") return
+    wrongUnansweredId.followUpCompletion.unansweredQuestion.id = "another-follow-up"
+    expect(
+      synchronizePracticeMutationResponse(current, wrongUnansweredId, {
+        kind: "endFollowUps",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongUnansweredOrder = structuredClone(response.session)
+    if (wrongUnansweredOrder.followUpCompletion.status !== "endedEarly") return
+    wrongUnansweredOrder.followUpCompletion.unansweredQuestion.order = 2
+    expect(
+      synchronizePracticeMutationResponse(current, wrongUnansweredOrder, {
+        kind: "endFollowUps",
+        input,
+      }),
+    ).toBe(current)
+  })
+
   it("accepts only the exact review-to-generating-next-question transition", () => {
     const current = createPracticeMockResponse("reviewBalanced")
     const response = createPracticeMockResponse("generatingQuestion")
@@ -535,6 +638,53 @@ describe("practice polling cache contract", () => {
     expect(synchronizePracticeEvaluationResponse(current, illegal, request)).toBe(current)
     review.session.version = request.version + 2
     expect(synchronizePracticeEvaluationResponse(current, review, request)).toBe(current)
+  })
+
+  it("preserves an ended-early evaluation snapshot through polling into review", () => {
+    const current = createPracticeMockResponse("evaluatingFollowUpEndedEarly")
+    const review = createPracticeMockResponse("reviewBalanced")
+    if (current.session.status !== "evaluating" || review.session.status !== "review") return
+
+    review.session.sessionId = current.session.sessionId
+    review.session.version = current.session.version + 1
+    review.session.attemptId = current.session.attemptId
+    review.session.attemptNumber = current.session.attemptNumber
+    review.session.question = structuredClone(current.session.question)
+    review.session.mainAnswer = structuredClone(current.session.mainAnswer)
+    review.session.followUpExchanges = structuredClone(current.session.followUpExchanges)
+    review.session.followUpCompletion = structuredClone(current.session.followUpCompletion)
+    const request = {
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+
+    expect(synchronizePracticeEvaluationResponse(current, review, request)?.session).toBe(
+      review.session,
+    )
+
+    const wrongCompletion = structuredClone(review)
+    if (wrongCompletion.session.status !== "review") return
+    wrongCompletion.session.followUpCompletion = {
+      status: "completed",
+      reason: "allAnswered",
+    }
+    expect(synchronizePracticeEvaluationResponse(current, wrongCompletion, request)).toBe(current)
+
+    const changedAnswerChain = structuredClone(review)
+    if (changedAnswerChain.session.status !== "review") return
+    changedAnswerChain.session.followUpExchanges = [
+      {
+        ...changedAnswerChain.session.followUpExchanges[0]!,
+        answer: {
+          ...changedAnswerChain.session.followUpExchanges[0]!.answer,
+          id: "another-answer",
+        },
+      },
+    ]
+    expect(synchronizePracticeEvaluationResponse(current, changedAnswerChain, request)).toBe(
+      current,
+    )
   })
 
   it("merges active-only evaluation polling responses into the page cache", () => {

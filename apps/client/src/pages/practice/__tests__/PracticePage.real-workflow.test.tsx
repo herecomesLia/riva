@@ -132,8 +132,9 @@ describe("PracticePage: active session workflow", () => {
     }
     const finalReview = {
       ...review.session,
-      followUpCompletion: { status: "completed" as const, reason: "allAnswered" as const },
-      followUpExchanges: secondAnswering.followUpExchanges,
+      mainAnswer: evaluatingPending.mainAnswer,
+      followUpCompletion: structuredClone(evaluatingPending.followUpCompletion),
+      followUpExchanges: structuredClone(evaluatingPending.followUpExchanges),
       question: initialSession.question,
       sessionId,
       version: evaluatingPending.version + 1,

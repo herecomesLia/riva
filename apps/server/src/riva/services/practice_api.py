@@ -13,6 +13,7 @@ from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
+    EndPracticeFollowUpsRequest,
     EndPracticeSessionEarlyRequest,
     PracticeActiveSessionResponse,
     PracticeAnswerResponse,
@@ -23,9 +24,10 @@ from riva.schemas.practice_sessions import (
     PracticeCompletedSessionResponse,
     PracticeUnfinishedAttemptResponse,
     PracticeAwaitingFollowUpExchangeResponse,
-    PracticeCompletedFollowUpCompletionResponse,
+    PracticeEndedEarlyFollowUpCompletionResponse,
     PracticeEvaluationResponse,
     PracticeEvaluatingResponse,
+    PracticeFollowUpCompletionResponse,
     PracticeFollowUpQuestionResponse,
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
@@ -215,6 +217,25 @@ class PracticeAPIService:
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
+    async def end_follow_ups(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: EndPracticeFollowUpsRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().end_follow_ups(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                follow_up_question_id=payload.follow_up_question_id,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
     async def refresh_follow_up_generation(
         self,
         *,
@@ -374,7 +395,6 @@ def build_practice_session_response(
             if (
                 context.attempt.status != "review"
                 or context.follow_up_decision is None
-                or context.follow_up_question is not None
             ):
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             evaluation_output = practice_evaluation_output_from_artifact(
@@ -389,7 +409,8 @@ def build_practice_session_response(
                 context.follow_up_exchanges
             )
             follow_up_completion = build_practice_follow_up_completion_response(
-                context.follow_up_completion_reason
+                context.follow_up_completion_reason,
+                unanswered_question=context.follow_up_question,
             )
             return PracticeReviewResponse(
                 status="review",
@@ -467,7 +488,6 @@ def build_practice_session_response(
             if context.attempt.status == "evaluating":
                 if (
                     context.follow_up_decision is None
-                    or context.follow_up_question is not None
                 ):
                     raise PracticeSessionStateError(
                         PRACTICE_SESSION_STATE_CONFLICT
@@ -480,7 +500,8 @@ def build_practice_session_response(
                         context.follow_up_exchanges
                     ),
                     follow_up_completion=build_practice_follow_up_completion_response(
-                        context.follow_up_completion_reason
+                        context.follow_up_completion_reason,
+                        unanswered_question=context.follow_up_question,
                     ),
                     submitted_at=context.attempt.updated_at,
                     **base,
@@ -732,7 +753,20 @@ def _build_practice_answered_follow_up_exchanges(
 
 def build_practice_follow_up_completion_response(
     reason: PracticeEvaluationFollowUpCompletionReason | None,
-) -> PracticeCompletedFollowUpCompletionResponse:
+    *,
+    unanswered_question: PracticeFollowUpQuestion | None = None,
+) -> PracticeFollowUpCompletionResponse:
+    if reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
+        if unanswered_question is None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        return PracticeEndedEarlyFollowUpCompletionResponse(
+            status="endedEarly",
+            unanswered_question=build_practice_follow_up_question_response(
+                unanswered_question
+            ),
+        )
+    if unanswered_question is not None:
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
     if reason == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED:
         return PracticeNoFollowUpRequiredCompletionResponse(
             status="completed",

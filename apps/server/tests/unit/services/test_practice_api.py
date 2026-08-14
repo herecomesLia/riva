@@ -28,6 +28,7 @@ from riva.services.practice_sessions import (
     PRACTICE_SESSION_STATE_CONFLICT,
     PracticeAnsweredFollowUpExchangeContext,
     PracticeCompletedSessionWorkflowContext,
+    PracticeEvaluationWorkflowContext,
     PracticePrimaryAnswerWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionStateError,
@@ -36,6 +37,7 @@ from riva.services.practice_sessions import (
 from riva.schemas.practice_sessions import (
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
+    EndPracticeFollowUpsRequest,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
@@ -128,6 +130,16 @@ class FakePracticeSessionService:
         if self.error is not None:
             raise self.error
         assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
+        return self.context
+
+    async def end_follow_ups(
+        self,
+        **kwargs: object,
+    ) -> PracticeEvaluationWorkflowContext:
+        self.calls.append(("end_follow_ups", kwargs))
+        if self.error is not None:
+            raise self.error
+        assert isinstance(self.context, PracticeEvaluationWorkflowContext)
         return self.context
 
     async def refresh_follow_up_generation(
@@ -381,6 +393,52 @@ def review_context(
         review=review,
         recommendation_generation_run=recommendation_run_value,
         recommendation=recommendation,
+    )
+
+
+def ended_early_evaluation_context(
+    *,
+    exchange_count: int = 0,
+) -> PracticeEvaluationWorkflowContext:
+    primary = context_with_answered_exchanges(
+        attempt_status="evaluating",
+        version=5,
+        exchange_count=exchange_count,
+        current_order=exchange_count + 1,
+    )
+    assert primary.follow_up_decision is not None
+    assert primary.follow_up_question is not None
+    run = evaluation_run(
+        user_id=primary.session.user_id,
+        attempt_id=primary.attempt.id,
+        question_card_id=primary.question_card.id,
+        main_answer_id=primary.main_answer.id,
+        decision_id=primary.follow_up_decision.id,
+        follow_up_completion_reason=PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY,
+        unanswered_follow_up_question_id=primary.follow_up_question.id,
+        follow_up_question_1_id=(
+            primary.follow_up_exchanges[0].question.id
+            if exchange_count == 1
+            else None
+        ),
+        follow_up_answer_1_id=(
+            primary.follow_up_exchanges[0].answer.id
+            if exchange_count == 1
+            else None
+        ),
+    )
+    return PracticeEvaluationWorkflowContext(
+        session=primary.session,
+        attempt=primary.attempt,
+        question_card=primary.question_card,
+        main_answer=primary.main_answer,
+        follow_up_generation_run=primary.follow_up_generation_run,
+        follow_up_decision=primary.follow_up_decision,
+        follow_up_question=primary.follow_up_question,
+        follow_up_exchanges=primary.follow_up_exchanges,
+        follow_up_completion_reason=PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY,
+        evaluation_generation_run=run,
+        evaluation=None,
     )
 
 
@@ -1001,6 +1059,58 @@ def test_follow_up_public_projection_separates_answered_and_current_questions() 
     assert result.follow_up_exchanges[0].answer.order == 2
     assert result.current_follow_up.question.order == 2
     assert result.current_follow_up.answer is None
+
+
+@pytest.mark.parametrize("exchange_count", [0, 1])
+def test_end_follow_ups_forwards_exact_args_without_llm_precheck_and_projects_ended_early(
+    exchange_count: int,
+) -> None:
+    domain = FakePracticeSessionService(
+        context=ended_early_evaluation_context(exchange_count=exchange_count)
+    )
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model=None,
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    context = domain.context
+    assert isinstance(context, PracticeEvaluationWorkflowContext)
+    assert context.follow_up_question is not None
+    payload = EndPracticeFollowUpsRequest(
+        version=context.session.version,
+        question_id=context.question_card.id,
+        follow_up_question_id=context.follow_up_question.id,
+    )
+
+    result = asyncio.run(
+        service.end_follow_ups(
+            user_id=context.session.user_id,
+            session_id=context.session.id,
+            payload=payload,
+        )
+    )
+
+    assert result.status == "evaluating"
+    assert result.version == context.session.version
+    assert result.follow_up_completion.status == "endedEarly"
+    assert result.follow_up_completion.unanswered_question.id == (
+        context.follow_up_question.id
+    )
+    assert result.follow_up_completion.unanswered_question.order == exchange_count + 1
+    assert len(result.follow_up_exchanges) == exchange_count
+    assert domain.calls == [
+        (
+            "end_follow_ups",
+            {
+                "user_id": context.session.user_id,
+                "session_id": context.session.id,
+                "expected_version": context.session.version,
+                "question_id": context.question_card.id,
+                "follow_up_question_id": context.follow_up_question.id,
+            },
+        )
+    ]
 
 
 @pytest.mark.parametrize("exchange_count", [1, 2])

@@ -6,10 +6,12 @@ import {
   practiceAwaitingFollowUpExchangeSchema,
   currentPracticeSessionResponseSchema,
   practiceCompletedFollowUpCompletionSchema,
+  practiceEndedEarlyFollowUpCompletionSchema,
   practiceEvaluationSchema,
   practiceActiveSessionResponseSchema,
   practiceCompletedSessionResponseSchema,
   practiceFollowUpQuestionSchema,
+  practiceFollowUpCompletionSchema,
   practiceQuestionSchema,
   practiceRecommendationSchema,
   practiceReviewSchema,
@@ -312,6 +314,114 @@ describe("practice wire schemas", () => {
     expect(
       practiceRecommendationSchema.parse({ action: "retryCurrent", reason: "继续练习。" }),
     ).toEqual({ action: "retryCurrent", reason: "继续练习。" })
+  })
+
+  it("accepts ended-early evaluating and review snapshots with their unanswered question", () => {
+    const unansweredQuestion = { ...followUpQuestion, order: 1 }
+    const evaluating = {
+      ...createFollowUpSession("evaluating"),
+      followUpExchanges: [],
+      followUpCompletion: {
+        status: "endedEarly" as const,
+        unansweredQuestion,
+      },
+    }
+    const reviewEndedEarly = {
+      ...createFollowUpSession("review"),
+      followUpExchanges: [],
+      followUpCompletion: {
+        status: "endedEarly" as const,
+        unansweredQuestion,
+      },
+    }
+
+    expect(practiceActiveSessionResponseSchema.parse(evaluating)).toMatchObject({
+      status: "evaluating",
+      followUpCompletion: { status: "endedEarly", unansweredQuestion },
+    })
+    expect(practiceActiveSessionResponseSchema.parse(reviewEndedEarly)).toMatchObject({
+      status: "review",
+      followUpCompletion: { status: "endedEarly", unansweredQuestion },
+    })
+    expect(practiceEndedEarlyFollowUpCompletionSchema.parse(evaluating.followUpCompletion)).toEqual(
+      evaluating.followUpCompletion,
+    )
+    expect(practiceFollowUpCompletionSchema.parse(evaluating.followUpCompletion)).toEqual(
+      evaluating.followUpCompletion,
+    )
+  })
+
+  it("accepts one answered exchange followed by a different unanswered question", () => {
+    const unansweredQuestion = {
+      ...followUpQuestion,
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      order: 2,
+    }
+    const evaluating = {
+      ...createFollowUpSession("evaluating"),
+      followUpCompletion: {
+        status: "endedEarly" as const,
+        unansweredQuestion,
+      },
+      followUpExchanges: [answeredExchange],
+    }
+
+    expect(practiceActiveSessionResponseSchema.parse(evaluating)).toMatchObject({
+      status: "evaluating",
+      followUpExchanges: [answeredExchange],
+      followUpCompletion: { status: "endedEarly", unansweredQuestion },
+    })
+  })
+
+  it("rejects malformed ended-early completion snapshots", () => {
+    const twoExchanges = {
+      ...createFollowUpSession("evaluating"),
+      followUpExchanges: [
+        answeredExchange,
+        {
+          ...answeredExchange,
+          answer: {
+            ...answeredExchange.answer,
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            order: 3,
+          },
+          question: {
+            ...answeredExchange.question,
+            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            order: 2,
+          },
+        },
+      ],
+      followUpCompletion: {
+        status: "endedEarly" as const,
+        unansweredQuestion: {
+          ...followUpQuestion,
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          order: 2,
+        },
+      },
+    }
+    expect(() => practiceActiveSessionResponseSchema.parse(twoExchanges)).toThrow()
+
+    const wrongOrder = {
+      ...createFollowUpSession("evaluating"),
+      followUpExchanges: [],
+      followUpCompletion: {
+        status: "endedEarly" as const,
+        unansweredQuestion: { ...followUpQuestion, order: 2 },
+      },
+    }
+    expect(() => practiceActiveSessionResponseSchema.parse(wrongOrder)).toThrow()
+
+    const duplicateQuestion = {
+      ...createFollowUpSession("evaluating"),
+      followUpCompletion: {
+        status: "endedEarly" as const,
+        unansweredQuestion: { ...followUpQuestion, order: 2 },
+      },
+      followUpExchanges: [answeredExchange],
+    }
+    expect(() => practiceActiveSessionResponseSchema.parse(duplicateQuestion)).toThrow()
   })
 
   it("accepts every public question type, difficulty, source, and material type", () => {

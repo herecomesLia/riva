@@ -7,6 +7,7 @@ import pytest
 from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
+    EndPracticeFollowUpsRequest,
     EndPracticeSessionEarlyRequest,
     PracticeAttemptStatus,
     PracticeActiveSessionResponse,
@@ -20,6 +21,7 @@ from riva.schemas.practice_sessions import (
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     PracticeAllAnsweredCompletionResponse,
+    PracticeEndedEarlyFollowUpCompletionResponse,
     PracticeNoFollowUpRequiredCompletionResponse,
     PracticeQuestionResponse,
     PracticeReviewResponse,
@@ -534,6 +536,52 @@ def test_refresh_follow_up_request_requires_only_positive_version() -> None:
         )
 
 
+def test_end_follow_ups_request_uses_only_public_provenance_and_strict_aliases() -> None:
+    question_id = uuid4()
+    follow_up_question_id = uuid4()
+    request = EndPracticeFollowUpsRequest.model_validate(
+        {
+            "version": 4,
+            "questionId": str(question_id),
+            "followUpQuestionId": str(follow_up_question_id),
+        }
+    )
+
+    assert request.version == 4
+    assert request.question_id == question_id
+    assert request.follow_up_question_id == follow_up_question_id
+    assert request.model_dump(mode="json") == {
+        "version": 4,
+        "questionId": str(question_id),
+        "followUpQuestionId": str(follow_up_question_id),
+    }
+    with pytest.raises(ValidationError):
+        EndPracticeFollowUpsRequest.model_validate(
+            {
+                "version": 0,
+                "questionId": str(question_id),
+                "followUpQuestionId": str(follow_up_question_id),
+            }
+        )
+    with pytest.raises(ValidationError):
+        EndPracticeFollowUpsRequest.model_validate(
+            {
+                "version": 4,
+                "questionId": "not-a-uuid",
+                "followUpQuestionId": str(follow_up_question_id),
+            }
+        )
+    with pytest.raises(ValidationError):
+        EndPracticeFollowUpsRequest.model_validate(
+            {
+                "version": 4,
+                "questionId": str(question_id),
+                "followUpQuestionId": str(follow_up_question_id),
+                "attemptId": str(uuid4()),
+            }
+        )
+
+
 def test_refresh_evaluation_request_requires_positive_version_and_forbids_internal_fields() -> None:
     request = RefreshPracticeEvaluationRequest.model_validate({"version": 4})
     assert request.model_dump(mode="json") == {"version": 4}
@@ -757,6 +805,102 @@ def test_public_all_answered_completion_accepts_one_or_two_exchanges(
     parsed = TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
     assert parsed.follow_up_completion.reason == "allAnswered"  # type: ignore[union-attr]
     assert len(parsed.follow_up_exchanges) == exchange_count  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("status", ["evaluating", "review"])
+@pytest.mark.parametrize("exchange_count", [0, 1])
+def test_public_ended_early_completion_projects_the_unanswered_question(
+    status: str,
+    exchange_count: int,
+) -> None:
+    payload = public_session_payload(status)
+    exchanges = [
+        answered_exchange_payload(question_order=1, answer_order=2)
+    ] if exchange_count else []
+    current_follow_up = public_session_payload("answeringFollowUp")[
+        "currentFollowUp"
+    ]
+    assert isinstance(current_follow_up, dict)
+    unanswered_question = current_follow_up["question"]
+    assert isinstance(unanswered_question, dict)
+    unanswered_question["order"] = exchange_count + 1
+    payload["followUpExchanges"] = exchanges
+    payload["followUpCompletion"] = {
+        "status": "endedEarly",
+        "unansweredQuestion": unanswered_question,
+    }
+    if status == "evaluating":
+        payload["submittedAt"] = datetime(
+            2026, 8, 11, 12, 3, tzinfo=UTC
+        ).isoformat()
+    else:
+        payload.update(
+            {
+                "evaluation": public_session_payload("review")["evaluation"],
+                "review": public_session_payload("review")["review"],
+            }
+        )
+
+    parsed = TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
+    assert parsed.follow_up_completion.status == "endedEarly"  # type: ignore[union-attr]
+    assert parsed.follow_up_completion.unanswered_question.order == (  # type: ignore[union-attr]
+        exchange_count + 1
+    )
+    assert len(parsed.follow_up_exchanges) == exchange_count  # type: ignore[union-attr]
+    assert isinstance(
+        PracticeEndedEarlyFollowUpCompletionResponse.model_validate(
+            parsed.follow_up_completion.model_dump(mode="json")  # type: ignore[union-attr]
+        ),
+        PracticeEndedEarlyFollowUpCompletionResponse,
+    )
+
+
+@pytest.mark.parametrize("status", ["evaluating", "review"])
+def test_public_ended_early_completion_rejects_invalid_snapshot(
+    status: str,
+) -> None:
+    payload = public_session_payload(status)
+    unanswered = public_session_payload("answeringFollowUp")["currentFollowUp"]
+    assert isinstance(unanswered, dict)
+    unanswered_question = unanswered["question"]
+    assert isinstance(unanswered_question, dict)
+    exchanges = [
+        answered_exchange_payload(question_order=1, answer_order=2),
+        answered_exchange_payload(question_order=2, answer_order=3),
+    ]
+    payload["followUpExchanges"] = exchanges
+    payload["followUpCompletion"] = {
+        "status": "endedEarly",
+        "unansweredQuestion": {
+            **unanswered_question,
+            "order": 2,
+        },
+    }
+    if status == "evaluating":
+        payload["submittedAt"] = datetime(
+            2026, 8, 11, 12, 3, tzinfo=UTC
+        ).isoformat()
+    else:
+        review_payload = public_session_payload("review")
+        payload["evaluation"] = review_payload["evaluation"]
+        payload["review"] = review_payload["review"]
+    with pytest.raises(ValidationError):
+        TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
+
+    one_exchange = answered_exchange_payload(question_order=1, answer_order=2)
+    duplicate_question = one_exchange["question"]
+    assert isinstance(duplicate_question, dict)
+    payload["followUpExchanges"] = [one_exchange]
+    payload["followUpCompletion"] = {
+        "status": "endedEarly",
+        "unansweredQuestion": {
+            **unanswered_question,
+            "id": duplicate_question["id"],
+            "order": 2,
+        },
+    }
+    with pytest.raises(ValidationError):
+        TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
 
 
 def test_public_follow_up_exchanges_reject_awaiting_items_and_more_than_two() -> None:

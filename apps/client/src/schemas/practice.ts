@@ -169,6 +169,70 @@ export const practiceCompletedFollowUpCompletionSchema = z.discriminatedUnion("r
     .strict(),
 ])
 
+export const practiceEndedEarlyFollowUpCompletionSchema = z
+  .object({
+    status: z.literal("endedEarly"),
+    unansweredQuestion: practiceFollowUpQuestionSchema,
+  })
+  .strict()
+
+export const practiceFollowUpCompletionSchema = z.union([
+  practiceCompletedFollowUpCompletionSchema,
+  practiceEndedEarlyFollowUpCompletionSchema,
+])
+
+function validateFollowUpCompletionSnapshot(
+  session: {
+    followUpCompletion: z.infer<typeof practiceFollowUpCompletionSchema>
+    followUpExchanges: Array<z.infer<typeof practiceAnsweredFollowUpExchangeSchema>>
+  },
+  context: z.RefinementCtx,
+) {
+  const completion = session.followUpCompletion
+  if (completion.status === "endedEarly") {
+    if (![0, 1].includes(session.followUpExchanges.length)) {
+      context.addIssue({
+        code: "custom",
+        message: "ended-early completion must have zero or one exchange",
+        path: ["followUpCompletion", "status"],
+      })
+    }
+    if (completion.unansweredQuestion.order !== session.followUpExchanges.length + 1) {
+      context.addIssue({
+        code: "custom",
+        message: "unanswered follow-up question order is invalid",
+        path: ["followUpCompletion", "unansweredQuestion", "order"],
+      })
+    }
+    if (
+      session.followUpExchanges.some(
+        (exchange) => exchange.question.id === completion.unansweredQuestion.id,
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "unanswered follow-up question must not be answered",
+        path: ["followUpCompletion", "unansweredQuestion", "id"],
+      })
+    }
+    return
+  }
+  if (completion.reason === "noFollowUpRequired" && session.followUpExchanges.length) {
+    context.addIssue({
+      code: "custom",
+      message: "no-follow-up completion must have no exchanges",
+      path: ["followUpCompletion", "reason"],
+    })
+  }
+  if (completion.reason === "allAnswered" && ![1, 2].includes(session.followUpExchanges.length)) {
+    context.addIssue({
+      code: "custom",
+      message: "all-answered completion must have one or two exchanges",
+      path: ["followUpCompletion", "reason"],
+    })
+  }
+}
+
 export const practiceEvaluationSchema = z
   .object({
     overallScore: z.number().int().min(0).max(100),
@@ -292,31 +356,12 @@ export const practiceEvaluatingSchema = practiceActiveSessionBaseSchema
     question: practiceQuestionSchema,
     mainAnswer: practiceAnswerSchema,
     followUpExchanges: answeredFollowUpExchangesUpToTwoSchema,
-    followUpCompletion: practiceCompletedFollowUpCompletionSchema,
+    followUpCompletion: practiceFollowUpCompletionSchema,
     submittedAt: dateTimeSchema,
   })
   .strict()
   .superRefine((session, context) => {
-    if (
-      session.followUpCompletion.reason === "noFollowUpRequired" &&
-      session.followUpExchanges.length
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "no-follow-up completion must have no exchanges",
-        path: ["followUpCompletion", "reason"],
-      })
-    }
-    if (
-      session.followUpCompletion.reason === "allAnswered" &&
-      ![1, 2].includes(session.followUpExchanges.length)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "all-answered completion must have one or two exchanges",
-        path: ["followUpCompletion", "reason"],
-      })
-    }
+    validateFollowUpCompletionSnapshot(session, context)
   })
 
 export const practiceReviewSessionSchema = practiceActiveSessionBaseSchema
@@ -325,32 +370,13 @@ export const practiceReviewSessionSchema = practiceActiveSessionBaseSchema
     question: practiceQuestionSchema,
     mainAnswer: practiceAnswerSchema,
     followUpExchanges: answeredFollowUpExchangesUpToTwoSchema,
-    followUpCompletion: practiceCompletedFollowUpCompletionSchema,
+    followUpCompletion: practiceFollowUpCompletionSchema,
     evaluation: practiceEvaluationSchema,
     review: practiceReviewSchema,
   })
   .strict()
   .superRefine((session, context) => {
-    if (
-      session.followUpCompletion.reason === "noFollowUpRequired" &&
-      session.followUpExchanges.length
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "no-follow-up completion must have no exchanges",
-        path: ["followUpCompletion", "reason"],
-      })
-    }
-    if (
-      session.followUpCompletion.reason === "allAnswered" &&
-      ![1, 2].includes(session.followUpExchanges.length)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "all-answered completion must have one or two exchanges",
-        path: ["followUpCompletion", "reason"],
-      })
-    }
+    validateFollowUpCompletionSnapshot(session, context)
   })
 
 export const practiceActiveSessionResponseSchema = z.discriminatedUnion("status", [
@@ -516,6 +542,10 @@ export type PracticeAwaitingFollowUpExchangeWire = z.infer<
 export type PracticeCompletedFollowUpCompletionWire = z.infer<
   typeof practiceCompletedFollowUpCompletionSchema
 >
+export type PracticeEndedEarlyFollowUpCompletionWire = z.infer<
+  typeof practiceEndedEarlyFollowUpCompletionSchema
+>
+export type PracticeFollowUpCompletionWire = z.infer<typeof practiceFollowUpCompletionSchema>
 export type PracticeEvaluationWire = z.infer<typeof practiceEvaluationSchema>
 export type PracticeRecommendationWire = z.infer<typeof practiceRecommendationSchema>
 export type PracticeReviewWire = z.infer<typeof practiceReviewSchema>

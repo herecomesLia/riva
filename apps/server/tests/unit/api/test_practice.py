@@ -10,9 +10,12 @@ from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
+    EndPracticeFollowUpsRequest,
     EndPracticeSessionEarlyRequest,
     PracticeAnswerResponse,
     PracticeCompletedSessionResponse,
+    PracticeEvaluatingResponse,
+    PracticeFollowUpQuestionResponse,
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     RefreshPracticeEvaluationRequest,
@@ -88,6 +91,33 @@ def follow_up_response() -> PracticeGeneratingFollowUpResponse:
     )
 
 
+def end_follow_up_response() -> PracticeEvaluatingResponse:
+    generated = follow_up_response()
+    return PracticeEvaluatingResponse(
+        status="evaluating",
+        session_id=generated.session_id,
+        language=generated.language,
+        version=generated.version + 1,
+        selection=generated.selection,
+        started_at=generated.started_at,
+        attempt_id=generated.attempt_id,
+        attempt_number=generated.attempt_number,
+        question=generated.question,
+        main_answer=generated.main_answer,
+        follow_up_exchanges=[],
+        follow_up_completion={
+            "status": "endedEarly",
+            "unansweredQuestion": PracticeFollowUpQuestionResponse(
+                id=uuid4(),
+                prompt="What metric changed?",
+                created_at=datetime(2026, 8, 11, 12, 2, tzinfo=UTC),
+                order=1,
+            ),
+        },
+        submitted_at=datetime(2026, 8, 11, 12, 3, tzinfo=UTC),
+    )
+
+
 def completed_response() -> PracticeCompletedSessionResponse:
     return PracticeCompletedSessionResponse(
         status="completed",
@@ -114,6 +144,7 @@ class FakePracticeAPIService:
     def __init__(self) -> None:
         self.result = response()
         self.submit_result = follow_up_response()
+        self.end_follow_up_result = end_follow_up_response()
         self.refresh_follow_up_result = self.submit_result
         self.refresh_evaluation_result = self.result
         self.completed_result = completed_response()
@@ -144,6 +175,10 @@ class FakePracticeAPIService:
     async def submit_follow_up_answer(self, **kwargs: object):
         self.calls.append(("submit_follow_up", kwargs))
         return self.submit_result
+
+    async def end_follow_ups(self, **kwargs: object):
+        self.calls.append(("end_follow_ups", kwargs))
+        return self.end_follow_up_result
 
     async def refresh_follow_up_generation(self, **kwargs: object):
         self.calls.append(("refresh_follow_up", kwargs))
@@ -538,6 +573,68 @@ def test_submit_follow_up_answer_requires_csrf_and_forbids_extra_fields(app) -> 
     assert service.calls == []
 
 
+def test_end_follow_ups_returns_202_and_forwards_exact_public_body(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    payload = {
+        "version": 4,
+        "questionId": str(service.submit_result.question.id),
+        "followUpQuestionId": str(
+            service.end_follow_up_result.follow_up_completion.unanswered_question.id
+        ),
+    }
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/follow-ups/end",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 202
+    assert result.json()["status"] == "evaluating"
+    assert result.json()["followUpCompletion"]["status"] == "endedEarly"
+    assert service.calls[0][0] == "end_follow_ups"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(
+        service.calls[0][1]["payload"], EndPracticeFollowUpsRequest
+    )
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+
+
+def test_end_follow_ups_requires_csrf_and_forbids_internal_fields(app) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+    payload = {
+        "version": 4,
+        "questionId": str(service.submit_result.question.id),
+        "followUpQuestionId": str(
+            service.end_follow_up_result.follow_up_completion.unanswered_question.id
+        ),
+    }
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/follow-ups/end",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/follow-ups/end",
+        json={**payload, "unansweredQuestion": {}},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert service.calls == []
+
+
 def test_refresh_follow_up_generation_returns_200_and_forwards_version(app) -> None:
     service = FakePracticeAPIService()
     current_user = user()
@@ -661,6 +758,17 @@ def test_new_practice_mutations_require_authentication(app) -> None:
         },
         headers={"Origin": TRUSTED_ORIGIN},
     )
+    end_follow_ups = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/follow-ups/end",
+        json={
+            "version": 4,
+            "questionId": str(service.submit_result.question.id),
+            "followUpQuestionId": str(uuid4()),
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
     next_question = request(
         app,
         "POST",
@@ -683,6 +791,7 @@ def test_new_practice_mutations_require_authentication(app) -> None:
     assert refresh.status_code == 401
     assert evaluation_refresh.status_code == 401
     assert follow_up_submit.status_code == 401
+    assert end_follow_ups.status_code == 401
     assert next_question.status_code == 401
     assert retry_question.status_code == 401
     assert service.calls == []
@@ -748,6 +857,7 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
     )
     assert "/api/practice/sessions/{sessionId}/answers/main" in paths
     assert "/api/practice/sessions/{sessionId}/answers/follow-up" in paths
+    assert "/api/practice/sessions/{sessionId}/follow-ups/end" in paths
     assert (
         "/api/practice/sessions/{sessionId}/follow-up-generation/refresh"
         in paths
@@ -768,6 +878,10 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
         "/api/practice/sessions/{sessionId}/answers/follow-up"
     ]["post"]["responses"]["202"]["content"]["application/json"]["schema"]
     assert follow_up_submit_schema["discriminator"]["propertyName"] == "status"
+    end_follow_ups_schema = paths[
+        "/api/practice/sessions/{sessionId}/follow-ups/end"
+    ]["post"]["responses"]["202"]["content"]["application/json"]["schema"]
+    assert end_follow_ups_schema["discriminator"]["propertyName"] == "status"
     current_schema = paths["/api/practice/sessions/current"]["get"]["responses"][
         "200"
     ]["content"]["application/json"]["schema"]

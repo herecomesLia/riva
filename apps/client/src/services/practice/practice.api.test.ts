@@ -10,6 +10,7 @@ import {
   getPracticePage,
   getQuestionGenerationStatus,
   continueToNextPracticeQuestion,
+  endPracticeFollowUps,
   endPracticeSession,
   requestEndPracticeSession,
   prepareNextPracticeSession,
@@ -600,6 +601,48 @@ describe("practice service API", () => {
       version: response.version - 1,
     })
     expect(session.status).toBe(_status)
+  })
+
+  it("ends follow-ups through the real endpoint with only public provenance", async () => {
+    const response = createFollowUpSession("evaluating", {
+      version: 5,
+      followUpExchanges: [],
+      followUpCompletion: {
+        status: "endedEarly" as const,
+        unansweredQuestion: createFollowUpQuestion(followUpQuestionId, 1),
+      },
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+    const session = requireActiveSession(
+      await endPracticeFollowUps({
+        followUpQuestionId,
+        questionId,
+        sessionId,
+        version: 4,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${sessionId}/follow-ups/end`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({
+      followUpQuestionId,
+      questionId,
+      version: 4,
+    })
+    expect(requestJson(fetchMock)).not.toHaveProperty("completionReason")
+    expect(requestJson(fetchMock)).not.toHaveProperty("unansweredQuestion")
+    expect(requestJson(fetchMock)).not.toHaveProperty("attemptId")
+    expect(session).toMatchObject({
+      status: "evaluating",
+      version: 5,
+      followUpCompletion: {
+        status: "endedEarly",
+        unansweredQuestion: { id: followUpQuestionId, order: 1 },
+      },
+    })
   })
 
   it("refreshes evaluation with only version and never sends questionId", async () => {
