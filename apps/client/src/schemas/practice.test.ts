@@ -16,6 +16,10 @@ import {
   practiceGuidanceRevealedSchema,
   practiceGuidanceSchema,
   practiceGuidanceUnavailableSchema,
+  practiceFollowUpReferenceAnswerContentSchema,
+  practiceFollowUpReferenceAnswerStateSchema,
+  practiceMainReferenceAnswerContentSchema,
+  practiceMainReferenceAnswerStateSchema,
   practiceQuestionSchema,
   practiceRecommendationSchema,
   practiceReviewSchema,
@@ -223,6 +227,96 @@ describe("practice wire schemas", () => {
       practiceGuidanceNotRequestedSchema.parse({ ...notRequested, content: ["x"] }),
     ).toThrow()
     expect(() => practiceGuidanceSchema.parse({ ...revealed, extra: true })).toThrow()
+  })
+
+  it("accepts the four main and follow-up reference answer states", () => {
+    const mainContent = {
+      answer: "A grounded answer.",
+      commonMistakes: ["Inventing a metric."],
+      generatedAt: "2026-08-14T09:30:00Z",
+      keyPoints: ["State the decision.", "Connect the evidence."],
+      kind: "personalizedExample" as const,
+    }
+    const followUpContent = {
+      addressedGap: "Connect the decision to the result.",
+      answer: "Tie the decision to the measurable result.",
+      commonMistakes: ["Claiming team impact as personal impact."],
+      generatedAt: "2026-08-14T09:30:00Z",
+      keyPoints: ["Name the baseline.", "Connect the result."],
+      kind: "personalizedSupplement" as const,
+    }
+    const states = [
+      { content: null, status: "notRequested" as const, viewedBeforeSubmission: false },
+      { content: null, status: "generating" as const, viewedBeforeSubmission: false },
+      { content: null, status: "unavailable" as const, viewedBeforeSubmission: false },
+      { content: mainContent, status: "revealed" as const, viewedBeforeSubmission: true },
+    ]
+    const followUpStates = [
+      ...states.slice(0, 3),
+      { content: followUpContent, status: "revealed" as const, viewedBeforeSubmission: true },
+    ]
+
+    for (const state of states) {
+      expect(practiceMainReferenceAnswerStateSchema.parse(state)).toEqual(state)
+    }
+    for (const state of followUpStates) {
+      expect(practiceFollowUpReferenceAnswerStateSchema.parse(state)).toEqual(state)
+    }
+    expect(practiceMainReferenceAnswerContentSchema.parse(mainContent)).toEqual(mainContent)
+    expect(practiceFollowUpReferenceAnswerContentSchema.parse(followUpContent)).toEqual(
+      followUpContent,
+    )
+  })
+
+  it("rejects malformed reference answer content and non-revealed states", () => {
+    const mainContent = {
+      answer: "A grounded answer.",
+      commonMistakes: ["Inventing a metric."],
+      generatedAt: "2026-08-14T09:30:00Z",
+      keyPoints: ["State the decision.", "Connect the evidence."],
+      kind: "personalizedExample" as const,
+    }
+    const followUpContent = {
+      addressedGap: "Connect the decision to the result.",
+      answer: "Tie the decision to the measurable result.",
+      commonMistakes: ["Claiming team impact as personal impact."],
+      generatedAt: "2026-08-14T09:30:00Z",
+      keyPoints: ["Name the baseline.", "Connect the result."],
+      kind: "personalizedSupplement" as const,
+    }
+
+    expect(() =>
+      practiceMainReferenceAnswerContentSchema.parse({
+        ...mainContent,
+        kind: "personalizedSupplement",
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceFollowUpReferenceAnswerContentSchema.parse({
+        ...followUpContent,
+        addressedGap: undefined,
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceMainReferenceAnswerStateSchema.parse({
+        content: mainContent,
+        status: "generating",
+        viewedBeforeSubmission: false,
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceFollowUpReferenceAnswerStateSchema.parse({
+        content: null,
+        status: "unavailable",
+        viewedBeforeSubmission: true,
+      }),
+    ).toThrow()
+    expect(() =>
+      practiceMainReferenceAnswerContentSchema.parse({
+        ...mainContent,
+        generatedAt: "2026-08-14T09:30:00",
+      }),
+    ).toThrow()
   })
 
   it("accepts revealed and unavailable guidance independently on questions and follow-ups", () => {

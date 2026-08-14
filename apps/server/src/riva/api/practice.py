@@ -16,6 +16,8 @@ from riva.schemas.practice_sessions import (
     EndPracticeSessionEarlyRequest,
     PracticeActiveSessionResponse,
     PracticeCompletedSessionResponse,
+    PracticeFollowUpReferenceAnswerRequest,
+    PracticeQuestionReferenceAnswerRequest,
     PracticeSessionResponse,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
@@ -184,6 +186,45 @@ async def reveal_practice_question_framework(
 
 
 @router.post(
+    "/sessions/{sessionId}/questions/reference-answer",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_practice_question_reference_answer(
+    session_id: PracticeSessionId,
+    payload: PracticeQuestionReferenceAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.request_question_reference_answer(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/questions/reference-answer/refresh",
+    response_model=PracticeActiveSessionResponse,
+)
+async def refresh_practice_question_reference_answer(
+    session_id: PracticeSessionId,
+    payload: PracticeQuestionReferenceAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.refresh_question_reference_answer(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
     "/sessions/{sessionId}/question-generation/refresh",
     response_model=PracticeActiveSessionResponse,
 )
@@ -315,6 +356,45 @@ async def reveal_practice_follow_up_framework(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.reveal_follow_up_framework(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/follow-ups/reference-answer",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_practice_follow_up_reference_answer(
+    session_id: PracticeSessionId,
+    payload: PracticeFollowUpReferenceAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.request_follow_up_reference_answer(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/follow-ups/reference-answer/refresh",
+    response_model=PracticeActiveSessionResponse,
+)
+async def refresh_practice_follow_up_reference_answer(
+    session_id: PracticeSessionId,
+    payload: PracticeFollowUpReferenceAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.refresh_follow_up_reference_answer(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

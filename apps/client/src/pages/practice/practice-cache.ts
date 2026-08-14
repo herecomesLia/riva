@@ -5,6 +5,8 @@ import type {
   GetFollowUpGenerationStatusInput,
   GetQuestionGenerationStatusInput,
   GetPracticeEvaluationStatusInput,
+  GetPracticeReferenceAnswerStatusInput,
+  GetPracticeFollowUpReferenceAnswerStatusInput,
   AnsweredPracticeFollowUpExchange,
   PracticeFollowUpMutationInput,
   PracticeActiveSessionState,
@@ -29,11 +31,11 @@ type PracticeMutationInputByKind = {
   endReviewSession: EndPracticeSessionInput
   followUpFrameworkReveal: PracticeFollowUpMutationInput
   followUpHintReveal: PracticeFollowUpMutationInput
-  followUpUpdate: PracticeFollowUpMutationInput
+  followUpReferenceAnswerRequest: PracticeFollowUpMutationInput
   prepareNextSession: PrepareNextPracticeSessionInput
   questionFrameworkReveal: PracticeQuestionMutationInput
   questionHintReveal: PracticeQuestionMutationInput
-  questionUpdate: PracticeQuestionMutationInput
+  questionReferenceAnswerRequest: PracticeQuestionMutationInput
   questionFlagUpdate: PracticeQuestionFlagMutationInput
   retryCurrentQuestion: PracticeQuestionMutationInput
   retryEvaluation: PracticeQuestionMutationInput
@@ -120,6 +122,44 @@ export function synchronizeQuestionGenerationResponse(
   }
 
   return { ...current, session: responseSession }
+}
+
+export function synchronizePracticeReferenceAnswerResponse(
+  current: PracticePageResponse | undefined,
+  response: PracticeServiceResponse,
+  request: GetPracticeReferenceAnswerStatusInput | GetPracticeFollowUpReferenceAnswerStatusInput,
+) {
+  const currentSession = current?.session
+  if (!currentSession || !isVersionedSession(currentSession)) return current
+
+  const responseSession = getPracticeResponseSession(response)
+  if (
+    !isVersionedSession(responseSession) ||
+    responseSession.sessionId !== request.sessionId ||
+    responseSession.version !== request.version
+  ) {
+    return current
+  }
+
+  if ("followUpQuestionId" in request) {
+    if (
+      currentSession.status !== "answeringFollowUp" ||
+      responseSession.status !== "answeringFollowUp" ||
+      !isGeneratingFollowUpReferenceAnswer(currentSession, request) ||
+      !isFollowUpReferenceAnswerRefreshResponseValid(responseSession, currentSession, request)
+    ) {
+      return current
+    }
+  } else if (
+    currentSession.status !== "answering" ||
+    responseSession.status !== "answering" ||
+    !isGeneratingQuestionReferenceAnswer(currentSession, request) ||
+    !isQuestionReferenceAnswerRefreshResponseValid(responseSession, currentSession, request)
+  ) {
+    return current
+  }
+
+  return isPracticePageResponse(response) ? response : { ...current, session: responseSession }
 }
 
 export function synchronizeFollowUpGenerationResponse(
@@ -232,11 +272,16 @@ function currentMatchesMutation(
   switch (kind) {
     case "questionFrameworkReveal":
     case "questionHintReveal":
-    case "questionUpdate":
+    case "questionReferenceAnswerRequest":
     case "skipQuestion":
     case "endQuestionSession":
     case "submitPrimaryAnswer":
-      return session.status === "answering" && questionMatches(session, request)
+      return (
+        session.status === "answering" &&
+        questionMatches(session, request) &&
+        (kind !== "questionReferenceAnswerRequest" ||
+          session.question.referenceAnswer.status === "notRequested")
+      )
     case "questionFlagUpdate":
       return (
         (session.status === "answering" || session.status === "review") &&
@@ -244,14 +289,16 @@ function currentMatchesMutation(
       )
     case "followUpFrameworkReveal":
     case "followUpHintReveal":
-    case "followUpUpdate":
+    case "followUpReferenceAnswerRequest":
     case "submitFollowUpAnswer":
     case "endFollowUps":
       return (
         session.status === "answeringFollowUp" &&
         questionMatches(session, request) &&
         "followUpQuestionId" in request &&
-        session.currentFollowUp.question.id === request.followUpQuestionId
+        session.currentFollowUp.question.id === request.followUpQuestionId &&
+        (kind !== "followUpReferenceAnswerRequest" ||
+          session.currentFollowUp.question.referenceAnswer.status === "notRequested")
       )
     case "retryEvaluation":
       return session.status === "evaluating" && questionMatches(session, request)
@@ -270,8 +317,20 @@ function responseMatchesMutation(
   request: PracticeQuestionMutationInput | EndPracticeSessionInput,
 ) {
   switch (kind) {
-    case "questionUpdate":
-      return session.status === "answering" && questionMatches(session, request)
+    case "questionReferenceAnswerRequest":
+      return (
+        session.status === "answering" &&
+        currentSession.status === "answering" &&
+        session.attemptId === currentSession.attemptId &&
+        session.attemptNumber === currentSession.attemptNumber &&
+        samePracticeSelection(session.selection, currentSession.selection) &&
+        questionMatches(session, request) &&
+        samePracticeQuestionSnapshotExceptReferenceAnswer(
+          session.question,
+          currentSession.question,
+        ) &&
+        isReferenceAnswerStateValidForRequest(session.question.referenceAnswer)
+      )
     case "questionHintReveal":
       return isQuestionGuidanceRevealResponseValid(
         session,
@@ -330,12 +389,31 @@ function responseMatchesMutation(
         session.attemptId === currentSession.attemptId &&
         session.attemptNumber === currentSession.attemptNumber
       )
-    case "followUpUpdate":
+    case "followUpReferenceAnswerRequest":
       return (
         session.status === "answeringFollowUp" &&
+        currentSession.status === "answeringFollowUp" &&
+        session.attemptId === currentSession.attemptId &&
+        session.attemptNumber === currentSession.attemptNumber &&
+        samePracticeSelection(session.selection, currentSession.selection) &&
         questionMatches(session, request) &&
         "followUpQuestionId" in request &&
-        session.currentFollowUp.question.id === request.followUpQuestionId
+        session.currentFollowUp.question.id === request.followUpQuestionId &&
+        JSON.stringify(session.question) === JSON.stringify(currentSession.question) &&
+        JSON.stringify(session.mainAnswer) === JSON.stringify(currentSession.mainAnswer) &&
+        sameExactAnsweredFollowUpChain(
+          session.followUpExchanges,
+          currentSession.followUpExchanges,
+        ) &&
+        session.currentFollowUp.status === currentSession.currentFollowUp.status &&
+        session.currentFollowUp.answer === currentSession.currentFollowUp.answer &&
+        samePracticeFollowUpQuestionSnapshotExceptReferenceAnswer(
+          session.currentFollowUp.question,
+          currentSession.currentFollowUp.question,
+        ) &&
+        isFollowUpReferenceAnswerStateValidForRequest(
+          session.currentFollowUp.question.referenceAnswer,
+        )
       )
     case "followUpHintReveal":
       return isFollowUpGuidanceRevealResponseValid(
@@ -379,6 +457,100 @@ function responseMatchesMutation(
     case "retryCurrentQuestion":
       return session.status === "answering" && questionMatches(session, request)
   }
+}
+
+function isGeneratingQuestionReferenceAnswer(
+  session: VersionedPracticeSession,
+  request: GetPracticeReferenceAnswerStatusInput,
+) {
+  return (
+    session.status === "answering" &&
+    session.question.id === request.questionId &&
+    session.question.referenceAnswer.status === "generating"
+  )
+}
+
+function isGeneratingFollowUpReferenceAnswer(
+  session: VersionedPracticeSession,
+  request: GetPracticeFollowUpReferenceAnswerStatusInput,
+) {
+  return (
+    session.status === "answeringFollowUp" &&
+    session.question.id === request.questionId &&
+    session.currentFollowUp.question.id === request.followUpQuestionId &&
+    session.currentFollowUp.question.referenceAnswer.status === "generating"
+  )
+}
+
+function isReferenceAnswerStateValidForRefresh(state: PracticeQuestionCard["referenceAnswer"]) {
+  if (state.status === "notRequested") return false
+  if (state.status === "revealed") return state.viewedBeforeSubmission
+  return state.content === null && state.viewedBeforeSubmission === false
+}
+
+function isFollowUpReferenceAnswerStateValidForRefresh(
+  state: PracticeFollowUpQuestion["referenceAnswer"],
+) {
+  if (state.status === "notRequested") return false
+  if (state.status === "revealed") return state.viewedBeforeSubmission
+  return state.content === null && state.viewedBeforeSubmission === false
+}
+
+function isReferenceAnswerStateValidForRequest(state: PracticeQuestionCard["referenceAnswer"]) {
+  if (state.status === "notRequested") return false
+  if (state.status === "revealed") return state.viewedBeforeSubmission
+  return state.content === null && state.viewedBeforeSubmission === false
+}
+
+function isFollowUpReferenceAnswerStateValidForRequest(
+  state: PracticeFollowUpQuestion["referenceAnswer"],
+) {
+  if (state.status === "notRequested") return false
+  if (state.status === "revealed") return state.viewedBeforeSubmission
+  return state.content === null && state.viewedBeforeSubmission === false
+}
+
+function isQuestionReferenceAnswerRefreshResponseValid(
+  response: VersionedPracticeSession,
+  current: VersionedPracticeSession,
+  request: GetPracticeReferenceAnswerStatusInput,
+) {
+  return (
+    response.status === "answering" &&
+    current.status === "answering" &&
+    response.attemptId === current.attemptId &&
+    response.attemptNumber === current.attemptNumber &&
+    samePracticeSelection(response.selection, current.selection) &&
+    questionMatches(response, request) &&
+    samePracticeQuestionSnapshotExceptReferenceAnswer(response.question, current.question) &&
+    isReferenceAnswerStateValidForRefresh(response.question.referenceAnswer)
+  )
+}
+
+function isFollowUpReferenceAnswerRefreshResponseValid(
+  response: VersionedPracticeSession,
+  current: VersionedPracticeSession,
+  request: GetPracticeFollowUpReferenceAnswerStatusInput,
+) {
+  return (
+    response.status === "answeringFollowUp" &&
+    current.status === "answeringFollowUp" &&
+    response.attemptId === current.attemptId &&
+    response.attemptNumber === current.attemptNumber &&
+    samePracticeSelection(response.selection, current.selection) &&
+    questionMatches(response, request) &&
+    response.currentFollowUp.question.id === request.followUpQuestionId &&
+    JSON.stringify(response.mainAnswer) === JSON.stringify(current.mainAnswer) &&
+    sameExactAnsweredFollowUpChain(response.followUpExchanges, current.followUpExchanges) &&
+    JSON.stringify(response.question) === JSON.stringify(current.question) &&
+    response.currentFollowUp.status === current.currentFollowUp.status &&
+    response.currentFollowUp.answer === current.currentFollowUp.answer &&
+    samePracticeFollowUpQuestionSnapshotExceptReferenceAnswer(
+      response.currentFollowUp.question,
+      current.currentFollowUp.question,
+    ) &&
+    isFollowUpReferenceAnswerStateValidForRefresh(response.currentFollowUp.question.referenceAnswer)
+  )
 }
 
 type VersionedPracticeSession = Exclude<PracticePageResponse["session"], { status: "setup" }>
@@ -507,6 +679,15 @@ function samePracticeQuestionSnapshotExceptFlags(
   return JSON.stringify(leftWithoutFlags) === JSON.stringify(rightWithoutFlags)
 }
 
+function samePracticeQuestionSnapshotExceptReferenceAnswer(
+  left: PracticeQuestionCard,
+  right: PracticeQuestionCard,
+) {
+  const { referenceAnswer: _leftReferenceAnswer, ...leftWithoutReferenceAnswer } = left
+  const { referenceAnswer: _rightReferenceAnswer, ...rightWithoutReferenceAnswer } = right
+  return JSON.stringify(leftWithoutReferenceAnswer) === JSON.stringify(rightWithoutReferenceAnswer)
+}
+
 function samePracticeQuestionSnapshotExceptGuidance(
   left: PracticeQuestionCard,
   right: PracticeQuestionCard,
@@ -537,6 +718,15 @@ function samePracticeFollowUpQuestionSnapshotExceptGuidance(
   const { answerFramework: _leftGuidance, ...leftWithoutGuidance } = left
   const { answerFramework: _rightGuidance, ...rightWithoutGuidance } = right
   return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
+}
+
+function samePracticeFollowUpQuestionSnapshotExceptReferenceAnswer(
+  left: PracticeQuestionCard | PracticeFollowUpQuestion,
+  right: PracticeQuestionCard | PracticeFollowUpQuestion,
+) {
+  const { referenceAnswer: _leftReferenceAnswer, ...leftWithoutReferenceAnswer } = left
+  const { referenceAnswer: _rightReferenceAnswer, ...rightWithoutReferenceAnswer } = right
+  return JSON.stringify(leftWithoutReferenceAnswer) === JSON.stringify(rightWithoutReferenceAnswer)
 }
 
 function samePracticeReviewSnapshot(
@@ -597,6 +787,23 @@ function sameAnsweredFollowUpChain(
         exchange.question.order === other.question.order &&
         exchange.answer.id === other.answer.id &&
         exchange.answer.order === other.answer.order
+      )
+    })
+  )
+}
+
+function sameExactAnsweredFollowUpChain(
+  left: AnsweredPracticeFollowUpExchange[],
+  right: AnsweredPracticeFollowUpExchange[],
+) {
+  return (
+    sameAnsweredFollowUpChain(left, right) &&
+    left.every((exchange, index) => {
+      const other = right[index]
+      return (
+        other !== undefined &&
+        JSON.stringify(exchange.question) === JSON.stringify(other.question) &&
+        JSON.stringify(exchange.answer) === JSON.stringify(other.answer)
       )
     })
   )

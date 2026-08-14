@@ -65,13 +65,80 @@ export const practiceGuidanceSchema = z.discriminatedUnion("status", [
   practiceGuidanceUnavailableSchema,
 ])
 
-const practiceReferenceAnswerNotRequestedSchema = z
+export const practiceMainReferenceAnswerContentSchema = z
+  .object({
+    answer: z.string().min(1),
+    commonMistakes: z.array(z.string().min(1)).min(1),
+    generatedAt: dateTimeSchema,
+    keyPoints: z.array(z.string().min(1)).min(2),
+    kind: z.enum(["personalizedExample", "technicalReference"]),
+  })
+  .strict()
+
+export const practiceFollowUpReferenceAnswerContentSchema = z
+  .object({
+    addressedGap: z.string().min(1),
+    answer: z.string().min(1),
+    commonMistakes: z.array(z.string().min(1)).min(1),
+    generatedAt: dateTimeSchema,
+    keyPoints: z.array(z.string().min(1)).min(2),
+    kind: z.enum(["personalizedSupplement", "technicalReference"]),
+  })
+  .strict()
+
+export const practiceReferenceAnswerNotRequestedSchema = z
   .object({
     content: z.null(),
     status: z.literal("notRequested"),
     viewedBeforeSubmission: z.literal(false),
   })
   .strict()
+
+export const practiceReferenceAnswerGeneratingSchema = z
+  .object({
+    content: z.null(),
+    status: z.literal("generating"),
+    viewedBeforeSubmission: z.literal(false),
+  })
+  .strict()
+
+export const practiceReferenceAnswerUnavailableSchema = z
+  .object({
+    content: z.null(),
+    status: z.literal("unavailable"),
+    viewedBeforeSubmission: z.literal(false),
+  })
+  .strict()
+
+export const practiceMainReferenceAnswerRevealedSchema = z
+  .object({
+    content: practiceMainReferenceAnswerContentSchema,
+    status: z.literal("revealed"),
+    viewedBeforeSubmission: z.boolean(),
+  })
+  .strict()
+
+export const practiceFollowUpReferenceAnswerRevealedSchema = z
+  .object({
+    content: practiceFollowUpReferenceAnswerContentSchema,
+    status: z.literal("revealed"),
+    viewedBeforeSubmission: z.boolean(),
+  })
+  .strict()
+
+export const practiceMainReferenceAnswerStateSchema = z.discriminatedUnion("status", [
+  practiceReferenceAnswerNotRequestedSchema,
+  practiceReferenceAnswerGeneratingSchema,
+  practiceMainReferenceAnswerRevealedSchema,
+  practiceReferenceAnswerUnavailableSchema,
+])
+
+export const practiceFollowUpReferenceAnswerStateSchema = z.discriminatedUnion("status", [
+  practiceReferenceAnswerNotRequestedSchema,
+  practiceReferenceAnswerGeneratingSchema,
+  practiceFollowUpReferenceAnswerRevealedSchema,
+  practiceReferenceAnswerUnavailableSchema,
+])
 
 export const practiceQuestionSchema = z
   .object({
@@ -85,7 +152,7 @@ export const practiceQuestionSchema = z
     prompt: z.string(),
     questionType: practiceQuestionTypeSchema,
     recommendedMaterials: z.array(practiceMaterialReferenceSchema),
-    referenceAnswer: practiceReferenceAnswerNotRequestedSchema,
+    referenceAnswer: practiceMainReferenceAnswerStateSchema,
   })
   .strict()
 
@@ -106,7 +173,7 @@ export const practiceFollowUpQuestionSchema = z
     order: z.number().int().min(1).max(2),
     answerHints: practiceGuidanceSchema,
     answerFramework: practiceGuidanceSchema,
-    referenceAnswer: practiceReferenceAnswerNotRequestedSchema,
+    referenceAnswer: practiceFollowUpReferenceAnswerStateSchema,
   })
   .strict()
 
@@ -550,6 +617,18 @@ export const currentPracticeSessionResponseSchema = z
 
 export type PracticeMaterialReferenceWire = z.infer<typeof practiceMaterialReferenceSchema>
 export type PracticeSessionSelectionWire = z.infer<typeof practiceSessionSelectionSchema>
+export type PracticeMainReferenceAnswerContentWire = z.infer<
+  typeof practiceMainReferenceAnswerContentSchema
+>
+export type PracticeFollowUpReferenceAnswerContentWire = z.infer<
+  typeof practiceFollowUpReferenceAnswerContentSchema
+>
+export type PracticeMainReferenceAnswerStateWire = z.infer<
+  typeof practiceMainReferenceAnswerStateSchema
+>
+export type PracticeFollowUpReferenceAnswerStateWire = z.infer<
+  typeof practiceFollowUpReferenceAnswerStateSchema
+>
 export type PracticeQuestionWire = z.infer<typeof practiceQuestionSchema>
 export type PracticeAnswerWire = z.infer<typeof practiceAnswerSchema>
 export type PracticeFollowUpQuestionWire = z.infer<typeof practiceFollowUpQuestionSchema>

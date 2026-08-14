@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest"
 
 import { createPracticeMockResponse } from "@/mocks/data/practice"
-import type { PracticeCompletedEarlyState } from "@/models/practice"
+import type { PracticeCompletedEarlyState, PracticeReferenceAnswerState } from "@/models/practice"
 
 import {
   synchronizeFollowUpGenerationResponse,
+  synchronizePracticeReferenceAnswerResponse,
   synchronizePracticeEvaluationResponse,
   synchronizePracticeMutationResponse,
   synchronizeQuestionGenerationResponse,
@@ -737,7 +738,7 @@ describe("practice mutation cache contract", () => {
 
     expect(
       synchronizePracticeMutationResponse(current, response, {
-        kind: "questionUpdate",
+        kind: "questionReferenceAnswerRequest",
         input,
       }),
     ).toBe(current)
@@ -789,7 +790,7 @@ describe("practice mutation cache contract", () => {
 
     expect(
       synchronizePracticeMutationResponse(current, response, {
-        kind: "questionUpdate",
+        kind: "questionReferenceAnswerRequest",
         input,
       }),
     ).toBe(current)
@@ -815,7 +816,7 @@ describe("practice mutation cache contract", () => {
 
     expect(
       synchronizePracticeMutationResponse(current, response, {
-        kind: "followUpUpdate",
+        kind: "followUpReferenceAnswerRequest",
         input,
       }),
     ).toBe(current)
@@ -1018,5 +1019,200 @@ describe("practice polling cache contract", () => {
     expect(
       synchronizeFollowUpGenerationResponse(currentGeneratingPage, wrongSession, request),
     ).toBe(currentGeneratingPage)
+  })
+})
+
+describe("practice reference answer cache contract", () => {
+  const mainReferenceInput = (sessionId: string, version: number, questionId: string) => ({
+    questionId,
+    sessionId,
+    version,
+  })
+
+  const followUpReferenceInput = (
+    sessionId: string,
+    version: number,
+    questionId: string,
+    followUpQuestionId: string,
+  ) => ({
+    followUpQuestionId,
+    questionId,
+    sessionId,
+    version,
+  })
+
+  it("accepts main request transitions to generating, revealed, or unavailable", () => {
+    const referenceAnswers: PracticeReferenceAnswerState[] = [
+      { content: null, status: "generating" as const, viewedBeforeSubmission: false },
+      {
+        content: {
+          answer: "A grounded answer.",
+          commonMistakes: ["Inventing a metric."],
+          generatedAt: "2026-08-14T09:30:00Z",
+          keyPoints: ["State the decision.", "Connect the evidence."],
+          kind: "personalizedExample" as const,
+        },
+        status: "revealed" as const,
+        viewedBeforeSubmission: true,
+      },
+      { content: null, status: "unavailable" as const, viewedBeforeSubmission: false },
+    ]
+    for (const referenceAnswer of referenceAnswers) {
+      const current = createPracticeMockResponse("answeringQuestion")
+      if (current.session.status !== "answering") return
+      const input = mainReferenceInput(
+        current.session.sessionId,
+        current.session.version,
+        current.session.question.id,
+      )
+      const response = structuredClone(current)
+      if (response.session.status !== "answering") return
+      response.session.version += 1
+      response.session.question.referenceAnswer = referenceAnswer
+
+      const next = synchronizePracticeMutationResponse(current, response, {
+        kind: "questionReferenceAnswerRequest",
+        input,
+      })
+      expect(next?.session).toBe(response.session)
+    }
+  })
+
+  it("accepts main polling while generating and then revealed or unavailable", () => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    if (current.session.status !== "answering") return
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const request = mainReferenceInput(
+      current.session.sessionId,
+      current.session.version,
+      current.session.question.id,
+    )
+
+    const referenceAnswers: PracticeReferenceAnswerState[] = [
+      { content: null, status: "generating" as const, viewedBeforeSubmission: false },
+      { content: null, status: "unavailable" as const, viewedBeforeSubmission: false },
+    ]
+    for (const referenceAnswer of referenceAnswers) {
+      const response = structuredClone(current)
+      if (response.session.status !== "answering") return
+      response.session.question.referenceAnswer = referenceAnswer
+      expect(synchronizePracticeReferenceAnswerResponse(current, response, request)?.session).toBe(
+        response.session,
+      )
+    }
+
+    const revealed = structuredClone(current)
+    if (revealed.session.status !== "answering") return
+    revealed.session.question.referenceAnswer = {
+      content: {
+        answer: "A grounded answer.",
+        commonMistakes: ["Inventing a metric."],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["State the decision.", "Connect the evidence."],
+        kind: "technicalReference",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+    expect(synchronizePracticeReferenceAnswerResponse(current, revealed, request)?.session).toBe(
+      revealed.session,
+    )
+
+    const wrongVersion = structuredClone(revealed)
+    if (wrongVersion.session.status !== "answering") return
+    wrongVersion.session.version += 1
+    expect(synchronizePracticeReferenceAnswerResponse(current, wrongVersion, request)).toBe(current)
+
+    const changedQuestion = structuredClone(revealed)
+    if (changedQuestion.session.status !== "answering") return
+    changedQuestion.session.question.prompt = "A changed question prompt."
+    expect(synchronizePracticeReferenceAnswerResponse(current, changedQuestion, request)).toBe(
+      current,
+    )
+
+    const changedGuidance = structuredClone(revealed)
+    if (changedGuidance.session.status !== "answering") return
+    changedGuidance.session.question.answerHints = {
+      content: ["A changed hint."],
+      status: "revealed",
+    }
+    expect(synchronizePracticeReferenceAnswerResponse(current, changedGuidance, request)).toBe(
+      current,
+    )
+
+    const changedFlags = structuredClone(revealed)
+    if (changedFlags.session.status !== "answering") return
+    changedFlags.session.question.isSaved = !changedFlags.session.question.isSaved
+    expect(synchronizePracticeReferenceAnswerResponse(current, changedFlags, request)).toBe(current)
+
+    const changedAttempt = structuredClone(revealed)
+    if (changedAttempt.session.status !== "answering") return
+    changedAttempt.session.attemptId = "another_attempt"
+    expect(synchronizePracticeReferenceAnswerResponse(current, changedAttempt, request)).toBe(
+      current,
+    )
+
+    const notRequested = structuredClone(revealed)
+    if (notRequested.session.status !== "answering") return
+    notRequested.session.question.referenceAnswer = {
+      content: null,
+      status: "notRequested",
+      viewedBeforeSubmission: false,
+    }
+    expect(synchronizePracticeReferenceAnswerResponse(current, notRequested, request)).toBe(current)
+  })
+
+  it("keeps follow-up reference lineage isolated from history", () => {
+    const current = createPracticeMockResponse("answeringFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    current.session.currentFollowUp.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const request = followUpReferenceInput(
+      current.session.sessionId,
+      current.session.version,
+      current.session.question.id,
+      current.session.currentFollowUp.question.id,
+    )
+    const response = structuredClone(current)
+    if (response.session.status !== "answeringFollowUp") return
+    response.session.currentFollowUp.question.referenceAnswer = {
+      content: {
+        addressedGap: "Connect the decision to the result.",
+        answer: "Tie the decision to the measurable result.",
+        commonMistakes: ["Claiming team impact as personal impact."],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["Name the baseline.", "Connect the result."],
+        kind: "personalizedSupplement",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    const next = synchronizePracticeReferenceAnswerResponse(current, response, request)
+    expect(next?.session).toBe(response.session)
+    expect(next?.session).toMatchObject({
+      followUpExchanges: current.session.followUpExchanges,
+      currentFollowUp: {
+        question: {
+          referenceAnswer: { status: "revealed" },
+        },
+      },
+    })
+
+    const changedHistory = structuredClone(response)
+    if (changedHistory.session.status !== "answeringFollowUp") return
+    const historicalExchange = changedHistory.session.followUpExchanges[0]
+    if (!historicalExchange) return
+    historicalExchange.answer.content = "Changed historical answer"
+    expect(synchronizePracticeReferenceAnswerResponse(current, changedHistory, request)).toBe(
+      current,
+    )
   })
 })

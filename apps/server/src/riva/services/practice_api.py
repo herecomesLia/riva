@@ -1,4 +1,5 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from fastapi import status
@@ -36,8 +37,16 @@ from riva.schemas.practice_sessions import (
     PracticeGuidanceResponse,
     PracticeGuidanceUnavailableResponse,
     PracticeNoFollowUpRequiredCompletionResponse,
+    PracticeFollowUpReferenceAnswerContentResponse,
+    PracticeFollowUpReferenceAnswerRevealedResponse,
+    PracticeFollowUpReferenceAnswerResponse,
+    PracticeMainReferenceAnswerContentResponse,
+    PracticeMainReferenceAnswerRevealedResponse,
+    PracticeMainReferenceAnswerResponse,
     PracticeQuestionResponse,
+    PracticeReferenceAnswerGeneratingResponse,
     PracticeReferenceAnswerNotRequestedResponse,
+    PracticeReferenceAnswerUnavailableResponse,
     PracticeReviewContentResponse,
     PracticeReviewResponse,
     PracticeSessionSelection,
@@ -53,6 +62,8 @@ from riva.schemas.practice_sessions import (
     StartPracticeSessionRequest,
     SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
+    PracticeFollowUpReferenceAnswerRequest,
+    PracticeQuestionReferenceAnswerRequest,
 )
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -62,6 +73,7 @@ from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
     PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
+    PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
@@ -82,6 +94,13 @@ from riva.services.recommendation_generation import (
     practice_recommendation_output_from_artifact,
 )
 from riva.services.review_generation import practice_review_output_from_artifact
+from riva.services.reference_answer_generation import (
+    PracticeReferenceAnswerLifecycleStatus,
+    PracticeReferenceAnswerWorkflowState,
+    ReferenceAnswerGenerationService,
+    ReferenceAnswerGenerationStateError,
+    PracticeReferenceAnswerTargetType,
+)
 
 
 PRACTICE_EVALUATION_GENERATION_UNAVAILABLE = (
@@ -89,6 +108,17 @@ PRACTICE_EVALUATION_GENERATION_UNAVAILABLE = (
 )
 
 PracticeSessionServiceFactory = Callable[..., PracticeSessionService]
+ReferenceAnswerGenerationServiceFactory = Callable[
+    ..., ReferenceAnswerGenerationService
+]
+
+
+@dataclass(frozen=True)
+class _PracticeReferenceAnswerProjection:
+    main: PracticeReferenceAnswerWorkflowState | None = None
+    follow_ups: Mapping[UUID, PracticeReferenceAnswerWorkflowState] = field(
+        default_factory=dict
+    )
 
 
 class PracticeAPIService:
@@ -101,11 +131,21 @@ class PracticeAPIService:
         practice_service_factory: PracticeSessionServiceFactory = (
             PracticeSessionService
         ),
+        reference_answer_generation_service_factory: ReferenceAnswerGenerationServiceFactory
+        | None = None,
     ) -> None:
         self.session = session
         self.llm_provider = (llm_provider or "").strip().lower()
         self.llm_model = (llm_model or "").strip()
         self.practice_service_factory = practice_service_factory
+        self.reference_answer_generation_service_factory = (
+            reference_answer_generation_service_factory
+            or ReferenceAnswerGenerationService
+        )
+        self._reference_answer_hydration_enabled = (
+            reference_answer_generation_service_factory is not None
+            or isinstance(session, AsyncSession)
+        )
 
     async def start_session(
         self,
@@ -125,7 +165,7 @@ class PracticeAPIService:
                 ),
                 interaction_language=interaction_language,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -142,7 +182,7 @@ class PracticeAPIService:
                 session_id=session_id,
                 expected_version=payload.version,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -160,7 +200,7 @@ class PracticeAPIService:
                 expected_version=payload.version,
                 question_id=payload.question_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -178,7 +218,7 @@ class PracticeAPIService:
                 expected_version=payload.version,
                 question_id=payload.question_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -197,7 +237,7 @@ class PracticeAPIService:
                 question_id=payload.question_id,
                 is_saved=payload.is_saved,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -216,7 +256,7 @@ class PracticeAPIService:
                 question_id=payload.question_id,
                 is_marked_weak=payload.is_marked_weak,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -234,7 +274,7 @@ class PracticeAPIService:
                 expected_version=payload.version,
                 question_id=payload.question_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -252,7 +292,7 @@ class PracticeAPIService:
                 expected_version=payload.version,
                 question_id=payload.question_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -271,7 +311,7 @@ class PracticeAPIService:
                 question_id=payload.question_id,
                 follow_up_question_id=payload.follow_up_question_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -290,7 +330,7 @@ class PracticeAPIService:
                 question_id=payload.question_id,
                 follow_up_question_id=payload.follow_up_question_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -312,7 +352,7 @@ class PracticeAPIService:
                 question_id=payload.question_id,
                 content=payload.content,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -332,7 +372,7 @@ class PracticeAPIService:
                 follow_up_question_id=payload.follow_up_question_id,
                 content=payload.content,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -351,7 +391,7 @@ class PracticeAPIService:
                 question_id=payload.question_id,
                 follow_up_question_id=payload.follow_up_question_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -368,7 +408,7 @@ class PracticeAPIService:
                 session_id=session_id,
                 expected_version=payload.version,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -385,7 +425,131 @@ class PracticeAPIService:
                 session_id=session_id,
                 expected_version=payload.version,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def request_question_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: PracticeQuestionReferenceAnswerRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            self._require_llm_configuration(
+                PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE
+            )
+            service = self._practice_service()
+            await service.request_question_reference_answer(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+            )
+            context = await service.get_session_context(
+                user_id=user_id,
+                session_id=session_id,
+            )
+            response = await self._build_session_response(
+                user_id=user_id,
+                context=context,
+            )
+            if response.status == "completed":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return response
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def refresh_question_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: PracticeQuestionReferenceAnswerRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            service = self._practice_service()
+            await service.refresh_question_reference_answer(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+            )
+            context = await service.get_session_context(
+                user_id=user_id,
+                session_id=session_id,
+            )
+            response = await self._build_session_response(
+                user_id=user_id,
+                context=context,
+            )
+            if response.status == "completed":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return response
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def request_follow_up_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: PracticeFollowUpReferenceAnswerRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            self._require_llm_configuration(
+                PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE
+            )
+            service = self._practice_service()
+            await service.request_follow_up_reference_answer(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                follow_up_question_id=payload.follow_up_question_id,
+            )
+            context = await service.get_session_context(
+                user_id=user_id,
+                session_id=session_id,
+            )
+            response = await self._build_session_response(
+                user_id=user_id,
+                context=context,
+            )
+            if response.status == "completed":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return response
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def refresh_follow_up_reference_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: PracticeFollowUpReferenceAnswerRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            service = self._practice_service()
+            await service.refresh_follow_up_reference_answer(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                follow_up_question_id=payload.follow_up_question_id,
+            )
+            context = await service.get_session_context(
+                user_id=user_id,
+                session_id=session_id,
+            )
+            response = await self._build_session_response(
+                user_id=user_id,
+                context=context,
+            )
+            if response.status == "completed":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return response
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -400,7 +564,7 @@ class PracticeAPIService:
                 user_id=user_id,
                 session_id=session_id,
             )
-            return build_practice_session_response(context)
+            return await self._build_session_response(user_id=user_id, context=context)
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -417,7 +581,13 @@ class PracticeAPIService:
                 session_id=session_id,
                 expected_version=payload.version,
             )
-            return build_practice_completed_session_response(context)
+            response = await self._build_session_response(
+                user_id=user_id,
+                context=context,
+            )
+            if response.status != "completed":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return response
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -435,7 +605,13 @@ class PracticeAPIService:
                 expected_version=payload.version,
                 question_id=payload.question_id,
             )
-            return build_practice_completed_session_response(context)
+            response = await self._build_session_response(
+                user_id=user_id,
+                context=context,
+            )
+            if response.status != "completed":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return response
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
@@ -450,7 +626,7 @@ class PracticeAPIService:
             )
             return CurrentPracticeSessionResponse(
                 session=(
-                    build_practice_session_response(context)
+                    await self._build_session_response(user_id=user_id, context=context)
                     if context is not None
                     else None
                 )
@@ -462,6 +638,110 @@ class PracticeAPIService:
         return self.practice_service_factory(
             self.session,
             llm_model=self.llm_model,
+        )
+
+    def _reference_answer_generation_service(self) -> ReferenceAnswerGenerationService:
+        return self.reference_answer_generation_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
+    async def _build_session_response(
+        self,
+        *,
+        user_id: UUID,
+        context: (
+            PracticePublicWorkflowContext
+            | PracticeCompletedSessionWorkflowContext
+            | PracticeEndedEarlySessionWorkflowContext
+        ),
+    ) -> PracticeSessionResponse:
+        projection = await self._resolve_reference_answer_projection(
+            user_id=user_id,
+            context=context,
+        )
+        return build_practice_session_response(
+            context,
+            reference_answers=projection,
+        )
+
+    async def _resolve_reference_answer_projection(
+        self,
+        *,
+        user_id: UUID,
+        context: (
+            PracticePublicWorkflowContext
+            | PracticeCompletedSessionWorkflowContext
+            | PracticeEndedEarlySessionWorkflowContext
+        ),
+    ) -> _PracticeReferenceAnswerProjection:
+        if not self._reference_answer_hydration_enabled:
+            return _PracticeReferenceAnswerProjection()
+        if isinstance(context, PracticeCompletedSessionWorkflowContext):
+            return _PracticeReferenceAnswerProjection()
+
+        card = (
+            context.question_context.question_card
+            if isinstance(context, PracticeEndedEarlySessionWorkflowContext)
+            else context.question_card
+        )
+        if card is None:
+            return _PracticeReferenceAnswerProjection()
+
+        main_answer = (
+            context.main_answer
+            if isinstance(context, PracticePrimaryAnswerWorkflowContext)
+            else None
+        )
+        follow_up_exchanges = (
+            ()
+            if isinstance(context, PracticeEndedEarlySessionWorkflowContext)
+            else (
+                context.follow_up_exchanges
+                if isinstance(context, PracticePrimaryAnswerWorkflowContext)
+                else ()
+            )
+        )
+        follow_up_question = (
+            None
+            if isinstance(context, PracticeEndedEarlySessionWorkflowContext)
+            else (
+                context.follow_up_question
+                if isinstance(context, PracticePrimaryAnswerWorkflowContext)
+                else None
+            )
+        )
+        generation_service = self._reference_answer_generation_service()
+        try:
+            main_state = await generation_service.get_main_generation_state(
+                user_id=user_id,
+                question_card_id=card.id,
+                submitted_at=main_answer.submitted_at if main_answer else None,
+            )
+            follow_up_states: dict[UUID, PracticeReferenceAnswerWorkflowState] = {}
+            for exchange in follow_up_exchanges:
+                follow_up_states[exchange.question.id] = (
+                    await generation_service.get_follow_up_generation_state(
+                        user_id=user_id,
+                        question_card_id=card.id,
+                        follow_up_question_id=exchange.question.id,
+                        submitted_at=exchange.answer.submitted_at,
+                    )
+                )
+            if follow_up_question is not None:
+                follow_up_states[follow_up_question.id] = (
+                    await generation_service.get_follow_up_generation_state(
+                        user_id=user_id,
+                        question_card_id=card.id,
+                        follow_up_question_id=follow_up_question.id,
+                        submitted_at=None,
+                    )
+                )
+        except ReferenceAnswerGenerationStateError:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        return _PracticeReferenceAnswerProjection(
+            main=main_state,
+            follow_ups=follow_up_states,
         )
 
     def _require_llm_configuration(self, error_code: str) -> str:
@@ -482,12 +762,21 @@ def build_practice_session_response(
         | PracticeCompletedSessionWorkflowContext
         | PracticeEndedEarlySessionWorkflowContext
     ),
+    *,
+    reference_answers: _PracticeReferenceAnswerProjection | None = None,
 ) -> PracticeSessionResponse:
     try:
+        reference_answers = reference_answers or _PracticeReferenceAnswerProjection()
         if isinstance(context, PracticeCompletedSessionWorkflowContext):
-            return build_practice_completed_session_response(context)
+            return build_practice_completed_session_response(
+                context,
+                reference_answers=reference_answers,
+            )
         if isinstance(context, PracticeEndedEarlySessionWorkflowContext):
-            return build_practice_completed_session_response(context)
+            return build_practice_completed_session_response(
+                context,
+                reference_answers=reference_answers,
+            )
         base = {
             "session_id": context.session.id,
             "language": context.session.language,
@@ -525,15 +814,26 @@ def build_practice_session_response(
                 context.recommendation
             )
             follow_up_exchanges = _build_practice_answered_follow_up_exchanges(
-                context.follow_up_exchanges
+                context.follow_up_exchanges,
+                reference_answers=reference_answers.follow_ups,
             )
             follow_up_completion = build_practice_follow_up_completion_response(
                 context.follow_up_completion_reason,
                 unanswered_question=context.follow_up_question,
+                unanswered_reference_answer_state=(
+                    reference_answers.follow_ups.get(
+                        context.follow_up_question.id
+                    )
+                    if context.follow_up_question is not None
+                    else None
+                ),
             )
             return PracticeReviewResponse(
                 status="review",
-                question=build_practice_question_response(context.question_card),
+                question=build_practice_question_response(
+                    context.question_card,
+                    reference_answer_state=reference_answers.main,
+                ),
                 main_answer=build_practice_answer_response(context.main_answer),
                 follow_up_exchanges=follow_up_exchanges,
                 follow_up_completion=follow_up_completion,
@@ -560,24 +860,32 @@ def build_practice_session_response(
                 return PracticeGeneratingFollowUpResponse(
                     status="generatingFollowUp",
                     question=build_practice_question_response(
-                        context.question_card
+                        context.question_card,
+                        reference_answer_state=reference_answers.main,
                     ),
                     main_answer=build_practice_answer_response(context.main_answer),
                     follow_up_exchanges=_build_practice_answered_follow_up_exchanges(
-                        context.follow_up_exchanges
+                        context.follow_up_exchanges,
+                        reference_answers=reference_answers.follow_ups,
                     ),
                     **base,
                 )
             return PracticeAnsweringResponse(
                 status="answering",
-                question=build_practice_question_response(context.question_card),
+                question=build_practice_question_response(
+                    context.question_card,
+                    reference_answer_state=reference_answers.main,
+                ),
                 **base,
             )
         if isinstance(context, PracticePrimaryAnswerWorkflowContext):
             if context.question_card is None:
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             main_answer = build_practice_answer_response(context.main_answer)
-            question = build_practice_question_response(context.question_card)
+            question = build_practice_question_response(
+                context.question_card,
+                reference_answer_state=reference_answers.main,
+            )
             if context.attempt.status == "answeringFollowUp":
                 if (
                     context.follow_up_decision is None
@@ -590,7 +898,10 @@ def build_practice_session_response(
                 current_follow_up = PracticeAwaitingFollowUpExchangeResponse(
                     status="awaitingAnswer",
                     question=build_practice_follow_up_question_response(
-                        context.follow_up_question
+                        context.follow_up_question,
+                        reference_answer_state=reference_answers.follow_ups.get(
+                            context.follow_up_question.id
+                        ),
                     ),
                     answer=None,
                 )
@@ -599,7 +910,8 @@ def build_practice_session_response(
                     question=question,
                     main_answer=main_answer,
                     follow_up_exchanges=_build_practice_answered_follow_up_exchanges(
-                        context.follow_up_exchanges
+                        context.follow_up_exchanges,
+                        reference_answers=reference_answers.follow_ups,
                     ),
                     current_follow_up=current_follow_up,
                     **base,
@@ -616,11 +928,19 @@ def build_practice_session_response(
                     question=question,
                     main_answer=main_answer,
                     follow_up_exchanges=_build_practice_answered_follow_up_exchanges(
-                        context.follow_up_exchanges
+                        context.follow_up_exchanges,
+                        reference_answers=reference_answers.follow_ups,
                     ),
                     follow_up_completion=build_practice_follow_up_completion_response(
                         context.follow_up_completion_reason,
                         unanswered_question=context.follow_up_question,
+                        unanswered_reference_answer_state=(
+                            reference_answers.follow_ups.get(
+                                context.follow_up_question.id
+                            )
+                            if context.follow_up_question is not None
+                            else None
+                        ),
                     ),
                     submitted_at=context.attempt.updated_at,
                     **base,
@@ -635,10 +955,16 @@ def build_practice_session_response(
 def build_practice_completed_session_response(
     context: PracticeCompletedSessionWorkflowContext
     | PracticeEndedEarlySessionWorkflowContext,
+    *,
+    reference_answers: _PracticeReferenceAnswerProjection | None = None,
 ) -> PracticeCompletedSessionResponse:
     try:
+        reference_answers = reference_answers or _PracticeReferenceAnswerProjection()
         if isinstance(context, PracticeEndedEarlySessionWorkflowContext):
-            return _build_practice_ended_early_session_response(context)
+            return _build_practice_ended_early_session_response(
+                context,
+                reference_answer_state=reference_answers.main,
+            )
 
         review_contexts = context.attempt_review_contexts
         if not review_contexts:
@@ -704,6 +1030,8 @@ def build_practice_completed_session_response(
 
 def _build_practice_ended_early_session_response(
     context: PracticeEndedEarlySessionWorkflowContext,
+    *,
+    reference_answer_state: PracticeReferenceAnswerWorkflowState | None = None,
 ) -> PracticeCompletedSessionResponse:
     try:
         review_contexts = context.completed_attempt_review_contexts
@@ -771,7 +1099,10 @@ def _build_practice_ended_early_session_response(
                 attempt_id=unfinished_attempt.id,
                 attempt_number=unfinished_attempt.attempt_number,
                 selection=unfinished_selection,
-                question=build_practice_question_response(unfinished_question),
+                question=build_practice_question_response(
+                    unfinished_question,
+                    reference_answer_state=reference_answer_state,
+                ),
             ),
         )
     except PracticeSessionStateError:
@@ -795,7 +1126,139 @@ def build_practice_guidance_response(
     )
 
 
-def build_practice_question_response(card: QuestionCard) -> PracticeQuestionResponse:
+def build_practice_main_reference_answer_response(
+    state: PracticeReferenceAnswerWorkflowState,
+) -> PracticeMainReferenceAnswerResponse:
+    try:
+        if state.status == PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED:
+            if (
+                state.generation_run is not None
+                or state.artifact is not None
+                or state.output is not None
+                or state.viewed_before_submission
+            ):
+                raise ValueError("not-requested reference state contains data")
+            return PracticeReferenceAnswerNotRequestedResponse(
+                status="notRequested"
+            )
+        if state.status == PracticeReferenceAnswerLifecycleStatus.GENERATING:
+            if (
+                state.generation_run is None
+                or state.artifact is not None
+                or state.output is not None
+                or state.viewed_before_submission
+            ):
+                raise ValueError("generating reference state is invalid")
+            return PracticeReferenceAnswerGeneratingResponse(
+                status="generating"
+            )
+        if state.status == PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE:
+            if (
+                state.generation_run is None
+                or state.artifact is not None
+                or state.output is not None
+                or state.viewed_before_submission
+            ):
+                raise ValueError("unavailable reference state is invalid")
+            return PracticeReferenceAnswerUnavailableResponse(
+                status="unavailable"
+            )
+        if state.status != PracticeReferenceAnswerLifecycleStatus.REVEALED:
+            raise ValueError("unknown reference answer lifecycle status")
+        if (
+            state.generation_run is None
+            or state.artifact is None
+            or state.output is None
+            or state.output.target_type != PracticeReferenceAnswerTargetType.MAIN
+        ):
+            raise ValueError("revealed main reference state is invalid")
+        return PracticeMainReferenceAnswerRevealedResponse(
+            status="revealed",
+            content=PracticeMainReferenceAnswerContentResponse(
+                kind=state.output.kind,
+                answer=state.output.answer,
+                key_points=state.output.key_points,
+                common_mistakes=state.output.common_mistakes,
+                generated_at=state.artifact.generated_at,
+            ),
+            viewed_before_submission=state.viewed_before_submission,
+        )
+    except PracticeSessionStateError:
+        raise
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+
+
+def build_practice_follow_up_reference_answer_response(
+    state: PracticeReferenceAnswerWorkflowState,
+) -> PracticeFollowUpReferenceAnswerResponse:
+    try:
+        if state.status == PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED:
+            if (
+                state.generation_run is not None
+                or state.artifact is not None
+                or state.output is not None
+                or state.viewed_before_submission
+            ):
+                raise ValueError("not-requested reference state contains data")
+            return PracticeReferenceAnswerNotRequestedResponse(
+                status="notRequested"
+            )
+        if state.status == PracticeReferenceAnswerLifecycleStatus.GENERATING:
+            if (
+                state.generation_run is None
+                or state.artifact is not None
+                or state.output is not None
+                or state.viewed_before_submission
+            ):
+                raise ValueError("generating reference state is invalid")
+            return PracticeReferenceAnswerGeneratingResponse(
+                status="generating"
+            )
+        if state.status == PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE:
+            if (
+                state.generation_run is None
+                or state.artifact is not None
+                or state.output is not None
+                or state.viewed_before_submission
+            ):
+                raise ValueError("unavailable reference state is invalid")
+            return PracticeReferenceAnswerUnavailableResponse(
+                status="unavailable"
+            )
+        if state.status != PracticeReferenceAnswerLifecycleStatus.REVEALED:
+            raise ValueError("unknown reference answer lifecycle status")
+        if (
+            state.generation_run is None
+            or state.artifact is None
+            or state.output is None
+            or state.output.target_type
+            != PracticeReferenceAnswerTargetType.FOLLOW_UP
+        ):
+            raise ValueError("revealed follow-up reference state is invalid")
+        return PracticeFollowUpReferenceAnswerRevealedResponse(
+            status="revealed",
+            content=PracticeFollowUpReferenceAnswerContentResponse(
+                kind=state.output.kind,
+                addressed_gap=state.output.addressed_gap,
+                answer=state.output.answer,
+                key_points=state.output.key_points,
+                common_mistakes=state.output.common_mistakes,
+                generated_at=state.artifact.generated_at,
+            ),
+            viewed_before_submission=state.viewed_before_submission,
+        )
+    except PracticeSessionStateError:
+        raise
+    except (AttributeError, TypeError, ValueError, ValidationError):
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+
+
+def build_practice_question_response(
+    card: QuestionCard,
+    *,
+    reference_answer_state: PracticeReferenceAnswerWorkflowState | None = None,
+) -> PracticeQuestionResponse:
     try:
         return PracticeQuestionResponse.model_validate(
             {
@@ -813,8 +1276,14 @@ def build_practice_question_response(card: QuestionCard) -> PracticeQuestionResp
                     content=list(card.answer_framework),
                     revealed=card.answer_framework_revealed,
                 ),
-                "reference_answer": PracticeReferenceAnswerNotRequestedResponse(
-                    status="notRequested"
+                "reference_answer": (
+                    build_practice_main_reference_answer_response(
+                        reference_answer_state
+                    )
+                    if reference_answer_state is not None
+                    else PracticeReferenceAnswerNotRequestedResponse(
+                        status="notRequested"
+                    )
                 ),
                 "is_saved": card.is_saved,
                 "is_marked_weak": card.is_marked_weak,
@@ -842,6 +1311,8 @@ def build_practice_answer_response(
 
 def build_practice_follow_up_question_response(
     question: PracticeFollowUpQuestion,
+    *,
+    reference_answer_state: PracticeReferenceAnswerWorkflowState | None = None,
 ) -> PracticeFollowUpQuestionResponse:
     try:
         return PracticeFollowUpQuestionResponse.model_validate(
@@ -858,8 +1329,14 @@ def build_practice_follow_up_question_response(
                     content=list(question.answer_framework),
                     revealed=question.answer_framework_revealed,
                 ),
-                "reference_answer": PracticeReferenceAnswerNotRequestedResponse(
-                    status="notRequested"
+                "reference_answer": (
+                    build_practice_follow_up_reference_answer_response(
+                        reference_answer_state
+                    )
+                    if reference_answer_state is not None
+                    else PracticeReferenceAnswerNotRequestedResponse(
+                        status="notRequested"
+                    )
                 ),
             }
         )
@@ -869,11 +1346,16 @@ def build_practice_follow_up_question_response(
 
 def build_practice_answered_follow_up_exchange_response(
     exchange: PracticeAnsweredFollowUpExchangeContext,
+    *,
+    reference_answer_state: PracticeReferenceAnswerWorkflowState | None = None,
 ) -> PracticeAnsweredFollowUpExchangeResponse:
     try:
         return PracticeAnsweredFollowUpExchangeResponse(
             status="answered",
-            question=build_practice_follow_up_question_response(exchange.question),
+            question=build_practice_follow_up_question_response(
+                exchange.question,
+                reference_answer_state=reference_answer_state,
+            ),
             answer=build_practice_answer_response(exchange.answer),
         )
     except (AttributeError, TypeError, ValueError, ValidationError):
@@ -882,9 +1364,19 @@ def build_practice_answered_follow_up_exchange_response(
 
 def _build_practice_answered_follow_up_exchanges(
     exchanges: tuple[PracticeAnsweredFollowUpExchangeContext, ...],
+    *,
+    reference_answers: Mapping[UUID, PracticeReferenceAnswerWorkflowState]
+    | None = None,
 ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
     return [
-        build_practice_answered_follow_up_exchange_response(exchange)
+        build_practice_answered_follow_up_exchange_response(
+            exchange,
+            reference_answer_state=(
+                reference_answers.get(exchange.question.id)
+                if reference_answers is not None
+                else None
+            ),
+        )
         for exchange in exchanges
     ]
 
@@ -893,6 +1385,8 @@ def build_practice_follow_up_completion_response(
     reason: PracticeEvaluationFollowUpCompletionReason | None,
     *,
     unanswered_question: PracticeFollowUpQuestion | None = None,
+    unanswered_reference_answer_state: PracticeReferenceAnswerWorkflowState
+    | None = None,
 ) -> PracticeFollowUpCompletionResponse:
     if reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
         if unanswered_question is None:
@@ -900,7 +1394,8 @@ def build_practice_follow_up_completion_response(
         return PracticeEndedEarlyFollowUpCompletionResponse(
             status="endedEarly",
             unanswered_question=build_practice_follow_up_question_response(
-                unanswered_question
+                unanswered_question,
+                reference_answer_state=unanswered_reference_answer_state,
             ),
         )
     if unanswered_question is not None:
@@ -930,6 +1425,7 @@ def practice_session_state_api_error(error: PracticeSessionStateError) -> APIErr
             PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
             PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
             PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
+            PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
         }
         else status.HTTP_409_CONFLICT
     )
@@ -941,10 +1437,13 @@ __all__ = [
     "PRACTICE_EVALUATION_GENERATION_UNAVAILABLE",
     "PRACTICE_REVIEW_GENERATION_UNAVAILABLE",
     "PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE",
+    "PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE",
     "PRACTICE_QUESTION_GENERATION_UNAVAILABLE",
     "PracticeAPIService",
     "PracticeSessionAPIService",
     "build_practice_guidance_response",
+    "build_practice_main_reference_answer_response",
+    "build_practice_follow_up_reference_answer_response",
     "build_practice_question_response",
     "build_practice_answer_response",
     "build_practice_answered_follow_up_exchange_response",

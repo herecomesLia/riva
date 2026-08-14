@@ -40,6 +40,7 @@ export type PracticeReferenceAnswer = {
 
 export type PracticeReferenceAnswerState =
   | { status: "notRequested"; content: null; viewedBeforeSubmission: false }
+  | { status: "generating"; content: null; viewedBeforeSubmission: false }
   | {
       status: "revealed"
       content: PracticeReferenceAnswer
@@ -113,6 +114,7 @@ export type PracticeFollowUpReferenceAnswer = {
 
 export type PracticeFollowUpReferenceAnswerState =
   | { status: "notRequested"; content: null; viewedBeforeSubmission: false }
+  | { status: "generating"; content: null; viewedBeforeSubmission: false }
   | {
       status: "revealed"
       content: PracticeFollowUpReferenceAnswer
@@ -358,6 +360,10 @@ export type GetPracticeEvaluationStatusInput = {
   version: number
   questionId: string
 }
+
+export type GetPracticeReferenceAnswerStatusInput = PracticeQuestionMutationInput
+
+export type GetPracticeFollowUpReferenceAnswerStatusInput = PracticeFollowUpMutationInput
 
 export type RetryPracticeEvaluationInput = GetPracticeEvaluationStatusInput
 

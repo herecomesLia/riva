@@ -11,6 +11,7 @@ import { usePracticeFollowUpActions } from "./hooks/usePracticeFollowUpActions"
 import { usePracticeFollowUpGenerationPolling } from "./hooks/usePracticeFollowUpGenerationPolling"
 import { usePracticeGenerationPolling } from "./hooks/usePracticeGenerationPolling"
 import { usePracticeReviewActions } from "./hooks/usePracticeReviewActions"
+import { usePracticeReferenceAnswerPolling } from "./hooks/usePracticeReferenceAnswerPolling"
 import { usePracticeSession } from "./hooks/usePracticeSession"
 import { PracticeView } from "./PracticeView"
 
@@ -28,6 +29,7 @@ export function PracticePage() {
   } = usePracticeSession(entrySearch)
   const generation = usePracticeGenerationPolling(practiceQuery.data)
   const followUpGeneration = usePracticeFollowUpGenerationPolling(practiceQuery.data)
+  usePracticeReferenceAnswerPolling(practiceQuery.data)
   const evaluation = usePracticeEvaluationPolling(practiceQuery.data)
   const runAction = usePracticeActionLock()
   const answering = usePracticeAnsweringActions(runAction)

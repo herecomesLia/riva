@@ -146,8 +146,12 @@ export const FollowUpReferenceConfirmation = meta.story({
 export const FollowUpReferenceGenerating = meta.story({
   args: {
     ...baseArgs,
-    interactionLocked: true,
-    pending: { hint: false, framework: false, referenceAnswer: true },
+    interactionLocked: false,
+    pending: { hint: false, framework: false, referenceAnswer: false },
+    question: {
+      ...baseArgs.question,
+      referenceAnswer: { status: "generating", content: null, viewedBeforeSubmission: false },
+    },
   },
 })
 

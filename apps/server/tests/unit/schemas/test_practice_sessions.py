@@ -29,6 +29,10 @@ from riva.schemas.practice_sessions import (
     PracticeQuestionResponse,
     PracticeReviewResponse,
     PracticeFollowUpQuestionResponse,
+    PracticeFollowUpReferenceAnswerRequest,
+    PracticeFollowUpReferenceAnswerResponse,
+    PracticeMainReferenceAnswerResponse,
+    PracticeQuestionReferenceAnswerRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeQuestionGenerationRequest,
@@ -78,6 +82,169 @@ def test_practice_selection_enums_cover_the_public_contract() -> None:
         "technicalFoundation",
     }
     assert {item.value for item in QuestionCardDifficulty} == {"basic", "pressure"}
+
+
+def test_reference_answer_request_contract_is_strict() -> None:
+    question_id = str(uuid4())
+    follow_up_question_id = str(uuid4())
+    main = PracticeQuestionReferenceAnswerRequest.model_validate(
+        {"version": 3, "questionId": question_id}
+    )
+    follow_up = PracticeFollowUpReferenceAnswerRequest.model_validate(
+        {
+            "version": 4,
+            "questionId": question_id,
+            "followUpQuestionId": follow_up_question_id,
+        }
+    )
+
+    assert main.model_dump(mode="json", by_alias=True) == {
+        "version": 3,
+        "questionId": question_id,
+    }
+    assert follow_up.model_dump(mode="json", by_alias=True) == {
+        "version": 4,
+        "questionId": question_id,
+        "followUpQuestionId": follow_up_question_id,
+    }
+    for request_type, payload in (
+        (
+            PracticeQuestionReferenceAnswerRequest,
+            {"version": 3, "questionId": question_id},
+        ),
+        (
+            PracticeFollowUpReferenceAnswerRequest,
+            {
+                "version": 4,
+                "questionId": question_id,
+                "followUpQuestionId": follow_up_question_id,
+            },
+        ),
+    ):
+        for invalid in (
+            {**payload, "version": 0},
+            {**payload, "targetType": "main"},
+            {**payload, "expectedKind": "personalizedExample"},
+            {**payload, "content": "internal"},
+            {**payload, "runId": str(uuid4())},
+        ):
+            with pytest.raises(ValidationError):
+                request_type.model_validate(invalid)
+
+
+def test_reference_answer_public_unions_cover_four_states_and_content_variants() -> None:
+    main_adapter = TypeAdapter(PracticeMainReferenceAnswerResponse)
+    follow_up_adapter = TypeAdapter(PracticeFollowUpReferenceAnswerResponse)
+    common = {
+        "answer": "A grounded answer.",
+        "keyPoints": ["State the decision.", "Connect the evidence."],
+        "commonMistakes": ["Inventing a metric."],
+        "generatedAt": "2026-08-14T09:30:00+00:00",
+    }
+
+    for state in (
+        {"status": "notRequested", "content": None, "viewedBeforeSubmission": False},
+        {"status": "generating", "content": None, "viewedBeforeSubmission": False},
+        {"status": "unavailable", "content": None, "viewedBeforeSubmission": False},
+        {
+            "status": "revealed",
+            "content": {**common, "kind": "personalizedExample"},
+            "viewedBeforeSubmission": True,
+        },
+        {
+            "status": "revealed",
+            "content": {**common, "kind": "technicalReference"},
+            "viewedBeforeSubmission": False,
+        },
+    ):
+        parsed = main_adapter.validate_python(state)
+        assert parsed.status == state["status"]
+        if parsed.status == "revealed":
+            assert parsed.content.kind == state["content"]["kind"]
+            assert parsed.content.generated_at.tzinfo is not None
+
+    for state in (
+        {"status": "notRequested", "content": None, "viewedBeforeSubmission": False},
+        {"status": "generating", "content": None, "viewedBeforeSubmission": False},
+        {"status": "unavailable", "content": None, "viewedBeforeSubmission": False},
+        {
+            "status": "revealed",
+            "content": {
+                **common,
+                "kind": "personalizedSupplement",
+                "addressedGap": "Connect the decision to the result.",
+            },
+            "viewedBeforeSubmission": True,
+        },
+        {
+            "status": "revealed",
+            "content": {
+                **common,
+                "kind": "technicalReference",
+                "addressedGap": "Name the relevant technical trade-off.",
+            },
+            "viewedBeforeSubmission": False,
+        },
+    ):
+        parsed = follow_up_adapter.validate_python(state)
+        assert parsed.status == state["status"]
+        if parsed.status == "revealed":
+            assert parsed.content.kind == state["content"]["kind"]
+            assert parsed.content.generated_at.tzinfo is not None
+
+    with pytest.raises(ValidationError):
+        main_adapter.validate_python(
+            {
+                "status": "revealed",
+                "content": {**common, "kind": "personalizedSupplement"},
+                "viewedBeforeSubmission": True,
+            }
+        )
+    with pytest.raises(ValidationError):
+        follow_up_adapter.validate_python(
+            {
+                "status": "revealed",
+                "content": {**common, "kind": "personalizedSupplement"},
+                "viewedBeforeSubmission": True,
+            }
+        )
+    with pytest.raises(ValidationError):
+        main_adapter.validate_python(
+            {
+                "status": "revealed",
+                "content": {
+                    **common,
+                    "kind": "personalizedExample",
+                    "addressedGap": "Must not be present.",
+                },
+                "viewedBeforeSubmission": True,
+            }
+        )
+    with pytest.raises(ValidationError):
+        follow_up_adapter.validate_python(
+            {
+                "status": "revealed",
+                "content": {**common, "kind": "personalizedSupplement"},
+                "viewedBeforeSubmission": True,
+            }
+        )
+    with pytest.raises(ValidationError):
+        main_adapter.validate_python(
+            {
+                "status": "revealed",
+                "content": {**common, "kind": "personalizedExample", "generatedAt": "2026-08-14T09:30:00"},
+                "viewedBeforeSubmission": True,
+            }
+        )
+
+    for adapter in (main_adapter, follow_up_adapter):
+        for invalid in (
+            {"status": "generating", "content": [], "viewedBeforeSubmission": False},
+            {"status": "unavailable", "content": None, "viewedBeforeSubmission": True},
+            {"status": "notRequested", "content": None, "viewedBeforeSubmission": False, "runId": str(uuid4())},
+        ):
+            with pytest.raises(ValidationError):
+                adapter.validate_python(invalid)
 
 
 def test_practice_lifecycle_enums_are_exact() -> None:

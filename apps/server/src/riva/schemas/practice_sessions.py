@@ -19,6 +19,13 @@ from riva.schemas.practice_recommendation import (
     PracticeRecommendationOutput,
     RecommendationReason,
 )
+from riva.schemas.practice_reference_answer import (
+    PracticeReferenceAnswerCommonMistakes,
+    PracticeReferenceAnswerKeyPoints,
+    PracticeReferenceAnswerKind,
+    ReferenceAnswer,
+    ReferenceAnswerAddressedGap,
+)
 from riva.schemas.practice_review import (
     MAX_PRACTICE_REVIEW_ITEMS,
     ReviewItem,
@@ -115,6 +122,21 @@ class RefreshPracticeQuestionGenerationRequest(APIModel):
     version: Annotated[int, Field(ge=1)]
 
 
+class PracticeQuestionReferenceAnswerRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+
+
+class PracticeFollowUpReferenceAnswerRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+    follow_up_question_id: StandardUUID
+
+
 class SubmitPrimaryAnswerRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -184,6 +206,12 @@ class PracticeAPIModel(APIModel):
     model_config = ConfigDict(extra="forbid")
 
 
+def _validate_aware_timestamp(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamps must be timezone-aware")
+    return value
+
+
 class PracticeGuidanceNotRequestedResponse(PracticeAPIModel):
     status: Literal["notRequested"]
     content: None = None
@@ -216,6 +244,78 @@ class PracticeReferenceAnswerNotRequestedResponse(PracticeAPIModel):
     viewed_before_submission: Literal[False] = False
 
 
+class PracticeReferenceAnswerGeneratingResponse(PracticeAPIModel):
+    status: Literal["generating"]
+    content: None = None
+    viewed_before_submission: Literal[False] = False
+
+
+class PracticeReferenceAnswerUnavailableResponse(PracticeAPIModel):
+    status: Literal["unavailable"]
+    content: None = None
+    viewed_before_submission: Literal[False] = False
+
+
+class PracticeMainReferenceAnswerContentResponse(PracticeAPIModel):
+    kind: Literal[
+        PracticeReferenceAnswerKind.PERSONALIZED_EXAMPLE,
+        PracticeReferenceAnswerKind.TECHNICAL_REFERENCE,
+    ]
+    answer: ReferenceAnswer
+    key_points: PracticeReferenceAnswerKeyPoints
+    common_mistakes: PracticeReferenceAnswerCommonMistakes
+    generated_at: datetime
+
+    _validate_generated_at = field_validator("generated_at")(
+        _validate_aware_timestamp
+    )
+
+
+class PracticeFollowUpReferenceAnswerContentResponse(PracticeAPIModel):
+    kind: Literal[
+        PracticeReferenceAnswerKind.PERSONALIZED_SUPPLEMENT,
+        PracticeReferenceAnswerKind.TECHNICAL_REFERENCE,
+    ]
+    addressed_gap: ReferenceAnswerAddressedGap
+    answer: ReferenceAnswer
+    key_points: PracticeReferenceAnswerKeyPoints
+    common_mistakes: PracticeReferenceAnswerCommonMistakes
+    generated_at: datetime
+
+    _validate_generated_at = field_validator("generated_at")(
+        _validate_aware_timestamp
+    )
+
+
+class PracticeMainReferenceAnswerRevealedResponse(PracticeAPIModel):
+    status: Literal["revealed"]
+    content: PracticeMainReferenceAnswerContentResponse
+    viewed_before_submission: bool
+
+
+class PracticeFollowUpReferenceAnswerRevealedResponse(PracticeAPIModel):
+    status: Literal["revealed"]
+    content: PracticeFollowUpReferenceAnswerContentResponse
+    viewed_before_submission: bool
+
+
+PracticeMainReferenceAnswerResponse = Annotated[
+    PracticeReferenceAnswerNotRequestedResponse
+    | PracticeReferenceAnswerGeneratingResponse
+    | PracticeMainReferenceAnswerRevealedResponse
+    | PracticeReferenceAnswerUnavailableResponse,
+    Field(discriminator="status"),
+]
+
+PracticeFollowUpReferenceAnswerResponse = Annotated[
+    PracticeReferenceAnswerNotRequestedResponse
+    | PracticeReferenceAnswerGeneratingResponse
+    | PracticeFollowUpReferenceAnswerRevealedResponse
+    | PracticeReferenceAnswerUnavailableResponse,
+    Field(discriminator="status"),
+]
+
+
 class PracticeQuestionResponse(PracticeAPIModel):
     id: StandardUUID
     prompt: QuestionCardPrompt
@@ -233,19 +333,13 @@ class PracticeQuestionResponse(PracticeAPIModel):
             status="notRequested"
         )
     )
-    reference_answer: PracticeReferenceAnswerNotRequestedResponse = Field(
+    reference_answer: PracticeMainReferenceAnswerResponse = Field(
         default_factory=lambda: PracticeReferenceAnswerNotRequestedResponse(
             status="notRequested"
         )
     )
     is_saved: bool
     is_marked_weak: bool
-
-
-def _validate_aware_timestamp(value: datetime) -> datetime:
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("timestamps must be timezone-aware")
-    return value
 
 
 class PracticeAnswerResponse(PracticeAPIModel):
@@ -275,7 +369,7 @@ class PracticeFollowUpQuestionResponse(PracticeAPIModel):
             status="notRequested"
         )
     )
-    reference_answer: PracticeReferenceAnswerNotRequestedResponse = Field(
+    reference_answer: PracticeFollowUpReferenceAnswerResponse = Field(
         default_factory=lambda: PracticeReferenceAnswerNotRequestedResponse(
             status="notRequested"
         )
@@ -698,7 +792,17 @@ __all__ = [
     "PracticeGuidanceUnavailableResponse",
     "PracticeQuestionSource",
     "PracticeQuestionResponse",
+    "PracticeQuestionReferenceAnswerRequest",
+    "PracticeFollowUpReferenceAnswerRequest",
+    "PracticeReferenceAnswerGeneratingResponse",
     "PracticeReferenceAnswerNotRequestedResponse",
+    "PracticeReferenceAnswerUnavailableResponse",
+    "PracticeMainReferenceAnswerContentResponse",
+    "PracticeMainReferenceAnswerRevealedResponse",
+    "PracticeMainReferenceAnswerResponse",
+    "PracticeFollowUpReferenceAnswerContentResponse",
+    "PracticeFollowUpReferenceAnswerRevealedResponse",
+    "PracticeFollowUpReferenceAnswerResponse",
     "PracticeNoFollowUpRequiredCompletionResponse",
     "PracticeAllAnsweredCompletionResponse",
     "PracticeCompletedFollowUpCompletionResponse",

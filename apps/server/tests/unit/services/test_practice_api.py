@@ -1,5 +1,7 @@
 import asyncio
 from dataclasses import replace
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -7,15 +9,23 @@ import pytest
 from riva.core.errors import APIError
 from riva.models import AgentRunStatus, PracticeAnswer
 from riva.schemas.evaluation import PracticeEvaluationFollowUpCompletionReason
+from riva.schemas.practice_reference_answer import (
+    PracticeFollowUpReferenceAnswerOutput,
+    PracticeMainReferenceAnswerOutput,
+    PracticeReferenceAnswerTargetType,
+)
 from riva.services.practice_api import (
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
     PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
+    PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PracticeAPIService,
+    build_practice_follow_up_reference_answer_response,
     build_practice_completed_session_response,
     build_practice_follow_up_question_response,
+    build_practice_main_reference_answer_response,
     build_practice_question_response,
 )
 from riva.services.practice_sessions import (
@@ -36,6 +46,10 @@ from riva.services.practice_sessions import (
     PracticeSessionStateError,
     PracticeSessionWorkflowContext,
 )
+from riva.services.reference_answer_generation import (
+    PracticeReferenceAnswerLifecycleStatus,
+    PracticeReferenceAnswerWorkflowState,
+)
 from riva.schemas.practice_sessions import (
     ContinuePracticeQuestionRequest,
     CurrentPracticeSessionResponse,
@@ -43,6 +57,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    PracticeFollowUpReferenceAnswerRequest,
+    PracticeQuestionReferenceAnswerRequest,
     RevealPracticeFollowUpGuidanceRequest,
     RevealPracticeQuestionGuidanceRequest,
     RetryPracticeQuestionRequest,
@@ -201,6 +217,42 @@ class FakePracticeSessionService:
         **kwargs: object,
     ) -> PracticeSessionWorkflowContext:
         self.calls.append(("refresh_evaluation", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def request_question_reference_answer(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext:
+        self.calls.append(("request_reference", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def refresh_question_reference_answer(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext:
+        self.calls.append(("refresh_reference", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def request_follow_up_reference_answer(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext:
+        self.calls.append(("request_follow_up_reference", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def refresh_follow_up_reference_answer(
+        self,
+        **kwargs: object,
+    ) -> PracticeSessionWorkflowContext:
+        self.calls.append(("refresh_follow_up_reference", kwargs))
         if self.error is not None:
             raise self.error
         return self.context
@@ -490,6 +542,218 @@ def start_request() -> StartPracticeSessionRequest:
     return StartPracticeSessionRequest.model_validate(
         selection(target_role_id=uuid4()).model_dump(mode="json")
     )
+
+
+def reference_answer_state(
+    status: PracticeReferenceAnswerLifecycleStatus,
+    *,
+    target_type: PracticeReferenceAnswerTargetType,
+    viewed_before_submission: bool = False,
+    generated_at: datetime = datetime(2026, 8, 14, 9, 30, tzinfo=UTC),
+) -> PracticeReferenceAnswerWorkflowState:
+    if status is PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED:
+        return PracticeReferenceAnswerWorkflowState(
+            status=status,
+            generation_run=None,
+            artifact=None,
+            output=None,
+            viewed_before_submission=False,
+        )
+
+    output = (
+        PracticeMainReferenceAnswerOutput(
+            targetType="main",
+            kind="personalizedExample",
+            answer="A grounded main answer.",
+            keyPoints=["State the decision.", "Connect the evidence."],
+            commonMistakes=["Inventing a metric."],
+        )
+        if target_type is PracticeReferenceAnswerTargetType.MAIN
+        else PracticeFollowUpReferenceAnswerOutput(
+            targetType="followUp",
+            kind="personalizedSupplement",
+            addressedGap="Connect the decision to the result.",
+            answer="A grounded follow-up answer.",
+            keyPoints=["Name the baseline.", "Connect the result."],
+            commonMistakes=["Claiming team impact as personal impact."],
+        )
+    )
+    return PracticeReferenceAnswerWorkflowState(
+        status=status,
+        generation_run=object(),
+        artifact=SimpleNamespace(generated_at=generated_at)
+        if status is PracticeReferenceAnswerLifecycleStatus.REVEALED
+        else None,
+        output=output
+        if status is PracticeReferenceAnswerLifecycleStatus.REVEALED
+        else None,
+        viewed_before_submission=(
+            viewed_before_submission
+            if status is PracticeReferenceAnswerLifecycleStatus.REVEALED
+            else False
+        ),
+    )
+
+
+class FakeReferenceAnswerGenerationService:
+    def __init__(self, state: PracticeReferenceAnswerWorkflowState) -> None:
+        self.state = state
+        self.main_calls: list[dict[str, object]] = []
+
+    async def get_main_generation_state(self, **kwargs: object):
+        self.main_calls.append(kwargs)
+        return self.state
+
+    async def get_follow_up_generation_state(self, **kwargs: object):
+        raise AssertionError("no follow-up state should be resolved in this test")
+
+
+def test_reference_answer_converters_map_all_lifecycle_states_without_raw_fields() -> None:
+    for status in (
+        PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+        PracticeReferenceAnswerLifecycleStatus.GENERATING,
+        PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE,
+    ):
+        state = reference_answer_state(
+            status,
+            target_type=PracticeReferenceAnswerTargetType.MAIN,
+            viewed_before_submission=True,
+        )
+        response = build_practice_main_reference_answer_response(state)
+        assert response.status == status.value
+        assert response.content is None
+        assert response.viewed_before_submission is False
+
+    generated_at = datetime(2026, 8, 14, 10, 15, tzinfo=UTC)
+    main_revealed = build_practice_main_reference_answer_response(
+        reference_answer_state(
+            PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            target_type=PracticeReferenceAnswerTargetType.MAIN,
+            viewed_before_submission=True,
+            generated_at=generated_at,
+        )
+    )
+    assert main_revealed.status == "revealed"
+    assert main_revealed.content is not None
+    assert main_revealed.content.generated_at == generated_at
+    assert main_revealed.content.answer == "A grounded main answer."
+    assert main_revealed.viewed_before_submission is True
+
+    follow_up_revealed = build_practice_follow_up_reference_answer_response(
+        reference_answer_state(
+            PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            target_type=PracticeReferenceAnswerTargetType.FOLLOW_UP,
+            generated_at=generated_at,
+        )
+    )
+    assert follow_up_revealed.status == "revealed"
+    assert follow_up_revealed.content is not None
+    assert follow_up_revealed.content.addressed_gap == (
+        "Connect the decision to the result."
+    )
+    assert follow_up_revealed.content.generated_at == generated_at
+
+
+def test_ordinary_mutation_and_current_session_hydrate_reference_state() -> None:
+    domain = FakePracticeSessionService(context=context(answering=True))
+    state = reference_answer_state(
+        PracticeReferenceAnswerLifecycleStatus.GENERATING,
+        target_type=PracticeReferenceAnswerTargetType.MAIN,
+    )
+    resolver = FakeReferenceAnswerGenerationService(state)
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+        reference_answer_generation_service_factory=lambda *_args, **_kwargs: resolver,
+    )
+    question_id = domain.context.question_card.id
+
+    saved = asyncio.run(
+        service.set_question_saved(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=SetPracticeQuestionSavedRequest(
+                version=domain.context.session.version,
+                question_id=question_id,
+                is_saved=True,
+            ),
+        )
+    )
+    current = asyncio.run(
+        service.get_current_session(user_id=domain.context.session.user_id)
+    )
+
+    assert saved.status == "answering"
+    assert saved.question.reference_answer.status == "generating"
+    assert current.session is not None
+    assert current.session.question.reference_answer.status == "generating"
+    assert len(resolver.main_calls) == 2
+    assert all(call["question_card_id"] == question_id for call in resolver.main_calls)
+
+
+def test_failed_reference_state_hydrates_as_unavailable_without_internal_fields() -> None:
+    domain = FakePracticeSessionService(context=context(answering=True))
+    resolver = FakeReferenceAnswerGenerationService(
+        reference_answer_state(
+            PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE,
+            target_type=PracticeReferenceAnswerTargetType.MAIN,
+        )
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+        reference_answer_generation_service_factory=lambda *_args, **_kwargs: resolver,
+    )
+
+    response = asyncio.run(
+        service.get_current_session(user_id=domain.context.session.user_id)
+    )
+
+    assert response.session is not None
+    reference_answer = response.session.question.reference_answer
+    assert reference_answer.status == "unavailable"
+    assert reference_answer.content is None
+    assert reference_answer.viewed_before_submission is False
+
+
+def test_reference_request_checks_llm_but_refresh_does_not() -> None:
+    domain = FakePracticeSessionService(context=context(answering=True))
+    question_id = domain.context.question_card.id
+    payload = PracticeQuestionReferenceAnswerRequest(
+        version=domain.context.session.version,
+        question_id=question_id,
+    )
+    unavailable = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model="model",
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+
+    with pytest.raises(APIError) as error:
+        asyncio.run(
+            unavailable.request_question_reference_answer(
+                user_id=domain.context.session.user_id,
+                session_id=domain.context.session.id,
+                payload=payload,
+            )
+        )
+    assert error.value.status_code == 503
+    assert error.value.error == PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE
+    assert domain.calls == []
+
+    refreshed = asyncio.run(
+        unavailable.refresh_question_reference_answer(
+            user_id=domain.context.session.user_id,
+            session_id=domain.context.session.id,
+            payload=payload,
+        )
+    )
+    assert refreshed.status == "answering"
+    assert [call[0] for call in domain.calls] == [
+        "refresh_reference",
+        "get",
+    ]
 
 
 def factory_for(

@@ -16,10 +16,10 @@ import {
   requestAnswerFramework as requestAnswerFrameworkService,
   requestEndPracticeSession,
   requestPracticeHint as requestPracticeHintService,
-  requestPracticeReferenceAnswer,
+  requestPracticeReferenceAnswer as requestPracticeReferenceAnswerService,
   requestPracticeFollowUpFramework as requestPracticeFollowUpFrameworkService,
   requestPracticeFollowUpHint as requestPracticeFollowUpHintService,
-  requestPracticeFollowUpReferenceAnswer,
+  requestPracticeFollowUpReferenceAnswer as requestPracticeFollowUpReferenceAnswerService,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
@@ -102,6 +102,18 @@ async function requestPracticeFollowUpFramework(
   input: Parameters<typeof requestPracticeFollowUpFrameworkService>[0],
 ) {
   return requireMockPageResponse(await requestPracticeFollowUpFrameworkService(input))
+}
+
+async function requestPracticeReferenceAnswer(
+  input: Parameters<typeof requestPracticeReferenceAnswerService>[0],
+) {
+  return requireMockPageResponse(await requestPracticeReferenceAnswerService(input))
+}
+
+async function requestPracticeFollowUpReferenceAnswer(
+  input: Parameters<typeof requestPracticeFollowUpReferenceAnswerService>[0],
+) {
+  return requireMockPageResponse(await requestPracticeFollowUpReferenceAnswerService(input))
 }
 
 export async function generateQuestion(

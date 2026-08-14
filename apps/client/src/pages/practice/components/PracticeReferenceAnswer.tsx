@@ -101,6 +101,13 @@ export function PracticeReferenceAnswer(props: Props) {
           </Button>
         )}
 
+        {state.status === "generating" && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+            <Spinner aria-hidden="true" />
+            {t("practice.referenceAnswer.generating")}
+          </div>
+        )}
+
         {state.status === "unavailable" && (
           <p className="text-sm text-muted-foreground" role="status">
             {t("practice.referenceAnswer.unavailable")}

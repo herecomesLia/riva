@@ -131,6 +131,12 @@ export function PracticeFollowUpAssistance({
                 : t("practice.followUpAssistance.viewReference")}
             </Button>
           ) : null}
+          {question.referenceAnswer.status === "generating" ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+              <Spinner aria-hidden="true" />
+              {t("practice.followUpAssistance.referenceGenerating")}
+            </div>
+          ) : null}
           {question.referenceAnswer.status === "revealed" ? (
             <div className="flex min-w-0 flex-col gap-4 break-words [overflow-wrap:anywhere]">
               <div className="flex flex-wrap gap-2">

@@ -6,6 +6,8 @@ import type { PracticeActiveSessionState, PracticeServiceResponse } from "@/mode
 import type { RolesPageResponseDto, TargetRoleApiDto } from "@/models/roles"
 import {
   getFollowUpGenerationStatus,
+  getPracticeFollowUpReferenceAnswerStatus,
+  getPracticeReferenceAnswerStatus,
   getPracticeEvaluationStatus,
   getPracticePage,
   getQuestionGenerationStatus,
@@ -18,7 +20,9 @@ import {
   retryCurrentPracticeQuestion,
   requestPracticeFollowUpFramework,
   requestPracticeFollowUpHint,
+  requestPracticeFollowUpReferenceAnswer,
   requestPracticeHint,
+  requestPracticeReferenceAnswer,
   setQuestionSaved,
   setQuestionWeak,
   startPracticeSession,
@@ -628,6 +632,70 @@ describe("practice service API", () => {
     },
   )
 
+  it("requests a main reference answer with only public provenance", async () => {
+    const response = createActiveSession("answering", {
+      version: 3,
+      question: {
+        ...createQuestion(),
+        referenceAnswer: {
+          content: null,
+          status: "generating" as const,
+          viewedBeforeSubmission: false,
+        },
+      },
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response, 202))
+
+    const session = requireActiveSession(
+      await requestPracticeReferenceAnswer({ questionId, sessionId, version: 2 }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/reference-answer`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 2, questionId })
+    for (const field of ["targetType", "expectedKind", "content", "attemptId", "runId"]) {
+      expect(requestJson(fetchMock)).not.toHaveProperty(field)
+    }
+    expect(session).toMatchObject({ status: "answering", version: 3 })
+    if (session.status === "answering") {
+      expect(session.question.referenceAnswer.status).toBe("generating")
+    }
+  })
+
+  it("refreshes a main reference answer without changing the session version", async () => {
+    const response = createActiveSession("answering", {
+      version: 3,
+      question: {
+        ...createQuestion(),
+        referenceAnswer: {
+          content: {
+            answer: "A grounded answer.",
+            commonMistakes: ["Inventing a metric."],
+            generatedAt: "2026-08-14T09:30:00Z",
+            keyPoints: ["State the decision.", "Connect the evidence."],
+            kind: "personalizedExample" as const,
+          },
+          status: "revealed" as const,
+          viewedBeforeSubmission: true,
+        },
+      },
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+    const session = requireActiveSession(
+      await getPracticeReferenceAnswerStatus({ questionId, sessionId, version: 3 }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/reference-answer/refresh`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 3, questionId })
+    expect(session).toMatchObject({ status: "answering", version: 3 })
+  })
+
   it.each([
     [
       "hint",
@@ -664,6 +732,84 @@ describe("practice service API", () => {
       expect(session.status).toBe("answeringFollowUp")
     },
   )
+
+  it("requests a follow-up reference answer with only the three public IDs", async () => {
+    const response = createFollowUpSession("answeringFollowUp", {
+      version: 5,
+      currentFollowUp: {
+        answer: null,
+        question: {
+          ...createFollowUpQuestion(followUpQuestionId, 1),
+          referenceAnswer: {
+            content: null,
+            status: "generating" as const,
+            viewedBeforeSubmission: false,
+          },
+        },
+        status: "awaitingAnswer" as const,
+      },
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response, 202))
+
+    const session = requireActiveSession(
+      await requestPracticeFollowUpReferenceAnswer({
+        followUpQuestionId,
+        questionId,
+        sessionId,
+        version: 4,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/follow-ups/reference-answer`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 4, questionId, followUpQuestionId })
+    for (const field of ["targetType", "expectedKind", "content", "attemptId", "runId"]) {
+      expect(requestJson(fetchMock)).not.toHaveProperty(field)
+    }
+    expect(session).toMatchObject({ status: "answeringFollowUp", version: 5 })
+  })
+
+  it("refreshes a follow-up reference answer and preserves its addressed gap", async () => {
+    const response = createFollowUpSession("answeringFollowUp", {
+      version: 5,
+    }) as Extract<PracticeActiveSessionState, { status: "answeringFollowUp" }>
+    response.currentFollowUp.question.referenceAnswer = {
+      content: {
+        addressedGap: "Connect the decision to the result.",
+        answer: "Tie the decision to the measurable result.",
+        commonMistakes: ["Claiming team impact as personal impact."],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["Name the baseline.", "Connect the result."],
+        kind: "personalizedSupplement" as const,
+      },
+      status: "revealed" as const,
+      viewedBeforeSubmission: true,
+    }
+    fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+    const session = requireActiveSession(
+      await getPracticeFollowUpReferenceAnswerStatus({
+        followUpQuestionId,
+        questionId,
+        sessionId,
+        version: 5,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/follow-ups/reference-answer/refresh`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 5, questionId, followUpQuestionId })
+    if (session.status === "answeringFollowUp") {
+      expect(session.currentFollowUp.question.referenceAnswer).toMatchObject({
+        status: "revealed",
+        content: { addressedGap: "Connect the decision to the result." },
+      })
+    }
+  })
 
   it("polls the encoded session refresh endpoint with only the requested version", async () => {
     const response = createActiveSession("answering", { version: 2 })

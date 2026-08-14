@@ -45,6 +45,7 @@ function practiceReferenceAnswer(
   if (state.status === "unavailable") {
     return { status: "unavailable", content: null, reason: "generationFailed" }
   }
+  if (state.status === "generating") return { status: "notRequested", content: null }
   return {
     status: "ready",
     content: {
@@ -64,6 +65,7 @@ function practiceFollowUpReferenceAnswer(
   if (state.status === "unavailable") {
     return { status: "unavailable", content: null, reason: "generationFailed" }
   }
+  if (state.status === "generating") return { status: "notRequested", content: null }
   return {
     status: "ready",
     content: {

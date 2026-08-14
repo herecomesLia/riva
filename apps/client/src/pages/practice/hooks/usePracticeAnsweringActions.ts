@@ -41,7 +41,7 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
   const hintMutation = usePracticeMutation("questionHintReveal", requestPracticeHint)
   const frameworkMutation = usePracticeMutation("questionFrameworkReveal", requestAnswerFramework)
   const referenceAnswerMutation = usePracticeMutation(
-    "questionUpdate",
+    "questionReferenceAnswerRequest",
     requestPracticeReferenceAnswer,
   )
   const savedMutation = usePracticeMutation("questionFlagUpdate", setQuestionSaved)

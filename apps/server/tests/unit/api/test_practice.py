@@ -217,6 +217,22 @@ class FakePracticeAPIService:
         self.calls.append(("refresh_evaluation", kwargs))
         return self.refresh_evaluation_result
 
+    async def request_question_reference_answer(self, **kwargs: object):
+        self.calls.append(("request_question_reference_answer", kwargs))
+        return self.submit_result
+
+    async def refresh_question_reference_answer(self, **kwargs: object):
+        self.calls.append(("refresh_question_reference_answer", kwargs))
+        return self.submit_result
+
+    async def request_follow_up_reference_answer(self, **kwargs: object):
+        self.calls.append(("request_follow_up_reference_answer", kwargs))
+        return self.submit_result
+
+    async def refresh_follow_up_reference_answer(self, **kwargs: object):
+        self.calls.append(("refresh_follow_up_reference_answer", kwargs))
+        return self.submit_result
+
     async def get_session(self, **kwargs: object):
         self.calls.append(("get", kwargs))
         return self.completed_get_result
@@ -930,6 +946,134 @@ def test_refresh_follow_up_generation_returns_200_and_forwards_version(app) -> N
     }
 
 
+@pytest.mark.parametrize(
+    ("path", "method_name", "status_code", "payload"),
+    [
+        (
+            "questions/reference-answer",
+            "request_question_reference_answer",
+            202,
+            {"version": 2, "questionId": str(uuid4())},
+        ),
+        (
+            "questions/reference-answer/refresh",
+            "refresh_question_reference_answer",
+            200,
+            {"version": 3, "questionId": str(uuid4())},
+        ),
+        (
+            "follow-ups/reference-answer",
+            "request_follow_up_reference_answer",
+            202,
+            {
+                "version": 4,
+                "questionId": str(uuid4()),
+                "followUpQuestionId": str(uuid4()),
+            },
+        ),
+        (
+            "follow-ups/reference-answer/refresh",
+            "refresh_follow_up_reference_answer",
+            200,
+            {
+                "version": 5,
+                "questionId": str(uuid4()),
+                "followUpQuestionId": str(uuid4()),
+            },
+        ),
+    ],
+)
+def test_reference_answer_routes_forward_exact_public_body_and_status(
+    app,
+    path: str,
+    method_name: str,
+    status_code: int,
+    payload: dict[str, object],
+) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == status_code
+    assert result.json()["status"] == "generatingFollowUp"
+    assert service.calls[0][0] == method_name
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+
+
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        (
+            "questions/reference-answer",
+            {"version": 2, "questionId": str(uuid4())},
+        ),
+        (
+            "questions/reference-answer/refresh",
+            {"version": 2, "questionId": str(uuid4())},
+        ),
+        (
+            "follow-ups/reference-answer",
+            {
+                "version": 4,
+                "questionId": str(uuid4()),
+                "followUpQuestionId": str(uuid4()),
+            },
+        ),
+        (
+            "follow-ups/reference-answer/refresh",
+            {
+                "version": 4,
+                "questionId": str(uuid4()),
+                "followUpQuestionId": str(uuid4()),
+            },
+        ),
+    ],
+)
+def test_reference_answer_routes_require_csrf_and_forbid_internal_fields(
+    app,
+    path: str,
+    payload: dict[str, object],
+) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json={**payload, "targetType": "main", "attemptId": str(uuid4())},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+    invalid_version = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json={**payload, "version": 0},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert invalid_version.status_code == 422
+    assert service.calls == []
+
+
 def test_refresh_evaluation_returns_200_and_forwards_version(app) -> None:
     service = FakePracticeAPIService()
     current_user = user()
@@ -1080,6 +1224,48 @@ def test_new_practice_mutations_require_authentication(app) -> None:
         },
         headers={"Origin": TRUSTED_ORIGIN},
     )
+    main_reference_request = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/reference-answer",
+        json={
+            "version": 2,
+            "questionId": str(service.submit_result.question.id),
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+    main_reference_refresh = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/reference-answer/refresh",
+        json={
+            "version": 2,
+            "questionId": str(service.submit_result.question.id),
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+    follow_up_reference_request = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/follow-ups/reference-answer",
+        json={
+            "version": 4,
+            "questionId": str(service.submit_result.question.id),
+            "followUpQuestionId": str(uuid4()),
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+    follow_up_reference_refresh = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/follow-ups/reference-answer/refresh",
+        json={
+            "version": 4,
+            "questionId": str(service.submit_result.question.id),
+            "followUpQuestionId": str(uuid4()),
+        },
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
 
     assert submit.status_code == 401
     assert refresh.status_code == 401
@@ -1090,6 +1276,10 @@ def test_new_practice_mutations_require_authentication(app) -> None:
     assert retry_question.status_code == 401
     assert saved_question.status_code == 401
     assert weak_question.status_code == 401
+    assert main_reference_request.status_code == 401
+    assert main_reference_refresh.status_code == 401
+    assert follow_up_reference_request.status_code == 401
+    assert follow_up_reference_refresh.status_code == 401
     assert service.calls == []
 
 
@@ -1160,6 +1350,16 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
     )
     assert "/api/practice/sessions/{sessionId}/evaluation/refresh" in paths
     assert "/api/practice/sessions/{sessionId}/end" in paths
+    assert "/api/practice/sessions/{sessionId}/questions/reference-answer" in paths
+    assert (
+        "/api/practice/sessions/{sessionId}/questions/reference-answer/refresh"
+        in paths
+    )
+    assert "/api/practice/sessions/{sessionId}/follow-ups/reference-answer" in paths
+    assert (
+        "/api/practice/sessions/{sessionId}/follow-ups/reference-answer/refresh"
+        in paths
+    )
     assert "202" in paths["/api/practice/sessions"]["post"]["responses"]
     assert "200" in paths["/api/practice/sessions/{sessionId}"]["get"]["responses"]
     response_schema = paths["/api/practice/sessions"]["post"]["responses"]["202"][

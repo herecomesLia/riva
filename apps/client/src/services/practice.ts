@@ -6,6 +6,8 @@ import type {
   PracticeCompletedState,
   GetQuestionGenerationStatusInput,
   GetFollowUpGenerationStatusInput,
+  GetPracticeReferenceAnswerStatusInput,
+  GetPracticeFollowUpReferenceAnswerStatusInput,
   GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
   PracticeMutationResponse,
@@ -264,8 +266,34 @@ export function requestAnswerFramework(
 
 export function requestPracticeReferenceAnswer(
   input: RequestPracticeReferenceAnswerInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestPracticeReferenceAnswer(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.requestPracticeReferenceAnswer(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/reference-answer`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+      },
+      method: "POST",
+    },
+  )
+}
+
+export function getPracticeReferenceAnswerStatus(
+  input: GetPracticeReferenceAnswerStatusInput,
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return realApiUnavailable()
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/reference-answer/refresh`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function requestPracticeFollowUpHint(
@@ -304,10 +332,36 @@ export function requestPracticeFollowUpFramework(
 
 export function requestPracticeFollowUpReferenceAnswer(
   input: RequestPracticeFollowUpReferenceAnswerInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock
-    ? practiceMockService.requestPracticeFollowUpReferenceAnswer(input)
-    : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.requestPracticeFollowUpReferenceAnswer(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-ups/reference-answer`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+        followUpQuestionId: input.followUpQuestionId,
+      },
+      method: "POST",
+    },
+  )
+}
+
+export function getPracticeFollowUpReferenceAnswerStatus(
+  input: GetPracticeFollowUpReferenceAnswerStatusInput,
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return realApiUnavailable()
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-ups/reference-answer/refresh`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+        followUpQuestionId: input.followUpQuestionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function setQuestionSaved(

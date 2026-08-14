@@ -949,6 +949,228 @@ describe("PracticePage real API workflow", () => {
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("questions/"))).toBe(false)
   })
 
+  it("requests and polls a main reference answer through the real endpoints", async () => {
+    const user = userEvent.setup()
+    const current = session("answering", 2)
+    if (current.status !== "answering") return
+    const generating = {
+      ...current,
+      question: {
+        ...current.question,
+        referenceAnswer: {
+          content: null,
+          status: "generating" as const,
+          viewedBeforeSubmission: false,
+        },
+      },
+      version: 3,
+    }
+    const revealed = {
+      ...generating,
+      question: {
+        ...generating.question,
+        referenceAnswer: {
+          content: {
+            answer: "参考答案中的项目行动与结果。",
+            commonMistakes: ["只描述职责而没有结果。"],
+            generatedAt: "2026-08-12T08:05:00.000Z",
+            keyPoints: ["说明个人行动。", "量化最终结果。"],
+            kind: "personalizedExample" as const,
+          },
+          status: "revealed" as const,
+          viewedBeforeSubmission: true,
+        },
+      },
+    }
+    let refreshCount = 0
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 2, questionId })
+        return jsonResponse(generating)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 3, questionId })
+        refreshCount += 1
+        return jsonResponse(refreshCount === 1 ? generating : revealed)
+      }
+      throw new Error(`Unexpected request during main reference answer workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.referenceAnswer.request"),
+      }),
+    )
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.referenceAnswer.confirm"),
+      }),
+    )
+
+    expect(await testing.screen.findByText("参考答案中的项目行动与结果。")).toBeVisible()
+
+    const requestCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).endsWith("/questions/reference-answer"),
+    )
+    expect(requestCalls).toHaveLength(1)
+    const refreshCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).endsWith("/questions/reference-answer/refresh"),
+    )
+    expect(refreshCalls.length).toBeGreaterThanOrEqual(2)
+    for (const [input, init] of refreshCalls) {
+      expect(requestBody([input, init])).toEqual({ version: 3, questionId })
+    }
+  })
+
+  it("recovers a generating main reference answer from GET without requesting again", async () => {
+    const current = session("answering", 4)
+    if (current.status !== "answering") return
+    const generating = {
+      ...current,
+      question: {
+        ...current.question,
+        referenceAnswer: {
+          content: null,
+          status: "generating" as const,
+          viewedBeforeSubmission: false,
+        },
+      },
+    }
+    const recovered = {
+      ...generating,
+      question: {
+        ...generating.question,
+        referenceAnswer: {
+          content: {
+            answer: "浏览器恢复后的参考答案。",
+            commonMistakes: ["跳过关键证据。"],
+            generatedAt: "2026-08-12T08:06:00.000Z",
+            keyPoints: ["先说明背景。", "再说明结果。"],
+            kind: "technicalReference" as const,
+          },
+          status: "revealed" as const,
+          viewedBeforeSubmission: true,
+        },
+      },
+    }
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: generating })
+      if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 4, questionId })
+        return jsonResponse(recovered)
+      }
+      throw new Error(`Unexpected request during main reference answer recovery: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    expect(await testing.screen.findByText("浏览器恢复后的参考答案。")).toBeVisible()
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).endsWith("/questions/reference-answer")),
+    ).toBe(false)
+  })
+
+  it("keeps the answer composer usable and stops reference polling after submit", async () => {
+    const user = userEvent.setup()
+    const current = session("answering", 2)
+    if (current.status !== "answering") return
+    const generating = {
+      ...current,
+      question: {
+        ...current.question,
+        referenceAnswer: {
+          content: null,
+          status: "generating" as const,
+          viewedBeforeSubmission: false,
+        },
+      },
+      version: 3,
+    }
+    const submittedBase = session("generatingFollowUp", 3)
+    if (submittedBase.status !== "generatingFollowUp") return
+    const submitted = {
+      ...submittedBase,
+      question: {
+        ...submittedBase.question,
+        referenceAnswer: generating.question.referenceAnswer,
+      },
+      version: 4,
+    }
+    let referenceRefreshCount = 0
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 2, questionId })
+        return jsonResponse(generating)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 3, questionId })
+        referenceRefreshCount += 1
+        return jsonResponse(generating)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/answers/main`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          content: "用户仍可提交的回答。",
+          questionId,
+          version: 3,
+        })
+        return jsonResponse(submitted)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/follow-up-generation/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 4 })
+        return jsonResponse(submitted)
+      }
+      throw new Error(`Unexpected request during submit-before-reference-worker workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.referenceAnswer.request"),
+      }),
+    )
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.referenceAnswer.confirm"),
+      }),
+    )
+    expect(
+      await testing.screen.findByText(i18n.t("practice.referenceAnswer.generating")),
+    ).toBeVisible()
+    await testing.waitFor(() => expect(referenceRefreshCount).toBeGreaterThan(0))
+
+    await user.type(
+      await testing.screen.findByLabelText(i18n.t("practice.answer.label")),
+      "用户仍可提交的回答。",
+    )
+    await user.click(testing.screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+    expect(await testing.screen.findByTestId("practice-generating-follow-up-state")).toBeVisible()
+
+    const refreshCountAfterSubmit = referenceRefreshCount
+    await new Promise((resolve) => setTimeout(resolve, 650))
+    expect(referenceRefreshCount).toBe(refreshCountAfterSubmit)
+  })
+
   it("reveals follow-up hint and framework with consecutive versions", async () => {
     const user = userEvent.setup()
     const current = session("answeringFollowUp", 4)
@@ -1018,5 +1240,105 @@ describe("PracticePage real API workflow", () => {
       }),
     )
     expect(await testing.screen.findByText("基线")).toBeVisible()
+  })
+
+  it("requests and polls a follow-up reference answer through the real endpoints", async () => {
+    const user = userEvent.setup()
+    const current = session("answeringFollowUp", 4)
+    if (current.status !== "answeringFollowUp") return
+    const generating = {
+      ...current,
+      currentFollowUp: {
+        ...current.currentFollowUp,
+        question: {
+          ...current.currentFollowUp.question,
+          referenceAnswer: {
+            content: null,
+            status: "generating" as const,
+            viewedBeforeSubmission: false,
+          },
+        },
+      },
+      version: 5,
+    }
+    const revealed = {
+      ...generating,
+      currentFollowUp: {
+        ...generating.currentFollowUp,
+        question: {
+          ...generating.currentFollowUp.question,
+          referenceAnswer: {
+            content: {
+              addressedGap: "补充可验证的结果证据。",
+              answer: "追问参考答案中的证据补充。",
+              commonMistakes: ["只重复主回答。"],
+              generatedAt: "2026-08-12T08:07:00.000Z",
+              keyPoints: ["给出基线。", "说明变化。"],
+              kind: "personalizedSupplement" as const,
+            },
+            status: "revealed" as const,
+            viewedBeforeSubmission: true,
+          },
+        },
+      },
+    }
+    let refreshCount = 0
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/follow-ups/reference-answer`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          followUpQuestionId: followUpQuestionOneId,
+          questionId,
+          version: 4,
+        })
+        return jsonResponse(generating)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/follow-ups/reference-answer/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          followUpQuestionId: followUpQuestionOneId,
+          questionId,
+          version: 5,
+        })
+        refreshCount += 1
+        return jsonResponse(refreshCount === 1 ? generating : revealed)
+      }
+      throw new Error(`Unexpected request during follow-up reference answer workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewReference"),
+      }),
+    )
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.confirm"),
+      }),
+    )
+
+    expect(await testing.screen.findByText("补充可验证的结果证据。")).toBeVisible()
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).endsWith("/follow-ups/reference-answer"),
+      ),
+    ).toHaveLength(1)
+    const refreshCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).endsWith("/follow-ups/reference-answer/refresh"),
+    )
+    expect(refreshCalls.length).toBeGreaterThanOrEqual(2)
+    for (const [input, init] of refreshCalls) {
+      expect(requestBody([input, init])).toEqual({
+        followUpQuestionId: followUpQuestionOneId,
+        questionId,
+        version: 5,
+      })
+    }
   })
 })

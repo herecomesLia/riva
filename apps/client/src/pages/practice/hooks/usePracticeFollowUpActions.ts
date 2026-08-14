@@ -20,7 +20,7 @@ export function usePracticeFollowUpActions(runAction: RunPracticeAction): {
     requestPracticeFollowUpFramework,
   )
   const referenceAnswerMutation = usePracticeMutation(
-    "followUpUpdate",
+    "followUpReferenceAnswerRequest",
     requestPracticeFollowUpReferenceAnswer,
   )
   const submitMutation = usePracticeMutation("submitFollowUpAnswer", submitFollowUpAnswer)
