@@ -4,7 +4,7 @@ import re
 from typing import TypeVar, cast
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.agents import AgentResult
 from riva.core.language import INTERACTION_LANGUAGES
 from riva.models import AgentRun, AgentRunStatus
-from riva.models.agent_runs import AgentRunPayload, AgentRunResult
+from riva.models.agent_runs import AgentRunPayload, AgentRunResult, JSONValue
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
@@ -22,11 +22,15 @@ from riva.schemas.evaluation import (
     PracticeEvaluationFollowUpCompletionReason,
     PracticeEvaluationOutput,
 )
+from riva.schemas.practice_reference_answer import (
+    PracticeReferenceFrozenContext,
+    PracticeReferencePreviousFollowUpRunPayload,
+)
 from riva.utils import utc_now
 
 
 AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
-PayloadValue = UUID | str | int | None
+PayloadValue = UUID | JSONValue
 _ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _QUESTION_TYPES = frozenset(item.value for item in QuestionCardQuestionType)
 _DIFFICULTIES = frozenset(item.value for item in QuestionCardDifficulty)
@@ -418,6 +422,26 @@ def _serialize_payload(
                     "practice evaluation completion reason"
                 )
             serialized[key] = value
+        elif key == "targetType":
+            if not isinstance(value, str) or value not in {"main", "followUp"}:
+                raise ValueError(
+                    "payload.targetType must be a supported target type"
+                )
+            serialized[key] = value
+        elif key == "expectedKind":
+            if not isinstance(value, str) or value not in {
+                "personalizedExample",
+                "personalizedSupplement",
+                "technicalReference",
+            }:
+                raise ValueError(
+                    "payload.expectedKind must be a supported reference answer kind"
+                )
+            serialized[key] = value
+        elif key == "referenceContext":
+            serialized[key] = _serialize_reference_context(value)
+        elif key == "previousFollowUps":
+            serialized[key] = _serialize_previous_follow_ups(value)
         elif key == "nextFollowUpOrder":
             if (
                 isinstance(value, bool)
@@ -460,6 +484,34 @@ def _serialize_payload(
                 "payload keys must identify a business resource/version or approved invocation metadata"
             )
     return serialized
+
+
+def _serialize_reference_context(value: object) -> dict[str, JSONValue]:
+    try:
+        context = PracticeReferenceFrozenContext.model_validate(value)
+        return cast(
+            dict[str, JSONValue],
+            context.model_dump(mode="json", by_alias=True),
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.referenceContext must be a valid frozen reference context"
+        ) from None
+
+
+def _serialize_previous_follow_ups(value: object) -> list[JSONValue]:
+    try:
+        previous = TypeAdapter(
+            list[PracticeReferencePreviousFollowUpRunPayload]
+        ).validate_python(value)
+        return cast(
+            list[JSONValue],
+            [item.model_dump(mode="json", by_alias=True) for item in previous],
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.previousFollowUps must contain valid follow-up lineage"
+        ) from None
 
 
 def _safe_error_code(error_code: str) -> str:

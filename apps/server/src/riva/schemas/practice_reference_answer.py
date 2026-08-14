@@ -254,6 +254,18 @@ PracticeReferenceEvidenceList = Annotated[
 ]
 
 
+class PracticeReferenceFrozenContext(_PracticeReferenceModel):
+    target_role: PracticeReferenceRoleContext = _alias(
+        "target_role",
+        "targetRole",
+    )
+    candidate_evidence: PracticeReferenceEvidenceList = _alias(
+        "candidate_evidence",
+        "candidateEvidence",
+        default_factory=list,
+    )
+
+
 class PracticeReferenceMainAnswer(_PracticeReferenceModel):
     content: PracticeAnswerContent
 
@@ -382,6 +394,123 @@ PracticeReferenceAnswerInput = Annotated[
 ]
 
 
+class PracticeReferencePreviousFollowUpRunPayload(_PracticeReferenceModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    order: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=MAX_PRACTICE_FOLLOW_UPS,
+            strict=True,
+        ),
+    ]
+    question_id: StandardUUID = _alias("question_id", "questionId")
+    answer_id: StandardUUID = _alias("answer_id", "answerId")
+
+
+class PracticeMainReferenceAnswerRunPayload(_PracticeReferenceModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = (
+        _discriminator_alias("targetType")
+    )
+    question_card_id: StandardUUID = _alias(
+        "question_card_id",
+        "questionCardId",
+    )
+    interaction_language: InteractionLanguage = _alias(
+        "interaction_language",
+        "interactionLanguage",
+    )
+    expected_kind: Literal[
+        PracticeReferenceAnswerKind.PERSONALIZED_EXAMPLE,
+        PracticeReferenceAnswerKind.TECHNICAL_REFERENCE,
+    ] = _alias("expected_kind", "expectedKind")
+    reference_context: PracticeReferenceFrozenContext = _alias(
+        "reference_context",
+        "referenceContext",
+    )
+
+
+class PracticeFollowUpReferenceAnswerRunPayload(_PracticeReferenceModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    target_type: Literal[PracticeReferenceAnswerTargetType.FOLLOW_UP] = (
+        _discriminator_alias("targetType")
+    )
+    question_card_id: StandardUUID = _alias(
+        "question_card_id",
+        "questionCardId",
+    )
+    attempt_id: StandardUUID = _alias("attempt_id", "attemptId")
+    main_answer_id: StandardUUID = _alias(
+        "main_answer_id",
+        "mainAnswerId",
+    )
+    follow_up_question_id: StandardUUID = _alias(
+        "follow_up_question_id",
+        "followUpQuestionId",
+    )
+    previous_follow_ups: list[PracticeReferencePreviousFollowUpRunPayload] = (
+        _alias(
+            "previous_follow_ups",
+            "previousFollowUps",
+            default_factory=list,
+            max_length=MAX_PRACTICE_FOLLOW_UPS,
+        )
+    )
+    interaction_language: InteractionLanguage = _alias(
+        "interaction_language",
+        "interactionLanguage",
+    )
+    expected_kind: Literal[
+        PracticeReferenceAnswerKind.PERSONALIZED_SUPPLEMENT,
+        PracticeReferenceAnswerKind.TECHNICAL_REFERENCE,
+    ] = _alias("expected_kind", "expectedKind")
+    reference_context: PracticeReferenceFrozenContext = _alias(
+        "reference_context",
+        "referenceContext",
+    )
+
+    @model_validator(mode="after")
+    def validate_previous_follow_ups(self) -> Self:
+        actual_orders = [item.order for item in self.previous_follow_ups]
+        if actual_orders != list(range(1, len(actual_orders) + 1)):
+            raise ValueError(
+                "previous_follow_ups must contain completed orders in sequence"
+            )
+        question_ids = [item.question_id for item in self.previous_follow_ups]
+        answer_ids = [item.answer_id for item in self.previous_follow_ups]
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError("previous_follow_ups question ids must be unique")
+        if len(answer_ids) != len(set(answer_ids)):
+            raise ValueError("previous_follow_ups answer ids must be unique")
+        return self
+
+
+PracticeReferenceAnswerRunPayload = Annotated[
+    PracticeMainReferenceAnswerRunPayload
+    | PracticeFollowUpReferenceAnswerRunPayload,
+    Field(discriminator="target_type"),
+]
+
+
 class PracticeMainReferenceAnswerOutput(_PracticeReferenceModel):
     target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = (
         _discriminator_alias("targetType")
@@ -437,20 +566,25 @@ __all__ = [
     "MAX_PRACTICE_REFERENCE_ANSWER_LENGTH",
     "PracticeFollowUpReferenceAnswerInput",
     "PracticeFollowUpReferenceAnswerOutput",
+    "PracticeFollowUpReferenceAnswerRunPayload",
     "PracticeMainReferenceAnswerInput",
     "PracticeMainReferenceAnswerOutput",
+    "PracticeMainReferenceAnswerRunPayload",
     "PracticeReferenceAnswer",
     "PracticeReferenceAnswerCommonMistakes",
     "PracticeReferenceAnswerInput",
     "PracticeReferenceAnswerKeyPoints",
     "PracticeReferenceAnswerKind",
     "PracticeReferenceAnswerOutput",
+    "PracticeReferenceAnswerRunPayload",
     "PracticeReferenceAnswerTargetType",
     "PracticeReferenceCurrentFollowUp",
     "PracticeReferenceEvidence",
     "PracticeReferenceEvidenceList",
+    "PracticeReferenceFrozenContext",
     "PracticeReferenceMainAnswer",
     "PracticeReferencePreviousFollowUp",
+    "PracticeReferencePreviousFollowUpRunPayload",
     "PracticeReferenceProjectEvidence",
     "PracticeReferenceQuestionContext",
     "PracticeReferenceRecommendedMaterialIds",

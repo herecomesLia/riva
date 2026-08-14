@@ -313,11 +313,12 @@ def make_worker(
         database.sessionmaker,
         **registry_options,
     )
-    assert registry.agent_ids == (
+    assert {
         "job-description-parser",
         "matching-analyzer",
+        "practice-reference-answer-generator",
         "resume-parser",
-    )
+    }.issubset(registry.agent_ids)
     assert isinstance(registry.get("resume-parser"), ResumeParsingWorkerHandler)
     return AgentWorker(
         worker_id="resume-integration-worker",

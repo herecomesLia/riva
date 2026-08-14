@@ -16,6 +16,7 @@ from riva.models import (
     CareerProfileWorkSkill,
     JobDescriptionAnalysis,
     MatchingAnalysis,
+    PracticeQuestionReferenceContext,
     QuestionCard,
     TargetRole,
     User,
@@ -30,6 +31,7 @@ from riva.schemas.question_generation import (
     QuestionGenerationOutput,
     QuestionGenerationRunPayload,
 )
+from riva.schemas.practice_reference_answer import PracticeReferenceFrozenContext
 from riva.services.question_generation import (
     INVALID_QUESTION_GENERATION_RUN,
     QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY,
@@ -615,6 +617,7 @@ def test_persist_success_creates_question_card_with_lineage() -> None:
     run = run_for(owner, run_payload)
     session = ScriptedSession(
         owner.id,
+        None,
         role,
         profile,
         analysis,
@@ -646,6 +649,129 @@ def test_persist_success_creates_question_card_with_lineage() -> None:
     assert session.commit_count == 1
 
 
+def test_persist_success_freezes_reference_role_and_recommended_evidence_order() -> None:
+    owner, role, profile, analysis, matching = graph()
+    run_payload = payload(role, profile, analysis, matching)
+    run = run_for(owner, run_payload)
+    output = output_for(run_payload).model_copy(
+        update={
+            "recommended_materials": [
+                QuestionCardMaterialReference(
+                    type="workExperience",
+                    id=profile.work_experiences[0].id,
+                    label="untrusted label",
+                    reason="untrusted reason",
+                ),
+                QuestionCardMaterialReference(
+                    type="projectExperience",
+                    id=profile.project_experiences[0].id,
+                    label="another label",
+                    reason="another reason",
+                ),
+            ]
+        }
+    )
+    session = ScriptedSession(
+        owner.id,
+        None,
+        role,
+        profile,
+        analysis,
+        matching,
+        None,
+    )
+
+    card = asyncio.run(service_for(session).persist_success(run, output))
+
+    context = next(
+        value
+        for value in session.added
+        if isinstance(value, PracticeQuestionReferenceContext)
+    )
+    frozen = PracticeReferenceFrozenContext.model_validate(
+        context.frozen_context
+    )
+    assert frozen.target_role.title == role.title
+    assert [item.id for item in frozen.candidate_evidence] == [
+        profile.work_experiences[0].id,
+        profile.project_experiences[0].id,
+    ]
+    assert frozen.candidate_evidence[0].company == profile.work_experiences[0].company
+    assert frozen.candidate_evidence[0].title == profile.work_experiences[0].title
+    assert frozen.candidate_evidence[1].name == profile.project_experiences[0].name
+    assert card.id == context.question_card_id
+
+
+@pytest.mark.parametrize(
+    "material",
+    [
+        QuestionCardMaterialReference(
+            type="workExperience",
+            id=uuid4(),
+            label="missing",
+            reason="missing",
+        ),
+    ],
+)
+def test_persist_success_rejects_noncanonical_recommended_material(
+    material: QuestionCardMaterialReference,
+) -> None:
+    owner, role, profile, analysis, matching = graph()
+    run_payload = payload(role, profile, analysis, matching)
+    run = run_for(owner, run_payload)
+    output = output_for(run_payload).model_copy(
+        update={"recommended_materials": [material]}
+    )
+    session = ScriptedSession(
+        owner.id,
+        None,
+        role,
+        profile,
+        analysis,
+        matching,
+        None,
+    )
+
+    with pytest.raises(QuestionGenerationStateError) as error:
+        asyncio.run(service_for(session).persist_success(run, output))
+
+    assert error.value.code == INVALID_QUESTION_GENERATION_RUN
+    assert session.added == []
+
+
+def test_persist_success_rejects_material_type_mismatch() -> None:
+    owner, role, profile, analysis, matching = graph()
+    run_payload = payload(role, profile, analysis, matching)
+    run = run_for(owner, run_payload)
+    output = output_for(run_payload).model_copy(
+        update={
+            "recommended_materials": [
+                QuestionCardMaterialReference(
+                    type="projectExperience",
+                    id=profile.work_experiences[0].id,
+                    label="wrong type",
+                    reason="wrong type",
+                )
+            ]
+        }
+    )
+    session = ScriptedSession(
+        owner.id,
+        None,
+        role,
+        profile,
+        analysis,
+        matching,
+        None,
+    )
+
+    with pytest.raises(QuestionGenerationStateError) as error:
+        asyncio.run(service_for(session).persist_success(run, output))
+
+    assert error.value.code == INVALID_QUESTION_GENERATION_RUN
+    assert session.added == []
+
+
 def test_persist_success_is_idempotent_for_matching_lineage() -> None:
     owner, role, profile, analysis, matching = graph()
     run_payload = payload(role, profile, analysis, matching)
@@ -673,11 +799,23 @@ def test_persist_success_is_idempotent_for_matching_lineage() -> None:
     )
     session = ScriptedSession(
         owner.id,
-        role,
-        profile,
-        analysis,
-        matching,
         existing,
+        PracticeQuestionReferenceContext(
+            question_card_id=existing.id,
+            frozen_context={
+                "targetRole": {
+                    "title": role.title,
+                    "company": role.company,
+                    "rivaSummary": analysis.riva_summary,
+                    "responsibilities": analysis.responsibilities,
+                    "qualificationRequirements": analysis.qualification_requirements,
+                    "requiredSkills": analysis.required_skills,
+                    "businessDomains": analysis.business_domains,
+                },
+                "candidateEvidence": [],
+            },
+            created_at=NOW,
+        ),
     )
 
     returned = asyncio.run(
@@ -716,10 +854,6 @@ def test_persist_success_rejects_mismatched_existing_lineage() -> None:
     )
     session = ScriptedSession(
         owner.id,
-        role,
-        profile,
-        analysis,
-        matching,
         existing,
     )
 
@@ -761,7 +895,7 @@ def test_persist_success_rejects_profile_snapshot_change_without_writing_card() 
     run_payload = payload(role, profile, analysis, matching)
     run = run_for(owner, run_payload)
     profile.version = 4
-    session = ScriptedSession(owner.id, role, profile, analysis, matching)
+    session = ScriptedSession(owner.id, None, role, profile, analysis, matching)
 
     with pytest.raises(QuestionGenerationStateError) as error:
         asyncio.run(

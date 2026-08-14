@@ -11,6 +11,7 @@ from riva.agents import (
     MatchingAnalysisAgent,
     PracticeEvaluationAgent,
     PracticeRecommendationAgent,
+    PracticeReferenceAnswerAgent,
     PracticeReviewAgent,
     QuestionGenerationAgent,
     ResumeParsingAgent,
@@ -25,6 +26,7 @@ from riva.workers import (
     MatchingAnalysisHandler,
     PracticeEvaluationHandler,
     PracticeRecommendationHandler,
+    PracticeReferenceAnswerHandler,
     PracticeReviewHandler,
     QuestionGenerationHandler,
     ResumeParsingWorkerHandler,
@@ -330,12 +332,23 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
     assert practice_recommendation.agent.provider is provider
     assert practice_recommendation.agent.model == "qwen-test-model"
+    practice_reference_answer = registry.get(
+        "practice-reference-answer-generator"
+    )
+    assert isinstance(practice_reference_answer, PracticeReferenceAnswerHandler)
+    assert isinstance(
+        practice_reference_answer.agent,
+        PracticeReferenceAnswerAgent,
+    )
+    assert practice_reference_answer.agent.provider is provider
+    assert practice_reference_answer.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",
         "practice-recommender",
+        "practice-reference-answer-generator",
         "practice-reviewer",
         "question-generator",
         "resume-parser",
@@ -389,12 +402,23 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
     assert practice_recommendation.agent.provider is handler.agent.provider
     assert practice_recommendation.agent.model == "qwen-test-model"
+    practice_reference_answer = registry.get(
+        "practice-reference-answer-generator"
+    )
+    assert isinstance(practice_reference_answer, PracticeReferenceAnswerHandler)
+    assert isinstance(
+        practice_reference_answer.agent,
+        PracticeReferenceAnswerAgent,
+    )
+    assert practice_reference_answer.agent.provider is handler.agent.provider
+    assert practice_reference_answer.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",
         "practice-recommender",
+        "practice-reference-answer-generator",
         "practice-reviewer",
         "question-generator",
         "resume-parser",

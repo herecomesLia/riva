@@ -19,6 +19,7 @@ from riva.models import (
     CareerProfileWorkSkill,
     JobDescriptionAnalysis,
     MatchingAnalysis,
+    PracticeQuestionReferenceContext,
     QuestionCard,
     TargetRole,
     User,
@@ -27,6 +28,7 @@ from riva.prompts import QUESTION_GENERATION_PROMPT
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_LIST_ITEMS,
     QuestionCardDifficulty,
+    QuestionCardMaterialType,
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import (
@@ -45,6 +47,12 @@ from riva.schemas.question_generation import (
     QuestionGenerationRunPayload,
     QuestionGenerationTargetRoleContext,
     QuestionGenerationWorkExperienceContext,
+)
+from riva.schemas.practice_reference_answer import (
+    PracticeReferenceFrozenContext,
+    PracticeReferenceProjectEvidence,
+    PracticeReferenceRoleContext,
+    PracticeReferenceWorkEvidence,
 )
 from riva.services.agent_runs import AgentRunService
 from riva.services.profile_completion import career_profile_completed
@@ -131,6 +139,20 @@ def validate_question_generation_run(
         raise QuestionGenerationStateError(
             INVALID_QUESTION_GENERATION_RUN
         ) from None
+
+
+def validate_question_card_generation_lineage(
+    card: QuestionCard,
+    run: AgentRun,
+) -> QuestionGenerationRunPayload:
+    payload = validate_question_generation_run(run)
+    try:
+        matches = _question_card_lineage_matches(card, run, payload)
+    except (AttributeError, TypeError, ValueError):
+        matches = False
+    if not matches:
+        raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
+    return payload
 
 
 _Item = TypeVar("_Item")
@@ -433,20 +455,6 @@ class QuestionGenerationService:
         try:
             payload = validate_question_generation_run(run)
             await self._lock_user(run.user_id)
-            context = await self._load_context(
-                user_id=run.user_id,
-                role_id=payload.role_id,
-                profile_id=payload.profile_id,
-                profile_version=payload.profile_version,
-                job_description_version=payload.job_description_version,
-                job_description_analysis_version=(
-                    payload.job_description_analysis_version
-                ),
-                matching_analysis_run_id=payload.matching_analysis_run_id,
-                for_update=True,
-            )
-            _build_context_input(context, payload)
-
             if not isinstance(output, QuestionGenerationOutput):
                 raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
             if (
@@ -461,16 +469,51 @@ class QuestionGenerationService:
                 .with_for_update()
             )
             if existing is not None:
-                if not _question_card_lineage_matches(existing, run, payload):
+                validate_question_card_generation_lineage(existing, run)
+                reference_context = await self.session.scalar(
+                    select(PracticeQuestionReferenceContext)
+                    .where(
+                        PracticeQuestionReferenceContext.question_card_id
+                        == existing.id
+                    )
+                    .with_for_update()
+                )
+                if reference_context is None:
                     raise QuestionGenerationStateError(
                         INVALID_QUESTION_GENERATION_RUN
                     )
+                try:
+                    PracticeReferenceFrozenContext.model_validate(
+                        reference_context.frozen_context
+                    )
+                except (TypeError, ValueError, ValidationError):
+                    raise QuestionGenerationStateError(
+                        INVALID_QUESTION_GENERATION_RUN
+                    ) from None
                 await self.session.commit()
                 return existing
+
+            context = await self._load_context(
+                user_id=run.user_id,
+                role_id=payload.role_id,
+                profile_id=payload.profile_id,
+                profile_version=payload.profile_version,
+                job_description_version=payload.job_description_version,
+                job_description_analysis_version=(
+                    payload.job_description_analysis_version
+                ),
+                matching_analysis_run_id=payload.matching_analysis_run_id,
+                for_update=True,
+            )
+            _build_context_input(context, payload)
 
             now = self.clock()
             _require_aware_datetime(now)
             values = output.model_dump(mode="json")
+            frozen_context = build_practice_reference_frozen_context(
+                context,
+                output,
+            )
             card = QuestionCard(
                 id=uuid4(),
                 user_id=run.user_id,
@@ -513,6 +556,16 @@ class QuestionGenerationService:
                 updated_at=now,
             )
             self.session.add(card)
+            self.session.add(
+                PracticeQuestionReferenceContext(
+                    question_card_id=card.id,
+                    frozen_context=frozen_context.model_dump(
+                        mode="json",
+                        by_alias=True,
+                    ),
+                    created_at=now,
+                )
+            )
             await self.session.commit()
             return card
         except Exception:
@@ -731,6 +784,98 @@ def _question_card_lineage_matches(
     )
 
 
+def build_practice_reference_frozen_context(
+    context: _QuestionGenerationContext,
+    output: QuestionGenerationOutput,
+) -> PracticeReferenceFrozenContext:
+    try:
+        role_context = PracticeReferenceRoleContext(
+            title=context.role.title,
+            company=context.role.company,
+            riva_summary=context.job_description_analysis.riva_summary,
+            responsibilities=context.job_description_analysis.responsibilities,
+            qualification_requirements=(
+                context.job_description_analysis.qualification_requirements
+            ),
+            required_skills=context.job_description_analysis.required_skills,
+            business_domains=context.job_description_analysis.business_domains,
+        )
+        work_by_id = {
+            item.id: item for item in context.profile.work_experiences
+        }
+        project_by_id = {
+            item.id: item for item in context.profile.project_experiences
+        }
+        evidence = []
+        for material in output.recommended_materials:
+            if material.type is QuestionCardMaterialType.WORK_EXPERIENCE:
+                item = work_by_id.get(material.id)
+                if item is None:
+                    raise ValueError("recommended work material is not canonical")
+                evidence.append(
+                    PracticeReferenceWorkEvidence(
+                        type="workExperience",
+                        id=item.id,
+                        company=item.company,
+                        title=item.title,
+                        responsibilities=_stable_unique_texts(
+                            item.responsibilities,
+                            limit=MAX_QUESTION_CARD_LIST_ITEMS,
+                        ),
+                        achievements=_stable_unique_texts(
+                            item.achievements,
+                            limit=MAX_QUESTION_CARD_LIST_ITEMS,
+                        ),
+                        skills=_stable_unique_texts(
+                            [
+                                link.skill.name
+                                for link in _ordered(item.skill_links, limit=None)
+                            ],
+                            limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
+                        ),
+                    )
+                )
+            elif material.type is QuestionCardMaterialType.PROJECT_EXPERIENCE:
+                item = project_by_id.get(material.id)
+                if item is None:
+                    raise ValueError(
+                        "recommended project material is not canonical"
+                    )
+                evidence.append(
+                    PracticeReferenceProjectEvidence(
+                        type="projectExperience",
+                        id=item.id,
+                        name=item.name,
+                        role=item.role,
+                        responsibilities=_stable_unique_texts(
+                            item.responsibilities,
+                            limit=MAX_QUESTION_CARD_LIST_ITEMS,
+                        ),
+                        achievements=_stable_unique_texts(
+                            item.achievements,
+                            limit=MAX_QUESTION_CARD_LIST_ITEMS,
+                        ),
+                        skills=_stable_unique_texts(
+                            [
+                                link.skill.name
+                                for link in _ordered(item.skill_links, limit=None)
+                            ],
+                            limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
+                        ),
+                    )
+                )
+            else:
+                raise ValueError("recommended material type is invalid")
+        return PracticeReferenceFrozenContext(
+            target_role=role_context,
+            candidate_evidence=evidence,
+        )
+    except (AttributeError, KeyError, TypeError, ValueError, ValidationError):
+        raise QuestionGenerationStateError(
+            INVALID_QUESTION_GENERATION_RUN
+        ) from None
+
+
 def _stable_unique_texts(
     values: Iterable[str],
     *,
@@ -793,11 +938,13 @@ __all__ = [
     "QUESTION_GENERATION_TARGET_NOT_FOUND",
     "QuestionGenerationService",
     "QuestionGenerationStateError",
+    "build_practice_reference_frozen_context",
     "build_question_generation_input",
     "build_question_generation_job_context",
     "build_question_generation_matching_context",
     "build_question_generation_profile_context",
     "build_question_generation_target_role_context",
     "question_generation_output_from_card",
+    "validate_question_card_generation_lineage",
     "validate_question_generation_run",
 ]

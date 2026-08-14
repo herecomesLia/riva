@@ -6,8 +6,12 @@ from pydantic import TypeAdapter, ValidationError
 
 from riva.schemas.practice_reference_answer import (
     PracticeFollowUpReferenceAnswerInput,
+    PracticeFollowUpReferenceAnswerRunPayload,
+    PracticeMainReferenceAnswerRunPayload,
+    PracticeReferenceAnswerRunPayload,
     PracticeReferenceAnswerInput,
     PracticeReferenceAnswerOutput,
+    PracticeReferenceFrozenContext,
     PracticeReferenceQuestionContext,
     PracticeMainReferenceAnswerInput,
 )
@@ -157,6 +161,13 @@ def output_payload(
     if target_type == "followUp":
         payload["addressedGap"] = "It adds the missing result attribution."
     return payload
+
+
+def frozen_context_payload() -> dict[str, object]:
+    return {
+        "targetRole": role_payload(),
+        "candidateEvidence": [],
+    }
 
 
 def parse_input(payload: dict[str, object]) -> object:
@@ -398,6 +409,95 @@ def test_follow_up_output_requires_addressed_gap() -> None:
 
     with pytest.raises(ValidationError):
         parse_output(payload)
+
+
+def test_frozen_context_forbids_extra_fields_and_round_trips_aliases() -> None:
+    parsed = PracticeReferenceFrozenContext.model_validate(
+        frozen_context_payload()
+    )
+
+    assert parsed.candidate_evidence == []
+    assert parsed.model_dump(mode="json", by_alias=True)["targetRole"][
+        "rivaSummary"
+    ] == role_payload()["rivaSummary"]
+    with pytest.raises(ValidationError):
+        PracticeReferenceFrozenContext.model_validate(
+            {**frozen_context_payload(), "untrusted": True}
+        )
+
+
+def test_main_reference_answer_run_payload_is_discriminated_and_frozen() -> None:
+    payload = PracticeMainReferenceAnswerRunPayload.model_validate(
+        {
+            "targetType": "main",
+            "questionCardId": str(uuid4()),
+            "interactionLanguage": "en",
+            "expectedKind": "personalizedExample",
+            "referenceContext": frozen_context_payload(),
+        }
+    )
+
+    parsed = TypeAdapter(PracticeReferenceAnswerRunPayload).validate_python(
+        payload.model_dump(mode="json", by_alias=True)
+    )
+    assert isinstance(parsed, PracticeMainReferenceAnswerRunPayload)
+    assert parsed.reference_context.target_role.title == "Backend Engineer"
+
+
+@pytest.mark.parametrize("previous", [[], [
+    {
+        "order": 1,
+        "questionId": str(uuid4()),
+        "answerId": str(uuid4()),
+    }
+]])
+def test_follow_up_reference_answer_run_payload_supports_q1_and_q2_lineage(
+    previous: list[dict[str, object]],
+) -> None:
+    payload = PracticeFollowUpReferenceAnswerRunPayload.model_validate(
+        {
+            "targetType": "followUp",
+            "questionCardId": str(uuid4()),
+            "attemptId": str(uuid4()),
+            "mainAnswerId": str(uuid4()),
+            "followUpQuestionId": str(uuid4()),
+            "previousFollowUps": previous,
+            "interactionLanguage": "en",
+            "expectedKind": "personalizedSupplement",
+            "referenceContext": frozen_context_payload(),
+        }
+    )
+
+    assert [item.order for item in payload.previous_follow_ups] == [
+        item["order"] for item in previous
+    ]
+
+
+def test_follow_up_reference_answer_run_payload_rejects_lineage_gaps_and_extras() -> None:
+    payload = {
+        "targetType": "followUp",
+        "questionCardId": str(uuid4()),
+        "attemptId": str(uuid4()),
+        "mainAnswerId": str(uuid4()),
+        "followUpQuestionId": str(uuid4()),
+        "previousFollowUps": [
+            {
+                "order": 2,
+                "questionId": str(uuid4()),
+                "answerId": str(uuid4()),
+            }
+        ],
+        "interactionLanguage": "en",
+        "expectedKind": "personalizedSupplement",
+        "referenceContext": frozen_context_payload(),
+    }
+    with pytest.raises(ValidationError, match="sequence"):
+        PracticeFollowUpReferenceAnswerRunPayload.model_validate(payload)
+
+    payload["previousFollowUps"] = []
+    payload["extra"] = True
+    with pytest.raises(ValidationError):
+        PracticeFollowUpReferenceAnswerRunPayload.model_validate(payload)
 
 
 @pytest.mark.parametrize(

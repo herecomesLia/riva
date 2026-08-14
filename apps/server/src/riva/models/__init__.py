@@ -19,6 +19,10 @@ from riva.models.practice_interactions import (
     PracticeRecommendation,
     PracticeReview,
 )
+from riva.models.practice_reference_answers import (
+    PracticeQuestionReferenceContext,
+    PracticeReferenceAnswerArtifact,
+)
 from riva.models.practice_sessions import PracticeAttempt, PracticeSession
 from riva.models.question_cards import QuestionCard
 from riva.models.resume_documents import ResumeDocument
@@ -46,7 +50,9 @@ __all__ = [
     "PracticeAttempt",
     "PracticeFollowUpDecision",
     "PracticeFollowUpQuestion",
+    "PracticeQuestionReferenceContext",
     "PracticeRecommendation",
+    "PracticeReferenceAnswerArtifact",
     "PracticeReview",
     "PracticeSession",
     "QuestionCard",

@@ -21,6 +21,7 @@ from riva.models import (
     CareerProfileWorkSkill,
     JobDescriptionAnalysis,
     MatchingAnalysis,
+    PracticeQuestionReferenceContext,
     QuestionCard,
     TargetRole,
     User,
@@ -358,7 +359,23 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                     assert stored_run is not None
                     assert stored_run.status is AgentRunStatus.SUCCEEDED
                     assert card is not None
+                    frozen_context = await session.get(
+                        PracticeQuestionReferenceContext,
+                        card.id,
+                    )
                     assert card.source_agent_run_id == run.id
+                    assert frozen_context is not None
+                    assert frozen_context.frozen_context["candidateEvidence"] == [
+                        {
+                            "type": "projectExperience",
+                            "id": str(project_id),
+                            "name": "Payment Platform",
+                            "role": "Developer",
+                            "responsibilities": ["Designed payment workflows"],
+                            "achievements": ["Shipped the first version"],
+                            "skills": ["Python"],
+                        }
+                    ]
                     assert card.matching_analysis_run_id == (
                         role.matching_analysis_run_id
                     )
@@ -383,8 +400,17 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                         .select_from(QuestionCard)
                         .where(QuestionCard.source_agent_run_id == run.id)
                     )
+                    context_count = await session.scalar(
+                        select(func.count())
+                        .select_from(PracticeQuestionReferenceContext)
+                        .where(
+                            PracticeQuestionReferenceContext.question_card_id
+                            == card.id
+                        )
+                    )
                     assert returned.id == card.id
                     assert count == 1
+                    assert context_count == 1
 
                 async with database.sessionmaker() as session:
                     retry_run = await QuestionGenerationService(

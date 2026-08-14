@@ -13,6 +13,9 @@ from riva.schemas.question_cards import (
 from riva.schemas.question_generation import QuestionGenerationRunPayload
 from riva.schemas.resume_parsing import ResumeParsingRunPayload
 from riva.schemas.practice_review import ReviewRunPayload
+from riva.schemas.practice_reference_answer import (
+    PracticeMainReferenceAnswerRunPayload,
+)
 from riva.services.agent_runs import AgentRunService, _serialize_payload
 
 
@@ -194,6 +197,63 @@ def test_review_run_payload_is_accepted_without_widening_metadata() -> None:
     ).model_dump(mode="json", by_alias=True)
 
     assert _serialize_payload(payload) == payload
+
+
+def test_reference_answer_run_payload_preserves_structured_context() -> None:
+    payload = PracticeMainReferenceAnswerRunPayload(
+        targetType="main",
+        questionCardId=uuid4(),
+        interactionLanguage="en",
+        expectedKind="personalizedExample",
+        referenceContext={
+            "targetRole": {
+                "title": "Backend Engineer",
+                "company": "Riva",
+                "rivaSummary": "Build reliable APIs.",
+                "responsibilities": ["Design service boundaries."],
+                "qualificationRequirements": {
+                    "education": [],
+                    "graduationCohorts": [],
+                    "majors": [],
+                    "experience": [],
+                    "languages": [],
+                    "certifications": [],
+                    "other": [],
+                },
+                "requiredSkills": {
+                    "programmingLanguages": ["Python"],
+                    "frameworksAndLibraries": [],
+                    "platforms": [],
+                    "tools": [],
+                    "conceptsAndMethods": [],
+                    "databasesAndMiddleware": [],
+                    "other": [],
+                },
+                "businessDomains": [],
+            },
+            "candidateEvidence": [],
+        },
+    ).model_dump(mode="json", by_alias=True)
+
+    assert _serialize_payload(payload) == payload
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["targetType", "expectedKind", "referenceContext", "previousFollowUps"],
+)
+def test_serialize_payload_rejects_invalid_reference_answer_metadata(
+    key: str,
+) -> None:
+    values: dict[str, object] = {
+        "targetType": "unknown",
+        "expectedKind": "unknown",
+        "referenceContext": {"invalid": True},
+        "previousFollowUps": [{"order": 2}],
+    }
+
+    with pytest.raises(ValueError):
+        _serialize_payload({key: values[key]})  # type: ignore[dict-item]
 
 
 def test_question_generation_run_payload_is_strict_and_camel_case() -> None:
