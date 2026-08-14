@@ -11,6 +11,190 @@ import {
 } from "./practice-cache"
 
 describe("practice mutation cache contract", () => {
+  it.each([
+    ["questionHintReveal", "answerHints"],
+    ["questionFrameworkReveal", "answerFramework"],
+  ] as const)("accepts an exact main %s response and same-value reveal", (kind, field) => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    if (current.session.status !== "answering") return
+    const input = {
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answering") return
+    response.session.version = input.version + 1
+    response.session.question[field] = {
+      content: field === "answerHints" ? ["Use a result metric."] : ["Context", "Action", "Result"],
+      status: "revealed",
+    }
+
+    const next = synchronizePracticeMutationResponse(current, response, { kind, input })
+    expect(next?.session).toBe(response.session)
+    expect(next?.session).toMatchObject({
+      question: { [field]: { status: "revealed" } },
+      version: input.version + 1,
+    })
+
+    const sameValue = structuredClone(response)
+    if (sameValue.session.status !== "answering") return
+    sameValue.session.version += 1
+    const repeated = synchronizePracticeMutationResponse(response, sameValue, {
+      kind,
+      input: { ...input, version: response.session.version },
+    })
+    expect(repeated?.session).toBe(sameValue.session)
+  })
+
+  it("rejects main guidance responses that change anything besides the requested field", () => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    if (current.session.status !== "answering") return
+    const input = {
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answering") return
+    response.session.version += 1
+    response.session.question.answerHints = {
+      content: ["Use a result metric."],
+      status: "revealed",
+    }
+
+    const targetStillHidden = structuredClone(response)
+    if (targetStillHidden.session.status !== "answering") return
+    targetStillHidden.session.question.answerHints = {
+      content: null,
+      status: "notRequested",
+    }
+    expect(
+      synchronizePracticeMutationResponse(current, targetStillHidden, {
+        kind: "questionHintReveal",
+        input,
+      }),
+    ).toBe(current)
+
+    const nonTargetChanged = structuredClone(response)
+    if (nonTargetChanged.session.status !== "answering") return
+    nonTargetChanged.session.question.answerFramework = {
+      content: ["Changed unexpectedly"],
+      status: "revealed",
+    }
+    expect(
+      synchronizePracticeMutationResponse(current, nonTargetChanged, {
+        kind: "questionHintReveal",
+        input,
+      }),
+    ).toBe(current)
+
+    const changedQuestion = structuredClone(response)
+    if (changedQuestion.session.status !== "answering") return
+    changedQuestion.session.question.prompt = "Changed unexpectedly"
+    expect(
+      synchronizePracticeMutationResponse(current, changedQuestion, {
+        kind: "questionHintReveal",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongVersion = structuredClone(response)
+    if (wrongVersion.session.status !== "answering") return
+    wrongVersion.session.version += 1
+    expect(
+      synchronizePracticeMutationResponse(current, wrongVersion, {
+        kind: "questionHintReveal",
+        input,
+      }),
+    ).toBe(current)
+  })
+
+  it.each([
+    ["followUpHintReveal", "answerHints"],
+    ["followUpFrameworkReveal", "answerFramework"],
+  ] as const)("accepts an exact current follow-up %s response", (kind, field) => {
+    const current = createPracticeMockResponse("answeringFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    const input = {
+      followUpQuestionId: current.session.currentFollowUp.question.id,
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answeringFollowUp") return
+    response.session.version += 1
+    response.session.currentFollowUp.question[field] = {
+      content: field === "answerHints" ? ["Name the metric."] : ["Baseline", "Result"],
+      status: "revealed",
+    }
+
+    const next = synchronizePracticeMutationResponse(current, response, { kind, input })
+    expect(next?.session).toBe(response.session)
+    expect(next?.session).toMatchObject({
+      currentFollowUp: { question: { [field]: { status: "revealed" } } },
+      version: input.version + 1,
+    })
+  })
+
+  it("rejects a follow-up reveal that mutates history or leaves the target hidden", () => {
+    const current = createPracticeMockResponse("answeringFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    const input = {
+      followUpQuestionId: current.session.currentFollowUp.question.id,
+      questionId: current.session.question.id,
+      sessionId: current.session.sessionId,
+      version: current.session.version,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answeringFollowUp") return
+    response.session.version += 1
+    response.session.currentFollowUp.question.answerHints = {
+      content: ["Name the metric."],
+      status: "revealed",
+    }
+
+    const historyChanged = structuredClone(response)
+    if (historyChanged.session.status !== "answeringFollowUp") return
+    historyChanged.session.followUpExchanges.push({
+      ...historyChanged.session.followUpExchanges[0]!,
+      answer: {
+        ...historyChanged.session.followUpExchanges[0]!.answer,
+        content: "Changed history",
+      },
+    })
+    expect(
+      synchronizePracticeMutationResponse(current, historyChanged, {
+        kind: "followUpHintReveal",
+        input,
+      }),
+    ).toBe(current)
+
+    const targetStillHidden = structuredClone(response)
+    if (targetStillHidden.session.status !== "answeringFollowUp") return
+    targetStillHidden.session.currentFollowUp.question.answerHints = {
+      content: null,
+      status: "notRequested",
+    }
+    expect(
+      synchronizePracticeMutationResponse(current, targetStillHidden, {
+        kind: "followUpHintReveal",
+        input,
+      }),
+    ).toBe(current)
+
+    const wrongAttempt = structuredClone(response)
+    if (wrongAttempt.session.status !== "answeringFollowUp") return
+    wrongAttempt.session.attemptId = "another-attempt"
+    expect(
+      synchronizePracticeMutationResponse(current, wrongAttempt, {
+        kind: "followUpHintReveal",
+        input,
+      }),
+    ).toBe(current)
+  })
+
   it("merges an active-only real mutation response while preserving setup context", () => {
     const current = createPracticeMockResponse("answeringQuestion")
     const followUp = createPracticeMockResponse("answeringFirstFollowUp").session

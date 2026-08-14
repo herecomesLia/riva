@@ -14,8 +14,11 @@ export function usePracticeFollowUpActions(runAction: RunPracticeAction): {
   actions: PracticeFollowUpActions
   pending: PracticeFollowUpPending
 } {
-  const hintMutation = usePracticeMutation("followUpUpdate", requestPracticeFollowUpHint)
-  const frameworkMutation = usePracticeMutation("followUpUpdate", requestPracticeFollowUpFramework)
+  const hintMutation = usePracticeMutation("followUpHintReveal", requestPracticeFollowUpHint)
+  const frameworkMutation = usePracticeMutation(
+    "followUpFrameworkReveal",
+    requestPracticeFollowUpFramework,
+  )
   const referenceAnswerMutation = usePracticeMutation(
     "followUpUpdate",
     requestPracticeFollowUpReferenceAnswer,

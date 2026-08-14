@@ -11,6 +11,7 @@ import type {
   PracticePageResponse,
   PracticeAnswer,
   PracticeEvaluatingState,
+  PracticeFollowUpQuestion,
   PracticeQuestionCard,
   PracticeQuestionMutationInput,
   PracticeQuestionFlagMutationInput,
@@ -26,8 +27,12 @@ type PracticeMutationInputByKind = {
   endFollowUps: EndPracticeFollowUpsInput
   endQuestionSession: PracticeQuestionMutationInput
   endReviewSession: EndPracticeSessionInput
+  followUpFrameworkReveal: PracticeFollowUpMutationInput
+  followUpHintReveal: PracticeFollowUpMutationInput
   followUpUpdate: PracticeFollowUpMutationInput
   prepareNextSession: PrepareNextPracticeSessionInput
+  questionFrameworkReveal: PracticeQuestionMutationInput
+  questionHintReveal: PracticeQuestionMutationInput
   questionUpdate: PracticeQuestionMutationInput
   questionFlagUpdate: PracticeQuestionFlagMutationInput
   retryCurrentQuestion: PracticeQuestionMutationInput
@@ -225,6 +230,8 @@ function currentMatchesMutation(
   if (session.status === "completed") return false
 
   switch (kind) {
+    case "questionFrameworkReveal":
+    case "questionHintReveal":
     case "questionUpdate":
     case "skipQuestion":
     case "endQuestionSession":
@@ -235,6 +242,8 @@ function currentMatchesMutation(
         (session.status === "answering" || session.status === "review") &&
         questionMatches(session, request)
       )
+    case "followUpFrameworkReveal":
+    case "followUpHintReveal":
     case "followUpUpdate":
     case "submitFollowUpAnswer":
     case "endFollowUps":
@@ -263,6 +272,20 @@ function responseMatchesMutation(
   switch (kind) {
     case "questionUpdate":
       return session.status === "answering" && questionMatches(session, request)
+    case "questionHintReveal":
+      return isQuestionGuidanceRevealResponseValid(
+        session,
+        currentSession,
+        request as PracticeQuestionMutationInput,
+        "answerHints",
+      )
+    case "questionFrameworkReveal":
+      return isQuestionGuidanceRevealResponseValid(
+        session,
+        currentSession,
+        request as PracticeQuestionMutationInput,
+        "answerFramework",
+      )
     case "questionFlagUpdate":
       return (
         (session.status === "answering" || session.status === "review") &&
@@ -313,6 +336,20 @@ function responseMatchesMutation(
         questionMatches(session, request) &&
         "followUpQuestionId" in request &&
         session.currentFollowUp.question.id === request.followUpQuestionId
+      )
+    case "followUpHintReveal":
+      return isFollowUpGuidanceRevealResponseValid(
+        session,
+        currentSession,
+        request as PracticeFollowUpMutationInput,
+        "answerHints",
+      )
+    case "followUpFrameworkReveal":
+      return isFollowUpGuidanceRevealResponseValid(
+        session,
+        currentSession,
+        request as PracticeFollowUpMutationInput,
+        "answerFramework",
       )
     case "submitFollowUpAnswer":
       return (
@@ -407,6 +444,60 @@ function isQuestionFlagMutationResponseValid(
   )
 }
 
+type PracticeGuidanceField = "answerHints" | "answerFramework"
+
+function isQuestionGuidanceRevealResponseValid(
+  response: VersionedPracticeSession,
+  current: VersionedPracticeSession,
+  request: PracticeQuestionMutationInput,
+  guidance: PracticeGuidanceField,
+) {
+  if (
+    response.status !== "answering" ||
+    current.status !== "answering" ||
+    response.attemptId !== current.attemptId ||
+    response.attemptNumber !== current.attemptNumber ||
+    !samePracticeSelection(response.selection, current.selection) ||
+    !questionMatches(response, request) ||
+    !samePracticeQuestionSnapshotExceptGuidance(response.question, current.question, guidance)
+  ) {
+    return false
+  }
+
+  return response.question[guidance].status !== "notRequested"
+}
+
+function isFollowUpGuidanceRevealResponseValid(
+  response: VersionedPracticeSession,
+  current: VersionedPracticeSession,
+  request: PracticeFollowUpMutationInput,
+  guidance: PracticeGuidanceField,
+) {
+  if (
+    response.status !== "answeringFollowUp" ||
+    current.status !== "answeringFollowUp" ||
+    response.attemptId !== current.attemptId ||
+    response.attemptNumber !== current.attemptNumber ||
+    !samePracticeSelection(response.selection, current.selection) ||
+    !questionMatches(response, request) ||
+    response.currentFollowUp.question.id !== request.followUpQuestionId ||
+    response.currentFollowUp.status !== current.currentFollowUp.status ||
+    response.currentFollowUp.answer !== current.currentFollowUp.answer ||
+    JSON.stringify(response.question) !== JSON.stringify(current.question) ||
+    JSON.stringify(response.mainAnswer) !== JSON.stringify(current.mainAnswer) ||
+    JSON.stringify(response.followUpExchanges) !== JSON.stringify(current.followUpExchanges) ||
+    !samePracticeFollowUpQuestionSnapshotExceptGuidance(
+      response.currentFollowUp.question,
+      current.currentFollowUp.question,
+      guidance,
+    )
+  ) {
+    return false
+  }
+
+  return response.currentFollowUp.question[guidance].status !== "notRequested"
+}
+
 function samePracticeQuestionSnapshotExceptFlags(
   left: PracticeQuestionCard,
   right: PracticeQuestionCard,
@@ -414,6 +505,38 @@ function samePracticeQuestionSnapshotExceptFlags(
   const { isMarkedWeak: _leftMarkedWeak, isSaved: _leftSaved, ...leftWithoutFlags } = left
   const { isMarkedWeak: _rightMarkedWeak, isSaved: _rightSaved, ...rightWithoutFlags } = right
   return JSON.stringify(leftWithoutFlags) === JSON.stringify(rightWithoutFlags)
+}
+
+function samePracticeQuestionSnapshotExceptGuidance(
+  left: PracticeQuestionCard,
+  right: PracticeQuestionCard,
+  guidance: PracticeGuidanceField,
+) {
+  if (guidance === "answerHints") {
+    const { answerHints: _leftGuidance, ...leftWithoutGuidance } = left
+    const { answerHints: _rightGuidance, ...rightWithoutGuidance } = right
+    return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
+  }
+
+  const { answerFramework: _leftGuidance, ...leftWithoutGuidance } = left
+  const { answerFramework: _rightGuidance, ...rightWithoutGuidance } = right
+  return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
+}
+
+function samePracticeFollowUpQuestionSnapshotExceptGuidance(
+  left: PracticeQuestionCard | PracticeFollowUpQuestion,
+  right: PracticeQuestionCard | PracticeFollowUpQuestion,
+  guidance: PracticeGuidanceField,
+) {
+  if (guidance === "answerHints") {
+    const { answerHints: _leftGuidance, ...leftWithoutGuidance } = left
+    const { answerHints: _rightGuidance, ...rightWithoutGuidance } = right
+    return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
+  }
+
+  const { answerFramework: _leftGuidance, ...leftWithoutGuidance } = left
+  const { answerFramework: _rightGuidance, ...rightWithoutGuidance } = right
+  return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
 }
 
 function samePracticeReviewSnapshot(

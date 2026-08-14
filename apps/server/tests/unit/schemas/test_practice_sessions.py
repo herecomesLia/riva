@@ -22,6 +22,9 @@ from riva.schemas.practice_sessions import (
     PracticeGeneratingQuestionResponse,
     PracticeAllAnsweredCompletionResponse,
     PracticeEndedEarlyFollowUpCompletionResponse,
+    PracticeGuidanceNotRequestedResponse,
+    PracticeGuidanceRevealedResponse,
+    PracticeGuidanceUnavailableResponse,
     PracticeNoFollowUpRequiredCompletionResponse,
     PracticeQuestionResponse,
     PracticeReviewResponse,
@@ -29,6 +32,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RevealPracticeFollowUpGuidanceRequest,
+    RevealPracticeQuestionGuidanceRequest,
     RetryPracticeQuestionRequest,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
@@ -1096,6 +1101,118 @@ def test_question_projection_hides_internal_fields_and_defaults_guidance() -> No
     assert "templateId" not in serialized
     assert "followUpDirections" not in serialized
     assert "scoringFocus" not in serialized
+
+
+def test_practice_guidance_variants_are_strict_and_nonempty_when_revealed() -> None:
+    assert PracticeGuidanceNotRequestedResponse(
+        status="notRequested"
+    ).model_dump(mode="json") == {
+        "status": "notRequested",
+        "content": None,
+    }
+    assert PracticeGuidanceRevealedResponse(
+        status="revealed",
+        content=["Context", "Action"],
+    ).model_dump(mode="json") == {
+        "status": "revealed",
+        "content": ["Context", "Action"],
+    }
+    assert PracticeGuidanceUnavailableResponse(
+        status="unavailable"
+    ).model_dump(mode="json") == {
+        "status": "unavailable",
+        "content": None,
+    }
+
+    with pytest.raises(ValidationError):
+        PracticeGuidanceRevealedResponse(status="revealed", content=[])
+    with pytest.raises(ValidationError):
+        PracticeGuidanceUnavailableResponse(
+            status="unavailable",
+            content=["not allowed"],
+        )
+    with pytest.raises(ValidationError):
+        PracticeGuidanceNotRequestedResponse(
+            status="notRequested",
+            content=["not allowed"],
+        )
+    with pytest.raises(ValidationError):
+        PracticeGuidanceRevealedResponse(
+            status="revealed",
+            content=["Context"],
+            extra=True,
+        )
+
+
+def test_question_and_follow_up_responses_accept_all_guidance_states() -> None:
+    question_payload = public_session_payload("answering")["question"]
+    assert isinstance(question_payload, dict)
+    question_payload["answerHints"] = {
+        "status": "revealed",
+        "content": ["Use a concrete metric."],
+    }
+    question_payload["answerFramework"] = {
+        "status": "unavailable",
+        "content": None,
+    }
+    question = PracticeQuestionResponse.model_validate(question_payload)
+    assert question.answer_hints.status == "revealed"
+    assert question.answer_framework.status == "unavailable"
+
+    follow_up_payload = public_session_payload("answeringFollowUp")[
+        "currentFollowUp"
+    ]["question"]
+    assert isinstance(follow_up_payload, dict)
+    follow_up_payload["answerHints"] = {
+        "status": "revealed",
+        "content": ["Name the metric."],
+    }
+    follow_up_payload["answerFramework"] = {
+        "status": "unavailable",
+        "content": None,
+    }
+    follow_up = PracticeFollowUpQuestionResponse.model_validate(follow_up_payload)
+    assert follow_up.answer_hints.status == "revealed"
+    assert follow_up.answer_framework.status == "unavailable"
+
+
+def test_reveal_guidance_requests_use_only_public_provenance() -> None:
+    question_id = uuid4()
+    follow_up_question_id = uuid4()
+    question_request = RevealPracticeQuestionGuidanceRequest.model_validate(
+        {"version": 2, "questionId": str(question_id)}
+    )
+    follow_up_request = RevealPracticeFollowUpGuidanceRequest.model_validate(
+        {
+            "version": 4,
+            "questionId": str(question_id),
+            "followUpQuestionId": str(follow_up_question_id),
+        }
+    )
+    assert question_request.model_dump(mode="json") == {
+        "version": 2,
+        "questionId": str(question_id),
+    }
+    assert follow_up_request.model_dump(mode="json") == {
+        "version": 4,
+        "questionId": str(question_id),
+        "followUpQuestionId": str(follow_up_question_id),
+    }
+
+    for request_type, payload in (
+        (RevealPracticeQuestionGuidanceRequest, {"version": 0, "questionId": str(question_id)}),
+        (
+            RevealPracticeFollowUpGuidanceRequest,
+            {
+                "version": 4,
+                "questionId": str(question_id),
+                "followUpQuestionId": str(follow_up_question_id),
+                "content": ["forbidden"],
+            },
+        ),
+    ):
+        with pytest.raises(ValidationError):
+            request_type.model_validate(payload)
 
 
 def test_active_response_rejects_naive_timestamp_and_unknown_fields() -> None:

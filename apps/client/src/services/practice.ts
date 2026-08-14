@@ -232,14 +232,34 @@ export function endPracticeSession(
 
 export function requestPracticeHint(
   input: RequestPracticeHintInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestPracticeHint(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.requestPracticeHint(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/hint`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function requestAnswerFramework(
   input: RequestAnswerFrameworkInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestAnswerFramework(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.requestAnswerFramework(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/framework`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function requestPracticeReferenceAnswer(
@@ -250,16 +270,36 @@ export function requestPracticeReferenceAnswer(
 
 export function requestPracticeFollowUpHint(
   input: RequestPracticeFollowUpHintInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestPracticeFollowUpHint(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.requestPracticeFollowUpHint(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-ups/hint`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+        followUpQuestionId: input.followUpQuestionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function requestPracticeFollowUpFramework(
   input: RequestPracticeFollowUpFrameworkInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock
-    ? practiceMockService.requestPracticeFollowUpFramework(input)
-    : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.requestPracticeFollowUpFramework(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-ups/framework`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+        followUpQuestionId: input.followUpQuestionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function requestPracticeFollowUpReferenceAnswer(

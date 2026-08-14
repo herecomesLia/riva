@@ -12,6 +12,10 @@ import {
   practiceCompletedSessionResponseSchema,
   practiceFollowUpQuestionSchema,
   practiceFollowUpCompletionSchema,
+  practiceGuidanceNotRequestedSchema,
+  practiceGuidanceRevealedSchema,
+  practiceGuidanceSchema,
+  practiceGuidanceUnavailableSchema,
   practiceQuestionSchema,
   practiceRecommendationSchema,
   practiceReviewSchema,
@@ -201,6 +205,48 @@ function createCompletedSession() {
 }
 
 describe("practice wire schemas", () => {
+  it("accepts all three guidance states and rejects invalid variants", () => {
+    const notRequested = { content: null, status: "notRequested" as const }
+    const revealed = { content: ["Use a metric."], status: "revealed" as const }
+    const unavailable = { content: null, status: "unavailable" as const }
+
+    expect(practiceGuidanceNotRequestedSchema.parse(notRequested)).toEqual(notRequested)
+    expect(practiceGuidanceRevealedSchema.parse(revealed)).toEqual(revealed)
+    expect(practiceGuidanceUnavailableSchema.parse(unavailable)).toEqual(unavailable)
+    expect(practiceGuidanceSchema.parse(notRequested)).toEqual(notRequested)
+    expect(practiceGuidanceSchema.parse(revealed)).toEqual(revealed)
+    expect(practiceGuidanceSchema.parse(unavailable)).toEqual(unavailable)
+
+    expect(() => practiceGuidanceRevealedSchema.parse({ ...revealed, content: [] })).toThrow()
+    expect(() => practiceGuidanceUnavailableSchema.parse({ ...unavailable, content: [] })).toThrow()
+    expect(() =>
+      practiceGuidanceNotRequestedSchema.parse({ ...notRequested, content: ["x"] }),
+    ).toThrow()
+    expect(() => practiceGuidanceSchema.parse({ ...revealed, extra: true })).toThrow()
+  })
+
+  it("accepts revealed and unavailable guidance independently on questions and follow-ups", () => {
+    const questionWithGuidance = {
+      ...question,
+      answerFramework: { content: null, status: "unavailable" as const },
+      answerHints: { content: ["Name the result."], status: "revealed" as const },
+    }
+    const followUpWithGuidance = {
+      ...followUpQuestion,
+      answerFramework: { content: ["Baseline", "Result"], status: "revealed" as const },
+      answerHints: { content: null, status: "unavailable" as const },
+    }
+
+    expect(practiceQuestionSchema.parse(questionWithGuidance)).toMatchObject({
+      answerFramework: { status: "unavailable" },
+      answerHints: { status: "revealed" },
+    })
+    expect(practiceFollowUpQuestionSchema.parse(followUpWithGuidance)).toMatchObject({
+      answerFramework: { status: "revealed" },
+      answerHints: { status: "unavailable" },
+    })
+  })
+
   it("accepts setup selection and both active session states", () => {
     expect(practiceSessionSelectionSchema.parse(selection)).toEqual(selection)
     expect(practiceActiveSessionResponseSchema.parse(createSession())).toMatchObject({

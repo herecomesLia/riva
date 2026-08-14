@@ -14,7 +14,11 @@ import {
   endPracticeSession,
   requestEndPracticeSession,
   prepareNextPracticeSession,
+  requestAnswerFramework,
   retryCurrentPracticeQuestion,
+  requestPracticeFollowUpFramework,
+  requestPracticeFollowUpHint,
+  requestPracticeHint,
   setQuestionSaved,
   setQuestionWeak,
   startPracticeSession,
@@ -573,6 +577,93 @@ describe("practice service API", () => {
     expect(requestJson(fetchMock)).not.toHaveProperty("isSaved")
     expect(session).toMatchObject({ status: "answering", version: 6 })
   })
+
+  it.each([
+    [
+      "hint",
+      requestPracticeHint,
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/hint`,
+      { questionId, sessionId, version: 5 },
+      createActiveSession("answering", {
+        version: 6,
+        question: {
+          ...createQuestion(),
+          answerHints: { content: ["Use a concrete metric."], status: "revealed" as const },
+        },
+      }),
+    ],
+    [
+      "framework",
+      requestAnswerFramework,
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/framework`,
+      { questionId, sessionId, version: 5 },
+      createActiveSession("answering", {
+        version: 6,
+        question: {
+          ...createQuestion(),
+          answerFramework: {
+            content: ["Context", "Action", "Result"],
+            status: "revealed" as const,
+          },
+        },
+      }),
+    ],
+  ] as const)(
+    "sends the main $0 reveal request with only provenance",
+    async (_name, requestFn, path, input, response) => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(response))
+
+      const session = requireActiveSession(await requestFn(input))
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        path,
+        expect.objectContaining({ credentials: "include", method: "POST" }),
+      )
+      expect(requestJson(fetchMock)).toEqual({ version: 5, questionId })
+      expect(requestJson(fetchMock)).not.toHaveProperty("content")
+      expect(requestJson(fetchMock)).not.toHaveProperty("status")
+      expect(requestJson(fetchMock)).not.toHaveProperty("guidanceType")
+      expect(requestJson(fetchMock)).not.toHaveProperty("attemptId")
+      expect(session).toMatchObject({ status: "answering", version: 6 })
+    },
+  )
+
+  it.each([
+    [
+      "hint",
+      requestPracticeFollowUpHint,
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/follow-ups/hint`,
+      { followUpQuestionId, questionId, sessionId, version: 3 },
+    ],
+    [
+      "framework",
+      requestPracticeFollowUpFramework,
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/follow-ups/framework`,
+      { followUpQuestionId, questionId, sessionId, version: 3 },
+    ],
+  ] as const)(
+    "sends the follow-up $0 reveal request with only provenance",
+    async (_name, requestFn, path, input) => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(createFollowUpSession("answeringFollowUp")))
+
+      const session = requireActiveSession(await requestFn(input))
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        path,
+        expect.objectContaining({ credentials: "include", method: "POST" }),
+      )
+      expect(requestJson(fetchMock)).toEqual({
+        version: 3,
+        questionId,
+        followUpQuestionId,
+      })
+      expect(requestJson(fetchMock)).not.toHaveProperty("content")
+      expect(requestJson(fetchMock)).not.toHaveProperty("status")
+      expect(requestJson(fetchMock)).not.toHaveProperty("guidanceType")
+      expect(requestJson(fetchMock)).not.toHaveProperty("attemptId")
+      expect(session.status).toBe("answeringFollowUp")
+    },
+  )
 
   it("polls the encoded session refresh endpoint with only the requested version", async () => {
     const response = createActiveSession("answering", { version: 2 })

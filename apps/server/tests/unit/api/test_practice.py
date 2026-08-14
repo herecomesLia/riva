@@ -20,6 +20,8 @@ from riva.schemas.practice_sessions import (
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     RefreshPracticeEvaluationRequest,
+    RevealPracticeFollowUpGuidanceRequest,
+    RevealPracticeQuestionGuidanceRequest,
     RetryPracticeQuestionRequest,
     PracticeSessionSelection,
     SetPracticeQuestionSavedRequest,
@@ -177,6 +179,22 @@ class FakePracticeAPIService:
 
     async def set_question_weak(self, **kwargs: object):
         self.calls.append(("set_weak", kwargs))
+        return self.submit_result
+
+    async def reveal_question_hint(self, **kwargs: object):
+        self.calls.append(("reveal_hint", kwargs))
+        return self.submit_result
+
+    async def reveal_question_framework(self, **kwargs: object):
+        self.calls.append(("reveal_framework", kwargs))
+        return self.submit_result
+
+    async def reveal_follow_up_hint(self, **kwargs: object):
+        self.calls.append(("reveal_follow_up_hint", kwargs))
+        return self.submit_result
+
+    async def reveal_follow_up_framework(self, **kwargs: object):
+        self.calls.append(("reveal_follow_up_framework", kwargs))
         return self.submit_result
 
     async def submit_primary_answer(self, **kwargs: object):
@@ -551,6 +569,167 @@ def test_question_flag_routes_require_csrf_and_reject_extra_fields(
     assert csrf.status_code == 403
     assert invalid.status_code == 422
     assert service.calls == []
+
+
+@pytest.mark.parametrize(
+    ("path", "method_name", "payload_type", "payload_fields"),
+    [
+        (
+            "questions/hint",
+            "reveal_hint",
+            RevealPracticeQuestionGuidanceRequest,
+            lambda question_id, follow_up_id: {
+                "version": 2,
+                "questionId": str(question_id),
+            },
+        ),
+        (
+            "questions/framework",
+            "reveal_framework",
+            RevealPracticeQuestionGuidanceRequest,
+            lambda question_id, follow_up_id: {
+                "version": 2,
+                "questionId": str(question_id),
+            },
+        ),
+        (
+            "follow-ups/hint",
+            "reveal_follow_up_hint",
+            RevealPracticeFollowUpGuidanceRequest,
+            lambda question_id, follow_up_id: {
+                "version": 4,
+                "questionId": str(question_id),
+                "followUpQuestionId": str(follow_up_id),
+            },
+        ),
+        (
+            "follow-ups/framework",
+            "reveal_follow_up_framework",
+            RevealPracticeFollowUpGuidanceRequest,
+            lambda question_id, follow_up_id: {
+                "version": 4,
+                "questionId": str(question_id),
+                "followUpQuestionId": str(follow_up_id),
+            },
+        ),
+    ],
+)
+def test_guidance_reveal_routes_return_200_and_forward_exact_body(
+    app,
+    path: str,
+    method_name: str,
+    payload_type,
+    payload_fields,
+) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    question_id = service.submit_result.question.id
+    follow_up_id = uuid4()
+    payload = payload_fields(question_id, follow_up_id)
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "generatingFollowUp"
+    assert service.calls[0][0] == method_name
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(service.calls[0][1]["payload"], payload_type)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+    assert "content" not in payload
+    assert "guidanceType" not in payload
+    assert "attemptId" not in payload
+
+
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        (
+            "questions/hint",
+            {"version": 2, "questionId": str(uuid4())},
+        ),
+        (
+            "follow-ups/framework",
+            {
+                "version": 4,
+                "questionId": str(uuid4()),
+                "followUpQuestionId": str(uuid4()),
+            },
+        ),
+    ],
+)
+def test_guidance_reveal_routes_require_csrf_and_forbid_internal_fields(
+    app,
+    path: str,
+    payload: dict[str, object],
+) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json={**payload, "content": ["forbidden"]},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+    invalid_uuid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/not-a-uuid/{path}",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+    invalid_version = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/{path}",
+        json={**payload, "version": 0},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert invalid_uuid.status_code == 422
+    assert invalid_version.status_code == 422
+    assert service.calls == []
+
+
+def test_guidance_reveal_routes_publish_200_active_response_models_in_openapi(app) -> None:
+    paths = app.openapi()["paths"]
+    for path in (
+        "/api/practice/sessions/{sessionId}/questions/hint",
+        "/api/practice/sessions/{sessionId}/questions/framework",
+        "/api/practice/sessions/{sessionId}/follow-ups/hint",
+        "/api/practice/sessions/{sessionId}/follow-ups/framework",
+    ):
+        response_schema = paths[path]["post"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        assert {
+            item["$ref"].split("/")[-1]
+            for item in response_schema["oneOf"]
+        } == {
+            "PracticeGeneratingQuestionResponse",
+            "PracticeAnsweringResponse",
+            "PracticeGeneratingFollowUpResponse",
+            "PracticeAnsweringFollowUpResponse",
+            "PracticeEvaluatingResponse",
+            "PracticeReviewResponse",
+        }
 
 
 def test_submit_primary_answer_returns_202_and_forwards_exact_body(app) -> None:

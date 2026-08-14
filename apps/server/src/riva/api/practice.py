@@ -20,6 +20,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RevealPracticeFollowUpGuidanceRequest,
+    RevealPracticeQuestionGuidanceRequest,
     RetryPracticeQuestionRequest,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
@@ -142,6 +144,46 @@ async def set_practice_question_weak(
 
 
 @router.post(
+    "/sessions/{sessionId}/questions/hint",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def reveal_practice_question_hint(
+    session_id: PracticeSessionId,
+    payload: RevealPracticeQuestionGuidanceRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.reveal_question_hint(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/questions/framework",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def reveal_practice_question_framework(
+    session_id: PracticeSessionId,
+    payload: RevealPracticeQuestionGuidanceRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.reveal_question_framework(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
     "/sessions/{sessionId}/question-generation/refresh",
     response_model=PracticeActiveSessionResponse,
 )
@@ -233,6 +275,46 @@ async def refresh_practice_follow_up_generation(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_follow_up_generation(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/follow-ups/hint",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def reveal_practice_follow_up_hint(
+    session_id: PracticeSessionId,
+    payload: RevealPracticeFollowUpGuidanceRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.reveal_follow_up_hint(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/follow-ups/framework",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def reveal_practice_follow_up_framework(
+    session_id: PracticeSessionId,
+    payload: RevealPracticeFollowUpGuidanceRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.reveal_follow_up_framework(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

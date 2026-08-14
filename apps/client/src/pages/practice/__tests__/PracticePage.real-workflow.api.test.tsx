@@ -330,6 +330,7 @@ describe("PracticePage real API workflow", () => {
   it("runs the real wire contract from answering through two follow-ups to review", async () => {
     const user = userEvent.setup()
     const current = session("answering", 2)
+    if (current.status !== "answering") return
     const mainSubmitted = session("generatingFollowUp", 3)
     const firstFollowUpReady = session("answeringFollowUp", 4)
     const firstAnswerSubmitted = session("generatingFollowUp", 5)
@@ -672,6 +673,7 @@ describe("PracticePage real API workflow", () => {
   it("ends the current follow-up through the real API and lets evaluation polling reach ended-early review", async () => {
     const user = userEvent.setup()
     const current = session("answeringFollowUp", 4)
+    if (current.status !== "answeringFollowUp") return
     const stopped = endedEarlyEvaluating(5)
     const finalReview = endedEarlyReview(6)
     let evaluationRefreshCount = 0
@@ -860,4 +862,161 @@ describe("PracticePage real API workflow", () => {
       }
     },
   )
+
+  it("reveals main hint and framework through the real endpoints using the latest version", async () => {
+    const user = userEvent.setup()
+    const current = session("answering", 2)
+    if (current.status !== "answering") return
+    const hinted = {
+      ...current,
+      question: {
+        ...current.question,
+        answerHints: { content: ["用一个可验证的结果收束回答。"], status: "revealed" as const },
+      },
+      version: 3,
+    }
+    const framed = {
+      ...hinted,
+      question: {
+        ...hinted.question,
+        answerFramework: {
+          content: ["背景", "行动", "结果"],
+          status: "revealed" as const,
+        },
+      },
+      version: 4,
+    }
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/hint`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 2, questionId })
+        return jsonResponse(hinted)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/questions/framework`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 3, questionId })
+        return jsonResponse(framed)
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.guidance.requestHint"),
+      }),
+    )
+    expect(await testing.screen.findByText("用一个可验证的结果收束回答。")).toBeVisible()
+
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.guidance.requestFramework"),
+      }),
+    )
+    expect(await testing.screen.findByText("背景")).toBeVisible()
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).includes("questions/")),
+    ).toHaveLength(2)
+  })
+
+  it("recovers revealed main guidance from GET without sending a reveal request", async () => {
+    const recoveredQuestion = {
+      ...question,
+      answerHints: { content: ["刷新后仍可见的提示。"], status: "revealed" as const },
+      answerFramework: {
+        content: ["刷新后仍可见的框架。"],
+        status: "revealed" as const,
+      },
+    }
+    const current = { ...session("answering", 4), question: recoveredQuestion }
+
+    fetchMock.mockImplementation(async (input) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      throw new Error(`Unexpected request during guidance recovery: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    expect(await testing.screen.findByText("刷新后仍可见的提示。")).toBeVisible()
+    expect(await testing.screen.findByText("刷新后仍可见的框架。")).toBeVisible()
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("questions/"))).toBe(false)
+  })
+
+  it("reveals follow-up hint and framework with consecutive versions", async () => {
+    const user = userEvent.setup()
+    const current = session("answeringFollowUp", 4)
+    if (current.status !== "answeringFollowUp") return
+    const hinted = {
+      ...current,
+      currentFollowUp: {
+        ...current.currentFollowUp,
+        question: {
+          ...current.currentFollowUp.question,
+          answerHints: { content: ["补充结果指标。"], status: "revealed" as const },
+        },
+      },
+      version: 5,
+    }
+    const framed = {
+      ...hinted,
+      currentFollowUp: {
+        ...hinted.currentFollowUp,
+        question: {
+          ...hinted.currentFollowUp.question,
+          answerFramework: {
+            content: ["基线", "变化", "归因"],
+            status: "revealed" as const,
+          },
+        },
+      },
+      version: 6,
+    }
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/follow-ups/hint`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          version: 4,
+          questionId,
+          followUpQuestionId: followUpQuestionOneId,
+        })
+        return jsonResponse(hinted)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/follow-ups/framework`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          version: 5,
+          questionId,
+          followUpQuestionId: followUpQuestionOneId,
+        })
+        return jsonResponse(framed)
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewHint"),
+      }),
+    )
+    expect(await testing.screen.findByText("补充结果指标。")).toBeVisible()
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.followUpAssistance.viewFramework"),
+      }),
+    )
+    expect(await testing.screen.findByText("基线")).toBeVisible()
+  })
 })

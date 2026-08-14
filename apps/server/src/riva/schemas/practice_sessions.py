@@ -27,10 +27,12 @@ from riva.schemas.practice_review import (
 )
 from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
+    MAX_QUESTION_CARD_LIST_ITEMS,
     QuestionCardDifficulty,
     QuestionCardMaterialList,
     QuestionCardPrompt,
     QuestionCardQuestionType,
+    QuestionCardTextItem,
     QuestionCardTextList,
 )
 
@@ -163,6 +165,21 @@ class EndPracticeSessionEarlyRequest(APIModel):
     question_id: StandardUUID
 
 
+class RevealPracticeQuestionGuidanceRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+
+
+class RevealPracticeFollowUpGuidanceRequest(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Annotated[int, Field(ge=1)]
+    question_id: StandardUUID
+    follow_up_question_id: StandardUUID
+
+
 class PracticeAPIModel(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -170,6 +187,27 @@ class PracticeAPIModel(APIModel):
 class PracticeGuidanceNotRequestedResponse(PracticeAPIModel):
     status: Literal["notRequested"]
     content: None = None
+
+
+class PracticeGuidanceRevealedResponse(PracticeAPIModel):
+    status: Literal["revealed"]
+    content: Annotated[
+        list[QuestionCardTextItem],
+        Field(min_length=1, max_length=MAX_QUESTION_CARD_LIST_ITEMS),
+    ]
+
+
+class PracticeGuidanceUnavailableResponse(PracticeAPIModel):
+    status: Literal["unavailable"]
+    content: None = None
+
+
+PracticeGuidanceResponse = Annotated[
+    PracticeGuidanceNotRequestedResponse
+    | PracticeGuidanceRevealedResponse
+    | PracticeGuidanceUnavailableResponse,
+    Field(discriminator="status"),
+]
 
 
 class PracticeReferenceAnswerNotRequestedResponse(PracticeAPIModel):
@@ -185,12 +223,12 @@ class PracticeQuestionResponse(PracticeAPIModel):
     difficulty: QuestionCardDifficulty
     assessed_capabilities: QuestionCardTextList
     recommended_materials: QuestionCardMaterialList
-    answer_hints: PracticeGuidanceNotRequestedResponse = Field(
+    answer_hints: PracticeGuidanceResponse = Field(
         default_factory=lambda: PracticeGuidanceNotRequestedResponse(
             status="notRequested"
         )
     )
-    answer_framework: PracticeGuidanceNotRequestedResponse = Field(
+    answer_framework: PracticeGuidanceResponse = Field(
         default_factory=lambda: PracticeGuidanceNotRequestedResponse(
             status="notRequested"
         )
@@ -227,12 +265,12 @@ class PracticeFollowUpQuestionResponse(PracticeAPIModel):
         int,
         Field(ge=1, le=MAX_PRACTICE_FOLLOW_UPS),
     ]
-    answer_hints: PracticeGuidanceNotRequestedResponse = Field(
+    answer_hints: PracticeGuidanceResponse = Field(
         default_factory=lambda: PracticeGuidanceNotRequestedResponse(
             status="notRequested"
         )
     )
-    answer_framework: PracticeGuidanceNotRequestedResponse = Field(
+    answer_framework: PracticeGuidanceResponse = Field(
         default_factory=lambda: PracticeGuidanceNotRequestedResponse(
             status="notRequested"
         )
@@ -655,6 +693,9 @@ __all__ = [
     "PracticeGeneratingFollowUpResponse",
     "PracticeGeneratingQuestionResponse",
     "PracticeGuidanceNotRequestedResponse",
+    "PracticeGuidanceRevealedResponse",
+    "PracticeGuidanceResponse",
+    "PracticeGuidanceUnavailableResponse",
     "PracticeQuestionSource",
     "PracticeQuestionResponse",
     "PracticeReferenceAnswerNotRequestedResponse",
@@ -674,6 +715,8 @@ __all__ = [
     "EndPracticeSessionEarlyRequest",
     "EndPracticeFollowUpsRequest",
     "RetryPracticeQuestionRequest",
+    "RevealPracticeFollowUpGuidanceRequest",
+    "RevealPracticeQuestionGuidanceRequest",
     "SetPracticeQuestionSavedRequest",
     "SetPracticeQuestionWeakRequest",
     "RefreshPracticeFollowUpGenerationRequest",

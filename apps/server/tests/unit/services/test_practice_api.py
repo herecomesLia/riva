@@ -15,6 +15,8 @@ from riva.services.practice_api import (
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PracticeAPIService,
     build_practice_completed_session_response,
+    build_practice_follow_up_question_response,
+    build_practice_question_response,
 )
 from riva.services.practice_sessions import (
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE as PRACTICE_EVALUATION_STATE_UNAVAILABLE,
@@ -41,6 +43,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RevealPracticeFollowUpGuidanceRequest,
+    RevealPracticeQuestionGuidanceRequest,
     RetryPracticeQuestionRequest,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
@@ -124,6 +128,32 @@ class FakePracticeSessionService:
         self.calls.append(("set_weak", kwargs))
         if self.error is not None:
             raise self.error
+        return self.context
+
+    async def reveal_question_hint(self, **kwargs: object):
+        self.calls.append(("reveal_hint", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def reveal_question_framework(self, **kwargs: object):
+        self.calls.append(("reveal_framework", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.context
+
+    async def reveal_follow_up_hint(self, **kwargs: object):
+        self.calls.append(("reveal_follow_up_hint", kwargs))
+        if self.error is not None:
+            raise self.error
+        assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
+        return self.context
+
+    async def reveal_follow_up_framework(self, **kwargs: object):
+        self.calls.append(("reveal_follow_up_framework", kwargs))
+        if self.error is not None:
+            raise self.error
+        assert isinstance(self.context, PracticePrimaryAnswerWorkflowContext)
         return self.context
 
     async def submit_primary_answer(
@@ -784,6 +814,179 @@ def test_question_flag_mutations_forward_exact_args_without_llm_precheck() -> No
                 "expected_version": 5,
                 "question_id": review_domain.context.question_card.id,
                 "is_marked_weak": True,
+            },
+        )
+    ]
+
+
+def test_question_builder_hides_frozen_guidance_until_each_flag_is_revealed() -> None:
+    workflow = context(answering=True)
+    assert workflow.question_card is not None
+    card = workflow.question_card
+    card.answer_hints = ["Frozen hint"]
+    card.answer_framework = ["Frozen framework"]
+    card.answer_hints_revealed = False
+    card.answer_framework_revealed = False
+
+    hidden = build_practice_question_response(card)
+    assert hidden.answer_hints.model_dump(mode="json") == {
+        "status": "notRequested",
+        "content": None,
+    }
+    assert hidden.answer_framework.model_dump(mode="json") == {
+        "status": "notRequested",
+        "content": None,
+    }
+
+    card.answer_hints_revealed = True
+    hint_revealed = build_practice_question_response(card)
+    assert hint_revealed.answer_hints.model_dump(mode="json") == {
+        "status": "revealed",
+        "content": ["Frozen hint"],
+    }
+    assert hint_revealed.answer_framework.status == "notRequested"
+
+    card.answer_framework_revealed = True
+    both_revealed = build_practice_question_response(card)
+    assert both_revealed.answer_hints.status == "revealed"
+    assert both_revealed.answer_framework.model_dump(mode="json") == {
+        "status": "revealed",
+        "content": ["Frozen framework"],
+    }
+
+    card.answer_hints = []
+    unavailable = build_practice_question_response(card)
+    assert unavailable.answer_hints.model_dump(mode="json") == {
+        "status": "unavailable",
+        "content": None,
+    }
+
+
+def test_follow_up_builder_projects_revealed_and_unavailable_guidance() -> None:
+    question = follow_up_question(attempt_id=uuid4(), run_id=uuid4())
+    question.answer_hints_revealed = True
+    question.answer_framework_revealed = True
+    projected = build_practice_follow_up_question_response(question)
+
+    assert projected.answer_hints.status == "revealed"
+    assert projected.answer_framework.status == "revealed"
+
+    question.answer_framework = []
+    unavailable = build_practice_follow_up_question_response(question)
+    assert unavailable.answer_framework.model_dump(mode="json") == {
+        "status": "unavailable",
+        "content": None,
+    }
+
+
+@pytest.mark.parametrize(
+    ("method_name", "request_type", "context_factory", "expected_call"),
+    [
+        (
+            "reveal_question_hint",
+            RevealPracticeQuestionGuidanceRequest,
+            lambda: context(answering=True),
+            "reveal_hint",
+        ),
+        (
+            "reveal_question_framework",
+            RevealPracticeQuestionGuidanceRequest,
+            lambda: context(answering=True),
+            "reveal_framework",
+        ),
+    ],
+)
+def test_main_guidance_reveal_service_methods_forward_exact_domain_args_without_llm(
+    method_name: str,
+    request_type: type[RevealPracticeQuestionGuidanceRequest],
+    context_factory,
+    expected_call: str,
+) -> None:
+    domain = FakePracticeSessionService(context=context_factory())
+    assert domain.context.question_card is not None
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model=None,
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    user_id = domain.context.session.user_id
+    session_id = domain.context.session.id
+    question_id = domain.context.question_card.id
+    payload = request_type(version=2, question_id=question_id)
+
+    result = asyncio.run(
+        getattr(service, method_name)(
+            user_id=user_id,
+            session_id=session_id,
+            payload=payload,
+        )
+    )
+
+    assert result.status == "answering"
+    assert domain.calls == [
+        (
+            expected_call,
+            {
+                "user_id": user_id,
+                "session_id": session_id,
+                "expected_version": 2,
+                "question_id": question_id,
+            },
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("method_name", "expected_call"),
+    [
+        ("reveal_follow_up_hint", "reveal_follow_up_hint"),
+        ("reveal_follow_up_framework", "reveal_follow_up_framework"),
+    ],
+)
+def test_follow_up_guidance_reveal_service_methods_forward_exact_domain_args_without_llm(
+    method_name: str,
+    expected_call: str,
+) -> None:
+    domain = FakePracticeSessionService(
+        context=primary_context(attempt_status="answeringFollowUp", action="askFollowUp")
+    )
+    assert isinstance(domain.context, PracticePrimaryAnswerWorkflowContext)
+    assert domain.context.follow_up_question is not None
+    service = PracticeAPIService(
+        object(),
+        llm_provider="openai",
+        llm_model=None,
+        practice_service_factory=lambda *_args, **_kwargs: domain,
+    )
+    user_id = domain.context.session.user_id
+    session_id = domain.context.session.id
+    question_id = domain.context.question_card.id
+    follow_up_question_id = domain.context.follow_up_question.id
+    payload = RevealPracticeFollowUpGuidanceRequest(
+        version=3,
+        question_id=question_id,
+        follow_up_question_id=follow_up_question_id,
+    )
+
+    result = asyncio.run(
+        getattr(service, method_name)(
+            user_id=user_id,
+            session_id=session_id,
+            payload=payload,
+        )
+    )
+
+    assert result.status == "answeringFollowUp"
+    assert domain.calls == [
+        (
+            expected_call,
+            {
+                "user_id": user_id,
+                "session_id": session_id,
+                "expected_version": 3,
+                "question_id": question_id,
+                "follow_up_question_id": follow_up_question_id,
             },
         )
     ]

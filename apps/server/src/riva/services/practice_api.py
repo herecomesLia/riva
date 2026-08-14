@@ -32,6 +32,9 @@ from riva.schemas.practice_sessions import (
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
     PracticeGuidanceNotRequestedResponse,
+    PracticeGuidanceRevealedResponse,
+    PracticeGuidanceResponse,
+    PracticeGuidanceUnavailableResponse,
     PracticeNoFollowUpRequiredCompletionResponse,
     PracticeQuestionResponse,
     PracticeReferenceAnswerNotRequestedResponse,
@@ -43,6 +46,8 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RevealPracticeFollowUpGuidanceRequest,
+    RevealPracticeQuestionGuidanceRequest,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
     StartPracticeSessionRequest,
@@ -210,6 +215,80 @@ class PracticeAPIService:
                 expected_version=payload.version,
                 question_id=payload.question_id,
                 is_marked_weak=payload.is_marked_weak,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def reveal_question_hint(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: RevealPracticeQuestionGuidanceRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().reveal_question_hint(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def reveal_question_framework(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: RevealPracticeQuestionGuidanceRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().reveal_question_framework(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def reveal_follow_up_hint(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: RevealPracticeFollowUpGuidanceRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().reveal_follow_up_hint(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                follow_up_question_id=payload.follow_up_question_id,
+            )
+            return build_practice_session_response(context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def reveal_follow_up_framework(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: RevealPracticeFollowUpGuidanceRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().reveal_follow_up_framework(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+                follow_up_question_id=payload.follow_up_question_id,
             )
             return build_practice_session_response(context)
         except PracticeSessionStateError as error:
@@ -701,6 +780,21 @@ def _build_practice_ended_early_session_response(
         raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
+def build_practice_guidance_response(
+    *,
+    content: list[str],
+    revealed: bool,
+) -> PracticeGuidanceResponse:
+    if not revealed:
+        return PracticeGuidanceNotRequestedResponse(status="notRequested")
+    if not content:
+        return PracticeGuidanceUnavailableResponse(status="unavailable")
+    return PracticeGuidanceRevealedResponse(
+        status="revealed",
+        content=list(content),
+    )
+
+
 def build_practice_question_response(card: QuestionCard) -> PracticeQuestionResponse:
     try:
         return PracticeQuestionResponse.model_validate(
@@ -711,11 +805,13 @@ def build_practice_question_response(card: QuestionCard) -> PracticeQuestionResp
                 "difficulty": card.difficulty,
                 "assessed_capabilities": list(card.assessed_capabilities),
                 "recommended_materials": list(card.recommended_materials),
-                "answer_hints": PracticeGuidanceNotRequestedResponse(
-                    status="notRequested"
+                "answer_hints": build_practice_guidance_response(
+                    content=list(card.answer_hints),
+                    revealed=card.answer_hints_revealed,
                 ),
-                "answer_framework": PracticeGuidanceNotRequestedResponse(
-                    status="notRequested"
+                "answer_framework": build_practice_guidance_response(
+                    content=list(card.answer_framework),
+                    revealed=card.answer_framework_revealed,
                 ),
                 "reference_answer": PracticeReferenceAnswerNotRequestedResponse(
                     status="notRequested"
@@ -754,11 +850,13 @@ def build_practice_follow_up_question_response(
                 "prompt": question.prompt,
                 "created_at": question.created_at,
                 "order": question.order,
-                "answer_hints": PracticeGuidanceNotRequestedResponse(
-                    status="notRequested"
+                "answer_hints": build_practice_guidance_response(
+                    content=list(question.answer_hints),
+                    revealed=question.answer_hints_revealed,
                 ),
-                "answer_framework": PracticeGuidanceNotRequestedResponse(
-                    status="notRequested"
+                "answer_framework": build_practice_guidance_response(
+                    content=list(question.answer_framework),
+                    revealed=question.answer_framework_revealed,
                 ),
                 "reference_answer": PracticeReferenceAnswerNotRequestedResponse(
                     status="notRequested"
@@ -846,6 +944,7 @@ __all__ = [
     "PRACTICE_QUESTION_GENERATION_UNAVAILABLE",
     "PracticeAPIService",
     "PracticeSessionAPIService",
+    "build_practice_guidance_response",
     "build_practice_question_response",
     "build_practice_answer_response",
     "build_practice_answered_follow_up_exchange_response",

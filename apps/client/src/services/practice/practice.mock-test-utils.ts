@@ -13,12 +13,12 @@ import {
   getPracticePage,
   getPracticeEvaluationStatus as requestPracticeEvaluationStatus,
   getQuestionGenerationStatus as requestQuestionGenerationStatus,
-  requestAnswerFramework,
+  requestAnswerFramework as requestAnswerFrameworkService,
   requestEndPracticeSession,
-  requestPracticeHint,
+  requestPracticeHint as requestPracticeHintService,
   requestPracticeReferenceAnswer,
-  requestPracticeFollowUpFramework,
-  requestPracticeFollowUpHint,
+  requestPracticeFollowUpFramework as requestPracticeFollowUpFrameworkService,
+  requestPracticeFollowUpHint as requestPracticeFollowUpHintService,
   requestPracticeFollowUpReferenceAnswer,
   retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
@@ -82,6 +82,26 @@ async function submitPrimaryAnswer(input: Parameters<typeof requestSubmitPrimary
 
 async function submitFollowUpAnswer(input: Parameters<typeof requestSubmitFollowUpAnswer>[0]) {
   return requireMockPageResponse(await requestSubmitFollowUpAnswer(input))
+}
+
+async function requestPracticeHint(input: Parameters<typeof requestPracticeHintService>[0]) {
+  return requireMockPageResponse(await requestPracticeHintService(input))
+}
+
+async function requestAnswerFramework(input: Parameters<typeof requestAnswerFrameworkService>[0]) {
+  return requireMockPageResponse(await requestAnswerFrameworkService(input))
+}
+
+async function requestPracticeFollowUpHint(
+  input: Parameters<typeof requestPracticeFollowUpHintService>[0],
+) {
+  return requireMockPageResponse(await requestPracticeFollowUpHintService(input))
+}
+
+async function requestPracticeFollowUpFramework(
+  input: Parameters<typeof requestPracticeFollowUpFrameworkService>[0],
+) {
+  return requireMockPageResponse(await requestPracticeFollowUpFrameworkService(input))
 }
 
 export async function generateQuestion(

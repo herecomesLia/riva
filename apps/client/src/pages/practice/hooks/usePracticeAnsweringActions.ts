@@ -38,8 +38,8 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
   actions: PracticeAnsweringActions
   pending: PracticeAnsweringPending
 } {
-  const hintMutation = usePracticeMutation("questionUpdate", requestPracticeHint)
-  const frameworkMutation = usePracticeMutation("questionUpdate", requestAnswerFramework)
+  const hintMutation = usePracticeMutation("questionHintReveal", requestPracticeHint)
+  const frameworkMutation = usePracticeMutation("questionFrameworkReveal", requestAnswerFramework)
   const referenceAnswerMutation = usePracticeMutation(
     "questionUpdate",
     requestPracticeReferenceAnswer,

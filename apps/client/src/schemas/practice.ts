@@ -38,12 +38,32 @@ export const practiceSessionSelectionSchema = z
   })
   .strict()
 
-const practiceGuidanceNotRequestedSchema = z
+export const practiceGuidanceNotRequestedSchema = z
   .object({
     content: z.null(),
     status: z.literal("notRequested"),
   })
   .strict()
+
+export const practiceGuidanceRevealedSchema = z
+  .object({
+    content: z.array(z.string().min(1)).min(1),
+    status: z.literal("revealed"),
+  })
+  .strict()
+
+export const practiceGuidanceUnavailableSchema = z
+  .object({
+    content: z.null(),
+    status: z.literal("unavailable"),
+  })
+  .strict()
+
+export const practiceGuidanceSchema = z.discriminatedUnion("status", [
+  practiceGuidanceNotRequestedSchema,
+  practiceGuidanceRevealedSchema,
+  practiceGuidanceUnavailableSchema,
+])
 
 const practiceReferenceAnswerNotRequestedSchema = z
   .object({
@@ -55,8 +75,8 @@ const practiceReferenceAnswerNotRequestedSchema = z
 
 export const practiceQuestionSchema = z
   .object({
-    answerFramework: practiceGuidanceNotRequestedSchema,
-    answerHints: practiceGuidanceNotRequestedSchema,
+    answerFramework: practiceGuidanceSchema,
+    answerHints: practiceGuidanceSchema,
     assessedCapabilities: z.array(z.string()),
     difficulty: practiceDifficultySchema,
     id: uuidSchema,
@@ -84,8 +104,8 @@ export const practiceFollowUpQuestionSchema = z
     prompt: z.string(),
     createdAt: dateTimeSchema,
     order: z.number().int().min(1).max(2),
-    answerHints: practiceGuidanceNotRequestedSchema,
-    answerFramework: practiceGuidanceNotRequestedSchema,
+    answerHints: practiceGuidanceSchema,
+    answerFramework: practiceGuidanceSchema,
     referenceAnswer: practiceReferenceAnswerNotRequestedSchema,
   })
   .strict()
