@@ -641,6 +641,8 @@ def test_persist_success_creates_question_card_with_lineage() -> None:
     assert card.job_description_analysis_version == 4
     assert card.is_saved is False
     assert card.is_marked_weak is False
+    assert card.answer_hints_revealed is False
+    assert card.answer_framework_revealed is False
     assert session.commit_count == 1
 
 

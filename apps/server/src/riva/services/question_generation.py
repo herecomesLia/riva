@@ -507,6 +507,8 @@ class QuestionGenerationService:
                 ),
                 is_saved=False,
                 is_marked_weak=False,
+                answer_hints_revealed=False,
+                answer_framework_revealed=False,
                 created_at=now,
                 updated_at=now,
             )

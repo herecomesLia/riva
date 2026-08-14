@@ -151,3 +151,7 @@ def test_question_card_saved_and_weak_flags_default_to_false() -> None:
 
     assert table.c.is_saved.default.arg is False
     assert table.c.is_marked_weak.default.arg is False
+    assert table.c.answer_hints_revealed.nullable is False
+    assert table.c.answer_framework_revealed.nullable is False
+    assert table.c.answer_hints_revealed.default.arg is False
+    assert table.c.answer_framework_revealed.default.arg is False

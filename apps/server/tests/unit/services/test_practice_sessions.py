@@ -419,6 +419,8 @@ def question_card(
         job_description_analysis_version=1,
         is_saved=False,
         is_marked_weak=False,
+        answer_hints_revealed=False,
+        answer_framework_revealed=False,
         created_at=NOW,
         updated_at=NOW,
     )
@@ -518,6 +520,482 @@ def primary_answer_context(
         question_card_id=card.id,
     )
     return active, attempt, question_run, card
+
+
+def test_reveal_question_hint_updates_only_the_durable_hint_state() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    mutation_time = NOW + timedelta(minutes=1)
+    original_attempt_updated_at = attempt.updated_at
+    original_attempt_completed_at = attempt.completed_at
+
+    result = asyncio.run(
+        PracticeSessionService(
+            ScriptedSession(active, attempt, question_run, card, None),
+            clock=lambda: mutation_time,
+        ).reveal_question_hint(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    assert isinstance(result, PracticeSessionWorkflowContext)
+    assert result.question_card is card
+    assert card.answer_hints_revealed is True
+    assert card.answer_framework_revealed is False
+    assert card.answer_hints == ["Explain the context."]
+    assert card.updated_at == mutation_time
+    assert active.version == 5
+    assert active.updated_at == mutation_time
+    assert attempt.status == PracticeAttemptStatus.ANSWERING.value
+    assert attempt.updated_at == original_attempt_updated_at
+    assert attempt.completed_at == original_attempt_completed_at
+
+
+def test_reveal_question_framework_preserves_hint_and_advances_on_same_value() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=5)
+    card.answer_hints_revealed = True
+    mutation_time = NOW + timedelta(minutes=2)
+
+    first_session = ScriptedSession(active, attempt, question_run, card, None)
+    result = asyncio.run(
+        PracticeSessionService(
+            first_session,
+            clock=lambda: mutation_time,
+        ).reveal_question_framework(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=5,
+            question_id=card.id,
+        )
+    )
+
+    assert result.question_card is card
+    assert card.answer_hints_revealed is True
+    assert card.answer_framework_revealed is True
+    assert active.version == 6
+    assert first_session.commit_count == 1
+
+    second_session = ScriptedSession(active, attempt, question_run, card, None)
+    second_time = NOW + timedelta(minutes=3)
+    asyncio.run(
+        PracticeSessionService(
+            second_session,
+            clock=lambda: second_time,
+        ).reveal_question_framework(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=6,
+            question_id=card.id,
+        )
+    )
+
+    assert card.answer_hints_revealed is True
+    assert card.answer_framework_revealed is True
+    assert card.updated_at == second_time
+    assert active.version == 7
+    assert second_session.commit_count == 1
+
+
+def test_reveal_question_allows_empty_frozen_guidance() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    card.answer_hints = []
+
+    result = asyncio.run(
+        PracticeSessionService(
+            ScriptedSession(active, attempt, question_run, card, None),
+        ).reveal_question_hint(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+        )
+    )
+
+    assert result.question_card is card
+    assert card.answer_hints == []
+    assert card.answer_hints_revealed is True
+    assert active.version == 5
+
+
+def test_reveal_question_works_for_a_retry_without_creating_generation_records() -> None:
+    records = _retry_review_records("retryCurrent")
+    active = records["active"]
+    original = records["attempt"]
+    question_run = records["question_run"]
+    card = records["card"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(original, PracticeAttempt)
+    assert isinstance(question_run, AgentRun)
+    assert isinstance(card, QuestionCard)
+    original.status = PracticeAttemptStatus.COMPLETED.value
+    retry = PracticeAttempt(
+        id=uuid4(),
+        user_id=active.user_id,
+        session_id=active.id,
+        attempt_number=original.attempt_number + 1,
+        question_type=original.question_type,
+        difficulty=original.difficulty,
+        status=PracticeAttemptStatus.ANSWERING.value,
+        question_generation_run_id=None,
+        question_card_id=card.id,
+        retry_of_attempt_id=original.id,
+        created_at=NOW,
+        updated_at=NOW,
+        completed_at=None,
+    )
+    scripted = ScriptedSession(
+        active,
+        retry,
+        original,
+        question_run,
+        card,
+        card,
+        None,
+    )
+
+    result = asyncio.run(
+        service(scripted).reveal_question_hint(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=active.version,
+            question_id=card.id,
+        )
+    )
+
+    assert result.attempt is retry
+    assert result.question_card is card
+    assert retry.question_generation_run_id is None
+    assert retry.question_card_id == original.question_card_id == card.id
+    assert card.answer_hints_revealed is True
+    assert scripted.added == []
+    assert scripted.commit_count == 1
+
+
+def test_reveal_follow_up_hint_and_framework_only_update_the_pending_question() -> None:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    follow_up_run_value = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    pending = follow_up_question(
+        attempt_id=attempt.id,
+        run_id=follow_up_run_value.id,
+    )
+    decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=follow_up_run_value.id,
+        action="askFollowUp",
+        question_id=pending.id,
+    )
+    original_attempt_updated_at = attempt.updated_at
+    original_card_hints = card.answer_hints_revealed
+    scripted_values = (
+        active,
+        attempt,
+        question_run,
+        card,
+        answer,
+        follow_up_run_value,
+        decision,
+        pending,
+    )
+
+    first_session = ScriptedSession(*scripted_values)
+    result = asyncio.run(
+        PracticeSessionService(
+            first_session,
+            clock=lambda: NOW + timedelta(minutes=6),
+        ).reveal_follow_up_hint(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=4,
+            question_id=card.id,
+            follow_up_question_id=pending.id,
+        )
+    )
+
+    assert isinstance(result, PracticePrimaryAnswerWorkflowContext)
+    assert result.follow_up_question is pending
+    assert pending.answer_hints_revealed is True
+    assert pending.answer_framework_revealed is False
+    assert card.answer_hints_revealed is original_card_hints
+    assert card.answer_framework_revealed is False
+    assert active.version == 5
+    assert attempt.status == PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+    assert attempt.updated_at == original_attempt_updated_at
+    assert first_session.commit_count == 1
+
+    second_session = ScriptedSession(*scripted_values)
+    result = asyncio.run(
+        PracticeSessionService(
+            second_session,
+            clock=lambda: NOW + timedelta(minutes=7),
+        ).reveal_follow_up_framework(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=5,
+            question_id=card.id,
+            follow_up_question_id=pending.id,
+        )
+    )
+
+    assert result.follow_up_question is pending
+    assert pending.answer_hints_revealed is True
+    assert pending.answer_framework_revealed is True
+    assert active.version == 6
+    assert second_session.commit_count == 1
+
+    third_session = ScriptedSession(*scripted_values)
+    asyncio.run(
+        PracticeSessionService(
+            third_session,
+            clock=lambda: NOW + timedelta(minutes=8),
+        ).reveal_follow_up_framework(
+            user_id=active.user_id,
+            session_id=active.id,
+            expected_version=6,
+            question_id=card.id,
+            follow_up_question_id=pending.id,
+        )
+    )
+
+    assert pending.answer_hints_revealed is True
+    assert pending.answer_framework_revealed is True
+    assert active.version == 7
+    assert third_session.commit_count == 1
+
+
+def test_reveal_follow_up_rejects_an_old_follow_up_when_a_new_one_is_pending() -> None:
+    records = _order2_refresh_records(
+        attempt_status=PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+        order2_status=AgentRunStatus.SUCCEEDED,
+        order2_action="askFollowUp",
+        include_order2_question=True,
+    )
+    active = records["active"]
+    card = records["card"]
+    question_1 = records["question_1"]
+    question_2 = records["question_2"]
+    assert isinstance(active, PracticeSession)
+    assert isinstance(card, QuestionCard)
+    assert isinstance(question_1, PracticeFollowUpQuestion)
+    assert isinstance(question_2, PracticeFollowUpQuestion)
+    scripted = ScriptedSession(*records["scripted_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).reveal_follow_up_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=5,
+                question_id=card.id,
+                follow_up_question_id=question_1.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert question_1.answer_hints_revealed is False
+    assert question_2.answer_hints_revealed is False
+    assert active.version == 5
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+    wrong_main_scripted = ScriptedSession(*records["scripted_values"])
+    with pytest.raises(PracticeSessionStateError) as wrong_main_error:
+        asyncio.run(
+            service(wrong_main_scripted).reveal_follow_up_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=5,
+                question_id=uuid4(),
+                follow_up_question_id=question_2.id,
+            )
+        )
+
+    assert wrong_main_error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert active.version == 5
+    assert wrong_main_scripted.commit_count == 0
+
+
+@pytest.mark.parametrize(
+    "attempt_status",
+    [
+        PracticeAttemptStatus.GENERATING_QUESTION.value,
+        PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
+        PracticeAttemptStatus.EVALUATING.value,
+        PracticeAttemptStatus.REVIEW.value,
+    ],
+)
+def test_reveal_question_rejects_non_answering_attempt_states(
+    attempt_status: str,
+) -> None:
+    active, attempt, _question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).reveal_question_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert card.answer_hints_revealed is False
+    assert active.version == 4
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_reveal_question_rejects_a_generating_follow_up_shape() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    answer = main_answer(attempt_id=attempt.id)
+    scripted = ScriptedSession(active, attempt, question_run, card, answer)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).reveal_question_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert card.answer_hints_revealed is False
+    assert active.version == 4
+    assert scripted.commit_count == 0
+
+
+def test_reveal_question_rejects_completed_session_wrong_version_owner_and_question() -> None:
+    active, attempt, question_run, card = primary_answer_context(version=4)
+    active.status = PracticeSessionStatus.COMPLETED.value
+    completed_session = ScriptedSession(active)
+
+    with pytest.raises(PracticeSessionStateError) as completed_error:
+        asyncio.run(
+            service(completed_session).reveal_question_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+    assert completed_error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+
+    active.status = PracticeSessionStatus.ACTIVE.value
+    wrong_version_session = ScriptedSession(active)
+    with pytest.raises(PracticeSessionStateError) as version_error:
+        asyncio.run(
+            service(wrong_version_session).reveal_question_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=3,
+                question_id=card.id,
+            )
+        )
+    assert version_error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+
+    owner_session = ScriptedSession(None)
+    with pytest.raises(PracticeSessionStateError) as owner_error:
+        asyncio.run(
+            service(owner_session).reveal_question_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+    assert owner_error.value.code == PRACTICE_SESSION_NOT_FOUND
+
+    wrong_question_session = ScriptedSession(
+        active,
+        attempt,
+        question_run,
+        card,
+        None,
+    )
+    with pytest.raises(PracticeSessionStateError) as question_error:
+        asyncio.run(
+            service(wrong_question_session).reveal_question_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=uuid4(),
+            )
+        )
+    assert question_error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert card.answer_hints_revealed is False
+    assert active.version == 4
+
+
+def test_reveal_question_does_not_replay_a_prior_version() -> None:
+    active, _attempt, _question_run, card = primary_answer_context(version=5)
+    card.answer_hints_revealed = True
+    scripted = ScriptedSession(active)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).reveal_question_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_VERSION_CONFLICT
+    assert card.answer_hints_revealed is True
+    assert active.version == 5
+    assert scripted.commit_count == 0
+
+
+@pytest.mark.parametrize(
+    "attempt_status",
+    [
+        PracticeAttemptStatus.ANSWERING.value,
+        PracticeAttemptStatus.EVALUATING.value,
+        PracticeAttemptStatus.REVIEW.value,
+    ],
+)
+def test_reveal_follow_up_rejects_non_answering_follow_up_states(
+    attempt_status: str,
+) -> None:
+    active, attempt, _question_run, card = primary_answer_context(
+        version=4,
+        attempt_status=attempt_status,
+    )
+    scripted = ScriptedSession(active, attempt)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(scripted).reveal_follow_up_hint(
+                user_id=active.user_id,
+                session_id=active.id,
+                expected_version=4,
+                question_id=card.id,
+                follow_up_question_id=uuid4(),
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert active.version == 4
+    assert scripted.commit_count == 0
 
 
 def test_set_question_saved_updates_only_the_flag_and_session_snapshot() -> None:
@@ -832,6 +1310,8 @@ def follow_up_question(
         focus="Evidence",
         answer_hints=["Name the metric."],
         answer_framework=["Baseline", "Result"],
+        answer_hints_revealed=False,
+        answer_framework_revealed=False,
         created_at=NOW,
     )
 

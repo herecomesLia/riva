@@ -790,6 +790,241 @@ class PracticeSessionService:
             await self.session.rollback()
             raise
 
+    async def reveal_question_hint(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        return await self._reveal_question_guidance(
+            user_id=user_id,
+            session_id=session_id,
+            expected_version=expected_version,
+            question_id=question_id,
+            flag="answer_hints_revealed",
+        )
+
+    async def reveal_question_framework(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        return await self._reveal_question_guidance(
+            user_id=user_id,
+            session_id=session_id,
+            expected_version=expected_version,
+            question_id=question_id,
+            flag="answer_framework_revealed",
+        )
+
+    async def _reveal_question_guidance(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        flag: Literal[
+            "answer_hints_revealed",
+            "answer_framework_revealed",
+        ],
+    ) -> PracticeSessionWorkflowContext:
+        try:
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            self._require_active_session_version(
+                practice_session,
+                expected_version=expected_version,
+            )
+
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if (
+                attempt is None
+                or attempt.user_id != user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status != PracticeAttemptStatus.ANSWERING.value
+                or attempt.question_card_id != question_id
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            question_generation_run, _ = await self._load_generation_run(
+                practice_session,
+                attempt,
+                for_update=True,
+            )
+            if question_generation_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            question_card = await self._load_card_by_id(
+                practice_session,
+                attempt,
+                question_generation_run,
+                for_update=True,
+            )
+            if (
+                question_card.id != question_id
+                or question_card.user_id != user_id
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+            if await self._load_main_answer(attempt, for_update=True) is not None:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            if flag == "answer_hints_revealed":
+                question_card.answer_hints_revealed = True
+            else:
+                question_card.answer_framework_revealed = True
+            question_card.updated_at = now
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_generation_run=question_generation_run,
+                question_card=question_card,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def reveal_follow_up_hint(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        follow_up_question_id: UUID,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        return await self._reveal_follow_up_guidance(
+            user_id=user_id,
+            session_id=session_id,
+            expected_version=expected_version,
+            question_id=question_id,
+            follow_up_question_id=follow_up_question_id,
+            flag="answer_hints_revealed",
+        )
+
+    async def reveal_follow_up_framework(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        follow_up_question_id: UUID,
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        return await self._reveal_follow_up_guidance(
+            user_id=user_id,
+            session_id=session_id,
+            expected_version=expected_version,
+            question_id=question_id,
+            follow_up_question_id=follow_up_question_id,
+            flag="answer_framework_revealed",
+        )
+
+    async def _reveal_follow_up_guidance(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+        follow_up_question_id: UUID,
+        flag: Literal[
+            "answer_hints_revealed",
+            "answer_framework_revealed",
+        ],
+    ) -> PracticePrimaryAnswerWorkflowContext:
+        try:
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            self._require_active_session_version(
+                practice_session,
+                expected_version=expected_version,
+            )
+
+            attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if (
+                attempt is None
+                or attempt.user_id != user_id
+                or attempt.session_id != practice_session.id
+                or attempt.status
+                != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+                or attempt.question_card_id != question_id
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            chain = await self._load_follow_up_chain(
+                practice_session,
+                attempt,
+                for_update=True,
+            )
+            pending_question = chain.follow_up_question
+            if (
+                chain.card.id != question_id
+                or chain.follow_up_generation_run.status
+                != AgentRunStatus.SUCCEEDED
+                or chain.follow_up_decision is None
+                or chain.follow_up_decision.action != "askFollowUp"
+                or pending_question is None
+                or pending_question.id != follow_up_question_id
+                or chain.completion_reason is not None
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                )
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            if flag == "answer_hints_revealed":
+                pending_question.answer_hints_revealed = True
+            else:
+                pending_question.answer_framework_revealed = True
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return self._primary_context_from_chain(
+                practice_session,
+                attempt,
+                chain,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
     async def set_question_saved(
         self,
         *,
@@ -911,6 +1146,23 @@ class PracticeSessionService:
         except BaseException:
             await self.session.rollback()
             raise
+
+    @staticmethod
+    def _require_active_session_version(
+        practice_session: PracticeSession,
+        *,
+        expected_version: int,
+    ) -> None:
+        if not _valid_expected_version(expected_version):
+            raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
+        if (
+            practice_session.status != PracticeSessionStatus.ACTIVE.value
+            or practice_session.completed_at is not None
+            or practice_session.completion_reason is not None
+        ):
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        if practice_session.version != expected_version:
+            raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
     async def complete_session_after_review(
         self,

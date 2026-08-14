@@ -323,6 +323,8 @@ def test_persist_success_recovers_first_artifact_without_comparing_retry_output(
     persisted = asyncio.run(service.persist_success(run, first))
     question = cast(PracticeFollowUpQuestion, first_db.added[0])
     decision = cast(PracticeFollowUpDecision, first_db.added[1])
+    assert question.answer_hints_revealed is False
+    assert question.answer_framework_revealed is False
 
     retry_db = ScriptedSession(
         attempt,

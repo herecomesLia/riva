@@ -152,6 +152,14 @@ class QuestionCard(Base):
     job_description_analysis_version: Mapped[int] = mapped_column(nullable=False)
     is_saved: Mapped[bool] = mapped_column(nullable=False, default=False)
     is_marked_weak: Mapped[bool] = mapped_column(nullable=False, default=False)
+    answer_hints_revealed: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
+    answer_framework_revealed: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

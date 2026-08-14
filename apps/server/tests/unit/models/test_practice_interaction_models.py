@@ -100,6 +100,10 @@ def test_practice_follow_up_question_table_columns_constraints_and_relationships
     assert isinstance(table.c.answer_framework.type, JSON)
     assert table.c.answer_hints.nullable is False
     assert table.c.answer_framework.nullable is False
+    assert table.c.answer_hints_revealed.nullable is False
+    assert table.c.answer_framework_revealed.nullable is False
+    assert table.c.answer_hints_revealed.default.arg is False
+    assert table.c.answer_framework_revealed.default.arg is False
     assert table.c.created_at.nullable is False
     assert table.c.created_at.type.timezone is True
 

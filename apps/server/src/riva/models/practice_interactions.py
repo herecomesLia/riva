@@ -141,6 +141,14 @@ class PracticeFollowUpQuestion(Base):
         JSON(none_as_null=True),
         nullable=False,
     )
+    answer_hints_revealed: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
+    answer_framework_revealed: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

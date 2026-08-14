@@ -325,6 +325,8 @@ class FollowUpGenerationService:
                 focus=validated_output.focus,
                 answer_hints=validated_output.answer_hints,
                 answer_framework=validated_output.answer_framework,
+                answer_hints_revealed=False,
+                answer_framework_revealed=False,
                 created_at=now,
             )
             decision = PracticeFollowUpDecision(
