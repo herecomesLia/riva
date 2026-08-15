@@ -684,6 +684,149 @@ class PracticeSessionService:
             await self.session.rollback()
             raise
 
+    async def skip_current_question(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        expected_version: int,
+        question_id: UUID,
+    ) -> PracticeSessionWorkflowContext:
+        """Replace the unanswered attempt and enqueue its next question."""
+
+        try:
+            if not _valid_expected_version(expected_version):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+
+            practice_session = await self._load_session(
+                user_id=user_id,
+                session_id=session_id,
+                for_update=True,
+            )
+            if practice_session.status != "active":
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            current_attempt = await self._load_current_attempt(
+                user_id=user_id,
+                session_id=practice_session.id,
+                for_update=True,
+            )
+            if current_attempt is None or (
+                current_attempt.user_id != user_id
+                or current_attempt.session_id != practice_session.id
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if practice_session.version != expected_version:
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_VERSION_CONFLICT
+                )
+            if (
+                current_attempt.status != PracticeAttemptStatus.ANSWERING.value
+                or current_attempt.question_card_id != question_id
+                or current_attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            question_generation_run, _ = await self._load_generation_run(
+                practice_session,
+                current_attempt,
+                for_update=True,
+            )
+            if question_generation_run.status != AgentRunStatus.SUCCEEDED:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            question_card = await self._load_card_by_id(
+                practice_session,
+                current_attempt,
+                question_generation_run,
+                for_update=True,
+            )
+            if question_card.id != question_id:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            if (
+                await self._load_main_answer(current_attempt, for_update=True)
+                is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            now = self.clock()
+            _require_aware_datetime(now)
+            question_type = QuestionCardQuestionType(current_attempt.question_type)
+            difficulty = QuestionCardDifficulty(current_attempt.difficulty)
+
+            await self.session.delete(current_attempt)
+            await self.session.flush()
+
+            replacement_attempt = PracticeAttempt(
+                id=uuid4(),
+                user_id=user_id,
+                session_id=practice_session.id,
+                attempt_number=current_attempt.attempt_number,
+                question_type=question_type.value,
+                difficulty=difficulty.value,
+                status=PracticeAttemptStatus.GENERATING_QUESTION.value,
+                question_generation_run_id=None,
+                question_card_id=None,
+                retry_of_attempt_id=None,
+                created_at=now,
+                updated_at=now,
+                completed_at=None,
+            )
+            self.session.add(replacement_attempt)
+            await self.session.flush()
+
+            idempotency_key = practice_question_generation_idempotency_key(
+                practice_session.id,
+                replacement_attempt.id,
+            )
+            try:
+                replacement_run = (
+                    await self._generation_service().enqueue_generation_in_transaction(
+                        user_id=user_id,
+                        target_role_id=practice_session.target_role_id,
+                        question_type=question_type,
+                        difficulty=difficulty,
+                        interaction_language=practice_session.language,
+                        idempotency_key=idempotency_key,
+                    )
+                )
+            except QuestionGenerationStateError as error:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
+                    source_code=error.code,
+                ) from None
+            except ValueError:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
+                    source_code="question_generation_unavailable",
+                ) from None
+
+            self._validate_question_generation_run_lineage(
+                replacement_run,
+                practice_session=practice_session,
+                attempt=replacement_attempt,
+                idempotency_key=idempotency_key,
+            )
+            if replacement_run.id is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                )
+            replacement_attempt.question_generation_run_id = replacement_run.id
+            replacement_attempt.question_generation_run = replacement_run
+            practice_session.version += 1
+            practice_session.updated_at = now
+            await self.session.commit()
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=replacement_attempt,
+                question_generation_run=replacement_run,
+                question_card=None,
+            )
+        except BaseException:
+            await self.session.rollback()
+            raise
+
     async def retry_current_question(
         self,
         *,

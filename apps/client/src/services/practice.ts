@@ -523,8 +523,18 @@ export function endPracticeFollowUps(
 
 export function skipPracticeQuestion(
   input: SkipPracticeQuestionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.skipPracticeQuestion(input) : realApiUnavailable()
+): Promise<PracticeServiceResponse> {
+  if (env.mock) return practiceMockService.skipPracticeQuestion(input)
+  return requestPracticeActiveSession(
+    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/skip`,
+    {
+      json: {
+        version: input.version,
+        questionId: input.questionId,
+      },
+      method: "POST",
+    },
+  )
 }
 
 export function requestEndPracticeSession(

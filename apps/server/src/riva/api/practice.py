@@ -25,6 +25,7 @@ from riva.schemas.practice_sessions import (
     RevealPracticeFollowUpGuidanceRequest,
     RevealPracticeQuestionGuidanceRequest,
     RetryPracticeQuestionRequest,
+    SkipPracticeQuestionRequest,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
     SubmitFollowUpAnswerRequest,
@@ -99,6 +100,26 @@ async def retry_current_practice_question(
     ),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.retry_current_question(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{sessionId}/questions/skip",
+    response_model=PracticeActiveSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def skip_current_practice_question(
+    session_id: PracticeSessionId,
+    payload: SkipPracticeQuestionRequest,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeActiveSessionResponse:
+    return await practice_api_service.skip_current_question(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

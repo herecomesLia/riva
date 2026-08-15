@@ -23,6 +23,7 @@ from riva.schemas.practice_sessions import (
     RevealPracticeFollowUpGuidanceRequest,
     RevealPracticeQuestionGuidanceRequest,
     RetryPracticeQuestionRequest,
+    SkipPracticeQuestionRequest,
     PracticeSessionSelection,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
@@ -172,6 +173,10 @@ class FakePracticeAPIService:
     async def retry_current_question(self, **kwargs: object):
         self.calls.append(("retry", kwargs))
         return self.submit_result
+
+    async def skip_current_question(self, **kwargs: object):
+        self.calls.append(("skip", kwargs))
+        return self.result
 
     async def set_question_saved(self, **kwargs: object):
         self.calls.append(("set_saved", kwargs))
@@ -497,6 +502,59 @@ def test_retry_current_question_requires_csrf_and_forbids_internal_fields(app) -
         "POST",
         f"/api/practice/sessions/{SESSION_ID}/questions/retry",
         json={**payload, "retryOfAttemptId": str(uuid4())},
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert csrf.status_code == 403
+    assert invalid.status_code == 422
+    assert service.calls == []
+
+
+def test_skip_current_question_returns_202_and_forwards_only_public_body(app) -> None:
+    service = FakePracticeAPIService()
+    current_user = user()
+    install_service(app, service, current_user)
+    payload = {
+        "version": 2,
+        "questionId": str(uuid4()),
+    }
+
+    result = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/skip",
+        json=payload,
+        headers={"Origin": TRUSTED_ORIGIN},
+    )
+
+    assert result.status_code == 202
+    assert result.json()["status"] == "generatingQuestion"
+    assert service.calls[0][0] == "skip"
+    assert service.calls[0][1]["user_id"] == current_user.id
+    assert service.calls[0][1]["session_id"] == SESSION_ID
+    assert isinstance(service.calls[0][1]["payload"], SkipPracticeQuestionRequest)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
+
+
+def test_skip_current_question_requires_csrf_and_forbids_internal_fields(app) -> None:
+    service = FakePracticeAPIService()
+    install_service(app, service, user())
+    payload = {
+        "version": 2,
+        "questionId": str(uuid4()),
+    }
+
+    csrf = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/skip",
+        json=payload,
+    )
+    invalid = request(
+        app,
+        "POST",
+        f"/api/practice/sessions/{SESSION_ID}/questions/skip",
+        json={**payload, "attemptId": str(uuid4())},
         headers={"Origin": TRUSTED_ORIGIN},
     )
 

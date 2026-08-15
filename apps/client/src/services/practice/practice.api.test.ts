@@ -26,6 +26,7 @@ import {
   requestPracticeReferenceAnswer,
   setQuestionSaved,
   setQuestionWeak,
+  skipPracticeQuestion,
   startPracticeSession,
   submitFollowUpAnswer,
   submitPrimaryAnswer,
@@ -735,6 +736,35 @@ describe("practice service API", () => {
       question: { id: questionId },
       status: "answering",
       version: 6,
+    })
+  })
+
+  it("skips the current question through the real endpoint and accepts generation", async () => {
+    const response = createActiveSession("generatingQuestion", {
+      attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      attemptNumber: 1,
+      version: 3,
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse(response, 202))
+
+    const session = requireActiveSession(
+      await skipPracticeQuestion({
+        questionId,
+        sessionId,
+        version: 2,
+      }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/practice/sessions/${encodeURIComponent(sessionId)}/questions/skip`,
+      expect.objectContaining({ credentials: "include", method: "POST" }),
+    )
+    expect(requestJson(fetchMock)).toEqual({ version: 2, questionId })
+    expect(session).toMatchObject({
+      attemptNumber: 1,
+      attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      status: "generatingQuestion",
+      version: 3,
     })
   })
 

@@ -28,7 +28,7 @@ import {
   preparePracticeTrainingEntry,
   setQuestionSaved,
   setQuestionWeak,
-  skipPracticeQuestion,
+  skipPracticeQuestion as requestSkipPracticeQuestion,
   startPracticeSession as requestStartPracticeSession,
   submitFollowUpAnswer as requestSubmitFollowUpAnswer,
   submitPrimaryAnswer as requestSubmitPrimaryAnswer,
@@ -82,6 +82,10 @@ async function submitPrimaryAnswer(input: Parameters<typeof requestSubmitPrimary
 
 async function submitFollowUpAnswer(input: Parameters<typeof requestSubmitFollowUpAnswer>[0]) {
   return requireMockPageResponse(await requestSubmitFollowUpAnswer(input))
+}
+
+async function skipPracticeQuestion(input: Parameters<typeof requestSkipPracticeQuestion>[0]) {
+  return requireMockPageResponse(await requestSkipPracticeQuestion(input))
 }
 
 async function requestPracticeHint(input: Parameters<typeof requestPracticeHintService>[0]) {

@@ -52,6 +52,7 @@ from riva.schemas.practice_sessions import (
     PracticeSessionSelection,
     PracticeSessionResponse,
     RetryPracticeQuestionRequest,
+    SkipPracticeQuestionRequest,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
@@ -214,6 +215,24 @@ class PracticeAPIService:
     ) -> PracticeActiveSessionResponse:
         try:
             context = await self._practice_service().retry_current_question(
+                user_id=user_id,
+                session_id=session_id,
+                expected_version=payload.version,
+                question_id=payload.question_id,
+            )
+            return await self._build_session_response(user_id=user_id, context=context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def skip_current_question(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: SkipPracticeQuestionRequest,
+    ) -> PracticeActiveSessionResponse:
+        try:
+            context = await self._practice_service().skip_current_question(
                 user_id=user_id,
                 session_id=session_id,
                 expected_version=payload.version,
