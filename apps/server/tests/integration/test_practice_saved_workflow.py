@@ -5,7 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from riva.agents import QuestionGenerationAgent
+from riva.agents import (
+    FollowUpAgent,
+    PracticeEvaluationAgent,
+    PracticeRecommendationAgent,
+    PracticeReviewAgent,
+    QuestionGenerationAgent,
+)
 from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
@@ -28,10 +34,16 @@ from riva.services.practice_sessions import (
 )
 from riva.services.question_generation import QuestionGenerationService
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_practice_next_question_workflow import (
     build_worker,
+    evaluation_output,
+    recommendation_output,
     question_output,
     produce_first_review,
+    review_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
 
@@ -522,6 +534,283 @@ def test_saved_continue_and_retry_reuse_card_provenance_without_generation() -> 
                     assert retried.question_card.id == card_id
                     assert retried.question_generation_run is not None
                     assert retried.question_generation_run.id == run_id
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_saved_source_full_lifecycle_reuses_question_card_provenance() -> None:
+    async def run_test() -> None:
+        url = database_url()
+        async with Database(url) as database:
+            await database.reset()
+            try:
+                owner, role, _profile, project_id = await seed_context(database)
+                saved_card = await generate_saved_card(
+                    database,
+                    user_id=owner.id,
+                    role_id=role.id,
+                    project_id=project_id,
+                    prompt="Explain the saved payment workflow decision.",
+                    idempotency_key="saved-lifecycle-card",
+                )
+                async with database.sessionmaker() as session:
+                    persisted_card = await session.get(QuestionCard, saved_card.id)
+                    original_question_runs = list(
+                        (
+                            await session.scalars(
+                                select(AgentRun)
+                                .where(
+                                    AgentRun.user_id == owner.id,
+                                    AgentRun.agent_id == "question-generator",
+                                )
+                                .order_by(AgentRun.created_at, AgentRun.id)
+                            )
+                        ).all()
+                    )
+                    assert persisted_card is not None
+                    assert persisted_card.source_agent_run_id is not None
+                    assert persisted_card.is_saved is True
+                    original_source_run_id = persisted_card.source_agent_run_id
+                    original_question_run_ids = {
+                        run.id for run in original_question_runs
+                    }
+
+                app = create_app(settings(url, llm_enabled=True))
+                app.dependency_overrides[require_current_user] = lambda: owner
+                headers = {
+                    "Origin": TRUSTED_ORIGIN,
+                    "Accept-Language": "en-US",
+                }
+
+                with TestClient(app) as client:
+                    started = client.post(
+                        "/api/practice/sessions",
+                        json={
+                            "targetRoleId": str(role.id),
+                            "questionType": "projectDeepDive",
+                            "difficulty": "basic",
+                            "source": "saved",
+                            "prioritizeWeaknesses": False,
+                        },
+                        headers=headers,
+                    )
+                    assert started.status_code == 202
+                    started_body = started.json()
+                    assert started_body["status"] == "answering"
+                    assert started_body["version"] == 1
+                    assert started_body["question"]["id"] == str(saved_card.id)
+                    session_id = UUID(started_body["sessionId"])
+                    attempt_id = UUID(started_body["attemptId"])
+
+                    async with database.sessionmaker() as session:
+                        attempt = await session.get(PracticeAttempt, attempt_id)
+                        assert attempt is not None
+                        assert attempt.question_card_id == saved_card.id
+                        assert attempt.question_generation_run_id is None
+
+                    answered = client.post(
+                        f"/api/practice/sessions/{session_id}/answers/main",
+                        json={
+                            "version": 1,
+                            "questionId": str(saved_card.id),
+                            "content": "I owned the rollout and reduced failures.",
+                        },
+                        headers=headers,
+                    )
+                    assert answered.status_code == 202
+                    assert answered.json()["status"] == "generatingFollowUp"
+                    assert answered.json()["version"] == 2
+
+                assert await build_worker(
+                    database,
+                    FollowUpAgent(
+                        FakeLLMProvider(
+                            [{"action": "complete"}],
+                            provider="saved-lifecycle-follow-up-provider",
+                        ),
+                        model="fake-practice-model",
+                    ),
+                ).process_one()
+
+                with TestClient(app) as client:
+                    follow_up_finished = client.post(
+                        (
+                            f"/api/practice/sessions/{session_id}/"
+                            "follow-up-generation/refresh"
+                        ),
+                        json={"version": 2},
+                        headers=headers,
+                    )
+                    assert follow_up_finished.status_code == 200
+                    assert follow_up_finished.json()["status"] == "evaluating"
+                    assert follow_up_finished.json()["version"] == 3
+
+                assert await build_worker(
+                    database,
+                    PracticeEvaluationAgent(
+                        FakeLLMProvider(
+                            [evaluation_output()],
+                            provider="saved-lifecycle-evaluation-provider",
+                        ),
+                        model="fake-practice-model",
+                    ),
+                ).process_one()
+
+                with TestClient(app) as client:
+                    evaluation_finished = client.post(
+                        f"/api/practice/sessions/{session_id}/evaluation/refresh",
+                        json={"version": 3},
+                        headers=headers,
+                    )
+                    assert evaluation_finished.status_code == 200
+                    assert evaluation_finished.json()["status"] == "evaluating"
+                    assert evaluation_finished.json()["version"] == 3
+
+                assert await build_worker(
+                    database,
+                    PracticeReviewAgent(
+                        FakeLLMProvider(
+                            [review_output()],
+                            provider="saved-lifecycle-review-provider",
+                        ),
+                        model="fake-practice-model",
+                    ),
+                ).process_one()
+
+                with TestClient(app) as client:
+                    review_finished = client.post(
+                        f"/api/practice/sessions/{session_id}/evaluation/refresh",
+                        json={"version": 3},
+                        headers=headers,
+                    )
+                    assert review_finished.status_code == 200
+                    assert review_finished.json()["status"] == "evaluating"
+                    assert review_finished.json()["version"] == 3
+
+                assert await build_worker(
+                    database,
+                    PracticeRecommendationAgent(
+                        FakeLLMProvider(
+                            [recommendation_output()],
+                            provider="saved-lifecycle-recommendation-provider",
+                        ),
+                        model="fake-practice-model",
+                    ),
+                ).process_one()
+
+                with TestClient(app) as client:
+                    references_queued = client.post(
+                        f"/api/practice/sessions/{session_id}/evaluation/refresh",
+                        json={"version": 3},
+                        headers=headers,
+                    )
+                    assert references_queued.status_code == 200
+                    assert references_queued.json()["status"] == "evaluating"
+                    assert references_queued.json()["version"] == 3
+                await complete_queued_reference_answers(database)
+
+                with TestClient(app) as client:
+                    review = client.post(
+                        f"/api/practice/sessions/{session_id}/evaluation/refresh",
+                        json={"version": 3},
+                        headers=headers,
+                    )
+                    assert review.status_code == 200
+                    review_body = review.json()
+                    assert review_body["status"] == "review"
+                    assert review_body["version"] == 4
+                    assert review_body["question"]["id"] == str(saved_card.id)
+
+                    completed = client.post(
+                        f"/api/practice/sessions/{session_id}/complete",
+                        json={"version": 4},
+                        headers=headers,
+                    )
+                    assert completed.status_code == 200
+                    assert completed.json()["status"] == "completed"
+                    assert completed.json()["version"] == 5
+
+                    record = client.get(
+                        f"/api/training-records/practice/{session_id}"
+                    )
+                    assert record.status_code == 200
+                    record_body = record.json()
+
+                assert record_body["recordId"] == str(session_id)
+                assert record_body["status"] == "completed"
+                assert record_body["setup"] == {
+                    "source": "saved",
+                    "prioritizeWeaknesses": False,
+                }
+                assert len(record_body["attempts"]) == 1
+                record_attempt = record_body["attempts"][0]
+                assert record_attempt["attemptId"] == str(attempt_id)
+                assert record_attempt["attemptNumber"] == 1
+                assert record_attempt["question"]["questionCardId"] == str(
+                    saved_card.id
+                )
+                assert record_attempt["question"]["prompt"] == saved_card.prompt
+                assert record_attempt["question"]["referenceAnswer"]["status"] == (
+                    "revealed"
+                )
+                assert record_attempt["mainAnswer"]["content"] == (
+                    "I owned the rollout and reduced failures."
+                )
+                assert record_attempt["evaluation"]["overallScore"] == 82
+                assert record_attempt["review"]["overallPerformance"] == (
+                    "Strong answer with a measurable result."
+                )
+                assert record_attempt["recommendation"]["action"] == "nextQuestion"
+
+                async with database.sessionmaker() as session:
+                    question_runs = list(
+                        (
+                            await session.scalars(
+                                select(AgentRun).where(
+                                    AgentRun.user_id == owner.id,
+                                    AgentRun.agent_id == "question-generator",
+                                )
+                            )
+                        ).all()
+                    )
+                    assert {run.id for run in question_runs} == (
+                        original_question_run_ids
+                    )
+                    assert len(question_runs) == len(original_question_runs)
+                    for agent_id in (
+                        "follow-up-generator",
+                        "practice-evaluator",
+                        "practice-reviewer",
+                        "practice-recommender",
+                    ):
+                        runs = list(
+                            (
+                                await session.scalars(
+                                    select(AgentRun).where(
+                                        AgentRun.user_id == owner.id,
+                                        AgentRun.agent_id == agent_id,
+                                    )
+                                )
+                            ).all()
+                        )
+                        assert len(runs) == 1
+
+                    persisted_card = await session.get(QuestionCard, saved_card.id)
+                    persisted_session = await session.get(
+                        PracticeSession, session_id
+                    )
+                    persisted_attempt = await session.get(
+                        PracticeAttempt, attempt_id
+                    )
+                    assert persisted_card is not None
+                    assert persisted_card.source_agent_run_id == original_source_run_id
+                    assert persisted_card.is_saved is True
+                    assert persisted_session is not None
+                    assert persisted_session.source == "saved"
+                    assert persisted_attempt is not None
+                    assert persisted_attempt.question_generation_run_id is None
             finally:
                 await database.reset()
 

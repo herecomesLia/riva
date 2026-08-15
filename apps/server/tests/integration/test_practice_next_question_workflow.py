@@ -333,6 +333,18 @@ async def produce_first_review(
             model="fake-practice-model",
         ),
     ).process_one()
+
+    async with database.sessionmaker() as session:
+        references_queued = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).refresh_evaluation_generation(
+            user_id=owner.id,
+            session_id=session_id,
+            expected_version=4,
+        )
+        assert references_queued.session.version == 4
+        assert references_queued.attempt.status == "evaluating"
     await complete_queued_reference_answers(database)
     async with database.sessionmaker() as session:
         review = await PracticeSessionService(
