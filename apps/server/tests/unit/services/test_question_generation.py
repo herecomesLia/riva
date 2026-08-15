@@ -30,8 +30,16 @@ from riva.schemas.question_cards import (
 from riva.schemas.question_generation import (
     QuestionGenerationOutput,
     QuestionGenerationRunPayload,
+    QuestionGenerationWeaknessEvidence,
 )
 from riva.schemas.practice_reference_answer import PracticeReferenceFrozenContext
+from riva.services.practice_weaknesses import (
+    PracticeWeaknessEvidence,
+    PracticeWeaknessFocus,
+)
+from riva.services.question_generation_prompt_versions import (
+    QUESTION_GENERATION_LEGACY_PROMPT,
+)
 from riva.services.question_generation import (
     INVALID_QUESTION_GENERATION_RUN,
     QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY,
@@ -47,6 +55,7 @@ from riva.services.question_generation import (
     QuestionGenerationStateError,
     build_question_generation_profile_context,
     question_generation_output_from_card,
+    validate_question_generation_run,
 )
 
 
@@ -422,6 +431,27 @@ def test_load_generation_input_rebuilds_real_db_snapshot() -> None:
     assert session.rollback_count == 0
 
 
+def test_load_generation_input_rehydrates_weakness_focus_from_run_payload() -> None:
+    owner, role, profile, analysis, matching = graph()
+    run_payload = payload(role, profile, analysis, matching)
+    evidence = QuestionGenerationWeaknessEvidence(
+        weakness="Ownership evidence",
+        source_attempt_id=uuid4(),
+        source_target_role_id=role.id,
+        source_question_type="behavioral",
+        reviewed_at=NOW,
+    )
+    run_payload.weakness_focus = [evidence]
+    run = run_for(owner, run_payload)
+    session = ScriptedSession(role, profile, analysis, matching)
+
+    result = asyncio.run(service_for(session).load_generation_input(run))
+
+    assert len(result.weakness_focus) == 1
+    assert result.weakness_focus[0].weakness == "Ownership evidence"
+    assert result.weakness_focus[0].source_target_role_id == role.id
+
+
 def test_enqueue_generation_freezes_only_snapshot_and_controls() -> None:
     owner, role, profile, analysis, matching = graph()
     expected_run = run_for(owner, payload(role, profile, analysis, matching))
@@ -447,7 +477,7 @@ def test_enqueue_generation_freezes_only_snapshot_and_controls() -> None:
     call = fake_agent_runs.calls[0]
     assert call["agent_id"] == "question-generator"
     assert call["prompt_id"] == QUESTION_GENERATION_PROMPT.prompt_id
-    assert call["prompt_version"] == "1"
+    assert call["prompt_version"] == "2"
     assert call["output_schema_id"] == "question-generation-v1"
     assert call["model"] == "test-model"
     assert call["max_attempts"] == 3
@@ -462,7 +492,67 @@ def test_enqueue_generation_freezes_only_snapshot_and_controls() -> None:
         "interactionLanguage": "en",
         "questionType": "projectDeepDive",
         "difficulty": "basic",
+        "weaknessFocus": [],
     }
+
+
+def test_enqueue_generation_snapshots_weakness_focus_without_requerying_it() -> None:
+    owner, role, profile, analysis, matching = graph()
+    expected_run = run_for(owner, payload(role, profile, analysis, matching))
+    fake_agent_runs = FakeAgentRunService(expected_run)
+    session = ScriptedSession(owner.id, role, profile, analysis, matching)
+    focus = PracticeWeaknessFocus(
+        evidence=(
+            PracticeWeaknessEvidence(
+                weakness="  ownership evidence  ",
+                source_attempt_id=uuid4(),
+                source_target_role_id=role.id,
+                source_question_type=QuestionCardQuestionType.BEHAVIORAL,
+                reviewed_at=NOW,
+            ),
+        )
+    )
+
+    asyncio.run(
+        QuestionGenerationService(
+            session,  # type: ignore[arg-type]
+            llm_model="test-model",
+            agent_run_service_factory=lambda _session: fake_agent_runs,  # type: ignore[arg-type]
+        ).enqueue_generation(
+            user_id=owner.id,
+            target_role_id=role.id,
+            question_type=QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+            difficulty=QuestionCardDifficulty.BASIC,
+            interaction_language="en",
+            idempotency_key="weakness-aware-request",
+            weakness_focus=focus,
+        )
+    )
+
+    call = fake_agent_runs.calls[0]
+    serialized_payload = call["payload"]
+    assert isinstance(serialized_payload, dict)
+    assert serialized_payload["weaknessFocus"] == [
+        {
+            "weakness": "ownership evidence",
+            "sourceAttemptId": str(focus.evidence[0].source_attempt_id),
+            "sourceTargetRoleId": str(role.id),
+            "sourceQuestionType": "behavioral",
+            "reviewedAt": NOW.isoformat().replace("+00:00", "Z"),
+        }
+    ]
+
+
+def test_v1_run_without_weakness_focus_keeps_empty_backward_compatible_snapshot() -> None:
+    owner, role, profile, analysis, matching = graph()
+    run_payload = payload(role, profile, analysis, matching)
+    run = run_for(owner, run_payload)
+    run.prompt_version = QUESTION_GENERATION_LEGACY_PROMPT.version
+    run.payload.pop("weaknessFocus", None)
+
+    validated = validate_question_generation_run(run)
+
+    assert validated.weakness_focus == []
 
 
 def test_enqueue_generation_in_transaction_does_not_commit_or_rollback() -> None:
@@ -611,10 +701,19 @@ def test_load_generation_input_rejects_unready_jd_context(
     assert error.value.code == expected
 
 
-def test_persist_success_creates_question_card_with_lineage() -> None:
+@pytest.mark.parametrize(
+    "prompt_version",
+    [QUESTION_GENERATION_LEGACY_PROMPT.version, QUESTION_GENERATION_PROMPT.version],
+)
+def test_persist_success_creates_question_card_with_lineage(
+    prompt_version: str,
+) -> None:
     owner, role, profile, analysis, matching = graph()
     run_payload = payload(role, profile, analysis, matching)
     run = run_for(owner, run_payload)
+    if prompt_version == QUESTION_GENERATION_LEGACY_PROMPT.version:
+        run.prompt_version = prompt_version
+        run.payload.pop("weaknessFocus", None)
     session = ScriptedSession(
         owner.id,
         None,

@@ -26,6 +26,10 @@ from riva.schemas.practice_reference_answer import (
     PracticeReferenceFrozenContext,
     PracticeReferencePreviousFollowUpRunPayload,
 )
+from riva.schemas.question_generation import (
+    MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
+    QuestionGenerationWeaknessEvidence,
+)
 from riva.utils import utc_now
 
 
@@ -442,6 +446,8 @@ def _serialize_payload(
             serialized[key] = _serialize_reference_context(value)
         elif key == "previousFollowUps":
             serialized[key] = _serialize_previous_follow_ups(value)
+        elif key == "weaknessFocus":
+            serialized[key] = _serialize_weakness_focus(value)
         elif key == "nextFollowUpOrder":
             if (
                 isinstance(value, bool)
@@ -511,6 +517,23 @@ def _serialize_previous_follow_ups(value: object) -> list[JSONValue]:
     except (TypeError, ValueError, ValidationError):
         raise ValueError(
             "payload.previousFollowUps must contain valid follow-up lineage"
+        ) from None
+
+
+def _serialize_weakness_focus(value: object) -> list[JSONValue]:
+    try:
+        evidence = TypeAdapter(
+            list[QuestionGenerationWeaknessEvidence]
+        ).validate_python(value)
+        if len(evidence) > MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS:
+            raise ValueError
+        return cast(
+            list[JSONValue],
+            [item.model_dump(mode="json", by_alias=True) for item in evidence],
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.weaknessFocus must contain valid weakness evidence"
         ) from None
 
 

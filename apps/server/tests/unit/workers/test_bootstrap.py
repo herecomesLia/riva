@@ -18,7 +18,13 @@ from riva.agents import (
 )
 from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
+from riva.prompts import (
+    JOB_DESCRIPTION_PARSING_PROMPT,
+    QUESTION_GENERATION_PROMPT,
+)
+from riva.services.question_generation_prompt_versions import (
+    get_question_generation_prompt,
+)
 from riva.workers import (
     AgentHandlerRegistry,
     DuplicateAgentHandlerError,
@@ -317,6 +323,14 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(question_generation, QuestionGenerationHandler)
     assert isinstance(question_generation.agent, QuestionGenerationAgent)
     assert question_generation.agent.provider is provider
+    assert question_generation.agent.prompt_version == "2"
+    assert question_generation.agent.prompt is QUESTION_GENERATION_PROMPT
+    assert question_generation.legacy_agent is not None
+    assert question_generation.legacy_agent.prompt_version == "1"
+    assert (
+        question_generation.legacy_agent.prompt
+        is get_question_generation_prompt("1")
+    )
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)
@@ -387,6 +401,12 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(question_generation.agent, QuestionGenerationAgent)
     assert question_generation.agent.provider is handler.agent.provider
     assert question_generation.agent.model == "qwen-test-model"
+    assert question_generation.legacy_agent is not None
+    assert question_generation.legacy_agent.prompt_version == "1"
+    assert (
+        question_generation.legacy_agent.prompt
+        is get_question_generation_prompt("1")
+    )
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)

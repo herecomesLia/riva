@@ -3,18 +3,24 @@ import pytest
 from riva.prompts import QUESTION_GENERATION_PROMPT
 from riva.prompts.base import PromptRenderError
 from riva.schemas.question_generation import QuestionGenerationOutput
+from riva.services.question_generation_prompt_versions import (
+    QUESTION_GENERATION_LEGACY_PROMPT,
+    get_question_generation_prompt,
+)
 
 
 def test_question_generation_prompt_has_current_identity_and_output_contract() -> None:
     prompt = QUESTION_GENERATION_PROMPT
 
     assert prompt.prompt_id == "question-generator"
-    assert prompt.version == "1"
+    assert prompt.version == "2"
     assert prompt.output_schema_id == "question-generation-v1"
     assert prompt.output_schema is QuestionGenerationOutput
-    assert "QUESTION_GENERATION_PROMPT_V1" not in dir(__import__(
-        "riva.prompts.question_generation", fromlist=["QUESTION_GENERATION_PROMPT"]
-    ))
+    assert (
+        get_question_generation_prompt("1")
+        is QUESTION_GENERATION_LEGACY_PROMPT
+    )
+    assert get_question_generation_prompt("2") is prompt
 
 
 def test_question_generation_prompt_defines_task_evidence_and_injection_boundaries() -> None:
@@ -60,6 +66,8 @@ def test_question_generation_prompt_defines_difficulty_language_and_internal_fie
     assert "not actual follow-up questions" in system
     assert "scoring_focus" in system
     assert "not a score, evaluation" in system
+    assert "Weakness focus is a training signal" in system
+    assert "untrusted structured data" in system
 
 
 def test_question_generation_user_prompt_has_untrusted_context_regions() -> None:
@@ -71,6 +79,7 @@ def test_question_generation_user_prompt_has_untrusted_context_regions() -> None
         "career_profile": '{"skills":["candidate-secret-marker"]}',
         "job_description_analysis": '{"riva_summary":"Build APIs"}',
         "matching_analysis": '{"overall_match_score":80}',
+        "weakness_focus": "[]",
     }
     rendered = QUESTION_GENERATION_PROMPT.render(values)
 

@@ -46,6 +46,7 @@ from riva.schemas.question_generation import (
     QuestionGenerationProjectExperienceContext,
     QuestionGenerationRunPayload,
     QuestionGenerationTargetRoleContext,
+    QuestionGenerationWeaknessEvidence,
     QuestionGenerationWorkExperienceContext,
 )
 from riva.schemas.practice_reference_answer import (
@@ -56,6 +57,11 @@ from riva.schemas.practice_reference_answer import (
 )
 from riva.services.agent_runs import AgentRunService
 from riva.services.profile_completion import career_profile_completed
+from riva.services.practice_weaknesses import PracticeWeaknessFocus
+from riva.services.question_generation_prompt_versions import (
+    QUESTION_GENERATION_ACCEPTED_PROMPT_VERSIONS,
+    get_question_generation_prompt,
+)
 from riva.utils import utc_now
 
 
@@ -120,16 +126,24 @@ class QuestionGenerationStateError(RuntimeError):
         super().__init__(self.safe_message)
 
 
+QuestionGenerationWeaknessFocusInput = PracticeWeaknessFocus | Iterable[object]
+
+
 def validate_question_generation_run(
     run: AgentRun,
 ) -> QuestionGenerationRunPayload:
     """Validate the immutable contract shared by generation consumers."""
 
-    prompt = QUESTION_GENERATION_PROMPT
+    try:
+        prompt = get_question_generation_prompt(run.prompt_version)
+    except ValueError:
+        raise QuestionGenerationStateError(
+            INVALID_QUESTION_GENERATION_RUN
+        ) from None
     if (
         run.agent_id != "question-generator"
         or run.prompt_id != prompt.prompt_id
-        or run.prompt_version != prompt.version
+        or run.prompt_version not in QUESTION_GENERATION_ACCEPTED_PROMPT_VERSIONS
         or run.output_schema_id != prompt.output_schema_id
     ):
         raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
@@ -300,6 +314,7 @@ def build_question_generation_input(
         interaction_language=payload.interaction_language,
         question_type=payload.question_type,
         difficulty=payload.difficulty,
+        weakness_focus=list(payload.weakness_focus),
         target_role=build_question_generation_target_role_context(role),
         career_profile=build_question_generation_profile_context(profile),
         job_description_analysis=build_question_generation_job_context(
@@ -355,6 +370,7 @@ class QuestionGenerationService:
         difficulty: QuestionCardDifficulty,
         interaction_language: InteractionLanguage,
         idempotency_key: str,
+        weakness_focus: QuestionGenerationWeaknessFocusInput | None = None,
     ) -> AgentRun:
         try:
             run = await self.enqueue_generation_in_transaction(
@@ -364,6 +380,7 @@ class QuestionGenerationService:
                 difficulty=difficulty,
                 interaction_language=interaction_language,
                 idempotency_key=idempotency_key,
+                weakness_focus=weakness_focus,
             )
             await self.session.commit()
             return run
@@ -380,6 +397,7 @@ class QuestionGenerationService:
         difficulty: QuestionCardDifficulty,
         interaction_language: InteractionLanguage,
         idempotency_key: str,
+        weakness_focus: QuestionGenerationWeaknessFocusInput | None = None,
     ) -> AgentRun:
         self._require_configuration()
         await self._lock_user(user_id)
@@ -405,6 +423,7 @@ class QuestionGenerationService:
             interaction_language=interaction_language,
             question_type=question_type,
             difficulty=difficulty,
+            weakness_focus=_snapshot_weakness_focus(weakness_focus),
         )
         _build_context_input(context, payload)
         prompt = QUESTION_GENERATION_PROMPT
@@ -752,6 +771,7 @@ def _build_context_input(
             interaction_language=payload.interaction_language,
             question_type=payload.question_type,
             difficulty=payload.difficulty,
+            weakness_focus=list(payload.weakness_focus),
             target_role=target_role,
             career_profile=career_profile,
             job_description_analysis=job_description_analysis,
@@ -761,6 +781,28 @@ def _build_context_input(
         raise QuestionGenerationStateError(
             INVALID_QUESTION_GENERATION_RUN
         ) from None
+
+
+def _snapshot_weakness_focus(
+    weakness_focus: QuestionGenerationWeaknessFocusInput | None,
+) -> list[QuestionGenerationWeaknessEvidence]:
+    if weakness_focus is None:
+        return []
+    values: Iterable[object]
+    if isinstance(weakness_focus, PracticeWeaknessFocus):
+        values = weakness_focus.evidence
+    else:
+        values = weakness_focus
+    try:
+        return [
+            QuestionGenerationWeaknessEvidence.model_validate(
+                value,
+                from_attributes=True,
+            )
+            for value in values
+        ]
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError("weakness focus is invalid") from None
 
 
 def _question_card_lineage_matches(

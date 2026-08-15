@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -15,6 +16,8 @@ from riva.schemas.question_generation import (
     MAX_QUESTION_GENERATION_PROFILE_SKILLS,
     QuestionGenerationInput,
     QuestionGenerationOutput,
+    QuestionGenerationRunPayload,
+    QuestionGenerationWeaknessEvidence,
 )
 from tests.helpers.question_generation import (
     valid_question_generation_input,
@@ -147,6 +150,78 @@ def test_question_generation_input_profile_skill_count_is_bounded() -> None:
 
     with pytest.raises(ValidationError):
         QuestionGenerationInput.model_validate(payload)
+
+
+def test_question_generation_run_payload_snapshots_weakness_focus_with_aliases() -> None:
+    evidence = QuestionGenerationWeaknessEvidence(
+        weakness="Ownership evidence",
+        source_attempt_id=uuid4(),
+        source_target_role_id=uuid4(),
+        source_question_type="behavioral",
+        reviewed_at=datetime(2026, 8, 12, tzinfo=UTC),
+    )
+    payload = QuestionGenerationRunPayload(
+        role_id=uuid4(),
+        profile_id=uuid4(),
+        profile_version=1,
+        job_description_version=1,
+        job_description_analysis_version=1,
+        matching_analysis_run_id=uuid4(),
+        interaction_language="en",
+        question_type="behavioral",
+        difficulty="basic",
+        weakness_focus=[evidence],
+    )
+
+    serialized = payload.model_dump(mode="json", by_alias=True)
+
+    assert serialized["weaknessFocus"] == [
+        evidence.model_dump(mode="json", by_alias=True)
+    ]
+
+
+def test_question_generation_run_payload_v1_without_weakness_focus_defaults_empty() -> None:
+    payload = QuestionGenerationRunPayload(
+        role_id=uuid4(),
+        profile_id=uuid4(),
+        profile_version=1,
+        job_description_version=1,
+        job_description_analysis_version=1,
+        matching_analysis_run_id=uuid4(),
+        interaction_language="en",
+        question_type="behavioral",
+        difficulty="basic",
+    )
+    serialized = payload.model_dump(mode="json", by_alias=True)
+    serialized.pop("weaknessFocus")
+
+    parsed = QuestionGenerationRunPayload.model_validate(serialized)
+
+    assert parsed.weakness_focus == []
+
+
+def test_question_generation_weakness_focus_is_bounded_to_eight_items() -> None:
+    evidence = QuestionGenerationWeaknessEvidence(
+        weakness="Ownership evidence",
+        source_attempt_id=uuid4(),
+        source_target_role_id=uuid4(),
+        source_question_type="behavioral",
+        reviewed_at=datetime(2026, 8, 12, tzinfo=UTC),
+    )
+
+    with pytest.raises(ValidationError):
+        QuestionGenerationRunPayload(
+            role_id=uuid4(),
+            profile_id=uuid4(),
+            profile_version=1,
+            job_description_version=1,
+            job_description_analysis_version=1,
+            matching_analysis_run_id=uuid4(),
+            interaction_language="en",
+            question_type="behavioral",
+            difficulty="basic",
+            weakness_focus=[evidence] * 9,
+        )
 
 
 def test_question_generation_schemas_reject_extra_fields() -> None:

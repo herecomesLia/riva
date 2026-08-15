@@ -13,6 +13,7 @@ from riva.integrations import (
     StructuredOutputValidationError,
 )
 from riva.prompts import QUESTION_GENERATION_PROMPT
+from riva.prompts.base import PromptDefinition
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_MATERIAL_LABEL_LENGTH,
     QuestionCardMaterialType,
@@ -20,6 +21,9 @@ from riva.schemas.question_cards import (
 from riva.schemas.question_generation import (
     QuestionGenerationInput,
     QuestionGenerationOutput,
+)
+from riva.services.question_generation_prompt_versions import (
+    get_question_generation_prompt,
 )
 
 
@@ -61,10 +65,14 @@ class QuestionGenerationAgent(
         provider: LLMProvider,
         model: str,
         parameters: GenerationParameters | None = None,
+        *,
+        prompt: PromptDefinition[QuestionGenerationOutput] = (
+            QUESTION_GENERATION_PROMPT
+        ),
     ) -> None:
         super().__init__(
             provider=provider,
-            prompt=QUESTION_GENERATION_PROMPT,
+            prompt=prompt,
             model=model,
             parameters=parameters,
         )
@@ -76,7 +84,7 @@ class QuestionGenerationAgent(
     def prompt_values(
         self, input: QuestionGenerationInput
     ) -> Mapping[str, object]:
-        return {
+        values: dict[str, object] = {
             "interaction_language": input.interaction_language,
             "question_type": input.question_type.value,
             "difficulty": input.difficulty.value,
@@ -87,6 +95,18 @@ class QuestionGenerationAgent(
             ),
             "matching_analysis": _stable_json(input.matching_analysis),
         }
+        resolved_prompt = get_question_generation_prompt(self.prompt.version)
+        if resolved_prompt.version == QUESTION_GENERATION_PROMPT.version:
+            values["weakness_focus"] = json.dumps(
+                [
+                    evidence.model_dump(mode="json", by_alias=True)
+                    for evidence in input.weakness_focus
+                ],
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        return values
 
     async def run(
         self, input: QuestionGenerationInput

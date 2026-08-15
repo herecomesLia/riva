@@ -21,6 +21,9 @@ from riva.schemas.question_generation import (
     QuestionGenerationOutput,
 )
 from riva.services.question_generation import QuestionGenerationStateError
+from riva.services.question_generation_prompt_versions import (
+    get_question_generation_prompt,
+)
 from riva.workers import AgentExecutionError, QuestionGenerationHandler
 from riva.workers.question_generation import QuestionGenerationServiceFactory
 from riva.workers.runtime import SessionFactory
@@ -209,9 +212,14 @@ class FakeAgent:
         self,
         sessions: FakeSessionFactory,
         response: AgentResult[BaseModel] | Exception,
+        *,
+        prompt_version: str = "1",
     ) -> None:
         self.sessions = sessions
         self.response = response
+        self.prompt_id = "question-generator"
+        self.prompt_version = prompt_version
+        self.prompt = get_question_generation_prompt(prompt_version)
         self.inputs: list[QuestionGenerationInput] = []
 
     async def run(
@@ -229,10 +237,13 @@ def handler(
     sessions: FakeSessionFactory,
     state: GenerationState,
     agent: FakeAgent,
+    *,
+    legacy_agent: FakeAgent | None = None,
 ) -> QuestionGenerationHandler:
     return QuestionGenerationHandler(
         session_factory=cast(SessionFactory, sessions),
         agent=cast(QuestionGenerationAgent, agent),
+        legacy_agent=cast(QuestionGenerationAgent | None, legacy_agent),
         generation_service_factory=cast(
             QuestionGenerationServiceFactory,
             lambda session: FakeGenerationService(
@@ -241,6 +252,76 @@ def handler(
             ),
         ),
     )
+
+
+def test_handler_routes_v1_and_v2_runs_to_matching_agents() -> None:
+    async def run_test() -> None:
+        sessions = FakeSessionFactory()
+        state = GenerationState(sessions)
+        legacy = FakeAgent(
+            sessions,
+            agent_result(prompt_version="1"),
+            prompt_version="1",
+        )
+        current = FakeAgent(
+            sessions,
+            agent_result(prompt_version="2"),
+            prompt_version="2",
+        )
+        current_run = running_agent_run()
+        current_run.prompt_version = "2"
+
+        await handler(
+            sessions,
+            state,
+            current,
+            legacy_agent=legacy,
+        ).execute(running_agent_run())
+        await handler(
+            sessions,
+            state,
+            current,
+            legacy_agent=legacy,
+        ).execute(current_run)
+
+        assert len(legacy.inputs) == 1
+        assert len(current.inputs) == 1
+
+    asyncio.run(run_test())
+
+
+def test_handler_rejects_unsupported_prompt_version_as_non_retryable() -> None:
+    sessions = FakeSessionFactory()
+    state = GenerationState(sessions)
+    run = running_agent_run()
+    run.prompt_version = "99"
+    current = FakeAgent(
+        sessions,
+        agent_result(prompt_version="2"),
+        prompt_version="2",
+    )
+
+    with pytest.raises(AgentExecutionError) as error:
+        asyncio.run(handler(sessions, state, current).execute(run))
+
+    assert error.value.retryable is False
+    assert sessions.created == 0
+
+
+def test_handler_does_not_use_v2_agent_for_v1_run() -> None:
+    sessions = FakeSessionFactory()
+    state = GenerationState(sessions)
+    current = FakeAgent(
+        sessions,
+        agent_result(prompt_version="2"),
+        prompt_version="2",
+    )
+
+    with pytest.raises(AgentExecutionError) as error:
+        asyncio.run(handler(sessions, state, current).execute(running_agent_run()))
+
+    assert error.value.retryable is False
+    assert sessions.created == 0
 
 
 def test_handler_loads_generates_persists_and_returns_result() -> None:

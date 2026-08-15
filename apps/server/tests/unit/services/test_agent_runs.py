@@ -10,7 +10,10 @@ from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
-from riva.schemas.question_generation import QuestionGenerationRunPayload
+from riva.schemas.question_generation import (
+    QuestionGenerationRunPayload,
+    QuestionGenerationWeaknessEvidence,
+)
 from riva.schemas.resume_parsing import ResumeParsingRunPayload
 from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.practice_reference_answer import (
@@ -81,6 +84,22 @@ def test_serialize_payload_accepts_question_generation_invocation_metadata() -> 
     ) == {
         "questionType": "technicalFoundation",
         "difficulty": "pressure",
+    }
+
+
+def test_serialize_payload_accepts_question_generation_weakness_focus() -> None:
+    evidence = QuestionGenerationWeaknessEvidence(
+        weakness="Ownership evidence",
+        source_attempt_id=uuid4(),
+        source_target_role_id=uuid4(),
+        source_question_type=QuestionCardQuestionType.BEHAVIORAL,
+        reviewed_at=datetime(2026, 8, 12, tzinfo=UTC),
+    )
+
+    assert _serialize_payload(
+        {"weaknessFocus": [evidence.model_dump(mode="json", by_alias=True)]}
+    ) == {
+        "weaknessFocus": [evidence.model_dump(mode="json", by_alias=True)]
     }
 
 
@@ -282,6 +301,7 @@ def test_question_generation_run_payload_is_strict_and_camel_case() -> None:
         "interactionLanguage": "en",
         "questionType": "projectDeepDive",
         "difficulty": "pressure",
+        "weaknessFocus": [],
     }
 
     with pytest.raises(ValueError):

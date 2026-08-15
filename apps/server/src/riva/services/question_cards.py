@@ -154,10 +154,9 @@ class QuestionCardService:
                 AgentRun.user_id == user_id,
                 AgentRun.agent_id == "question-generator",
                 AgentRun.prompt_id == prompt.prompt_id,
-                AgentRun.prompt_version == prompt.version,
                 AgentRun.output_schema_id == prompt.output_schema_id,
                 AgentRun.idempotency_key == idempotency_key,
-            )
+            ).order_by(AgentRun.created_at.asc(), AgentRun.id.asc()).limit(1)
         )
 
     async def _load_run(self, *, user_id: UUID, run_id: UUID) -> AgentRun:
@@ -248,8 +247,8 @@ class QuestionCardService:
         run: AgentRun,
     ) -> QuestionGenerationRunPayload:
         try:
-            return QuestionGenerationRunPayload.model_validate(run.payload)
-        except ValidationError:
+            return validate_question_generation_run(run)
+        except (ValidationError, QuestionGenerationStateError):
             raise _state_conflict() from None
 
     @staticmethod

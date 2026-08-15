@@ -26,6 +26,9 @@ from riva.integrations import (
     LLMProviderConfigurationError,
     build_llm_provider,
 )
+from riva.services.question_generation_prompt_versions import (
+    get_question_generation_prompt,
+)
 from riva.workers.handlers import AgentHandlerRegistry
 from riva.workers.follow_up import FollowUpHandler
 from riva.workers.job_description_parsing import (
@@ -144,9 +147,15 @@ def build_agent_handler_registry(
         provider=provider,
         model=model,
     )
+    question_generation_legacy_agent = QuestionGenerationAgent(
+        provider=provider,
+        model=model,
+        prompt=get_question_generation_prompt("1"),
+    )
     question_generation_handler = question_generation_handler_factory(
         session_factory=session_factory,
         agent=question_generation_agent,
+        legacy_agent=question_generation_legacy_agent,
     )
     follow_up_agent = follow_up_agent_factory(
         provider=provider,

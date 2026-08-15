@@ -23,6 +23,9 @@ from riva.services.question_cards import (
     QuestionCardService,
 )
 from riva.services.question_generation import QuestionGenerationStateError
+from riva.services.question_generation_prompt_versions import (
+    QUESTION_GENERATION_LEGACY_PROMPT,
+)
 
 
 NOW = datetime(2026, 8, 10, 10, 0, tzinfo=UTC)
@@ -230,6 +233,37 @@ def test_duplicate_request_id_returns_existing_state_before_configuration_check(
 
     assert response.status == "failed"
     assert response.failure_reason == QUESTION_GENERATION_FAILURE_REASON
+    assert fake_generation.calls == []
+
+
+def test_duplicate_request_id_replays_existing_v1_run_without_v2_duplicate() -> None:
+    owner = user()
+    run_payload = payload()
+    request_id = uuid4()
+    existing = run_for(
+        owner.id,
+        run_payload,
+        idempotency_key=f"question-generation:{request_id}",
+    )
+    existing.prompt_version = QUESTION_GENERATION_LEGACY_PROMPT.version
+    existing.payload.pop("weaknessFocus", None)
+    fake_generation = FakeGenerationService()
+    session = ScriptedSession(existing)
+
+    response = asyncio.run(
+        service(
+            session,
+            fake_generation,
+            provider=None,
+            model=None,
+        ).start_generation(
+            owner,
+            start_payload(run_payload, request_id=request_id),
+            interaction_language="en",
+        )
+    )
+
+    assert response.status == "queued"
     assert fake_generation.calls == []
 
 

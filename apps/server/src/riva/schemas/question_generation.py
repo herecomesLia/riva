@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import BeforeValidator, BaseModel, ConfigDict, Field
@@ -28,6 +29,7 @@ MAX_QUESTION_GENERATION_WORK_EXPERIENCE_ITEMS = 20
 MAX_QUESTION_GENERATION_PROJECT_EXPERIENCE_ITEMS = 20
 MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS = 100
 MAX_QUESTION_GENERATION_PROFILE_SKILLS = 200
+MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS = 8
 
 
 def _normalize_text_list(value: object) -> object:
@@ -63,6 +65,24 @@ QuestionGenerationProfileSkillList = Annotated[
 
 class _QuestionGenerationModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class QuestionGenerationWeaknessEvidence(_QuestionGenerationModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+        from_attributes=True,
+    )
+
+    weakness: RequiredText
+    source_attempt_id: StandardUUID = Field(alias="sourceAttemptId")
+    source_target_role_id: StandardUUID = Field(alias="sourceTargetRoleId")
+    source_question_type: QuestionCardQuestionType = Field(
+        alias="sourceQuestionType"
+    )
+    reviewed_at: datetime = Field(alias="reviewedAt")
 
 
 class QuestionGenerationTargetRoleContext(_QuestionGenerationModel):
@@ -123,6 +143,10 @@ class QuestionGenerationInput(_QuestionGenerationModel):
     interaction_language: InteractionLanguage
     question_type: QuestionCardQuestionType
     difficulty: QuestionCardDifficulty
+    weakness_focus: list[QuestionGenerationWeaknessEvidence] = Field(
+        default_factory=list,
+        max_length=MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
+    )
     target_role: QuestionGenerationTargetRoleContext
     career_profile: QuestionGenerationProfileContext
     job_description_analysis: QuestionGenerationJobContext
@@ -166,6 +190,11 @@ class QuestionGenerationRunPayload(BaseModel):
     interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
     question_type: QuestionCardQuestionType = Field(alias="questionType")
     difficulty: QuestionCardDifficulty
+    weakness_focus: list[QuestionGenerationWeaknessEvidence] = Field(
+        alias="weaknessFocus",
+        default_factory=list,
+        max_length=MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
+    )
 
 
 __all__ = [
@@ -173,6 +202,7 @@ __all__ = [
     "MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS",
     "MAX_QUESTION_GENERATION_PROJECT_EXPERIENCE_ITEMS",
     "MAX_QUESTION_GENERATION_PROFILE_SKILLS",
+    "MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS",
     "MAX_QUESTION_GENERATION_WORK_EXPERIENCE_ITEMS",
     "QuestionGenerationEducationContext",
     "QuestionGenerationInput",
@@ -186,5 +216,6 @@ __all__ = [
     "QuestionGenerationSkill",
     "QuestionGenerationSkillList",
     "QuestionGenerationTargetRoleContext",
+    "QuestionGenerationWeaknessEvidence",
     "QuestionGenerationWorkExperienceContext",
 ]

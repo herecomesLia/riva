@@ -225,6 +225,7 @@ from riva.schemas.question_cards import (
     StartQuestionGenerationRequest,
 )
 from riva.schemas.question_generation import (
+    MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
     QuestionGenerationEducationContext,
     QuestionGenerationInput,
     QuestionGenerationJobContext,
@@ -234,6 +235,7 @@ from riva.schemas.question_generation import (
     QuestionGenerationProjectExperienceContext,
     QuestionGenerationRunPayload,
     QuestionGenerationTargetRoleContext,
+    QuestionGenerationWeaknessEvidence,
     QuestionGenerationWorkExperienceContext,
 )
 from riva.schemas.roles import (
@@ -442,7 +444,9 @@ __all__ = [
     "QuestionGenerationProjectExperienceContext",
     "QuestionGenerationRunPayload",
     "QuestionGenerationTargetRoleContext",
+    "QuestionGenerationWeaknessEvidence",
     "QuestionGenerationWorkExperienceContext",
+    "MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS",
     "StartQuestionGenerationRequest",
     "StartPracticeSessionRequest",
     "ActiveTargetRolePreparationStatus",
