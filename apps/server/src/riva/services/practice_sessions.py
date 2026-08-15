@@ -7,7 +7,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.language import InteractionLanguage
@@ -93,6 +93,10 @@ from riva.services.question_generation import (
     QuestionGenerationService,
     QuestionGenerationStateError,
     validate_question_generation_run,
+)
+from riva.services.practice_weaknesses import (
+    PracticeWeaknessFocus,
+    PracticeWeaknessService,
 )
 from riva.services.reference_answer_generation import (
     PracticeReferenceAnswerLifecycleStatus,
@@ -474,10 +478,16 @@ class PracticeSessionService:
                 TargetRole.preparation_status != "archived",
             )
         )
+        can_prioritize_weaknesses = await PracticeWeaknessService(
+            self.session
+        ).has_eligible_weakness(
+            user_id=user_id,
+            interaction_language=interaction_language,
+        )
         return PracticeSetupCapabilitiesResponse(
             saved_question_count=int(saved_question_count or 0),
             history_question_count=int(history_question_count or 0),
-            can_prioritize_weaknesses=False,
+            can_prioritize_weaknesses=can_prioritize_weaknesses,
         )
 
     async def start_session(
@@ -507,6 +517,33 @@ class PracticeSessionService:
                 await self.session.commit()
                 return context
 
+            if selection.prioritize_weaknesses and not await PracticeWeaknessService(
+                self.session
+            ).has_eligible_weakness(
+                user_id=user_id,
+                interaction_language=interaction_language,
+            ):
+                raise PracticeSessionStateError(
+                    PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE
+                )
+
+            weakness_focus = PracticeWeaknessFocus()
+            preferred_question_card_ids: frozenset[UUID] = frozenset()
+            if selection.prioritize_weaknesses:
+                weakness_focus = await self._load_weakness_focus(
+                    user_id=user_id,
+                    target_role_id=selection.target_role_id,
+                    question_type=selection.question_type,
+                    interaction_language=interaction_language,
+                )
+                if selection.source.value in REUSED_QUESTION_SOURCES:
+                    preferred_question_card_ids = (
+                        await self._load_weakness_question_card_ids(
+                            user_id=user_id,
+                            focus=weakness_focus,
+                        )
+                    )
+
             reused_question_card: QuestionCard | None = None
             if selection.source.value in REUSED_QUESTION_SOURCES:
                 reused_question_card = await self._load_reused_question_card(
@@ -516,6 +553,7 @@ class PracticeSessionService:
                     question_type=selection.question_type,
                     difficulty=selection.difficulty,
                     source=selection.source.value,
+                    preferred_question_card_ids=preferred_question_card_ids,
                 )
                 if reused_question_card is None:
                     raise PracticeSessionStateError(
@@ -534,7 +572,7 @@ class PracticeSessionService:
                 initial_question_type=selection.question_type.value,
                 initial_difficulty=selection.difficulty.value,
                 source=selection.source.value,
-                prioritize_weaknesses=False,
+                prioritize_weaknesses=selection.prioritize_weaknesses,
                 started_at=now,
                 completed_at=None,
                 completion_reason=None,
@@ -576,6 +614,9 @@ class PracticeSessionService:
                 )
 
             try:
+                generation_kwargs: dict[str, object] = {}
+                if selection.prioritize_weaknesses:
+                    generation_kwargs["weakness_focus"] = weakness_focus
                 run = await self._generation_service().enqueue_generation_in_transaction(
                     user_id=user_id,
                     target_role_id=practice_session.target_role_id,
@@ -586,6 +627,7 @@ class PracticeSessionService:
                         practice_session.id,
                         attempt.id,
                     ),
+                    **generation_kwargs,
                 )
             except QuestionGenerationStateError as error:
                 raise PracticeSessionStateError(
@@ -690,6 +732,34 @@ class PracticeSessionService:
                 recommendation,
             )
 
+            now = self.clock()
+            _require_aware_datetime(now)
+            previous_attempt = current_attempt
+            previous_status = current_attempt.status
+            previous_updated_at = current_attempt.updated_at
+            previous_version = practice_session.version
+            previous_session_updated_at = practice_session.updated_at
+            current_attempt.status = PracticeAttemptStatus.COMPLETED.value
+            current_attempt.updated_at = now
+            await self.session.flush()
+
+            weakness_focus = PracticeWeaknessFocus()
+            preferred_question_card_ids: frozenset[UUID] = frozenset()
+            if practice_session.prioritize_weaknesses:
+                weakness_focus = await self._load_weakness_focus(
+                    user_id=user_id,
+                    target_role_id=practice_session.target_role_id,
+                    question_type=next_question_type,
+                    interaction_language=practice_session.language,
+                )
+                if practice_session.source in REUSED_QUESTION_SOURCES:
+                    preferred_question_card_ids = (
+                        await self._load_weakness_question_card_ids(
+                            user_id=user_id,
+                            focus=weakness_focus,
+                        )
+                    )
+
             if practice_session.source in REUSED_QUESTION_SOURCES:
                 reused_question_card = await self._load_reused_question_card(
                     user_id=user_id,
@@ -699,19 +769,12 @@ class PracticeSessionService:
                     difficulty=next_difficulty,
                     source=practice_session.source,
                     exclude_question_id=current_attempt.question_card_id,
+                    preferred_question_card_ids=preferred_question_card_ids,
                 )
                 if reused_question_card is None:
                     raise PracticeSessionStateError(
                         PRACTICE_SESSION_SOURCE_UNAVAILABLE
                     )
-
-                now = self.clock()
-                _require_aware_datetime(now)
-                previous_attempt = current_attempt
-                previous_status = current_attempt.status
-                previous_updated_at = current_attempt.updated_at
-                previous_version = practice_session.version
-                previous_session_updated_at = practice_session.updated_at
 
                 next_attempt = PracticeAttempt(
                     id=uuid4(),
@@ -730,8 +793,6 @@ class PracticeSessionService:
                 )
                 next_attempt.question_card = reused_question_card
                 self.session.add(next_attempt)
-                current_attempt.status = PracticeAttemptStatus.COMPLETED.value
-                current_attempt.updated_at = now
                 practice_session.version += 1
                 practice_session.updated_at = now
                 await self.session.commit()
@@ -741,14 +802,6 @@ class PracticeSessionService:
                     question_generation_run=None,
                     question_card=reused_question_card,
                 )
-
-            now = self.clock()
-            _require_aware_datetime(now)
-            previous_attempt = current_attempt
-            previous_status = current_attempt.status
-            previous_updated_at = current_attempt.updated_at
-            previous_version = practice_session.version
-            previous_session_updated_at = practice_session.updated_at
 
             next_attempt = PracticeAttempt(
                 id=uuid4(),
@@ -773,6 +826,9 @@ class PracticeSessionService:
                 next_attempt.id,
             )
             try:
+                generation_kwargs: dict[str, object] = {}
+                if practice_session.prioritize_weaknesses:
+                    generation_kwargs["weakness_focus"] = weakness_focus
                 question_generation_run = (
                     await self._generation_service().enqueue_generation_in_transaction(
                         user_id=user_id,
@@ -781,6 +837,7 @@ class PracticeSessionService:
                         difficulty=next_difficulty,
                         interaction_language=practice_session.language,
                         idempotency_key=idempotency_key,
+                        **generation_kwargs,
                     )
                 )
             except QuestionGenerationStateError as error:
@@ -804,8 +861,6 @@ class PracticeSessionService:
             next_attempt.question_generation_run_id = question_generation_run.id
             next_attempt.question_generation_run = question_generation_run
 
-            current_attempt.status = PracticeAttemptStatus.COMPLETED.value
-            current_attempt.updated_at = now
             practice_session.version += 1
             practice_session.updated_at = now
             await self.session.commit()
@@ -904,6 +959,22 @@ class PracticeSessionService:
 
             question_type = QuestionCardQuestionType(current_attempt.question_type)
             difficulty = QuestionCardDifficulty(current_attempt.difficulty)
+            weakness_focus = PracticeWeaknessFocus()
+            preferred_question_card_ids: frozenset[UUID] = frozenset()
+            if practice_session.prioritize_weaknesses:
+                weakness_focus = await self._load_weakness_focus(
+                    user_id=user_id,
+                    target_role_id=practice_session.target_role_id,
+                    question_type=question_type,
+                    interaction_language=practice_session.language,
+                )
+                if practice_session.source in REUSED_QUESTION_SOURCES:
+                    preferred_question_card_ids = (
+                        await self._load_weakness_question_card_ids(
+                            user_id=user_id,
+                            focus=weakness_focus,
+                        )
+                    )
             if practice_session.source in REUSED_QUESTION_SOURCES:
                 replacement_card = await self._load_reused_question_card(
                     user_id=user_id,
@@ -913,6 +984,7 @@ class PracticeSessionService:
                     difficulty=difficulty,
                     source=practice_session.source,
                     exclude_question_id=current_attempt.question_card_id,
+                    preferred_question_card_ids=preferred_question_card_ids,
                 )
                 if replacement_card is None:
                     raise PracticeSessionStateError(
@@ -980,6 +1052,9 @@ class PracticeSessionService:
                 replacement_attempt.id,
             )
             try:
+                generation_kwargs: dict[str, object] = {}
+                if practice_session.prioritize_weaknesses:
+                    generation_kwargs["weakness_focus"] = weakness_focus
                 replacement_run = (
                     await self._generation_service().enqueue_generation_in_transaction(
                         user_id=user_id,
@@ -988,6 +1063,7 @@ class PracticeSessionService:
                         difficulty=difficulty,
                         interaction_language=practice_session.language,
                         idempotency_key=idempotency_key,
+                        **generation_kwargs,
                     )
                 )
             except QuestionGenerationStateError as error:
@@ -5618,6 +5694,45 @@ class PracticeSessionService:
             llm_model=self.llm_model,
         )
 
+    async def _load_weakness_focus(
+        self,
+        *,
+        user_id: UUID,
+        target_role_id: UUID,
+        question_type: QuestionCardQuestionType,
+        interaction_language: InteractionLanguage,
+    ) -> PracticeWeaknessFocus:
+        return await PracticeWeaknessService(self.session).get_focus(
+            user_id=user_id,
+            target_role_id=target_role_id,
+            question_type=question_type,
+            interaction_language=interaction_language,
+        )
+
+    async def _load_weakness_question_card_ids(
+        self,
+        *,
+        user_id: UUID,
+        focus: PracticeWeaknessFocus,
+    ) -> frozenset[UUID]:
+        source_attempt_ids = {
+            evidence.source_attempt_id for evidence in focus.evidence
+        }
+        if not source_attempt_ids:
+            return frozenset()
+        question_card_ids = await self.session.scalars(
+            select(PracticeAttempt.question_card_id).where(
+                PracticeAttempt.user_id == user_id,
+                PracticeAttempt.id.in_(source_attempt_ids),
+                PracticeAttempt.question_card_id.is_not(None),
+            )
+        )
+        return frozenset(
+            question_card_id
+            for question_card_id in question_card_ids.all()
+            if question_card_id is not None
+        )
+
     async def _lock_user(self, user_id: UUID) -> None:
         user = await self.session.scalar(
             select(User.id).where(User.id == user_id).with_for_update()
@@ -5652,6 +5767,7 @@ class PracticeSessionService:
         difficulty: QuestionCardDifficulty,
         source: str,
         exclude_question_id: UUID | None = None,
+        preferred_question_card_ids: frozenset[UUID] = frozenset(),
     ) -> QuestionCard | None:
         statement = (
             select(QuestionCard)
@@ -5672,8 +5788,17 @@ class PracticeSessionService:
             )
             .with_for_update()
         )
+        priority_order = None
+        if preferred_question_card_ids:
+            priority_order = case(
+                (QuestionCard.id.in_(preferred_question_card_ids), 0),
+                else_=1,
+            )
         if source == "saved":
-            statement = statement.where(QuestionCard.is_saved.is_(True)).order_by(
+            statement = statement.where(QuestionCard.is_saved.is_(True))
+            if priority_order is not None:
+                statement = statement.order_by(priority_order)
+            statement = statement.order_by(
                 QuestionCard.created_at.asc(), QuestionCard.id.asc()
             )
         elif source == "history":
@@ -5688,11 +5813,13 @@ class PracticeSessionService:
                         PracticeAttempt.completed_at.is_not(None),
                     ),
                 )
-                .order_by(
-                    PracticeAttempt.completed_at.desc(),
-                    PracticeAttempt.id.desc(),
-                    QuestionCard.id.asc(),
-                )
+            )
+            if priority_order is not None:
+                statement = statement.order_by(priority_order)
+            statement = statement.order_by(
+                PracticeAttempt.completed_at.desc(),
+                PracticeAttempt.id.desc(),
+                QuestionCard.id.asc(),
             )
         else:
             raise ValueError(f"unsupported reused question source: {source}")
@@ -6763,10 +6890,6 @@ class PracticeSessionService:
         }:
             raise PracticeSessionStateError(
                 PRACTICE_SESSION_SOURCE_UNAVAILABLE
-            )
-        if selection.prioritize_weaknesses:
-            raise PracticeSessionStateError(
-                PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE
             )
 
 

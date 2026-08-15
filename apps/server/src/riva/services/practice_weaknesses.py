@@ -61,6 +61,65 @@ class PracticeWeaknessService:
         interaction_language: InteractionLanguage,
     ) -> PracticeWeaknessFocus:
         requested_question_type = self._question_type_value(question_type)
+        candidates = await self._load_eligible_candidates(
+            user_id=user_id,
+            interaction_language=interaction_language,
+        )
+        candidates = self._sort_candidates(
+            candidates,
+            target_role_id=target_role_id,
+            question_type=requested_question_type,
+        )
+
+        evidence: list[PracticeWeaknessEvidence] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            for weakness in self._normalized_weaknesses(
+                candidate.exposed_weaknesses
+            ):
+                normalized = " ".join(weakness.split()).casefold()
+                if normalized in seen:
+                    continue
+                seen.add(normalized)
+                evidence.append(
+                    PracticeWeaknessEvidence(
+                        weakness=weakness,
+                        source_attempt_id=candidate.attempt_id,
+                        source_target_role_id=candidate.target_role_id,
+                        source_question_type=QuestionCardQuestionType(
+                            candidate.question_type
+                        ),
+                        reviewed_at=candidate.reviewed_at,
+                    )
+                )
+                if len(evidence) == MAX_PRACTICE_WEAKNESS_FOCUS_ITEMS:
+                    return PracticeWeaknessFocus(evidence=tuple(evidence))
+
+        return PracticeWeaknessFocus(evidence=tuple(evidence))
+
+    async def has_eligible_weakness(
+        self,
+        *,
+        user_id: UUID,
+        interaction_language: InteractionLanguage,
+    ) -> bool:
+        """Return whether setup can offer weakness prioritization."""
+
+        candidates = await self._load_eligible_candidates(
+            user_id=user_id,
+            interaction_language=interaction_language,
+        )
+        return any(
+            self._normalized_weaknesses(candidate.exposed_weaknesses)
+            for candidate in candidates
+        )
+
+    async def _load_eligible_candidates(
+        self,
+        *,
+        user_id: UUID,
+        interaction_language: InteractionLanguage,
+    ) -> list[_WeaknessCandidate]:
         statement = (
             select(
                 PracticeAttempt.id,
@@ -100,7 +159,7 @@ class PracticeWeaknessService:
             .order_by(PracticeReview.reviewed_at.desc(), PracticeAttempt.id)
         )
         result = await self.session.execute(statement)
-        candidates = [
+        return [
             _WeaknessCandidate(
                 attempt_id=attempt_id,
                 target_role_id=source_target_role_id,
@@ -116,37 +175,6 @@ class PracticeWeaknessService:
                 exposed_weaknesses,
             ) in result.all()
         ]
-        candidates = self._sort_candidates(
-            candidates,
-            target_role_id=target_role_id,
-            question_type=requested_question_type,
-        )
-
-        evidence: list[PracticeWeaknessEvidence] = []
-        seen: set[str] = set()
-        for candidate in candidates:
-            for weakness in self._normalized_weaknesses(
-                candidate.exposed_weaknesses
-            ):
-                normalized = " ".join(weakness.split()).casefold()
-                if normalized in seen:
-                    continue
-                seen.add(normalized)
-                evidence.append(
-                    PracticeWeaknessEvidence(
-                        weakness=weakness,
-                        source_attempt_id=candidate.attempt_id,
-                        source_target_role_id=candidate.target_role_id,
-                        source_question_type=QuestionCardQuestionType(
-                            candidate.question_type
-                        ),
-                        reviewed_at=candidate.reviewed_at,
-                    )
-                )
-                if len(evidence) == MAX_PRACTICE_WEAKNESS_FOCUS_ITEMS:
-                    return PracticeWeaknessFocus(evidence=tuple(evidence))
-
-        return PracticeWeaknessFocus(evidence=tuple(evidence))
 
     @staticmethod
     def _question_type_value(question_type: object) -> str:

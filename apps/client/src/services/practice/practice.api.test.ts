@@ -452,6 +452,50 @@ describe("practice service API", () => {
     expect(page.setupContext.eligibleQuestionCounts).toEqual({ history: 4, saved: 0 })
   })
 
+  it("exposes and preserves the real weakness-priority capability", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") {
+        return jsonResponse(createTrainableRolesResponse([createTrainableRole(roleId)]))
+      }
+      if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
+      if (input === "/api/practice/setup") {
+        return jsonResponse(
+          createSetupCapabilitiesResponse({
+            canPrioritizeWeaknesses: true,
+            historyQuestionCount: 2,
+          }),
+        )
+      }
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const page = await getPracticePage()
+    expect(page.setupContext.canPrioritizeWeaknesses).toBe(true)
+
+    const prepared = await preparePracticeTrainingEntry({
+      difficulty: "pressure",
+      prioritizeWeaknesses: true,
+      questionType: "projectDeepDive",
+      source: "history",
+      targetRoleId: roleId,
+    })
+
+    expect(prepared.resolution).toMatchObject({
+      configuration: {
+        difficulty: "pressure",
+        prioritizeWeaknesses: true,
+        questionType: "projectDeepDive",
+        source: "history",
+        targetRoleId: roleId,
+      },
+      status: "available",
+    })
+    expect(prepared.page.setupContext).toMatchObject({
+      canPrioritizeWeaknesses: true,
+      eligibleQuestionCounts: { history: 2, saved: 0 },
+    })
+  })
+
   it.each(["generatingQuestion", "answering"] as const)(
     "adapts an active %s current session without local fixture metadata",
     async (status) => {

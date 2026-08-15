@@ -103,8 +103,13 @@ NOW = datetime(2026, 8, 10, 10, 0, tzinfo=UTC)
 
 
 class ScriptedSession:
-    def __init__(self, *scalar_values: object) -> None:
+    def __init__(
+        self,
+        *scalar_values: object,
+        execute_rows: list[tuple[object, ...]] | None = None,
+    ) -> None:
         self.scalar_values = list(scalar_values)
+        self.execute_rows = execute_rows or []
         self.consumed_values: list[object] = []
         self.statements: list[Any] = []
         self.added: list[object] = []
@@ -138,6 +143,16 @@ class ScriptedSession:
         class Result:
             def all(self) -> list[object]:
                 return values
+
+        return Result()
+
+    async def execute(self, statement: Any) -> Any:
+        self.statements.append(statement)
+        rows = self.execute_rows
+
+        class Result:
+            def all(self) -> list[tuple[object, ...]]:
+                return rows
 
         return Result()
 
@@ -2604,13 +2619,41 @@ def test_setup_capabilities_expose_only_currently_supported_sources() -> None:
     assert result.can_prioritize_weaknesses is False
 
 
-def test_start_session_rejects_weakness_prioritization_until_history_exists() -> None:
-    session = ScriptedSession()
+def test_setup_capabilities_enable_weakness_prioritization_for_eligible_review() -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    session = ScriptedSession(
+        0,
+        0,
+        execute_rows=[
+            (
+                uuid4(),
+                role_id,
+                "projectDeepDive",
+                NOW,
+                ["Ownership evidence"],
+            )
+        ],
+    )
+
+    result = asyncio.run(
+        PracticeSessionService(session).get_setup_capabilities(
+            user_id=user_id,
+            interaction_language="en",
+        )
+    )
+
+    assert result.can_prioritize_weaknesses is True
+
+
+def test_start_session_rejects_weakness_prioritization_without_eligible_weakness() -> None:
+    user_id = uuid4()
+    session = ScriptedSession(user_id, None)
 
     with pytest.raises(PracticeSessionStateError) as error:
         asyncio.run(
             service(session).start_session(
-                user_id=uuid4(),
+                user_id=user_id,
                 selection=selection(prioritize_weaknesses=True),
                 interaction_language="en",
             )
@@ -2618,6 +2661,46 @@ def test_start_session_rejects_weakness_prioritization_until_history_exists() ->
 
     assert error.value.code == PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE
     assert session.rollback_count == 1
+
+
+def test_start_session_persists_priority_and_snapshots_weakness_focus() -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    source_attempt_id = uuid4()
+    run = generation_run(
+        user_id=user_id,
+        payload=generation_payload(role_id=role_id),
+    )
+    fake_generation = FakeGenerationService(run)
+    session = ScriptedSession(
+        user_id,
+        None,
+        execute_rows=[
+            (
+                source_attempt_id,
+                role_id,
+                "projectDeepDive",
+                NOW,
+                ["Ownership evidence"],
+            )
+        ],
+    )
+
+    result = asyncio.run(
+        service(session, fake_generation=fake_generation).start_session(
+            user_id=user_id,
+            selection=selection(
+                target_role_id=role_id,
+                prioritize_weaknesses=True,
+            ),
+            interaction_language="en",
+        )
+    )
+
+    assert result.session.prioritize_weaknesses is True
+    assert fake_generation.calls[0]["weakness_focus"].evidence[0].weakness == (
+        "Ownership evidence"
+    )
 
 
 def test_start_session_same_intent_returns_existing_active_workflow() -> None:
@@ -7375,7 +7458,7 @@ def test_continue_to_next_question_completes_review_and_enqueues_new_attempt(
             result.attempt.id,
         ),
     }
-    assert scripted.flush_count == 1
+    assert scripted.flush_count == 2
     assert scripted.commit_count == 1
     assert scripted.rollback_count == 0
 
