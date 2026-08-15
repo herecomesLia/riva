@@ -104,9 +104,13 @@ describe("app router auth redirects", () => {
       }),
     ).toBeInTheDocument()
     expect(window.location.pathname).toBe("/interview/session/mock-session")
-    expect(screen.getByRole("link", { name: i18n.t("appShell.nav.interview") })).toHaveAttribute(
-      "data-active",
-    )
+    await waitFor(() => {
+      expect(
+        screen.getByRole("link", {
+          name: i18n.t("appShell.nav.interview"),
+        }),
+      ).toHaveAttribute("data-active")
+    })
   })
 
   it("renders the authenticated interview review route", async () => {
