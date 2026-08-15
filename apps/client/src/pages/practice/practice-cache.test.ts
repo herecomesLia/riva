@@ -1041,6 +1041,447 @@ describe("practice reference answer cache contract", () => {
     version,
   })
 
+  it("does not let stale main reference polling roll back a newer session version", () => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    if (current.session.status !== "answering") return
+    current.session.version = 4
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+
+    const staleResponse = structuredClone(current)
+    if (staleResponse.session.status !== "answering") return
+    staleResponse.session.version = 3
+    staleResponse.session.question.referenceAnswer = {
+      content: {
+        answer: "旧的参考答案。",
+        commonMistakes: ["忽略结果。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["说明行动。", "说明结果。"],
+        kind: "personalizedExample",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    expect(
+      synchronizePracticeReferenceAnswerResponse(
+        current,
+        staleResponse,
+        mainReferenceInput(current.session.sessionId, 3, current.session.question.id),
+      ),
+    ).toBe(current)
+  })
+
+  it("does not let stale follow-up reference polling roll back a newer session version", () => {
+    const current = createPracticeMockResponse("answeringFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    current.session.version = 4
+    current.session.currentFollowUp.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+
+    const staleResponse = structuredClone(current)
+    if (staleResponse.session.status !== "answeringFollowUp") return
+    staleResponse.session.version = 3
+    staleResponse.session.currentFollowUp.question.referenceAnswer = {
+      content: {
+        addressedGap: "旧的证据缺口。",
+        answer: "旧的追问参考答案。",
+        commonMistakes: ["没有量化结果。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["说明基线。", "说明变化。"],
+        kind: "personalizedSupplement",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    expect(
+      synchronizePracticeReferenceAnswerResponse(
+        current,
+        staleResponse,
+        followUpReferenceInput(
+          current.session.sessionId,
+          3,
+          current.session.question.id,
+          current.session.currentFollowUp.question.id,
+        ),
+      ),
+    ).toBe(current)
+  })
+
+  it("enforces monotonic main reference answer progression", () => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    if (current.session.status !== "answering") return
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const request = mainReferenceInput(
+      current.session.sessionId,
+      current.session.version,
+      current.session.question.id,
+    )
+
+    const revealed = structuredClone(current)
+    if (revealed.session.status !== "answering") return
+    revealed.session.question.referenceAnswer = {
+      content: {
+        answer: "稳定的参考答案。",
+        commonMistakes: ["没有结果。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["行动。", "结果。"],
+        kind: "personalizedExample",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+    expect(synchronizePracticeReferenceAnswerResponse(current, revealed, request)?.session).toBe(
+      revealed.session,
+    )
+
+    const unavailable = structuredClone(current)
+    if (unavailable.session.status !== "answering") return
+    unavailable.session.question.referenceAnswer = {
+      content: null,
+      status: "unavailable",
+      viewedBeforeSubmission: false,
+    }
+    expect(synchronizePracticeReferenceAnswerResponse(current, unavailable, request)?.session).toBe(
+      unavailable.session,
+    )
+
+    const revealedCurrent = structuredClone(revealed)
+    const backward = structuredClone(revealedCurrent)
+    if (backward.session.status !== "answering") return
+    backward.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    expect(synchronizePracticeReferenceAnswerResponse(revealedCurrent, backward, request)).toBe(
+      revealedCurrent,
+    )
+
+    const changedRevealed = structuredClone(revealedCurrent)
+    if (changedRevealed.session.status !== "answering") return
+    if (changedRevealed.session.question.referenceAnswer.status !== "revealed") return
+    changedRevealed.session.question.referenceAnswer.content.answer = "另一份参考答案。"
+    expect(
+      synchronizePracticeReferenceAnswerResponse(revealedCurrent, changedRevealed, request),
+    ).toBe(revealedCurrent)
+
+    const unavailableCurrent = structuredClone(unavailable)
+    const unavailableBackward = structuredClone(unavailableCurrent)
+    if (unavailableBackward.session.status !== "answering") return
+    unavailableBackward.session.question.referenceAnswer = {
+      content: null,
+      status: "notRequested",
+      viewedBeforeSubmission: false,
+    }
+    expect(
+      synchronizePracticeReferenceAnswerResponse(unavailableCurrent, unavailableBackward, request),
+    ).toBe(unavailableCurrent)
+  })
+
+  it.each([
+    ["questionHintReveal", "answerHints"],
+    ["questionFrameworkReveal", "answerFramework"],
+  ] as const)("accepts main %s while the reference answer completes", (kind, field) => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    if (current.session.status !== "answering") return
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answering") return
+    response.session.version += 1
+    response.session.question[field] = {
+      content: field === "answerHints" ? ["补充结果。"] : ["背景", "行动", "结果"],
+      status: "revealed",
+    }
+    response.session.question.referenceAnswer = {
+      content: {
+        answer: "后台完成的参考答案。",
+        commonMistakes: ["只讲职责。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["个人行动。", "可验证结果。"],
+        kind: "personalizedExample",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    const next = synchronizePracticeMutationResponse(current, response, {
+      kind,
+      input: {
+        questionId: current.session.question.id,
+        sessionId: current.session.sessionId,
+        version: current.session.version,
+      },
+    })
+    expect(next?.session).toBe(response.session)
+  })
+
+  it("accepts a main save response while the reference answer completes", () => {
+    const current = createPracticeMockResponse("answeringQuestion")
+    if (current.session.status !== "answering") return
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answering") return
+    response.session.version += 1
+    response.session.question.isSaved = true
+    response.session.question.referenceAnswer = {
+      content: {
+        answer: "后台完成的参考答案。",
+        commonMistakes: ["缺少指标。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["行动。", "结果。"],
+        kind: "technicalReference",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    expect(
+      synchronizePracticeMutationResponse(current, response, {
+        kind: "questionFlagUpdate",
+        input: {
+          isSaved: true,
+          questionId: current.session.question.id,
+          sessionId: current.session.sessionId,
+          version: current.session.version,
+        },
+      })?.session,
+    ).toBe(response.session)
+  })
+
+  it("accepts a review weak-flag response while the main reference answer completes", () => {
+    const current = createPracticeMockResponse("reviewBalanced")
+    if (current.session.status !== "review") return
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "review") return
+    response.session.version += 1
+    response.session.question.isMarkedWeak = true
+    response.session.question.referenceAnswer = {
+      content: {
+        answer: "后台完成的复习参考答案。",
+        commonMistakes: ["没有复盘结果。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["找出问题。", "给出改进。"],
+        kind: "personalizedExample",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    expect(
+      synchronizePracticeMutationResponse(current, response, {
+        kind: "questionFlagUpdate",
+        input: {
+          isMarkedWeak: true,
+          questionId: current.session.question.id,
+          sessionId: current.session.sessionId,
+          version: current.session.version,
+        },
+      })?.session,
+    ).toBe(response.session)
+  })
+
+  it("accepts a follow-up hint while main, history, and current references complete", () => {
+    const current = createPracticeMockResponse("answeringFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const historicalExchange = current.session.followUpExchanges[0]
+    if (!historicalExchange) return
+    historicalExchange.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    current.session.currentFollowUp.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answeringFollowUp") return
+    response.session.version += 1
+    response.session.currentFollowUp.question.answerHints = {
+      content: ["补充结果。"],
+      status: "revealed",
+    }
+    response.session.question.referenceAnswer = {
+      content: {
+        answer: "主问题参考答案。",
+        commonMistakes: ["没有结果。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["行动。", "结果。"],
+        kind: "personalizedExample",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+    response.session.followUpExchanges[0]!.question.referenceAnswer = {
+      content: {
+        addressedGap: "历史追问证据。",
+        answer: "历史追问参考答案。",
+        commonMistakes: ["没有基线。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["基线。", "变化。"],
+        kind: "personalizedSupplement",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+    response.session.currentFollowUp.question.referenceAnswer = {
+      content: {
+        addressedGap: "当前追问证据。",
+        answer: "当前追问参考答案。",
+        commonMistakes: ["只重复主回答。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["基线。", "结果。"],
+        kind: "personalizedSupplement",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    const next = synchronizePracticeMutationResponse(current, response, {
+      kind: "followUpHintReveal",
+      input: {
+        followUpQuestionId: current.session.currentFollowUp.question.id,
+        questionId: current.session.question.id,
+        sessionId: current.session.sessionId,
+        version: current.session.version,
+      },
+    })
+    expect(next?.session).toBe(response.session)
+
+    const changedAnswer = structuredClone(response)
+    if (changedAnswer.session.status !== "answeringFollowUp") return
+    changedAnswer.session.mainAnswer.content = "改动后的主回答。"
+    expect(
+      synchronizePracticeMutationResponse(current, changedAnswer, {
+        kind: "followUpHintReveal",
+        input: {
+          followUpQuestionId: current.session.currentFollowUp.question.id,
+          questionId: current.session.question.id,
+          sessionId: current.session.sessionId,
+          version: current.session.version,
+        },
+      }),
+    ).toBe(current)
+  })
+
+  it("accepts follow-up reference polling with same-version reference hydration", () => {
+    const current = createPracticeMockResponse("answeringFollowUp")
+    if (current.session.status !== "answeringFollowUp") return
+    current.session.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const historicalExchange = current.session.followUpExchanges[0]
+    if (!historicalExchange) return
+    historicalExchange.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    current.session.currentFollowUp.question.referenceAnswer = {
+      content: null,
+      status: "generating",
+      viewedBeforeSubmission: false,
+    }
+    const response = structuredClone(current)
+    if (response.session.status !== "answeringFollowUp") return
+    response.session.question.referenceAnswer = {
+      content: {
+        answer: "主问题参考答案。",
+        commonMistakes: ["没有结果。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["行动。", "结果。"],
+        kind: "technicalReference",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+    response.session.followUpExchanges[0]!.question.referenceAnswer = {
+      content: {
+        addressedGap: "历史追问证据。",
+        answer: "历史追问参考答案。",
+        commonMistakes: ["没有基线。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["基线。", "变化。"],
+        kind: "technicalReference",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+    response.session.currentFollowUp.question.referenceAnswer = {
+      content: {
+        addressedGap: "当前追问证据。",
+        answer: "当前追问参考答案。",
+        commonMistakes: ["只重复主回答。"],
+        generatedAt: "2026-08-14T09:30:00Z",
+        keyPoints: ["基线。", "结果。"],
+        kind: "personalizedSupplement",
+      },
+      status: "revealed",
+      viewedBeforeSubmission: true,
+    }
+
+    const next = synchronizePracticeReferenceAnswerResponse(
+      current,
+      response,
+      followUpReferenceInput(
+        current.session.sessionId,
+        current.session.version,
+        current.session.question.id,
+        current.session.currentFollowUp.question.id,
+      ),
+    )
+    expect(next?.session).toBe(response.session)
+
+    const changedPrompt = structuredClone(response)
+    if (changedPrompt.session.status !== "answeringFollowUp") return
+    changedPrompt.session.question.prompt = "不允许改变的主问题。"
+    expect(
+      synchronizePracticeReferenceAnswerResponse(
+        current,
+        changedPrompt,
+        followUpReferenceInput(
+          current.session.sessionId,
+          current.session.version,
+          current.session.question.id,
+          current.session.currentFollowUp.question.id,
+        ),
+      ),
+    ).toBe(current)
+  })
+
   it("accepts main request transitions to generating, revealed, or unavailable", () => {
     const referenceAnswers: PracticeReferenceAnswerState[] = [
       { content: null, status: "generating" as const, viewedBeforeSubmission: false },

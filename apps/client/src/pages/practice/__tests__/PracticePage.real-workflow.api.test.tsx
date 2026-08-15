@@ -1030,6 +1030,132 @@ describe("PracticePage real API workflow", () => {
     }
   })
 
+  it("keeps a v4 hint mutation and reference completion when an old v3 refresh resolves late", async () => {
+    const user = userEvent.setup()
+    const current = session("answering", 2)
+    if (current.status !== "answering") return
+    const generating = {
+      ...current,
+      question: {
+        ...current.question,
+        referenceAnswer: {
+          content: null,
+          status: "generating" as const,
+          viewedBeforeSubmission: false,
+        },
+      },
+      version: 3,
+    }
+    const referenceAnswer = {
+      content: {
+        answer: "后台完成的参考答案。",
+        commonMistakes: ["只描述职责。"],
+        generatedAt: "2026-08-12T08:05:00.000Z",
+        keyPoints: ["说明行动。", "量化结果。"],
+        kind: "personalizedExample" as const,
+      },
+      status: "revealed" as const,
+      viewedBeforeSubmission: true,
+    }
+    const hinted = {
+      ...generating,
+      question: {
+        ...generating.question,
+        answerHints: { content: ["补充结果指标。"], status: "revealed" as const },
+        referenceAnswer,
+      },
+      version: 4,
+    }
+    const submittedBase = session("generatingFollowUp", 5)
+    if (submittedBase.status !== "generatingFollowUp") return
+    const submitted = {
+      ...submittedBase,
+      question: hinted.question,
+      version: 5,
+    }
+    const staleRefresh = {
+      ...generating,
+      question: { ...generating.question, referenceAnswer },
+    }
+    let refreshCount = 0
+    let releaseOldRefresh: ((response: Response) => void) | undefined
+    const oldRefresh = new Promise<Response>((resolve) => {
+      releaseOldRefresh = resolve
+    })
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
+      if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 2, questionId })
+        return jsonResponse(generating)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 3, questionId })
+        refreshCount += 1
+        return oldRefresh
+      }
+      if (path === `/api/practice/sessions/${sessionId}/questions/hint`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 3, questionId })
+        return jsonResponse(hinted)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/answers/main`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({
+          content: "用户在 v4 提交的回答。",
+          questionId,
+          version: 4,
+        })
+        return jsonResponse(submitted)
+      }
+      if (path === `/api/practice/sessions/${sessionId}/follow-up-generation/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 5 })
+        return jsonResponse(submitted)
+      }
+      throw new Error(`Unexpected request during concurrent reference cache workflow: ${path}`)
+    })
+
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.referenceAnswer.request"),
+      }),
+    )
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.referenceAnswer.confirm"),
+      }),
+    )
+    await testing.waitFor(() => expect(refreshCount).toBe(1))
+
+    await user.click(
+      await testing.screen.findByRole("button", {
+        name: i18n.t("practice.guidance.requestHint"),
+      }),
+    )
+    expect(await testing.screen.findByText("补充结果指标。")).toBeVisible()
+    expect(await testing.screen.findByText("后台完成的参考答案。")).toBeVisible()
+
+    if (releaseOldRefresh === undefined) throw new Error("old refresh was not started")
+    releaseOldRefresh(jsonResponse(staleRefresh))
+    await testing.waitFor(() =>
+      expect(testing.screen.getByText("后台完成的参考答案。")).toBeVisible(),
+    )
+
+    await user.type(
+      await testing.screen.findByLabelText(i18n.t("practice.answer.label")),
+      "用户在 v4 提交的回答。",
+    )
+    await user.click(testing.screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
+    expect(await testing.screen.findByTestId("practice-generating-follow-up-state")).toBeVisible()
+  })
+
   it("recovers a generating main reference answer from GET without requesting again", async () => {
     const current = session("answering", 4)
     if (current.status !== "answering") return

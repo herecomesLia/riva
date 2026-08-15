@@ -130,7 +130,14 @@ export function synchronizePracticeReferenceAnswerResponse(
   request: GetPracticeReferenceAnswerStatusInput | GetPracticeFollowUpReferenceAnswerStatusInput,
 ) {
   const currentSession = current?.session
-  if (!currentSession || !isVersionedSession(currentSession)) return current
+  if (
+    !currentSession ||
+    !isVersionedSession(currentSession) ||
+    currentSession.sessionId !== request.sessionId ||
+    currentSession.version !== request.version
+  ) {
+    return current
+  }
 
   const responseSession = getPracticeResponseSession(response)
   if (
@@ -399,11 +406,18 @@ function responseMatchesMutation(
         questionMatches(session, request) &&
         "followUpQuestionId" in request &&
         session.currentFollowUp.question.id === request.followUpQuestionId &&
-        JSON.stringify(session.question) === JSON.stringify(currentSession.question) &&
-        JSON.stringify(session.mainAnswer) === JSON.stringify(currentSession.mainAnswer) &&
-        sameExactAnsweredFollowUpChain(
-          session.followUpExchanges,
+        samePracticeQuestionSnapshotExceptReferenceAnswer(
+          session.question,
+          currentSession.question,
+        ) &&
+        isReferenceAnswerProgressionValid(
+          currentSession.question.referenceAnswer,
+          session.question.referenceAnswer,
+        ) &&
+        samePracticeAnswer(session.mainAnswer, currentSession.mainAnswer) &&
+        samePracticeAnsweredFollowUpExchangesSnapshot(
           currentSession.followUpExchanges,
+          session.followUpExchanges,
         ) &&
         session.currentFollowUp.status === currentSession.currentFollowUp.status &&
         session.currentFollowUp.answer === currentSession.currentFollowUp.answer &&
@@ -482,20 +496,6 @@ function isGeneratingFollowUpReferenceAnswer(
   )
 }
 
-function isReferenceAnswerStateValidForRefresh(state: PracticeQuestionCard["referenceAnswer"]) {
-  if (state.status === "notRequested") return false
-  if (state.status === "revealed") return state.viewedBeforeSubmission
-  return state.content === null && state.viewedBeforeSubmission === false
-}
-
-function isFollowUpReferenceAnswerStateValidForRefresh(
-  state: PracticeFollowUpQuestion["referenceAnswer"],
-) {
-  if (state.status === "notRequested") return false
-  if (state.status === "revealed") return state.viewedBeforeSubmission
-  return state.content === null && state.viewedBeforeSubmission === false
-}
-
 function isReferenceAnswerStateValidForRequest(state: PracticeQuestionCard["referenceAnswer"]) {
   if (state.status === "notRequested") return false
   if (state.status === "revealed") return state.viewedBeforeSubmission
@@ -508,6 +508,54 @@ function isFollowUpReferenceAnswerStateValidForRequest(
   if (state.status === "notRequested") return false
   if (state.status === "revealed") return state.viewedBeforeSubmission
   return state.content === null && state.viewedBeforeSubmission === false
+}
+
+type PracticeReferenceAnswerStateSnapshot =
+  PracticeQuestionCard["referenceAnswer"] | PracticeFollowUpQuestion["referenceAnswer"]
+
+type PracticeReferenceAnswerContentSnapshot =
+  | Extract<PracticeQuestionCard["referenceAnswer"], { status: "revealed" }>["content"]
+  | Extract<PracticeFollowUpQuestion["referenceAnswer"], { status: "revealed" }>["content"]
+
+function isReferenceAnswerProgressionValid(
+  current: PracticeReferenceAnswerStateSnapshot,
+  response: PracticeReferenceAnswerStateSnapshot,
+) {
+  if (current.status === "notRequested") return response.status === "notRequested"
+  if (current.status === "generating") {
+    return (
+      response.status === "generating" ||
+      response.status === "unavailable" ||
+      response.status === "revealed"
+    )
+  }
+  if (current.status === "unavailable") return response.status === "unavailable"
+  return (
+    response.status === "revealed" &&
+    current.viewedBeforeSubmission === response.viewedBeforeSubmission &&
+    samePracticeReferenceAnswerContent(current.content, response.content)
+  )
+}
+
+function samePracticeReferenceAnswerContent(
+  left: PracticeReferenceAnswerContentSnapshot,
+  right: PracticeReferenceAnswerContentSnapshot,
+) {
+  const leftHasAddressedGap = "addressedGap" in left
+  const rightHasAddressedGap = "addressedGap" in right
+  return (
+    left.kind === right.kind &&
+    left.answer === right.answer &&
+    left.generatedAt === right.generatedAt &&
+    sameStringArray(left.keyPoints, right.keyPoints) &&
+    sameStringArray(left.commonMistakes, right.commonMistakes) &&
+    leftHasAddressedGap === rightHasAddressedGap &&
+    (!leftHasAddressedGap || !rightHasAddressedGap || left.addressedGap === right.addressedGap)
+  )
+}
+
+function sameStringArray(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index])
 }
 
 function isQuestionReferenceAnswerRefreshResponseValid(
@@ -523,7 +571,10 @@ function isQuestionReferenceAnswerRefreshResponseValid(
     samePracticeSelection(response.selection, current.selection) &&
     questionMatches(response, request) &&
     samePracticeQuestionSnapshotExceptReferenceAnswer(response.question, current.question) &&
-    isReferenceAnswerStateValidForRefresh(response.question.referenceAnswer)
+    isReferenceAnswerProgressionValid(
+      current.question.referenceAnswer,
+      response.question.referenceAnswer,
+    )
   )
 }
 
@@ -540,16 +591,26 @@ function isFollowUpReferenceAnswerRefreshResponseValid(
     samePracticeSelection(response.selection, current.selection) &&
     questionMatches(response, request) &&
     response.currentFollowUp.question.id === request.followUpQuestionId &&
-    JSON.stringify(response.mainAnswer) === JSON.stringify(current.mainAnswer) &&
-    sameExactAnsweredFollowUpChain(response.followUpExchanges, current.followUpExchanges) &&
-    JSON.stringify(response.question) === JSON.stringify(current.question) &&
+    samePracticeAnswer(response.mainAnswer, current.mainAnswer) &&
+    samePracticeAnsweredFollowUpExchangesSnapshot(
+      current.followUpExchanges,
+      response.followUpExchanges,
+    ) &&
+    samePracticeQuestionSnapshotExceptReferenceAnswer(response.question, current.question) &&
+    isReferenceAnswerProgressionValid(
+      current.question.referenceAnswer,
+      response.question.referenceAnswer,
+    ) &&
     response.currentFollowUp.status === current.currentFollowUp.status &&
     response.currentFollowUp.answer === current.currentFollowUp.answer &&
     samePracticeFollowUpQuestionSnapshotExceptReferenceAnswer(
       response.currentFollowUp.question,
       current.currentFollowUp.question,
     ) &&
-    isFollowUpReferenceAnswerStateValidForRefresh(response.currentFollowUp.question.referenceAnswer)
+    isReferenceAnswerProgressionValid(
+      current.currentFollowUp.question.referenceAnswer,
+      response.currentFollowUp.question.referenceAnswer,
+    )
   )
 }
 
@@ -596,7 +657,11 @@ function isQuestionFlagMutationResponseValid(
   if (
     !("question" in response) ||
     !("question" in current) ||
-    !samePracticeQuestionSnapshotExceptFlags(response.question, current.question)
+    !samePracticeQuestionSnapshotExceptFlags(response.question, current.question) ||
+    !isReferenceAnswerProgressionValid(
+      current.question.referenceAnswer,
+      response.question.referenceAnswer,
+    )
   ) {
     return false
   }
@@ -631,7 +696,11 @@ function isQuestionGuidanceRevealResponseValid(
     response.attemptNumber !== current.attemptNumber ||
     !samePracticeSelection(response.selection, current.selection) ||
     !questionMatches(response, request) ||
-    !samePracticeQuestionSnapshotExceptGuidance(response.question, current.question, guidance)
+    !samePracticeQuestionSnapshotExceptGuidance(response.question, current.question, guidance) ||
+    !isReferenceAnswerProgressionValid(
+      current.question.referenceAnswer,
+      response.question.referenceAnswer,
+    )
   ) {
     return false
   }
@@ -655,13 +724,24 @@ function isFollowUpGuidanceRevealResponseValid(
     response.currentFollowUp.question.id !== request.followUpQuestionId ||
     response.currentFollowUp.status !== current.currentFollowUp.status ||
     response.currentFollowUp.answer !== current.currentFollowUp.answer ||
-    JSON.stringify(response.question) !== JSON.stringify(current.question) ||
-    JSON.stringify(response.mainAnswer) !== JSON.stringify(current.mainAnswer) ||
-    JSON.stringify(response.followUpExchanges) !== JSON.stringify(current.followUpExchanges) ||
+    !samePracticeQuestionSnapshotExceptReferenceAnswer(response.question, current.question) ||
+    !isReferenceAnswerProgressionValid(
+      current.question.referenceAnswer,
+      response.question.referenceAnswer,
+    ) ||
+    !samePracticeAnswer(response.mainAnswer, current.mainAnswer) ||
+    !samePracticeAnsweredFollowUpExchangesSnapshot(
+      current.followUpExchanges,
+      response.followUpExchanges,
+    ) ||
     !samePracticeFollowUpQuestionSnapshotExceptGuidance(
       response.currentFollowUp.question,
       current.currentFollowUp.question,
       guidance,
+    ) ||
+    !isReferenceAnswerProgressionValid(
+      current.currentFollowUp.question.referenceAnswer,
+      response.currentFollowUp.question.referenceAnswer,
     )
   ) {
     return false
@@ -674,8 +754,18 @@ function samePracticeQuestionSnapshotExceptFlags(
   left: PracticeQuestionCard,
   right: PracticeQuestionCard,
 ) {
-  const { isMarkedWeak: _leftMarkedWeak, isSaved: _leftSaved, ...leftWithoutFlags } = left
-  const { isMarkedWeak: _rightMarkedWeak, isSaved: _rightSaved, ...rightWithoutFlags } = right
+  const {
+    isMarkedWeak: _leftMarkedWeak,
+    isSaved: _leftSaved,
+    referenceAnswer: _leftReferenceAnswer,
+    ...leftWithoutFlags
+  } = left
+  const {
+    isMarkedWeak: _rightMarkedWeak,
+    isSaved: _rightSaved,
+    referenceAnswer: _rightReferenceAnswer,
+    ...rightWithoutFlags
+  } = right
   return JSON.stringify(leftWithoutFlags) === JSON.stringify(rightWithoutFlags)
 }
 
@@ -694,13 +784,29 @@ function samePracticeQuestionSnapshotExceptGuidance(
   guidance: PracticeGuidanceField,
 ) {
   if (guidance === "answerHints") {
-    const { answerHints: _leftGuidance, ...leftWithoutGuidance } = left
-    const { answerHints: _rightGuidance, ...rightWithoutGuidance } = right
+    const {
+      answerHints: _leftGuidance,
+      referenceAnswer: _leftReferenceAnswer,
+      ...leftWithoutGuidance
+    } = left
+    const {
+      answerHints: _rightGuidance,
+      referenceAnswer: _rightReferenceAnswer,
+      ...rightWithoutGuidance
+    } = right
     return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
   }
 
-  const { answerFramework: _leftGuidance, ...leftWithoutGuidance } = left
-  const { answerFramework: _rightGuidance, ...rightWithoutGuidance } = right
+  const {
+    answerFramework: _leftGuidance,
+    referenceAnswer: _leftReferenceAnswer,
+    ...leftWithoutGuidance
+  } = left
+  const {
+    answerFramework: _rightGuidance,
+    referenceAnswer: _rightReferenceAnswer,
+    ...rightWithoutGuidance
+  } = right
   return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
 }
 
@@ -710,13 +816,29 @@ function samePracticeFollowUpQuestionSnapshotExceptGuidance(
   guidance: PracticeGuidanceField,
 ) {
   if (guidance === "answerHints") {
-    const { answerHints: _leftGuidance, ...leftWithoutGuidance } = left
-    const { answerHints: _rightGuidance, ...rightWithoutGuidance } = right
+    const {
+      answerHints: _leftGuidance,
+      referenceAnswer: _leftReferenceAnswer,
+      ...leftWithoutGuidance
+    } = left
+    const {
+      answerHints: _rightGuidance,
+      referenceAnswer: _rightReferenceAnswer,
+      ...rightWithoutGuidance
+    } = right
     return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
   }
 
-  const { answerFramework: _leftGuidance, ...leftWithoutGuidance } = left
-  const { answerFramework: _rightGuidance, ...rightWithoutGuidance } = right
+  const {
+    answerFramework: _leftGuidance,
+    referenceAnswer: _leftReferenceAnswer,
+    ...leftWithoutGuidance
+  } = left
+  const {
+    answerFramework: _rightGuidance,
+    referenceAnswer: _rightReferenceAnswer,
+    ...rightWithoutGuidance
+  } = right
   return JSON.stringify(leftWithoutGuidance) === JSON.stringify(rightWithoutGuidance)
 }
 
@@ -736,10 +858,17 @@ function samePracticeReviewSnapshot(
   if (right.status !== "review") return false
   return (
     samePracticeSubmittedAnswerSnapshot(left, right) &&
+    samePracticeQuestionSnapshotExceptFlags(left.question, right.question) &&
+    isReferenceAnswerProgressionValid(
+      left.question.referenceAnswer,
+      right.question.referenceAnswer,
+    ) &&
     samePracticeFollowUpCompletionSnapshot(left.followUpCompletion, right.followUpCompletion) &&
-    JSON.stringify(left.mainAnswer) === JSON.stringify(right.mainAnswer) &&
-    JSON.stringify(left.followUpExchanges) === JSON.stringify(right.followUpExchanges) &&
-    JSON.stringify(left.followUpCompletion) === JSON.stringify(right.followUpCompletion) &&
+    samePracticeAnswer(left.mainAnswer, right.mainAnswer) &&
+    samePracticeAnsweredFollowUpExchangesSnapshot(
+      left.followUpExchanges,
+      right.followUpExchanges,
+    ) &&
     JSON.stringify(left.evaluation) === JSON.stringify(right.evaluation) &&
     JSON.stringify(left.review) === JSON.stringify(right.review)
   )
@@ -792,20 +921,37 @@ function sameAnsweredFollowUpChain(
   )
 }
 
-function sameExactAnsweredFollowUpChain(
-  left: AnsweredPracticeFollowUpExchange[],
-  right: AnsweredPracticeFollowUpExchange[],
+function samePracticeAnsweredFollowUpExchangesSnapshot(
+  current: AnsweredPracticeFollowUpExchange[],
+  response: AnsweredPracticeFollowUpExchange[],
 ) {
   return (
-    sameAnsweredFollowUpChain(left, right) &&
-    left.every((exchange, index) => {
-      const other = right[index]
+    current.length === response.length &&
+    current.every((currentExchange, index) => {
+      const responseExchange = response[index]
       return (
-        other !== undefined &&
-        JSON.stringify(exchange.question) === JSON.stringify(other.question) &&
-        JSON.stringify(exchange.answer) === JSON.stringify(other.answer)
+        responseExchange !== undefined &&
+        currentExchange.status === responseExchange.status &&
+        samePracticeFollowUpQuestionSnapshotExceptReferenceAnswer(
+          currentExchange.question,
+          responseExchange.question,
+        ) &&
+        isReferenceAnswerProgressionValid(
+          currentExchange.question.referenceAnswer,
+          responseExchange.question.referenceAnswer,
+        ) &&
+        samePracticeAnswer(currentExchange.answer, responseExchange.answer)
       )
     })
+  )
+}
+
+function samePracticeAnswer(left: PracticeAnswer, right: PracticeAnswer) {
+  return (
+    left.id === right.id &&
+    left.content === right.content &&
+    left.createdAt === right.createdAt &&
+    left.order === right.order
   )
 }
 
@@ -830,8 +976,14 @@ function samePracticeFollowUpCompletionSnapshot(
   if (left.status !== right.status) return false
   if (left.status === "endedEarly" && right.status === "endedEarly") {
     return (
-      left.unansweredQuestion.id === right.unansweredQuestion.id &&
-      left.unansweredQuestion.order === right.unansweredQuestion.order
+      samePracticeFollowUpQuestionSnapshotExceptReferenceAnswer(
+        left.unansweredQuestion,
+        right.unansweredQuestion,
+      ) &&
+      isReferenceAnswerProgressionValid(
+        left.unansweredQuestion.referenceAnswer,
+        right.unansweredQuestion.referenceAnswer,
+      )
     )
   }
   if (left.status === "completed" && right.status === "completed") {
