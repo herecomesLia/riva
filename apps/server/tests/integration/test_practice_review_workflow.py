@@ -47,6 +47,9 @@ from riva.workers import (
     QuestionGenerationHandler,
 )
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_question_generation import database_url, seed_context
 from tests.integration.test_recommendation_generation import produce_review
 from tests.integration.test_review_generation import produce_evaluation
@@ -555,6 +558,7 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                             model="fake-practice-model",
                         ),
                     ).process_one()
+                    await complete_queued_reference_answers(database)
                     async with database.sessionmaker() as session:
                         stored_recommendation = await session.scalar(
                             select(PracticeRecommendation).where(

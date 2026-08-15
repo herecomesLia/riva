@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -596,16 +596,23 @@ def reference_answer_state(
 
 
 class FakeReferenceAnswerGenerationService:
-    def __init__(self, state: PracticeReferenceAnswerWorkflowState) -> None:
+    def __init__(
+        self,
+        state: PracticeReferenceAnswerWorkflowState,
+        follow_up_state: PracticeReferenceAnswerWorkflowState | None = None,
+    ) -> None:
         self.state = state
+        self.follow_up_state = follow_up_state or state
         self.main_calls: list[dict[str, object]] = []
+        self.follow_up_calls: list[dict[str, object]] = []
 
     async def get_main_generation_state(self, **kwargs: object):
         self.main_calls.append(kwargs)
         return self.state
 
     async def get_follow_up_generation_state(self, **kwargs: object):
-        raise AssertionError("no follow-up state should be resolved in this test")
+        self.follow_up_calls.append(kwargs)
+        return self.follow_up_state
 
 
 def test_reference_answer_converters_map_all_lifecycle_states_without_raw_fields() -> None:
@@ -1685,6 +1692,92 @@ def test_end_follow_ups_forwards_exact_args_without_llm_precheck_and_projects_en
             },
         )
     ]
+
+
+def test_ended_early_evaluation_and_review_hydration_use_evaluation_run_cutoff() -> None:
+    evaluation_context = ended_early_evaluation_context(exchange_count=0)
+    cutoff = datetime(2026, 8, 14, 10, 0, tzinfo=UTC)
+    evaluation_context.evaluation_generation_run.created_at = cutoff
+    resolver = FakeReferenceAnswerGenerationService(
+        reference_answer_state(
+            PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            target_type=PracticeReferenceAnswerTargetType.MAIN,
+            generated_at=cutoff + timedelta(seconds=1),
+        ),
+        follow_up_state=reference_answer_state(
+            PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            target_type=PracticeReferenceAnswerTargetType.FOLLOW_UP,
+            generated_at=cutoff + timedelta(seconds=1),
+        ),
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: FakePracticeSessionService(
+            context=evaluation_context
+        ),
+        reference_answer_generation_service_factory=lambda *_args, **_kwargs: resolver,
+    )
+
+    asyncio.run(
+        service._resolve_reference_answer_projection(
+            user_id=evaluation_context.session.user_id,
+            context=evaluation_context,
+        )
+    )
+    assert resolver.follow_up_calls[-1]["submitted_at"] == cutoff
+
+    review_value = review_context()
+    review_value.evaluation_generation_run.created_at = cutoff
+    review_value = replace(
+        review_value,
+        follow_up_decision=evaluation_context.follow_up_decision,
+        follow_up_question=evaluation_context.follow_up_question,
+        follow_up_completion_reason=(
+            PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+        ),
+    )
+    resolver.follow_up_calls.clear()
+    asyncio.run(
+        service._resolve_reference_answer_projection(
+            user_id=review_value.session.user_id,
+            context=review_value,
+        )
+    )
+    assert resolver.follow_up_calls[-1]["submitted_at"] == cutoff
+
+
+def test_answering_follow_up_hydration_keeps_pending_submission_cutoff_none() -> None:
+    context_value = primary_context(
+        attempt_status="answeringFollowUp",
+        version=4,
+        action="askFollowUp",
+    )
+    resolver = FakeReferenceAnswerGenerationService(
+        reference_answer_state(
+            PracticeReferenceAnswerLifecycleStatus.GENERATING,
+            target_type=PracticeReferenceAnswerTargetType.MAIN,
+        ),
+        follow_up_state=reference_answer_state(
+            PracticeReferenceAnswerLifecycleStatus.GENERATING,
+            target_type=PracticeReferenceAnswerTargetType.FOLLOW_UP,
+        ),
+    )
+    service = PracticeAPIService(
+        object(),
+        practice_service_factory=lambda *_args, **_kwargs: FakePracticeSessionService(
+            context=context_value
+        ),
+        reference_answer_generation_service_factory=lambda *_args, **_kwargs: resolver,
+    )
+
+    asyncio.run(
+        service._resolve_reference_answer_projection(
+            user_id=context_value.session.user_id,
+            context=context_value,
+        )
+    )
+
+    assert resolver.follow_up_calls[-1]["submitted_at"] is None
 
 
 @pytest.mark.parametrize("exchange_count", [1, 2])

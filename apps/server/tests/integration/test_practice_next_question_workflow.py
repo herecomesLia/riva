@@ -42,6 +42,9 @@ from riva.workers import (
     QuestionGenerationHandler,
 )
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_question_generation import database_url, seed_context
 
 
@@ -330,6 +333,7 @@ async def produce_first_review(
             model="fake-practice-model",
         ),
     ).process_one()
+    await complete_queued_reference_answers(database)
     async with database.sessionmaker() as session:
         review = await PracticeSessionService(
             session,

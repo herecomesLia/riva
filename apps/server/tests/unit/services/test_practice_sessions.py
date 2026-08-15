@@ -93,6 +93,7 @@ from riva.services.question_generation import QuestionGenerationStateError
 from riva.services.reference_answer_generation import (
     PracticeReferenceAnswerLifecycleStatus,
     PracticeReferenceAnswerWorkflowState,
+    ReferenceAnswerGenerationStateError,
     practice_follow_up_reference_answer_idempotency_key,
     practice_main_reference_answer_idempotency_key,
 )
@@ -279,12 +280,49 @@ class FakeReferenceAnswerGenerationService:
         run: AgentRun | None = None,
         state: PracticeReferenceAnswerWorkflowState | None = None,
         error: BaseException | None = None,
+        state_error: ReferenceAnswerGenerationStateError | None = None,
+        states: dict[
+            tuple[str, UUID | None], PracticeReferenceAnswerWorkflowState
+        ]
+        | None = None,
     ) -> None:
         self.run = run
         self.state = state
         self.error = error
+        self.state_error = state_error
+        self.states = states or {}
         self.main_calls: list[dict[str, object]] = []
         self.follow_up_calls: list[dict[str, object]] = []
+        self.state_calls: list[dict[str, object]] = []
+
+    def _state_for(
+        self,
+        *,
+        target_type: str,
+        follow_up_question_id: UUID | None,
+    ) -> PracticeReferenceAnswerWorkflowState:
+        if self.state_error is not None:
+            raise self.state_error
+        state = self.states.get((target_type, follow_up_question_id), self.state)
+        if state is None:
+            raise AssertionError("reference state was not configured")
+        return state
+
+    def _mark_enqueued(
+        self,
+        *,
+        target_type: str,
+        follow_up_question_id: UUID | None,
+    ) -> None:
+        key = (target_type, follow_up_question_id)
+        state = self.states.get(key, self.state)
+        if (
+            state is not None
+            and state.status is PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED
+        ):
+            if self.run is None:
+                raise AssertionError("reference run was not configured")
+            self.states[key] = reference_answer_state(self.run)
 
     async def enqueue_main_generation_in_transaction(
         self,
@@ -294,6 +332,7 @@ class FakeReferenceAnswerGenerationService:
         if self.error is not None:
             raise self.error
         assert self.run is not None
+        self._mark_enqueued(target_type="main", follow_up_question_id=None)
         return self.run
 
     async def enqueue_follow_up_generation_in_transaction(
@@ -304,23 +343,30 @@ class FakeReferenceAnswerGenerationService:
         if self.error is not None:
             raise self.error
         assert self.run is not None
+        self._mark_enqueued(
+            target_type="followUp",
+            follow_up_question_id=kwargs.get("follow_up_question_id"),  # type: ignore[arg-type]
+        )
         return self.run
 
     async def get_main_generation_state(
         self,
         **kwargs: object,
     ) -> PracticeReferenceAnswerWorkflowState:
-        assert kwargs["submitted_at"] is None
-        assert self.state is not None
-        return self.state
+        self.state_calls.append({"target_type": "main", **kwargs})
+        return self._state_for(target_type="main", follow_up_question_id=None)
 
     async def get_follow_up_generation_state(
         self,
         **kwargs: object,
     ) -> PracticeReferenceAnswerWorkflowState:
-        assert kwargs["submitted_at"] is None
-        assert self.state is not None
-        return self.state
+        follow_up_question_id = kwargs.get("follow_up_question_id")
+        assert isinstance(follow_up_question_id, UUID)
+        self.state_calls.append({"target_type": "followUp", **kwargs})
+        return self._state_for(
+            target_type="followUp",
+            follow_up_question_id=follow_up_question_id,
+        )
 
 
 def reference_answer_run(*, user_id: UUID) -> AgentRun:
@@ -2262,6 +2308,167 @@ def evaluation_pipeline(
         "recommendation": recommendation,
         "recommendation_value": recommendation_value,
         "scalar_values": scalar_values,
+    }
+
+
+def evaluation_pipeline_with_two_follow_ups(
+    *,
+    ended_early: bool = False,
+) -> dict[str, object]:
+    active, attempt, question_run, card = primary_answer_context(
+        version=4,
+        attempt_status="evaluating",
+    )
+    answer = main_answer(attempt_id=attempt.id, content="Stored answer")
+    first_follow_up_run = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+        order=1,
+    )
+    first_question = follow_up_question(
+        attempt_id=attempt.id,
+        run_id=first_follow_up_run.id,
+        order=1,
+    )
+    first_decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=first_follow_up_run.id,
+        action="askFollowUp",
+        question_id=first_question.id,
+        order=1,
+    )
+    first_answer = PracticeAnswer(
+        id=uuid4(),
+        attempt_id=attempt.id,
+        kind=PracticeAnswerKind.FOLLOW_UP.value,
+        order=2,
+        content="First follow-up answer",
+        follow_up_question_id=first_question.id,
+        submitted_at=NOW,
+    )
+    second_follow_up_run = follow_up_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        status=AgentRunStatus.SUCCEEDED,
+        order=2,
+        previous_question_id=first_question.id,
+        previous_answer_id=first_answer.id,
+    )
+    second_question = follow_up_question(
+        attempt_id=attempt.id,
+        run_id=second_follow_up_run.id,
+        order=2,
+    )
+    second_decision = follow_up_decision(
+        attempt_id=attempt.id,
+        run_id=second_follow_up_run.id,
+        action="askFollowUp",
+        question_id=second_question.id,
+        order=2,
+    )
+    second_answer = None
+    completion_reason = (
+        PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+        if ended_early
+        else PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED
+    )
+    if not ended_early:
+        second_answer = PracticeAnswer(
+            id=uuid4(),
+            attempt_id=attempt.id,
+            kind=PracticeAnswerKind.FOLLOW_UP.value,
+            order=3,
+            content="Second follow-up answer",
+            follow_up_question_id=second_question.id,
+            submitted_at=NOW,
+        )
+    evaluation = evaluation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        question_card_id=card.id,
+        main_answer_id=answer.id,
+        decision_id=second_decision.id,
+        status=AgentRunStatus.SUCCEEDED,
+        follow_up_completion_reason=completion_reason,
+        follow_up_question_1_id=first_question.id,
+        follow_up_answer_1_id=first_answer.id,
+        follow_up_question_2_id=second_question.id if second_answer else None,
+        follow_up_answer_2_id=second_answer.id if second_answer else None,
+        unanswered_follow_up_question_id=(
+            second_question.id if ended_early else None
+        ),
+    )
+    evaluation_value = evaluation_artifact(
+        attempt_id=attempt.id,
+        run_id=evaluation.id,
+    )
+    review = review_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        evaluation_id=evaluation_value.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    review_value = review_artifact(
+        attempt_id=attempt.id,
+        run_id=review.id,
+    )
+    recommendation = recommendation_run(
+        user_id=active.user_id,
+        attempt_id=attempt.id,
+        evaluation_id=evaluation_value.id,
+        review_id=review_value.id,
+        status=AgentRunStatus.SUCCEEDED,
+    )
+    recommendation_value = recommendation_artifact(
+        attempt_id=attempt.id,
+        run_id=recommendation.id,
+    )
+    return {
+        "active": active,
+        "attempt": attempt,
+        "question_run": question_run,
+        "card": card,
+        "answer": answer,
+        "first_follow_up_run": first_follow_up_run,
+        "first_question": first_question,
+        "first_decision": first_decision,
+        "first_answer": first_answer,
+        "second_follow_up_run": second_follow_up_run,
+        "second_question": second_question,
+        "second_decision": second_decision,
+        "second_answer": second_answer,
+        "evaluation": evaluation,
+        "evaluation_value": evaluation_value,
+        "review": review,
+        "review_value": review_value,
+        "recommendation": recommendation,
+        "recommendation_value": recommendation_value,
+        "scalar_values": [
+            active,
+            attempt,
+            question_run,
+            card,
+            answer,
+            first_follow_up_run,
+            first_decision,
+            first_question,
+            second_follow_up_run,
+            second_decision,
+            second_question,
+            evaluation,
+            evaluation_value,
+            review,
+            review_value,
+            recommendation,
+            recommendation_value,
+            first_answer,
+            *([second_answer] if second_answer is not None else []),
+        ],
     }
 
 
@@ -4598,9 +4805,19 @@ def test_refresh_evaluation_finalizes_only_after_recommendation_artifact() -> No
         recommendation_action="retryCurrent",
     )
     scripted = ScriptedSession(*records["scalar_values"])
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(
+            reference_run,
+            PracticeReferenceAnswerLifecycleStatus.REVEALED,
+        ),
+    )
 
     result = asyncio.run(
-        service(scripted).refresh_evaluation_generation(
+        service(scripted, fake_reference=fake_reference).refresh_evaluation_generation(
             user_id=records["active"].user_id,  # type: ignore[union-attr]
             session_id=records["active"].id,  # type: ignore[union-attr]
             expected_version=4,
@@ -4615,6 +4832,338 @@ def test_refresh_evaluation_finalizes_only_after_recommendation_artifact() -> No
     assert result.session.completion_reason is None
     assert scripted.commit_count == 1
     assert scripted.rollback_count == 0
+
+
+def test_refresh_evaluation_guarantees_main_reference_before_review() -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+    )
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(
+            reference_run,
+            PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+        ),
+    )
+
+    first_session = ScriptedSession(*records["scalar_values"])
+    first = asyncio.run(
+        service(
+            first_session,
+            fake_reference=fake_reference,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(first, PracticeEvaluationWorkflowContext)
+    assert first.attempt.status == "evaluating"
+    assert first.session.version == 4
+    assert first.attempt.completed_at is None
+    assert fake_reference.main_calls == [
+        {
+            "user_id": records["active"].user_id,  # type: ignore[union-attr]
+            "question_card_id": records["card"].id,  # type: ignore[union-attr]
+            "idempotency_key": practice_main_reference_answer_idempotency_key(
+                records["card"].id  # type: ignore[union-attr]
+            ),
+        }
+    ]
+
+    second_session = ScriptedSession(*records["scalar_values"])
+    second = asyncio.run(
+        service(
+            second_session,
+            fake_reference=fake_reference,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+    assert isinstance(second, PracticeEvaluationWorkflowContext)
+    assert len(fake_reference.main_calls) == 1
+
+    fake_reference.states[("main", None)] = reference_answer_state(
+        reference_run,
+        PracticeReferenceAnswerLifecycleStatus.REVEALED,
+    )
+    third_session = ScriptedSession(*records["scalar_values"])
+    third = asyncio.run(
+        service(
+            third_session,
+            fake_reference=fake_reference,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(third, PracticeReviewWorkflowContext)
+    assert third.attempt.status == "review"
+    assert third.session.version == 5
+
+
+def test_refresh_evaluation_enqueues_all_reference_targets_in_stable_order() -> None:
+    records = evaluation_pipeline_with_two_follow_ups()
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        states={
+            ("main", None): reference_answer_state(
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+            ),
+            ("followUp", records["first_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+            ),
+            ("followUp", records["second_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+            ),
+        },
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert result.session.version == 4
+    assert result.attempt.status == "evaluating"
+    assert fake_reference.main_calls[0]["idempotency_key"] == (
+        practice_main_reference_answer_idempotency_key(records["card"].id)  # type: ignore[union-attr]
+    )
+    assert [call["idempotency_key"] for call in fake_reference.follow_up_calls] == [
+        practice_follow_up_reference_answer_idempotency_key(
+            records["first_question"].id  # type: ignore[union-attr]
+        ),
+        practice_follow_up_reference_answer_idempotency_key(
+            records["second_question"].id  # type: ignore[union-attr]
+        ),
+    ]
+    assert len(fake_reference.main_calls) + len(fake_reference.follow_up_calls) == 3
+
+
+def test_refresh_evaluation_only_enqueues_missing_reference_target() -> None:
+    records = evaluation_pipeline_with_two_follow_ups()
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        states={
+            ("main", None): reference_answer_state(
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            ),
+            ("followUp", records["first_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.GENERATING,
+            ),
+            ("followUp", records["second_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+            ),
+        },
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeEvaluationWorkflowContext)
+    assert fake_reference.main_calls == []
+    assert [call["follow_up_question_id"] for call in fake_reference.follow_up_calls] == [
+        records["second_question"].id,  # type: ignore[union-attr]
+    ]
+
+
+def test_refresh_evaluation_allows_unavailable_reference_target_to_reach_review() -> None:
+    records = evaluation_pipeline_with_two_follow_ups()
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        states={
+            ("main", None): reference_answer_state(
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            ),
+            ("followUp", records["first_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE,
+            ),
+            ("followUp", records["second_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            ),
+        },
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeReviewWorkflowContext)
+    assert result.attempt.status == "review"
+    assert result.session.version == 5
+    assert fake_reference.main_calls == []
+    assert fake_reference.follow_up_calls == []
+
+
+def test_refresh_evaluation_uses_evaluation_run_created_at_for_ended_early_pending_target() -> None:
+    records = evaluation_pipeline_with_two_follow_ups(ended_early=True)
+    cutoff = NOW + timedelta(minutes=2)
+    records["evaluation"].created_at = cutoff  # type: ignore[union-attr]
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        states={
+            ("main", None): reference_answer_state(
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            ),
+            ("followUp", records["first_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            ),
+            ("followUp", records["second_question"].id): reference_answer_state(  # type: ignore[union-attr]
+                reference_run,
+                PracticeReferenceAnswerLifecycleStatus.REVEALED,
+            ),
+        },
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    result = asyncio.run(
+        service(
+            scripted,
+            fake_reference=fake_reference,
+        ).refresh_evaluation_generation(
+            user_id=records["active"].user_id,  # type: ignore[union-attr]
+            session_id=records["active"].id,  # type: ignore[union-attr]
+            expected_version=4,
+        )
+    )
+
+    assert isinstance(result, PracticeReviewWorkflowContext)
+    pending_calls = [
+        call
+        for call in fake_reference.state_calls
+        if call["target_type"] == "followUp"
+        and call["follow_up_question_id"] == records["second_question"].id  # type: ignore[union-attr]
+    ]
+    assert pending_calls
+    assert all(call["submitted_at"] == cutoff for call in pending_calls)
+
+
+def test_refresh_evaluation_maps_reference_resolver_corruption_to_state_conflict() -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+    )
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_reference=FakeReferenceAnswerGenerationService(
+                    run=reference_run,
+                    state_error=ReferenceAnswerGenerationStateError(
+                        "reference_answer_artifact_conflict"
+                    ),
+                ),
+            ).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "evaluating"  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
+
+
+def test_refresh_evaluation_maps_reference_configuration_failure_without_advancing() -> None:
+    records = evaluation_pipeline(
+        review_status=AgentRunStatus.SUCCEEDED,
+        recommendation_status=AgentRunStatus.SUCCEEDED,
+    )
+    reference_run = reference_answer_run(
+        user_id=records["active"].user_id,  # type: ignore[union-attr]
+    )
+    fake_reference = FakeReferenceAnswerGenerationService(
+        run=reference_run,
+        state=reference_answer_state(
+            reference_run,
+            PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
+        ),
+        error=ValueError("missing reference model"),
+    )
+    scripted = ScriptedSession(*records["scalar_values"])
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(
+                scripted,
+                fake_reference=fake_reference,
+            ).refresh_evaluation_generation(
+                user_id=records["active"].user_id,  # type: ignore[union-attr]
+                session_id=records["active"].id,  # type: ignore[union-attr]
+                expected_version=4,
+            )
+        )
+
+    assert error.value.code == PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE
+    assert records["active"].version == 4  # type: ignore[union-attr]
+    assert records["attempt"].status == "evaluating"  # type: ignore[union-attr]
+    assert scripted.commit_count == 0
+    assert scripted.rollback_count == 1
 
 
 @pytest.mark.parametrize(

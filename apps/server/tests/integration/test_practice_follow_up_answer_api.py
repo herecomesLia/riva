@@ -34,6 +34,9 @@ from riva.services.follow_up_generation import practice_follow_up_idempotency_ke
 from riva.services.practice_api import PracticeAPIService
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_practice_answer_api import (
     TRUSTED_ORIGIN,
     ask_output,
@@ -212,6 +215,7 @@ async def complete_downstream_pipeline(
             model="fake-practice-model",
         ),
     ).process_one()
+    await complete_queued_reference_answers(database)
     final = client.post(
         f"/api/practice/sessions/{session_id}/evaluation/refresh",
         json={"version": evaluation_version},

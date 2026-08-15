@@ -18,6 +18,9 @@ from riva.integrations import LLMUsage
 from riva.models import AgentRun, PracticeFollowUpQuestion, QuestionCard
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_practice_answer_workflow import seed_answering_session
 from tests.integration.test_practice_follow_up_answer_workflow import (
     follow_up_question_output,
@@ -460,6 +463,7 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
                             model="fake-practice-model",
                         ),
                     ).process_one()
+                    await complete_queued_reference_answers(database)
                     async with database.sessionmaker() as session:
                         review = await PracticeSessionService(
                             session,

@@ -199,6 +199,75 @@ function review(version: number) {
   }
 }
 
+const guaranteedMainReferenceAnswer = {
+  content: {
+    answer: "自动生成的主问题参考答案。",
+    commonMistakes: ["不要虚构结果。"],
+    generatedAt: "2026-08-12T08:05:30.000Z",
+    keyPoints: ["说明决策。", "连接证据。"],
+    kind: "personalizedExample" as const,
+  },
+  status: "revealed" as const,
+  viewedBeforeSubmission: false,
+}
+
+const guaranteedFollowUpReferenceAnswer = {
+  content: {
+    addressedGap: "补充可验证的结果证据。",
+    answer: "自动生成的追问参考答案。",
+    commonMistakes: ["不要把团队结果当成个人结果。"],
+    generatedAt: "2026-08-12T08:05:31.000Z",
+    keyPoints: ["说清基线。", "连接结果。"],
+    kind: "personalizedSupplement" as const,
+  },
+  status: "revealed" as const,
+  viewedBeforeSubmission: false,
+}
+
+function evaluatingWithGeneratingReferences(version: number) {
+  const snapshot = evaluating(version)
+  return {
+    ...snapshot,
+    followUpExchanges: snapshot.followUpExchanges.map((exchange) => ({
+      ...exchange,
+      question: {
+        ...exchange.question,
+        referenceAnswer: {
+          content: null,
+          status: "generating" as const,
+          viewedBeforeSubmission: false,
+        },
+      },
+    })),
+    question: {
+      ...snapshot.question,
+      referenceAnswer: {
+        content: null,
+        status: "generating" as const,
+        viewedBeforeSubmission: false,
+      },
+    },
+  }
+}
+
+function guaranteedReview(version: number) {
+  const snapshot = review(version)
+  return {
+    ...snapshot,
+    followUpExchanges: snapshot.followUpExchanges.map((exchange) => ({
+      ...exchange,
+      question: {
+        ...exchange.question,
+        referenceAnswer: guaranteedFollowUpReferenceAnswer,
+      },
+    })),
+    question: {
+      ...snapshot.question,
+      referenceAnswer: guaranteedMainReferenceAnswer,
+    },
+  }
+}
+
 function endedEarlyEvaluating(version: number) {
   return {
     ...base(version),
@@ -441,6 +510,61 @@ describe("PracticePage real API workflow", () => {
     for (const [input, init] of evaluationCalls) {
       expect(requestBody([input, init])).toEqual({ version: 7 })
       expect(requestBody([input, init])).not.toHaveProperty("questionId")
+    }
+  })
+
+  it("keeps reference answers inside the evaluation poll and renders the guaranteed review snapshot", async () => {
+    const pending = evaluatingWithGeneratingReferences(7)
+    const finalReview = guaranteedReview(8)
+    let evaluationRefreshCount = 0
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/sessions/current") {
+        return jsonResponse({ session: pending })
+      }
+      if (path === `/api/practice/sessions/${sessionId}/evaluation/refresh`) {
+        expect(init?.method).toBe("POST")
+        expect(requestBody([input, init])).toEqual({ version: 7 })
+        evaluationRefreshCount += 1
+        return jsonResponse(evaluationRefreshCount === 1 ? pending : finalReview)
+      }
+      throw new Error(`Unexpected request during reference guarantee workflow: ${path}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<PracticePage />, { router: { initialEntries: ["/practice"] } })
+
+    expect(await testing.screen.findByTestId("practice-evaluating-state")).toBeVisible()
+    const reviewState = await testing.screen.findByTestId(
+      "practice-review-state",
+      {},
+      { timeout: 4_000 },
+    )
+    expect(reviewState).toBeVisible()
+    expect(evaluationRefreshCount).toBeGreaterThanOrEqual(2)
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("reference-answer"))).toBe(
+      false,
+    )
+
+    await user.click(
+      testing.screen.getByRole("button", {
+        name: i18n.t("practice.referenceAnswer.expand"),
+      }),
+    )
+    expect(await testing.screen.findByText("自动生成的主问题参考答案。")).toBeVisible()
+
+    const followUpExpandButtons = testing.screen.getAllByRole("button", {
+      name: i18n.t("practice.followUpReview.expandReference"),
+    })
+    expect(followUpExpandButtons).toHaveLength(2)
+    await user.click(followUpExpandButtons[0]!)
+    await user.click(followUpExpandButtons[1]!)
+    const followUpReferenceAnswers = await testing.screen.findAllByText("自动生成的追问参考答案。")
+    expect(followUpReferenceAnswers).toHaveLength(2)
+    for (const referenceAnswer of followUpReferenceAnswers) {
+      expect(referenceAnswer).toBeVisible()
     }
   })
 

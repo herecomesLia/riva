@@ -93,6 +93,7 @@ from riva.services.question_generation import (
     validate_question_generation_run,
 )
 from riva.services.reference_answer_generation import (
+    PracticeReferenceAnswerLifecycleStatus,
     PracticeReferenceAnswerWorkflowState,
     ReferenceAnswerGenerationService,
     ReferenceAnswerGenerationStateError,
@@ -305,6 +306,12 @@ class _PracticeFollowUpChain:
     follow_up_question: PracticeFollowUpQuestion | None
     follow_up_exchanges: tuple[PracticeAnsweredFollowUpExchangeContext, ...]
     completion_reason: PracticeEvaluationFollowUpCompletionReason | None
+
+
+@dataclass(frozen=True)
+class _PracticeReviewReferenceAnswerTarget:
+    follow_up_question_id: UUID | None
+    submitted_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -2620,6 +2627,20 @@ class PracticeSessionService:
                 raise PracticeSessionStateError(
                     PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
                 )
+
+            evaluation_context["recommendation"] = recommendation
+            reference_answers_ready = await self._ensure_review_reference_answers(
+                user_id=user_id,
+                question_card=chain.card,
+                main_answer=chain.main_answer,
+                follow_up_exchanges=chain.follow_up_exchanges,
+                follow_up_completion_reason=follow_up_completion_reason,
+                unanswered_follow_up_question=unanswered_question,
+                evaluation_generation_run=evaluation_run,
+            )
+            if not reference_answers_ready:
+                await self.session.commit()
+                return PracticeEvaluationWorkflowContext(**evaluation_context)
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -5063,6 +5084,126 @@ class PracticeSessionService:
             self.session,
             llm_model=self.llm_model,
         )
+
+    async def _ensure_review_reference_answers(
+        self,
+        *,
+        user_id: UUID,
+        question_card: QuestionCard,
+        main_answer: PracticeAnswer,
+        follow_up_exchanges: tuple[PracticeAnsweredFollowUpExchangeContext, ...],
+        follow_up_completion_reason: PracticeEvaluationFollowUpCompletionReason,
+        unanswered_follow_up_question: PracticeFollowUpQuestion | None,
+        evaluation_generation_run: AgentRun,
+    ) -> bool:
+        targets = [
+            _PracticeReviewReferenceAnswerTarget(
+                follow_up_question_id=None,
+                submitted_at=main_answer.submitted_at,
+            ),
+            *(
+                _PracticeReviewReferenceAnswerTarget(
+                    follow_up_question_id=exchange.question.id,
+                    submitted_at=exchange.answer.submitted_at,
+                )
+                for exchange in follow_up_exchanges
+            ),
+        ]
+        if (
+            follow_up_completion_reason
+            == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+        ):
+            if unanswered_follow_up_question is None:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            try:
+                _require_aware_datetime(evaluation_generation_run.created_at)
+            except (AttributeError, TypeError, ValueError):
+                raise PracticeSessionStateError(
+                    PRACTICE_SESSION_STATE_CONFLICT
+                ) from None
+            targets.append(
+                _PracticeReviewReferenceAnswerTarget(
+                    follow_up_question_id=unanswered_follow_up_question.id,
+                    submitted_at=evaluation_generation_run.created_at,
+                )
+            )
+        elif unanswered_follow_up_question is not None:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+        generation_service = self._reference_answer_generation_service()
+        missing_targets: list[_PracticeReviewReferenceAnswerTarget] = []
+        try:
+            for target in targets:
+                if target.follow_up_question_id is None:
+                    state = await generation_service.get_main_generation_state(
+                        user_id=user_id,
+                        question_card_id=question_card.id,
+                        submitted_at=target.submitted_at,
+                        for_update=True,
+                    )
+                else:
+                    state = await generation_service.get_follow_up_generation_state(
+                        user_id=user_id,
+                        question_card_id=question_card.id,
+                        follow_up_question_id=target.follow_up_question_id,
+                        submitted_at=target.submitted_at,
+                        for_update=True,
+                    )
+                if state.status is PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED:
+                    missing_targets.append(target)
+
+            for target in missing_targets:
+                if target.follow_up_question_id is None:
+                    await generation_service.enqueue_main_generation_in_transaction(
+                        user_id=user_id,
+                        question_card_id=question_card.id,
+                        idempotency_key=practice_main_reference_answer_idempotency_key(
+                            question_card.id
+                        ),
+                    )
+                else:
+                    await generation_service.enqueue_follow_up_generation_in_transaction(
+                        user_id=user_id,
+                        question_card_id=question_card.id,
+                        follow_up_question_id=target.follow_up_question_id,
+                        idempotency_key=practice_follow_up_reference_answer_idempotency_key(
+                            target.follow_up_question_id
+                        ),
+                    )
+
+            all_terminal = True
+            for target in targets:
+                if target.follow_up_question_id is None:
+                    state = await generation_service.get_main_generation_state(
+                        user_id=user_id,
+                        question_card_id=question_card.id,
+                        submitted_at=target.submitted_at,
+                        for_update=True,
+                    )
+                else:
+                    state = await generation_service.get_follow_up_generation_state(
+                        user_id=user_id,
+                        question_card_id=question_card.id,
+                        follow_up_question_id=target.follow_up_question_id,
+                        submitted_at=target.submitted_at,
+                        for_update=True,
+                    )
+                if state.status not in {
+                    PracticeReferenceAnswerLifecycleStatus.REVEALED,
+                    PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE,
+                }:
+                    all_terminal = False
+            return all_terminal
+        except ReferenceAnswerGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_SESSION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        except ValueError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+                source_code="reference_answer_generation_unavailable",
+            ) from error
 
     def _generation_service(self) -> QuestionGenerationService:
         return self.question_generation_service_factory(

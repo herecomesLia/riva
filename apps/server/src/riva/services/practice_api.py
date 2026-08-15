@@ -80,6 +80,7 @@ from riva.services.practice_sessions import (
     PracticeAnsweredFollowUpExchangeContext,
     PracticeCompletedSessionWorkflowContext,
     PracticeEndedEarlySessionWorkflowContext,
+    PracticeEvaluationWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
     PracticePrimaryAnswerWorkflowContext,
@@ -729,12 +730,27 @@ class PracticeAPIService:
                     )
                 )
             if follow_up_question is not None:
+                unanswered_submitted_at = None
+                if (
+                    isinstance(
+                        context,
+                        (
+                            PracticeEvaluationWorkflowContext,
+                            PracticeReviewWorkflowContext,
+                        ),
+                    )
+                    and context.follow_up_completion_reason
+                    == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
+                ):
+                    unanswered_submitted_at = (
+                        context.evaluation_generation_run.created_at
+                    )
                 follow_up_states[follow_up_question.id] = (
                     await generation_service.get_follow_up_generation_state(
                         user_id=user_id,
                         question_card_id=card.id,
                         follow_up_question_id=follow_up_question.id,
-                        submitted_at=None,
+                        submitted_at=unanswered_submitted_at,
                     )
                 )
         except ReferenceAnswerGenerationStateError:

@@ -35,6 +35,9 @@ from riva.services.practice_sessions import (
     PracticeSessionService,
 )
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_practice_answer_workflow import (
     build_evaluation_worker,
     build_follow_up_worker,
@@ -218,6 +221,7 @@ async def finish_evaluation_pipeline(
             model="fake-recommendation-model",
         ),
     ).process_one()
+    await complete_queued_reference_answers(database)
     async with database.sessionmaker() as session:
         final = await PracticeSessionService(
             session,

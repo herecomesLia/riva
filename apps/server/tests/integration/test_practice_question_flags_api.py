@@ -12,6 +12,9 @@ from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import PracticeAttempt, QuestionCard
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_practice_answer_api import start_answering
 from tests.integration.test_question_generation import database_url, seed_context
 from tests.integration.test_recommendation_generation import (
@@ -50,6 +53,7 @@ async def prepare_review_session(
             usage=LLMUsage(input_tokens=20, output_tokens=10),
         ),
     ).process_one()
+    await complete_queued_reference_answers(database)
 
     question_id = attempt.question_card_id
     assert question_id is not None

@@ -23,6 +23,9 @@ from riva.models import (
     PracticeSession,
 )
 from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_practice_answer_workflow import (
     build_evaluation_worker,
     evaluation_response,
@@ -279,6 +282,7 @@ def test_practice_follow_up_stop_public_api_replay_poll_and_normal_completion() 
                             model="fake-practice-model",
                         ),
                     ).process_one()
+                    await complete_queued_reference_answers(database)
                     review = client.post(
                         f"/api/practice/sessions/{session_id}/evaluation/refresh",
                         json={"version": 5},
