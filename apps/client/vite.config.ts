@@ -90,12 +90,11 @@ export default defineConfig({
         plugins: [storybookTest({ configDir: path.resolve(dirname, ".storybook") })],
         test: {
           name: "storybook",
-          // Keep Chromium iframe workloads bounded while retaining file isolation.
-          maxWorkers: 2,
           setupFiles: [path.resolve(dirname, "src/test/setup.ts")],
           browser: {
             enabled: true,
             headless: true,
+            fileParallelism: false,
             instances: [{ browser: "chromium" }],
             provider: storybookBrowserProvider,
           },
