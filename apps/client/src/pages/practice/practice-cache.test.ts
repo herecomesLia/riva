@@ -389,55 +389,61 @@ describe("practice mutation cache contract", () => {
     ).toBe(current)
   })
 
-  it("accepts saved continue responses that are already answering", () => {
-    const current = createPracticeMockResponse("reviewBalanced")
-    const response = createPracticeMockResponse("answeringQuestion")
-    if (current.session.status !== "review" || response.session.status !== "answering") return
+  it.each(["saved", "history"] as const)(
+    "accepts %s continue responses that are already answering",
+    (source) => {
+      const current = createPracticeMockResponse("reviewBalanced")
+      const response = createPracticeMockResponse("answeringQuestion")
+      if (current.session.status !== "review" || response.session.status !== "answering") return
 
-    const input = {
-      questionId: current.session.question.id,
-      sessionId: current.session.sessionId,
-      version: current.session.version,
-    }
-    current.session.selection = { ...current.session.selection, source: "saved" }
-    response.session.sessionId = input.sessionId
-    response.session.version = input.version + 1
-    response.session.selection = structuredClone(current.session.selection)
-    response.session.attemptNumber = current.session.attemptNumber + 1
+      const input = {
+        questionId: current.session.question.id,
+        sessionId: current.session.sessionId,
+        version: current.session.version,
+      }
+      current.session.selection = { ...current.session.selection, source }
+      response.session.sessionId = input.sessionId
+      response.session.version = input.version + 1
+      response.session.selection = structuredClone(current.session.selection)
+      response.session.attemptNumber = current.session.attemptNumber + 1
 
-    const next = synchronizePracticeMutationResponse(current, response.session, {
-      kind: "continueToNextQuestion",
-      input,
-    })
+      const next = synchronizePracticeMutationResponse(current, response.session, {
+        kind: "continueToNextQuestion",
+        input,
+      })
 
-    expect(next?.session).toBe(response.session)
-    expect(next?.session).toMatchObject({ status: "answering", version: input.version + 1 })
-  })
+      expect(next?.session).toBe(response.session)
+      expect(next?.session).toMatchObject({ status: "answering", version: input.version + 1 })
+    },
+  )
 
-  it("accepts saved skip responses that are already answering", () => {
-    const current = createPracticeMockResponse("answeringQuestion")
-    const response = createPracticeMockResponse("answeringQuestion")
-    if (current.session.status !== "answering" || response.session.status !== "answering") return
+  it.each(["saved", "history"] as const)(
+    "accepts %s skip responses that are already answering",
+    (source) => {
+      const current = createPracticeMockResponse("answeringQuestion")
+      const response = createPracticeMockResponse("answeringQuestion")
+      if (current.session.status !== "answering" || response.session.status !== "answering") return
 
-    const input = {
-      questionId: current.session.question.id,
-      sessionId: current.session.sessionId,
-      version: current.session.version,
-    }
-    current.session.selection = { ...current.session.selection, source: "saved" }
-    response.session.sessionId = input.sessionId
-    response.session.version = input.version + 1
-    response.session.selection = structuredClone(current.session.selection)
-    response.session.attemptId = "saved-replacement-attempt"
+      const input = {
+        questionId: current.session.question.id,
+        sessionId: current.session.sessionId,
+        version: current.session.version,
+      }
+      current.session.selection = { ...current.session.selection, source }
+      response.session.sessionId = input.sessionId
+      response.session.version = input.version + 1
+      response.session.selection = structuredClone(current.session.selection)
+      response.session.attemptId = "saved-replacement-attempt"
 
-    const next = synchronizePracticeMutationResponse(current, response.session, {
-      kind: "skipQuestion",
-      input,
-    })
+      const next = synchronizePracticeMutationResponse(current, response.session, {
+        kind: "skipQuestion",
+        input,
+      })
 
-    expect(next?.session).toBe(response.session)
-    expect(next?.session).toMatchObject({ status: "answering", version: input.version + 1 })
-  })
+      expect(next?.session).toBe(response.session)
+      expect(next?.session).toMatchObject({ status: "answering", version: input.version + 1 })
+    },
+  )
 
   it("accepts review-to-answering retry with a new attempt and the same question", () => {
     const current = createPracticeMockResponse("reviewBalanced")

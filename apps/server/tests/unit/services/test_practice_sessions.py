@@ -2555,12 +2555,13 @@ def test_start_session_rejects_unavailable_sources(
     source: str,
     expected: str,
 ) -> None:
-    session = ScriptedSession()
+    user_id = uuid4()
+    session = ScriptedSession(user_id, None, None)
 
     with pytest.raises(PracticeSessionStateError) as error:
         asyncio.run(
             service(session).start_session(
-                user_id=uuid4(),
+                user_id=user_id,
                 selection=selection(source=source),
                 interaction_language="en",
             )
@@ -2591,7 +2592,7 @@ def test_start_session_rejects_saved_without_an_eligible_question_card() -> None
 def test_setup_capabilities_expose_only_currently_supported_sources() -> None:
     result = asyncio.run(
         PracticeSessionService(
-            ScriptedSession(3),  # type: ignore[arg-type]
+            ScriptedSession(3, 0),  # type: ignore[arg-type]
         ).get_setup_capabilities(
             user_id=uuid4(),
             interaction_language="en",

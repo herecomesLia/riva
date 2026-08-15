@@ -437,6 +437,21 @@ describe("practice service API", () => {
     expect(fetchMock.mock.calls.map(([input]) => input)).toContain("/api/practice/setup")
   })
 
+  it("uses the real setup capability count for history questions", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") return jsonResponse(createRolesResponse())
+      if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
+      if (input === "/api/practice/setup") {
+        return jsonResponse(createSetupCapabilitiesResponse({ historyQuestionCount: 4 }))
+      }
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const page = await getPracticePage()
+
+    expect(page.setupContext.eligibleQuestionCounts).toEqual({ history: 4, saved: 0 })
+  })
+
   it.each(["generatingQuestion", "answering"] as const)(
     "adapts an active %s current session without local fixture metadata",
     async (status) => {
@@ -513,6 +528,28 @@ describe("practice service API", () => {
     expect(requestJson(fetchMock)).toEqual(savedSelection)
     expect(session).toMatchObject({
       selection: savedSelection,
+      status: "answering",
+      version: 1,
+    })
+  })
+
+  it("starts a history session directly in answering state", async () => {
+    const historySelection = { ...selection, source: "history" as const }
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        createActiveSession("answering", {
+          selection: historySelection,
+          version: 1,
+        }),
+        202,
+      ),
+    )
+
+    const session = await startPracticeSession(historySelection)
+
+    expect(requestJson(fetchMock)).toEqual(historySelection)
+    expect(session).toMatchObject({
+      selection: historySelection,
       status: "answering",
       version: 1,
     })
@@ -615,7 +652,9 @@ describe("practice service API", () => {
         return jsonResponse(createTrainableRolesResponse([createTrainableRole(roleId)]))
       }
       if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
-      if (input === "/api/practice/setup") return jsonResponse(createSetupCapabilitiesResponse())
+      if (input === "/api/practice/setup") {
+        return jsonResponse(createSetupCapabilitiesResponse({ historyQuestionCount: 4 }))
+      }
       throw new Error(`Unexpected request: ${String(input)}`)
     })
 
@@ -641,7 +680,7 @@ describe("practice service API", () => {
     expect(prepared.page).toEqual({
       setupContext: expect.objectContaining({
         canPrioritizeWeaknesses: false,
-        eligibleQuestionCounts: { history: 0, saved: 0 },
+        eligibleQuestionCounts: { history: 4, saved: 0 },
       }),
       session: {
         selection: prepared.resolution.configuration,
@@ -865,35 +904,38 @@ describe("practice service API", () => {
     })
   })
 
-  it("accepts saved continue and skip responses that are already answering", async () => {
-    const savedSelection = { ...selection, source: "saved" as const }
-    const savedResponse = createActiveSession("answering", {
-      selection: savedSelection,
-      attemptNumber: 2,
-      version: 6,
-    })
+  it.each(["saved", "history"] as const)(
+    "accepts %s continue and skip responses that are already answering",
+    async (source) => {
+      const reusedSelection = { ...selection, source }
+      const reusedResponse = createActiveSession("answering", {
+        selection: reusedSelection,
+        attemptNumber: 2,
+        version: 6,
+      })
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(savedResponse, 202))
-    const continued = requireActiveSession(
-      await continueToNextPracticeQuestion({ questionId, sessionId, version: 5 }),
-    )
-    expect(continued.status).toBe("answering")
-    expect(requestJson(fetchMock)).toEqual({ version: 5, questionId })
+      fetchMock.mockResolvedValueOnce(jsonResponse(reusedResponse, 202))
+      const continued = requireActiveSession(
+        await continueToNextPracticeQuestion({ questionId, sessionId, version: 5 }),
+      )
+      expect(continued.status).toBe("answering")
+      expect(requestJson(fetchMock)).toEqual({ version: 5, questionId })
 
-    fetchMock.mockReset()
-    vi.stubGlobal("fetch", fetchMock)
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(
-        createActiveSession("answering", { selection: savedSelection, version: 3 }),
-        202,
-      ),
-    )
-    const skipped = requireActiveSession(
-      await skipPracticeQuestion({ questionId, sessionId, version: 2 }),
-    )
-    expect(skipped.status).toBe("answering")
-    expect(requestJson(fetchMock)).toEqual({ version: 2, questionId })
-  })
+      fetchMock.mockReset()
+      vi.stubGlobal("fetch", fetchMock)
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          createActiveSession("answering", { selection: reusedSelection, version: 3 }),
+          202,
+        ),
+      )
+      const skipped = requireActiveSession(
+        await skipPracticeQuestion({ questionId, sessionId, version: 2 }),
+      )
+      expect(skipped.status).toBe("answering")
+      expect(requestJson(fetchMock)).toEqual({ version: 2, questionId })
+    },
+  )
 
   it("sets saved state through the real endpoint with only the saved flag", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(createActiveSession("answering", { version: 6 })))

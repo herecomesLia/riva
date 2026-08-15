@@ -377,7 +377,9 @@ function responseMatchesMutation(
     case "continueToNextQuestion":
       return (
         session.status === "generatingQuestion" ||
-        (currentSession.selection.source === "saved" && session.status === "answering")
+        ((currentSession.selection.source === "saved" ||
+          currentSession.selection.source === "history") &&
+          session.status === "answering")
       )
     case "endQuestionSession":
       return (
