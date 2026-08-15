@@ -180,13 +180,13 @@ describe("training records mock service", () => {
       answer: expect.objectContaining({ content: expect.any(String) }),
       evaluation: expect.objectContaining({ overallScore: 86 }),
       review: expect.objectContaining({ summary: expect.any(String) }),
-      referenceAnswer: expect.objectContaining({ status: "ready" }),
+      referenceAnswer: expect.objectContaining({ status: "revealed" }),
       followUps: [
         expect.objectContaining({
           answer: expect.objectContaining({ content: expect.any(String) }),
           evaluation: expect.objectContaining({ overallScore: 82 }),
           review: expect.objectContaining({ summary: expect.any(String) }),
-          referenceAnswer: expect.objectContaining({ status: "ready" }),
+          referenceAnswer: expect.objectContaining({ status: "revealed" }),
         }),
       ],
     })
@@ -329,7 +329,9 @@ describe("training records mock service", () => {
     ).resolves.toMatchObject({ referenceAnswer: { status: "generating" } })
     await expect(
       settle(getTrainingRecordReferenceAnswerGenerationStatus(target)),
-    ).resolves.toMatchObject({ referenceAnswer: { status: "ready" } })
+    ).resolves.toMatchObject({
+      referenceAnswer: { status: target.kind === "targetedPractice" ? "revealed" : "ready" },
+    })
 
     const after =
       target.kind === "targetedPractice"

@@ -103,9 +103,9 @@ describe("DashboardView", () => {
     expect(screen.getByText(dashboardResponseMock.weaknesses[0].description)).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.weaknesses.description"))).toBeInTheDocument()
     const recommendationLink = screen.getByRole("link", {
-      name: i18n.t("history.detail.recommendationActions.mockInterview"),
+      name: i18n.t("history.detail.recommendationActions.targetedPractice"),
     })
-    expect(recommendationLink).toHaveAttribute("href", expect.stringContaining("/interview?"))
+    expect(recommendationLink).toHaveAttribute("href", expect.stringContaining("/practice?"))
     expect(recommendationLink.getAttribute("href")).toContain(
       `targetRoleId=${dashboardResponseMock.recommendation!.targetRoleId}`,
     )

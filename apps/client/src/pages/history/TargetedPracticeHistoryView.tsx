@@ -30,8 +30,8 @@ import type { TargetedPracticeHistoryViewState } from "./targeted-practice-histo
 
 export function TargetedPracticeHistoryView({
   historySearch,
-  isReferenceAnswerRequesting = () => false,
-  onGenerateReferenceAnswer = () => {},
+  isReferenceAnswerRequesting,
+  onGenerateReferenceAnswer,
   onRetry,
   state,
 }: {
@@ -125,8 +125,8 @@ function DetailReady({
   onGenerateReferenceAnswer,
   record,
 }: {
-  isReferenceAnswerRequesting: (subject: HistoryReferenceAnswerSubject) => boolean
-  onGenerateReferenceAnswer: (subject: HistoryReferenceAnswerSubject) => void
+  isReferenceAnswerRequesting?: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer?: (subject: HistoryReferenceAnswerSubject) => void
   record: TargetedPracticeRecordDetailResponse
 }) {
   const { t } = useTranslation()

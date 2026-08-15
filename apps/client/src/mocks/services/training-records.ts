@@ -6,11 +6,16 @@ import {
   type TrainingRecordsRepositoryScenario,
 } from "@/mocks/repositories/training-records"
 import { waitForMockDelay } from "@/mocks/utils"
+import type {
+  PracticeFollowUpReferenceAnswerState,
+  PracticeReferenceAnswerState,
+} from "@/models/practice"
 import {
   TrainingRecordNotFoundError,
   type ListTrainingRecordsInput,
   type MockInterviewRecordDetailResponse,
   type TargetedPracticeRecordDetailResponse,
+  type TargetedPracticeQuestion,
   type TrainingRecordKind,
   type TrainingRecordQuestion,
   type TrainingRecordReferenceAnswer,
@@ -24,6 +29,11 @@ import {
 } from "@/models/training-records"
 
 type TrainingRecordDetail = TargetedPracticeRecordDetailResponse | MockInterviewRecordDetailResponse
+type TrainingRecordQuestionDetail = TrainingRecordQuestion | TargetedPracticeQuestion
+type TrainingRecordReferenceAnswerState =
+  | TrainingRecordReferenceAnswer
+  | PracticeReferenceAnswerState
+  | PracticeFollowUpReferenceAnswerState
 
 export type TrainingRecordReferenceAnswerMockOutcome =
   "ready" | "generationFailed" | "insufficientContext"
@@ -77,8 +87,8 @@ function targetKey(target: TrainingRecordReferenceAnswerTarget): string {
 
 function findTarget(target: TrainingRecordReferenceAnswerTarget): {
   record: TrainingRecordDetail
-  question: TrainingRecordQuestion
-  referenceAnswer: TrainingRecordReferenceAnswer
+  question: TrainingRecordQuestionDetail
+  referenceAnswer: TrainingRecordReferenceAnswerState
   prompt: string
 } {
   const record = getTrainingRecordSnapshot(target.recordId)
@@ -96,7 +106,12 @@ function findTarget(target: TrainingRecordReferenceAnswerTarget): {
     )
   }
   if (target.subject === "mainQuestion") {
-    return { record, question, referenceAnswer: question.referenceAnswer, prompt: question.prompt }
+    return {
+      record,
+      question,
+      referenceAnswer: question.referenceAnswer,
+      prompt: question.prompt,
+    }
   }
   const followUp = question.followUps.find(({ id }) => id === target.followUpId)
   if (!followUp) {
@@ -115,38 +130,94 @@ function findTarget(target: TrainingRecordReferenceAnswerTarget): {
 
 function updateTargetReferenceAnswer(
   target: TrainingRecordReferenceAnswerTarget,
-  referenceAnswer: TrainingRecordReferenceAnswer,
+  referenceAnswer: TrainingRecordReferenceAnswerState,
 ): TrainingRecordReferenceAnswerGenerationResponse {
-  const updated = updateTrainingRecordSnapshot(target.recordId, (record) => ({
-    ...record,
-    questions: record.questions.map((question) =>
-      question.id !== target.questionId
-        ? question
-        : target.subject === "mainQuestion"
-          ? { ...question, referenceAnswer }
-          : {
-              ...question,
-              followUps: question.followUps.map((followUp) =>
-                followUp.id === target.followUpId ? { ...followUp, referenceAnswer } : followUp,
-              ),
-            },
-    ),
-  }))
+  const updated = updateTrainingRecordSnapshot(target.recordId, (record) => {
+    const next = {
+      ...record,
+      questions: record.questions.map((question) =>
+        question.id !== target.questionId
+          ? question
+          : target.subject === "mainQuestion"
+            ? { ...question, referenceAnswer }
+            : {
+                ...question,
+                followUps: question.followUps.map((followUp) =>
+                  followUp.id === target.followUpId ? { ...followUp, referenceAnswer } : followUp,
+                ),
+              },
+      ),
+    }
+    return next as TrainingRecordDetail
+  })
   if (!updated) {
     throw new TrainingRecordReferenceAnswerGenerationError(
       "recordNotFound",
       "Training record does not exist.",
     )
   }
-  return { target: copy(target), referenceAnswer: copy(referenceAnswer) }
+  return generationResponse(target, referenceAnswer)
+}
+
+function generationResponse(
+  target: TrainingRecordReferenceAnswerTarget,
+  referenceAnswer: TrainingRecordReferenceAnswerState,
+): TrainingRecordReferenceAnswerGenerationResponse {
+  if (target.kind === "mockInterview") {
+    return {
+      target: copy(target),
+      referenceAnswer: copy(referenceAnswer) as TrainingRecordReferenceAnswer,
+    }
+  }
+  if (target.subject === "mainQuestion") {
+    return {
+      target: copy(target),
+      referenceAnswer: copy(referenceAnswer) as PracticeReferenceAnswerState,
+    }
+  }
+  return {
+    target: copy(target),
+    referenceAnswer: copy(referenceAnswer) as PracticeFollowUpReferenceAnswerState,
+  }
 }
 
 function readyReferenceAnswer(
   target: TrainingRecordReferenceAnswerTarget,
   prompt: string,
-): TrainingRecordReferenceAnswer {
+): TrainingRecordReferenceAnswerState {
   referenceAnswerGenerationSequence += 1
   const subject = target.subject === "mainQuestion" ? "主问题" : "追问"
+  if (target.kind === "targetedPractice") {
+    if (target.subject === "mainQuestion") {
+      return {
+        status: "revealed",
+        viewedBeforeSubmission: false,
+        content: {
+          kind: "personalizedExample",
+          answer: `针对${subject}“${prompt}”，我会先说明结论，再结合具体经历解释自己的判断、行动和取舍，最后用结果与复盘证明这套做法能够迁移到目标岗位。`,
+          keyPoints: ["明确个人贡献", "解释方案取舍"],
+          commonMistakes: ["只描述团队工作，不说明个人贡献"],
+          generatedAt: new Date(
+            Date.UTC(2026, 6, 25, 8, referenceAnswerGenerationSequence),
+          ).toISOString(),
+        },
+      } satisfies PracticeReferenceAnswerState
+    }
+    return {
+      status: "revealed",
+      viewedBeforeSubmission: false,
+      content: {
+        kind: "personalizedSupplement",
+        addressedGap: `针对${prompt}补充个人判断、行动和结果证据。`,
+        answer: `我会围绕${prompt}补充具体的判断依据、行动边界和结果数据。`,
+        keyPoints: ["补充个人贡献", "补充结果证据"],
+        commonMistakes: ["只给结论，不解释取舍"],
+        generatedAt: new Date(
+          Date.UTC(2026, 6, 25, 8, referenceAnswerGenerationSequence),
+        ).toISOString(),
+      },
+    } satisfies PracticeFollowUpReferenceAnswerState
+  }
   return {
     status: "ready",
     content: {
@@ -172,7 +243,7 @@ export async function requestTrainingRecordReferenceAnswer(
       "Reference answer generation is already in progress.",
     )
   }
-  if (referenceAnswer.status === "ready") {
+  if (referenceAnswer.status === "ready" || referenceAnswer.status === "revealed") {
     throw new TrainingRecordReferenceAnswerGenerationError(
       "alreadyReady",
       "Reference answer is already ready.",
@@ -180,6 +251,7 @@ export async function requestTrainingRecordReferenceAnswer(
   }
   if (
     referenceAnswer.status === "unavailable" &&
+    "reason" in referenceAnswer &&
     referenceAnswer.reason === "insufficientContext"
   ) {
     throw new TrainingRecordReferenceAnswerGenerationError(
@@ -192,7 +264,12 @@ export async function requestTrainingRecordReferenceAnswer(
     outcome: referenceAnswerOutcome,
     pollsRemaining: referenceAnswerPollsBeforeCompletion,
   })
-  return updateTargetReferenceAnswer(target, { status: "generating", content: null })
+  return updateTargetReferenceAnswer(
+    target,
+    target.kind === "targetedPractice"
+      ? { status: "generating", content: null, viewedBeforeSubmission: false }
+      : { status: "generating", content: null },
+  )
 }
 
 export async function getTrainingRecordReferenceAnswerGenerationStatus(
@@ -201,7 +278,7 @@ export async function getTrainingRecordReferenceAnswerGenerationStatus(
   await waitForMockDelay()
   const located = findTarget(target)
   if (located.referenceAnswer.status !== "generating") {
-    return { target: copy(target), referenceAnswer: copy(located.referenceAnswer) }
+    return generationResponse(target, located.referenceAnswer)
   }
 
   const key = targetKey(target)
@@ -214,7 +291,7 @@ export async function getTrainingRecordReferenceAnswerGenerationStatus(
       ...generation,
       pollsRemaining: generation.pollsRemaining - 1,
     })
-    return { target: copy(target), referenceAnswer: copy(located.referenceAnswer) }
+    return generationResponse(target, copy(located.referenceAnswer))
   }
 
   referenceGenerations.delete(key)

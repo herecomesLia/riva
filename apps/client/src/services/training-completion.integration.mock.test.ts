@@ -111,7 +111,7 @@ describe("training completion to history mock integration", () => {
           answer: expect.objectContaining({ content: expect.any(String) }),
           evaluation: expect.objectContaining({ overallScore: expect.any(Number) }),
           review: expect.objectContaining({ summary: expect.any(String) }),
-          referenceAnswer: { status: "ready", content: expect.any(Object) },
+          referenceAnswer: { status: "revealed", content: expect.any(Object) },
         },
       ],
     })

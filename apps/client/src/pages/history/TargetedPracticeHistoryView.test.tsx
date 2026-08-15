@@ -71,12 +71,12 @@ describe("TargetedPracticeHistoryView", () => {
     )
     expect(retryHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
     const recommendationLink = screen.getByRole("link", {
-      name: i18n.t("history.detail.recommendationActions.mockInterview"),
+      name: i18n.t("history.detail.recommendationActions.targetedPractice"),
     })
     const recommendationHref = recommendationLink.getAttribute("href") ?? ""
-    expect(recommendationHref).toContain("/interview?")
+    expect(recommendationHref).toContain("/practice?")
     expect(recommendationHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
-    expect(recommendationHref).toContain(`round=${record.recommendation!.round}`)
+    expect(recommendationHref).toContain(`questionType=${record.recommendation!.questionType}`)
     expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })
 

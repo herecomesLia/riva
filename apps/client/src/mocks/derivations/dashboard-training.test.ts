@@ -21,7 +21,7 @@ describe("deriveDashboardTrainingData", () => {
     expect(dashboard.recommendation).toMatchObject({
       sourceRecordId: "targeted-practice-record-001",
       targetRoleId: "role_frontend_bytedance",
-      recommendation: { action: "mockInterview" },
+      recommendation: { action: "targetedPractice" },
     })
   })
 

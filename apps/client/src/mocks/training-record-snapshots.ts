@@ -17,11 +17,12 @@ import type {
   MockInterviewOverallReviewState,
   MockInterviewRecordDetailResponse,
   TargetedPracticeRecordDetailResponse,
+  TargetedPracticeFollowUp,
+  TargetedPracticeQuestion,
   TrainingRecordEvaluation,
-  TrainingRecordFollowUp,
-  TrainingRecordQuestion,
   TrainingRecordRecommendation,
   TrainingRecordReferenceAnswer,
+  TrainingRecordQuestion,
   TrainingRecordReview,
 } from "@/models/training-records"
 
@@ -40,42 +41,14 @@ function unique(values: readonly string[]): string[] {
 
 function practiceReferenceAnswer(
   state: PracticeReferenceAnswerState,
-): TrainingRecordReferenceAnswer {
-  if (state.status === "notRequested") return { status: "notRequested", content: null }
-  if (state.status === "unavailable") {
-    return { status: "unavailable", content: null, reason: "generationFailed" }
-  }
-  if (state.status === "generating") return { status: "notRequested", content: null }
-  return {
-    status: "ready",
-    content: {
-      recommendedStructure: state.content.keyPoints,
-      keyPoints: state.content.keyPoints,
-      exampleAnswer: state.content.answer,
-      usageGuidance: state.content.commonMistakes.join("；"),
-      generatedAt: state.content.generatedAt,
-    },
-  }
+): PracticeReferenceAnswerState {
+  return structuredClone(state)
 }
 
 function practiceFollowUpReferenceAnswer(
   state: PracticeFollowUpReferenceAnswerState,
-): TrainingRecordReferenceAnswer {
-  if (state.status === "notRequested") return { status: "notRequested", content: null }
-  if (state.status === "unavailable") {
-    return { status: "unavailable", content: null, reason: "generationFailed" }
-  }
-  if (state.status === "generating") return { status: "notRequested", content: null }
-  return {
-    status: "ready",
-    content: {
-      recommendedStructure: state.content.keyPoints,
-      keyPoints: state.content.keyPoints,
-      exampleAnswer: state.content.answer,
-      usageGuidance: state.content.commonMistakes.join("；"),
-      generatedAt: state.content.generatedAt,
-    },
-  }
+): PracticeFollowUpReferenceAnswerState {
+  return structuredClone(state)
 }
 
 function practiceEvaluation(record: PracticeAttemptRecord): TrainingRecordEvaluation {
@@ -96,7 +69,7 @@ function practiceReview(record: PracticeAttemptRecord): TrainingRecordReview {
   }
 }
 
-function practiceFollowUps(record: PracticeAttemptRecord): TrainingRecordFollowUp[] {
+function practiceFollowUps(record: PracticeAttemptRecord): TargetedPracticeFollowUp[] {
   const answered = record.followUpExchanges.map(({ answer, question }) => ({
     id: `${record.attemptId}:${question.id}`,
     prompt: question.prompt,
@@ -131,7 +104,7 @@ function practiceFollowUps(record: PracticeAttemptRecord): TrainingRecordFollowU
 
 function completedPracticeQuestions(
   records: readonly PracticeAttemptRecord[],
-): TrainingRecordQuestion[] {
+): TargetedPracticeQuestion[] {
   const latestAttemptByQuestion = new Map<string, string>()
   return records.map((record, index) => {
     const retryOfQuestionId = latestAttemptByQuestion.get(record.question.id) ?? null
@@ -163,7 +136,7 @@ function unfinishedPracticeQuestion(
   attempt: UnfinishedPracticeAttempt,
   order: number,
   retryOfQuestionId: string | null,
-): TrainingRecordQuestion {
+): TargetedPracticeQuestion {
   return {
     id: attempt.attemptId,
     prompt: attempt.question.prompt,

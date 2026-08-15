@@ -1,4 +1,8 @@
 import type { InteractionLanguage } from "@/types/language"
+import type {
+  PracticeFollowUpReferenceAnswerState,
+  PracticeReferenceAnswerState,
+} from "@/models/practice"
 
 export type TrainingRecordKind = "targetedPractice" | "mockInterview"
 
@@ -120,11 +124,6 @@ export type TrainingRecordReferenceAnswerTarget =
       followUpId: string
     })
 
-export type TrainingRecordReferenceAnswerGenerationResponse = {
-  target: TrainingRecordReferenceAnswerTarget
-  referenceAnswer: TrainingRecordReferenceAnswer
-}
-
 export type TrainingRecordReferenceAnswerGenerationErrorCode =
   | "recordNotFound"
   | "questionNotFound"
@@ -170,6 +169,42 @@ export type TrainingRecordQuestion = {
   referenceAnswer: TrainingRecordReferenceAnswer
   followUps: TrainingRecordFollowUp[]
 }
+
+export type TargetedPracticeReferenceAnswer = PracticeReferenceAnswerState
+
+export type TargetedPracticeFollowUpReferenceAnswer = PracticeFollowUpReferenceAnswerState
+
+export type TargetedPracticeFollowUp = Omit<TrainingRecordFollowUp, "referenceAnswer"> & {
+  referenceAnswer: TargetedPracticeFollowUpReferenceAnswer
+}
+
+export type TargetedPracticeQuestion = Omit<
+  TrainingRecordQuestion,
+  "followUps" | "referenceAnswer"
+> & {
+  referenceAnswer: TargetedPracticeReferenceAnswer
+  followUps: TargetedPracticeFollowUp[]
+}
+
+export type TrainingRecordReferenceAnswerGenerationResponse =
+  | {
+      target: Extract<
+        TrainingRecordReferenceAnswerTarget,
+        { kind: "targetedPractice"; subject: "mainQuestion" }
+      >
+      referenceAnswer: PracticeReferenceAnswerState
+    }
+  | {
+      target: Extract<
+        TrainingRecordReferenceAnswerTarget,
+        { kind: "targetedPractice"; subject: "followUp" }
+      >
+      referenceAnswer: PracticeFollowUpReferenceAnswerState
+    }
+  | {
+      target: Extract<TrainingRecordReferenceAnswerTarget, { kind: "mockInterview" }>
+      referenceAnswer: TrainingRecordReferenceAnswer
+    }
 
 export type TrainingRecordRecommendation =
   | {
@@ -266,21 +301,22 @@ export type TrainingRecordsPageResponse = {
   }
 }
 
-type TrainingRecordDetailBase = TrainingRecordBase & {
-  questions: TrainingRecordQuestion[]
+type TrainingRecordDetailBase<TQuestion = TrainingRecordQuestion> = TrainingRecordBase & {
+  questions: TQuestion[]
   exposedWeaknesses: string[]
   recommendation: TrainingRecordRecommendation | null
 }
 
-export type TargetedPracticeRecordDetailResponse = TrainingRecordDetailBase & {
-  kind: "targetedPractice"
-  setup: {
-    questionType: TrainingRecordQuestionType
-    difficulty: TrainingRecordDifficulty
-    source: "personalized" | "saved" | "history"
-    prioritizedWeaknesses: boolean
+export type TargetedPracticeRecordDetailResponse =
+  TrainingRecordDetailBase<TargetedPracticeQuestion> & {
+    kind: "targetedPractice"
+    setup: {
+      questionType: TrainingRecordQuestionType
+      difficulty: TrainingRecordDifficulty
+      source: "personalized" | "saved" | "history"
+      prioritizedWeaknesses: boolean
+    }
   }
-}
 
 export type MockInterviewOverallReview = {
   summary: string

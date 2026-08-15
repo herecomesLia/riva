@@ -2,9 +2,14 @@ import { SparklesIcon, TriangleAlertIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
+import type {
+  PracticeFollowUpReferenceAnswerState,
+  PracticeReferenceAnswerState,
+} from "@/models/practice"
 import type { TrainingRecordReferenceAnswer } from "@/models/training-records"
 
 export function HistoryReferenceAnswer({
@@ -13,8 +18,11 @@ export function HistoryReferenceAnswer({
   referenceAnswer,
 }: {
   isRequesting?: boolean
-  onGenerate: () => void
-  referenceAnswer: TrainingRecordReferenceAnswer
+  onGenerate?: () => void
+  referenceAnswer:
+    | TrainingRecordReferenceAnswer
+    | PracticeReferenceAnswerState
+    | PracticeFollowUpReferenceAnswerState
 }) {
   const { i18n, t } = useTranslation()
 
@@ -63,6 +71,10 @@ export function HistoryReferenceAnswer({
           </div>
         )}
 
+        {referenceAnswer.status === "revealed" && (
+          <PracticeReferenceAnswerContent referenceAnswer={referenceAnswer} />
+        )}
+
         {referenceAnswer.status === "generating" && (
           <div className="flex flex-col items-start gap-4">
             <Alert role="status">
@@ -72,7 +84,7 @@ export function HistoryReferenceAnswer({
                 {t("history.detail.reference.generatingDescription")}
               </AlertDescription>
             </Alert>
-            <GenerateButton disabled onGenerate={onGenerate} />
+            {onGenerate && <GenerateButton disabled onGenerate={onGenerate} />}
           </div>
         )}
 
@@ -85,7 +97,7 @@ export function HistoryReferenceAnswer({
                 {t("history.detail.reference.pollingRetryingDescription")}
               </AlertDescription>
             </Alert>
-            <GenerateButton disabled onGenerate={onGenerate} />
+            {onGenerate && <GenerateButton disabled onGenerate={onGenerate} />}
           </div>
         )}
 
@@ -101,16 +113,23 @@ export function HistoryReferenceAnswer({
           />
         )}
 
-        {referenceAnswer.status === "unavailable" && (
-          <ReferenceUnavailable
-            description={t("history.detail.reference.unavailableDescription")}
-            onGenerate={referenceAnswer.reason === "generationFailed" ? onGenerate : undefined}
-            isRequesting={isRequesting}
-            title={`${t("history.detail.reference.unavailable")} · ${t(
-              `history.detail.reference.reason.${referenceAnswer.reason}`,
-            )}`}
-          />
-        )}
+        {referenceAnswer.status === "unavailable" &&
+          ("reason" in referenceAnswer ? (
+            <ReferenceUnavailable
+              description={t("history.detail.reference.unavailableDescription")}
+              onGenerate={referenceAnswer.reason === "generationFailed" ? onGenerate : undefined}
+              isRequesting={isRequesting}
+              title={`${t("history.detail.reference.unavailable")} · ${t(
+                `history.detail.reference.reason.${referenceAnswer.reason}`,
+              )}`}
+            />
+          ) : (
+            <ReferenceUnavailable
+              description={t("history.detail.reference.unavailableDescription")}
+              isRequesting={false}
+              title={t("history.detail.reference.unavailable")}
+            />
+          ))}
 
         {referenceAnswer.status === "notRequested" && (
           <ReferenceUnavailable
@@ -122,6 +141,65 @@ export function HistoryReferenceAnswer({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function PracticeReferenceAnswerContent({
+  referenceAnswer,
+}: {
+  referenceAnswer:
+    | Extract<PracticeReferenceAnswerState, { status: "revealed" }>
+    | Extract<PracticeFollowUpReferenceAnswerState, { status: "revealed" }>
+}) {
+  const { i18n, t } = useTranslation()
+  const followUpContent = "addressedGap" in referenceAnswer.content ? referenceAnswer.content : null
+  const kindKey = followUpContent
+    ? `practice.followUpAssistance.kind.${referenceAnswer.content.kind}`
+    : `practice.referenceAnswer.kind.${referenceAnswer.content.kind}`
+
+  return (
+    <div className="flex min-w-0 flex-col gap-5 break-words [overflow-wrap:anywhere]">
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary">{t(kindKey)}</Badge>
+        <Badge variant="outline">
+          {referenceAnswer.viewedBeforeSubmission
+            ? followUpContent
+              ? t("practice.followUpAssistance.viewedBeforeSubmission")
+              : t("practice.referenceAnswer.viewedBeforeSubmission")
+            : t("history.detail.reference.notViewedBeforeSubmission")}
+        </Badge>
+      </div>
+      {followUpContent && (
+        <section className="flex flex-col gap-2">
+          <h4 className="font-heading text-sm font-medium">
+            {t("history.detail.reference.addressedGap")}
+          </h4>
+          <p className="text-sm leading-6 text-muted-foreground">{followUpContent.addressedGap}</p>
+        </section>
+      )}
+      <section className="flex flex-col gap-2">
+        <h4 className="font-heading text-sm font-medium">
+          {t("history.detail.reference.example")}
+        </h4>
+        <p className="whitespace-pre-wrap text-sm leading-7">{referenceAnswer.content.answer}</p>
+      </section>
+      <ReferenceList
+        items={referenceAnswer.content.keyPoints}
+        title={t("history.detail.reference.keyPoints")}
+      />
+      <ReferenceList
+        items={referenceAnswer.content.commonMistakes}
+        title={t("history.detail.reference.commonMistakes")}
+      />
+      <p className="text-xs text-muted-foreground">
+        {t("history.detail.reference.generatedAt", {
+          date: new Intl.DateTimeFormat(i18n.language, {
+            dateStyle: "medium",
+            timeStyle: "short",
+          }).format(new Date(referenceAnswer.content.generatedAt)),
+        })}
+      </p>
+    </div>
   )
 }
 

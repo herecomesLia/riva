@@ -70,25 +70,66 @@ export function applyReferenceAnswerGeneration<TRecord extends TrainingRecordDet
   response: TrainingRecordReferenceAnswerGenerationResponse,
 ): TRecord {
   if (record.id !== response.target.recordId || record.kind !== response.target.kind) return record
-  const followUpId = response.target.subject === "followUp" ? response.target.followUpId : null
 
-  return {
-    ...record,
-    questions: record.questions.map((question) =>
-      question.id !== response.target.questionId
-        ? question
-        : response.target.subject === "mainQuestion"
-          ? { ...question, referenceAnswer: response.referenceAnswer }
+  if (response.target.kind === "targetedPractice") {
+    const targetedRecord = record as TargetedPracticeRecordDetailResponse
+    if (response.target.subject === "mainQuestion") {
+      return {
+        ...targetedRecord,
+        questions: targetedRecord.questions.map((question) =>
+          question.id === response.target.questionId
+            ? { ...question, referenceAnswer: response.referenceAnswer }
+            : question,
+        ),
+      } as TRecord
+    }
+    const followUpTarget = response.target
+    if (!("followUpId" in followUpTarget)) return record
+    return {
+      ...targetedRecord,
+      questions: targetedRecord.questions.map((question) =>
+        question.id !== response.target.questionId
+          ? question
           : {
               ...question,
               followUps: question.followUps.map((followUp) =>
-                followUp.id === followUpId
+                followUp.id === followUpTarget.followUpId
                   ? { ...followUp, referenceAnswer: response.referenceAnswer }
                   : followUp,
               ),
             },
-    ),
+      ),
+    } as TRecord
   }
+
+  const interviewRecord = record as MockInterviewRecordDetailResponse
+  if (response.target.subject === "mainQuestion") {
+    return {
+      ...interviewRecord,
+      questions: interviewRecord.questions.map((question) =>
+        question.id === response.target.questionId
+          ? { ...question, referenceAnswer: response.referenceAnswer }
+          : question,
+      ),
+    } as TRecord
+  }
+  const followUpTarget = response.target
+  if (!("followUpId" in followUpTarget)) return record
+  return {
+    ...interviewRecord,
+    questions: interviewRecord.questions.map((question) =>
+      question.id !== response.target.questionId
+        ? question
+        : {
+            ...question,
+            followUps: question.followUps.map((followUp) =>
+              followUp.id === followUpTarget.followUpId
+                ? { ...followUp, referenceAnswer: response.referenceAnswer }
+                : followUp,
+            ),
+          },
+    ),
+  } as TRecord
 }
 
 function generatingTargets(record: TrainingRecordDetail): TrainingRecordReferenceAnswerTarget[] {
@@ -128,11 +169,13 @@ function referenceAnswerForTarget(
 
 export function useHistoryReferenceAnswerGeneration({
   detailQueryKey,
+  enabled = true,
   kind,
   record,
   recordId,
 }: {
   detailQueryKey: QueryKey
+  enabled?: boolean
   kind: TrainingRecordKind
   record: TrainingRecordDetail | undefined
   recordId: string
@@ -177,19 +220,31 @@ export function useHistoryReferenceAnswerGeneration({
 
   const failPolling = useCallback(
     (target: TrainingRecordReferenceAnswerTarget, reason: "consecutiveFailures" | "timeout") => {
-      updateDetail({
-        target,
-        referenceAnswer: { status: "pollingFailed", content: null, reason },
-      })
+      if (target.kind === "mockInterview") {
+        updateDetail({
+          target,
+          referenceAnswer: { status: "pollingFailed", content: null, reason },
+        })
+      } else if (target.subject === "mainQuestion") {
+        updateDetail({
+          target,
+          referenceAnswer: { status: "unavailable", content: null, viewedBeforeSubmission: false },
+        })
+      } else {
+        updateDetail({
+          target,
+          referenceAnswer: { status: "unavailable", content: null, viewedBeforeSubmission: false },
+        })
+      }
       deactivateTarget(target)
     },
     [deactivateTarget, updateDetail],
   )
 
   useEffect(() => {
-    if (!record) return
+    if (!enabled || !record) return
     generatingTargets(record).forEach(activateTarget)
-  }, [activateTarget, record])
+  }, [activateTarget, enabled, record])
 
   const requestMutation = useMutation({
     mutationFn: requestTrainingRecordReferenceAnswer,
@@ -211,21 +266,25 @@ export function useHistoryReferenceAnswerGeneration({
   })
 
   const polls = useQueries({
-    queries: activeTargets.map((target) => ({
-      queryFn: () => getTrainingRecordReferenceAnswerGenerationStatus(target),
-      queryKey: pollQueryKey(detailQueryKey, target),
-      refetchInterval: (query: {
-        state: { data?: TrainingRecordReferenceAnswerGenerationResponse }
-      }) =>
-        query.state.data === undefined || query.state.data.referenceAnswer.status === "generating"
-          ? HISTORY_REFERENCE_POLL_INTERVAL_MS
-          : false,
-      retry: HISTORY_REFERENCE_POLL_RETRY_LIMIT,
-      retryDelay: HISTORY_REFERENCE_POLL_RETRY_DELAY_MS,
-    })),
+    queries: enabled
+      ? activeTargets.map((target) => ({
+          queryFn: () => getTrainingRecordReferenceAnswerGenerationStatus(target),
+          queryKey: pollQueryKey(detailQueryKey, target),
+          refetchInterval: (query: {
+            state: { data?: TrainingRecordReferenceAnswerGenerationResponse }
+          }) =>
+            query.state.data === undefined ||
+            query.state.data.referenceAnswer.status === "generating"
+              ? HISTORY_REFERENCE_POLL_INTERVAL_MS
+              : false,
+          retry: HISTORY_REFERENCE_POLL_RETRY_LIMIT,
+          retryDelay: HISTORY_REFERENCE_POLL_RETRY_DELAY_MS,
+        }))
+      : [],
   })
 
   useEffect(() => {
+    if (!enabled) return
     polls.forEach((poll, index) => {
       const target = activeTargets[index]
       if (!target) return
@@ -234,7 +293,11 @@ export function useHistoryReferenceAnswerGeneration({
         failPolling(target, "consecutiveFailures")
         return
       }
-      if (poll.failureCount > 0 && processedRetryCounts.current.get(key) !== poll.failureCount) {
+      if (
+        target.kind === "mockInterview" &&
+        poll.failureCount > 0 &&
+        processedRetryCounts.current.get(key) !== poll.failureCount
+      ) {
         processedRetryCounts.current.set(key, poll.failureCount)
         updateDetail({
           target,
@@ -248,9 +311,10 @@ export function useHistoryReferenceAnswerGeneration({
       updateDetail(poll.data)
       if (poll.data.referenceAnswer.status !== "generating") deactivateTarget(target)
     })
-  }, [activeTargets, deactivateTarget, failPolling, polls, updateDetail])
+  }, [activeTargets, deactivateTarget, enabled, failPolling, polls, updateDetail])
 
   useEffect(() => {
+    if (!enabled) return
     const timers = activeTargets.map((target) => {
       const key = targetKey(target)
       const startedAt = pollingStartedAt.current.get(key) ?? Date.now()
@@ -258,7 +322,7 @@ export function useHistoryReferenceAnswerGeneration({
       return setTimeout(() => failPolling(target, "timeout"), remaining)
     })
     return () => timers.forEach(clearTimeout)
-  }, [activeTargets, failPolling])
+  }, [activeTargets, enabled, failPolling])
 
   useEffect(
     () => () => {
@@ -278,12 +342,13 @@ export function useHistoryReferenceAnswerGeneration({
   )
 
   function generate(subject: HistoryReferenceAnswerSubject) {
+    if (!enabled) return
     const target = toTarget(kind, recordId, subject)
     const key = targetKey(target)
     if (requestLocks.current.has(key) || activeTargetKeys.current.has(key)) return
 
     const currentReferenceAnswer = record ? referenceAnswerForTarget(record, target) : undefined
-    if (currentReferenceAnswer?.status === "pollingFailed") {
+    if (target.kind === "mockInterview" && currentReferenceAnswer?.status === "pollingFailed") {
       queryClient.removeQueries({ exact: true, queryKey: pollQueryKey(detailQueryKey, target) })
       updateDetail({
         target,

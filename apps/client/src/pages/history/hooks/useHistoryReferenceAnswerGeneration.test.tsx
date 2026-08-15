@@ -3,12 +3,12 @@ import { act, fireEvent, render, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type {
-  TargetedPracticeRecordDetailResponse,
+  MockInterviewRecordDetailResponse,
   TrainingRecordReferenceAnswer,
   TrainingRecordReferenceAnswerGenerationResponse,
   TrainingRecordReferenceAnswerTarget,
 } from "@/models/training-records"
-import { completedTargetedPracticeHistoryStoryFixture } from "@/pages/history/stories/targeted-practice-history-story-fixtures"
+import { completeMockInterviewHistoryStoryFixture } from "@/pages/history/stories/mock-interview-history-story-fixtures"
 import { i18n } from "@/i18n/i18n"
 import {
   getTrainingRecordReferenceAnswerGenerationStatus,
@@ -33,7 +33,7 @@ vi.mock("@/services/training-records", async (importOriginal) => ({
 const detailQueryKey = ["training-records", "detail", "polling-test"] as const
 
 function readyResponse(
-  target: TrainingRecordReferenceAnswerTarget,
+  target: Extract<TrainingRecordReferenceAnswerTarget, { kind: "mockInterview" }>,
   answer = "Generated reference answer",
 ): TrainingRecordReferenceAnswerGenerationResponse {
   return {
@@ -55,18 +55,23 @@ function createRecord(
   first: TrainingRecordReferenceAnswer,
   second: TrainingRecordReferenceAnswer = { status: "notRequested", content: null },
 ) {
-  const record = structuredClone(completedTargetedPracticeHistoryStoryFixture)
+  const record = structuredClone(completeMockInterviewHistoryStoryFixture)
   record.questions[0]!.referenceAnswer = first
   record.questions[1]!.referenceAnswer = second
+  for (const question of record.questions) {
+    for (const followUp of question.followUps) {
+      followUp.referenceAnswer = { status: "notRequested", content: null }
+    }
+  }
   return record
 }
 
 function mainTarget(
-  record: TargetedPracticeRecordDetailResponse,
+  record: MockInterviewRecordDetailResponse,
   questionIndex = 0,
-): TrainingRecordReferenceAnswerTarget {
+): Extract<TrainingRecordReferenceAnswerTarget, { kind: "mockInterview" }> {
   return {
-    kind: "targetedPractice",
+    kind: "mockInterview",
     subject: "mainQuestion",
     recordId: record.id,
     questionId: record.questions[questionIndex]!.id,
@@ -74,14 +79,14 @@ function mainTarget(
 }
 
 function ReferenceGenerationHarness({ queryKey }: { queryKey: QueryKey }) {
-  const query = useQuery<TargetedPracticeRecordDetailResponse>({
+  const query = useQuery<MockInterviewRecordDetailResponse>({
     enabled: false,
     queryFn: () => Promise.reject(new Error("Detail query is disabled in this harness.")),
     queryKey,
   })
   const generation = useHistoryReferenceAnswerGeneration({
     detailQueryKey: queryKey,
-    kind: "targetedPractice",
+    kind: "mockInterview",
     record: query.data,
     recordId: query.data?.id ?? "",
   })
@@ -105,7 +110,7 @@ function ReferenceGenerationHarness({ queryKey }: { queryKey: QueryKey }) {
   )
 }
 
-function renderHarness(record: TargetedPracticeRecordDetailResponse) {
+function renderHarness(record: MockInterviewRecordDetailResponse) {
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(detailQueryKey, record)
   const result = render(
@@ -117,7 +122,7 @@ function renderHarness(record: TargetedPracticeRecordDetailResponse) {
 }
 
 function cachedRecord(queryClient: ReturnType<typeof createTestQueryClient>) {
-  const record = queryClient.getQueryData<TargetedPracticeRecordDetailResponse>(detailQueryKey)
+  const record = queryClient.getQueryData<MockInterviewRecordDetailResponse>(detailQueryKey)
   if (!record) throw new Error("Expected a cached training record.")
   return record
 }

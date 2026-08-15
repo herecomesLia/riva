@@ -1,5 +1,6 @@
 import { env } from "@/app/env"
 import * as trainingRecordsMockService from "@/mocks/services/training-records"
+import { TrainingRecordNotFoundError } from "@/models/training-records"
 import type {
   ListTrainingRecordsInput,
   MockInterviewRecordDetailResponse,
@@ -9,6 +10,9 @@ import type {
   TrainingRecordReferenceAnswerGenerationResponse,
   TrainingRecordReferenceAnswerTarget,
 } from "@/models/training-records"
+import { targetedPracticeTrainingRecordDetailResponseSchema } from "@/schemas/training-records"
+import { apiRequest, ApiError } from "@/services/api"
+import { adaptTargetedPracticeRecord } from "@/services/training-records-adapter"
 
 async function realApiUnavailable(): Promise<never> {
   throw new Error("Real training records API is not implemented.")
@@ -27,9 +31,19 @@ export async function listTrainingRecords(
 export async function getTargetedPracticeRecord(
   recordId: string,
 ): Promise<TargetedPracticeRecordDetailResponse> {
-  return env.mock
-    ? trainingRecordsMockService.getTargetedPracticeRecord(recordId)
-    : realApiUnavailable()
+  if (env.mock) return trainingRecordsMockService.getTargetedPracticeRecord(recordId)
+
+  try {
+    const wire = targetedPracticeTrainingRecordDetailResponseSchema.parse(
+      await apiRequest<unknown>(`/training-records/practice/${encodeURIComponent(recordId)}`),
+    )
+    return adaptTargetedPracticeRecord(wire)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      throw new TrainingRecordNotFoundError("targetedPractice", recordId)
+    }
+    throw error
+  }
 }
 
 export async function getMockInterviewRecord(

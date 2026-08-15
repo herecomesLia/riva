@@ -157,9 +157,12 @@ export const history = {
         "Generation updates only this question's reference answer, never its answer, score, or review.",
       structure: "Recommended structure",
       keyPoints: "Key points",
+      commonMistakes: "Common mistakes",
+      addressedGap: "Addressed gap",
       example: "Example answer",
       guidance: "Usage guidance",
       generatedAt: "Generated {{date}}",
+      notViewedBeforeSubmission: "Reference answer not viewed before submission",
       generating: "Generating reference answer",
       generatingDescription:
         "A reference answer is being generated for this historical question and will update automatically.",

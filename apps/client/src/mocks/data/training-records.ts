@@ -1,10 +1,15 @@
 import type {
+  PracticeFollowUpReferenceAnswerState,
+  PracticeReferenceAnswerState,
+} from "@/models/practice"
+import type {
   MockInterviewRecordDetailResponse,
   TargetedPracticeRecordDetailResponse,
   TrainingRecordEvaluation,
-  TrainingRecordQuestion,
   TrainingRecordReferenceAnswer,
   TrainingRecordReview,
+  TrainingRecordQuestion,
+  TargetedPracticeQuestion,
 } from "@/models/training-records"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 
@@ -44,20 +49,55 @@ function review(summary: string, issue: string): TrainingRecordReview {
   }
 }
 
-function readyReference(exampleAnswer: string, generatedAt: string): TrainingRecordReferenceAnswer {
+function revealedMainReference(answer: string, generatedAt: string): PracticeReferenceAnswerState {
   return {
-    status: "ready",
+    status: "revealed",
+    viewedBeforeSubmission: true,
     content: {
-      recommendedStructure: ["交代业务背景与目标", "说明关键判断和个人行动", "用结果与复盘收束"],
+      kind: "personalizedExample",
+      answer,
       keyPoints: ["明确个人贡献", "解释方案取舍", "量化最终结果"],
-      exampleAnswer,
-      usageGuidance: "参考结构和信息密度，结合自己的真实经历重新组织回答。",
+      commonMistakes: ["只描述团队工作，不说明个人贡献"],
       generatedAt,
     },
   }
 }
 
-const completedPracticeQuestion: TrainingRecordQuestion = {
+function revealedFollowUpReference(
+  answer: string,
+  generatedAt: string,
+): PracticeFollowUpReferenceAnswerState {
+  return {
+    status: "revealed",
+    viewedBeforeSubmission: true,
+    content: {
+      kind: "personalizedSupplement",
+      addressedGap: "需要补充交付风险和结果证据。",
+      answer,
+      keyPoints: ["明确个人贡献", "解释方案取舍"],
+      commonMistakes: ["只给结论，不解释取舍"],
+      generatedAt,
+    },
+  }
+}
+
+function legacyReadyReference(
+  exampleAnswer: string,
+  generatedAt: string,
+): TrainingRecordReferenceAnswer {
+  return {
+    status: "ready",
+    content: {
+      recommendedStructure: ["先给出明确结论", "补充具体情境与个人行动", "用结果和复盘收束"],
+      keyPoints: ["紧扣岗位要求", "说明个人贡献与关键取舍", "提供可验证的结果"],
+      exampleAnswer,
+      usageGuidance: "请结合自己的真实经历改写，不要直接背诵示例。",
+      generatedAt,
+    },
+  }
+}
+
+const completedPracticeQuestion: TargetedPracticeQuestion = {
   id: "history-practice-question-001",
   prompt: "请介绍一次你主导前端性能治理的经历，并说明如何验证治理结果。",
   type: "projectDeepDive",
@@ -79,7 +119,7 @@ const completedPracticeQuestion: TrainingRecordQuestion = {
     "回答紧扣问题，但方案取舍还可以解释得更完整。",
   ),
   review: review("背景、行动和结果完整，量化证据清晰。", "没有说明为何优先处理长任务。"),
-  referenceAnswer: readyReference(
+  referenceAnswer: revealedMainReference(
     "我先以真实用户数据确认最影响转化的性能瓶颈，再按风险拆分治理步骤，并通过灰度组与对照组验证技术指标和业务指标。",
     "2026-07-20T02:13:00.000Z",
   ),
@@ -101,7 +141,7 @@ const completedPracticeQuestion: TrainingRecordQuestion = {
         "风险控制方法具体，还可以补充跨团队协作方式。",
       ),
       review: review("能够给出渐进式交付和回滚机制。", "跨团队协同过程描述不足。"),
-      referenceAnswer: readyReference(
+      referenceAnswer: revealedFollowUpReference(
         "我会先补齐监控和回滚能力，再将改造拆成可独立验证的小批次，随业务版本灰度，并明确每一阶段的停止条件。",
         "2026-07-20T02:13:30.000Z",
       ),
@@ -109,7 +149,7 @@ const completedPracticeQuestion: TrainingRecordQuestion = {
   ],
 }
 
-const completedPracticeOriginalQuestion: TrainingRecordQuestion = {
+const completedPracticeOriginalQuestion: TargetedPracticeQuestion = {
   ...completedPracticeQuestion,
   id: "history-practice-question-001-original",
   attemptNumber: 1,
@@ -125,15 +165,11 @@ const completedPracticeOriginalQuestion: TrainingRecordQuestion = {
     "说明了行动方向，但缺少问题基线、取舍依据和可验证结果。",
   ),
   review: review("能够快速给出优化方向。", "缺少性能基线和量化结果。"),
-  referenceAnswer: {
-    status: "unavailable",
-    content: null,
-    reason: "generationFailed",
-  },
+  referenceAnswer: { status: "unavailable", content: null, viewedBeforeSubmission: false },
   followUps: [],
 }
 
-const partiallyAnsweredPracticeQuestion: TrainingRecordQuestion = {
+const partiallyAnsweredPracticeQuestion: TargetedPracticeQuestion = {
   id: "history-practice-question-002",
   prompt: "讲述一次你处理跨团队技术分歧的经历。",
   type: "behavioral",
@@ -155,7 +191,7 @@ const partiallyAnsweredPracticeQuestion: TrainingRecordQuestion = {
     "给出了处理方法，但缺少个人推动过程和最终结果。",
   ),
   review: review("能够识别共同约束并提出折中方案。", "没有说明方案落地后的效果。"),
-  referenceAnswer: { status: "generating", content: null },
+  referenceAnswer: { status: "generating", content: null, viewedBeforeSubmission: false },
   followUps: [
     {
       id: "history-practice-follow-up-002",
@@ -165,12 +201,12 @@ const partiallyAnsweredPracticeQuestion: TrainingRecordQuestion = {
       answer: null,
       evaluation: null,
       review: null,
-      referenceAnswer: { status: "notRequested", content: null },
+      referenceAnswer: { status: "notRequested", content: null, viewedBeforeSubmission: false },
     },
   ],
 }
 
-const endedPracticeQuestion: TrainingRecordQuestion = {
+const endedPracticeQuestion: TargetedPracticeQuestion = {
   id: "history-practice-question-003",
   prompt: "你如何理解高级前端工程师对业务结果的责任？",
   type: "businessUnderstanding",
@@ -183,7 +219,7 @@ const endedPracticeQuestion: TrainingRecordQuestion = {
   answer: null,
   evaluation: null,
   review: null,
-  referenceAnswer: { status: "notRequested", content: null },
+  referenceAnswer: { status: "notRequested", content: null, viewedBeforeSubmission: false },
   followUps: [],
 }
 
@@ -209,9 +245,9 @@ export const targetedPracticeRecordDetailsMock = [
     questions: [completedPracticeOriginalQuestion, completedPracticeQuestion],
     exposedWeaknesses: ["复杂方案的取舍说明不够充分"],
     recommendation: {
-      action: "mockInterview",
-      reason: "单题结构已经稳定，可以在连续问答中验证临场表达。",
-      round: "technical",
+      action: "targetedPractice",
+      reason: "单题结构已经稳定，可以继续强化方案取舍。",
+      questionType: "projectDeepDive",
       difficulty: "pressure",
       focusAreas: ["方案取舍", "跨团队协作"],
     },
@@ -290,7 +326,7 @@ const interviewQuestionOne: TrainingRecordQuestion = {
     "经历与岗位匹配明确，可以进一步突出差异化优势。",
   ),
   review: review("主线明确，能够主动关联岗位要求。", "差异化价值还不够突出。"),
-  referenceAnswer: readyReference(
+  referenceAnswer: legacyReadyReference(
     "我会围绕与岗位最相关的两段经历展开，分别说明承担的责任、产生的结果和沉淀的能力，最后明确这些能力如何支持目标岗位。",
     "2026-07-16T03:29:00.000Z",
   ),
@@ -385,7 +421,7 @@ const unavailableReviewInterviewQuestion: TrainingRecordQuestion = {
   order: 1,
   prompt: "当你需要快速理解一个陌生业务时，会从哪些信息开始？",
   assessedCapabilities: ["业务理解", "信息分析"],
-  referenceAnswer: readyReference(
+  referenceAnswer: legacyReadyReference(
     "我会先明确业务目标、核心用户和关键流程，再结合指标、用户反馈与一线访谈建立问题地图，最后用小范围验证校准判断。",
     "2026-07-08T01:04:00.000Z",
   ),

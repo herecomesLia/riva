@@ -37,7 +37,11 @@ const unansweredMainQuestion = structuredClone(
 unansweredMainQuestion.answer = null
 unansweredMainQuestion.evaluation = null
 unansweredMainQuestion.review = null
-unansweredMainQuestion.referenceAnswer = { status: "notRequested", content: null }
+unansweredMainQuestion.referenceAnswer = {
+  status: "notRequested",
+  content: null,
+  viewedBeforeSubmission: false,
+}
 
 export const UnansweredMainQuestion = meta.story({
   args: {

@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type {
+  TargetedPracticeFollowUpReferenceAnswer,
+  TargetedPracticeReferenceAnswer,
   TrainingRecordAnswer,
   TrainingRecordEvaluation,
-  TrainingRecordQuestion,
+  TargetedPracticeQuestion,
   TrainingRecordReview,
 } from "@/models/training-records"
 import { PracticeDimensionScores } from "@/pages/practice/components/PracticeDimensionScores"
@@ -28,9 +30,9 @@ export function TargetedPracticeQuestionRecord({
   onGenerateReferenceAnswer,
   question,
 }: {
-  isReferenceAnswerRequesting: (subject: HistoryReferenceAnswerSubject) => boolean
-  onGenerateReferenceAnswer: (subject: HistoryReferenceAnswerSubject) => void
-  question: TrainingRecordQuestion
+  isReferenceAnswerRequesting?: (subject: HistoryReferenceAnswerSubject) => boolean
+  onGenerateReferenceAnswer?: (subject: HistoryReferenceAnswerSubject) => void
+  question: TargetedPracticeQuestion
 }) {
   const { i18n, t } = useTranslation()
 
@@ -79,15 +81,20 @@ export function TargetedPracticeQuestionRecord({
         <AnswerSection answer={question.answer} />
         <QuestionDetails
           evaluation={question.evaluation}
-          isRequesting={isReferenceAnswerRequesting({
-            subject: "mainQuestion",
-            questionId: question.id,
-          })}
-          onGenerate={() =>
-            onGenerateReferenceAnswer({
+          isRequesting={
+            isReferenceAnswerRequesting?.({
               subject: "mainQuestion",
               questionId: question.id,
-            })
+            }) ?? false
+          }
+          onGenerate={
+            onGenerateReferenceAnswer
+              ? () =>
+                  onGenerateReferenceAnswer({
+                    subject: "mainQuestion",
+                    questionId: question.id,
+                  })
+              : undefined
           }
           referenceAnswer={question.referenceAnswer}
           review={question.review}
@@ -112,17 +119,22 @@ export function TargetedPracticeQuestionRecord({
                   <AnswerSection answer={followUp.answer} />
                   <QuestionDetails
                     evaluation={followUp.evaluation}
-                    isRequesting={isReferenceAnswerRequesting({
-                      subject: "followUp",
-                      questionId: question.id,
-                      followUpId: followUp.id,
-                    })}
-                    onGenerate={() =>
-                      onGenerateReferenceAnswer({
+                    isRequesting={
+                      isReferenceAnswerRequesting?.({
                         subject: "followUp",
                         questionId: question.id,
                         followUpId: followUp.id,
-                      })
+                      }) ?? false
+                    }
+                    onGenerate={
+                      onGenerateReferenceAnswer
+                        ? () =>
+                            onGenerateReferenceAnswer({
+                              subject: "followUp",
+                              questionId: question.id,
+                              followUpId: followUp.id,
+                            })
+                        : undefined
                     }
                     referenceAnswer={followUp.referenceAnswer}
                     review={followUp.review}
@@ -146,8 +158,8 @@ function QuestionDetails({
 }: {
   evaluation: TrainingRecordEvaluation | null
   isRequesting: boolean
-  onGenerate: () => void
-  referenceAnswer: TrainingRecordQuestion["referenceAnswer"]
+  onGenerate?: () => void
+  referenceAnswer: TargetedPracticeReferenceAnswer | TargetedPracticeFollowUpReferenceAnswer
   review: TrainingRecordReview | null
 }) {
   const { t } = useTranslation()

@@ -105,7 +105,7 @@ describe("training record response fixtures", () => {
         retryOfQuestionId: complete.questions[0].id,
         isSaved: true,
         isMarkedWeak: false,
-        referenceAnswer: expect.objectContaining({ status: "ready" }),
+        referenceAnswer: expect.objectContaining({ status: "revealed" }),
       }),
     ])
     expect(complete.questions[1].review?.reusableAnswerStructure).not.toHaveLength(0)

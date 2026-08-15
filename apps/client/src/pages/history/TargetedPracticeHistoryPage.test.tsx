@@ -20,6 +20,10 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
   useParams: () => ({ recordId }),
 }))
 
+vi.mock("@/app/env", () => ({
+  env: { apiBaseUrl: "/api", mock: true },
+}))
+
 vi.mock("@/services/training-records", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/training-records")>()),
   getTargetedPracticeRecord: vi.fn(),
@@ -81,7 +85,11 @@ describe("TargetedPracticeHistoryPage", () => {
     const user = userEvent.setup()
     const record = structuredClone(completedTargetedPracticeHistoryStoryFixture)
     const question = record.questions[0]
-    question.referenceAnswer = { status: "notRequested", content: null }
+    question.referenceAnswer = {
+      status: "notRequested",
+      content: null,
+      viewedBeforeSubmission: false,
+    }
     const target = {
       kind: "targetedPractice",
       subject: "mainQuestion",
@@ -91,17 +99,18 @@ describe("TargetedPracticeHistoryPage", () => {
     vi.mocked(getTargetedPracticeRecord).mockResolvedValue(record)
     vi.mocked(requestTrainingRecordReferenceAnswer).mockResolvedValue({
       target,
-      referenceAnswer: { status: "generating", content: null },
+      referenceAnswer: { status: "generating", content: null, viewedBeforeSubmission: false },
     })
     vi.mocked(getTrainingRecordReferenceAnswerGenerationStatus).mockResolvedValue({
       target,
       referenceAnswer: {
-        status: "ready",
+        status: "revealed",
+        viewedBeforeSubmission: false,
         content: {
-          recommendedStructure: ["结论", "行动", "结果"],
+          kind: "personalizedExample",
+          answer: "Generated history answer",
           keyPoints: ["岗位关联"],
-          exampleAnswer: "Generated history answer",
-          usageGuidance: "Use your own experience.",
+          commonMistakes: ["Missing evidence"],
           generatedAt: "2026-07-25T08:00:00.000Z",
         },
       },
