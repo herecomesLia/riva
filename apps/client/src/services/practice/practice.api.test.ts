@@ -16,6 +16,7 @@ import {
   endPracticeSession,
   requestEndPracticeSession,
   prepareNextPracticeSession,
+  preparePracticeTrainingEntry,
   requestAnswerFramework,
   retryCurrentPracticeQuestion,
   requestPracticeFollowUpFramework,
@@ -80,6 +81,83 @@ function createRolesResponse(): RolesPageResponseDto {
     currentRoleId: roleId,
     profileContext: { completed: true, exists: true, version: 1 },
     roles: [createRole(roleId), createRole(archivedRoleId, "archived")],
+  }
+}
+
+function createTrainableRole(
+  id: string,
+  preparationStatus: TargetRoleApiDto["preparationStatus"] = "paused",
+  title = "Frontend Engineer",
+): TargetRoleApiDto {
+  return {
+    ...createRole(id, preparationStatus),
+    jobDescription: {
+      parsingFailureReason: null,
+      rawText: "Build reliable customer-facing products.",
+      status: "ready",
+      version: 1,
+    },
+    jobDescriptionAnalysis: {
+      analysisVersion: 1,
+      businessDomains: [],
+      jobDescriptionVersion: 1,
+      parsedAt: "2026-08-10T09:30:00Z",
+      preferredQualifications: [],
+      qualificationRequirements: {
+        certifications: [],
+        education: [],
+        experience: [],
+        graduationCohorts: [],
+        languages: [],
+        majors: [],
+        other: [],
+      },
+      requiredSkills: {
+        conceptsAndMethods: [],
+        databasesAndMiddleware: [],
+        frameworksAndLibraries: [],
+        other: [],
+        platforms: [],
+        programmingLanguages: [],
+        tools: [],
+      },
+      responsibilities: [],
+      rivaSummary: "Build reliable products.",
+      softSkills: [],
+    },
+    matchingAnalysis: {
+      failureReason: null,
+      generatedAt: "2026-08-10T10:00:00Z",
+      jobDescriptionAnalysisVersion: 1,
+      jobDescriptionVersion: 1,
+      profileVersion: 1,
+      result: {
+        coreRequirementsSummary: "Strong product delivery skills.",
+        highRiskQuestions: [],
+        matchedCapabilities: [],
+        missingCapabilities: [],
+        overallMatchScore: 80,
+        preparationRecommendations: [],
+        resumeGaps: [],
+        resumeHighlights: [],
+        underrepresentedCapabilities: [],
+      },
+      status: "current",
+    },
+    title,
+  }
+}
+
+function createTrainableRolesResponse(
+  roles: TargetRoleApiDto[] = [
+    createTrainableRole(roleId),
+    createTrainableRole(archivedRoleId, "archived"),
+  ],
+): RolesPageResponseDto {
+  return {
+    currentRoleId: roleId,
+    profileContext: { completed: true, exists: true, version: 1 },
+    roles,
   }
 }
 
@@ -469,6 +547,134 @@ describe("practice service API", () => {
         "/api/roles",
         "/api/practice/sessions/current",
       ]),
+    )
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false)
+  })
+
+  it("recovers a history configuration from the current real practice setup", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") {
+        return jsonResponse(createTrainableRolesResponse([createTrainableRole(roleId)]))
+      }
+      if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const prepared = await preparePracticeTrainingEntry({
+      difficulty: "pressure",
+      prioritizeWeaknesses: true,
+      questionType: "projectDeepDive",
+      source: "history",
+      targetRoleId: roleId,
+    })
+
+    expect(prepared.resolution).toEqual({
+      adjustments: [],
+      configuration: {
+        difficulty: "pressure",
+        prioritizeWeaknesses: false,
+        questionType: "projectDeepDive",
+        source: "history",
+        targetRoleId: roleId,
+      },
+      status: "available",
+    })
+    expect(prepared.page).toEqual({
+      setupContext: expect.objectContaining({
+        canPrioritizeWeaknesses: false,
+        eligibleQuestionCounts: { history: 0, saved: 0 },
+      }),
+      session: {
+        selection: prepared.resolution.configuration,
+        status: "setup",
+      },
+    })
+  })
+
+  it("adjusts a history question type against the current role capabilities", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") {
+        return jsonResponse(
+          createTrainableRolesResponse([createTrainableRole(roleId, "paused", "Product Manager")]),
+        )
+      }
+      if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const prepared = await preparePracticeTrainingEntry({
+      questionType: "technicalFoundation",
+      targetRoleId: roleId,
+    })
+
+    expect(prepared.resolution).toEqual({
+      adjustments: ["practiceQuestionTypeUnsupported"],
+      configuration: {
+        difficulty: "basic",
+        prioritizeWeaknesses: false,
+        questionType: "projectDeepDive",
+        source: "personalized",
+        targetRoleId: roleId,
+      },
+      status: "adjusted",
+    })
+  })
+
+  it.each([
+    {
+      name: "deleted",
+      rolesResponse: () => createTrainableRolesResponse([createTrainableRole(roleId)]),
+      targetRoleId: "missing-role",
+      reason: "targetRoleDeleted" as const,
+    },
+    {
+      name: "archived",
+      rolesResponse: () => createTrainableRolesResponse(),
+      targetRoleId: archivedRoleId,
+      reason: "targetRoleArchived" as const,
+    },
+    {
+      name: "prerequisite-unavailable",
+      rolesResponse: () => createRolesResponse(),
+      targetRoleId: roleId,
+      reason: "targetRolePrerequisiteUnavailable" as const,
+    },
+  ])(
+    "returns roleUnavailable when the history role is $name",
+    async ({ rolesResponse, reason, targetRoleId }) => {
+      fetchMock.mockImplementation(async (input) => {
+        if (input === "/api/roles") return jsonResponse(rolesResponse())
+        if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
+        throw new Error(`Unexpected request: ${String(input)}`)
+      })
+
+      const prepared = await preparePracticeTrainingEntry({ targetRoleId })
+
+      expect(prepared.resolution).toMatchObject({
+        configuration: { targetRoleId: null },
+        reason,
+        status: "roleUnavailable",
+      })
+      expect(prepared.page.session).toEqual({
+        selection: prepared.resolution.configuration,
+        status: "setup",
+      })
+    },
+  )
+
+  it("fails without replacing an authoritative active practice session", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") {
+        return jsonResponse(createTrainableRolesResponse([createTrainableRole(roleId)]))
+      }
+      if (input === "/api/practice/sessions/current") {
+        return jsonResponse({ session: createActiveSession("generatingQuestion") })
+      }
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    await expect(preparePracticeTrainingEntry({ targetRoleId: roleId })).rejects.toThrow(
+      "practice session is active",
     )
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false)
   })

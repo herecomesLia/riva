@@ -1,6 +1,10 @@
 import { env } from "@/app/env"
 import * as practiceMockService from "@/mocks/services/practice"
-import { buildPracticeSetupContext, createDefaultPracticeSelection } from "@/models/practice-setup"
+import {
+  buildPracticeSetupContext,
+  createDefaultPracticeSelection,
+  reconcilePracticeSetupSelection,
+} from "@/models/practice-setup"
 import type {
   PracticeActiveSessionState,
   PracticeCompletedState,
@@ -44,9 +48,14 @@ import {
 } from "@/schemas/practice"
 import { getRolesPage } from "@/services/roles"
 import { apiRequest } from "@/services/api"
+import type { RolesPageResponse } from "@/models/roles"
 import type {
   PracticeTrainingEntryParameters,
   PracticeTrainingEntryPreparationResponse,
+} from "@/models/training-entry"
+import {
+  resolvePracticeTrainingEntry,
+  resolveTrainingEntryRoleAvailability,
 } from "@/models/training-entry"
 
 function realApiUnavailable(): never {
@@ -57,6 +66,28 @@ async function requestCurrentPracticeSession() {
   return currentPracticeSessionResponseSchema.parse(
     await apiRequest<unknown>("/practice/sessions/current"),
   )
+}
+
+function hasPracticeTrainingPrerequisites(rolesResponse: RolesPageResponse): boolean {
+  return rolesResponse.profileContext.exists && rolesResponse.profileContext.completed
+}
+
+function getTrainablePracticeRoleIds(rolesResponse: RolesPageResponse): string[] {
+  if (!hasPracticeTrainingPrerequisites(rolesResponse)) return []
+
+  return rolesResponse.roles
+    .filter(
+      (role) =>
+        role.preparationStatus !== "archived" &&
+        role.jobDescription.status === "ready" &&
+        role.jobDescriptionAnalysis !== null &&
+        role.matchingAnalysis?.status === "current",
+    )
+    .map(({ id }) => id)
+}
+
+function createRealPracticeSetupSelection(setupContext: PracticePageResponse["setupContext"]) {
+  return reconcilePracticeSetupSelection(setupContext, createDefaultPracticeSelection(setupContext))
 }
 
 async function requestPracticeActiveSession(
@@ -92,7 +123,7 @@ export async function getPracticePage(): Promise<PracticePageResponse> {
       currentResponse.session === null
         ? {
             status: "setup",
-            selection: createDefaultPracticeSelection(setupContext),
+            selection: createRealPracticeSetupSelection(setupContext),
           }
         : toPracticeActiveSessionState(currentResponse.session),
   }
@@ -130,7 +161,47 @@ export async function prepareNextPracticeSession(
 export function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
 ): Promise<PracticeTrainingEntryPreparationResponse> {
-  return env.mock ? practiceMockService.preparePracticeTrainingEntry(input) : realApiUnavailable()
+  if (env.mock) return practiceMockService.preparePracticeTrainingEntry(input)
+
+  return prepareRealPracticeTrainingEntry(input)
+}
+
+async function prepareRealPracticeTrainingEntry(
+  input: PracticeTrainingEntryParameters,
+): Promise<PracticeTrainingEntryPreparationResponse> {
+  const [rolesResponse, currentResponse] = await Promise.all([
+    getRolesPage(),
+    requestCurrentPracticeSession(),
+  ])
+  if (currentResponse.session !== null) {
+    throw new Error("Cannot prepare a history entry while a practice session is active.")
+  }
+
+  const setupContext = buildPracticeSetupContext(rolesResponse)
+  const currentSelection = createRealPracticeSetupSelection(setupContext)
+  const roleAvailability = resolveTrainingEntryRoleAvailability(
+    rolesResponse.roles,
+    getTrainablePracticeRoleIds(rolesResponse),
+    input.targetRoleId,
+    hasPracticeTrainingPrerequisites(rolesResponse),
+  )
+  const resolution = resolvePracticeTrainingEntry(
+    setupContext,
+    currentSelection,
+    setupContext.canPrioritizeWeaknesses ? input : { ...input, prioritizeWeaknesses: false },
+    roleAvailability,
+  )
+
+  return {
+    page: {
+      setupContext,
+      session: {
+        status: "setup",
+        selection: resolution.configuration,
+      },
+    },
+    resolution,
+  }
 }
 
 export async function getQuestionGenerationStatus(
