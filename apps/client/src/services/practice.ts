@@ -39,11 +39,13 @@ import type {
 import type {
   PracticeActiveSessionWire,
   PracticeCompletedSessionWire,
+  PracticeSetupCapabilitiesResponseWire,
   PracticeSessionResponseWire,
 } from "@/schemas/practice"
 import {
   currentPracticeSessionResponseSchema,
   practiceActiveSessionResponseSchema,
+  practiceSetupCapabilitiesResponseSchema,
   practiceSessionResponseSchema,
 } from "@/schemas/practice"
 import { getRolesPage } from "@/services/roles"
@@ -68,6 +70,10 @@ async function requestCurrentPracticeSession() {
   )
 }
 
+async function requestPracticeSetupCapabilities(): Promise<PracticeSetupCapabilitiesResponseWire> {
+  return practiceSetupCapabilitiesResponseSchema.parse(await apiRequest<unknown>("/practice/setup"))
+}
+
 function hasPracticeTrainingPrerequisites(rolesResponse: RolesPageResponse): boolean {
   return rolesResponse.profileContext.exists && rolesResponse.profileContext.completed
 }
@@ -88,6 +94,19 @@ function getTrainablePracticeRoleIds(rolesResponse: RolesPageResponse): string[]
 
 function createRealPracticeSetupSelection(setupContext: PracticePageResponse["setupContext"]) {
   return reconcilePracticeSetupSelection(setupContext, createDefaultPracticeSelection(setupContext))
+}
+
+function buildRealPracticeSetupContext(
+  rolesResponse: RolesPageResponse,
+  capabilities: PracticeSetupCapabilitiesResponseWire,
+) {
+  return buildPracticeSetupContext(rolesResponse, {
+    canPrioritizeWeaknesses: capabilities.canPrioritizeWeaknesses,
+    eligibleQuestionCounts: {
+      history: capabilities.historyQuestionCount,
+      saved: capabilities.savedQuestionCount,
+    },
+  })
 }
 
 async function requestPracticeActiveSession(
@@ -111,11 +130,12 @@ async function requestPracticeSession(
 export async function getPracticePage(): Promise<PracticePageResponse> {
   if (env.mock) return practiceMockService.getPracticePage()
 
-  const [rolesResponse, currentResponse] = await Promise.all([
+  const [rolesResponse, currentResponse, capabilities] = await Promise.all([
     getRolesPage(),
     requestCurrentPracticeSession(),
+    requestPracticeSetupCapabilities(),
   ])
-  const setupContext = buildPracticeSetupContext(rolesResponse)
+  const setupContext = buildRealPracticeSetupContext(rolesResponse, capabilities)
 
   return {
     setupContext,
@@ -169,15 +189,16 @@ export function preparePracticeTrainingEntry(
 async function prepareRealPracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
 ): Promise<PracticeTrainingEntryPreparationResponse> {
-  const [rolesResponse, currentResponse] = await Promise.all([
+  const [rolesResponse, currentResponse, capabilities] = await Promise.all([
     getRolesPage(),
     requestCurrentPracticeSession(),
+    requestPracticeSetupCapabilities(),
   ])
   if (currentResponse.session !== null) {
     throw new Error("Cannot prepare a history entry while a practice session is active.")
   }
 
-  const setupContext = buildPracticeSetupContext(rolesResponse)
+  const setupContext = buildRealPracticeSetupContext(rolesResponse, capabilities)
   const currentSelection = createRealPracticeSetupSelection(setupContext)
   const roleAvailability = resolveTrainingEntryRoleAvailability(
     rolesResponse.roles,

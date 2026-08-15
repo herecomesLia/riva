@@ -2548,7 +2548,6 @@ def test_start_session_maps_generation_prerequisite_and_rolls_back() -> None:
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
-        ("saved", PRACTICE_SESSION_SOURCE_UNAVAILABLE),
         ("history", PRACTICE_SESSION_SOURCE_UNAVAILABLE),
     ],
 )
@@ -2569,6 +2568,39 @@ def test_start_session_rejects_unavailable_sources(
 
     assert error.value.code == expected
     assert session.rollback_count == 1
+
+
+def test_start_session_rejects_saved_without_an_eligible_question_card() -> None:
+    user_id = uuid4()
+    session = ScriptedSession(user_id, None, None)
+
+    with pytest.raises(PracticeSessionStateError) as error:
+        asyncio.run(
+            service(session).start_session(
+                user_id=user_id,
+                selection=selection(source="saved"),
+                interaction_language="en",
+            )
+        )
+
+    assert error.value.code == PRACTICE_SESSION_SOURCE_UNAVAILABLE
+    assert session.commit_count == 0
+    assert session.rollback_count == 1
+
+
+def test_setup_capabilities_expose_only_currently_supported_sources() -> None:
+    result = asyncio.run(
+        PracticeSessionService(
+            ScriptedSession(3),  # type: ignore[arg-type]
+        ).get_setup_capabilities(
+            user_id=uuid4(),
+            interaction_language="en",
+        )
+    )
+
+    assert result.saved_question_count == 3
+    assert result.history_question_count == 0
+    assert result.can_prioritize_weaknesses is False
 
 
 def test_start_session_rejects_weakness_prioritization_until_history_exists() -> None:

@@ -375,7 +375,10 @@ function responseMatchesMutation(
       )
     case "skipQuestion":
     case "continueToNextQuestion":
-      return session.status === "generatingQuestion"
+      return (
+        session.status === "generatingQuestion" ||
+        (currentSession.selection.source === "saved" && session.status === "answering")
+      )
     case "endQuestionSession":
       return (
         session.status === "completed" &&

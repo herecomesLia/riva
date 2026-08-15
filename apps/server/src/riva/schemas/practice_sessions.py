@@ -80,6 +80,14 @@ class PracticeSessionSelection(APIModel):
     prioritize_weaknesses: bool
 
 
+class PracticeSetupCapabilitiesResponse(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    saved_question_count: Annotated[int, Field(ge=0)]
+    history_question_count: Annotated[int, Field(ge=0)]
+    can_prioritize_weaknesses: bool
+
+
 class StartPracticeSessionRequest(PracticeSessionSelection):
     """The client-controlled selection for a new practice session."""
 
@@ -821,6 +829,7 @@ __all__ = [
     "PracticeSessionResponse",
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
+    "PracticeSetupCapabilitiesResponse",
     "PracticeSessionStatus",
     "CompletePracticeSessionRequest",
     "EndPracticeSessionEarlyRequest",

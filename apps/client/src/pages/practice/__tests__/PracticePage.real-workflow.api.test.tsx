@@ -372,6 +372,14 @@ function rolesResponse() {
   }
 }
 
+function setupCapabilitiesResponse() {
+  return {
+    canPrioritizeWeaknesses: false,
+    historyQuestionCount: 0,
+    savedQuestionCount: 0,
+  }
+}
+
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
@@ -410,6 +418,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/answers/main`) {
         expect(init?.method).toBe("POST")
@@ -521,6 +530,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") {
         return jsonResponse({ session: pending })
       }
@@ -578,6 +588,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/next`) {
         expect(init?.method).toBe("POST")
@@ -627,6 +638,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/saved`) {
         expect(init?.method).toBe("PATCH")
@@ -686,6 +698,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/weak`) {
         expect(init?.method).toBe("PATCH")
@@ -726,6 +739,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/complete`) {
         expect(init?.method).toBe("POST")
@@ -764,6 +778,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/end`) {
         expect(init?.method).toBe("POST")
@@ -805,6 +820,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/follow-ups/end`) {
         expect(init?.method).toBe("POST")
@@ -882,6 +898,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/retry`) {
         expect(init?.method).toBe("POST")
@@ -953,6 +970,7 @@ describe("PracticePage real API workflow", () => {
       fetchMock.mockImplementation(async (input) => {
         const path = String(input)
         if (path === "/api/roles") return jsonResponse(rolesResponse())
+        if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
         if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
         if (path.endsWith("/follow-up-generation/refresh")) return jsonResponse(followUpReady)
         if (path.endsWith("/evaluation/refresh")) return jsonResponse(finalReview)
@@ -1014,6 +1032,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/hint`) {
         expect(init?.method).toBe("POST")
@@ -1062,6 +1081,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       throw new Error(`Unexpected request during guidance recovery: ${path}`)
     })
@@ -1111,6 +1131,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer`) {
         expect(init?.method).toBe("POST")
@@ -1210,6 +1231,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer`) {
         expect(init?.method).toBe("POST")
@@ -1315,6 +1337,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: generating })
       if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer/refresh`) {
         expect(init?.method).toBe("POST")
@@ -1363,6 +1386,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/questions/reference-answer`) {
         expect(init?.method).toBe("POST")
@@ -1454,6 +1478,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/follow-ups/hint`) {
         expect(init?.method).toBe("POST")
@@ -1537,6 +1562,7 @@ describe("PracticePage real API workflow", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const path = String(input)
       if (path === "/api/roles") return jsonResponse(rolesResponse())
+      if (path === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
       if (path === "/api/practice/sessions/current") return jsonResponse({ session: current })
       if (path === `/api/practice/sessions/${sessionId}/follow-ups/reference-answer`) {
         expect(init?.method).toBe("POST")

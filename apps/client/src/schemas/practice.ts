@@ -38,6 +38,14 @@ export const practiceSessionSelectionSchema = z
   })
   .strict()
 
+export const practiceSetupCapabilitiesResponseSchema = z
+  .object({
+    canPrioritizeWeaknesses: z.boolean(),
+    historyQuestionCount: z.number().int().nonnegative(),
+    savedQuestionCount: z.number().int().nonnegative(),
+  })
+  .strict()
+
 export const practiceGuidanceNotRequestedSchema = z
   .object({
     content: z.null(),
@@ -617,6 +625,9 @@ export const currentPracticeSessionResponseSchema = z
 
 export type PracticeMaterialReferenceWire = z.infer<typeof practiceMaterialReferenceSchema>
 export type PracticeSessionSelectionWire = z.infer<typeof practiceSessionSelectionSchema>
+export type PracticeSetupCapabilitiesResponseWire = z.infer<
+  typeof practiceSetupCapabilitiesResponseSchema
+>
 export type PracticeMainReferenceAnswerContentWire = z.infer<
   typeof practiceMainReferenceAnswerContentSchema
 >

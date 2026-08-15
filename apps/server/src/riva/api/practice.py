@@ -19,6 +19,7 @@ from riva.schemas.practice_sessions import (
     PracticeFollowUpReferenceAnswerRequest,
     PracticeQuestionReferenceAnswerRequest,
     PracticeSessionResponse,
+    PracticeSetupCapabilitiesResponse,
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
@@ -42,6 +43,25 @@ router = APIRouter(
     tags=["practice"],
     dependencies=[Depends(csrf_protect)],
 )
+
+
+@router.get(
+    "/setup",
+    response_model=PracticeSetupCapabilitiesResponse,
+)
+async def get_practice_setup_capabilities(
+    request: Request,
+    current_user: User = Depends(require_current_user),
+    practice_api_service: PracticeAPIService = Depends(
+        get_practice_api_service
+    ),
+) -> PracticeSetupCapabilitiesResponse:
+    return await practice_api_service.get_setup_capabilities(
+        user_id=current_user.id,
+        interaction_language=normalize_interaction_language(
+            request.headers.get("accept-language")
+        ),
+    )
 
 
 @router.post(

@@ -7,7 +7,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.language import InteractionLanguage
@@ -23,6 +23,7 @@ from riva.models import (
     PracticeReview,
     PracticeSession,
     QuestionCard,
+    TargetRole,
     User,
 )
 from riva.prompts import (
@@ -47,6 +48,7 @@ from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
     PracticeSessionCompletionReason,
     PracticeSessionSelection,
+    PracticeSetupCapabilitiesResponse,
     PracticeSessionStatus,
 )
 from riva.schemas.practice_recommendation import (
@@ -218,7 +220,7 @@ class PracticeSessionStateError(RuntimeError):
 class PracticeSessionWorkflowContext:
     session: PracticeSession
     attempt: PracticeAttempt
-    question_generation_run: AgentRun
+    question_generation_run: AgentRun | None
     question_card: QuestionCard | None
 
 
@@ -421,6 +423,35 @@ class PracticeSessionService:
         )
         self.clock = clock
 
+    async def get_setup_capabilities(
+        self,
+        *,
+        user_id: UUID,
+        interaction_language: InteractionLanguage,
+    ) -> PracticeSetupCapabilitiesResponse:
+        saved_question_count = await self.session.scalar(
+            select(func.count(QuestionCard.id))
+            .select_from(QuestionCard)
+            .join(
+                TargetRole,
+                and_(
+                    TargetRole.id == QuestionCard.target_role_id,
+                    TargetRole.user_id == QuestionCard.user_id,
+                ),
+            )
+            .where(
+                QuestionCard.user_id == user_id,
+                QuestionCard.language == interaction_language,
+                QuestionCard.is_saved.is_(True),
+                TargetRole.preparation_status != "archived",
+            )
+        )
+        return PracticeSetupCapabilitiesResponse(
+            saved_question_count=int(saved_question_count or 0),
+            history_question_count=0,
+            can_prioritize_weaknesses=False,
+        )
+
     async def start_session(
         self,
         *,
@@ -448,6 +479,20 @@ class PracticeSessionService:
                 await self.session.commit()
                 return context
 
+            saved_question_card: QuestionCard | None = None
+            if selection.source.value == "saved":
+                saved_question_card = await self._load_saved_question_card(
+                    user_id=user_id,
+                    target_role_id=selection.target_role_id,
+                    interaction_language=interaction_language,
+                    question_type=selection.question_type,
+                    difficulty=selection.difficulty,
+                )
+                if saved_question_card is None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_SOURCE_UNAVAILABLE
+                    )
+
             now = self.clock()
             _require_aware_datetime(now)
             practice_session = PracticeSession(
@@ -474,15 +519,32 @@ class PracticeSessionService:
                 attempt_number=1,
                 question_type=selection.question_type.value,
                 difficulty=selection.difficulty.value,
-                status=PracticeAttemptStatus.GENERATING_QUESTION.value,
+                status=(
+                    PracticeAttemptStatus.ANSWERING.value
+                    if saved_question_card is not None
+                    else PracticeAttemptStatus.GENERATING_QUESTION.value
+                ),
                 question_generation_run_id=None,
-                question_card_id=None,
+                question_card_id=(
+                    saved_question_card.id if saved_question_card is not None else None
+                ),
                 retry_of_attempt_id=None,
                 created_at=now,
                 updated_at=now,
                 completed_at=None,
             )
+            if saved_question_card is not None:
+                attempt.question_card = saved_question_card
             self.session.add_all([practice_session, attempt])
+
+            if saved_question_card is not None:
+                await self.session.commit()
+                return PracticeSessionWorkflowContext(
+                    session=practice_session,
+                    attempt=attempt,
+                    question_generation_run=None,
+                    question_card=saved_question_card,
+                )
 
             try:
                 run = await self._generation_service().enqueue_generation_in_transaction(
@@ -598,6 +660,57 @@ class PracticeSessionService:
                 current_attempt,
                 recommendation,
             )
+
+            if practice_session.source == "saved":
+                saved_question_card = await self._load_saved_question_card(
+                    user_id=user_id,
+                    target_role_id=practice_session.target_role_id,
+                    interaction_language=practice_session.language,
+                    question_type=next_question_type,
+                    difficulty=next_difficulty,
+                    exclude_question_id=current_attempt.question_card_id,
+                )
+                if saved_question_card is None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_SOURCE_UNAVAILABLE
+                    )
+
+                now = self.clock()
+                _require_aware_datetime(now)
+                previous_attempt = current_attempt
+                previous_status = current_attempt.status
+                previous_updated_at = current_attempt.updated_at
+                previous_version = practice_session.version
+                previous_session_updated_at = practice_session.updated_at
+
+                next_attempt = PracticeAttempt(
+                    id=uuid4(),
+                    user_id=user_id,
+                    session_id=practice_session.id,
+                    attempt_number=current_attempt.attempt_number + 1,
+                    question_type=next_question_type.value,
+                    difficulty=next_difficulty.value,
+                    status=PracticeAttemptStatus.ANSWERING.value,
+                    question_generation_run_id=None,
+                    question_card_id=saved_question_card.id,
+                    retry_of_attempt_id=None,
+                    created_at=now,
+                    updated_at=now,
+                    completed_at=None,
+                )
+                next_attempt.question_card = saved_question_card
+                self.session.add(next_attempt)
+                current_attempt.status = PracticeAttemptStatus.COMPLETED.value
+                current_attempt.updated_at = now
+                practice_session.version += 1
+                practice_session.updated_at = now
+                await self.session.commit()
+                return PracticeSessionWorkflowContext(
+                    session=practice_session,
+                    attempt=next_attempt,
+                    question_generation_run=None,
+                    question_card=saved_question_card,
+                )
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -750,10 +863,56 @@ class PracticeSessionService:
             ):
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
-            now = self.clock()
-            _require_aware_datetime(now)
             question_type = QuestionCardQuestionType(current_attempt.question_type)
             difficulty = QuestionCardDifficulty(current_attempt.difficulty)
+            if practice_session.source == "saved":
+                replacement_card = await self._load_saved_question_card(
+                    user_id=user_id,
+                    target_role_id=practice_session.target_role_id,
+                    interaction_language=practice_session.language,
+                    question_type=question_type,
+                    difficulty=difficulty,
+                    exclude_question_id=current_attempt.question_card_id,
+                )
+                if replacement_card is None:
+                    raise PracticeSessionStateError(
+                        PRACTICE_SESSION_SOURCE_UNAVAILABLE
+                    )
+
+                now = self.clock()
+                _require_aware_datetime(now)
+                attempt_number = current_attempt.attempt_number
+                await self.session.delete(current_attempt)
+                await self.session.flush()
+                replacement_attempt = PracticeAttempt(
+                    id=uuid4(),
+                    user_id=user_id,
+                    session_id=practice_session.id,
+                    attempt_number=attempt_number,
+                    question_type=question_type.value,
+                    difficulty=difficulty.value,
+                    status=PracticeAttemptStatus.ANSWERING.value,
+                    question_generation_run_id=None,
+                    question_card_id=replacement_card.id,
+                    retry_of_attempt_id=None,
+                    created_at=now,
+                    updated_at=now,
+                    completed_at=None,
+                )
+                replacement_attempt.question_card = replacement_card
+                self.session.add(replacement_attempt)
+                practice_session.version += 1
+                practice_session.updated_at = now
+                await self.session.commit()
+                return PracticeSessionWorkflowContext(
+                    session=practice_session,
+                    attempt=replacement_attempt,
+                    question_generation_run=None,
+                    question_card=replacement_card,
+                )
+
+            now = self.clock()
+            _require_aware_datetime(now)
 
             await self.session.delete(current_attempt)
             await self.session.flush()
@@ -3451,6 +3610,71 @@ class PracticeSessionService:
         attempt: PracticeAttempt,
         question_id: UUID,
     ) -> PracticeSessionWorkflowContext:
+        if practice_session.source == "saved":
+            if (
+                attempt.status != PracticeAttemptStatus.ANSWERING.value
+                or attempt.attempt_number <= 1
+                or attempt.retry_of_attempt_id is not None
+                or attempt.question_generation_run_id is not None
+                or attempt.question_card_id is None
+                or attempt.completed_at is not None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            previous_attempt = await self._load_attempt_by_number(
+                user_id=practice_session.user_id,
+                session_id=practice_session.id,
+                attempt_number=attempt.attempt_number - 1,
+                for_update=True,
+            )
+            if (
+                previous_attempt is None
+                or previous_attempt.user_id != practice_session.user_id
+                or previous_attempt.session_id != practice_session.id
+                or previous_attempt.status != PracticeAttemptStatus.COMPLETED.value
+                or previous_attempt.question_card_id != question_id
+                or previous_attempt.completed_at is None
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            review_context = await self._load_review_replay_context(
+                practice_session,
+                previous_attempt,
+                allow_completed=True,
+            )
+            recommendation = review_context.recommendation
+            if recommendation is None:
+                raise PracticeSessionStateError(
+                    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
+                )
+            next_question_type, next_difficulty = self._next_question_selection(
+                previous_attempt,
+                recommendation,
+            )
+            if (
+                attempt.user_id != practice_session.user_id
+                or attempt.session_id != practice_session.id
+                or attempt.attempt_number != previous_attempt.attempt_number + 1
+                or attempt.question_type != next_question_type.value
+                or attempt.difficulty != next_difficulty.value
+            ):
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+
+            source = await self._load_question_source(
+                practice_session,
+                attempt,
+                for_update=True,
+                require_succeeded=True,
+            )
+            if source.question_card.id == previous_attempt.question_card_id:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            return PracticeSessionWorkflowContext(
+                session=practice_session,
+                attempt=attempt,
+                question_generation_run=None,
+                question_card=source.question_card,
+            )
+
         if (
             attempt.status != PracticeAttemptStatus.GENERATING_QUESTION.value
             or attempt.attempt_number <= 1
@@ -5378,6 +5602,41 @@ class PracticeSessionService:
             return None
         return practice_session
 
+    async def _load_saved_question_card(
+        self,
+        *,
+        user_id: UUID,
+        target_role_id: UUID,
+        interaction_language: InteractionLanguage,
+        question_type: QuestionCardQuestionType,
+        difficulty: QuestionCardDifficulty,
+        exclude_question_id: UUID | None = None,
+    ) -> QuestionCard | None:
+        statement = (
+            select(QuestionCard)
+            .join(
+                TargetRole,
+                and_(
+                    TargetRole.id == QuestionCard.target_role_id,
+                    TargetRole.user_id == QuestionCard.user_id,
+                ),
+            )
+            .where(
+                QuestionCard.user_id == user_id,
+                QuestionCard.target_role_id == target_role_id,
+                QuestionCard.language == interaction_language,
+                QuestionCard.question_type == question_type.value,
+                QuestionCard.difficulty == difficulty.value,
+                QuestionCard.is_saved.is_(True),
+                TargetRole.preparation_status != "archived",
+            )
+            .order_by(QuestionCard.created_at.asc(), QuestionCard.id.asc())
+            .with_for_update()
+        )
+        if exclude_question_id is not None:
+            statement = statement.where(QuestionCard.id != exclude_question_id)
+        return await self.session.scalar(statement)
+
     async def _load_attempt_by_number(
         self,
         *,
@@ -6068,9 +6327,13 @@ class PracticeSessionService:
 
             if current.retry_of_attempt_id is None:
                 if current.question_generation_run_id is None:
-                    raise PracticeSessionStateError(
-                        PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-                    )
+                    if (
+                        practice_session.source != "saved"
+                        or current.question_card_id is None
+                    ):
+                        raise PracticeSessionStateError(
+                            PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+                        )
                 return current
 
             if current.question_generation_run_id is not None:
@@ -6112,6 +6375,14 @@ class PracticeSessionService:
         for_update: bool,
         require_succeeded: bool,
     ) -> _PracticeQuestionSource:
+        if practice_session.source == "saved":
+            return await self._load_saved_question_source(
+                practice_session,
+                attempt,
+                for_update=for_update,
+                require_succeeded=require_succeeded,
+            )
+
         source_attempt = await self._resolve_question_source_attempt(
             practice_session=practice_session,
             attempt=attempt,
@@ -6164,6 +6435,65 @@ class PracticeSessionService:
             question_card=card,
         )
 
+    async def _load_saved_question_source(
+        self,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        *,
+        for_update: bool,
+        require_succeeded: bool,
+    ) -> _PracticeQuestionSource:
+        if attempt.question_generation_run_id is not None:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        source_attempt = await self._resolve_question_source_attempt(
+            practice_session=practice_session,
+            attempt=attempt,
+            for_update=for_update,
+        )
+        if (
+            source_attempt.question_card_id is None
+            or attempt.question_card_id != source_attempt.question_card_id
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+
+        card = await self._load_question_card_identity(
+            practice_session,
+            attempt,
+            for_update=for_update,
+        )
+        statement = select(AgentRun).where(
+            AgentRun.id == card.source_agent_run_id,
+            AgentRun.user_id == practice_session.user_id,
+            AgentRun.agent_id == "question-generator",
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        run = await self.session.scalar(statement)
+        if run is None:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        payload = self._validate_saved_question_generation_run(
+            run,
+            practice_session=practice_session,
+            attempt=source_attempt,
+        )
+        if require_succeeded and run.status != AgentRunStatus.SUCCEEDED:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        self._validate_question_card(practice_session, attempt, run, card)
+        return _PracticeQuestionSource(
+            attempt=source_attempt,
+            generation_run=run,
+            generation_payload=payload,
+            question_card=card,
+        )
+
     async def _load_generation_run(
         self,
         practice_session: PracticeSession,
@@ -6171,6 +6501,15 @@ class PracticeSessionService:
         *,
         for_update: bool = True,
     ) -> tuple[AgentRun, QuestionGenerationRunPayload]:
+        if practice_session.source == "saved":
+            source = await self._load_saved_question_source(
+                practice_session,
+                attempt,
+                for_update=for_update,
+                require_succeeded=True,
+            )
+            return source.generation_run, source.generation_payload
+
         if attempt.retry_of_attempt_id is not None:
             source = await self._load_question_source(
                 practice_session,
@@ -6212,6 +6551,35 @@ class PracticeSessionService:
             )
         return run, payload
 
+    @staticmethod
+    def _validate_saved_question_generation_run(
+        run: AgentRun,
+        *,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+    ) -> QuestionGenerationRunPayload:
+        try:
+            payload = validate_question_generation_run(run)
+        except QuestionGenerationStateError as error:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
+                source_code=error.code,
+            ) from None
+        if (
+            run.id is None
+            or run.user_id != practice_session.user_id
+            or attempt.user_id != practice_session.user_id
+            or attempt.session_id != practice_session.id
+            or payload.role_id != practice_session.target_role_id
+            or payload.interaction_language != practice_session.language
+            or payload.question_type.value != attempt.question_type
+            or payload.difficulty.value != attempt.difficulty
+        ):
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+        return payload
+
     async def _load_card_for_run(
         self,
         practice_session: PracticeSession,
@@ -6242,6 +6610,21 @@ class PracticeSessionService:
         *,
         for_update: bool = True,
     ) -> QuestionCard:
+        card = await self._load_question_card_identity(
+            practice_session,
+            attempt,
+            for_update=for_update,
+        )
+        self._validate_question_card(practice_session, attempt, run, card)
+        return card
+
+    async def _load_question_card_identity(
+        self,
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        *,
+        for_update: bool,
+    ) -> QuestionCard:
         assert attempt.question_card_id is not None
         statement = select(QuestionCard).where(
             QuestionCard.id == attempt.question_card_id,
@@ -6252,7 +6635,7 @@ class PracticeSessionService:
         card = await self.session.scalar(statement)
         if card is None:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-        self._validate_question_card(practice_session, attempt, run, card)
+        self._validate_question_card_identity(practice_session, attempt, card)
         return card
 
     @staticmethod
@@ -6262,13 +6645,28 @@ class PracticeSessionService:
         run: AgentRun,
         card: QuestionCard,
     ) -> None:
+        PracticeSessionService._validate_question_card_identity(
+            practice_session,
+            attempt,
+            card,
+        )
+        if card.source_agent_run_id != run.id:
+            raise PracticeSessionStateError(
+                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
+            )
+
+    @staticmethod
+    def _validate_question_card_identity(
+        practice_session: PracticeSession,
+        attempt: PracticeAttempt,
+        card: QuestionCard,
+    ) -> None:
         if (
             card.user_id != practice_session.user_id
             or card.target_role_id != practice_session.target_role_id
             or card.language != practice_session.language
             or card.question_type != attempt.question_type
             or card.difficulty != attempt.difficulty
-            or card.source_agent_run_id != run.id
         ):
             raise PracticeSessionStateError(
                 PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
@@ -6296,7 +6694,7 @@ class PracticeSessionService:
     def _require_supported_selection(
         selection: PracticeSessionSelection,
     ) -> None:
-        if selection.source.value != "personalized":
+        if selection.source.value not in {"personalized", "saved"}:
             raise PracticeSessionStateError(
                 PRACTICE_SESSION_SOURCE_UNAVAILABLE
             )

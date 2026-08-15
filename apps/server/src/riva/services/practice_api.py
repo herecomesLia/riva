@@ -50,6 +50,7 @@ from riva.schemas.practice_sessions import (
     PracticeReviewContentResponse,
     PracticeReviewResponse,
     PracticeSessionSelection,
+    PracticeSetupCapabilitiesResponse,
     PracticeSessionResponse,
     RetryPracticeQuestionRequest,
     SkipPracticeQuestionRequest,
@@ -157,9 +158,10 @@ class PracticeAPIService:
         interaction_language: InteractionLanguage,
     ) -> PracticeActiveSessionResponse:
         try:
-            self._require_llm_configuration(
-                PRACTICE_QUESTION_GENERATION_UNAVAILABLE
-            )
+            if payload.source.value == "personalized":
+                self._require_llm_configuration(
+                    PRACTICE_QUESTION_GENERATION_UNAVAILABLE
+                )
             context = await self._practice_service().start_session(
                 user_id=user_id,
                 selection=PracticeSessionSelection.model_validate(
@@ -168,6 +170,20 @@ class PracticeAPIService:
                 interaction_language=interaction_language,
             )
             return await self._build_session_response(user_id=user_id, context=context)
+        except PracticeSessionStateError as error:
+            raise practice_session_state_api_error(error) from None
+
+    async def get_setup_capabilities(
+        self,
+        *,
+        user_id: UUID,
+        interaction_language: InteractionLanguage,
+    ) -> PracticeSetupCapabilitiesResponse:
+        try:
+            return await self._practice_service().get_setup_capabilities(
+                user_id=user_id,
+                interaction_language=interaction_language,
+            )
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None
 
