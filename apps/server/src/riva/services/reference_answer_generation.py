@@ -371,6 +371,25 @@ class ReferenceAnswerGenerationService:
             for_update=for_update,
         )
 
+    async def get_question_reference_context(
+        self,
+        *,
+        user_id: UUID,
+        question_card_id: UUID,
+    ) -> PracticeReferenceFrozenContext:
+        """Read the frozen question context without touching generation state."""
+
+        card, _ = await self._load_card_and_question_generation_run(
+            user_id=user_id,
+            question_card_id=question_card_id,
+            for_update=False,
+        )
+        return await self._load_frozen_context(
+            question_card_id=card.id,
+            expected_context=None,
+            for_update=False,
+        )
+
     async def _get_generation_state(
         self,
         *,
