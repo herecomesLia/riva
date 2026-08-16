@@ -17,6 +17,7 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
+  retryInterviewTurn,
   submitCandidateQuestion,
   submitInterviewAnswer,
 } from "@/services/interview"
@@ -45,20 +46,24 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const finishLock = useRef(false)
   const endLock = useRef(false)
   const [beginFailed, setBeginFailed] = useState(false)
+  const [turnRetryFailed, setTurnRetryFailed] = useState(false)
 
   const interviewQuery = useQuery({
     queryFn: getInterviewPage,
     queryKey: INTERVIEW_QUERY_KEY,
     retry: false,
     refetchInterval: (query) =>
-      query.state.data?.session?.status === "generatingQuestion" &&
-      query.state.data.session.generationStatus === "generating"
+      (query.state.data?.session?.status === "generatingQuestion" &&
+        query.state.data.session.generationStatus === "generating") ||
+      (query.state.data?.session?.status === "generatingTurn" &&
+        query.state.data.session.generationStatus === "generating")
         ? INTERVIEW_GENERATING_POLL_INTERVAL_MS
         : false,
     refetchIntervalInBackground: false,
   })
   const beginMutation = useMutation({ mutationFn: beginInterviewQuestions })
   const submitMutation = useMutation({ mutationFn: submitInterviewAnswer })
+  const turnRetryMutation = useMutation({ mutationFn: retryInterviewTurn })
   const candidateQuestionMutation = useMutation({ mutationFn: submitCandidateQuestion })
   const finishMutation = useMutation({ mutationFn: finishInterview })
   const endMutation = useMutation({ mutationFn: endInterview })
@@ -143,10 +148,31 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     }
   }
 
+  async function handleRetryTurn() {
+    if (turnRetryMutation.isPending) return
+    const session = currentSession()
+    if (session.status !== "generatingTurn" || session.generationStatus !== "failed") {
+      return
+    }
+
+    setTurnRetryFailed(false)
+    try {
+      commit(
+        await turnRetryMutation.mutateAsync({
+          sessionId: session.sessionId,
+          version: session.version,
+        }),
+      )
+    } catch {
+      setTurnRetryFailed(true)
+    }
+  }
+
   async function handleSubmit(content: string) {
     if (
       submitLock.current ||
       submitMutation.isPending ||
+      turnRetryMutation.isPending ||
       endLock.current ||
       endMutation.isPending
     ) {
@@ -230,7 +256,8 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
       beginLock.current ||
       beginMutation.isPending ||
       submitLock.current ||
-      submitMutation.isPending
+      submitMutation.isPending ||
+      turnRetryMutation.isPending
     ) {
       return
     }
@@ -333,6 +360,21 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     )
   }
 
+  if (session.status === "generatingTurn") {
+    return (
+      <InterviewSessionView
+        generationStatus={session.generationStatus}
+        history={history}
+        isRetrying={turnRetryMutation.isPending}
+        onBack={() => void backToSetup()}
+        onRetry={handleRetryTurn}
+        retryFailed={turnRetryFailed}
+        status="generatingTurn"
+        summary={summary}
+      />
+    )
+  }
+
   if (session.status === "candidateQuestions") {
     return (
       <InterviewSessionView
@@ -385,7 +427,9 @@ function toSummary(
 function toPrompt(
   session: Exclude<
     ActiveInterviewSessionResponse,
-    { status: "opening" | "candidateQuestions" | "generatingQuestion" }
+    {
+      status: "opening" | "candidateQuestions" | "generatingQuestion" | "generatingTurn"
+    }
   >,
 ): InterviewPromptViewData {
   if (session.status === "question") {
@@ -424,7 +468,7 @@ function toConversationHistory(
     })),
   ])
 
-  if (session.status === "followUp") {
+  if (session.status === "followUp" || session.status === "generatingTurn") {
     records.push({
       id: session.currentQuestion.question.id,
       kind: "question",

@@ -3,14 +3,23 @@ from riva.schemas.auth import AuthCredentials, UserResponse
 from riva.schemas.health import HealthResponse
 from riva.schemas.health import DependencyHealthStatus, ServiceHealthStatus
 from riva.schemas.interview import (
+    InterviewAnswerResponse,
+    InterviewAnsweredFollowUpResponse,
     InterviewAwaitingQuestionResponse,
+    InterviewAwaitingFollowUpResponse,
     BeginInterviewQuestionsRequest,
+    InterviewCandidateQuestionsSessionResponse,
+    InterviewCompletedQuestionResponse,
     InterviewConfiguration,
     InterviewDefaultConfiguration,
     InterviewDifficulty,
     InterviewDurationMinutes,
     InterviewGenerationStatus,
     InterviewGeneratingQuestionSessionResponse,
+    InterviewGeneratingTurnQuestionResponse,
+    InterviewGeneratingTurnSessionResponse,
+    InterviewFollowUpQuestionResponse,
+    InterviewFollowUpSessionResponse,
     InterviewOpeningSessionResponse,
     InterviewPageResponse,
     InterviewProgressResponse,
@@ -25,6 +34,10 @@ from riva.schemas.interview import (
     InterviewSetupBlockedResponse,
     InterviewSetupResponse,
     InterviewTargetRoleResponse,
+    RetryInterviewTurnRequest,
+    SubmitFollowUpInterviewAnswerRequest,
+    SubmitInterviewAnswerRequest,
+    SubmitMainInterviewAnswerRequest,
     StartInterviewRequest,
 )
 from riva.schemas.interview_planning import (
@@ -43,6 +56,23 @@ from riva.schemas.interview_planning import (
     InterviewTargetRoleSnapshot,
     QUESTION_COUNT_RANGES,
     validate_interview_plan_for_duration,
+)
+from riva.schemas.interview_turn import (
+    InterviewTurnAnswerSnapshot,
+    InterviewTurnAssessment,
+    InterviewTurnAssessmentOutput,
+    InterviewTurnCompleteQuestionAction,
+    InterviewTurnFollowUpAction,
+    InterviewTurnFollowUpExchange,
+    InterviewTurnInput,
+    InterviewTurnNextAction,
+    InterviewTurnOutput,
+    InterviewTurnQuestionContext,
+    InterviewTurnRunPayload,
+    InterviewTurnSessionSnapshot,
+    MAX_INTERVIEW_FOLLOW_UPS,
+    MAX_INTERVIEW_FOLLOW_UPS_BASIC,
+    MAX_INTERVIEW_FOLLOW_UPS_PRESSURE,
 )
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,

@@ -8,6 +8,7 @@ import type {
   GetInterviewReviewResponse,
   InterviewMutationResponse,
   InterviewPageResponse,
+  RetryInterviewTurnInput,
   StartInterviewInput,
   SubmitCandidateQuestionInput,
   SubmitInterviewAnswerInput,
@@ -62,7 +63,39 @@ export function submitInterviewAnswer(
   input: SubmitInterviewAnswerInput,
 ): Promise<InterviewMutationResponse> {
   if (env.mock) return interviewMockService.submitInterviewAnswer(input)
-  throw new Error("Real interview answer API is not implemented.")
+  return requestInterviewPage(
+    `/interview/sessions/${encodeURIComponent(input.sessionId)}/answers`,
+    {
+      json:
+        input.target === "question"
+          ? {
+              version: input.version,
+              target: input.target,
+              questionId: input.questionId,
+              content: input.content,
+            }
+          : {
+              version: input.version,
+              target: input.target,
+              questionId: input.questionId,
+              followUpQuestionId: input.followUpQuestionId,
+              content: input.content,
+            },
+      method: "POST",
+    },
+  )
+}
+
+export function retryInterviewTurn(
+  input: RetryInterviewTurnInput,
+): Promise<InterviewMutationResponse> {
+  if (env.mock) {
+    throw new Error("Real interview turn retry is not available in the mock service.")
+  }
+  return requestInterviewPage(
+    `/interview/sessions/${encodeURIComponent(input.sessionId)}/turn/retry`,
+    { json: { version: input.version }, method: "POST" },
+  )
 }
 
 export function submitCandidateQuestion(

@@ -75,6 +75,12 @@ export const interview = {
       failedTitle: "第一道主问题生成失败",
       failedDescription: "会话仍然保留，你可以重试生成问题。",
     },
+    turn: {
+      title: "正在分析你的回答",
+      description: "面试官正在复核回答并准备下一步提问，请稍候。",
+      failedTitle: "下一步面试流程准备失败",
+      failedDescription: "你的回答已经保存，可以重试，不需要重复提交。",
+    },
     answer: {
       title: "你的回答",
       description: "可以分段组织内容，尽量说明具体背景、行动和结果。",
@@ -149,6 +155,8 @@ export const interview = {
       candidateSubmitDescription: "你的问题已保留，请检查网络后重试。",
       finishTitle: "暂时无法完成面试",
       finishDescription: "当前候选人提问记录仍然保留，请重试。",
+      turnTitle: "暂时无法准备下一步面试流程",
+      turnDescription: "你的回答已经保留，重试后即可继续面试。",
     },
     unavailable: {
       missingTitle: "未找到有效的面试会话",

@@ -165,6 +165,16 @@ export type InterviewGeneratingQuestionSessionResponse = InterviewActiveSessionR
   generationStatus: InterviewGenerationStatus
 }
 
+export type InterviewGeneratingTurnSessionResponse = InterviewActiveSessionResponseBase & {
+  status: "generatingTurn"
+  generationStatus: InterviewGenerationStatus
+  currentQuestion: {
+    question: InterviewQuestionResponse
+    answer: InterviewAnswerResponse
+    answeredFollowUps: AnsweredInterviewFollowUpResponse[]
+  }
+}
+
 export type InterviewQuestionSessionResponse = InterviewActiveSessionResponseBase & {
   status: "question"
   currentQuestion: {
@@ -329,6 +339,7 @@ export type InterviewCompletedSessionResponse = InterviewActiveSessionResponseBa
 export type ActiveInterviewSessionResponse =
   | InterviewOpeningSessionResponse
   | InterviewGeneratingQuestionSessionResponse
+  | InterviewGeneratingTurnSessionResponse
   | InterviewQuestionSessionResponse
   | InterviewFollowUpSessionResponse
   | InterviewCandidateQuestionsSessionResponse
@@ -434,6 +445,8 @@ export type InterviewSessionMutationInput = {
 }
 
 export type BeginInterviewQuestionsInput = InterviewSessionMutationInput
+
+export type RetryInterviewTurnInput = InterviewSessionMutationInput
 
 export type SubmitInterviewAnswerInput =
   | (InterviewSessionMutationInput & {

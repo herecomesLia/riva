@@ -19,7 +19,9 @@ from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.practice_reference_answer import (
     PracticeMainReferenceAnswerRunPayload,
 )
+from riva.schemas.interview_turn import InterviewTurnRunPayload
 from riva.services.agent_runs import AgentRunService, _serialize_payload
+from tests.unit.agents.test_interview_turn import turn_input
 
 
 class ValidationSession:
@@ -206,6 +208,30 @@ def test_current_agent_payloads_are_accepted_after_alias_serialization() -> None
 
     for payload in payloads:
         assert _serialize_payload(payload) == payload
+
+
+def test_interview_turn_run_payload_is_accepted_after_alias_serialization() -> None:
+    input = turn_input()
+    payload = InterviewTurnRunPayload(
+        session_id=input.session.id,
+        session_version=input.session.version,
+        session_state_version=input.session.version + 1,
+        plan_id=input.plan_id,
+        plan_revision=input.plan_revision,
+        question_id=input.question_id,
+        target_type="main",
+        submitted_answer_id=input.main_answer.id,
+        main_answer_id=input.main_answer.id,
+        interaction_language=input.session.language,
+        remaining_follow_up_slots=input.remaining_follow_up_slots,
+        interview_turn_input=input,
+    ).model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    serialized = _serialize_payload(payload)
+    assert serialized == {
+        **payload,
+        "interviewTurnInput": input.model_dump(mode="json", by_alias=True),
+    }
 
 
 def test_review_run_payload_is_accepted_without_widening_metadata() -> None:

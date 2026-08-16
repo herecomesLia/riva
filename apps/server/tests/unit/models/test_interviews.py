@@ -4,9 +4,13 @@ from sqlalchemy.sql.sqltypes import Uuid
 from riva.db import Base
 from riva.db.database import load_models
 from riva.models import (
+    InterviewAnswer,
+    InterviewFollowUpAnswer,
+    InterviewFollowUpQuestion,
     InterviewPlan,
     InterviewQuestion,
     InterviewSession,
+    InterviewTurnAssessment,
     TargetRole,
     User,
 )
@@ -40,6 +44,8 @@ def test_interview_session_table_and_columns_are_registered() -> None:
     assert table.c.completion_reason.nullable is True
     assert table.c.plan_revision.nullable is False
     assert table.c.total_main_questions.nullable is True
+    assert table.c.planning_run_id.nullable is True
+    assert table.c.turn_run_id.nullable is True
     for column_name in ("started_at", "created_at", "updated_at"):
         assert table.c[column_name].type.timezone is True
         assert table.c[column_name].nullable is False
@@ -144,3 +150,37 @@ def test_interview_question_table_is_independent_from_question_cards() -> None:
         if constraint.name == "uq_interview_questions_session_order"
     )
     assert [column.name for column in unique.columns] == ["session_id", "order"]
+    assert table.c.completed_at.nullable is True
+    assert table.c.completed_at.type.timezone is True
+
+
+def test_interview_turn_tables_use_single_answer_lineage_and_independent_lifecycle() -> None:
+    load_models()
+
+    answer = InterviewAnswer.__table__
+    follow_up_question = InterviewFollowUpQuestion.__table__
+    follow_up_answer = InterviewFollowUpAnswer.__table__
+    assessment = InterviewTurnAssessment.__table__
+
+    assert answer.c.content.nullable is False
+    assert answer.c.submitted_at.type.timezone is True
+    assert {
+        column.name for column in answer.constraints if column.name
+    } >= {"uq_interview_answers_question"}
+    assert {
+        column.name for column in follow_up_question.constraints if column.name
+    } >= {
+        "uq_interview_follow_up_questions_parent_order",
+        "uq_interview_follow_up_questions_source_run",
+    }
+    assert {
+        column.name for column in follow_up_answer.constraints if column.name
+    } >= {"uq_interview_follow_up_answers_question"}
+    assert {
+        column.name for column in assessment.constraints if column.name
+    } >= {
+        "uq_interview_turn_assessments_source_run",
+        "uq_interview_turn_assessments_main_answer",
+        "uq_interview_turn_assessments_follow_up_answer",
+        "ck_interview_turn_assessments_exactly_one_answer",
+    }

@@ -46,6 +46,41 @@ export const interviewQuestionSchema = z
   })
   .strict()
 
+const interviewAnswerSchema = z
+  .object({
+    id: uuidSchema,
+    content: z.string().trim().min(1).max(20_000),
+    submittedAt: dateTimeSchema,
+  })
+  .strict()
+
+const interviewFollowUpQuestionSchema = z
+  .object({
+    id: uuidSchema,
+    parentQuestionId: uuidSchema,
+    prompt: z.string().trim().min(1).max(4_000),
+    order: z.number().int().positive(),
+    createdAt: dateTimeSchema,
+  })
+  .strict()
+
+const interviewAnsweredFollowUpSchema = z
+  .object({
+    status: z.literal("answered"),
+    question: interviewFollowUpQuestionSchema,
+    answer: interviewAnswerSchema,
+  })
+  .strict()
+
+const interviewCompletedQuestionSchema = z
+  .object({
+    question: interviewQuestionSchema,
+    answer: interviewAnswerSchema,
+    followUps: z.array(interviewAnsweredFollowUpSchema),
+    completedAt: dateTimeSchema,
+  })
+  .strict()
+
 const interviewProgressSchema = z
   .object({
     completedMainQuestions: z.number().int().nonnegative(),
@@ -93,7 +128,7 @@ const sessionBaseSchema = z
     configuration: interviewConfigurationSchema,
     startedAt: dateTimeSchema,
     progress: interviewProgressSchema,
-    completedQuestions: z.array(z.any()),
+    completedQuestions: z.array(interviewCompletedQuestionSchema),
   })
   .strict()
 
@@ -126,10 +161,53 @@ export const interviewQuestionSessionSchema = sessionBaseSchema
   })
   .strict()
 
+const answeredQuestionSnapshotSchema = z
+  .object({
+    question: interviewQuestionSchema,
+    answer: interviewAnswerSchema,
+    answeredFollowUps: z.array(interviewAnsweredFollowUpSchema),
+  })
+  .strict()
+
+export const interviewGeneratingTurnSessionSchema = sessionBaseSchema
+  .extend({
+    status: z.literal("generatingTurn"),
+    generationStatus: z.enum(["generating", "failed"]),
+    currentQuestion: answeredQuestionSnapshotSchema,
+  })
+  .strict()
+
+const awaitingFollowUpSchema = z
+  .object({
+    status: z.literal("awaitingAnswer"),
+    question: interviewFollowUpQuestionSchema,
+    answer: z.null(),
+  })
+  .strict()
+
+export const interviewFollowUpSessionSchema = sessionBaseSchema
+  .extend({
+    status: z.literal("followUp"),
+    currentQuestion: answeredQuestionSnapshotSchema,
+    currentFollowUp: awaitingFollowUpSchema,
+  })
+  .strict()
+
+export const interviewCandidateQuestionsSessionSchema = sessionBaseSchema
+  .extend({
+    status: z.literal("candidateQuestions"),
+    prompt: z.string().trim().min(1).max(255),
+    exchanges: z.array(z.unknown()),
+  })
+  .strict()
+
 export const interviewSessionSchema = z.discriminatedUnion("status", [
   interviewOpeningSessionSchema,
   interviewGeneratingQuestionSessionSchema,
   interviewQuestionSessionSchema,
+  interviewGeneratingTurnSessionSchema,
+  interviewFollowUpSessionSchema,
+  interviewCandidateQuestionsSessionSchema,
 ])
 
 export const interviewPageResponseSchema: z.ZodType<

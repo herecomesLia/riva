@@ -13,6 +13,8 @@ from sqlalchemy.orm import selectinload
 from riva.models import (
     CareerProfile,
     CurrentTargetRole,
+    InterviewFollowUpQuestion,
+    InterviewQuestion,
     InterviewSession,
     TargetRole,
     User,
@@ -143,7 +145,12 @@ class InterviewSessionService:
         return await self.session.scalar(
             select(InterviewSession).options(
                 selectinload(InterviewSession.planning_run),
-                selectinload(InterviewSession.questions),
+                selectinload(InterviewSession.turn_run),
+                selectinload(InterviewSession.questions)
+                .selectinload(InterviewQuestion.answer),
+                selectinload(InterviewSession.questions)
+                .selectinload(InterviewQuestion.follow_up_questions)
+                .selectinload(InterviewFollowUpQuestion.answer),
             )
             .where(
                 InterviewSession.user_id == user_id,

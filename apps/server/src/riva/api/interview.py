@@ -10,6 +10,8 @@ from riva.models import User
 from riva.schemas.interview import (
     BeginInterviewQuestionsRequest,
     InterviewPageResponse,
+    RetryInterviewTurnRequest,
+    SubmitInterviewAnswerRequest,
     StartInterviewRequest,
 )
 from riva.services.interview_api import InterviewAPIService
@@ -68,6 +70,46 @@ async def begin_interview_questions(
     ),
 ) -> InterviewPageResponse:
     return await interview_api_service.begin_questions(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/answers",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def submit_interview_answer(
+    session_id: UUID,
+    payload: SubmitInterviewAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.submit_answer(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/turn/retry",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def retry_interview_turn(
+    session_id: UUID,
+    payload: RetryInterviewTurnRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.retry_turn(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

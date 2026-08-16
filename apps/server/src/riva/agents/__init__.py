@@ -7,6 +7,7 @@ from riva.agents.practice_reference_answer import PracticeReferenceAnswerAgent
 from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.agents.interview_planning import InterviewPlanningAgent
+from riva.agents.interview_turn import InterviewTurnAgent
 from riva.agents.question_generation import QuestionGenerationAgent
 from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.schemas.resume_parsing import ResumeParsingInput, ResumeParsingOutput
@@ -26,6 +27,7 @@ from riva.schemas.question_generation import (
 )
 from riva.schemas.follow_up import FollowUpInput, FollowUpGenerationOutput
 from riva.schemas.evaluation import EvaluationInput, PracticeEvaluationOutput
+from riva.schemas.interview_turn import InterviewTurnInput, InterviewTurnOutput
 
 __all__ = [
     "Agent",
@@ -39,6 +41,9 @@ __all__ = [
     "JobDescriptionParsingOutput",
     "MatchingAnalysisAgent",
     "InterviewPlanningAgent",
+    "InterviewTurnAgent",
+    "InterviewTurnInput",
+    "InterviewTurnOutput",
     "MatchingAnalysisInput",
     "MatchingAnalysisOutput",
     "PracticeEvaluationAgent",

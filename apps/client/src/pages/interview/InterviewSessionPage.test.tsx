@@ -23,6 +23,7 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
+  retryInterviewTurn,
   submitCandidateQuestion,
   submitInterviewAnswer,
 } from "@/services/interview"
@@ -36,6 +37,7 @@ vi.mock("@/services/interview", async (importOriginal) => ({
   endInterview: vi.fn(),
   finishInterview: vi.fn(),
   getInterviewPage: vi.fn(),
+  retryInterviewTurn: vi.fn(),
   submitCandidateQuestion: vi.fn(),
   submitInterviewAnswer: vi.fn(),
 }))
@@ -151,6 +153,32 @@ function questionSession(order: number, version: number): InterviewQuestionSessi
   }
 }
 
+function generatingTurnResponse(
+  generationStatus: "generating" | "failed" = "generating",
+): InterviewPageResponse {
+  const active = questionSession(1, 4)
+  return responseWithSession({
+    status: "generatingTurn",
+    sessionId,
+    language: active.language,
+    version: active.version,
+    configuration: active.configuration,
+    startedAt: active.startedAt,
+    progress: active.progress,
+    completedQuestions: [],
+    generationStatus,
+    currentQuestion: {
+      question: active.currentQuestion.question,
+      answer: {
+        id: "main-answer",
+        content: "我会先拆解目标，再通过灰度验证方案和结果。",
+        submittedAt: "2026-07-24T02:03:00.000Z",
+      },
+      answeredFollowUps: [],
+    },
+  })
+}
+
 function followUpSession(followUpIndex: number, version: number): InterviewFollowUpSessionResponse {
   const planned = createInterviewAgentPlanMock({
     ...defaultInterviewConfigurationMock,
@@ -230,6 +258,7 @@ function candidateSession(
 describe("InterviewSessionContainer", () => {
   beforeEach(() => {
     vi.mocked(getInterviewPage).mockReset()
+    vi.mocked(retryInterviewTurn).mockReset()
     vi.mocked(beginInterviewQuestions).mockReset()
     vi.mocked(endInterview).mockReset()
     vi.mocked(submitInterviewAnswer).mockReset()
@@ -301,6 +330,40 @@ describe("InterviewSessionContainer", () => {
       ),
     ).toBeVisible()
     expect(getInterviewPage).toHaveBeenCalledTimes(2)
+  })
+
+  it("polls a generating turn until the next question is available", async () => {
+    vi.mocked(getInterviewPage)
+      .mockResolvedValueOnce(generatingTurnResponse())
+      .mockResolvedValueOnce(responseWithSession(questionSession(2, 5)))
+    renderSession()
+
+    expect(await screen.findByText(i18n.t("interview.session.turn.title"))).toBeVisible()
+    expect(
+      await screen.findByText(
+        questionSession(2, 5).currentQuestion.question.prompt,
+        {},
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible()
+    expect(getInterviewPage).toHaveBeenCalledTimes(2)
+  })
+
+  it("retries a failed turn without resubmitting the answer", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getInterviewPage).mockResolvedValue(generatingTurnResponse("failed"))
+    vi.mocked(retryInterviewTurn).mockResolvedValue(responseWithSession(questionSession(2, 5)))
+    renderSession()
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("interview.actions.retry") }))
+
+    expect(retryInterviewTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId, version: 4 }),
+      expect.anything(),
+    )
+    expect(
+      await screen.findByText(questionSession(2, 5).currentQuestion.question.prompt),
+    ).toBeVisible()
   })
 
   it("submits an answer only once while its mutation is pending", async () => {

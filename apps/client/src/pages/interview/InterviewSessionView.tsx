@@ -113,6 +113,16 @@ export type InterviewSessionViewProps =
       onBack: () => void
     }
   | {
+      status: "generatingTurn"
+      summary: InterviewSessionSummary
+      generationStatus: "generating" | "failed"
+      history: readonly InterviewConversationRecordViewData[]
+      isRetrying: boolean
+      retryFailed: boolean
+      onRetry: () => Promise<void>
+      onBack: () => void
+    }
+  | {
       status: "candidateQuestions"
       summary: InterviewSessionSummary
       prompt: string
@@ -142,7 +152,9 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
-      {props.status === "candidateQuestions" || props.status === "generatingQuestion" ? (
+      {props.status === "candidateQuestions" ||
+      props.status === "generatingQuestion" ||
+      props.status === "generatingTurn" ? (
         <SessionSummaryHeader summary={props.summary} />
       ) : (
         <SessionHeader
@@ -162,6 +174,8 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
         />
       ) : props.status === "generatingQuestion" ? (
         <GeneratingQuestionContent {...props} />
+      ) : props.status === "generatingTurn" ? (
+        <GeneratingTurnContent {...props} />
       ) : props.status === "question" ? (
         <QuestionContent {...props} />
       ) : (
@@ -220,6 +234,67 @@ function GeneratingQuestionContent(
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <Spinner aria-hidden="true" />
               <span>{t("interview.session.planning.description")}</span>
+            </div>
+          )}
+        </CardContent>
+        {failed ? (
+          <CardFooter className="flex flex-wrap gap-2 border-t">
+            <Button disabled={props.isRetrying} onClick={() => void props.onRetry()}>
+              {props.isRetrying ? (
+                <Spinner aria-hidden="true" data-icon="inline-start" />
+              ) : (
+                <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
+              )}
+              {t("interview.actions.retry")}
+            </Button>
+            <Button onClick={props.onBack} variant="outline">
+              <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
+              {t("interview.session.actions.backToSetup")}
+            </Button>
+          </CardFooter>
+        ) : null}
+      </Card>
+    </main>
+  )
+}
+
+function GeneratingTurnContent(
+  props: Extract<InterviewSessionViewProps, { status: "generatingTurn" }>,
+) {
+  const { t } = useTranslation()
+  const failed = props.generationStatus === "failed"
+
+  return (
+    <main className="grid min-w-0 gap-6">
+      <InterviewConversationHistory records={props.history} />
+      <Card aria-busy={!failed} data-testid="interview-turn-generation">
+        <CardHeader>
+          <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <BotIcon aria-hidden="true" className="size-5" />
+          </div>
+          <CardTitle>
+            {failed ? t("interview.session.turn.failedTitle") : t("interview.session.turn.title")}
+          </CardTitle>
+          <CardDescription>
+            {failed
+              ? t("interview.session.turn.failedDescription")
+              : t("interview.session.turn.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {failed ? (
+            <Alert variant="destructive">
+              <AlertTitle>{t("interview.session.errors.turnTitle")}</AlertTitle>
+              <AlertDescription>
+                {props.retryFailed
+                  ? t("interview.session.errors.turnDescription")
+                  : t("interview.session.turn.failedDescription")}
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Spinner aria-hidden="true" />
+              <span>{t("interview.session.turn.description")}</span>
             </div>
           )}
         </CardContent>

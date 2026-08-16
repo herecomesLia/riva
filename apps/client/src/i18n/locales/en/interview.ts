@@ -83,6 +83,12 @@ export const interview = {
       failedTitle: "The first main question could not be generated",
       failedDescription: "Your session is still available, so you can retry question generation.",
     },
+    turn: {
+      title: "Analyzing your answer",
+      description: "The interviewer is reviewing your answer and preparing the next step.",
+      failedTitle: "The next interview step could not be prepared",
+      failedDescription: "Your answer is saved, so you can retry without submitting it again.",
+    },
     answer: {
       title: "Your answer",
       description: "Use paragraphs as needed and explain the context, actions, and outcome.",
@@ -162,6 +168,8 @@ export const interview = {
         "Your question is preserved. Check your connection and try again.",
       finishTitle: "Unable to finish the interview",
       finishDescription: "Your candidate-question record is preserved. Please try again.",
+      turnTitle: "Unable to prepare the next interview step",
+      turnDescription: "Your answer is preserved. Retry to continue the interview.",
     },
     unavailable: {
       missingTitle: "No valid interview session found",

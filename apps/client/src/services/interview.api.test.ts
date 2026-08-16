@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { InterviewPageResponse } from "@/models/interview"
-import { beginInterviewQuestions, getInterviewPage, startInterview } from "@/services/interview"
+import {
+  beginInterviewQuestions,
+  getInterviewPage,
+  retryInterviewTurn,
+  startInterview,
+  submitInterviewAnswer,
+} from "@/services/interview"
 
 const roleId = "11111111-1111-4111-8111-111111111111"
 const sessionId = "22222222-2222-4222-8222-222222222222"
@@ -131,5 +137,66 @@ describe("interview service API", () => {
       method: "POST",
     })
     expect(requestJson(fetchMock)).toEqual({ version: 1 })
+  })
+
+  it("submits a main answer through the real endpoint", async () => {
+    const page = generation()
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page), { status: 202 }))
+
+    await submitInterviewAnswer({
+      sessionId,
+      version: 3,
+      target: "question",
+      questionId: "33333333-3333-4333-8333-333333333333",
+      content: "A concrete answer.",
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/interview/sessions/${sessionId}/answers`)
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      credentials: "include",
+      method: "POST",
+    })
+    expect(requestJson(fetchMock)).toEqual({
+      version: 3,
+      target: "question",
+      questionId: "33333333-3333-4333-8333-333333333333",
+      content: "A concrete answer.",
+    })
+  })
+
+  it("submits a follow-up answer with its parent question lineage", async () => {
+    const page = generation()
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page), { status: 202 }))
+
+    await submitInterviewAnswer({
+      sessionId,
+      version: 5,
+      target: "followUp",
+      questionId: "33333333-3333-4333-8333-333333333333",
+      followUpQuestionId: "44444444-4444-4444-8444-444444444444",
+      content: "A concrete follow-up answer.",
+    })
+
+    expect(requestJson(fetchMock)).toEqual({
+      version: 5,
+      target: "followUp",
+      questionId: "33333333-3333-4333-8333-333333333333",
+      followUpQuestionId: "44444444-4444-4444-8444-444444444444",
+      content: "A concrete follow-up answer.",
+    })
+  })
+
+  it("retries a failed turn with the authoritative version", async () => {
+    const page = generation()
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page), { status: 202 }))
+
+    await retryInterviewTurn({ sessionId, version: 4 })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/interview/sessions/${sessionId}/turn/retry`)
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      credentials: "include",
+      method: "POST",
+    })
+    expect(requestJson(fetchMock)).toEqual({ version: 4 })
   })
 })

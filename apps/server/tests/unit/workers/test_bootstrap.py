@@ -359,6 +359,7 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert registry.agent_ids == (
         "follow-up-generator",
         "interview-planner",
+        "interview-turn",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",
@@ -436,6 +437,7 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert registry.agent_ids == (
         "follow-up-generator",
         "interview-planner",
+        "interview-turn",
         "job-description-parser",
         "matching-analyzer",
         "practice-evaluator",

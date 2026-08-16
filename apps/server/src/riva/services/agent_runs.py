@@ -31,6 +31,7 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
 )
 from riva.schemas.interview_planning import InterviewPlanningInput
+from riva.schemas.interview_turn import InterviewTurnInput
 from riva.utils import utc_now
 
 
@@ -451,6 +452,43 @@ def _serialize_payload(
             serialized[key] = _serialize_weakness_focus(value)
         elif key == "interviewPlanningInput":
             serialized[key] = _serialize_interview_planning_input(value)
+        elif key == "interviewTurnInput":
+            serialized[key] = _serialize_interview_turn_input(value)
+        elif key == "planRevision":
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 1
+            ):
+                raise ValueError(
+                    "payload.planRevision must be a positive integer"
+                )
+            serialized[key] = value
+        elif key == "remainingFollowUpSlots":
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 0 <= value <= 2
+            ):
+                raise ValueError(
+                    "payload.remainingFollowUpSlots must be between 0 and 2"
+                )
+            serialized[key] = value
+        elif key in {
+            "followUpQuestionId",
+            "followUpAnswerId",
+            "retryOfRunId",
+        }:
+            if value is None:
+                serialized[key] = None
+            elif isinstance(value, UUID):
+                serialized[key] = str(value)
+            elif isinstance(value, str):
+                serialized[key] = _required_text(f"payload.{key}", value, 255)
+            else:
+                raise ValueError(
+                    "payload values must be resource identifiers or versions"
+                )
         elif key == "nextFollowUpOrder":
             if (
                 isinstance(value, bool)
@@ -518,6 +556,19 @@ def _serialize_interview_planning_input(value: object) -> dict[str, JSONValue]:
     except (TypeError, ValueError, ValidationError):
         raise ValueError(
             "payload.interviewPlanningInput must be a valid planning snapshot"
+        ) from None
+
+
+def _serialize_interview_turn_input(value: object) -> dict[str, JSONValue]:
+    try:
+        turn_input = InterviewTurnInput.model_validate(value)
+        return cast(
+            dict[str, JSONValue],
+            turn_input.model_dump(mode="json", by_alias=True),
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.interviewTurnInput must be a valid frozen turn snapshot"
         ) from None
 
 

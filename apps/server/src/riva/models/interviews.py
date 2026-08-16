@@ -142,6 +142,12 @@ class InterviewSession(Base):
         nullable=True,
         index=True,
     )
+    turn_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -168,6 +174,9 @@ class InterviewSession(Base):
     planning_run: Mapped[AgentRun | None] = relationship(
         foreign_keys=[planning_run_id],
     )
+    turn_run: Mapped[AgentRun | None] = relationship(
+        foreign_keys=[turn_run_id],
+    )
     plans: Mapped[list[InterviewPlan]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",
@@ -179,6 +188,30 @@ class InterviewSession(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="InterviewQuestion.order",
+    )
+    answers: Mapped[list[InterviewAnswer]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewAnswer.submitted_at",
+    )
+    follow_up_questions: Mapped[list[InterviewFollowUpQuestion]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewFollowUpQuestion.created_at",
+    )
+    follow_up_answers: Mapped[list[InterviewFollowUpAnswer]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewFollowUpAnswer.submitted_at",
+    )
+    turn_assessments: Mapped[list[InterviewTurnAssessment]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewTurnAssessment.created_at",
     )
 
 
@@ -300,6 +333,10 @@ class InterviewQuestion(Base):
         JSON(none_as_null=True),
         nullable=False,
     )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -312,6 +349,303 @@ class InterviewQuestion(Base):
     source_plan: Mapped[InterviewPlan] = relationship(
         back_populates="questions_records",
     )
+    answer: Mapped[InterviewAnswer | None] = relationship(
+        back_populates="question",
+        uselist=False,
+        passive_deletes=True,
+    )
+    follow_up_questions: Mapped[list[InterviewFollowUpQuestion]] = relationship(
+        back_populates="parent_question",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewFollowUpQuestion.order",
+    )
+    turn_assessments: Mapped[list[InterviewTurnAssessment]] = relationship(
+        back_populates="question",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewTurnAssessment.created_at",
+    )
 
 
-__all__ = ["InterviewPlan", "InterviewQuestion", "InterviewSession"]
+class InterviewAnswer(Base):
+    __tablename__ = "interview_answers"
+    __table_args__ = (
+        CheckConstraint(
+            "length(trim(content)) > 0 AND length(content) <= 20000",
+            name="ck_interview_answers_content",
+        ),
+        UniqueConstraint(
+            "question_id",
+            name="uq_interview_answers_question",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    question_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_questions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    session: Mapped[InterviewSession] = relationship(
+        back_populates="answers",
+    )
+    question: Mapped[InterviewQuestion] = relationship(
+        back_populates="answer",
+        uselist=False,
+    )
+    assessments: Mapped[list[InterviewTurnAssessment]] = relationship(
+        back_populates="main_answer",
+        foreign_keys="InterviewTurnAssessment.main_answer_id",
+        passive_deletes=True,
+    )
+
+
+class InterviewFollowUpQuestion(Base):
+    __tablename__ = "interview_follow_up_questions"
+    __table_args__ = (
+        CheckConstraint(
+            '"order" >= 1',
+            name="ck_interview_follow_up_questions_order",
+        ),
+        CheckConstraint(
+            "length(trim(prompt)) > 0 AND length(prompt) <= 4000",
+            name="ck_interview_follow_up_questions_prompt",
+        ),
+        UniqueConstraint(
+            "parent_question_id",
+            "order",
+            name="uq_interview_follow_up_questions_parent_order",
+        ),
+        UniqueConstraint(
+            "source_turn_run_id",
+            name="uq_interview_follow_up_questions_source_run",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    parent_question_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_questions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_turn_run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    order: Mapped[int] = mapped_column("order", Integer, nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    session: Mapped[InterviewSession] = relationship(
+        back_populates="follow_up_questions",
+    )
+    parent_question: Mapped[InterviewQuestion] = relationship(
+        back_populates="follow_up_questions",
+    )
+    source_turn_run: Mapped[AgentRun] = relationship(
+        foreign_keys=[source_turn_run_id],
+        passive_deletes=True,
+    )
+    answer: Mapped[InterviewFollowUpAnswer | None] = relationship(
+        back_populates="follow_up_question",
+        uselist=False,
+        passive_deletes=True,
+    )
+
+
+class InterviewFollowUpAnswer(Base):
+    __tablename__ = "interview_follow_up_answers"
+    __table_args__ = (
+        CheckConstraint(
+            "length(trim(content)) > 0 AND length(content) <= 20000",
+            name="ck_interview_follow_up_answers_content",
+        ),
+        UniqueConstraint(
+            "follow_up_question_id",
+            name="uq_interview_follow_up_answers_question",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    follow_up_question_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_follow_up_questions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    session: Mapped[InterviewSession] = relationship(
+        back_populates="follow_up_answers",
+    )
+    follow_up_question: Mapped[InterviewFollowUpQuestion] = relationship(
+        back_populates="answer",
+        uselist=False,
+    )
+    assessments: Mapped[list[InterviewTurnAssessment]] = relationship(
+        back_populates="follow_up_answer",
+        foreign_keys="InterviewTurnAssessment.follow_up_answer_id",
+        passive_deletes=True,
+    )
+
+
+class InterviewTurnAssessment(Base):
+    __tablename__ = "interview_turn_assessments"
+    __table_args__ = (
+        CheckConstraint(
+            "score >= 0 AND score <= 100",
+            name="ck_interview_turn_assessments_score",
+        ),
+        CheckConstraint(
+            "decision IN ('followUp', 'completeQuestion')",
+            name="ck_interview_turn_assessments_decision",
+        ),
+        CheckConstraint(
+            "((main_answer_id IS NOT NULL AND follow_up_answer_id IS NULL) OR "
+            "(main_answer_id IS NULL AND follow_up_answer_id IS NOT NULL))",
+            name="ck_interview_turn_assessments_exactly_one_answer",
+        ),
+        UniqueConstraint(
+            "source_agent_run_id",
+            name="uq_interview_turn_assessments_source_run",
+        ),
+        UniqueConstraint(
+            "main_answer_id",
+            name="uq_interview_turn_assessments_main_answer",
+        ),
+        UniqueConstraint(
+            "follow_up_answer_id",
+            name="uq_interview_turn_assessments_follow_up_answer",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    question_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_questions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_agent_run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    main_answer_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_answers.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    follow_up_answer_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_follow_up_answers.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    strengths: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    issues: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    session: Mapped[InterviewSession] = relationship(
+        back_populates="turn_assessments",
+    )
+    question: Mapped[InterviewQuestion] = relationship(
+        back_populates="turn_assessments",
+    )
+    source_agent_run: Mapped[AgentRun] = relationship(
+        foreign_keys=[source_agent_run_id],
+        passive_deletes=True,
+    )
+    main_answer: Mapped[InterviewAnswer | None] = relationship(
+        back_populates="assessments",
+        foreign_keys=[main_answer_id],
+        uselist=False,
+        passive_deletes=True,
+    )
+    follow_up_answer: Mapped[InterviewFollowUpAnswer | None] = relationship(
+        back_populates="assessments",
+        foreign_keys=[follow_up_answer_id],
+        uselist=False,
+        passive_deletes=True,
+    )
+
+
+__all__ = [
+    "InterviewAnswer",
+    "InterviewFollowUpAnswer",
+    "InterviewFollowUpQuestion",
+    "InterviewPlan",
+    "InterviewQuestion",
+    "InterviewSession",
+    "InterviewTurnAssessment",
+]
