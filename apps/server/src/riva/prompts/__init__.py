@@ -11,6 +11,10 @@ from riva.prompts.job_description_parsing import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.prompts.matching_analysis import MATCHING_ANALYSIS_PROMPT
 from riva.prompts.interview_planning import INTERVIEW_PLANNING_PROMPT
 from riva.prompts.interview_turn import INTERVIEW_TURN_PROMPT
+from riva.prompts.interview_candidate_question import (
+    INTERVIEW_CANDIDATE_QUESTION_PROMPT,
+)
+from riva.prompts.interview_review import INTERVIEW_REVIEW_PROMPT
 from riva.prompts.practice_evaluation import PRACTICE_EVALUATION_PROMPT
 from riva.prompts.practice_review import PRACTICE_REVIEW_PROMPT
 from riva.prompts.practice_recommendation import PRACTICE_RECOMMENDATION_PROMPT
@@ -30,6 +34,8 @@ __all__ = [
     "MATCHING_ANALYSIS_PROMPT",
     "INTERVIEW_PLANNING_PROMPT",
     "INTERVIEW_TURN_PROMPT",
+    "INTERVIEW_CANDIDATE_QUESTION_PROMPT",
+    "INTERVIEW_REVIEW_PROMPT",
     "PRACTICE_EVALUATION_PROMPT",
     "PRACTICE_REVIEW_PROMPT",
     "PRACTICE_RECOMMENDATION_PROMPT",

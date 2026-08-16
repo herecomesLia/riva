@@ -10,7 +10,9 @@ import structlog
 
 from riva.agents import (
     FollowUpAgent,
+    InterviewCandidateQuestionAgent,
     InterviewPlanningAgent,
+    InterviewReviewAgent,
     InterviewTurnAgent,
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
@@ -35,6 +37,10 @@ from riva.workers.handlers import AgentHandlerRegistry
 from riva.workers.follow_up import FollowUpHandler
 from riva.workers.interview_planning import InterviewPlanningHandler
 from riva.workers.interview_turn import InterviewTurnHandler
+from riva.workers.interview_candidate_question import (
+    InterviewCandidateQuestionHandler,
+)
+from riva.workers.interview_review import InterviewReviewHandler
 from riva.workers.job_description_parsing import (
     JobDescriptionParsingHandler,
 )
@@ -62,6 +68,14 @@ InterviewPlanningAgentFactory = Callable[..., InterviewPlanningAgent]
 InterviewPlanningHandlerFactory = Callable[..., InterviewPlanningHandler]
 InterviewTurnAgentFactory = Callable[..., InterviewTurnAgent]
 InterviewTurnHandlerFactory = Callable[..., InterviewTurnHandler]
+InterviewCandidateQuestionAgentFactory = Callable[
+    ..., InterviewCandidateQuestionAgent
+]
+InterviewCandidateQuestionHandlerFactory = Callable[
+    ..., InterviewCandidateQuestionHandler
+]
+InterviewReviewAgentFactory = Callable[..., InterviewReviewAgent]
+InterviewReviewHandlerFactory = Callable[..., InterviewReviewHandler]
 PracticeEvaluationAgentFactory = Callable[..., PracticeEvaluationAgent]
 PracticeEvaluationHandlerFactory = Callable[..., PracticeEvaluationHandler]
 PracticeRecommendationAgentFactory = Callable[..., PracticeRecommendationAgent]
@@ -111,6 +125,16 @@ def build_agent_handler_registry(
     interview_turn_agent_factory: InterviewTurnAgentFactory = InterviewTurnAgent,
     interview_turn_handler_factory: InterviewTurnHandlerFactory = (
         InterviewTurnHandler
+    ),
+    interview_candidate_question_agent_factory: InterviewCandidateQuestionAgentFactory = (
+        InterviewCandidateQuestionAgent
+    ),
+    interview_candidate_question_handler_factory: InterviewCandidateQuestionHandlerFactory = (
+        InterviewCandidateQuestionHandler
+    ),
+    interview_review_agent_factory: InterviewReviewAgentFactory = InterviewReviewAgent,
+    interview_review_handler_factory: InterviewReviewHandlerFactory = (
+        InterviewReviewHandler
     ),
     practice_evaluation_agent_factory: PracticeEvaluationAgentFactory = (
         PracticeEvaluationAgent
@@ -199,6 +223,22 @@ def build_agent_handler_registry(
         session_factory=session_factory,
         agent=interview_turn_agent,
     )
+    interview_candidate_question_agent = interview_candidate_question_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    interview_candidate_question_handler = interview_candidate_question_handler_factory(
+        session_factory=session_factory,
+        agent=interview_candidate_question_agent,
+    )
+    interview_review_agent = interview_review_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    interview_review_handler = interview_review_handler_factory(
+        session_factory=session_factory,
+        agent=interview_review_agent,
+    )
     practice_evaluation_agent = practice_evaluation_agent_factory(
         provider=provider,
         model=model,
@@ -247,6 +287,8 @@ def build_agent_handler_registry(
     registry.register(follow_up_handler)
     registry.register(interview_planning_handler)
     registry.register(interview_turn_handler)
+    registry.register(interview_candidate_question_handler)
+    registry.register(interview_review_handler)
     registry.register(practice_evaluation_handler)
     registry.register(practice_recommendation_handler)
     registry.register(practice_review_handler)

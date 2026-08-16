@@ -10,7 +10,7 @@ from tests.helpers.integration_database import get_integration_database_url
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "202608160004"
+HEAD_REVISION = "202608160005"
 
 
 async def _clear_database(database_url: str) -> None:

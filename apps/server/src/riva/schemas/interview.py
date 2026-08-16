@@ -321,6 +321,52 @@ class InterviewFollowUpSessionResponse(InterviewAPIModel):
         return value
 
 
+InterviewCandidateQuestionText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=4_000),
+]
+InterviewCandidateQuestionAnswerText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=20_000),
+]
+InterviewCandidateQuestionFeedbackText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=4_000),
+]
+
+
+class InterviewCandidateQuestionResponse(InterviewAPIModel):
+    id: StandardUUID
+    content: InterviewCandidateQuestionText
+    submitted_at: datetime
+
+    @field_validator("submitted_at")
+    @classmethod
+    def validate_submitted_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("submitted_at must be timezone-aware")
+        return value
+
+
+class InterviewCandidateQuestionFeedbackResponse(InterviewAPIModel):
+    summary: InterviewCandidateQuestionFeedbackText
+    strengths: list[InterviewCandidateQuestionFeedbackText] = Field(
+        default_factory=list
+    )
+    improvement_suggestions: list[InterviewCandidateQuestionFeedbackText] = Field(
+        default_factory=list
+    )
+    suggested_alternatives: list[InterviewCandidateQuestionFeedbackText] = Field(
+        default_factory=list
+    )
+
+
+class InterviewCandidateQuestionExchangeResponse(InterviewAPIModel):
+    question: InterviewCandidateQuestionResponse
+    interviewer_answer: InterviewCandidateQuestionAnswerText
+    feedback: InterviewCandidateQuestionFeedbackResponse
+
+
 class InterviewCandidateQuestionsSessionResponse(InterviewAPIModel):
     status: Literal["candidateQuestions"]
     session_id: StandardUUID
@@ -333,13 +379,281 @@ class InterviewCandidateQuestionsSessionResponse(InterviewAPIModel):
         default_factory=list
     )
     prompt: RequiredText
-    exchanges: list[object] = Field(default_factory=list)
+    exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
+        default_factory=list
+    )
 
     @field_validator("started_at")
     @classmethod
     def validate_started_at(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("started_at must be timezone-aware")
+        return value
+
+
+class InterviewGeneratingCandidateAnswerSessionResponse(InterviewAPIModel):
+    status: Literal["generatingCandidateAnswer"]
+    session_id: StandardUUID
+    language: InteractionLanguage
+    version: Annotated[int, Field(strict=True, ge=1)]
+    configuration: InterviewConfiguration
+    started_at: datetime
+    progress: InterviewProgressResponse
+    completed_questions: list[InterviewCompletedQuestionResponse] = Field(
+        default_factory=list
+    )
+    generation_status: InterviewGenerationStatus
+    current_candidate_question: InterviewCandidateQuestionResponse
+    exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
+        default_factory=list
+    )
+
+    @field_validator("started_at")
+    @classmethod
+    def validate_started_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("started_at must be timezone-aware")
+        return value
+
+
+InterviewCompletionReason = Literal["formalQuestionsCompleted", "userEndedEarly"]
+InterviewReviewText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=4_000),
+]
+InterviewScoreDimension = Literal[
+    "relevance",
+    "structure",
+    "specificity",
+    "personalContribution",
+    "resultsAndEvidence",
+    "roleAlignment",
+    "communication",
+    "riskControl",
+]
+
+
+class InterviewDimensionScoreResponse(InterviewAPIModel):
+    dimension: InterviewScoreDimension
+    score: Annotated[int, Field(strict=True, ge=0, le=100)]
+    explanation: InterviewReviewText
+
+
+class InterviewQuestionReviewResponse(InterviewAPIModel):
+    question_id: StandardUUID
+    score: Annotated[int, Field(strict=True, ge=0, le=100)]
+    summary: InterviewReviewText
+    strengths: list[InterviewReviewText] = Field(default_factory=list)
+    issues: list[InterviewReviewText] = Field(default_factory=list)
+
+
+class InterviewFollowUpReviewResponse(InterviewAPIModel):
+    follow_up_question_id: StandardUUID
+    score: Annotated[int, Field(strict=True, ge=0, le=100)]
+    summary: InterviewReviewText
+    strengths: list[InterviewReviewText] = Field(default_factory=list)
+    issues: list[InterviewReviewText] = Field(default_factory=list)
+
+
+class InterviewReferenceAnswerContentResponse(InterviewAPIModel):
+    recommended_structure: list[InterviewReviewText]
+    key_points: list[InterviewReviewText]
+    example_answer: InterviewReviewText
+    usage_guidance: InterviewReviewText
+    generated_at: datetime
+
+    @field_validator("generated_at")
+    @classmethod
+    def validate_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("generated_at must be timezone-aware")
+        return value
+
+
+class InterviewReadyReferenceAnswerResponse(InterviewAPIModel):
+    status: Literal["ready"]
+    content: InterviewReferenceAnswerContentResponse
+
+
+class InterviewGeneratingReferenceAnswerResponse(InterviewAPIModel):
+    status: Literal["generating"]
+
+
+class InterviewUnavailableReferenceAnswerResponse(InterviewAPIModel):
+    status: Literal["unavailable"]
+    reason: Literal["generationFailed"]
+
+
+InterviewReferenceAnswerResponse = Annotated[
+    InterviewReadyReferenceAnswerResponse
+    | InterviewGeneratingReferenceAnswerResponse
+    | InterviewUnavailableReferenceAnswerResponse,
+    Field(discriminator="status"),
+]
+
+
+class InterviewQuestionRecordResponse(InterviewAPIModel):
+    status: Literal["answered", "unanswered"]
+    question: InterviewQuestionResponse
+    answer: InterviewAnswerResponse | None
+    follow_ups: list["InterviewFollowUpRecordResponse"] = Field(
+        default_factory=list
+    )
+
+
+class InterviewFollowUpRecordResponse(InterviewAPIModel):
+    status: Literal["answered", "unanswered"]
+    question: InterviewFollowUpQuestionResponse
+    answer: InterviewAnswerResponse | None
+
+
+class InterviewReferenceAnswerStateResponse(InterviewAPIModel):
+    status: Literal["ready", "generating", "unavailable"]
+    content: InterviewReferenceAnswerContentResponse | None = None
+    reason: Literal["generationFailed"] | None = None
+
+
+class InterviewFollowUpLearningDetailResponse(InterviewAPIModel):
+    record: InterviewFollowUpRecordResponse
+    performance: InterviewFollowUpReviewResponse | None
+    reference_answer: InterviewReferenceAnswerStateResponse
+
+
+class InterviewQuestionLearningDetailResponse(InterviewAPIModel):
+    record: InterviewQuestionRecordResponse
+    performance: InterviewQuestionReviewResponse | None
+    reference_answer: InterviewReferenceAnswerStateResponse
+    follow_ups: list[InterviewFollowUpLearningDetailResponse] = Field(
+        default_factory=list
+    )
+
+
+class InterviewTrainingTargetedPracticeResponse(InterviewAPIModel):
+    action: Literal["targetedPractice"]
+    reason: InterviewReviewText
+    focus_areas: list[InterviewReviewText]
+    question_type: InterviewQuestionType
+    difficulty: InterviewDifficulty
+
+
+class InterviewTrainingMockInterviewResponse(InterviewAPIModel):
+    action: Literal["mockInterview"]
+    reason: InterviewReviewText
+    focus_areas: list[InterviewReviewText]
+    round: InterviewRound
+    difficulty: InterviewDifficulty
+
+
+InterviewTrainingSuggestionResponse = Annotated[
+    InterviewTrainingTargetedPracticeResponse
+    | InterviewTrainingMockInterviewResponse,
+    Field(discriminator="action"),
+]
+
+
+class InterviewReviewNarrativeResponse(InterviewAPIModel):
+    overall_performance: InterviewReviewText
+    question_reviews: list[InterviewQuestionReviewResponse]
+    main_strengths: list[InterviewReviewText]
+    frequent_issues: list[InterviewReviewText]
+    exposed_weaknesses: list[InterviewReviewText]
+    risk_points: list[InterviewReviewText]
+    communication_suggestions: list[InterviewReviewText]
+    preparation_suggestions: list[InterviewReviewText]
+    generated_at: datetime
+
+    @field_validator("generated_at")
+    @classmethod
+    def validate_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("generated_at must be timezone-aware")
+        return value
+
+
+class InterviewPartialReviewResponse(InterviewReviewNarrativeResponse):
+    pass
+
+
+class InterviewCompleteReviewResponse(InterviewReviewNarrativeResponse):
+    overall_score: Annotated[int, Field(strict=True, ge=0, le=100)]
+    dimension_scores: list[InterviewDimensionScoreResponse]
+    next_training: InterviewTrainingSuggestionResponse
+
+
+class InterviewUnavailableReviewResponse(InterviewAPIModel):
+    status: Literal["unavailable"]
+    reason: Literal["insufficientAnswers"]
+
+
+class InterviewPartialReviewStateResponse(InterviewAPIModel):
+    status: Literal["partial"]
+    review: InterviewPartialReviewResponse
+
+
+class InterviewCompleteReviewStateResponse(InterviewAPIModel):
+    status: Literal["complete"]
+    review: InterviewCompleteReviewResponse
+
+
+InterviewSessionReviewResponse = Annotated[
+    InterviewUnavailableReviewResponse
+    | InterviewPartialReviewStateResponse
+    | InterviewCompleteReviewStateResponse,
+    Field(discriminator="status"),
+]
+
+
+class InterviewGeneratingReviewSessionResponse(InterviewAPIModel):
+    status: Literal["generatingReview"]
+    session_id: StandardUUID
+    language: InteractionLanguage
+    version: Annotated[int, Field(strict=True, ge=1)]
+    configuration: InterviewConfiguration
+    started_at: datetime
+    progress: InterviewProgressResponse
+    completed_questions: list[InterviewCompletedQuestionResponse] = Field(
+        default_factory=list
+    )
+    generation_status: InterviewGenerationStatus
+    completion_reason: InterviewCompletionReason
+    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
+        default_factory=list
+    )
+
+    @field_validator("started_at")
+    @classmethod
+    def validate_started_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("started_at must be timezone-aware")
+        return value
+
+
+class InterviewCompletedSessionResponse(InterviewAPIModel):
+    status: Literal["completed"]
+    session_id: StandardUUID
+    language: InteractionLanguage
+    version: Annotated[int, Field(strict=True, ge=1)]
+    configuration: InterviewConfiguration
+    started_at: datetime
+    progress: InterviewProgressResponse
+    completed_questions: list[InterviewCompletedQuestionResponse] = Field(
+        default_factory=list
+    )
+    completion_reason: InterviewCompletionReason
+    completed_at: datetime
+    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
+        default_factory=list
+    )
+    review: InterviewSessionReviewResponse
+    question_details: list[InterviewQuestionLearningDetailResponse] = Field(
+        default_factory=list
+    )
+
+    @field_validator("started_at", "completed_at")
+    @classmethod
+    def validate_timestamps(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("timestamp must be timezone-aware")
         return value
 
 
@@ -352,6 +666,9 @@ class InterviewPageResponse(InterviewAPIModel):
         | InterviewGeneratingTurnSessionResponse
         | InterviewFollowUpSessionResponse
         | InterviewCandidateQuestionsSessionResponse
+        | InterviewGeneratingCandidateAnswerSessionResponse
+        | InterviewGeneratingReviewSessionResponse
+        | InterviewCompletedSessionResponse
         | None
     )
 
@@ -389,6 +706,70 @@ class RetryInterviewTurnRequest(InterviewAPIModel):
     version: Annotated[int, Field(strict=True, ge=1)]
 
 
+class SubmitCandidateQuestionRequest(InterviewAPIModel):
+    version: Annotated[int, Field(strict=True, ge=1)]
+    content: InterviewCandidateQuestionText
+
+
+class FinishInterviewRequest(InterviewAPIModel):
+    version: Annotated[int, Field(strict=True, ge=1)]
+
+
+class EndInterviewRequest(InterviewAPIModel):
+    version: Annotated[int, Field(strict=True, ge=1)]
+
+
+class RetryInterviewCandidateAnswerRequest(InterviewAPIModel):
+    version: Annotated[int, Field(strict=True, ge=1)]
+
+
+class RetryInterviewReviewRequest(InterviewAPIModel):
+    version: Annotated[int, Field(strict=True, ge=1)]
+
+
+class GetInterviewReviewBaseResponse(InterviewAPIModel):
+    session_id: StandardUUID
+    completion_reason: InterviewCompletionReason
+    question_details: list[InterviewQuestionLearningDetailResponse] = Field(
+        default_factory=list
+    )
+
+
+class GetInterviewUnavailableReviewResponse(GetInterviewReviewBaseResponse):
+    status: Literal["unavailable"]
+    reason: Literal["insufficientAnswers"]
+
+
+class GetInterviewPartialReviewResponse(GetInterviewReviewBaseResponse):
+    status: Literal["partial"]
+    review: InterviewPartialReviewResponse
+
+
+class GetInterviewCompleteReviewResponse(GetInterviewReviewBaseResponse):
+    status: Literal["complete"]
+    review: InterviewCompleteReviewResponse
+
+
+GetInterviewReviewResponse = Annotated[
+    GetInterviewUnavailableReviewResponse
+    | GetInterviewPartialReviewResponse
+    | GetInterviewCompleteReviewResponse,
+    Field(discriminator="status"),
+]
+
+
+InterviewCandidateQuestionsSessionResponse.model_rebuild()
+InterviewQuestionRecordResponse.model_rebuild()
+InterviewFollowUpLearningDetailResponse.model_rebuild()
+InterviewQuestionLearningDetailResponse.model_rebuild()
+InterviewCompletedSessionResponse.model_rebuild()
+InterviewPageResponse.model_rebuild()
+GetInterviewReviewBaseResponse.model_rebuild()
+GetInterviewUnavailableReviewResponse.model_rebuild()
+GetInterviewPartialReviewResponse.model_rebuild()
+GetInterviewCompleteReviewResponse.model_rebuild()
+
+
 __all__ = [
     "InterviewConfiguration",
     "InterviewAwaitingQuestionResponse",
@@ -397,12 +778,20 @@ __all__ = [
     "InterviewAnsweredFollowUpResponse",
     "InterviewAwaitingFollowUpResponse",
     "InterviewCandidateQuestionsSessionResponse",
+    "InterviewCandidateQuestionExchangeResponse",
+    "InterviewCandidateQuestionFeedbackResponse",
+    "InterviewCandidateQuestionResponse",
     "InterviewCompletedQuestionResponse",
+    "InterviewCompletedSessionResponse",
+    "InterviewCompleteReviewResponse",
+    "InterviewCompletionReason",
     "InterviewDefaultConfiguration",
     "InterviewDifficulty",
     "InterviewDurationMinutes",
     "InterviewGenerationStatus",
     "InterviewGeneratingQuestionSessionResponse",
+    "InterviewGeneratingCandidateAnswerSessionResponse",
+    "InterviewGeneratingReviewSessionResponse",
     "InterviewGeneratingTurnQuestionResponse",
     "InterviewGeneratingTurnSessionResponse",
     "InterviewFollowUpQuestionResponse",
@@ -411,10 +800,32 @@ __all__ = [
     "InterviewPageResponse",
     "InterviewProgressResponse",
     "InterviewQuestionResponse",
+    "InterviewQuestionLearningDetailResponse",
+    "InterviewQuestionRecordResponse",
+    "InterviewQuestionReviewResponse",
     "InterviewQuestionSessionResponse",
     "InterviewQuestionType",
     "InterviewRound",
     "InterviewSessionStatus",
+    "InterviewReviewNarrativeResponse",
+    "InterviewPartialReviewResponse",
+    "InterviewPartialReviewStateResponse",
+    "InterviewCompleteReviewStateResponse",
+    "InterviewSessionReviewResponse",
+    "InterviewScoreDimension",
+    "InterviewDimensionScoreResponse",
+    "InterviewFollowUpLearningDetailResponse",
+    "InterviewFollowUpRecordResponse",
+    "InterviewFollowUpReviewResponse",
+    "InterviewReferenceAnswerContentResponse",
+    "InterviewReferenceAnswerResponse",
+    "InterviewReferenceAnswerStateResponse",
+    "InterviewTrainingSuggestionResponse",
+    "GetInterviewReviewResponse",
+    "GetInterviewReviewBaseResponse",
+    "GetInterviewUnavailableReviewResponse",
+    "GetInterviewPartialReviewResponse",
+    "GetInterviewCompleteReviewResponse",
     "InterviewSetupAvailabilityResponse",
     "InterviewSetupAvailableResponse",
     "InterviewSetupBlockedReason",
@@ -422,6 +833,11 @@ __all__ = [
     "InterviewSetupResponse",
     "InterviewTargetRoleResponse",
     "RetryInterviewTurnRequest",
+    "RetryInterviewCandidateAnswerRequest",
+    "RetryInterviewReviewRequest",
+    "SubmitCandidateQuestionRequest",
+    "FinishInterviewRequest",
+    "EndInterviewRequest",
     "SubmitFollowUpInterviewAnswerRequest",
     "SubmitInterviewAnswerRequest",
     "SubmitMainInterviewAnswerRequest",

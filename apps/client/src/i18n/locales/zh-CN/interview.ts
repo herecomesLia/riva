@@ -81,6 +81,18 @@ export const interview = {
       failedTitle: "下一步面试流程准备失败",
       failedDescription: "你的回答已经保存，可以重试，不需要重复提交。",
     },
+    candidateAnswer: {
+      title: "正在准备面试官回答",
+      description: "面试官正在结合本场信息思考你的问题，请稍候。",
+      failedTitle: "面试官回答准备失败",
+      failedDescription: "你的问题已经保存，可以重试，不需要重复提交。",
+    },
+    reviewGeneration: {
+      title: "正在准备面试复盘",
+      description: "面试官正在整理已保存的对话和学习建议，请稍候。",
+      failedTitle: "面试复盘准备失败",
+      failedDescription: "本场面试记录已经保存，可以重试生成复盘。",
+    },
     answer: {
       title: "你的回答",
       description: "可以分段组织内容，尽量说明具体背景、行动和结果。",
@@ -117,6 +129,7 @@ export const interview = {
       exchangesDescription: "查看面试官回答和简短的提问建议。",
       yourQuestion: "你的第 {{current}} 个问题",
       interviewerAnswer: "面试官回答",
+      answeringQuestion: "你的问题",
       feedback: "简短反馈",
       betterQuestion: "更好的提问方式",
       finish: "完成面试",
@@ -157,6 +170,10 @@ export const interview = {
       finishDescription: "当前候选人提问记录仍然保留，请重试。",
       turnTitle: "暂时无法准备下一步面试流程",
       turnDescription: "你的回答已经保留，重试后即可继续面试。",
+      candidateAnswerTitle: "暂时无法准备面试官回答",
+      candidateAnswerDescription: "你的问题已经保留，请重试继续。",
+      reviewTitle: "暂时无法准备面试复盘",
+      reviewDescription: "本场面试记录已经保留，请重试继续。",
     },
     unavailable: {
       missingTitle: "未找到有效的面试会话",

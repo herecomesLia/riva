@@ -81,6 +81,29 @@ const interviewCompletedQuestionSchema = z
   })
   .strict()
 
+const interviewCandidateQuestionSchema = z
+  .object({
+    id: uuidSchema,
+    content: z.string().trim().min(1).max(4_000),
+    submittedAt: dateTimeSchema,
+  })
+  .strict()
+
+const interviewCandidateQuestionExchangeSchema = z
+  .object({
+    question: interviewCandidateQuestionSchema,
+    interviewerAnswer: z.string().trim().min(1).max(20_000),
+    feedback: z
+      .object({
+        summary: z.string().trim().min(1).max(4_000),
+        strengths: z.array(z.string().trim().min(1).max(4_000)),
+        improvementSuggestions: z.array(z.string().trim().min(1).max(4_000)),
+        suggestedAlternatives: z.array(z.string().trim().min(1).max(4_000)),
+      })
+      .strict(),
+  })
+  .strict()
+
 const interviewProgressSchema = z
   .object({
     completedMainQuestions: z.number().int().nonnegative(),
@@ -197,7 +220,205 @@ export const interviewCandidateQuestionsSessionSchema = sessionBaseSchema
   .extend({
     status: z.literal("candidateQuestions"),
     prompt: z.string().trim().min(1).max(255),
-    exchanges: z.array(z.unknown()),
+    exchanges: z.array(interviewCandidateQuestionExchangeSchema),
+  })
+  .strict()
+
+export const interviewGeneratingCandidateAnswerSessionSchema = sessionBaseSchema
+  .extend({
+    status: z.literal("generatingCandidateAnswer"),
+    generationStatus: z.enum(["generating", "failed"]),
+    currentCandidateQuestion: interviewCandidateQuestionSchema,
+    exchanges: z.array(interviewCandidateQuestionExchangeSchema),
+  })
+  .strict()
+
+const interviewDimensionScoreSchema = z
+  .object({
+    dimension: z.enum([
+      "relevance",
+      "structure",
+      "specificity",
+      "personalContribution",
+      "resultsAndEvidence",
+      "roleAlignment",
+      "communication",
+      "riskControl",
+    ]),
+    score: z.number().int().min(0).max(100),
+    explanation: z.string().trim().min(1),
+  })
+  .strict()
+
+const interviewQuestionReviewSchema = z
+  .object({
+    questionId: uuidSchema,
+    score: z.number().int().min(0).max(100),
+    summary: z.string().trim().min(1),
+    strengths: z.array(z.string().trim().min(1)),
+    issues: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+
+const interviewFollowUpReviewSchema = z
+  .object({
+    followUpQuestionId: uuidSchema,
+    score: z.number().int().min(0).max(100),
+    summary: z.string().trim().min(1),
+    strengths: z.array(z.string().trim().min(1)),
+    issues: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+
+const interviewReferenceAnswerSchema = z
+  .object({
+    status: z.literal("ready"),
+    content: z
+      .object({
+        recommendedStructure: z.array(z.string().trim().min(1)),
+        keyPoints: z.array(z.string().trim().min(1)),
+        exampleAnswer: z.string().trim().min(1),
+        usageGuidance: z.string().trim().min(1),
+        generatedAt: dateTimeSchema,
+      })
+      .strict(),
+  })
+  .strict()
+
+const interviewFollowUpRecordSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("answered"),
+      question: interviewFollowUpQuestionSchema,
+      answer: interviewAnswerSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("unanswered"),
+      question: interviewFollowUpQuestionSchema,
+      answer: z.null(),
+    })
+    .strict(),
+])
+
+const interviewQuestionRecordSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("answered"),
+      question: interviewQuestionSchema,
+      answer: interviewAnswerSchema,
+      followUps: z.array(interviewFollowUpRecordSchema),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("unanswered"),
+      question: interviewQuestionSchema,
+      answer: z.null(),
+      followUps: z.tuple([]),
+    })
+    .strict(),
+])
+
+const interviewQuestionLearningDetailSchema = z
+  .object({
+    record: interviewQuestionRecordSchema,
+    performance: interviewQuestionReviewSchema.nullable(),
+    referenceAnswer: interviewReferenceAnswerSchema,
+    followUps: z.array(
+      z
+        .object({
+          record: interviewFollowUpRecordSchema,
+          performance: interviewFollowUpReviewSchema.nullable(),
+          referenceAnswer: interviewReferenceAnswerSchema,
+        })
+        .strict(),
+    ),
+  })
+  .strict()
+
+const interviewNarrativeSchema = z
+  .object({
+    overallPerformance: z.string().trim().min(1),
+    questionReviews: z.array(interviewQuestionReviewSchema),
+    mainStrengths: z.array(z.string().trim().min(1)),
+    frequentIssues: z.array(z.string().trim().min(1)),
+    exposedWeaknesses: z.array(z.string().trim().min(1)),
+    riskPoints: z.array(z.string().trim().min(1)),
+    communicationSuggestions: z.array(z.string().trim().min(1)),
+    preparationSuggestions: z.array(z.string().trim().min(1)),
+    generatedAt: dateTimeSchema,
+  })
+  .strict()
+
+const interviewTrainingSuggestionSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("targetedPractice"),
+      reason: z.string().trim().min(1),
+      focusAreas: z.array(z.string().trim().min(1)),
+      questionType: interviewQuestionTypeSchema,
+      difficulty: interviewDifficultySchema,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("mockInterview"),
+      reason: z.string().trim().min(1),
+      focusAreas: z.array(z.string().trim().min(1)),
+      round: interviewRoundSchema,
+      difficulty: interviewDifficultySchema,
+    })
+    .strict(),
+])
+
+const interviewCompleteReviewSchema = interviewNarrativeSchema
+  .extend({
+    overallScore: z.number().int().min(0).max(100),
+    dimensionScores: z.array(interviewDimensionScoreSchema),
+    nextTraining: interviewTrainingSuggestionSchema,
+  })
+  .strict()
+
+const interviewSessionReviewSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("unavailable"),
+      reason: z.literal("insufficientAnswers"),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("partial"),
+      review: interviewNarrativeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("complete"),
+      review: interviewCompleteReviewSchema,
+    })
+    .strict(),
+])
+
+export const interviewGeneratingReviewSessionSchema = sessionBaseSchema
+  .extend({
+    status: z.literal("generatingReview"),
+    generationStatus: z.enum(["generating", "failed"]),
+    completionReason: z.enum(["formalQuestionsCompleted", "userEndedEarly"]),
+    candidateQuestionExchanges: z.array(interviewCandidateQuestionExchangeSchema),
+  })
+  .strict()
+
+export const interviewCompletedSessionSchema = sessionBaseSchema
+  .extend({
+    status: z.literal("completed"),
+    completionReason: z.enum(["formalQuestionsCompleted", "userEndedEarly"]),
+    completedAt: dateTimeSchema,
+    candidateQuestionExchanges: z.array(interviewCandidateQuestionExchangeSchema),
+    review: interviewSessionReviewSchema,
+    questionDetails: z.array(interviewQuestionLearningDetailSchema),
   })
   .strict()
 
@@ -208,6 +429,9 @@ export const interviewSessionSchema = z.discriminatedUnion("status", [
   interviewGeneratingTurnSessionSchema,
   interviewFollowUpSessionSchema,
   interviewCandidateQuestionsSessionSchema,
+  interviewGeneratingCandidateAnswerSessionSchema,
+  interviewGeneratingReviewSessionSchema,
+  interviewCompletedSessionSchema,
 ])
 
 export const interviewPageResponseSchema: z.ZodType<
@@ -220,5 +444,13 @@ export const interviewPageResponseSchema: z.ZodType<
     session: interviewSessionSchema.nullable(),
   })
   .strict()
+
+export const getInterviewReviewResponseSchema = z
+  .object({
+    sessionId: uuidSchema,
+    completionReason: z.enum(["formalQuestionsCompleted", "userEndedEarly"]),
+    questionDetails: z.array(interviewQuestionLearningDetailSchema),
+  })
+  .and(interviewSessionReviewSchema)
 
 export type InterviewPageWireResponse = z.infer<typeof interviewPageResponseSchema>

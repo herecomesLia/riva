@@ -9,8 +9,14 @@ from riva.core.language import normalize_interaction_language
 from riva.models import User
 from riva.schemas.interview import (
     BeginInterviewQuestionsRequest,
+    EndInterviewRequest,
+    FinishInterviewRequest,
+    GetInterviewReviewResponse,
+    RetryInterviewCandidateAnswerRequest,
+    RetryInterviewReviewRequest,
     InterviewPageResponse,
     RetryInterviewTurnRequest,
+    SubmitCandidateQuestionRequest,
     SubmitInterviewAnswerRequest,
     StartInterviewRequest,
 )
@@ -113,4 +119,121 @@ async def retry_interview_turn(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/candidate-questions",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def submit_candidate_question(
+    session_id: UUID,
+    payload: SubmitCandidateQuestionRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.submit_candidate_question(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/candidate-answer/retry",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def retry_candidate_answer(
+    session_id: UUID,
+    payload: RetryInterviewCandidateAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.retry_candidate_answer(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/finish",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def finish_interview(
+    session_id: UUID,
+    payload: FinishInterviewRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.finish_session(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/end",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def end_interview(
+    session_id: UUID,
+    payload: EndInterviewRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.end_session(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/review/retry",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def retry_interview_review(
+    session_id: UUID,
+    payload: RetryInterviewReviewRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.retry_review(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
+    )
+
+
+@router.get(
+    "/sessions/{session_id}/review",
+    response_model=GetInterviewReviewResponse,
+)
+async def get_interview_review(
+    session_id: UUID,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> GetInterviewReviewResponse:
+    return await interview_api_service.get_review(
+        user_id=current_user.id,
+        session_id=session_id,
     )

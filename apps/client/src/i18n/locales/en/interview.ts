@@ -89,6 +89,19 @@ export const interview = {
       failedTitle: "The next interview step could not be prepared",
       failedDescription: "Your answer is saved, so you can retry without submitting it again.",
     },
+    candidateAnswer: {
+      title: "Preparing the interviewer’s answer",
+      description:
+        "The interviewer is considering your question and preparing a grounded response.",
+      failedTitle: "The interviewer answer could not be prepared",
+      failedDescription: "Your question is saved, so you can retry without submitting it again.",
+    },
+    reviewGeneration: {
+      title: "Preparing your interview review",
+      description: "The interviewer is organizing the saved conversation and learning guidance.",
+      failedTitle: "The interview review could not be prepared",
+      failedDescription: "Your interview record is saved, so you can retry the review.",
+    },
     answer: {
       title: "Your answer",
       description: "Use paragraphs as needed and explain the context, actions, and outcome.",
@@ -127,6 +140,7 @@ export const interview = {
       exchangesDescription: "Review the interviewer responses and concise question feedback.",
       yourQuestion: "Your question {{current}}",
       interviewerAnswer: "Interviewer answer",
+      answeringQuestion: "Your question",
       feedback: "Quick feedback",
       betterQuestion: "A stronger way to ask",
       finish: "Finish interview",
@@ -170,6 +184,10 @@ export const interview = {
       finishDescription: "Your candidate-question record is preserved. Please try again.",
       turnTitle: "Unable to prepare the next interview step",
       turnDescription: "Your answer is preserved. Retry to continue the interview.",
+      candidateAnswerTitle: "Unable to prepare the interviewer answer",
+      candidateAnswerDescription: "Your question is preserved. Retry to continue.",
+      reviewTitle: "Unable to prepare the interview review",
+      reviewDescription: "Your interview record is preserved. Retry to continue.",
     },
     unavailable: {
       missingTitle: "No valid interview session found",

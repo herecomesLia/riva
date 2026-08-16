@@ -11,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from riva.models import (
+    InterviewCandidateQuestion,
     CareerProfile,
     CurrentTargetRole,
+    InterviewCandidateQuestionExchange,
     InterviewFollowUpQuestion,
     InterviewQuestion,
     InterviewSession,
@@ -143,15 +145,8 @@ class InterviewSessionService:
         user_id: UUID,
     ) -> InterviewSession | None:
         return await self.session.scalar(
-            select(InterviewSession).options(
-                selectinload(InterviewSession.planning_run),
-                selectinload(InterviewSession.turn_run),
-                selectinload(InterviewSession.questions)
-                .selectinload(InterviewQuestion.answer),
-                selectinload(InterviewSession.questions)
-                .selectinload(InterviewQuestion.follow_up_questions)
-                .selectinload(InterviewFollowUpQuestion.answer),
-            )
+            select(InterviewSession)
+            .options(*self._session_load_options())
             .where(
                 InterviewSession.user_id == user_id,
                 InterviewSession.status != "completed",
@@ -161,6 +156,44 @@ class InterviewSessionService:
                 InterviewSession.id.desc(),
             )
             .limit(1)
+        )
+
+    async def get_current_session(
+        self,
+        *,
+        user_id: UUID,
+    ) -> InterviewSession | None:
+        return await self.session.scalar(
+            select(InterviewSession)
+            .options(*self._session_load_options())
+            .where(InterviewSession.user_id == user_id)
+            .order_by(
+                InterviewSession.created_at.desc(),
+                InterviewSession.id.desc(),
+            )
+            .limit(1)
+        )
+
+    @staticmethod
+    def _session_load_options():
+        return (
+            selectinload(InterviewSession.planning_run),
+            selectinload(InterviewSession.turn_run),
+            selectinload(InterviewSession.candidate_answer_run),
+            selectinload(InterviewSession.review_run),
+            selectinload(InterviewSession.candidate_questions).selectinload(
+                InterviewCandidateQuestion.exchange
+            ),
+            selectinload(InterviewSession.candidate_question_exchanges).selectinload(
+                InterviewCandidateQuestionExchange.question
+            ),
+            selectinload(InterviewSession.review),
+            selectinload(InterviewSession.questions).selectinload(
+                InterviewQuestion.answer
+            ),
+            selectinload(InterviewSession.questions)
+            .selectinload(InterviewQuestion.follow_up_questions)
+            .selectinload(InterviewFollowUpQuestion.answer),
         )
 
     async def start_session(

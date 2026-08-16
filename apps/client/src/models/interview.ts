@@ -204,6 +204,21 @@ export type InterviewCandidateQuestionsSessionResponse = InterviewActiveSessionR
   exchanges: InterviewCandidateQuestionExchangeResponse[]
 }
 
+export type InterviewGeneratingCandidateAnswerSessionResponse =
+  InterviewActiveSessionResponseBase & {
+    status: "generatingCandidateAnswer"
+    generationStatus: InterviewGenerationStatus
+    currentCandidateQuestion: InterviewCandidateQuestionResponse
+    exchanges: InterviewCandidateQuestionExchangeResponse[]
+  }
+
+export type InterviewGeneratingReviewSessionResponse = InterviewActiveSessionResponseBase & {
+  status: "generatingReview"
+  generationStatus: InterviewGenerationStatus
+  completionReason: InterviewCompletionReason
+  candidateQuestionExchanges: InterviewCandidateQuestionExchangeResponse[]
+}
+
 export type InterviewScoreDimension =
   | "relevance"
   | "structure"
@@ -343,6 +358,8 @@ export type ActiveInterviewSessionResponse =
   | InterviewQuestionSessionResponse
   | InterviewFollowUpSessionResponse
   | InterviewCandidateQuestionsSessionResponse
+  | InterviewGeneratingCandidateAnswerSessionResponse
+  | InterviewGeneratingReviewSessionResponse
 
 export type InterviewSessionResponse =
   ActiveInterviewSessionResponse | InterviewCompletedSessionResponse
@@ -447,6 +464,10 @@ export type InterviewSessionMutationInput = {
 export type BeginInterviewQuestionsInput = InterviewSessionMutationInput
 
 export type RetryInterviewTurnInput = InterviewSessionMutationInput
+
+export type RetryInterviewCandidateAnswerInput = InterviewSessionMutationInput
+
+export type RetryInterviewReviewInput = InterviewSessionMutationInput
 
 export type SubmitInterviewAnswerInput =
   | (InterviewSessionMutationInput & {

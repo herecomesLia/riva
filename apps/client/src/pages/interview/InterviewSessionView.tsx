@@ -41,6 +41,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import type {
+  InterviewCandidateQuestionResponse,
   InterviewCandidateQuestionExchangeResponse,
   InterviewConversationRecordViewData,
   InterviewDifficulty,
@@ -123,6 +124,27 @@ export type InterviewSessionViewProps =
       onBack: () => void
     }
   | {
+      status: "generatingCandidateAnswer"
+      summary: InterviewSessionSummary
+      generationStatus: "generating" | "failed"
+      currentCandidateQuestion: InterviewCandidateQuestionResponse
+      history: readonly InterviewConversationRecordViewData[]
+      isRetrying: boolean
+      retryFailed: boolean
+      onRetry: () => Promise<void>
+      onBack: () => void
+    }
+  | {
+      status: "generatingReview"
+      summary: InterviewSessionSummary
+      generationStatus: "generating" | "failed"
+      history: readonly InterviewConversationRecordViewData[]
+      isRetrying: boolean
+      retryFailed: boolean
+      onRetry: () => Promise<void>
+      onBack: () => void
+    }
+  | {
       status: "candidateQuestions"
       summary: InterviewSessionSummary
       prompt: string
@@ -154,7 +176,9 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
     <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
       {props.status === "candidateQuestions" ||
       props.status === "generatingQuestion" ||
-      props.status === "generatingTurn" ? (
+      props.status === "generatingTurn" ||
+      props.status === "generatingCandidateAnswer" ||
+      props.status === "generatingReview" ? (
         <SessionSummaryHeader summary={props.summary} />
       ) : (
         <SessionHeader
@@ -176,6 +200,10 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
         <GeneratingQuestionContent {...props} />
       ) : props.status === "generatingTurn" ? (
         <GeneratingTurnContent {...props} />
+      ) : props.status === "generatingCandidateAnswer" ? (
+        <GeneratingCandidateAnswerContent {...props} />
+      ) : props.status === "generatingReview" ? (
+        <GeneratingReviewContent {...props} />
       ) : props.status === "question" ? (
         <QuestionContent {...props} />
       ) : (
@@ -316,6 +344,139 @@ function GeneratingTurnContent(
         ) : null}
       </Card>
     </main>
+  )
+}
+
+function GeneratingCandidateAnswerContent(
+  props: Extract<InterviewSessionViewProps, { status: "generatingCandidateAnswer" }>,
+) {
+  const { t } = useTranslation()
+
+  return (
+    <main className="grid min-w-0 gap-6">
+      <InterviewConversationHistory records={props.history} />
+      <Card>
+        <CardHeader>
+          <CardDescription>{t("interview.session.candidate.answeringQuestion")}</CardDescription>
+          <CardTitle className="break-words text-xl leading-8 sm:text-2xl sm:leading-9">
+            {props.currentCandidateQuestion.content}
+          </CardTitle>
+        </CardHeader>
+      </Card>
+      <GenerationStateCard
+        dataTestId="interview-candidate-answer-generation"
+        description={t("interview.session.candidateAnswer.description")}
+        errorDescription={t("interview.session.errors.candidateAnswerDescription")}
+        errorTitle={t("interview.session.errors.candidateAnswerTitle")}
+        failed={props.generationStatus === "failed"}
+        failedDescription={t("interview.session.candidateAnswer.failedDescription")}
+        failedTitle={t("interview.session.candidateAnswer.failedTitle")}
+        isRetrying={props.isRetrying}
+        onBack={props.onBack}
+        onRetry={props.onRetry}
+        retryFailed={props.retryFailed}
+        title={t("interview.session.candidateAnswer.title")}
+      />
+    </main>
+  )
+}
+
+function GeneratingReviewContent(
+  props: Extract<InterviewSessionViewProps, { status: "generatingReview" }>,
+) {
+  const { t } = useTranslation()
+
+  return (
+    <main className="grid min-w-0 gap-6">
+      <InterviewConversationHistory records={props.history} />
+      <GenerationStateCard
+        dataTestId="interview-review-generation"
+        description={t("interview.session.reviewGeneration.description")}
+        errorDescription={t("interview.session.errors.reviewDescription")}
+        errorTitle={t("interview.session.errors.reviewTitle")}
+        failed={props.generationStatus === "failed"}
+        failedDescription={t("interview.session.reviewGeneration.failedDescription")}
+        failedTitle={t("interview.session.reviewGeneration.failedTitle")}
+        isRetrying={props.isRetrying}
+        onBack={props.onBack}
+        onRetry={props.onRetry}
+        retryFailed={props.retryFailed}
+        title={t("interview.session.reviewGeneration.title")}
+      />
+    </main>
+  )
+}
+
+function GenerationStateCard({
+  dataTestId,
+  description,
+  errorDescription,
+  errorTitle,
+  failed,
+  failedDescription,
+  failedTitle,
+  isRetrying,
+  onBack,
+  onRetry,
+  retryFailed,
+  title,
+}: {
+  dataTestId: string
+  description: string
+  errorDescription: string
+  errorTitle: string
+  failed: boolean
+  failedDescription: string
+  failedTitle: string
+  isRetrying: boolean
+  onBack: () => void
+  onRetry: () => Promise<void>
+  retryFailed: boolean
+  title: string
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <Card aria-busy={!failed} data-testid={dataTestId}>
+      <CardHeader>
+        <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <BotIcon aria-hidden="true" className="size-5" />
+        </div>
+        <CardTitle>{failed ? failedTitle : title}</CardTitle>
+        <CardDescription>{failed ? failedDescription : description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {failed ? (
+          <Alert variant="destructive">
+            <AlertTitle>{errorTitle}</AlertTitle>
+            <AlertDescription>
+              {retryFailed ? errorDescription : failedDescription}
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <Spinner aria-hidden="true" />
+            <span>{description}</span>
+          </div>
+        )}
+      </CardContent>
+      {failed ? (
+        <CardFooter className="flex flex-wrap gap-2 border-t">
+          <Button disabled={isRetrying} onClick={() => void onRetry()}>
+            {isRetrying ? (
+              <Spinner aria-hidden="true" data-icon="inline-start" />
+            ) : (
+              <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
+            )}
+            {t("interview.actions.retry")}
+          </Button>
+          <Button onClick={onBack} variant="outline">
+            <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
+            {t("interview.session.actions.backToSetup")}
+          </Button>
+        </CardFooter>
+      ) : null}
+    </Card>
   )
 }
 

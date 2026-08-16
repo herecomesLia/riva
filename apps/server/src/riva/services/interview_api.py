@@ -7,37 +7,83 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.errors import APIError
 from riva.core.language import InteractionLanguage
-from riva.models import InterviewSession
+from riva.models import (
+    InterviewCandidateQuestion,
+    InterviewCandidateQuestionExchange,
+    InterviewReview,
+    InterviewSession,
+)
 from riva.schemas.interview import (
     BeginInterviewQuestionsRequest,
     InterviewAnswerResponse,
     InterviewAnsweredFollowUpResponse,
     InterviewAwaitingFollowUpResponse,
+    EndInterviewRequest,
+    FinishInterviewRequest,
     InterviewConfiguration,
+    InterviewCandidateQuestionExchangeResponse,
+    InterviewCandidateQuestionFeedbackResponse,
+    InterviewCandidateQuestionResponse,
+    InterviewCompletedSessionResponse,
     InterviewCandidateQuestionsSessionResponse,
+    InterviewCompleteReviewResponse,
+    InterviewCompleteReviewStateResponse,
     InterviewCompletedQuestionResponse,
+    InterviewCompletionReason,
     InterviewDifficulty,
     InterviewDurationMinutes,
     InterviewAwaitingQuestionResponse,
+    InterviewGeneratingCandidateAnswerSessionResponse,
+    InterviewGeneratingReviewSessionResponse,
     InterviewGeneratingQuestionSessionResponse,
     InterviewGeneratingTurnQuestionResponse,
     InterviewGeneratingTurnSessionResponse,
     InterviewFollowUpQuestionResponse,
     InterviewFollowUpSessionResponse,
     InterviewOpeningSessionResponse,
+    InterviewPartialReviewResponse,
+    InterviewPartialReviewStateResponse,
     InterviewPageResponse,
     InterviewProgressResponse,
     InterviewQuestionResponse,
     InterviewQuestionSessionResponse,
     InterviewQuestionType,
     InterviewRound,
+    InterviewSessionReviewResponse,
+    InterviewUnavailableReviewResponse,
+    GetInterviewCompleteReviewResponse,
+    GetInterviewPartialReviewResponse,
+    GetInterviewReviewResponse,
+    GetInterviewUnavailableReviewResponse,
+    RetryInterviewCandidateAnswerRequest,
+    RetryInterviewReviewRequest,
     RetryInterviewTurnRequest,
+    SubmitCandidateQuestionRequest,
     SubmitInterviewAnswerRequest,
     InterviewSetupAvailableResponse,
     InterviewSetupBlockedResponse,
     InterviewSetupResponse,
     InterviewTargetRoleResponse,
     StartInterviewRequest,
+)
+from riva.schemas.interview_review import InterviewReviewRunPayload
+from riva.services.interview_candidate_questions import (
+    INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED,
+    INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND,
+    InterviewCandidateQuestionService,
+    InterviewCandidateQuestionStateError,
+)
+from riva.services.interview_completion import (
+    INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED,
+    INTERVIEW_COMPLETION_SESSION_NOT_FOUND,
+    InterviewCompletionService,
+    InterviewCompletionStateError,
+)
+from riva.services.interview_review import (
+    INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED,
+    INTERVIEW_REVIEW_SESSION_NOT_FOUND,
+    InterviewReviewService,
+    InterviewReviewStateError,
 )
 from riva.services.interview_sessions import (
     INTERVIEW_SESSION_NOT_FOUND,
@@ -62,6 +108,11 @@ from riva.services.interview_turn import (
 InterviewSessionServiceFactory = Callable[[AsyncSession], InterviewSessionService]
 InterviewPlanningServiceFactory = Callable[..., InterviewPlanningService]
 InterviewTurnServiceFactory = Callable[..., InterviewTurnService]
+InterviewCandidateQuestionServiceFactory = Callable[
+    ..., InterviewCandidateQuestionService
+]
+InterviewCompletionServiceFactory = Callable[..., InterviewCompletionService]
+InterviewReviewServiceFactory = Callable[..., InterviewReviewService]
 
 INTERVIEW_OPENING_MESSAGES: dict[InteractionLanguage, str] = {
     "zh-CN": (
@@ -109,6 +160,15 @@ class InterviewAPIService:
         interview_turn_service_factory: InterviewTurnServiceFactory = (
             InterviewTurnService
         ),
+        interview_candidate_question_service_factory: InterviewCandidateQuestionServiceFactory = (
+            InterviewCandidateQuestionService
+        ),
+        interview_completion_service_factory: InterviewCompletionServiceFactory = (
+            InterviewCompletionService
+        ),
+        interview_review_service_factory: InterviewReviewServiceFactory = (
+            InterviewReviewService
+        ),
         llm_model: str | None = None,
     ) -> None:
         self.session = session
@@ -117,13 +177,25 @@ class InterviewAPIService:
             interview_planning_service_factory
         )
         self.interview_turn_service_factory = interview_turn_service_factory
+        self.interview_candidate_question_service_factory = (
+            interview_candidate_question_service_factory
+        )
+        self.interview_completion_service_factory = (
+            interview_completion_service_factory
+        )
+        self.interview_review_service_factory = interview_review_service_factory
         self.llm_model = llm_model
 
     async def get_page(self, *, user_id: UUID) -> InterviewPageResponse:
         service = self._interview_service()
         setup = await service.get_setup(user_id=user_id)
-        active_session = await service.get_active_session(user_id=user_id)
-        return build_interview_page_response(setup, active_session)
+        get_current_session = getattr(
+            service,
+            "get_current_session",
+            service.get_active_session,
+        )
+        current_session = await get_current_session(user_id=user_id)
+        return build_interview_page_response(setup, current_session)
 
     async def start_session(
         self,
@@ -223,6 +295,117 @@ class InterviewAPIService:
         except InterviewSessionStateError as error:
             raise interview_session_state_api_error(error) from None
 
+    async def submit_candidate_question(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: SubmitCandidateQuestionRequest,
+    ) -> InterviewPageResponse:
+        try:
+            await self._candidate_question_service().submit_question(
+                user_id=user_id,
+                session_id=session_id,
+                version=payload.version,
+                content=payload.content,
+            )
+            return await self._page_for_session(user_id, session_id)
+        except InterviewCandidateQuestionStateError as error:
+            raise interview_candidate_question_state_api_error(error) from None
+        except InterviewSessionStateError as error:
+            raise interview_session_state_api_error(error) from None
+
+    async def retry_candidate_answer(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: RetryInterviewCandidateAnswerRequest,
+    ) -> InterviewPageResponse:
+        try:
+            await self._candidate_question_service().retry_answer(
+                user_id=user_id,
+                session_id=session_id,
+                version=payload.version,
+            )
+            return await self._page_for_session(user_id, session_id)
+        except InterviewCandidateQuestionStateError as error:
+            raise interview_candidate_question_state_api_error(error) from None
+        except InterviewSessionStateError as error:
+            raise interview_session_state_api_error(error) from None
+
+    async def finish_session(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: FinishInterviewRequest,
+    ) -> InterviewPageResponse:
+        try:
+            await self._completion_service().finish(
+                user_id=user_id,
+                session_id=session_id,
+                version=payload.version,
+            )
+            return await self._page_for_session(user_id, session_id)
+        except InterviewCompletionStateError as error:
+            raise interview_completion_state_api_error(error) from None
+        except InterviewSessionStateError as error:
+            raise interview_session_state_api_error(error) from None
+
+    async def end_session(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: EndInterviewRequest,
+    ) -> InterviewPageResponse:
+        try:
+            await self._completion_service().end(
+                user_id=user_id,
+                session_id=session_id,
+                version=payload.version,
+            )
+            return await self._page_for_session(user_id, session_id)
+        except InterviewCompletionStateError as error:
+            raise interview_completion_state_api_error(error) from None
+        except InterviewSessionStateError as error:
+            raise interview_session_state_api_error(error) from None
+
+    async def retry_review(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+        payload: RetryInterviewReviewRequest,
+    ) -> InterviewPageResponse:
+        try:
+            await self._completion_service().retry_review(
+                user_id=user_id,
+                session_id=session_id,
+                version=payload.version,
+            )
+            return await self._page_for_session(user_id, session_id)
+        except InterviewCompletionStateError as error:
+            raise interview_completion_state_api_error(error) from None
+        except InterviewSessionStateError as error:
+            raise interview_session_state_api_error(error) from None
+
+    async def get_review(
+        self,
+        *,
+        user_id: UUID,
+        session_id: UUID,
+    ) -> GetInterviewReviewResponse:
+        try:
+            interview_session, review = await self._review_service().get_completed_review(
+                user_id=user_id,
+                session_id=session_id,
+            )
+            return build_interview_review_response(interview_session, review)
+        except InterviewReviewStateError as error:
+            raise interview_review_state_api_error(error) from None
+
     def _interview_service(self) -> InterviewSessionService:
         return self.interview_service_factory(self.session)
 
@@ -242,6 +425,30 @@ class InterviewAPIService:
             llm_model=self.llm_model,
         )
 
+    def _candidate_question_service(self) -> InterviewCandidateQuestionService:
+        if self.llm_model is None:
+            return self.interview_candidate_question_service_factory(self.session)
+        return self.interview_candidate_question_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
+    def _completion_service(self) -> InterviewCompletionService:
+        if self.llm_model is None:
+            return self.interview_completion_service_factory(self.session)
+        return self.interview_completion_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
+    def _review_service(self) -> InterviewReviewService:
+        if self.llm_model is None:
+            return self.interview_review_service_factory(self.session)
+        return self.interview_review_service_factory(
+            self.session,
+            llm_model=self.llm_model,
+        )
+
     async def _page_for_session(
         self,
         user_id: UUID,
@@ -249,10 +456,15 @@ class InterviewAPIService:
     ) -> InterviewPageResponse:
         interview_service = self._interview_service()
         setup = await interview_service.get_setup(user_id=user_id)
-        active_session = await interview_service.get_active_session(user_id=user_id)
-        if active_session is None or active_session.id != session_id:
+        get_current_session = getattr(
+            interview_service,
+            "get_current_session",
+            interview_service.get_active_session,
+        )
+        current_session = await get_current_session(user_id=user_id)
+        if current_session is None or current_session.id != session_id:
             raise InterviewTurnStateError(INTERVIEW_TURN_SESSION_NOT_FOUND)
-        return build_interview_page_response(setup, active_session)
+        return build_interview_page_response(setup, current_session)
 
 
 def build_interview_page_response(
@@ -347,6 +559,9 @@ def build_interview_session_response(
     | InterviewGeneratingTurnSessionResponse
     | InterviewFollowUpSessionResponse
     | InterviewCandidateQuestionsSessionResponse
+    | InterviewGeneratingCandidateAnswerSessionResponse
+    | InterviewGeneratingReviewSessionResponse
+    | InterviewCompletedSessionResponse
 ):
     if session.status == "opening":
         return build_interview_opening_session_response(session)
@@ -450,9 +665,212 @@ def build_interview_session_response(
             progress=_session_progress_response(session),
             completed_questions=completed_questions,
             prompt=CANDIDATE_QUESTIONS_PROMPTS[cast(InteractionLanguage, session.language)],
-            exchanges=[],
+            exchanges=_candidate_exchange_responses(session),
+        )
+    if session.status == "generatingCandidateAnswer":
+        current_candidate_question = _current_candidate_question(session)
+        if current_candidate_question is None:
+            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+        candidate_run = getattr(session, "candidate_answer_run", None)
+        return InterviewGeneratingCandidateAnswerSessionResponse(
+            status="generatingCandidateAnswer",
+            session_id=session.id,
+            language=cast(InteractionLanguage, session.language),
+            version=session.version,
+            configuration=_session_configuration_response(session),
+            started_at=session.started_at,
+            progress=_session_progress_response(session),
+            completed_questions=completed_questions,
+            generation_status=(
+                "failed"
+                if _status_value(getattr(candidate_run, "status", None)) == "failed"
+                else "generating"
+            ),
+            current_candidate_question=_candidate_question_response(
+                current_candidate_question
+            ),
+            exchanges=_candidate_exchange_responses(session),
+        )
+    if session.status == "generatingReview":
+        review_run = getattr(session, "review_run", None)
+        completion_reason = _pending_completion_reason(review_run)
+        if completion_reason is None:
+            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+        return InterviewGeneratingReviewSessionResponse(
+            status="generatingReview",
+            session_id=session.id,
+            language=cast(InteractionLanguage, session.language),
+            version=session.version,
+            configuration=_session_configuration_response(session),
+            started_at=session.started_at,
+            progress=_session_progress_response(session),
+            completed_questions=completed_questions,
+            generation_status=(
+                "failed"
+                if _status_value(getattr(review_run, "status", None)) == "failed"
+                else "generating"
+            ),
+            completion_reason=completion_reason,
+            candidate_question_exchanges=_candidate_exchange_responses(session),
+        )
+    if session.status == "completed":
+        review = getattr(session, "review", None)
+        if review is None or session.completed_at is None or session.completion_reason is None:
+            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+        return InterviewCompletedSessionResponse(
+            status="completed",
+            session_id=session.id,
+            language=cast(InteractionLanguage, session.language),
+            version=session.version,
+            configuration=_session_configuration_response(session),
+            started_at=session.started_at,
+            progress=_session_progress_response(session),
+            completed_questions=completed_questions,
+            completion_reason=cast(
+                InterviewCompletionReason,
+                session.completion_reason,
+            ),
+            completed_at=session.completed_at,
+            candidate_question_exchanges=_candidate_exchange_responses(session),
+            review=_review_state_response(review),
+            question_details=list(review.question_details),
         )
     raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+
+
+def _candidate_question_response(
+    question: InterviewCandidateQuestion,
+) -> InterviewCandidateQuestionResponse:
+    return InterviewCandidateQuestionResponse(
+        id=question.id,
+        content=question.content,
+        submitted_at=question.submitted_at,
+    )
+
+
+def _candidate_exchange_response(
+    exchange: InterviewCandidateQuestionExchange,
+) -> InterviewCandidateQuestionExchangeResponse:
+    return InterviewCandidateQuestionExchangeResponse(
+        question=_candidate_question_response(exchange.question),
+        interviewer_answer=exchange.interviewer_answer,
+        feedback=InterviewCandidateQuestionFeedbackResponse(
+            summary=exchange.feedback_summary,
+            strengths=list(exchange.strengths),
+            improvement_suggestions=list(exchange.improvement_suggestions),
+            suggested_alternatives=list(exchange.suggested_alternatives),
+        ),
+    )
+
+
+def _candidate_exchange_responses(
+    session: InterviewSession,
+) -> list[InterviewCandidateQuestionExchangeResponse]:
+    exchanges = sorted(
+        list(getattr(session, "candidate_question_exchanges", ())),
+        key=lambda exchange: (
+            getattr(getattr(exchange, "question", None), "order", 0),
+            exchange.created_at,
+            exchange.id,
+        ),
+    )
+    try:
+        return [_candidate_exchange_response(exchange) for exchange in exchanges]
+    except (AttributeError, TypeError, ValueError):
+        raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
+
+
+def _current_candidate_question(
+    session: InterviewSession,
+) -> InterviewCandidateQuestion | None:
+    questions = sorted(
+        list(getattr(session, "candidate_questions", ())),
+        key=lambda question: question.order,
+    )
+    for question in reversed(questions):
+        if getattr(question, "exchange", None) is None:
+            return question
+    return None
+
+
+def _pending_completion_reason(
+    run: object | None,
+) -> InterviewCompletionReason | None:
+    payload = getattr(run, "payload", None)
+    if not isinstance(payload, dict):
+        return None
+    try:
+        review_payload = InterviewReviewRunPayload.model_validate(payload)
+        return cast(InterviewCompletionReason, review_payload.completion_reason.value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _review_state_response(
+    review: InterviewReview,
+) -> InterviewSessionReviewResponse:
+    try:
+        status_value = str(review.status)
+        if status_value == "unavailable":
+            return InterviewUnavailableReviewResponse(
+                status="unavailable",
+                reason="insufficientAnswers",
+            )
+        if review.review is None:
+            raise ValueError
+        if status_value == "partial":
+            return InterviewPartialReviewStateResponse(
+                status="partial",
+                review=InterviewPartialReviewResponse.model_validate(review.review),
+            )
+        if status_value == "complete":
+            return InterviewCompleteReviewStateResponse(
+                status="complete",
+                review=InterviewCompleteReviewResponse.model_validate(review.review),
+            )
+    except (TypeError, ValueError):
+        pass
+    raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+
+
+def build_interview_review_response(
+    session: InterviewSession,
+    review: InterviewReview,
+) -> GetInterviewReviewResponse:
+    if session.completed_at is None or session.completion_reason is None:
+        raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
+    question_details = list(review.question_details)
+    completion_reason = cast(
+        InterviewCompletionReason,
+        session.completion_reason,
+    )
+    if review.status == "unavailable":
+        return GetInterviewUnavailableReviewResponse(
+            status="unavailable",
+            reason="insufficientAnswers",
+            session_id=session.id,
+            completion_reason=completion_reason,
+            question_details=question_details,
+        )
+    if review.review is None:
+        raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
+    if review.status == "partial":
+        return GetInterviewPartialReviewResponse(
+            status="partial",
+            review=InterviewPartialReviewResponse.model_validate(review.review),
+            session_id=session.id,
+            completion_reason=completion_reason,
+            question_details=question_details,
+        )
+    if review.status == "complete":
+        return GetInterviewCompleteReviewResponse(
+            status="complete",
+            review=InterviewCompleteReviewResponse.model_validate(review.review),
+            session_id=session.id,
+            completion_reason=completion_reason,
+            question_details=question_details,
+        )
+    raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
 
 
 def _session_configuration_response(session: InterviewSession) -> InterviewConfiguration:
@@ -645,17 +1063,51 @@ def interview_turn_state_api_error(
     return APIError(status.HTTP_409_CONFLICT, error.code)
 
 
+def interview_candidate_question_state_api_error(
+    error: InterviewCandidateQuestionStateError,
+) -> APIError:
+    if error.code == INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND:
+        return APIError(status.HTTP_404_NOT_FOUND, error.code)
+    if error.code == INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED:
+        return APIError(status.HTTP_503_SERVICE_UNAVAILABLE, error.code)
+    return APIError(status.HTTP_409_CONFLICT, error.code)
+
+
+def interview_completion_state_api_error(
+    error: InterviewCompletionStateError,
+) -> APIError:
+    if error.code == INTERVIEW_COMPLETION_SESSION_NOT_FOUND:
+        return APIError(status.HTTP_404_NOT_FOUND, error.code)
+    if error.code == INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED:
+        return APIError(status.HTTP_503_SERVICE_UNAVAILABLE, error.code)
+    return APIError(status.HTTP_409_CONFLICT, error.code)
+
+
+def interview_review_state_api_error(
+    error: InterviewReviewStateError,
+) -> APIError:
+    if error.code == INTERVIEW_REVIEW_SESSION_NOT_FOUND:
+        return APIError(status.HTTP_404_NOT_FOUND, error.code)
+    if error.code == INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED:
+        return APIError(status.HTTP_503_SERVICE_UNAVAILABLE, error.code)
+    return APIError(status.HTTP_409_CONFLICT, error.code)
+
+
 __all__ = [
     "AVAILABLE_DIFFICULTIES",
     "AVAILABLE_DURATIONS",
     "INTERVIEW_OPENING_MESSAGES",
     "SUPPORTED_ROUNDS",
     "InterviewAPIService",
+    "build_interview_review_response",
     "build_interview_opening_session_response",
     "build_interview_page_response",
     "build_interview_session_response",
     "build_interview_setup_response",
     "interview_planning_state_api_error",
+    "interview_candidate_question_state_api_error",
+    "interview_completion_state_api_error",
+    "interview_review_state_api_error",
     "interview_session_state_api_error",
     "interview_turn_state_api_error",
 ]

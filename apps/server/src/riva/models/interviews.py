@@ -148,6 +148,18 @@ class InterviewSession(Base):
         nullable=True,
         index=True,
     )
+    candidate_answer_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    review_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -176,6 +188,12 @@ class InterviewSession(Base):
     )
     turn_run: Mapped[AgentRun | None] = relationship(
         foreign_keys=[turn_run_id],
+    )
+    candidate_answer_run: Mapped[AgentRun | None] = relationship(
+        foreign_keys=[candidate_answer_run_id],
+    )
+    review_run: Mapped[AgentRun | None] = relationship(
+        foreign_keys=[review_run_id],
     )
     plans: Mapped[list[InterviewPlan]] = relationship(
         back_populates="session",
@@ -212,6 +230,26 @@ class InterviewSession(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="InterviewTurnAssessment.created_at",
+    )
+    candidate_questions: Mapped[list[InterviewCandidateQuestion]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewCandidateQuestion.order",
+    )
+    candidate_question_exchanges: Mapped[
+        list[InterviewCandidateQuestionExchange]
+    ] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InterviewCandidateQuestionExchange.created_at",
+    )
+    review: Mapped[InterviewReview | None] = relationship(
+        back_populates="session",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -640,12 +678,197 @@ class InterviewTurnAssessment(Base):
     )
 
 
+class InterviewCandidateQuestion(Base):
+    __tablename__ = "interview_candidate_questions"
+    __table_args__ = (
+        CheckConstraint(
+            "length(trim(content)) > 0 AND length(content) <= 4000",
+            name="ck_interview_candidate_questions_content",
+        ),
+        CheckConstraint(
+            '"order" >= 1',
+            name="ck_interview_candidate_questions_order",
+        ),
+        UniqueConstraint(
+            "session_id",
+            "order",
+            name="uq_interview_candidate_questions_session_order",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+    order: Mapped[int] = mapped_column("order", Integer, nullable=False)
+
+    session: Mapped[InterviewSession] = relationship(
+        back_populates="candidate_questions",
+    )
+    exchange: Mapped[InterviewCandidateQuestionExchange | None] = relationship(
+        back_populates="question",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+        passive_deletes=True,
+    )
+
+
+class InterviewCandidateQuestionExchange(Base):
+    __tablename__ = "interview_candidate_question_exchanges"
+    __table_args__ = (
+        CheckConstraint(
+            "length(trim(interviewer_answer)) > 0",
+            name="ck_interview_candidate_question_exchanges_answer",
+        ),
+        CheckConstraint(
+            "length(trim(feedback_summary)) > 0",
+            name="ck_interview_candidate_question_exchanges_feedback",
+        ),
+        UniqueConstraint(
+            "question_id",
+            name="uq_interview_candidate_question_exchanges_question",
+        ),
+        UniqueConstraint(
+            "source_agent_run_id",
+            name="uq_interview_candidate_question_exchanges_source_run",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    question_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_candidate_questions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_agent_run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    interviewer_answer: Mapped[str] = mapped_column(Text, nullable=False)
+    feedback_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    strengths: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    improvement_suggestions: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    suggested_alternatives: Mapped[list[str]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    session: Mapped[InterviewSession] = relationship(
+        back_populates="candidate_question_exchanges",
+    )
+    question: Mapped[InterviewCandidateQuestion] = relationship(
+        back_populates="exchange",
+        uselist=False,
+    )
+    source_agent_run: Mapped[AgentRun] = relationship(
+        foreign_keys=[source_agent_run_id],
+        passive_deletes=True,
+    )
+
+
+class InterviewReview(Base):
+    __tablename__ = "interview_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('unavailable', 'partial', 'complete')",
+            name="ck_interview_reviews_status",
+        ),
+        UniqueConstraint(
+            "session_id",
+            name="uq_interview_reviews_session",
+        ),
+        UniqueConstraint(
+            "source_agent_run_id",
+            name="uq_interview_reviews_source_run",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_agent_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("agent_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    review: Mapped[dict[str, object] | None] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=True,
+    )
+    question_details: Mapped[list[dict[str, object]]] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    session: Mapped[InterviewSession] = relationship(
+        back_populates="review",
+    )
+    source_agent_run: Mapped[AgentRun | None] = relationship(
+        foreign_keys=[source_agent_run_id],
+        passive_deletes=True,
+    )
+
+
 __all__ = [
     "InterviewAnswer",
+    "InterviewCandidateQuestion",
+    "InterviewCandidateQuestionExchange",
     "InterviewFollowUpAnswer",
     "InterviewFollowUpQuestion",
     "InterviewPlan",
     "InterviewQuestion",
+    "InterviewReview",
     "InterviewSession",
     "InterviewTurnAssessment",
 ]

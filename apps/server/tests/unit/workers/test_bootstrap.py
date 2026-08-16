@@ -358,7 +358,9 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert practice_reference_answer.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
+        "interview-candidate-question",
         "interview-planner",
+        "interview-review",
         "interview-turn",
         "job-description-parser",
         "matching-analyzer",
@@ -436,7 +438,9 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert practice_reference_answer.agent.model == "qwen-test-model"
     assert registry.agent_ids == (
         "follow-up-generator",
+        "interview-candidate-question",
         "interview-planner",
+        "interview-review",
         "interview-turn",
         "job-description-parser",
         "matching-analyzer",

@@ -3,8 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { InterviewPageResponse } from "@/models/interview"
 import {
   beginInterviewQuestions,
+  endInterview,
+  finishInterview,
+  getInterviewReview,
   getInterviewPage,
+  retryInterviewCandidateAnswer,
+  retryInterviewReview,
   retryInterviewTurn,
+  submitCandidateQuestion,
   startInterview,
   submitInterviewAnswer,
 } from "@/services/interview"
@@ -198,5 +204,58 @@ describe("interview service API", () => {
       method: "POST",
     })
     expect(requestJson(fetchMock)).toEqual({ version: 4 })
+  })
+
+  it("submits candidate questions through the real endpoint", async () => {
+    const page = generation()
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page), { status: 202 }))
+
+    await submitCandidateQuestion({
+      sessionId,
+      version: 7,
+      content: "How does the team define success in the first six months?",
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `/api/interview/sessions/${sessionId}/candidate-questions`,
+    )
+    expect(requestJson(fetchMock)).toEqual({
+      version: 7,
+      content: "How does the team define success in the first six months?",
+    })
+  })
+
+  it.each([
+    ["finish", finishInterview, `/api/interview/sessions/${sessionId}/finish`],
+    ["end", endInterview, `/api/interview/sessions/${sessionId}/end`],
+    [
+      "candidate answer retry",
+      retryInterviewCandidateAnswer,
+      `/api/interview/sessions/${sessionId}/candidate-answer/retry`,
+    ],
+    ["review retry", retryInterviewReview, `/api/interview/sessions/${sessionId}/review/retry`],
+  ] as const)("calls the real %s endpoint", async (_name, service, path) => {
+    const page = generation()
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page), { status: 202 }))
+
+    await service({ sessionId, version: 10 })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(path)
+    expect(requestJson(fetchMock)).toEqual({ version: 10 })
+  })
+
+  it("gets a completed review through the real endpoint", async () => {
+    const review = {
+      sessionId,
+      completionReason: "userEndedEarly" as const,
+      status: "unavailable" as const,
+      reason: "insufficientAnswers" as const,
+      questionDetails: [],
+    }
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(review), { status: 200 }))
+
+    await expect(getInterviewReview({ sessionId })).resolves.toEqual(review)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/interview/sessions/${sessionId}/review`)
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: "include" })
   })
 })

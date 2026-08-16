@@ -8,6 +8,8 @@ from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.agents.interview_planning import InterviewPlanningAgent
 from riva.agents.interview_turn import InterviewTurnAgent
+from riva.agents.interview_candidate_question import InterviewCandidateQuestionAgent
+from riva.agents.interview_review import InterviewReviewAgent
 from riva.agents.question_generation import QuestionGenerationAgent
 from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.schemas.resume_parsing import ResumeParsingInput, ResumeParsingOutput
@@ -42,6 +44,8 @@ __all__ = [
     "MatchingAnalysisAgent",
     "InterviewPlanningAgent",
     "InterviewTurnAgent",
+    "InterviewCandidateQuestionAgent",
+    "InterviewReviewAgent",
     "InterviewTurnInput",
     "InterviewTurnOutput",
     "MatchingAnalysisInput",

@@ -8,6 +8,8 @@ import type {
   GetInterviewReviewResponse,
   InterviewMutationResponse,
   InterviewPageResponse,
+  RetryInterviewCandidateAnswerInput,
+  RetryInterviewReviewInput,
   RetryInterviewTurnInput,
   StartInterviewInput,
   SubmitCandidateQuestionInput,
@@ -17,7 +19,7 @@ import type {
   InterviewTrainingEntryParameters,
   InterviewTrainingEntryPreparationResponse,
 } from "@/models/training-entry"
-import { interviewPageResponseSchema } from "@/schemas/interview"
+import { getInterviewReviewResponseSchema, interviewPageResponseSchema } from "@/schemas/interview"
 import { apiRequest } from "@/services/api"
 
 function realApiUnavailable(): never {
@@ -102,22 +104,60 @@ export function submitCandidateQuestion(
   input: SubmitCandidateQuestionInput,
 ): Promise<InterviewMutationResponse> {
   if (env.mock) return interviewMockService.submitCandidateQuestion(input)
-  throw new Error("Real interview candidate-question API is not implemented.")
+  return requestInterviewPage(
+    `/interview/sessions/${encodeURIComponent(input.sessionId)}/candidate-questions`,
+    {
+      json: { version: input.version, content: input.content },
+      method: "POST",
+    },
+  )
+}
+
+export function retryInterviewCandidateAnswer(
+  input: RetryInterviewCandidateAnswerInput,
+): Promise<InterviewMutationResponse> {
+  if (env.mock) {
+    return realApiUnavailable()
+  }
+  return requestInterviewPage(
+    `/interview/sessions/${encodeURIComponent(input.sessionId)}/candidate-answer/retry`,
+    { json: { version: input.version }, method: "POST" },
+  )
 }
 
 export function finishInterview(input: FinishInterviewInput): Promise<InterviewMutationResponse> {
   if (env.mock) return interviewMockService.finishInterview(input)
-  throw new Error("Real interview finish API is not implemented.")
+  return requestInterviewPage(`/interview/sessions/${encodeURIComponent(input.sessionId)}/finish`, {
+    json: { version: input.version },
+    method: "POST",
+  })
 }
 
 export function endInterview(input: EndInterviewInput): Promise<InterviewMutationResponse> {
   if (env.mock) return interviewMockService.endInterview(input)
-  throw new Error("Real interview end API is not implemented.")
+  return requestInterviewPage(`/interview/sessions/${encodeURIComponent(input.sessionId)}/end`, {
+    json: { version: input.version },
+    method: "POST",
+  })
 }
 
-export function getInterviewReview(
+export function retryInterviewReview(
+  input: RetryInterviewReviewInput,
+): Promise<InterviewMutationResponse> {
+  if (env.mock) {
+    return realApiUnavailable()
+  }
+  return requestInterviewPage(
+    `/interview/sessions/${encodeURIComponent(input.sessionId)}/review/retry`,
+    { json: { version: input.version }, method: "POST" },
+  )
+}
+
+export async function getInterviewReview(
   input: GetInterviewReviewInput,
 ): Promise<GetInterviewReviewResponse> {
   if (env.mock) return interviewMockService.getInterviewReview(input)
-  throw new Error("Real interview review API is not implemented.")
+  return getInterviewReviewResponseSchema.parse(
+    await apiRequest<unknown>(`/interview/sessions/${encodeURIComponent(input.sessionId)}/review`),
+  ) as GetInterviewReviewResponse
 }

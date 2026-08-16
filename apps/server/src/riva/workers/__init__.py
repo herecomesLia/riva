@@ -7,6 +7,8 @@ from riva.workers.handlers import AgentHandlerRegistry, AgentRunHandler
 from riva.workers.follow_up import FollowUpHandler
 from riva.workers.interview_planning import InterviewPlanningHandler
 from riva.workers.interview_turn import InterviewTurnHandler
+from riva.workers.interview_candidate_question import InterviewCandidateQuestionHandler
+from riva.workers.interview_review import InterviewReviewHandler
 from riva.workers.job_description_parsing import JobDescriptionParsingHandler
 from riva.workers.matching_analysis import MatchingAnalysisHandler
 from riva.workers.practice_evaluation import PracticeEvaluationHandler
@@ -28,6 +30,8 @@ __all__ = [
     "FollowUpHandler",
     "InterviewPlanningHandler",
     "InterviewTurnHandler",
+    "InterviewCandidateQuestionHandler",
+    "InterviewReviewHandler",
     "PracticeEvaluationHandler",
     "PracticeRecommendationHandler",
     "PracticeReviewHandler",

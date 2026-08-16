@@ -32,6 +32,10 @@ from riva.schemas.question_generation import (
 )
 from riva.schemas.interview_planning import InterviewPlanningInput
 from riva.schemas.interview_turn import InterviewTurnInput
+from riva.schemas.interview_candidate_question import (
+    InterviewCandidateQuestionInput,
+)
+from riva.schemas.interview_review import InterviewReviewInput
 from riva.utils import utc_now
 
 
@@ -434,6 +438,25 @@ def _serialize_payload(
                     "payload.targetType must be a supported target type"
                 )
             serialized[key] = value
+        elif key == "completionReason":
+            if not isinstance(value, str) or value not in {
+                "formalQuestionsCompleted",
+                "userEndedEarly",
+            }:
+                raise ValueError(
+                    "payload.completionReason must be a supported interview completion reason"
+                )
+            serialized[key] = value
+        elif key == "reviewMode":
+            if not isinstance(value, str) or value not in {
+                "unavailable",
+                "partial",
+                "complete",
+            }:
+                raise ValueError(
+                    "payload.reviewMode must be a supported interview review mode"
+                )
+            serialized[key] = value
         elif key == "expectedKind":
             if not isinstance(value, str) or value not in {
                 "personalizedExample",
@@ -454,6 +477,10 @@ def _serialize_payload(
             serialized[key] = _serialize_interview_planning_input(value)
         elif key == "interviewTurnInput":
             serialized[key] = _serialize_interview_turn_input(value)
+        elif key == "interviewCandidateQuestionInput":
+            serialized[key] = _serialize_interview_candidate_question_input(value)
+        elif key == "interviewReviewInput":
+            serialized[key] = _serialize_interview_review_input(value)
         elif key == "planRevision":
             if (
                 isinstance(value, bool)
@@ -569,6 +596,36 @@ def _serialize_interview_turn_input(value: object) -> dict[str, JSONValue]:
     except (TypeError, ValueError, ValidationError):
         raise ValueError(
             "payload.interviewTurnInput must be a valid frozen turn snapshot"
+        ) from None
+
+
+def _serialize_interview_candidate_question_input(
+    value: object,
+) -> dict[str, JSONValue]:
+    try:
+        candidate_question_input = InterviewCandidateQuestionInput.model_validate(
+            value
+        )
+        return cast(
+            dict[str, JSONValue],
+            candidate_question_input.model_dump(mode="json", by_alias=True),
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.interviewCandidateQuestionInput must be a valid frozen candidate-question snapshot"
+        ) from None
+
+
+def _serialize_interview_review_input(value: object) -> dict[str, JSONValue]:
+    try:
+        review_input = InterviewReviewInput.model_validate(value)
+        return cast(
+            dict[str, JSONValue],
+            review_input.model_dump(mode="json", by_alias=True),
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.interviewReviewInput must be a valid frozen review snapshot"
         ) from None
 
 

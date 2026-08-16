@@ -23,6 +23,8 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
+  retryInterviewCandidateAnswer,
+  retryInterviewReview,
   retryInterviewTurn,
   submitCandidateQuestion,
   submitInterviewAnswer,
@@ -37,6 +39,8 @@ vi.mock("@/services/interview", async (importOriginal) => ({
   endInterview: vi.fn(),
   finishInterview: vi.fn(),
   getInterviewPage: vi.fn(),
+  retryInterviewCandidateAnswer: vi.fn(),
+  retryInterviewReview: vi.fn(),
   retryInterviewTurn: vi.fn(),
   submitCandidateQuestion: vi.fn(),
   submitInterviewAnswer: vi.fn(),
@@ -179,6 +183,64 @@ function generatingTurnResponse(
   })
 }
 
+function generatingCandidateAnswerResponse(
+  generationStatus: "generating" | "failed" = "generating",
+): InterviewPageResponse {
+  return responseWithSession({
+    status: "generatingCandidateAnswer",
+    sessionId,
+    language: "zh-CN",
+    version: 7,
+    configuration: {
+      targetRoleId: "role_frontend_bytedance",
+      round: "technical",
+      difficulty: "pressure",
+      durationMinutes: 30,
+    },
+    startedAt: "2026-07-24T02:00:00.000Z",
+    progress: {
+      completedMainQuestions: 3,
+      totalMainQuestions: 3,
+      planRevision: 1,
+    },
+    completedQuestions: [],
+    generationStatus,
+    currentCandidateQuestion: {
+      id: "candidate-question-1",
+      content: "这个岗位入职六个月后的成功标准是什么？",
+      submittedAt: "2026-07-24T02:20:00.000Z",
+    },
+    exchanges: [],
+  })
+}
+
+function generatingReviewResponse(
+  generationStatus: "generating" | "failed" = "generating",
+): InterviewPageResponse {
+  return responseWithSession({
+    status: "generatingReview",
+    sessionId,
+    language: "zh-CN",
+    version: 9,
+    configuration: {
+      targetRoleId: "role_frontend_bytedance",
+      round: "technical",
+      difficulty: "pressure",
+      durationMinutes: 30,
+    },
+    startedAt: "2026-07-24T02:00:00.000Z",
+    progress: {
+      completedMainQuestions: 3,
+      totalMainQuestions: 3,
+      planRevision: 1,
+    },
+    completedQuestions: [],
+    generationStatus,
+    completionReason: "formalQuestionsCompleted",
+    candidateQuestionExchanges: [],
+  })
+}
+
 function followUpSession(followUpIndex: number, version: number): InterviewFollowUpSessionResponse {
   const planned = createInterviewAgentPlanMock({
     ...defaultInterviewConfigurationMock,
@@ -264,6 +326,8 @@ describe("InterviewSessionContainer", () => {
     vi.mocked(submitInterviewAnswer).mockReset()
     vi.mocked(submitCandidateQuestion).mockReset()
     vi.mocked(finishInterview).mockReset()
+    vi.mocked(retryInterviewCandidateAnswer).mockReset()
+    vi.mocked(retryInterviewReview).mockReset()
   })
 
   it("maps a pending session query to the structured loading view", async () => {
@@ -366,6 +430,43 @@ describe("InterviewSessionContainer", () => {
     ).toBeVisible()
   })
 
+  it("polls a candidate-question answer until the exchange is available", async () => {
+    vi.mocked(getInterviewPage)
+      .mockResolvedValueOnce(generatingCandidateAnswerResponse())
+      .mockResolvedValueOnce(responseWithSession(candidateSession(8)))
+    renderSession()
+
+    expect(await screen.findByText(i18n.t("interview.session.candidateAnswer.title"))).toBeVisible()
+    expect(
+      await screen.findByRole(
+        "textbox",
+        { name: i18n.t("interview.session.candidate.label") },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible()
+    expect(getInterviewPage).toHaveBeenCalledTimes(2)
+  })
+
+  it("retries a failed candidate-question answer without resubmitting the question", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getInterviewPage).mockResolvedValue(generatingCandidateAnswerResponse("failed"))
+    vi.mocked(retryInterviewCandidateAnswer).mockResolvedValue(
+      responseWithSession(candidateSession(8)),
+    )
+    renderSession()
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("interview.actions.retry") }))
+
+    expect(retryInterviewCandidateAnswer).toHaveBeenCalledWith(
+      {
+        sessionId,
+        version: 7,
+      },
+      expect.anything(),
+    )
+    expect(await screen.findByText(candidateSession(8).prompt)).toBeVisible()
+  })
+
   it("submits an answer only once while its mutation is pending", async () => {
     const user = userEvent.setup()
     const answer = "我会先说明背景和目标，再突出个人决策、推动动作和量化结果。"
@@ -394,6 +495,44 @@ describe("InterviewSessionContainer", () => {
       await screen.findByText(questionSession(2, 3).currentQuestion.question.prompt),
     ).toBeVisible()
     expect(submitInterviewAnswer).toHaveBeenCalledOnce()
+  })
+
+  it("polls a generating review and navigates after completion", async () => {
+    const completed = completedResponse(candidateSession(8))
+    vi.mocked(getInterviewPage)
+      .mockResolvedValueOnce(generatingReviewResponse())
+      .mockResolvedValueOnce(completed)
+    const result = renderSession()
+
+    expect(
+      await screen.findByText(i18n.t("interview.session.reviewGeneration.title")),
+    ).toBeVisible()
+    await waitFor(
+      () => expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
+      { timeout: 3_000 },
+    )
+    expect(getInterviewPage).toHaveBeenCalledTimes(2)
+  })
+
+  it("retries a failed review generation", async () => {
+    const user = userEvent.setup()
+    const completed = completedResponse(candidateSession(8))
+    vi.mocked(getInterviewPage).mockResolvedValue(generatingReviewResponse("failed"))
+    vi.mocked(retryInterviewReview).mockResolvedValue(completed)
+    const result = renderSession()
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("interview.actions.retry") }))
+
+    expect(retryInterviewReview).toHaveBeenCalledWith(
+      {
+        sessionId,
+        version: 9,
+      },
+      expect.anything(),
+    )
+    await waitFor(() =>
+      expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
+    )
   })
 
   it("consumes the next session state returned by answer submission", async () => {

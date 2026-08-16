@@ -3,10 +3,13 @@ from riva.models.auth import AuthSession
 from riva.models.job_description_analyses import JobDescriptionAnalysis
 from riva.models.interviews import (
     InterviewAnswer,
+    InterviewCandidateQuestion,
+    InterviewCandidateQuestionExchange,
     InterviewFollowUpAnswer,
     InterviewFollowUpQuestion,
     InterviewPlan,
     InterviewQuestion,
+    InterviewReview,
     InterviewSession,
     InterviewTurnAssessment,
 )
@@ -55,10 +58,13 @@ __all__ = [
     "JobDescriptionAnalysis",
     "InterviewSession",
     "InterviewAnswer",
+    "InterviewCandidateQuestion",
+    "InterviewCandidateQuestionExchange",
     "InterviewFollowUpAnswer",
     "InterviewFollowUpQuestion",
     "InterviewPlan",
     "InterviewQuestion",
+    "InterviewReview",
     "InterviewTurnAssessment",
     "MatchingAnalysis",
     "PracticeAnswer",

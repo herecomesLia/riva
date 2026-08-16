@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useParams } from "@tanstack/react-router"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import { dashboardQueryKeys } from "@/app/dashboard-query"
+import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import type {
   ActiveInterviewSessionResponse,
   InterviewConversationRecordViewData,
@@ -17,6 +17,8 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
+  retryInterviewCandidateAnswer,
+  retryInterviewReview,
   retryInterviewTurn,
   submitCandidateQuestion,
   submitInterviewAnswer,
@@ -47,6 +49,9 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const endLock = useRef(false)
   const [beginFailed, setBeginFailed] = useState(false)
   const [turnRetryFailed, setTurnRetryFailed] = useState(false)
+  const [candidateAnswerRetryFailed, setCandidateAnswerRetryFailed] = useState(false)
+  const [reviewRetryFailed, setReviewRetryFailed] = useState(false)
+  const completedReviewNavigation = useRef(false)
 
   const interviewQuery = useQuery({
     queryFn: getInterviewPage,
@@ -56,6 +61,10 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
       (query.state.data?.session?.status === "generatingQuestion" &&
         query.state.data.session.generationStatus === "generating") ||
       (query.state.data?.session?.status === "generatingTurn" &&
+        query.state.data.session.generationStatus === "generating") ||
+      (query.state.data?.session?.status === "generatingCandidateAnswer" &&
+        query.state.data.session.generationStatus === "generating") ||
+      (query.state.data?.session?.status === "generatingReview" &&
         query.state.data.session.generationStatus === "generating")
         ? INTERVIEW_GENERATING_POLL_INTERVAL_MS
         : false,
@@ -65,27 +74,37 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const submitMutation = useMutation({ mutationFn: submitInterviewAnswer })
   const turnRetryMutation = useMutation({ mutationFn: retryInterviewTurn })
   const candidateQuestionMutation = useMutation({ mutationFn: submitCandidateQuestion })
+  const candidateAnswerRetryMutation = useMutation({ mutationFn: retryInterviewCandidateAnswer })
   const finishMutation = useMutation({ mutationFn: finishInterview })
   const endMutation = useMutation({ mutationFn: endInterview })
+  const reviewRetryMutation = useMutation({ mutationFn: retryInterviewReview })
 
   function commit(response: InterviewMutationResponse) {
     queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, response)
   }
 
-  async function commitAndOpenReview(
-    response: InterviewMutationResponse,
-    completedSessionId: string,
-  ) {
+  async function commitCompletion(response: InterviewMutationResponse) {
     commit(response)
+    if (response.session?.status !== "completed") return
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all }),
       queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all }),
     ])
-    await navigate({
-      to: "/interview/review/$sessionId",
-      params: { sessionId: completedSessionId },
-    })
   }
+
+  useEffect(() => {
+    const current = interviewQuery.data?.session
+    if (current?.status === "completed" && current.sessionId === sessionId) {
+      if (completedReviewNavigation.current) return
+      completedReviewNavigation.current = true
+      void navigate({
+        to: "/interview/review/$sessionId",
+        params: { sessionId },
+      })
+      return
+    }
+    completedReviewNavigation.current = false
+  }, [interviewQuery.data?.session, navigate, sessionId])
 
   async function backToSetup() {
     await navigate({ to: "/interview" })
@@ -168,6 +187,46 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     }
   }
 
+  async function handleRetryCandidateAnswer() {
+    if (candidateAnswerRetryMutation.isPending) return
+    const session = currentSession()
+    if (session.status !== "generatingCandidateAnswer" || session.generationStatus !== "failed") {
+      return
+    }
+
+    setCandidateAnswerRetryFailed(false)
+    try {
+      commit(
+        await candidateAnswerRetryMutation.mutateAsync({
+          sessionId: session.sessionId,
+          version: session.version,
+        }),
+      )
+    } catch {
+      setCandidateAnswerRetryFailed(true)
+    }
+  }
+
+  async function handleRetryReview() {
+    if (reviewRetryMutation.isPending) return
+    const session = currentSession()
+    if (session.status !== "generatingReview" || session.generationStatus !== "failed") {
+      return
+    }
+
+    setReviewRetryFailed(false)
+    try {
+      commit(
+        await reviewRetryMutation.mutateAsync({
+          sessionId: session.sessionId,
+          version: session.version,
+        }),
+      )
+    } catch {
+      setReviewRetryFailed(true)
+    }
+  }
+
   async function handleSubmit(content: string) {
     if (
       submitLock.current ||
@@ -243,7 +302,7 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
         sessionId: session.sessionId,
         version: session.version,
       })
-      await commitAndOpenReview(response, session.sessionId)
+      await commitCompletion(response)
     } finally {
       finishLock.current = false
     }
@@ -257,11 +316,20 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
       beginMutation.isPending ||
       submitLock.current ||
       submitMutation.isPending ||
-      turnRetryMutation.isPending
+      turnRetryMutation.isPending ||
+      candidateAnswerRetryMutation.isPending ||
+      reviewRetryMutation.isPending
     ) {
       return
     }
     const session = currentSession()
+    if (
+      session.status !== "opening" &&
+      session.status !== "question" &&
+      session.status !== "followUp"
+    ) {
+      return
+    }
 
     endLock.current = true
     try {
@@ -269,7 +337,7 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
         sessionId: session.sessionId,
         version: session.version,
       })
-      await commitAndOpenReview(response, session.sessionId)
+      await commitCompletion(response)
     } finally {
       endLock.current = false
     }
@@ -375,6 +443,37 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     )
   }
 
+  if (session.status === "generatingCandidateAnswer") {
+    return (
+      <InterviewSessionView
+        currentCandidateQuestion={session.currentCandidateQuestion}
+        generationStatus={session.generationStatus}
+        history={history}
+        isRetrying={candidateAnswerRetryMutation.isPending}
+        onBack={() => void backToSetup()}
+        onRetry={handleRetryCandidateAnswer}
+        retryFailed={candidateAnswerRetryFailed}
+        status="generatingCandidateAnswer"
+        summary={summary}
+      />
+    )
+  }
+
+  if (session.status === "generatingReview") {
+    return (
+      <InterviewSessionView
+        generationStatus={session.generationStatus}
+        history={history}
+        isRetrying={reviewRetryMutation.isPending}
+        onBack={() => void backToSetup()}
+        onRetry={handleRetryReview}
+        retryFailed={reviewRetryFailed}
+        status="generatingReview"
+        summary={summary}
+      />
+    )
+  }
+
   if (session.status === "candidateQuestions") {
     return (
       <InterviewSessionView
@@ -428,7 +527,13 @@ function toPrompt(
   session: Exclude<
     ActiveInterviewSessionResponse,
     {
-      status: "opening" | "candidateQuestions" | "generatingQuestion" | "generatingTurn"
+      status:
+        | "opening"
+        | "candidateQuestions"
+        | "generatingQuestion"
+        | "generatingTurn"
+        | "generatingCandidateAnswer"
+        | "generatingReview"
     }
   >,
 ): InterviewPromptViewData {
