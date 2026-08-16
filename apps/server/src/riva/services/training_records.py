@@ -206,14 +206,12 @@ class TrainingRecordService:
         )
         duration_seconds = func.greatest(
             literal(0),
-            cast(
-                extract(
-                    "epoch",
-                    eligible_records.c.ended_at - eligible_records.c.started_at,
-                ),
-                Integer,
+            extract(
+                "epoch",
+                eligible_records.c.ended_at - eligible_records.c.started_at,
             ),
         )
+        duration_seconds = cast(func.floor(duration_seconds), Integer)
         completed_record = case(
             (
                 eligible_records.c.record_status

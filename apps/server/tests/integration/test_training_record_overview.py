@@ -13,6 +13,8 @@ from riva.models import (
     PracticeAnswer,
     PracticeAttempt,
     PracticeFollowUpQuestion,
+    PracticeSession,
+    TargetRole,
 )
 from riva.schemas.training_records import TrainingRecordKind
 from riva.services.training_records import TrainingRecordService
@@ -20,6 +22,7 @@ from tests.integration.test_question_generation import database_url, seed_contex
 from tests.integration.test_training_record_list import (
     START,
     TRUSTED_ORIGIN,
+    add_attempt,
     add_record,
     seed_records,
     settings,
@@ -112,6 +115,22 @@ def test_training_record_overview_aggregates_eligible_records_and_is_scoped() ->
                 owner, role, second_role, archived_role, _other_owner, ids = (
                     await seed_records(database)
                 )
+                unused_role = TargetRole(
+                    id=uuid4(),
+                    user_id=owner.id,
+                    title="Unstarted Engineer",
+                    company="No History Co",
+                    recruitment_type="experienced",
+                    location="Shanghai",
+                    preparation_status="preparing",
+                    job_description_status="saved",
+                    raw_job_description="This role has no training record.",
+                    job_description_version=1,
+                    version=1,
+                )
+                async with database.sessionmaker() as session:
+                    session.add(unused_role)
+                    await session.commit()
                 await _add_follow_up_answer_to_completed_attempt(
                     database,
                     user_id=owner.id,
@@ -144,6 +163,9 @@ def test_training_record_overview_aggregates_eligible_records_and_is_scoped() ->
                     second_role.id,
                 ]
                 assert len(overview.target_roles) == 3
+                assert unused_role.id not in {
+                    target_role.id for target_role in overview.target_roles
+                }
                 assert overview.by_kind[TrainingRecordKind.TARGETED_PRACTICE].record_count == 7
                 assert (
                     overview.by_kind[TrainingRecordKind.TARGETED_PRACTICE]
@@ -302,6 +324,71 @@ def test_training_record_overview_with_only_unscored_record_has_null_average() -
                 assert (
                     overview.by_kind[TrainingRecordKind.TARGETED_PRACTICE].average_score
                     is None
+                )
+            finally:
+                await database.reset()
+
+    asyncio.run(run_test())
+
+
+def test_training_record_overview_duration_matches_list_for_fractional_seconds() -> None:
+    async def run_test() -> None:
+        url = database_url()
+        async with Database(url) as database:
+            await database.reset()
+            try:
+                owner, role, _profile, _project_id = await seed_context(database)
+                record_id = uuid4()
+                started_at = START
+                ended_at = START + timedelta(seconds=10, microseconds=900_000)
+                async with database.sessionmaker() as session:
+                    session.add(
+                        PracticeSession(
+                            id=record_id,
+                            user_id=owner.id,
+                            target_role_id=role.id,
+                            language="en",
+                            version=1,
+                            status="completed",
+                            initial_question_type="behavioral",
+                            initial_difficulty="basic",
+                            source="personalized",
+                            prioritize_weaknesses=False,
+                            started_at=started_at,
+                            completed_at=ended_at,
+                            completion_reason="reviewCompleted",
+                            created_at=started_at,
+                            updated_at=ended_at,
+                        )
+                    )
+                    attempt = await add_attempt(
+                        session,
+                        user_id=owner.id,
+                        session_id=record_id,
+                        number=1,
+                        started_at=started_at,
+                        status="completed",
+                        answered=True,
+                    )
+                    attempt.completed_at = START + timedelta(seconds=5)
+                    await session.commit()
+
+                async with database.sessionmaker() as session:
+                    service = TrainingRecordService(session)
+                    page = await service.list_training_records(
+                        user_id=owner.id,
+                        target_role_id=role.id,
+                    )
+                    overview = await service.get_training_records_overview(
+                        user_id=owner.id
+                    )
+
+                assert len(page.items) == 1
+                assert page.items[0].record_id == record_id
+                assert page.items[0].duration_seconds == 10
+                assert overview.total_duration_seconds == 10
+                assert overview.total_duration_seconds == sum(
+                    item.duration_seconds for item in page.items
                 )
             finally:
                 await database.reset()
