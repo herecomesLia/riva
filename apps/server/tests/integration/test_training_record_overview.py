@@ -18,13 +18,14 @@ from riva.models import (
 )
 from riva.schemas.training_records import TrainingRecordKind
 from riva.services.training_records import TrainingRecordService
-from tests.integration.test_question_generation import database_url, seed_context
-from tests.integration.test_training_record_list import (
+from tests.helpers.integration_database import get_integration_database_url
+from tests.helpers.training_records import (
     START,
     TRUSTED_ORIGIN,
     add_attempt,
     add_record,
     seed_records,
+    seed_training_record_context,
     settings,
     succeeded_run,
 )
@@ -35,11 +36,11 @@ pytestmark = pytest.mark.integration
 
 def test_training_record_overview_without_training_records() -> None:
     async def run_test() -> None:
-        url = database_url()
+        url = get_integration_database_url()
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, _role, _profile, _project_id = await seed_context(database)
+                owner, _role = await seed_training_record_context(database)
                 async with database.sessionmaker() as session:
                     overview = await TrainingRecordService(
                         session
@@ -108,7 +109,7 @@ async def _add_follow_up_answer_to_completed_attempt(
 
 def test_training_record_overview_aggregates_eligible_records_and_is_scoped() -> None:
     async def run_test() -> None:
-        url = database_url()
+        url = get_integration_database_url()
         async with Database(url) as database:
             await database.reset()
             try:
@@ -237,11 +238,11 @@ def test_training_record_overview_aggregates_eligible_records_and_is_scoped() ->
 
 def test_training_record_overview_averages_records_and_ignores_unscored_records() -> None:
     async def run_test() -> None:
-        url = database_url()
+        url = get_integration_database_url()
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, role, _profile, _project_id = await seed_context(database)
+                owner, role = await seed_training_record_context(database)
                 async with database.sessionmaker() as session:
                     await add_record(
                         session,
@@ -295,11 +296,11 @@ def test_training_record_overview_averages_records_and_ignores_unscored_records(
 
 def test_training_record_overview_with_only_unscored_record_has_null_average() -> None:
     async def run_test() -> None:
-        url = database_url()
+        url = get_integration_database_url()
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, role, _profile, _project_id = await seed_context(database)
+                owner, role = await seed_training_record_context(database)
                 async with database.sessionmaker() as session:
                     await add_record(
                         session,
@@ -333,11 +334,11 @@ def test_training_record_overview_with_only_unscored_record_has_null_average() -
 
 def test_training_record_overview_duration_matches_list_for_fractional_seconds() -> None:
     async def run_test() -> None:
-        url = database_url()
+        url = get_integration_database_url()
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, role, _profile, _project_id = await seed_context(database)
+                owner, role = await seed_training_record_context(database)
                 record_id = uuid4()
                 started_at = START
                 ended_at = START + timedelta(seconds=10, microseconds=900_000)
