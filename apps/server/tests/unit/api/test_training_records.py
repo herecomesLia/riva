@@ -1,15 +1,28 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from riva.core.auth import get_auth_service, require_current_user
-from riva.core.training_records import get_training_record_service
+from riva.core.training_records import (
+    get_training_record_reference_answer_service,
+    get_training_record_service,
+)
 from riva.models import User
 from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordDetailResponse,
+    TrainingRecordReferenceAnswerResponse,
     TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
+)
+from riva.services.training_record_reference_answers import (
+    REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+    TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
+    TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
+    TRAINING_RECORD_QUESTION_NOT_FOUND,
+    TRAINING_RECORD_STATE_CONFLICT as REFERENCE_ANSWER_STATE_CONFLICT,
+    TrainingRecordReferenceAnswerStateError,
 )
 from riva.services.training_records import (
     TRAINING_RECORD_NOT_FOUND,
@@ -23,6 +36,7 @@ ATTEMPT_ID = UUID("22222222-2222-4222-8222-222222222222")
 CARD_ID = UUID("33333333-3333-4333-8333-333333333333")
 ROLE_ID = UUID("44444444-4444-4444-8444-444444444444")
 NOW = datetime(2026, 8, 15, 8, 0, tzinfo=UTC)
+TRUSTED_ORIGIN = "http://localhost:5173"
 
 
 def current_user() -> User:
@@ -128,6 +142,27 @@ def overview_response() -> TrainingRecordsOverviewResponse:
     )
 
 
+def reference_answer_response(
+    *,
+    subject: str = "mainQuestion",
+    follow_up_id: UUID | None = None,
+) -> TrainingRecordReferenceAnswerResponse:
+    target: dict[str, object] = {
+        "kind": "targetedPractice",
+        "recordId": str(RECORD_ID),
+        "questionId": str(ATTEMPT_ID),
+        "subject": subject,
+    }
+    if follow_up_id is not None:
+        target["followUpId"] = str(follow_up_id)
+    return TrainingRecordReferenceAnswerResponse.model_validate(
+        {
+            "target": target,
+            "referenceAnswer": {"status": "generating"},
+        }
+    )
+
+
 class FakeTrainingRecordService:
     def __init__(
         self,
@@ -158,10 +193,47 @@ class FakeTrainingRecordService:
         return self.overview_result
 
 
+class FakeTrainingRecordReferenceAnswerService:
+    def __init__(
+        self,
+        *,
+        result: TrainingRecordReferenceAnswerResponse | None = None,
+        error: str | None = None,
+    ) -> None:
+        self.result = result or reference_answer_response()
+        self.error = error
+        self.request_calls: list[dict[str, object]] = []
+        self.refresh_calls: list[dict[str, object]] = []
+
+    async def request_reference_answer(self, **kwargs: object):
+        self.request_calls.append(kwargs)
+        if self.error is not None:
+            raise TrainingRecordReferenceAnswerStateError(self.error)  # type: ignore[arg-type]
+        return self.result
+
+    async def refresh_reference_answer(self, **kwargs: object):
+        self.refresh_calls.append(kwargs)
+        if self.error is not None:
+            raise TrainingRecordReferenceAnswerStateError(self.error)  # type: ignore[arg-type]
+        return self.result
+
+
 def client_for(app, service: FakeTrainingRecordService) -> tuple[TestClient, User]:
     user = current_user()
     app.dependency_overrides[require_current_user] = lambda: user
     app.dependency_overrides[get_training_record_service] = lambda: service
+    return TestClient(app), user
+
+
+def reference_answer_client_for(
+    app,
+    service: FakeTrainingRecordReferenceAnswerService,
+) -> tuple[TestClient, User]:
+    user = current_user()
+    app.dependency_overrides[require_current_user] = lambda: user
+    app.dependency_overrides[
+        get_training_record_reference_answer_service
+    ] = lambda: service
     return TestClient(app), user
 
 
@@ -334,3 +406,112 @@ def test_get_training_records_overview_returns_camel_case_wire_contract(app) -> 
         },
     }
     assert service.overview_calls == [user.id]
+
+
+def test_request_training_record_reference_answer_forwards_main_request(app) -> None:
+    service = FakeTrainingRecordReferenceAnswerService()
+    client, user = reference_answer_client_for(app, service)
+
+    with client:
+        response = client.post(
+            f"/api/training-records/practice/{RECORD_ID}/reference-answer",
+            json={
+                "subject": "mainQuestion",
+                "questionId": str(ATTEMPT_ID),
+            },
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 202
+    assert response.json()["target"] == {
+        "kind": "targetedPractice",
+        "recordId": str(RECORD_ID),
+        "questionId": str(ATTEMPT_ID),
+        "subject": "mainQuestion",
+    }
+    assert response.json()["referenceAnswer"]["status"] == "generating"
+    assert len(service.request_calls) == 1
+    assert service.request_calls[0]["user_id"] == user.id
+    assert service.request_calls[0]["record_id"] == RECORD_ID
+    payload = service.request_calls[0]["payload"]
+    assert payload.model_dump(mode="json", by_alias=True) == {
+        "subject": "mainQuestion",
+        "questionId": str(ATTEMPT_ID),
+    }
+
+
+def test_refresh_training_record_reference_answer_forwards_follow_up_request(
+    app,
+) -> None:
+    follow_up_id = uuid4()
+    service = FakeTrainingRecordReferenceAnswerService(
+        result=reference_answer_response(
+            subject="followUp",
+            follow_up_id=follow_up_id,
+        )
+    )
+    client, user = reference_answer_client_for(app, service)
+
+    with client:
+        response = client.post(
+            f"/api/training-records/practice/{RECORD_ID}/reference-answer/refresh",
+            json={
+                "subject": "followUp",
+                "questionId": str(ATTEMPT_ID),
+                "followUpId": str(follow_up_id),
+            },
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["target"]["subject"] == "followUp"
+    assert response.json()["target"]["followUpId"] == str(follow_up_id)
+    assert service.refresh_calls[0]["user_id"] == user.id
+    assert service.refresh_calls[0]["record_id"] == RECORD_ID
+
+
+def test_training_record_reference_answer_routes_validate_body(app) -> None:
+    service = FakeTrainingRecordReferenceAnswerService()
+    client, _user = reference_answer_client_for(app, service)
+
+    with client:
+        response = client.post(
+            f"/api/training-records/practice/{RECORD_ID}/reference-answer",
+            json={"subject": "mainQuestion"},
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 422
+    assert service.request_calls == []
+
+
+@pytest.mark.parametrize(
+    ("error_code", "expected_status"),
+    [
+        (REFERENCE_ANSWER_RECORD_NOT_FOUND, 404),
+        (TRAINING_RECORD_QUESTION_NOT_FOUND, 404),
+        (TRAINING_RECORD_FOLLOW_UP_NOT_FOUND, 404),
+        (REFERENCE_ANSWER_STATE_CONFLICT, 409),
+        (REFERENCE_ANSWER_GENERATION_UNAVAILABLE, 503),
+    ],
+)
+def test_training_record_reference_answer_routes_map_service_errors(
+    app,
+    error_code: str,
+    expected_status: int,
+) -> None:
+    service = FakeTrainingRecordReferenceAnswerService(error=error_code)
+    client, _user = reference_answer_client_for(app, service)
+
+    with client:
+        response = client.post(
+            f"/api/training-records/practice/{RECORD_ID}/reference-answer",
+            json={
+                "subject": "mainQuestion",
+                "questionId": str(ATTEMPT_ID),
+            },
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == expected_status
+    assert response.json() == {"error": error_code}

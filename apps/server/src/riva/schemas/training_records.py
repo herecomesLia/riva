@@ -110,6 +110,54 @@ class TrainingRecordsOverviewResponse(TrainingRecordAPIModel):
     by_kind: dict[TrainingRecordKind, TrainingRecordKindOverviewResponse]
 
 
+class TargetedPracticeMainReferenceAnswerRequest(TrainingRecordAPIModel):
+    subject: Literal["mainQuestion"]
+    question_id: StandardUUID
+
+
+class TargetedPracticeFollowUpReferenceAnswerRequest(TrainingRecordAPIModel):
+    subject: Literal["followUp"]
+    question_id: StandardUUID
+    follow_up_id: StandardUUID
+
+
+TargetedPracticeReferenceAnswerRequest = Annotated[
+    TargetedPracticeMainReferenceAnswerRequest
+    | TargetedPracticeFollowUpReferenceAnswerRequest,
+    Field(discriminator="subject"),
+]
+
+
+class TargetedPracticeMainReferenceAnswerTargetResponse(TrainingRecordAPIModel):
+    kind: Literal[TrainingRecordKind.TARGETED_PRACTICE]
+    record_id: StandardUUID
+    question_id: StandardUUID
+    subject: Literal["mainQuestion"]
+
+
+class TargetedPracticeFollowUpReferenceAnswerTargetResponse(TrainingRecordAPIModel):
+    kind: Literal[TrainingRecordKind.TARGETED_PRACTICE]
+    record_id: StandardUUID
+    question_id: StandardUUID
+    subject: Literal["followUp"]
+    follow_up_id: StandardUUID
+
+
+TargetedPracticeReferenceAnswerTargetResponse = Annotated[
+    TargetedPracticeMainReferenceAnswerTargetResponse
+    | TargetedPracticeFollowUpReferenceAnswerTargetResponse,
+    Field(discriminator="subject"),
+]
+
+
+class TrainingRecordReferenceAnswerResponse(TrainingRecordAPIModel):
+    target: TargetedPracticeReferenceAnswerTargetResponse
+    reference_answer: (
+        PracticeMainReferenceAnswerResponse
+        | PracticeFollowUpReferenceAnswerResponse
+    )
+
+
 class TargetedPracticeSetupResponse(TrainingRecordAPIModel):
     source: PracticeQuestionSource
     prioritize_weaknesses: bool
@@ -239,6 +287,12 @@ __all__ = [
     "TargetedPracticeTrainingRecordSummaryResponse",
     "TargetedPracticeSetupResponse",
     "TargetedPracticeTrainingRecordDetailResponse",
+    "TargetedPracticeFollowUpReferenceAnswerRequest",
+    "TargetedPracticeFollowUpReferenceAnswerTargetResponse",
+    "TargetedPracticeMainReferenceAnswerRequest",
+    "TargetedPracticeMainReferenceAnswerTargetResponse",
+    "TargetedPracticeReferenceAnswerRequest",
+    "TargetedPracticeReferenceAnswerTargetResponse",
     "TrainingRecordAPIModel",
     "TrainingRecordAttemptResponse",
     "TrainingRecordEvaluationResponse",
@@ -247,6 +301,7 @@ __all__ = [
     "TrainingRecordKind",
     "TrainingRecordQuestionResponse",
     "TrainingRecordReviewResponse",
+    "TrainingRecordReferenceAnswerResponse",
     "TrainingRecordSummaryResponse",
     "TrainingRecordStatus",
     "TrainingRecordTargetRoleResponse",

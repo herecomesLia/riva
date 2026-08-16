@@ -20,17 +20,7 @@ from riva.models import (
 from riva.schemas.evaluation import PracticeEvaluationFollowUpCompletionReason
 from riva.schemas.practice_sessions import (
     PracticeAnswerResponse,
-    PracticeFollowUpReferenceAnswerContentResponse,
-    PracticeFollowUpReferenceAnswerRevealedResponse,
-    PracticeMainReferenceAnswerContentResponse,
-    PracticeMainReferenceAnswerRevealedResponse,
-    PracticeReferenceAnswerGeneratingResponse,
-    PracticeReferenceAnswerNotRequestedResponse,
-    PracticeReferenceAnswerUnavailableResponse,
     PracticeQuestionSource,
-)
-from riva.schemas.practice_reference_answer import (
-    PracticeReferenceAnswerTargetType,
 )
 from riva.schemas.training_records import (
     TargetedPracticeAttemptRecordResponse,
@@ -63,10 +53,12 @@ from riva.services.recommendation_generation import (
     practice_recommendation_output_from_artifact,
 )
 from riva.services.reference_answer_generation import (
-    PracticeReferenceAnswerLifecycleStatus,
-    PracticeReferenceAnswerWorkflowState,
     ReferenceAnswerGenerationService,
     ReferenceAnswerGenerationStateError,
+)
+from riva.services.practice_api import (
+    build_practice_follow_up_reference_answer_response,
+    build_practice_main_reference_answer_response,
 )
 from riva.services.review_generation import practice_review_output_from_artifact
 
@@ -596,7 +588,9 @@ class TrainingRecordService:
         question = self._build_question(
             attempt=attempt,
             card=card,
-            reference_answer=_build_main_reference_answer(main_reference_state),
+            reference_answer=_build_main_reference_answer(
+                main_reference_state
+            ),
         )
         follow_ups = await self._build_follow_ups(
             user_id=user_id,
@@ -669,7 +663,9 @@ class TrainingRecordService:
             question=self._build_question(
                 attempt=attempt,
                 card=card,
-                reference_answer=_build_main_reference_answer(main_reference_state),
+                reference_answer=_build_main_reference_answer(
+                    main_reference_state
+                ),
             ),
             main_answer=None,
             follow_ups=[],
@@ -732,7 +728,11 @@ class TrainingRecordService:
                     order=question.order,
                     asked_at=question.created_at,
                     answer=_build_answer_response(answer),
-                    reference_answer=_build_follow_up_reference_answer(state),
+                    reference_answer=(
+                        _build_follow_up_reference_answer(
+                            state
+                        )
+                    ),
                 )
             )
 
@@ -753,7 +753,11 @@ class TrainingRecordService:
                     order=pending.order,
                     asked_at=pending.created_at,
                     answer=None,
-                    reference_answer=_build_follow_up_reference_answer(state),
+                    reference_answer=(
+                        _build_follow_up_reference_answer(
+                            state
+                        )
+                    ),
                 )
             )
         return result
@@ -847,63 +851,18 @@ def _build_answer_response(answer: PracticeAnswer) -> PracticeAnswerResponse:
     )
 
 
-def _build_main_reference_answer(state: PracticeReferenceAnswerWorkflowState):
-    if state.status == PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED:
-        return PracticeReferenceAnswerNotRequestedResponse(status="notRequested")
-    if state.status == PracticeReferenceAnswerLifecycleStatus.GENERATING:
-        return PracticeReferenceAnswerGeneratingResponse(status="generating")
-    if state.status == PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE:
-        return PracticeReferenceAnswerUnavailableResponse(status="unavailable")
-    if (
-        state.status != PracticeReferenceAnswerLifecycleStatus.REVEALED
-        or state.generation_run is None
-        or state.artifact is None
-        or state.output is None
-        or state.output.target_type != PracticeReferenceAnswerTargetType.MAIN
-    ):
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
-    return PracticeMainReferenceAnswerRevealedResponse(
-        status="revealed",
-        content=PracticeMainReferenceAnswerContentResponse(
-            kind=state.output.kind,
-            answer=state.output.answer,
-            key_points=state.output.key_points,
-            common_mistakes=state.output.common_mistakes,
-            generated_at=state.artifact.generated_at,
-        ),
-        viewed_before_submission=state.viewed_before_submission,
-    )
+def _build_main_reference_answer(state):
+    try:
+        return build_practice_main_reference_answer_response(state)
+    except PracticeSessionStateError:
+        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
 
-def _build_follow_up_reference_answer(
-    state: PracticeReferenceAnswerWorkflowState,
-):
-    if state.status == PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED:
-        return PracticeReferenceAnswerNotRequestedResponse(status="notRequested")
-    if state.status == PracticeReferenceAnswerLifecycleStatus.GENERATING:
-        return PracticeReferenceAnswerGeneratingResponse(status="generating")
-    if state.status == PracticeReferenceAnswerLifecycleStatus.UNAVAILABLE:
-        return PracticeReferenceAnswerUnavailableResponse(status="unavailable")
-    if (
-        state.status != PracticeReferenceAnswerLifecycleStatus.REVEALED
-        or state.generation_run is None
-        or state.artifact is None
-        or state.output is None
-        or state.output.target_type != PracticeReferenceAnswerTargetType.FOLLOW_UP
-    ):
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
-    return PracticeFollowUpReferenceAnswerRevealedResponse(
-        status="revealed",
-        content=PracticeFollowUpReferenceAnswerContentResponse(
-            kind=state.output.kind,
-            addressed_gap=state.output.addressed_gap,
-            answer=state.output.answer,
-            key_points=state.output.key_points,
-            common_mistakes=state.output.common_mistakes,
-            generated_at=state.artifact.generated_at,
-        ),
-        viewed_before_submission=state.viewed_before_submission,
-    )
+def _build_follow_up_reference_answer(state):
+    try:
+        return build_practice_follow_up_reference_answer_response(state)
+    except PracticeSessionStateError:
+        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
 
 def _require_aware_timestamp(value: datetime) -> None:

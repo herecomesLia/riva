@@ -8,10 +8,15 @@ from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
 from riva.core.errors import APIError
 from riva.core.training_records import get_training_record_service
+from riva.core.training_records import (
+    get_training_record_reference_answer_service,
+)
 from riva.models import User
 from riva.schemas.training_records import (
+    TargetedPracticeReferenceAnswerRequest,
     TargetedPracticeTrainingRecordDetailResponse,
     TrainingRecordKind,
+    TrainingRecordReferenceAnswerResponse,
     TrainingRecordStatus,
     TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
@@ -21,6 +26,14 @@ from riva.services.training_records import (
     TRAINING_RECORD_STATE_CONFLICT,
     TrainingRecordService,
     TrainingRecordStateError,
+)
+from riva.services.training_record_reference_answers import (
+    REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+    TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
+    TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
+    TRAINING_RECORD_QUESTION_NOT_FOUND,
+    TrainingRecordReferenceAnswerService,
+    TrainingRecordReferenceAnswerStateError,
 )
 
 
@@ -36,6 +49,20 @@ router = APIRouter(
     tags=["training-records"],
     dependencies=[Depends(csrf_protect)],
 )
+
+
+def training_record_reference_answer_state_api_error(
+    error: TrainingRecordReferenceAnswerStateError,
+) -> APIError:
+    if error.code in {
+        REFERENCE_ANSWER_RECORD_NOT_FOUND,
+        TRAINING_RECORD_QUESTION_NOT_FOUND,
+        TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
+    }:
+        return APIError(status.HTTP_404_NOT_FOUND, error.code)
+    if error.code == REFERENCE_ANSWER_GENERATION_UNAVAILABLE:
+        return APIError(status.HTTP_503_SERVICE_UNAVAILABLE, error.code)
+    return APIError(status.HTTP_409_CONFLICT, error.code)
 
 
 @router.get(
@@ -88,6 +115,52 @@ async def get_training_records_overview(
     return await training_record_service.get_training_records_overview(
         user_id=current_user.id,
     )
+
+
+@router.post(
+    "/practice/{recordId}/reference-answer",
+    response_model=TrainingRecordReferenceAnswerResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_training_record_reference_answer(
+    record_id: TrainingRecordId,
+    payload: TargetedPracticeReferenceAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    reference_answer_service: TrainingRecordReferenceAnswerService = Depends(
+        get_training_record_reference_answer_service
+    ),
+) -> TrainingRecordReferenceAnswerResponse:
+    try:
+        return await reference_answer_service.request_reference_answer(
+            user_id=current_user.id,
+            record_id=record_id,
+            payload=payload,
+        )
+    except TrainingRecordReferenceAnswerStateError as error:
+        raise training_record_reference_answer_state_api_error(error) from None
+
+
+@router.post(
+    "/practice/{recordId}/reference-answer/refresh",
+    response_model=TrainingRecordReferenceAnswerResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def refresh_training_record_reference_answer(
+    record_id: TrainingRecordId,
+    payload: TargetedPracticeReferenceAnswerRequest,
+    current_user: User = Depends(require_current_user),
+    reference_answer_service: TrainingRecordReferenceAnswerService = Depends(
+        get_training_record_reference_answer_service
+    ),
+) -> TrainingRecordReferenceAnswerResponse:
+    try:
+        return await reference_answer_service.refresh_reference_answer(
+            user_id=current_user.id,
+            record_id=record_id,
+            payload=payload,
+        )
+    except TrainingRecordReferenceAnswerStateError as error:
+        raise training_record_reference_answer_state_api_error(error) from None
 
 
 @router.get(

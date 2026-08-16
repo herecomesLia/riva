@@ -11,11 +11,15 @@ from riva.schemas.practice_sessions import (
 )
 from riva.schemas.training_records import (
     TargetedPracticeAttemptRecordResponse,
+    TargetedPracticeFollowUpReferenceAnswerRequest,
+    TargetedPracticeMainReferenceAnswerRequest,
     TargetedPracticeQuestionRecordResponse,
+    TargetedPracticeReferenceAnswerRequest,
     TargetedPracticeSetupResponse,
     TargetedPracticeTrainingRecordDetailResponse,
     TargetedPracticeTrainingRecordSummaryResponse,
     TrainingRecordKind,
+    TrainingRecordReferenceAnswerResponse,
     TrainingRecordStatus,
     TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
@@ -230,4 +234,72 @@ def test_training_record_overview_uses_wire_aliases() -> None:
             "completedRecordCount": 0,
             "averageScore": None,
         },
+    }
+
+
+def test_training_record_reference_answer_request_is_discriminated_and_camel_case() -> None:
+    attempt_id = uuid4()
+    follow_up_id = uuid4()
+
+    main = TypeAdapter(TargetedPracticeReferenceAnswerRequest).validate_python(
+        {
+            "subject": "mainQuestion",
+            "questionId": str(attempt_id),
+        }
+    )
+    follow_up = TypeAdapter(TargetedPracticeReferenceAnswerRequest).validate_python(
+        {
+            "subject": "followUp",
+            "questionId": str(attempt_id),
+            "followUpId": str(follow_up_id),
+        }
+    )
+
+    assert isinstance(main, TargetedPracticeMainReferenceAnswerRequest)
+    assert main.question_id == attempt_id
+    assert isinstance(follow_up, TargetedPracticeFollowUpReferenceAnswerRequest)
+    assert follow_up.question_id == attempt_id
+    assert follow_up.follow_up_id == follow_up_id
+
+
+def test_training_record_reference_answer_request_rejects_wrong_shape() -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(TargetedPracticeReferenceAnswerRequest).validate_python(
+            {
+                "subject": "followUp",
+                "questionId": str(uuid4()),
+            }
+        )
+
+    with pytest.raises(ValidationError):
+        TypeAdapter(TargetedPracticeReferenceAnswerRequest).validate_python(
+            {
+                "subject": "mainQuestion",
+                "questionId": str(uuid4()),
+                "followUpId": str(uuid4()),
+            }
+        )
+
+
+def test_training_record_reference_answer_response_reuses_practice_union() -> None:
+    record_id = uuid4()
+    attempt_id = uuid4()
+    response = TrainingRecordReferenceAnswerResponse.model_validate(
+        {
+            "target": {
+                "kind": "targetedPractice",
+                "recordId": str(record_id),
+                "questionId": str(attempt_id),
+                "subject": "mainQuestion",
+            },
+            "referenceAnswer": {"status": "generating"},
+        }
+    )
+
+    assert response.target.question_id == attempt_id
+    assert response.reference_answer.status == "generating"
+    assert response.model_dump(mode="json", by_alias=True)["referenceAnswer"] == {
+        "status": "generating",
+        "content": None,
+        "viewedBeforeSubmission": False,
     }
