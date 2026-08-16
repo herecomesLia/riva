@@ -290,6 +290,20 @@ class FakeListResult:
         return iter(self.rows)
 
 
+class FakeOverviewResult:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+
+    def mappings(self):
+        return self
+
+    def one(self):
+        return self.rows[0]
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
 class FakeListSession:
     def __init__(self, rows: list[dict[str, object]], total_items: int) -> None:
         self.rows = rows
@@ -304,6 +318,22 @@ class FakeListSession:
     async def execute(self, statement: object) -> FakeListResult:
         self.execute_calls.append(statement)
         return FakeListResult(self.rows)
+
+
+class FakeOverviewSession:
+    def __init__(
+        self,
+        metrics: dict[str, object],
+        roles: list[dict[str, object]],
+    ) -> None:
+        self.results = [metrics, *roles]
+        self.execute_calls: list[object] = []
+
+    async def execute(self, statement: object) -> FakeOverviewResult:
+        self.execute_calls.append(statement)
+        if len(self.execute_calls) == 1:
+            return FakeOverviewResult([self.results[0]])
+        return FakeOverviewResult(self.results[1:])
 
 
 def test_list_training_records_projects_summary_and_rounds_average_score() -> None:
@@ -370,6 +400,52 @@ def test_list_training_records_mock_only_filter_is_an_empty_page() -> None:
     assert result.pagination.total_pages == 0
     assert fake_session.scalar_calls == []
     assert fake_session.execute_calls == []
+
+
+def test_get_training_records_overview_aggregates_record_scores_and_roles() -> None:
+    role_a = uuid4()
+    role_b = uuid4()
+    fake_session = FakeOverviewSession(
+        metrics={
+            "total_record_count": 3,
+            "completed_record_count": 1,
+            "total_duration_seconds": 1_200,
+            "answered_question_count": 4,
+            "average_score": 75.0,
+        },
+        roles=[
+            {
+                "target_role_id": role_a,
+                "target_role_title": "Backend Engineer",
+                "target_role_company": "Riva",
+            },
+            {
+                "target_role_id": role_b,
+                "target_role_title": "Product Engineer",
+                "target_role_company": None,
+            },
+        ],
+    )
+
+    result = asyncio.run(
+        TrainingRecordService(fake_session).get_training_records_overview(
+            user_id=uuid4(),
+        )
+    )
+
+    assert result.total_record_count == 3
+    assert result.completed_record_count == 1
+    assert result.total_duration_seconds == 1_200
+    assert result.answered_question_count == 4
+    assert result.average_score == 75.0
+    assert [role.id for role in result.target_roles] == [role_a, role_b]
+    assert result.by_kind["targetedPractice"].record_count == 3
+    assert result.by_kind["targetedPractice"].completed_record_count == 1
+    assert result.by_kind["targetedPractice"].average_score == 75.0
+    assert result.by_kind["mockInterview"].record_count == 0
+    assert result.by_kind["mockInterview"].completed_record_count == 0
+    assert result.by_kind["mockInterview"].average_score is None
+    assert len(fake_session.execute_calls) == 2
 
 
 def completed_session(owner_id: UUID, session_id: UUID) -> PracticeSession:

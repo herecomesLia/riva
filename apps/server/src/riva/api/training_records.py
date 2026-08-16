@@ -13,6 +13,7 @@ from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordDetailResponse,
     TrainingRecordKind,
     TrainingRecordStatus,
+    TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
 )
 from riva.services.training_records import (
@@ -70,6 +71,22 @@ async def list_training_records(
         started_at_to=started_at_to,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get(
+    "/overview",
+    response_model=TrainingRecordsOverviewResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_training_records_overview(
+    current_user: User = Depends(require_current_user),
+    training_record_service: TrainingRecordService = Depends(
+        get_training_record_service
+    ),
+) -> TrainingRecordsOverviewResponse:
+    return await training_record_service.get_training_records_overview(
+        user_id=current_user.id,
     )
 
 

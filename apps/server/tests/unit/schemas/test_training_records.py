@@ -17,6 +17,7 @@ from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordSummaryResponse,
     TrainingRecordKind,
     TrainingRecordStatus,
+    TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
     TrainingRecordTargetRoleResponse,
 )
@@ -181,4 +182,52 @@ def test_training_record_summary_and_page_use_wire_aliases() -> None:
         "pageSize": 10,
         "totalItems": 1,
         "totalPages": 1,
+    }
+
+
+def test_training_record_overview_uses_wire_aliases() -> None:
+    role_id = uuid4()
+    overview = TrainingRecordsOverviewResponse(
+        total_record_count=3,
+        completed_record_count=1,
+        total_duration_seconds=1200,
+        answered_question_count=4,
+        average_score=75.0,
+        target_roles=[
+            TrainingRecordTargetRoleResponse(
+                id=role_id,
+                title="Backend Engineer",
+                company="Riva",
+            )
+        ],
+        by_kind={
+            "targetedPractice": {
+                "recordCount": 3,
+                "completedRecordCount": 1,
+                "averageScore": 75.0,
+            },
+            "mockInterview": {
+                "recordCount": 0,
+                "completedRecordCount": 0,
+                "averageScore": None,
+            },
+        },
+    )
+
+    payload = overview.model_dump(mode="json", by_alias=True)
+    assert payload["totalRecordCount"] == 3
+    assert payload["totalDurationSeconds"] == 1200
+    assert payload["answeredQuestionCount"] == 4
+    assert payload["targetRoles"][0]["id"] == str(role_id)
+    assert payload["byKind"] == {
+        "targetedPractice": {
+            "recordCount": 3,
+            "completedRecordCount": 1,
+            "averageScore": 75.0,
+        },
+        "mockInterview": {
+            "recordCount": 0,
+            "completedRecordCount": 0,
+            "averageScore": None,
+        },
     }

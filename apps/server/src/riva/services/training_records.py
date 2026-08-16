@@ -5,7 +5,7 @@ from typing import Literal
 from uuid import UUID
 
 from pydantic import ValidationError
-from sqlalchemy import and_, case, func, literal, select
+from sqlalchemy import Integer, and_, case, cast, extract, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.models import (
@@ -40,10 +40,12 @@ from riva.schemas.training_records import (
     TrainingRecordEvaluationResponse,
     TrainingRecordFollowUpResponse,
     TrainingRecordKind,
+    TrainingRecordKindOverviewResponse,
     TrainingRecordReviewResponse,
     TrainingRecordStatus,
     TrainingRecordSummaryResponse,
     TrainingRecordTargetRoleResponse,
+    TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
 )
 from riva.services.evaluation_generation import (
@@ -141,166 +143,25 @@ class TrainingRecordService:
         ):
             return _empty_training_records_page(page=page, page_size=page_size)
 
-        attempt_summary = (
-            select(
-                PracticeAttempt.session_id.label("session_id"),
-                func.count(PracticeAttempt.id).label("total_question_count"),
-                func.count(PracticeAttempt.id)
-                .filter(PracticeAttempt.status == "completed")
-                .label("completed_attempt_count"),
-            )
-            .where(PracticeAttempt.user_id == user_id)
-            .group_by(PracticeAttempt.session_id)
-            .subquery("practice_record_attempt_summary")
+        eligible_records = _build_eligible_training_records_subquery(
+            user_id=user_id
         )
-        answer_summary = (
-            select(
-                PracticeAttempt.session_id.label("session_id"),
-                func.count(PracticeAnswer.id).label("answered_question_count"),
-            )
-            .select_from(PracticeAttempt)
-            .outerjoin(
-                PracticeAnswer,
-                and_(
-                    PracticeAnswer.attempt_id == PracticeAttempt.id,
-                    PracticeAnswer.kind == "main",
-                ),
-            )
-            .where(PracticeAttempt.user_id == user_id)
-            .group_by(PracticeAttempt.session_id)
-            .subquery("practice_record_answer_summary")
-        )
-        score_summary = (
-            select(
-                PracticeAttempt.session_id.label("session_id"),
-                func.avg(PracticeEvaluation.overall_score).label("overall_score"),
-            )
-            .select_from(PracticeAttempt)
-            .join(
-                PracticeEvaluation,
-                PracticeEvaluation.attempt_id == PracticeAttempt.id,
-            )
-            .where(
-                PracticeAttempt.user_id == user_id,
-                PracticeAttempt.status == "completed",
-            )
-            .group_by(PracticeAttempt.session_id)
-            .subquery("practice_record_score_summary")
-        )
-
-        completed_attempt_count = func.coalesce(
-            attempt_summary.c.completed_attempt_count,
-            0,
-        )
-        record_status = case(
-            (
-                PracticeSession.completion_reason == "reviewCompleted",
-                literal(TrainingRecordStatus.COMPLETED.value),
-            ),
-            (
-                and_(
-                    PracticeSession.completion_reason == "userEndedEarly",
-                    completed_attempt_count > 0,
-                ),
-                literal(TrainingRecordStatus.PARTIALLY_COMPLETED.value),
-            ),
-            (
-                PracticeSession.completion_reason == "userEndedEarly",
-                literal(TrainingRecordStatus.ENDED_EARLY.value),
-            ),
-            else_=literal(TrainingRecordStatus.ENDED_EARLY.value),
-        ).label("record_status")
-
-        last_completed_attempt_id = (
-            select(PracticeAttempt.id)
-            .where(
-                PracticeAttempt.user_id == user_id,
-                PracticeAttempt.session_id == PracticeSession.id,
-                PracticeAttempt.status == "completed",
-            )
-            .order_by(
-                PracticeAttempt.attempt_number.desc(),
-                PracticeAttempt.id.desc(),
-            )
-            .limit(1)
-            .correlate(PracticeSession)
-            .scalar_subquery()
-        )
-        review_summary = (
-            select(PracticeReview.overall_performance)
-            .where(PracticeReview.attempt_id == last_completed_attempt_id)
-            .limit(1)
-            .correlate(PracticeSession)
-            .scalar_subquery()
-            .label("review_summary")
-        )
-
-        filtered_statement = (
-            select(
-                PracticeSession.id.label("record_id"),
-                PracticeSession.language.label("language"),
-                PracticeSession.started_at.label("started_at"),
-                PracticeSession.completed_at.label("ended_at"),
-                PracticeSession.initial_question_type.label("question_type"),
-                PracticeSession.initial_difficulty.label("difficulty"),
-                TargetRole.id.label("target_role_id"),
-                TargetRole.title.label("target_role_title"),
-                TargetRole.company.label("target_role_company"),
-                func.coalesce(
-                    answer_summary.c.answered_question_count,
-                    0,
-                ).label("answered_question_count"),
-                func.coalesce(
-                    attempt_summary.c.total_question_count,
-                    0,
-                ).label("total_question_count"),
-                score_summary.c.overall_score.label("overall_score"),
-                review_summary,
-                record_status,
-            )
-            .select_from(PracticeSession)
-            .join(
-                TargetRole,
-                and_(
-                    TargetRole.id == PracticeSession.target_role_id,
-                    TargetRole.user_id == PracticeSession.user_id,
-                ),
-            )
-            .outerjoin(
-                attempt_summary,
-                attempt_summary.c.session_id == PracticeSession.id,
-            )
-            .outerjoin(
-                answer_summary,
-                answer_summary.c.session_id == PracticeSession.id,
-            )
-            .outerjoin(
-                score_summary,
-                score_summary.c.session_id == PracticeSession.id,
-            )
-            .where(
-                PracticeSession.user_id == user_id,
-                PracticeSession.status == "completed",
-                PracticeSession.completion_reason.in_(
-                    ("reviewCompleted", "userEndedEarly")
-                ),
-            )
-        )
+        filtered_statement = select(eligible_records)
         if statuses:
             filtered_statement = filtered_statement.where(
-                record_status.in_([status.value for status in statuses])
+                eligible_records.c.record_status.in_([status.value for status in statuses])
             )
         if target_role_id is not None:
             filtered_statement = filtered_statement.where(
-                PracticeSession.target_role_id == target_role_id
+                eligible_records.c.target_role_id == target_role_id
             )
         if started_at_from is not None:
             filtered_statement = filtered_statement.where(
-                PracticeSession.started_at >= started_at_from
+                eligible_records.c.started_at >= started_at_from
             )
         if started_at_to is not None:
             filtered_statement = filtered_statement.where(
-                PracticeSession.started_at <= started_at_to
+                eligible_records.c.started_at <= started_at_to
             )
 
         total_statement = select(func.count()).select_from(
@@ -311,8 +172,8 @@ class TrainingRecordService:
             await self.session.execute(
                 filtered_statement
                 .order_by(
-                    PracticeSession.started_at.desc(),
-                    PracticeSession.id.desc(),
+                    eligible_records.c.started_at.desc(),
+                    eligible_records.c.record_id.desc(),
                 )
                 .offset((page - 1) * page_size)
                 .limit(page_size)
@@ -333,6 +194,100 @@ class TrainingRecordService:
             },
         )
 
+    async def get_training_records_overview(
+        self,
+        *,
+        user_id: UUID,
+    ) -> TrainingRecordsOverviewResponse:
+        """Return aggregate metrics for the user's eligible practice records."""
+
+        eligible_records = _build_eligible_training_records_subquery(
+            user_id=user_id
+        )
+        duration_seconds = func.greatest(
+            literal(0),
+            cast(
+                extract(
+                    "epoch",
+                    eligible_records.c.ended_at - eligible_records.c.started_at,
+                ),
+                Integer,
+            ),
+        )
+        completed_record = case(
+            (
+                eligible_records.c.record_status
+                == TrainingRecordStatus.COMPLETED.value,
+                1,
+            ),
+            else_=0,
+        )
+        metrics = (
+            await self.session.execute(
+                select(
+                    func.count(eligible_records.c.record_id).label(
+                        "total_record_count"
+                    ),
+                    func.coalesce(func.sum(completed_record), 0).label(
+                        "completed_record_count"
+                    ),
+                    func.coalesce(func.sum(duration_seconds), 0).label(
+                        "total_duration_seconds"
+                    ),
+                    func.coalesce(
+                        func.sum(eligible_records.c.answered_question_count),
+                        0,
+                    ).label("answered_question_count"),
+                    func.avg(eligible_records.c.overall_score).label(
+                        "average_score"
+                    ),
+                ).select_from(eligible_records)
+            )
+        ).mappings().one()
+        target_roles = [
+            TrainingRecordTargetRoleResponse(
+                id=row["target_role_id"],
+                title=row["target_role_title"],
+                company=row["target_role_company"],
+            )
+            for row in (
+                await self.session.execute(
+                    select(
+                        eligible_records.c.target_role_id,
+                        eligible_records.c.target_role_title,
+                        eligible_records.c.target_role_company,
+                    )
+                    .distinct()
+                    .order_by(
+                        eligible_records.c.target_role_title.asc(),
+                        eligible_records.c.target_role_id.asc(),
+                    )
+                )
+            ).mappings()
+        ]
+        average_score = _round_optional_average_score(metrics["average_score"])
+        targeted_overview = TrainingRecordKindOverviewResponse(
+            record_count=int(metrics["total_record_count"] or 0),
+            completed_record_count=int(metrics["completed_record_count"] or 0),
+            average_score=average_score,
+        )
+        return TrainingRecordsOverviewResponse(
+            total_record_count=int(metrics["total_record_count"] or 0),
+            completed_record_count=int(metrics["completed_record_count"] or 0),
+            total_duration_seconds=int(metrics["total_duration_seconds"] or 0),
+            answered_question_count=int(metrics["answered_question_count"] or 0),
+            average_score=average_score,
+            target_roles=target_roles,
+            by_kind={
+                TrainingRecordKind.TARGETED_PRACTICE: targeted_overview,
+                TrainingRecordKind.MOCK_INTERVIEW: TrainingRecordKindOverviewResponse(
+                    record_count=0,
+                    completed_record_count=0,
+                    average_score=None,
+                ),
+            },
+        )
+
     @staticmethod
     def _build_summary(row) -> TrainingRecordSummaryResponse:
         started_at = row["started_at"]
@@ -342,9 +297,7 @@ class TrainingRecordService:
         _require_aware_timestamp(started_at)
         _require_aware_timestamp(ended_at)
         duration_seconds = max(0, int((ended_at - started_at).total_seconds()))
-        average_score = row["overall_score"]
-        if average_score is not None:
-            average_score = _round_average_score(float(average_score))
+        average_score = _round_optional_average_score(row["overall_score"])
         return TrainingRecordSummaryResponse(
             record_id=row["record_id"],
             kind=TrainingRecordKind.TARGETED_PRACTICE,
@@ -969,6 +922,156 @@ def _validate_pagination(*, page: int, page_size: int) -> None:
         )
 
 
+def _build_eligible_training_records_subquery(*, user_id: UUID):
+    attempt_summary = (
+        select(
+            PracticeAttempt.session_id.label("session_id"),
+            func.count(PracticeAttempt.id).label("total_question_count"),
+            func.count(PracticeAttempt.id)
+            .filter(PracticeAttempt.status == "completed")
+            .label("completed_attempt_count"),
+        )
+        .where(PracticeAttempt.user_id == user_id)
+        .group_by(PracticeAttempt.session_id)
+        .subquery("practice_record_attempt_summary")
+    )
+    answer_summary = (
+        select(
+            PracticeAttempt.session_id.label("session_id"),
+            func.count(PracticeAnswer.id).label("answered_question_count"),
+        )
+        .select_from(PracticeAttempt)
+        .outerjoin(
+            PracticeAnswer,
+            and_(
+                PracticeAnswer.attempt_id == PracticeAttempt.id,
+                PracticeAnswer.kind == "main",
+            ),
+        )
+        .where(PracticeAttempt.user_id == user_id)
+        .group_by(PracticeAttempt.session_id)
+        .subquery("practice_record_answer_summary")
+    )
+    score_summary = (
+        select(
+            PracticeAttempt.session_id.label("session_id"),
+            func.avg(PracticeEvaluation.overall_score).label("overall_score"),
+        )
+        .select_from(PracticeAttempt)
+        .join(
+            PracticeEvaluation,
+            PracticeEvaluation.attempt_id == PracticeAttempt.id,
+        )
+        .where(
+            PracticeAttempt.user_id == user_id,
+            PracticeAttempt.status == "completed",
+        )
+        .group_by(PracticeAttempt.session_id)
+        .subquery("practice_record_score_summary")
+    )
+    completed_attempt_count = func.coalesce(
+        attempt_summary.c.completed_attempt_count,
+        0,
+    )
+    record_status = _record_status_expression(completed_attempt_count)
+    last_completed_attempt_id = (
+        select(PracticeAttempt.id)
+        .where(
+            PracticeAttempt.user_id == user_id,
+            PracticeAttempt.session_id == PracticeSession.id,
+            PracticeAttempt.status == "completed",
+        )
+        .order_by(
+            PracticeAttempt.attempt_number.desc(),
+            PracticeAttempt.id.desc(),
+        )
+        .limit(1)
+        .correlate(PracticeSession)
+        .scalar_subquery()
+    )
+    review_summary = (
+        select(PracticeReview.overall_performance)
+        .where(PracticeReview.attempt_id == last_completed_attempt_id)
+        .limit(1)
+        .correlate(PracticeSession)
+        .scalar_subquery()
+        .label("review_summary")
+    )
+    return (
+        select(
+            PracticeSession.id.label("record_id"),
+            PracticeSession.language.label("language"),
+            PracticeSession.started_at.label("started_at"),
+            PracticeSession.completed_at.label("ended_at"),
+            PracticeSession.initial_question_type.label("question_type"),
+            PracticeSession.initial_difficulty.label("difficulty"),
+            TargetRole.id.label("target_role_id"),
+            TargetRole.title.label("target_role_title"),
+            TargetRole.company.label("target_role_company"),
+            func.coalesce(
+                answer_summary.c.answered_question_count,
+                0,
+            ).label("answered_question_count"),
+            func.coalesce(
+                attempt_summary.c.total_question_count,
+                0,
+            ).label("total_question_count"),
+            score_summary.c.overall_score.label("overall_score"),
+            review_summary,
+            record_status,
+        )
+        .select_from(PracticeSession)
+        .join(
+            TargetRole,
+            and_(
+                TargetRole.id == PracticeSession.target_role_id,
+                TargetRole.user_id == PracticeSession.user_id,
+            ),
+        )
+        .outerjoin(
+            attempt_summary,
+            attempt_summary.c.session_id == PracticeSession.id,
+        )
+        .outerjoin(
+            answer_summary,
+            answer_summary.c.session_id == PracticeSession.id,
+        )
+        .outerjoin(
+            score_summary,
+            score_summary.c.session_id == PracticeSession.id,
+        )
+        .where(
+            PracticeSession.user_id == user_id,
+            PracticeSession.status == "completed",
+            PracticeSession.completion_reason.in_(
+                ("reviewCompleted", "userEndedEarly")
+            ),
+        )
+        .subquery("eligible_training_records")
+    )
+
+
+def _record_status_expression(completed_attempt_count):
+    return case(
+        (
+            PracticeSession.completion_reason == "reviewCompleted",
+            literal(TrainingRecordStatus.COMPLETED.value),
+        ),
+        (
+            and_(
+                PracticeSession.completion_reason == "userEndedEarly",
+                completed_attempt_count > 0,
+            ),
+            literal(TrainingRecordStatus.PARTIALLY_COMPLETED.value),
+        ),
+        (
+            PracticeSession.completion_reason == "userEndedEarly",
+            literal(TrainingRecordStatus.ENDED_EARLY.value),
+        ),
+        else_=literal(TrainingRecordStatus.ENDED_EARLY.value),
+    ).label("record_status")
+
+
 def _empty_training_records_page(
     *,
     page: int,
@@ -989,6 +1092,12 @@ def _round_average_score(value: float) -> float:
     """Match the frontend's one-decimal Math.round convention."""
 
     return floor(value * 10 + 0.5) / 10
+
+
+def _round_optional_average_score(value: object | None) -> float | None:
+    if value is None:
+        return None
+    return _round_average_score(float(value))
 
 
 __all__ = [

@@ -8,6 +8,7 @@ from riva.core.training_records import get_training_record_service
 from riva.models import User
 from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordDetailResponse,
+    TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
 )
 from riva.services.training_records import (
@@ -98,6 +99,35 @@ def page_response() -> TrainingRecordsPageResponse:
     )
 
 
+def overview_response() -> TrainingRecordsOverviewResponse:
+    return TrainingRecordsOverviewResponse(
+        total_record_count=1,
+        completed_record_count=1,
+        total_duration_seconds=600,
+        answered_question_count=1,
+        average_score=82.0,
+        target_roles=[
+            {
+                "id": ROLE_ID,
+                "title": "Backend Engineer",
+                "company": "Riva",
+            }
+        ],
+        by_kind={
+            "targetedPractice": {
+                "recordCount": 1,
+                "completedRecordCount": 1,
+                "averageScore": 82.0,
+            },
+            "mockInterview": {
+                "recordCount": 0,
+                "completedRecordCount": 0,
+                "averageScore": None,
+            },
+        },
+    )
+
+
 class FakeTrainingRecordService:
     def __init__(
         self,
@@ -110,6 +140,8 @@ class FakeTrainingRecordService:
         self.calls: list[tuple[UUID, UUID]] = []
         self.list_result = list_result or page_response()
         self.list_calls: list[dict[str, object]] = []
+        self.overview_result = overview_response()
+        self.overview_calls: list[UUID] = []
 
     async def get_targeted_practice_record(self, *, user_id: UUID, record_id: UUID):
         self.calls.append((user_id, record_id))
@@ -120,6 +152,10 @@ class FakeTrainingRecordService:
     async def list_training_records(self, **kwargs: object):
         self.list_calls.append(kwargs)
         return self.list_result
+
+    async def get_training_records_overview(self, *, user_id: UUID):
+        self.overview_calls.append(user_id)
+        return self.overview_result
 
 
 def client_for(app, service: FakeTrainingRecordService) -> tuple[TestClient, User]:
@@ -261,3 +297,40 @@ def test_list_training_records_validates_page_size(app) -> None:
 
     assert response.status_code == 422
     assert service.list_calls == []
+
+
+def test_get_training_records_overview_returns_camel_case_wire_contract(app) -> None:
+    service = FakeTrainingRecordService()
+    client, user = client_for(app, service)
+
+    with client:
+        response = client.get("/api/training-records/overview")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "totalRecordCount": 1,
+        "completedRecordCount": 1,
+        "totalDurationSeconds": 600,
+        "answeredQuestionCount": 1,
+        "averageScore": 82.0,
+        "targetRoles": [
+            {
+                "id": str(ROLE_ID),
+                "title": "Backend Engineer",
+                "company": "Riva",
+            }
+        ],
+        "byKind": {
+            "targetedPractice": {
+                "recordCount": 1,
+                "completedRecordCount": 1,
+                "averageScore": 82.0,
+            },
+            "mockInterview": {
+                "recordCount": 0,
+                "completedRecordCount": 0,
+                "averageScore": None,
+            },
+        },
+    }
+    assert service.overview_calls == [user.id]

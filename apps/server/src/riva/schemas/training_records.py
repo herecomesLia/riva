@@ -94,6 +94,22 @@ class TrainingRecordsPageResponse(TrainingRecordAPIModel):
     pagination: TrainingRecordsPaginationResponse
 
 
+class TrainingRecordKindOverviewResponse(TrainingRecordAPIModel):
+    record_count: Annotated[int, Field(ge=0)]
+    completed_record_count: Annotated[int, Field(ge=0)]
+    average_score: float | None = Field(default=None, ge=0, le=100)
+
+
+class TrainingRecordsOverviewResponse(TrainingRecordAPIModel):
+    total_record_count: Annotated[int, Field(ge=0)]
+    completed_record_count: Annotated[int, Field(ge=0)]
+    total_duration_seconds: Annotated[int, Field(ge=0)]
+    answered_question_count: Annotated[int, Field(ge=0)]
+    average_score: float | None = Field(default=None, ge=0, le=100)
+    target_roles: list[TrainingRecordTargetRoleResponse]
+    by_kind: dict[TrainingRecordKind, TrainingRecordKindOverviewResponse]
+
+
 class TargetedPracticeSetupResponse(TrainingRecordAPIModel):
     source: PracticeQuestionSource
     prioritize_weaknesses: bool
@@ -227,12 +243,14 @@ __all__ = [
     "TrainingRecordAttemptResponse",
     "TrainingRecordEvaluationResponse",
     "TrainingRecordFollowUpResponse",
+    "TrainingRecordKindOverviewResponse",
     "TrainingRecordKind",
     "TrainingRecordQuestionResponse",
     "TrainingRecordReviewResponse",
     "TrainingRecordSummaryResponse",
     "TrainingRecordStatus",
     "TrainingRecordTargetRoleResponse",
+    "TrainingRecordsOverviewResponse",
     "TrainingRecordsPageResponse",
     "TrainingRecordsPaginationResponse",
 ]
