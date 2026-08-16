@@ -303,3 +303,20 @@ def test_training_record_reference_answer_response_reuses_practice_union() -> No
         "content": None,
         "viewedBeforeSubmission": False,
     }
+
+
+def test_training_record_reference_answer_contract_is_publicly_exported() -> None:
+    from riva import schemas
+    from riva.schemas import training_records
+
+    names = (
+        "TargetedPracticeMainReferenceAnswerRequest",
+        "TargetedPracticeFollowUpReferenceAnswerRequest",
+        "TargetedPracticeReferenceAnswerRequest",
+        "TargetedPracticeMainReferenceAnswerTargetResponse",
+        "TargetedPracticeFollowUpReferenceAnswerTargetResponse",
+        "TargetedPracticeReferenceAnswerTargetResponse",
+        "TrainingRecordReferenceAnswerResponse",
+    )
+    for name in names:
+        assert getattr(schemas, name) is getattr(training_records, name)
