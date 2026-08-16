@@ -100,10 +100,11 @@ def role(
 
 def complete_profile():
     return SimpleNamespace(
+        summary=None,
         skills=[SimpleNamespace(name="Python")],
         education=[object()],
-        work_experiences=[],
-        project_experiences=[],
+        work_experiences=[object()],
+        project_experiences=[object()],
     )
 
 
@@ -133,19 +134,39 @@ def test_setup_filters_archived_and_requires_current_jd_analysis() -> None:
     assert setup.current_target_role_id == ready.id
 
 
-def test_setup_reports_profile_incomplete_before_missing_jd() -> None:
+@pytest.mark.parametrize(
+    "missing_section",
+    ["education", "work_experiences", "project_experiences", "skills"],
+)
+def test_setup_reports_profile_incomplete_when_section_is_missing(
+    missing_section: str,
+) -> None:
     target_role_id = uuid4()
+    profile = complete_profile()
+    setattr(profile, missing_section, [])
     session = ScriptedSession(
-        profile=SimpleNamespace(
-            skills=[], education=[], work_experiences=[], project_experiences=[]
-        ),
-        roles=[role(role_id=target_role_id, ready=False)],
+        profile=profile,
+        roles=[role(role_id=target_role_id)],
         current_role_id=target_role_id,
     )
 
     setup = asyncio.run(InterviewSessionService(session).get_setup(user_id=uuid4()))
 
     assert setup.blocked_reason == "profileIncomplete"
+
+
+def test_profile_with_no_summary_can_be_fully_complete() -> None:
+    target_role = role()
+    session = ScriptedSession(
+        profile=complete_profile(),
+        roles=[target_role],
+        current_role_id=target_role.id,
+    )
+
+    setup = asyncio.run(InterviewSessionService(session).get_setup(user_id=uuid4()))
+
+    assert setup.profile_complete is True
+    assert setup.blocked_reason is None
 
 
 def test_setup_reports_job_description_missing_for_complete_profile() -> None:

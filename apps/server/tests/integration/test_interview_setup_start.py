@@ -1,36 +1,27 @@
 import asyncio
-from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.auth import require_current_user
 from riva.core.app import create_app
 from riva.core.config import Settings
 from riva.db import migrations
 from riva.db.database import Database
-from riva.models import (
-    AgentRun,
-    CareerProfile,
-    CareerProfileEducation,
-    CareerProfileSkill,
-    CurrentTargetRole,
-    InterviewSession,
-    JobDescriptionAnalysis,
-    TargetRole,
-    User,
-)
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
+from riva.models import CurrentTargetRole, InterviewSession, TargetRole
 from tests.helpers.integration_database import get_integration_database_url
-from tests.integration.test_question_generation import seed_context, succeeded_run
+from tests.helpers.interview import (
+    create_career_profile,
+    create_jd_ready_role,
+    create_user,
+    seed_interview_prerequisites,
+)
 
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
-START = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 
 
 async def _clear_database(database_url: str) -> None:
@@ -40,170 +31,59 @@ async def _clear_database(database_url: str) -> None:
             await connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
 
 
-def _user(label: str) -> User:
-    user_id = uuid4()
-    return User(
-        id=user_id,
-        username=f"{label}-{user_id.hex}",
-        normalized_username=f"{label}-{user_id.hex}",
-        password_hash="hash",
-        display_name=label,
-    )
-
-
-def _complete_profile(user_id: UUID) -> CareerProfile:
-    profile_id = uuid4()
-    profile = CareerProfile(
-        profile_id=profile_id,
-        user_id=user_id,
-        summary=None,
-        version=1,
-    )
-    skill = CareerProfileSkill(
-        id=uuid4(),
-        career_profile_id=profile_id,
-        position=0,
-        name="Python",
-        normalized_name="python",
-    )
-    education = CareerProfileEducation(
-        id=uuid4(),
-        career_profile_id=profile_id,
-        position=0,
-        school="Tongji University",
-        degree="Master",
-        major="Computer Science",
-        start_date="2018-09",
-        end_date="2021-06",
-        is_current=False,
-    )
-    profile.skills = [skill]
-    profile.education = [education]
-    return profile
-
-
-def _ready_role(
-    user_id: UUID,
-    *,
-    title: str,
-    preparation_status: str = "preparing",
-) -> tuple[TargetRole, AgentRun, JobDescriptionAnalysis]:
-    role_id = uuid4()
-    parsing_run = succeeded_run(
-        user_id=user_id,
-        agent_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
-        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
-        payload={
-            "roleId": str(role_id),
-            "jobDescriptionVersion": 1,
-        },
-        key=f"interview-jd-{role_id}",
-    )
+async def _seed_missing_jd_user(database: Database):
+    user = create_user("missing-jd")
+    profile = create_career_profile(user.id)
     role = TargetRole(
-        id=role_id,
-        user_id=user_id,
-        title=title,
+        id=uuid4(),
+        user_id=user.id,
+        title="Missing JD Role",
         company="Riva",
         recruitment_type="experienced",
         location="Shanghai",
-        preparation_status=preparation_status,
-        job_description_status="saved",
-        raw_job_description="Build reliable APIs.",
-        job_description_version=1,
-        job_description_parsing_run_id=parsing_run.id,
-        version=1,
-    )
-    analysis = JobDescriptionAnalysis(
-        role_id=role_id,
-        user_id=user_id,
-        job_description_version=1,
-        analysis_version=1,
-        source_agent_run_id=parsing_run.id,
-        parsed_at=START,
-        riva_summary="Build reliable APIs.",
-        responsibilities=["Design backend APIs"],
-        qualification_requirements={
-            "education": [],
-            "graduation_cohorts": [],
-            "majors": [],
-            "experience": ["Backend experience"],
-            "languages": [],
-            "certifications": [],
-            "other": [],
-        },
-        required_skills={
-            "programming_languages": ["Python"],
-            "frameworks_and_libraries": [],
-            "platforms": [],
-            "tools": [],
-            "concepts_and_methods": [],
-            "databases_and_middleware": [],
-            "other": [],
-        },
-        preferred_qualifications=[],
-        soft_skills=["Communication"],
-        business_domains=["Payments"],
-    )
-    return role, parsing_run, analysis
-
-
-async def _seed_auxiliary_users(
-    session: AsyncSession,
-) -> tuple[User, User, User, TargetRole]:
-    incomplete_user = _user("incomplete")
-    incomplete_profile = CareerProfile(
-        profile_id=uuid4(),
-        user_id=incomplete_user.id,
-        summary=None,
-        version=1,
-    )
-    incomplete_role, incomplete_run, incomplete_analysis = _ready_role(
-        incomplete_user.id,
-        title="Incomplete Profile Role",
-    )
-
-    missing_jd_user = _user("missing-jd")
-    missing_jd_profile = _complete_profile(missing_jd_user.id)
-    missing_jd_role = TargetRole(
-        id=uuid4(),
-        user_id=missing_jd_user.id,
-        title="Missing JD Role",
-        company="Riva",
         preparation_status="preparing",
         job_description_status="missing",
         raw_job_description=None,
         job_description_version=None,
         version=1,
     )
-    other_user = _user("other")
+    async with database.sessionmaker() as session:
+        session.add_all([user, profile, role])
+        await session.commit()
+    return user
 
-    session.add_all(
-        [
-            incomplete_user,
-            incomplete_profile,
-            incomplete_role,
-            incomplete_run,
-            incomplete_analysis,
-            missing_jd_user,
-            missing_jd_profile,
-            missing_jd_role,
-            other_user,
-        ]
-    )
-    await session.commit()
-    return incomplete_user, missing_jd_user, other_user, incomplete_role
+
+async def _seed_other_user(database: Database):
+    user = create_user("other")
+    async with database.sessionmaker() as session:
+        session.add(user)
+        await session.commit()
+    return user
 
 
 async def _run_workflow(url: str) -> None:
     async with Database(url) as database:
-        owner, role, _profile, _project_id = await seed_context(database)
-        archived_role, archived_run, archived_analysis = _ready_role(
+        owner, role, _profile = await seed_interview_prerequisites(
+            database,
+            label="owner",
+            summary=None,
+        )
+        archived_role, archived_run, archived_analysis = create_jd_ready_role(
             owner.id,
             title="Archived Role",
             preparation_status="archived",
         )
+        incomplete_user, incomplete_role, _incomplete_profile = (
+            await seed_interview_prerequisites(
+                database,
+                label="incomplete",
+                include_project_experience=False,
+                role_title="Incomplete Profile Role",
+            )
+        )
+        missing_jd_user = await _seed_missing_jd_user(database)
+        other_user = await _seed_other_user(database)
+
         async with database.sessionmaker() as session:
             session.add_all(
                 [
@@ -216,12 +96,7 @@ async def _run_workflow(url: str) -> None:
                     ),
                 ]
             )
-            (
-                incomplete_user,
-                missing_jd_user,
-                other_user,
-                incomplete_role,
-            ) = await _seed_auxiliary_users(session)
+            await session.commit()
 
         settings = Settings(
             database_url=url,

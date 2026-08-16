@@ -9,6 +9,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Runtime data
 .riva/
+/riva-before-*.sql
 pids/
 *.pid
 *.pid.lock

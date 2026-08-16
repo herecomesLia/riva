@@ -24,7 +24,7 @@ from riva.schemas.interview import (
     InterviewRound,
 )
 from riva.core.language import InteractionLanguage
-from riva.services.profile_completion import career_profile_completed
+from riva.services.profile_completion import career_profile_fully_complete
 from riva.utils import utc_now
 
 
@@ -114,7 +114,9 @@ class InterviewSessionService:
                 CurrentTargetRole.user_id == user_id
             )
         )
-        profile_complete = profile is not None and career_profile_completed(profile)
+        profile_complete = profile is not None and career_profile_fully_complete(
+            profile
+        )
 
         if not roles:
             blocked_reason = None
