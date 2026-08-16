@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import { useParams, useSearch } from "@tanstack/react-router"
 import { useMemo, useRef } from "react"
 
-import { env } from "@/app/env"
 import { TrainingRecordNotFoundError } from "@/models/training-records"
 import { getTargetedPracticeRecord } from "@/services/training-records"
 
@@ -27,14 +26,8 @@ export function TargetedPracticeHistoryPage() {
     retry: false,
     staleTime: trainingRecordCacheTime,
   })
-  const referenceAnswerGenerationEnabled =
-    env.mock ||
-    query.data?.questions.some(
-      (question) => !Object.hasOwn(question.referenceAnswer, "viewedBeforeSubmission"),
-    ) === true
   const referenceAnswerGeneration = useHistoryReferenceAnswerGeneration({
     detailQueryKey,
-    enabled: referenceAnswerGenerationEnabled,
     kind: "targetedPractice",
     record: query.data,
     recordId,
@@ -61,12 +54,8 @@ export function TargetedPracticeHistoryPage() {
   return (
     <TargetedPracticeHistoryView
       historySearch={historySearch}
-      isReferenceAnswerRequesting={
-        referenceAnswerGenerationEnabled ? referenceAnswerGeneration.isRequesting : undefined
-      }
-      onGenerateReferenceAnswer={
-        referenceAnswerGenerationEnabled ? referenceAnswerGeneration.generate : undefined
-      }
+      isReferenceAnswerRequesting={referenceAnswerGeneration.isRequesting}
+      onGenerateReferenceAnswer={referenceAnswerGeneration.generate}
       onRetry={() => void handleRetry()}
       state={state}
     />

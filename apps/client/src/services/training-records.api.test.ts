@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ZodError } from "zod"
 
-import { TrainingRecordNotFoundError } from "@/models/training-records"
+import {
+  TrainingRecordNotFoundError,
+  type TrainingRecordReferenceAnswerTarget,
+} from "@/models/training-records"
 
 import {
   getTargetedPracticeRecord,
   getTrainingRecordsOverview,
+  getTrainingRecordReferenceAnswerGenerationStatus,
   listTrainingRecords,
+  requestTrainingRecordReferenceAnswer,
 } from "./training-records"
 
 const recordId = "11111111-1111-4111-8111-111111111111"
@@ -112,6 +117,50 @@ function overviewResponse() {
     byKind: {
       targetedPractice: { recordCount: 1, completedRecordCount: 1, averageScore: 86 },
       mockInterview: { recordCount: 0, completedRecordCount: 0, averageScore: null },
+    },
+  }
+}
+
+function mainReferenceAnswerResponse(
+  status: "generating" | "revealed" = "generating",
+): Record<string, unknown> {
+  return {
+    target: {
+      kind: "targetedPractice",
+      recordId,
+      questionId: "33333333-3333-4333-8333-333333333333",
+      subject: "mainQuestion",
+    },
+    referenceAnswer:
+      status === "generating"
+        ? { status, content: null, viewedBeforeSubmission: false }
+        : {
+            status,
+            viewedBeforeSubmission: false,
+            content: {
+              kind: "technicalReference",
+              answer: "A reference answer.",
+              keyPoints: ["Context", "Trade-off"],
+              commonMistakes: ["No evidence"],
+              generatedAt: timestamp,
+            },
+          },
+  }
+}
+
+function followUpReferenceAnswerResponse(): Record<string, unknown> {
+  return {
+    target: {
+      kind: "targetedPractice",
+      recordId,
+      questionId: "33333333-3333-4333-8333-333333333333",
+      subject: "followUp",
+      followUpId: "55555555-5555-4555-8555-555555555555",
+    },
+    referenceAnswer: {
+      status: "generating",
+      content: null,
+      viewedBeforeSubmission: false,
     },
   }
 }
@@ -258,5 +307,110 @@ describe("targeted practice training record API service", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [], pagination: { page: 0 } }))
 
     await expect(listTrainingRecords({ page: 1, pageSize: 20 })).rejects.toBeInstanceOf(ZodError)
+  })
+
+  it("requests a main-question reference answer with the targeted practice body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(mainReferenceAnswerResponse()))
+    const target: Extract<
+      TrainingRecordReferenceAnswerTarget,
+      { kind: "targetedPractice"; subject: "mainQuestion" }
+    > = {
+      kind: "targetedPractice",
+      recordId,
+      questionId: "33333333-3333-4333-8333-333333333333",
+      subject: "mainQuestion",
+    }
+
+    await expect(requestTrainingRecordReferenceAnswer(target)).resolves.toMatchObject({
+      target,
+      referenceAnswer: { status: "generating" },
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `/api/training-records/practice/${recordId}/reference-answer`,
+    )
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      credentials: "include",
+      method: "POST",
+    })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      subject: "mainQuestion",
+      questionId: target.questionId,
+    })
+  })
+
+  it("requests a follow-up reference answer with followUpId", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(followUpReferenceAnswerResponse()))
+    const target: Extract<
+      TrainingRecordReferenceAnswerTarget,
+      { kind: "targetedPractice"; subject: "followUp" }
+    > = {
+      kind: "targetedPractice",
+      recordId,
+      questionId: "33333333-3333-4333-8333-333333333333",
+      subject: "followUp",
+      followUpId: "55555555-5555-4555-8555-555555555555",
+    }
+
+    await expect(requestTrainingRecordReferenceAnswer(target)).resolves.toMatchObject({
+      target,
+      referenceAnswer: { status: "generating" },
+    })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      subject: "followUp",
+      questionId: target.questionId,
+      followUpId: target.followUpId,
+    })
+  })
+
+  it("refreshes a targeted practice reference answer through the refresh endpoint", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(mainReferenceAnswerResponse("revealed")))
+    const target = {
+      kind: "targetedPractice" as const,
+      recordId,
+      questionId: "33333333-3333-4333-8333-333333333333",
+      subject: "mainQuestion" as const,
+    }
+
+    await expect(getTrainingRecordReferenceAnswerGenerationStatus(target)).resolves.toMatchObject({
+      target,
+      referenceAnswer: { status: "revealed" },
+    })
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `/api/training-records/practice/${recordId}/reference-answer/refresh`,
+    )
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      subject: "mainQuestion",
+      questionId: target.questionId,
+    })
+  })
+
+  it("rejects malformed reference-answer responses", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ target: { kind: "targetedPractice" } }))
+    const target = {
+      kind: "targetedPractice" as const,
+      recordId,
+      questionId: "33333333-3333-4333-8333-333333333333",
+      subject: "mainQuestion" as const,
+    }
+
+    await expect(requestTrainingRecordReferenceAnswer(target)).rejects.toBeInstanceOf(ZodError)
+  })
+
+  it("keeps real mock-interview reference answers unavailable without a request", async () => {
+    const target: Extract<TrainingRecordReferenceAnswerTarget, { kind: "mockInterview" }> = {
+      kind: "mockInterview",
+      recordId,
+      questionId: "33333333-3333-4333-8333-333333333333",
+      subject: "mainQuestion",
+    }
+
+    await expect(requestTrainingRecordReferenceAnswer(target)).rejects.toThrow(
+      "Real training records API is not implemented.",
+    )
+    await expect(getTrainingRecordReferenceAnswerGenerationStatus(target)).rejects.toThrow(
+      "Real training records API is not implemented.",
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

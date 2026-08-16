@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  targetedPracticeTrainingRecordReferenceAnswerResponseSchema,
   targetedPracticeTrainingRecordSummarySchema,
   trainingRecordsOverviewResponseSchema,
   trainingRecordsPageResponseSchema,
@@ -9,6 +10,8 @@ import {
 const recordId = "11111111-1111-4111-8111-111111111111"
 const roleId = "22222222-2222-4222-8222-222222222222"
 const timestamp = "2026-08-15T08:00:00Z"
+const questionId = "33333333-3333-4333-8333-333333333333"
+const followUpId = "44444444-4444-4444-8444-444444444444"
 
 function summary() {
   return {
@@ -57,6 +60,52 @@ function overview() {
     byKind: {
       targetedPractice: kind,
       mockInterview: { recordCount: 0, completedRecordCount: 0, averageScore: null },
+    },
+  }
+}
+
+function mainReferenceAnswerResponse() {
+  return {
+    target: {
+      kind: "targetedPractice" as const,
+      recordId,
+      questionId,
+      subject: "mainQuestion" as const,
+    },
+    referenceAnswer: {
+      status: "revealed" as const,
+      viewedBeforeSubmission: false,
+      content: {
+        kind: "technicalReference" as const,
+        answer: "A concise reference answer.",
+        keyPoints: ["Context", "Trade-off"],
+        commonMistakes: ["No evidence"],
+        generatedAt: timestamp,
+      },
+    },
+  }
+}
+
+function followUpReferenceAnswerResponse() {
+  return {
+    target: {
+      kind: "targetedPractice" as const,
+      recordId,
+      questionId,
+      subject: "followUp" as const,
+      followUpId,
+    },
+    referenceAnswer: {
+      status: "revealed" as const,
+      viewedBeforeSubmission: false,
+      content: {
+        kind: "personalizedSupplement" as const,
+        addressedGap: "Add outcome evidence.",
+        answer: "A concise follow-up reference answer.",
+        keyPoints: ["Impact", "Evidence"],
+        commonMistakes: ["Vague result"],
+        generatedAt: timestamp,
+      },
     },
   }
 }
@@ -127,6 +176,49 @@ describe("training record wire schemas", () => {
       targetedPracticeTrainingRecordSummarySchema.parse({
         ...summary(),
         kind: "mockInterview",
+      }),
+    ).toThrow()
+  })
+
+  it("parses main and follow-up reference-answer responses", () => {
+    expect(
+      targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse(
+        mainReferenceAnswerResponse(),
+      ),
+    ).toEqual(mainReferenceAnswerResponse())
+    expect(
+      targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse(
+        followUpReferenceAnswerResponse(),
+      ),
+    ).toEqual(followUpReferenceAnswerResponse())
+  })
+
+  it("requires the revealed reference schema to match the target subject", () => {
+    expect(() =>
+      targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse({
+        ...mainReferenceAnswerResponse(),
+        target: { ...mainReferenceAnswerResponse().target, subject: "followUp", followUpId },
+      }),
+    ).toThrow()
+    expect(() =>
+      targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse({
+        ...followUpReferenceAnswerResponse(),
+        target: { ...followUpReferenceAnswerResponse().target, subject: "mainQuestion" },
+      }),
+    ).toThrow()
+  })
+
+  it("rejects invalid UUIDs and extra fields in reference-answer responses", () => {
+    expect(() =>
+      targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse({
+        ...mainReferenceAnswerResponse(),
+        target: { ...mainReferenceAnswerResponse().target, questionId: "not-a-uuid" },
+      }),
+    ).toThrow()
+    expect(() =>
+      targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse({
+        ...followUpReferenceAnswerResponse(),
+        extra: true,
       }),
     ).toThrow()
   })

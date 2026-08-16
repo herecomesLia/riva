@@ -203,6 +203,52 @@ export const trainingRecordsOverviewResponseSchema = z
   })
   .strict()
 
+const targetedPracticeMainReferenceAnswerTargetSchema = z
+  .object({
+    kind: z.literal("targetedPractice"),
+    recordId: uuidSchema,
+    questionId: uuidSchema,
+    subject: z.literal("mainQuestion"),
+  })
+  .strict()
+
+const targetedPracticeFollowUpReferenceAnswerTargetSchema = z
+  .object({
+    kind: z.literal("targetedPractice"),
+    recordId: uuidSchema,
+    questionId: uuidSchema,
+    subject: z.literal("followUp"),
+    followUpId: uuidSchema,
+  })
+  .strict()
+
+export const targetedPracticeReferenceAnswerTargetSchema = z.discriminatedUnion("subject", [
+  targetedPracticeMainReferenceAnswerTargetSchema,
+  targetedPracticeFollowUpReferenceAnswerTargetSchema,
+])
+
+const targetedPracticeMainReferenceAnswerResponseSchema = z
+  .object({
+    target: targetedPracticeMainReferenceAnswerTargetSchema,
+    referenceAnswer: practiceMainReferenceAnswerStateSchema,
+  })
+  .strict()
+
+const targetedPracticeFollowUpReferenceAnswerResponseSchema = z
+  .object({
+    target: targetedPracticeFollowUpReferenceAnswerTargetSchema,
+    referenceAnswer: practiceFollowUpReferenceAnswerStateSchema,
+  })
+  .strict()
+
+export const targetedPracticeTrainingRecordReferenceAnswerResponseSchema = z.union([
+  targetedPracticeMainReferenceAnswerResponseSchema,
+  targetedPracticeFollowUpReferenceAnswerResponseSchema,
+])
+
+export const targetedPracticeReferenceAnswerResponseSchema =
+  targetedPracticeTrainingRecordReferenceAnswerResponseSchema
+
 export type TargetedPracticeTrainingRecordSummaryWire = z.infer<
   typeof targetedPracticeTrainingRecordSummarySchema
 >
@@ -210,6 +256,9 @@ export type TrainingRecordsPaginationWire = z.infer<typeof trainingRecordsPagina
 export type TrainingRecordsPageWire = z.infer<typeof trainingRecordsPageResponseSchema>
 export type TrainingRecordKindOverviewWire = z.infer<typeof trainingRecordKindOverviewSchema>
 export type TrainingRecordsOverviewWire = z.infer<typeof trainingRecordsOverviewResponseSchema>
+export type TargetedPracticeTrainingRecordReferenceAnswerWire = z.infer<
+  typeof targetedPracticeTrainingRecordReferenceAnswerResponseSchema
+>
 
 // Record-specific wire names keep the boundary discoverable without duplicating schemas.
 export const trainingRecordTargetRoleSchema = targetedPracticeTrainingRecordTargetRoleSchema

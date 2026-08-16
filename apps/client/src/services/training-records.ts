@@ -12,6 +12,7 @@ import type {
 } from "@/models/training-records"
 import {
   targetedPracticeTrainingRecordDetailResponseSchema,
+  targetedPracticeTrainingRecordReferenceAnswerResponseSchema,
   trainingRecordsOverviewResponseSchema,
   trainingRecordsPageResponseSchema,
 } from "@/schemas/training-records"
@@ -24,6 +25,35 @@ import {
 
 async function realApiUnavailable(): Promise<never> {
   throw new Error("Real training records API is not implemented.")
+}
+
+type TargetedPracticeReferenceAnswerTarget = Extract<
+  TrainingRecordReferenceAnswerTarget,
+  { kind: "targetedPractice" }
+>
+
+async function requestTargetedPracticeReferenceAnswer(
+  target: TargetedPracticeReferenceAnswerTarget,
+  pathSuffix = "",
+): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
+  const body =
+    target.subject === "mainQuestion"
+      ? {
+          subject: target.subject,
+          questionId: target.questionId,
+        }
+      : {
+          subject: target.subject,
+          questionId: target.questionId,
+          followUpId: target.followUpId,
+        }
+  const wire = targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse(
+    await apiRequest<unknown>(
+      `/training-records/practice/${encodeURIComponent(target.recordId)}/reference-answer${pathSuffix}`,
+      { method: "POST", json: body },
+    ),
+  )
+  return wire
 }
 
 export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverviewResponse> {
@@ -84,15 +114,17 @@ export async function getMockInterviewRecord(
 export async function requestTrainingRecordReferenceAnswer(
   target: TrainingRecordReferenceAnswerTarget,
 ): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
-  return env.mock
-    ? trainingRecordsMockService.requestTrainingRecordReferenceAnswer(target)
-    : realApiUnavailable()
+  if (env.mock) return trainingRecordsMockService.requestTrainingRecordReferenceAnswer(target)
+  if (target.kind !== "targetedPractice") return realApiUnavailable()
+  return requestTargetedPracticeReferenceAnswer(target)
 }
 
 export async function getTrainingRecordReferenceAnswerGenerationStatus(
   target: TrainingRecordReferenceAnswerTarget,
 ): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
-  return env.mock
-    ? trainingRecordsMockService.getTrainingRecordReferenceAnswerGenerationStatus(target)
-    : realApiUnavailable()
+  if (env.mock) {
+    return trainingRecordsMockService.getTrainingRecordReferenceAnswerGenerationStatus(target)
+  }
+  if (target.kind !== "targetedPractice") return realApiUnavailable()
+  return requestTargetedPracticeReferenceAnswer(target, "/refresh")
 }
