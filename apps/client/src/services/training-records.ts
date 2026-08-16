@@ -10,22 +10,49 @@ import type {
   TrainingRecordReferenceAnswerGenerationResponse,
   TrainingRecordReferenceAnswerTarget,
 } from "@/models/training-records"
-import { targetedPracticeTrainingRecordDetailResponseSchema } from "@/schemas/training-records"
+import {
+  targetedPracticeTrainingRecordDetailResponseSchema,
+  trainingRecordsOverviewResponseSchema,
+  trainingRecordsPageResponseSchema,
+} from "@/schemas/training-records"
 import { apiRequest, ApiError } from "@/services/api"
-import { adaptTargetedPracticeRecord } from "@/services/training-records-adapter"
+import {
+  adaptTargetedPracticeRecord,
+  adaptTrainingRecordsOverview,
+  adaptTrainingRecordsPage,
+} from "@/services/training-records-adapter"
 
 async function realApiUnavailable(): Promise<never> {
   throw new Error("Real training records API is not implemented.")
 }
 
 export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverviewResponse> {
-  return env.mock ? trainingRecordsMockService.getTrainingRecordsOverview() : realApiUnavailable()
+  if (env.mock) return trainingRecordsMockService.getTrainingRecordsOverview()
+
+  const wire = trainingRecordsOverviewResponseSchema.parse(
+    await apiRequest<unknown>("/training-records/overview", { method: "GET" }),
+  )
+  return adaptTrainingRecordsOverview(wire)
 }
 
 export async function listTrainingRecords(
   input: ListTrainingRecordsInput,
 ): Promise<TrainingRecordsPageResponse> {
-  return env.mock ? trainingRecordsMockService.listTrainingRecords(input) : realApiUnavailable()
+  if (env.mock) return trainingRecordsMockService.listTrainingRecords(input)
+
+  const query = new URLSearchParams()
+  for (const kind of input.kinds ?? []) query.append("kinds", kind)
+  for (const status of input.statuses ?? []) query.append("statuses", status)
+  if (input.targetRoleId !== undefined) query.set("targetRoleId", input.targetRoleId)
+  if (input.startedAtFrom !== undefined) query.set("startedAtFrom", input.startedAtFrom)
+  if (input.startedAtTo !== undefined) query.set("startedAtTo", input.startedAtTo)
+  query.set("page", String(input.page))
+  query.set("pageSize", String(input.pageSize))
+
+  const wire = trainingRecordsPageResponseSchema.parse(
+    await apiRequest<unknown>(`/training-records?${query.toString()}`, { method: "GET" }),
+  )
+  return adaptTrainingRecordsPage(wire)
 }
 
 export async function getTargetedPracticeRecord(

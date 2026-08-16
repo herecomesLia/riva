@@ -143,6 +143,74 @@ export type TargetedPracticeTrainingRecordDetailWire = z.infer<
 
 export const targetedPracticeRecordWireSchema = targetedPracticeTrainingRecordDetailResponseSchema
 
+export const targetedPracticeTrainingRecordSummarySchema = z
+  .object({
+    recordId: uuidSchema,
+    kind: z.literal("targetedPractice"),
+    language: interactionLanguageSchema,
+    status: z.enum(["completed", "endedEarly", "partiallyCompleted"]),
+    startedAt: dateTimeSchema,
+    endedAt: dateTimeSchema,
+    durationSeconds: z.number().int().nonnegative(),
+    targetRole: targetedPracticeTrainingRecordTargetRoleSchema,
+    answeredQuestionCount: z.number().int().nonnegative(),
+    totalQuestionCount: z.number().int().nonnegative(),
+    overallScore: z.number().min(0).max(100).nullable(),
+    reviewSummary: z.string().nullable(),
+    questionType: practiceQuestionTypeSchema,
+    difficulty: practiceDifficultySchema,
+  })
+  .strict()
+
+export const trainingRecordsPaginationSchema = z
+  .object({
+    page: z.number().int().min(1),
+    pageSize: z.number().int().min(1).max(100),
+    totalItems: z.number().int().nonnegative(),
+    totalPages: z.number().int().nonnegative(),
+  })
+  .strict()
+
+export const trainingRecordsPageResponseSchema = z
+  .object({
+    items: z.array(targetedPracticeTrainingRecordSummarySchema),
+    pagination: trainingRecordsPaginationSchema,
+  })
+  .strict()
+
+export const trainingRecordKindOverviewSchema = z
+  .object({
+    recordCount: z.number().int().nonnegative(),
+    completedRecordCount: z.number().int().nonnegative(),
+    averageScore: z.number().min(0).max(100).nullable(),
+  })
+  .strict()
+
+export const trainingRecordsOverviewResponseSchema = z
+  .object({
+    totalRecordCount: z.number().int().nonnegative(),
+    completedRecordCount: z.number().int().nonnegative(),
+    totalDurationSeconds: z.number().int().nonnegative(),
+    answeredQuestionCount: z.number().int().nonnegative(),
+    averageScore: z.number().min(0).max(100).nullable(),
+    targetRoles: z.array(targetedPracticeTrainingRecordTargetRoleSchema),
+    byKind: z
+      .object({
+        targetedPractice: trainingRecordKindOverviewSchema,
+        mockInterview: trainingRecordKindOverviewSchema,
+      })
+      .strict(),
+  })
+  .strict()
+
+export type TargetedPracticeTrainingRecordSummaryWire = z.infer<
+  typeof targetedPracticeTrainingRecordSummarySchema
+>
+export type TrainingRecordsPaginationWire = z.infer<typeof trainingRecordsPaginationSchema>
+export type TrainingRecordsPageWire = z.infer<typeof trainingRecordsPageResponseSchema>
+export type TrainingRecordKindOverviewWire = z.infer<typeof trainingRecordKindOverviewSchema>
+export type TrainingRecordsOverviewWire = z.infer<typeof trainingRecordsOverviewResponseSchema>
+
 // Record-specific wire names keep the boundary discoverable without duplicating schemas.
 export const trainingRecordTargetRoleSchema = targetedPracticeTrainingRecordTargetRoleSchema
 export const targetedPracticeSetupWireSchema = targetedPracticeTrainingRecordSetupSchema

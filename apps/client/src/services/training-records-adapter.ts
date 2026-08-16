@@ -1,10 +1,13 @@
 import type {
+  TargetedPracticeRecordSummary,
   TargetedPracticeRecordDetailResponse,
   TargetedPracticeQuestion,
   TrainingRecordAnswer,
   TrainingRecordEvaluation,
   TrainingRecordRecommendation,
   TrainingRecordReview,
+  TrainingRecordsOverviewResponse,
+  TrainingRecordsPageResponse,
 } from "@/models/training-records"
 import type {
   TargetedPracticeTrainingRecordAttemptWire,
@@ -12,7 +15,78 @@ import type {
   TargetedPracticeTrainingRecordEvaluationWire,
   TargetedPracticeTrainingRecordFollowUpWire,
   TargetedPracticeTrainingRecordReviewWire,
+  TargetedPracticeTrainingRecordSummaryWire,
+  TrainingRecordsOverviewWire,
+  TrainingRecordsPageWire,
 } from "@/schemas/training-records"
+
+export function adaptTrainingRecordSummary(
+  wire: TargetedPracticeTrainingRecordSummaryWire,
+): TargetedPracticeRecordSummary {
+  return {
+    id: wire.recordId,
+    kind: "targetedPractice",
+    language: wire.language,
+    status: wire.status,
+    startedAt: wire.startedAt,
+    endedAt: wire.endedAt,
+    durationSeconds: wire.durationSeconds,
+    targetRole: {
+      id: wire.targetRole.id,
+      title: wire.targetRole.title,
+      company: wire.targetRole.company,
+    },
+    answeredQuestionCount: wire.answeredQuestionCount,
+    totalQuestionCount: wire.totalQuestionCount,
+    overallScore: wire.overallScore,
+    reviewSummary: wire.reviewSummary,
+    questionType: wire.questionType,
+    difficulty: wire.difficulty,
+  }
+}
+
+export function adaptTrainingRecordsPage(
+  wire: TrainingRecordsPageWire,
+): TrainingRecordsPageResponse {
+  return {
+    items: wire.items.map(adaptTrainingRecordSummary),
+    pagination: {
+      page: wire.pagination.page,
+      pageSize: wire.pagination.pageSize,
+      totalItems: wire.pagination.totalItems,
+      totalPages: wire.pagination.totalPages,
+    },
+  }
+}
+
+export function adaptTrainingRecordsOverview(
+  wire: TrainingRecordsOverviewWire,
+): TrainingRecordsOverviewResponse {
+  return {
+    totalRecordCount: wire.totalRecordCount,
+    completedRecordCount: wire.completedRecordCount,
+    totalDurationSeconds: wire.totalDurationSeconds,
+    answeredQuestionCount: wire.answeredQuestionCount,
+    averageScore: wire.averageScore,
+    targetRoles: wire.targetRoles.map((role) => ({
+      id: role.id,
+      title: role.title,
+      company: role.company,
+    })),
+    byKind: {
+      targetedPractice: {
+        recordCount: wire.byKind.targetedPractice.recordCount,
+        completedRecordCount: wire.byKind.targetedPractice.completedRecordCount,
+        averageScore: wire.byKind.targetedPractice.averageScore,
+      },
+      mockInterview: {
+        recordCount: wire.byKind.mockInterview.recordCount,
+        completedRecordCount: wire.byKind.mockInterview.completedRecordCount,
+        averageScore: wire.byKind.mockInterview.averageScore,
+      },
+    },
+  }
+}
 
 function adaptAnswer(answer: {
   id: string
