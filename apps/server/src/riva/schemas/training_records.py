@@ -62,6 +62,38 @@ class TrainingRecordTargetRoleResponse(TrainingRecordAPIModel):
     company: Company
 
 
+class TargetedPracticeTrainingRecordSummaryResponse(TrainingRecordAPIModel):
+    record_id: StandardUUID
+    kind: Literal[TrainingRecordKind.TARGETED_PRACTICE]
+    language: InteractionLanguage
+    status: TrainingRecordStatus
+    started_at: datetime
+    ended_at: datetime
+    duration_seconds: Annotated[int, Field(ge=0)]
+    target_role: TrainingRecordTargetRoleResponse
+    answered_question_count: Annotated[int, Field(ge=0)]
+    total_question_count: Annotated[int, Field(ge=0)]
+    overall_score: float | None = Field(default=None, ge=0, le=100)
+    review_summary: str | None
+    question_type: QuestionCardQuestionType
+    difficulty: QuestionCardDifficulty
+
+    _validate_started_at = field_validator("started_at")(_validate_aware_timestamp)
+    _validate_ended_at = field_validator("ended_at")(_validate_aware_timestamp)
+
+
+class TrainingRecordsPaginationResponse(TrainingRecordAPIModel):
+    page: Annotated[int, Field(ge=1)]
+    page_size: Annotated[int, Field(ge=1, le=100)]
+    total_items: Annotated[int, Field(ge=0)]
+    total_pages: Annotated[int, Field(ge=0)]
+
+
+class TrainingRecordsPageResponse(TrainingRecordAPIModel):
+    items: list[TargetedPracticeTrainingRecordSummaryResponse]
+    pagination: TrainingRecordsPaginationResponse
+
+
 class TargetedPracticeSetupResponse(TrainingRecordAPIModel):
     source: PracticeQuestionSource
     prioritize_weaknesses: bool
@@ -183,10 +215,12 @@ class TargetedPracticeTrainingRecordDetailResponse(TrainingRecordAPIModel):
 # a second wire contract for the same projections.
 TrainingRecordQuestionResponse = TargetedPracticeQuestionRecordResponse
 TrainingRecordAttemptResponse = TargetedPracticeAttemptRecordResponse
+TrainingRecordSummaryResponse = TargetedPracticeTrainingRecordSummaryResponse
 
 __all__ = [
     "TargetedPracticeAttemptRecordResponse",
     "TargetedPracticeQuestionRecordResponse",
+    "TargetedPracticeTrainingRecordSummaryResponse",
     "TargetedPracticeSetupResponse",
     "TargetedPracticeTrainingRecordDetailResponse",
     "TrainingRecordAPIModel",
@@ -196,6 +230,9 @@ __all__ = [
     "TrainingRecordKind",
     "TrainingRecordQuestionResponse",
     "TrainingRecordReviewResponse",
+    "TrainingRecordSummaryResponse",
     "TrainingRecordStatus",
     "TrainingRecordTargetRoleResponse",
+    "TrainingRecordsPageResponse",
+    "TrainingRecordsPaginationResponse",
 ]

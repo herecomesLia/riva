@@ -8,6 +8,7 @@ from riva.core.training_records import get_training_record_service
 from riva.models import User
 from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordDetailResponse,
+    TrainingRecordsPageResponse,
 )
 from riva.services.training_records import (
     TRAINING_RECORD_NOT_FOUND,
@@ -85,17 +86,40 @@ def record_response() -> TargetedPracticeTrainingRecordDetailResponse:
     )
 
 
+def page_response() -> TrainingRecordsPageResponse:
+    return TrainingRecordsPageResponse(
+        items=[],
+        pagination={
+            "page": 2,
+            "pageSize": 10,
+            "totalItems": 0,
+            "totalPages": 0,
+        },
+    )
+
+
 class FakeTrainingRecordService:
-    def __init__(self, result=None, error: str | None = None) -> None:
+    def __init__(
+        self,
+        result=None,
+        error: str | None = None,
+        list_result: TrainingRecordsPageResponse | None = None,
+    ) -> None:
         self.result = result or record_response()
         self.error = error
         self.calls: list[tuple[UUID, UUID]] = []
+        self.list_result = list_result or page_response()
+        self.list_calls: list[dict[str, object]] = []
 
     async def get_targeted_practice_record(self, *, user_id: UUID, record_id: UUID):
         self.calls.append((user_id, record_id))
         if self.error is not None:
             raise TrainingRecordStateError(self.error)  # type: ignore[arg-type]
         return self.result
+
+    async def list_training_records(self, **kwargs: object):
+        self.list_calls.append(kwargs)
+        return self.list_result
 
 
 def client_for(app, service: FakeTrainingRecordService) -> tuple[TestClient, User]:
@@ -169,3 +193,71 @@ def test_get_targeted_practice_record_openapi_declares_response_model(app) -> No
     assert operation["responses"]["200"]["content"]["application/json"]["schema"][
         "$ref"
     ].endswith("TargetedPracticeTrainingRecordDetailResponse")
+
+
+def test_list_training_records_forwards_repeated_filters_and_camel_case_queries(app) -> None:
+    service = FakeTrainingRecordService()
+    client, user = client_for(app, service)
+
+    with client:
+        response = client.get(
+            "/api/training-records",
+            params=[
+                ("kinds", "targetedPractice"),
+                ("kinds", "mockInterview"),
+                ("statuses", "partiallyCompleted"),
+                ("targetRoleId", str(ROLE_ID)),
+                ("startedAtFrom", NOW.isoformat()),
+                ("startedAtTo", NOW.isoformat()),
+                ("page", "2"),
+                ("pageSize", "10"),
+            ],
+        )
+
+    assert response.status_code == 200
+    assert response.json()["pagination"] == {
+        "page": 2,
+        "pageSize": 10,
+        "totalItems": 0,
+        "totalPages": 0,
+    }
+    assert service.list_calls == [
+        {
+            "user_id": user.id,
+            "kinds": ["targetedPractice", "mockInterview"],
+            "statuses": ["partiallyCompleted"],
+            "target_role_id": ROLE_ID,
+            "started_at_from": NOW,
+            "started_at_to": NOW,
+            "page": 2,
+            "page_size": 10,
+        }
+    ]
+
+
+def test_list_training_records_accepts_mock_interview_filter(app) -> None:
+    service = FakeTrainingRecordService()
+    client, _user = client_for(app, service)
+
+    with client:
+        response = client.get(
+            "/api/training-records",
+            params={"kinds": "mockInterview"},
+        )
+
+    assert response.status_code == 200
+    assert service.list_calls[0]["kinds"] == ["mockInterview"]
+
+
+def test_list_training_records_validates_page_size(app) -> None:
+    service = FakeTrainingRecordService()
+    client, _user = client_for(app, service)
+
+    with client:
+        response = client.get(
+            "/api/training-records",
+            params={"pageSize": 101},
+        )
+
+    assert response.status_code == 422
+    assert service.list_calls == []

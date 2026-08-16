@@ -14,8 +14,10 @@ from riva.schemas.training_records import (
     TargetedPracticeQuestionRecordResponse,
     TargetedPracticeSetupResponse,
     TargetedPracticeTrainingRecordDetailResponse,
+    TargetedPracticeTrainingRecordSummaryResponse,
     TrainingRecordKind,
     TrainingRecordStatus,
+    TrainingRecordsPageResponse,
     TrainingRecordTargetRoleResponse,
 )
 
@@ -138,3 +140,45 @@ def test_training_record_models_forbid_unknown_fields() -> None:
             company="Riva",
             current_title="must not be accepted",
         )
+
+
+def test_training_record_summary_and_page_use_wire_aliases() -> None:
+    summary = TargetedPracticeTrainingRecordSummaryResponse(
+        record_id=uuid4(),
+        kind="targetedPractice",
+        language="en",
+        status="partiallyCompleted",
+        started_at=datetime(2026, 8, 15, 9, 0, tzinfo=UTC),
+        ended_at=datetime(2026, 8, 15, 9, 2, tzinfo=UTC),
+        duration_seconds=120,
+        target_role=TrainingRecordTargetRoleResponse(
+            id=uuid4(),
+            title="Backend Engineer",
+            company="Riva",
+        ),
+        answered_question_count=1,
+        total_question_count=2,
+        overall_score=81.5,
+        review_summary="Needs more evidence.",
+        question_type="behavioral",
+        difficulty="basic",
+    )
+    page = TrainingRecordsPageResponse(
+        items=[summary],
+        pagination={
+            "page": 1,
+            "pageSize": 10,
+            "totalItems": 1,
+            "totalPages": 1,
+        },
+    )
+
+    payload = page.model_dump(mode="json", by_alias=True)
+    assert payload["items"][0]["recordId"] == str(summary.record_id)
+    assert payload["items"][0]["answeredQuestionCount"] == 1
+    assert payload["pagination"] == {
+        "page": 1,
+        "pageSize": 10,
+        "totalItems": 1,
+        "totalPages": 1,
+    }

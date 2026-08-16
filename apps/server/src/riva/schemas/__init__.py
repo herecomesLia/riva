@@ -154,6 +154,7 @@ from riva.schemas.practice_reference_answer import (
 from riva.schemas.training_records import (
     TargetedPracticeAttemptRecordResponse,
     TargetedPracticeQuestionRecordResponse,
+    TargetedPracticeTrainingRecordSummaryResponse,
     TargetedPracticeSetupResponse,
     TargetedPracticeTrainingRecordDetailResponse,
     TrainingRecordAPIModel,
@@ -163,8 +164,11 @@ from riva.schemas.training_records import (
     TrainingRecordKind,
     TrainingRecordQuestionResponse,
     TrainingRecordReviewResponse,
+    TrainingRecordSummaryResponse,
     TrainingRecordStatus,
     TrainingRecordTargetRoleResponse,
+    TrainingRecordsPageResponse,
+    TrainingRecordsPaginationResponse,
 )
 from riva.schemas.resume_documents import (
     FailedResumeDocumentResponse,

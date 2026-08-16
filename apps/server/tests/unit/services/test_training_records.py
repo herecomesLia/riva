@@ -34,6 +34,7 @@ from riva.services.training_records import (
     TrainingRecordService,
     TrainingRecordStateError,
 )
+from riva.schemas.training_records import TrainingRecordKind
 
 
 NOW = datetime(2026, 8, 15, 9, 0, tzinfo=UTC)
@@ -279,6 +280,96 @@ def service(context, reference: FakeReferenceAnswerService):
         ),
         reference_answer_generation_service_factory=lambda _session: reference,
     )
+
+
+class FakeListResult:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+
+    def mappings(self):
+        return iter(self.rows)
+
+
+class FakeListSession:
+    def __init__(self, rows: list[dict[str, object]], total_items: int) -> None:
+        self.rows = rows
+        self.total_items = total_items
+        self.scalar_calls: list[object] = []
+        self.execute_calls: list[object] = []
+
+    async def scalar(self, statement: object) -> int:
+        self.scalar_calls.append(statement)
+        return self.total_items
+
+    async def execute(self, statement: object) -> FakeListResult:
+        self.execute_calls.append(statement)
+        return FakeListResult(self.rows)
+
+
+def test_list_training_records_projects_summary_and_rounds_average_score() -> None:
+    record_id = uuid4()
+    role_id = uuid4()
+    started_at = NOW
+    ended_at = NOW + timedelta(seconds=61, microseconds=900_000)
+    fake_session = FakeListSession(
+        rows=[
+            {
+                "record_id": record_id,
+                "language": "en",
+                "started_at": started_at,
+                "ended_at": ended_at,
+                "question_type": "behavioral",
+                "difficulty": "basic",
+                "target_role_id": role_id,
+                "target_role_title": "Backend Engineer",
+                "target_role_company": "Riva",
+                "answered_question_count": 1,
+                "total_question_count": 2,
+                "overall_score": 81.25,
+                "review_summary": "Needs more evidence.",
+                "record_status": "partiallyCompleted",
+            }
+        ],
+        total_items=3,
+    )
+
+    result = asyncio.run(
+        TrainingRecordService(fake_session).list_training_records(
+            user_id=uuid4(),
+            page=2,
+            page_size=2,
+        )
+    )
+
+    assert result.items[0].record_id == record_id
+    assert result.items[0].duration_seconds == 61
+    assert result.items[0].overall_score == 81.3
+    assert result.items[0].review_summary == "Needs more evidence."
+    assert result.pagination.model_dump() == {
+        "page": 2,
+        "pageSize": 2,
+        "totalItems": 3,
+        "totalPages": 2,
+    }
+    assert len(fake_session.scalar_calls) == 1
+    assert len(fake_session.execute_calls) == 1
+
+
+def test_list_training_records_mock_only_filter_is_an_empty_page() -> None:
+    fake_session = FakeListSession(rows=[], total_items=99)
+
+    result = asyncio.run(
+        TrainingRecordService(fake_session).list_training_records(
+            user_id=uuid4(),
+            kinds=[TrainingRecordKind.MOCK_INTERVIEW],
+        )
+    )
+
+    assert result.items == []
+    assert result.pagination.total_items == 0
+    assert result.pagination.total_pages == 0
+    assert fake_session.scalar_calls == []
+    assert fake_session.execute_calls == []
 
 
 def completed_session(owner_id: UUID, session_id: UUID) -> PracticeSession:
