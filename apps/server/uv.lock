@@ -858,7 +858,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = ">=1.18.4" },
+    { name = "alembic", specifier = ">=1.19.1,<1.20" },
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "asgi-correlation-id", specifier = ">=5.0.1" },
     { name = "asyncpg", specifier = ">=0.31.0" },

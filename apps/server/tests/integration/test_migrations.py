@@ -10,7 +10,7 @@ from tests.helpers.integration_database import get_integration_database_url
 
 pytestmark = pytest.mark.integration
 
-INITIAL_REVISION = "202608160001"
+HEAD_REVISION = "202608160002"
 
 
 async def _clear_database(database_url: str) -> None:
@@ -51,7 +51,7 @@ def test_migrations_build_and_rebuild_the_current_schema() -> None:
     try:
         migrations.upgrade(database_url)
         migrations.current(database_url)
-        assert asyncio.run(_current_revision(database_url)) == INITIAL_REVISION
+        assert asyncio.run(_current_revision(database_url)) == HEAD_REVISION
         migrations.check(database_url)
 
         migrations.downgrade(database_url, "base")
@@ -60,7 +60,7 @@ def test_migrations_build_and_rebuild_the_current_schema() -> None:
         assert "practice_sessions" not in tables_after_downgrade
 
         migrations.upgrade(database_url)
-        assert asyncio.run(_current_revision(database_url)) == INITIAL_REVISION
+        assert asyncio.run(_current_revision(database_url)) == HEAD_REVISION
 
         asyncio.run(_clear_database(database_url))
         asyncio.run(_create_legacy_database(database_url))
@@ -68,7 +68,7 @@ def test_migrations_build_and_rebuild_the_current_schema() -> None:
 
         migrations.stamp(database_url)
         migrations.current(database_url)
-        assert asyncio.run(_current_revision(database_url)) == INITIAL_REVISION
+        assert asyncio.run(_current_revision(database_url)) == HEAD_REVISION
         tables_after_stamp = asyncio.run(_table_names(database_url))
         assert tables_after_stamp == tables_before_stamp | {"alembic_version"}
         migrations.check(database_url)

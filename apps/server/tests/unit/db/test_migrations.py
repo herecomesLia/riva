@@ -1,6 +1,10 @@
 from collections.abc import Callable
+from contextlib import redirect_stdout
+from io import StringIO
 
 import pytest
+from alembic import command
+from alembic.runtime.environment import EnvironmentContext
 
 from riva.db import migrations
 
@@ -71,3 +75,29 @@ def test_revision_forwards_message_and_autogenerate(monkeypatch) -> None:
     assert calls[0][2] == {"message": "add interview tables", "autogenerate": True}
     assert calls[1][1] == ()
     assert calls[1][2] == {"message": "manual marker", "autogenerate": False}
+
+
+def test_offline_migration_context_excludes_checkconstraint_byname(monkeypatch) -> None:
+    configure_calls: list[dict[str, object]] = []
+    original_configure = EnvironmentContext.configure
+
+    def configure_spy(self, *args: object, **kwargs: object) -> None:
+        configure_calls.append(kwargs.copy())
+        original_configure(self, *args, **kwargs)
+
+    monkeypatch.setattr(EnvironmentContext, "configure", configure_spy)
+    with redirect_stdout(StringIO()):
+        command.upgrade(
+            migrations.create_config(DATABASE_URL),
+            "head",
+            sql=True,
+        )
+
+    assert len(configure_calls) == 1
+    assert configure_calls[0]["target_metadata"] is not None
+    assert configure_calls[0]["compare_type"] is True
+    assert configure_calls[0]["compare_server_default"] is True
+    assert configure_calls[0]["autogenerate_plugins"] == [
+        "alembic.autogenerate.*",
+        "~alembic.autogenerate.checkconstraint_byname",
+    ]

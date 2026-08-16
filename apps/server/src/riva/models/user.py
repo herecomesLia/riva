@@ -12,6 +12,7 @@ from riva.utils import utc_now
 if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
     from riva.models.auth import AuthSession
+    from riva.models.interviews import InterviewSession
     from riva.models.profile import CareerProfile
     from riva.models.practice_sessions import PracticeSession
     from riva.models.question_cards import QuestionCard
@@ -83,6 +84,12 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         foreign_keys="PracticeSession.user_id",
+        passive_deletes=True,
+    )
+    interview_sessions: Mapped[list[InterviewSession]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="InterviewSession.user_id",
         passive_deletes=True,
     )
     current_target_role: Mapped[CurrentTargetRole | None] = relationship(
