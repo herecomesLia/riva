@@ -3,13 +3,20 @@ from riva.schemas.auth import AuthCredentials, UserResponse
 from riva.schemas.health import HealthResponse
 from riva.schemas.health import DependencyHealthStatus, ServiceHealthStatus
 from riva.schemas.interview import (
+    InterviewAwaitingQuestionResponse,
+    BeginInterviewQuestionsRequest,
     InterviewConfiguration,
     InterviewDefaultConfiguration,
     InterviewDifficulty,
     InterviewDurationMinutes,
+    InterviewGenerationStatus,
+    InterviewGeneratingQuestionSessionResponse,
     InterviewOpeningSessionResponse,
     InterviewPageResponse,
     InterviewProgressResponse,
+    InterviewQuestionResponse,
+    InterviewQuestionSessionResponse,
+    InterviewQuestionType,
     InterviewRound,
     InterviewSessionStatus,
     InterviewSetupAvailabilityResponse,
@@ -19,6 +26,23 @@ from riva.schemas.interview import (
     InterviewSetupResponse,
     InterviewTargetRoleResponse,
     StartInterviewRequest,
+)
+from riva.schemas.interview_planning import (
+    InterviewCareerProfileSnapshot,
+    InterviewJobDescriptionAnalysisSnapshot,
+    InterviewMatchingAnalysisSnapshot,
+    InterviewPlanInput,
+    InterviewPlanOutput,
+    InterviewPlanQuestion,
+    InterviewPlanningInput,
+    InterviewPlanningModel,
+    InterviewPlanningOutput,
+    InterviewPlanningQuestion,
+    InterviewPlanningRunPayload,
+    InterviewPlanningSessionSnapshot,
+    InterviewTargetRoleSnapshot,
+    QUESTION_COUNT_RANGES,
+    validate_interview_plan_for_duration,
 )
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,

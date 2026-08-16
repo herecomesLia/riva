@@ -10,6 +10,7 @@ import structlog
 
 from riva.agents import (
     FollowUpAgent,
+    InterviewPlanningAgent,
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
     PracticeEvaluationAgent,
@@ -31,6 +32,7 @@ from riva.services.question_generation_prompt_versions import (
 )
 from riva.workers.handlers import AgentHandlerRegistry
 from riva.workers.follow_up import FollowUpHandler
+from riva.workers.interview_planning import InterviewPlanningHandler
 from riva.workers.job_description_parsing import (
     JobDescriptionParsingHandler,
 )
@@ -54,6 +56,8 @@ QuestionGenerationAgentFactory = Callable[..., QuestionGenerationAgent]
 QuestionGenerationHandlerFactory = Callable[..., QuestionGenerationHandler]
 FollowUpAgentFactory = Callable[..., FollowUpAgent]
 FollowUpHandlerFactory = Callable[..., FollowUpHandler]
+InterviewPlanningAgentFactory = Callable[..., InterviewPlanningAgent]
+InterviewPlanningHandlerFactory = Callable[..., InterviewPlanningHandler]
 PracticeEvaluationAgentFactory = Callable[..., PracticeEvaluationAgent]
 PracticeEvaluationHandlerFactory = Callable[..., PracticeEvaluationHandler]
 PracticeRecommendationAgentFactory = Callable[..., PracticeRecommendationAgent]
@@ -94,6 +98,12 @@ def build_agent_handler_registry(
     ),
     follow_up_agent_factory: FollowUpAgentFactory = FollowUpAgent,
     follow_up_handler_factory: FollowUpHandlerFactory = FollowUpHandler,
+    interview_planning_agent_factory: InterviewPlanningAgentFactory = (
+        InterviewPlanningAgent
+    ),
+    interview_planning_handler_factory: InterviewPlanningHandlerFactory = (
+        InterviewPlanningHandler
+    ),
     practice_evaluation_agent_factory: PracticeEvaluationAgentFactory = (
         PracticeEvaluationAgent
     ),
@@ -165,6 +175,14 @@ def build_agent_handler_registry(
         session_factory=session_factory,
         agent=follow_up_agent,
     )
+    interview_planning_agent = interview_planning_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    interview_planning_handler = interview_planning_handler_factory(
+        session_factory=session_factory,
+        agent=interview_planning_agent,
+    )
     practice_evaluation_agent = practice_evaluation_agent_factory(
         provider=provider,
         model=model,
@@ -211,6 +229,7 @@ def build_agent_handler_registry(
     registry.register(matching_handler)
     registry.register(question_generation_handler)
     registry.register(follow_up_handler)
+    registry.register(interview_planning_handler)
     registry.register(practice_evaluation_handler)
     registry.register(practice_recommendation_handler)
     registry.register(practice_review_handler)

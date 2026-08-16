@@ -141,7 +141,10 @@ class InterviewSessionService:
         user_id: UUID,
     ) -> InterviewSession | None:
         return await self.session.scalar(
-            select(InterviewSession)
+            select(InterviewSession).options(
+                selectinload(InterviewSession.planning_run),
+                selectinload(InterviewSession.questions),
+            )
             .where(
                 InterviewSession.user_id == user_id,
                 InterviewSession.status != "completed",

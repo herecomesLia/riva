@@ -9,6 +9,7 @@ from riva.prompts.base import (
 from riva.prompts.follow_up import FOLLOW_UP_PROMPT
 from riva.prompts.job_description_parsing import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.prompts.matching_analysis import MATCHING_ANALYSIS_PROMPT
+from riva.prompts.interview_planning import INTERVIEW_PLANNING_PROMPT
 from riva.prompts.practice_evaluation import PRACTICE_EVALUATION_PROMPT
 from riva.prompts.practice_review import PRACTICE_REVIEW_PROMPT
 from riva.prompts.practice_recommendation import PRACTICE_RECOMMENDATION_PROMPT
@@ -26,6 +27,7 @@ __all__ = [
     "FOLLOW_UP_PROMPT",
     "JOB_DESCRIPTION_PARSING_PROMPT",
     "MATCHING_ANALYSIS_PROMPT",
+    "INTERVIEW_PLANNING_PROMPT",
     "PRACTICE_EVALUATION_PROMPT",
     "PRACTICE_REVIEW_PROMPT",
     "PRACTICE_RECOMMENDATION_PROMPT",

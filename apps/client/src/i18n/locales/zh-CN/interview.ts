@@ -69,6 +69,12 @@ export const interview = {
       title: "面试开场",
       description: "准备好后进入连续问答。过程中不会展示逐题评分或参考答案。",
     },
+    planning: {
+      title: "正在准备第一道主问题",
+      description: "面试官正在结合你的求职档案和目标岗位生成本场问题，请稍候。",
+      failedTitle: "第一道主问题生成失败",
+      failedDescription: "会话仍然保留，你可以重试生成问题。",
+    },
     answer: {
       title: "你的回答",
       description: "可以分段组织内容，尽量说明具体背景、行动和结果。",

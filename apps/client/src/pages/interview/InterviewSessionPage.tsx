@@ -28,6 +28,8 @@ import {
 } from "./InterviewSessionView"
 import { INTERVIEW_QUERY_KEY } from "./interview-query"
 
+export const INTERVIEW_GENERATING_POLL_INTERVAL_MS = 500
+
 export function InterviewSessionPage() {
   const { sessionId } = useParams({ from: "/app/interview/session/$sessionId" })
 
@@ -48,6 +50,12 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     queryFn: getInterviewPage,
     queryKey: INTERVIEW_QUERY_KEY,
     retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.session?.status === "generatingQuestion" &&
+      query.state.data.session.generationStatus === "generating"
+        ? INTERVIEW_GENERATING_POLL_INTERVAL_MS
+        : false,
+    refetchIntervalInBackground: false,
   })
   const beginMutation = useMutation({ mutationFn: beginInterviewQuestions })
   const submitMutation = useMutation({ mutationFn: submitInterviewAnswer })
@@ -95,6 +103,29 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     }
     const session = currentSession()
     if (session.status !== "opening") return
+
+    beginLock.current = true
+    setBeginFailed(false)
+    try {
+      commit(
+        await beginMutation.mutateAsync({
+          sessionId: session.sessionId,
+          version: session.version,
+        }),
+      )
+    } catch {
+      setBeginFailed(true)
+    } finally {
+      beginLock.current = false
+    }
+  }
+
+  async function handleRetryPlanning() {
+    if (beginLock.current || beginMutation.isPending) return
+    const session = currentSession()
+    if (session.status !== "generatingQuestion" || session.generationStatus !== "failed") {
+      return
+    }
 
     beginLock.current = true
     setBeginFailed(false)
@@ -288,6 +319,20 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     )
   }
 
+  if (session.status === "generatingQuestion") {
+    return (
+      <InterviewSessionView
+        generationStatus={session.generationStatus}
+        isRetrying={beginMutation.isPending}
+        onBack={() => void backToSetup()}
+        onRetry={handleRetryPlanning}
+        retryFailed={beginFailed}
+        status="generatingQuestion"
+        summary={summary}
+      />
+    )
+  }
+
   if (session.status === "candidateQuestions") {
     return (
       <InterviewSessionView
@@ -338,7 +383,10 @@ function toSummary(
 }
 
 function toPrompt(
-  session: Exclude<ActiveInterviewSessionResponse, { status: "opening" | "candidateQuestions" }>,
+  session: Exclude<
+    ActiveInterviewSessionResponse,
+    { status: "opening" | "candidateQuestions" | "generatingQuestion" }
+  >,
 ): InterviewPromptViewData {
   if (session.status === "question") {
     return {

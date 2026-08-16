@@ -28,6 +28,16 @@ class InterviewDifficulty(StrEnum):
     PRESSURE = "pressure"
 
 
+class InterviewQuestionType(StrEnum):
+    SELF_INTRODUCTION = "selfIntroduction"
+    PROJECT_DEEP_DIVE = "projectDeepDive"
+    ROLE_CAPABILITY = "roleCapability"
+    BEHAVIORAL = "behavioral"
+    TECHNICAL_OR_BUSINESS = "technicalOrBusiness"
+    RESUME_RISK = "resumeRisk"
+    MOTIVATION = "motivation"
+
+
 class InterviewDurationMinutes(IntEnum):
     FIFTEEN = 15
     THIRTY = 30
@@ -44,6 +54,11 @@ class InterviewSessionStatus(StrEnum):
     GENERATING_CANDIDATE_ANSWER = "generatingCandidateAnswer"
     GENERATING_REVIEW = "generatingReview"
     COMPLETED = "completed"
+
+
+class InterviewGenerationStatus(StrEnum):
+    GENERATING = "generating"
+    FAILED = "failed"
 
 
 InterviewSetupBlockedReason = Literal[
@@ -111,6 +126,39 @@ class InterviewProgressResponse(InterviewAPIModel):
     plan_revision: Annotated[int, Field(strict=True, ge=0)]
 
 
+class InterviewQuestionResponse(InterviewAPIModel):
+    id: StandardUUID
+    prompt: RequiredText
+    type: InterviewQuestionType
+    assessed_capabilities: list[RequiredText]
+    order: Annotated[int, Field(strict=True, ge=1)]
+
+
+class InterviewAwaitingQuestionResponse(InterviewAPIModel):
+    status: Literal["awaitingAnswer"]
+    question: InterviewQuestionResponse
+    answer: None = None
+
+
+class InterviewGeneratingQuestionSessionResponse(InterviewAPIModel):
+    status: Literal["generatingQuestion"]
+    session_id: StandardUUID
+    language: InteractionLanguage
+    version: Annotated[int, Field(strict=True, ge=1)]
+    configuration: InterviewConfiguration
+    started_at: datetime
+    progress: InterviewProgressResponse
+    completed_questions: list[object] = Field(default_factory=list)
+    generation_status: InterviewGenerationStatus
+
+    @field_validator("started_at")
+    @classmethod
+    def validate_started_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("started_at must be timezone-aware")
+        return value
+
+
 class InterviewOpeningSessionResponse(InterviewAPIModel):
     status: Literal["opening"]
     session_id: StandardUUID
@@ -130,23 +178,58 @@ class InterviewOpeningSessionResponse(InterviewAPIModel):
         return value
 
 
+class InterviewQuestionSessionResponse(InterviewAPIModel):
+    status: Literal["question"]
+    session_id: StandardUUID
+    language: InteractionLanguage
+    version: Annotated[int, Field(strict=True, ge=1)]
+    configuration: InterviewConfiguration
+    started_at: datetime
+    progress: InterviewProgressResponse
+    completed_questions: list[object] = Field(default_factory=list)
+    current_question: InterviewAwaitingQuestionResponse
+
+    @field_validator("started_at")
+    @classmethod
+    def validate_started_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("started_at must be timezone-aware")
+        return value
+
+
 class InterviewPageResponse(InterviewAPIModel):
     setup: InterviewSetupResponse
-    session: InterviewOpeningSessionResponse | None
+    session: (
+        InterviewOpeningSessionResponse
+        | InterviewGeneratingQuestionSessionResponse
+        | InterviewQuestionSessionResponse
+        | None
+    )
 
 
 class StartInterviewRequest(InterviewConfiguration):
     """Client-selected interview configuration for a new session."""
 
 
+class BeginInterviewQuestionsRequest(InterviewAPIModel):
+    version: Annotated[int, Field(strict=True, ge=1)]
+
+
 __all__ = [
     "InterviewConfiguration",
+    "InterviewAwaitingQuestionResponse",
+    "BeginInterviewQuestionsRequest",
     "InterviewDefaultConfiguration",
     "InterviewDifficulty",
     "InterviewDurationMinutes",
+    "InterviewGenerationStatus",
+    "InterviewGeneratingQuestionSessionResponse",
     "InterviewOpeningSessionResponse",
     "InterviewPageResponse",
     "InterviewProgressResponse",
+    "InterviewQuestionResponse",
+    "InterviewQuestionSessionResponse",
+    "InterviewQuestionType",
     "InterviewRound",
     "InterviewSessionStatus",
     "InterviewSetupAvailabilityResponse",

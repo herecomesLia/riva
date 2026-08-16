@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Request, status
 
 from riva.core.auth import require_current_user
@@ -6,6 +8,7 @@ from riva.core.interview import get_interview_api_service
 from riva.core.language import normalize_interaction_language
 from riva.models import User
 from riva.schemas.interview import (
+    BeginInterviewQuestionsRequest,
     InterviewPageResponse,
     StartInterviewRequest,
 )
@@ -48,4 +51,24 @@ async def start_interview_session(
         interaction_language=normalize_interaction_language(
             request.headers.get("accept-language")
         ),
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/questions/begin",
+    response_model=InterviewPageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def begin_interview_questions(
+    session_id: UUID,
+    payload: BeginInterviewQuestionsRequest,
+    current_user: User = Depends(require_current_user),
+    interview_api_service: InterviewAPIService = Depends(
+        get_interview_api_service
+    ),
+) -> InterviewPageResponse:
+    return await interview_api_service.begin_questions(
+        user_id=current_user.id,
+        session_id=session_id,
+        payload=payload,
     )

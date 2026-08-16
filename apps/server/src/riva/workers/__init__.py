@@ -5,6 +5,7 @@ from riva.workers.errors import (
 )
 from riva.workers.handlers import AgentHandlerRegistry, AgentRunHandler
 from riva.workers.follow_up import FollowUpHandler
+from riva.workers.interview_planning import InterviewPlanningHandler
 from riva.workers.job_description_parsing import JobDescriptionParsingHandler
 from riva.workers.matching_analysis import MatchingAnalysisHandler
 from riva.workers.practice_evaluation import PracticeEvaluationHandler
@@ -24,6 +25,7 @@ __all__ = [
     "MatchingAnalysisHandler",
     "QuestionGenerationHandler",
     "FollowUpHandler",
+    "InterviewPlanningHandler",
     "PracticeEvaluationHandler",
     "PracticeRecommendationHandler",
     "PracticeReviewHandler",

@@ -30,6 +30,7 @@ from riva.schemas.question_generation import (
     MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
     QuestionGenerationWeaknessEvidence,
 )
+from riva.schemas.interview_planning import InterviewPlanningInput
 from riva.utils import utc_now
 
 
@@ -448,6 +449,8 @@ def _serialize_payload(
             serialized[key] = _serialize_previous_follow_ups(value)
         elif key == "weaknessFocus":
             serialized[key] = _serialize_weakness_focus(value)
+        elif key == "interviewPlanningInput":
+            serialized[key] = _serialize_interview_planning_input(value)
         elif key == "nextFollowUpOrder":
             if (
                 isinstance(value, bool)
@@ -502,6 +505,19 @@ def _serialize_reference_context(value: object) -> dict[str, JSONValue]:
     except (TypeError, ValueError, ValidationError):
         raise ValueError(
             "payload.referenceContext must be a valid frozen reference context"
+        ) from None
+
+
+def _serialize_interview_planning_input(value: object) -> dict[str, JSONValue]:
+    try:
+        planning_input = InterviewPlanningInput.model_validate(value)
+        return cast(
+            dict[str, JSONValue],
+            planning_input.model_dump(mode="json", by_alias=True),
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.interviewPlanningInput must be a valid planning snapshot"
         ) from None
 
 

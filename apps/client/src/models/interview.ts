@@ -65,6 +65,8 @@ export type InterviewQuestionResponse = {
   order: number
 }
 
+export type InterviewGenerationStatus = "generating" | "failed"
+
 export type InterviewAnswerResponse = {
   id: string
   content: string
@@ -156,6 +158,11 @@ type InterviewActiveSessionResponseBase = {
 export type InterviewOpeningSessionResponse = InterviewActiveSessionResponseBase & {
   status: "opening"
   openingMessage: string
+}
+
+export type InterviewGeneratingQuestionSessionResponse = InterviewActiveSessionResponseBase & {
+  status: "generatingQuestion"
+  generationStatus: InterviewGenerationStatus
 }
 
 export type InterviewQuestionSessionResponse = InterviewActiveSessionResponseBase & {
@@ -321,6 +328,7 @@ export type InterviewCompletedSessionResponse = InterviewActiveSessionResponseBa
 
 export type ActiveInterviewSessionResponse =
   | InterviewOpeningSessionResponse
+  | InterviewGeneratingQuestionSessionResponse
   | InterviewQuestionSessionResponse
   | InterviewFollowUpSessionResponse
   | InterviewCandidateQuestionsSessionResponse

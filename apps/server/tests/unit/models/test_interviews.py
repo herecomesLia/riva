@@ -1,9 +1,15 @@
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, JSON
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db import Base
 from riva.db.database import load_models
-from riva.models import InterviewSession, TargetRole, User
+from riva.models import (
+    InterviewPlan,
+    InterviewQuestion,
+    InterviewSession,
+    TargetRole,
+    User,
+)
 
 
 def _checks() -> dict[str, str]:
@@ -100,3 +106,41 @@ def test_interview_session_relationships_are_owned_by_user_and_role() -> None:
     assert InterviewSession.target_role.property.uselist is False
     assert User.interview_sessions.property.uselist is True
     assert TargetRole.interview_sessions.property.uselist is True
+
+
+def test_interview_plan_table_stores_validated_snapshot_and_revision() -> None:
+    load_models()
+
+    table = InterviewPlan.__table__
+    assert isinstance(table.c.id.type, Uuid)
+    assert table.c.session_id.nullable is False
+    assert table.c.revision.nullable is False
+    assert table.c.source_agent_run_id.nullable is False
+    assert table.c.total_main_questions.nullable is False
+    assert isinstance(table.c.questions.type, JSON)
+    assert table.c.created_at.type.timezone is True
+    unique = next(
+        constraint
+        for constraint in table.constraints
+        if constraint.name == "uq_interview_plans_session_revision"
+    )
+    assert [column.name for column in unique.columns] == ["session_id", "revision"]
+
+
+def test_interview_question_table_is_independent_from_question_cards() -> None:
+    load_models()
+
+    table = InterviewQuestion.__table__
+    assert table.c.session_id.nullable is False
+    assert table.c.source_plan_id.nullable is False
+    assert table.c.plan_revision.nullable is False
+    assert table.c.order.nullable is False
+    assert table.c.prompt.nullable is False
+    assert table.c.question_type.nullable is False
+    assert isinstance(table.c.assessed_capabilities.type, JSON)
+    unique = next(
+        constraint
+        for constraint in table.constraints
+        if constraint.name == "uq_interview_questions_session_order"
+    )
+    assert [column.name for column in unique.columns] == ["session_id", "order"]

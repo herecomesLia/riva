@@ -76,6 +76,13 @@ export const interview = {
       description:
         "Start the continuous interview when ready. Per-question scores and sample answers stay hidden.",
     },
+    planning: {
+      title: "Preparing the first main question",
+      description:
+        "The interviewer is using your profile and target role to prepare this interview. Please wait.",
+      failedTitle: "The first main question could not be generated",
+      failedDescription: "Your session is still available, so you can retry question generation.",
+    },
     answer: {
       title: "Your answer",
       description: "Use paragraphs as needed and explain the context, actions, and outcome.",

@@ -16,17 +16,30 @@ import type {
   InterviewTrainingEntryParameters,
   InterviewTrainingEntryPreparationResponse,
 } from "@/models/training-entry"
+import { interviewPageResponseSchema } from "@/schemas/interview"
+import { apiRequest } from "@/services/api"
 
 function realApiUnavailable(): never {
   throw new Error("Real interview API is not implemented.")
 }
 
+async function requestInterviewPage(
+  path: string,
+  options?: Parameters<typeof apiRequest>[1],
+): Promise<InterviewMutationResponse> {
+  return interviewPageResponseSchema.parse(
+    await apiRequest<unknown>(path, options),
+  ) as InterviewMutationResponse
+}
+
 export function getInterviewPage(): Promise<InterviewPageResponse> {
-  return env.mock ? interviewMockService.getInterviewPage() : realApiUnavailable()
+  if (env.mock) return interviewMockService.getInterviewPage()
+  return requestInterviewPage("/interview")
 }
 
 export function startInterview(input: StartInterviewInput): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.startInterview(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.startInterview(input)
+  return requestInterviewPage("/interview/sessions", { json: input, method: "POST" })
 }
 
 export function prepareInterviewTrainingEntry(
@@ -38,31 +51,40 @@ export function prepareInterviewTrainingEntry(
 export function beginInterviewQuestions(
   input: BeginInterviewQuestionsInput,
 ): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.beginInterviewQuestions(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.beginInterviewQuestions(input)
+  return requestInterviewPage(
+    `/interview/sessions/${encodeURIComponent(input.sessionId)}/questions/begin`,
+    { json: { version: input.version }, method: "POST" },
+  )
 }
 
 export function submitInterviewAnswer(
   input: SubmitInterviewAnswerInput,
 ): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.submitInterviewAnswer(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.submitInterviewAnswer(input)
+  throw new Error("Real interview answer API is not implemented.")
 }
 
 export function submitCandidateQuestion(
   input: SubmitCandidateQuestionInput,
 ): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.submitCandidateQuestion(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.submitCandidateQuestion(input)
+  throw new Error("Real interview candidate-question API is not implemented.")
 }
 
 export function finishInterview(input: FinishInterviewInput): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.finishInterview(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.finishInterview(input)
+  throw new Error("Real interview finish API is not implemented.")
 }
 
 export function endInterview(input: EndInterviewInput): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.endInterview(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.endInterview(input)
+  throw new Error("Real interview end API is not implemented.")
 }
 
 export function getInterviewReview(
   input: GetInterviewReviewInput,
 ): Promise<GetInterviewReviewResponse> {
-  return env.mock ? interviewMockService.getInterviewReview(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.getInterviewReview(input)
+  throw new Error("Real interview review API is not implemented.")
 }

@@ -102,6 +102,31 @@ function openingResponse(): InterviewPageResponse {
   })
 }
 
+function generatingResponse(
+  generationStatus: "generating" | "failed" = "generating",
+): InterviewPageResponse {
+  return responseWithSession({
+    status: "generatingQuestion",
+    sessionId,
+    language: "zh-CN",
+    version: 2,
+    configuration: {
+      targetRoleId: "role_frontend_bytedance",
+      round: "technical",
+      difficulty: "pressure",
+      durationMinutes: 30,
+    },
+    startedAt: "2026-07-24T02:00:00.000Z",
+    progress: {
+      completedMainQuestions: 0,
+      totalMainQuestions: null,
+      planRevision: 0,
+    },
+    completedQuestions: [],
+    generationStatus,
+  })
+}
+
 function questionSession(order: number, version: number): InterviewQuestionSessionResponse {
   const question = singleFollowUpPlan.questions[order - 1]!.question
   return {
@@ -259,6 +284,23 @@ describe("InterviewSessionContainer", () => {
     })
     expect(await screen.findByText(singleFollowUpPlan.questions[0]!.question.prompt)).toBeVisible()
     expect(result.queryClient.getQueryData(["interview"])).toEqual(firstQuestion)
+  })
+
+  it("polls a generating snapshot until the first real question is available", async () => {
+    vi.mocked(getInterviewPage)
+      .mockResolvedValueOnce(generatingResponse())
+      .mockResolvedValueOnce(responseWithSession(questionSession(1, 3)))
+    renderSession()
+
+    expect(await screen.findByText(i18n.t("interview.session.planning.title"))).toBeVisible()
+    expect(
+      await screen.findByText(
+        singleFollowUpPlan.questions[0]!.question.prompt,
+        {},
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible()
+    expect(getInterviewPage).toHaveBeenCalledTimes(2)
   })
 
   it("submits an answer only once while its mutation is pending", async () => {
