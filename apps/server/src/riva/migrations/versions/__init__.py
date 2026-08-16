@@ -1,0 +1,1 @@
+"""Riva Alembic revisions."""
