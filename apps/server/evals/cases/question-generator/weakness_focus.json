@@ -1,0 +1,102 @@
+{
+  "id": "question-generator.weakness-focus",
+  "agentId": "question-generator",
+  "promptVersion": "2",
+  "input": {
+    "interaction_language": "en",
+    "question_type": "projectDeepDive",
+    "difficulty": "pressure",
+    "weakness_focus": [
+      {
+        "weakness": "The personal contribution is not quantified.",
+        "sourceAttemptId": "44444444-4444-4444-8444-444444444444",
+        "sourceTargetRoleId": "11111111-1111-4111-8111-111111111111",
+        "sourceQuestionType": "projectDeepDive",
+        "reviewedAt": "2026-08-16T10:00:00Z"
+      }
+    ],
+    "target_role": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "title": "Backend Engineer",
+      "company": "Example Labs",
+      "recruitment_type": "experienced",
+      "location": "Shanghai"
+    },
+    "career_profile": {
+      "education": [
+        {
+          "school": "Tongji University",
+          "degree": "Bachelor's degree",
+          "major": "Software Engineering"
+        }
+      ],
+      "work_experiences": [
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "company": "Riva",
+          "title": "Backend Engineer",
+          "responsibilities": ["Designed payment APIs"],
+          "achievements": ["Improved API reliability"],
+          "skills": ["Python", "FastAPI"]
+        }
+      ],
+      "project_experiences": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Payment API",
+          "role": "Backend owner",
+          "responsibilities": ["Designed the service boundary"],
+          "achievements": ["Reduced payment failures"],
+          "skills": ["Python", "PostgreSQL"]
+        }
+      ],
+      "skills": ["Python", "FastAPI", "PostgreSQL"]
+    },
+    "job_description_analysis": {
+      "role_title": "Backend Engineer",
+      "company": "Example Labs",
+      "riva_summary": "Build reliable payment services.",
+      "responsibilities": ["Design and operate backend APIs"],
+      "qualification_requirements": {
+        "education": ["Bachelor's degree"],
+        "graduation_cohorts": [],
+        "majors": ["Computer Science or related field"],
+        "experience": ["Backend service experience"],
+        "languages": [],
+        "certifications": [],
+        "other": []
+      },
+      "required_skills": {
+        "programming_languages": ["Python"],
+        "frameworks_and_libraries": ["FastAPI"],
+        "platforms": [],
+        "tools": [],
+        "concepts_and_methods": ["Distributed systems"],
+        "databases_and_middleware": ["PostgreSQL"],
+        "other": []
+      },
+      "preferred_qualifications": [],
+      "soft_skills": ["Clear communication"],
+      "business_domains": ["Payments"]
+    },
+    "matching_analysis": {
+      "overall_match_score": 78,
+      "core_requirements_summary": "Reliable payment APIs with Python.",
+      "matched_capabilities": ["Python", "FastAPI"],
+      "missing_capabilities": ["Kubernetes"],
+      "underrepresented_capabilities": ["System design"],
+      "resume_highlights": ["Improved API reliability"],
+      "resume_gaps": ["Scale is not quantified"],
+      "high_risk_questions": ["How did you improve reliability?"],
+      "preparation_recommendations": ["Prepare the reliability example."]
+    }
+  },
+  "assertions": [
+    { "operator": "exact", "path": "/question_type", "expected": "projectDeepDive" },
+    { "operator": "exact", "path": "/difficulty", "expected": "pressure" },
+    { "operator": "itemCount", "path": "/assessed_capabilities", "min": 1, "max": 5 },
+    { "operator": "itemCount", "path": "/follow_up_directions", "min": 1, "max": 5 },
+    { "operator": "itemCount", "path": "/scoring_focus", "min": 1, "max": 5 }
+  ],
+  "tags": ["weakness", "pressure"]
+}

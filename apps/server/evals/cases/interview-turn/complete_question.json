@@ -1,0 +1,101 @@
+{
+  "id": "interview-turn.complete-question",
+  "agentId": "interview-turn",
+  "promptVersion": "1",
+  "input": {
+    "session": {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "version": 3,
+      "status": "question",
+      "language": "en",
+      "configuration": {
+        "targetRoleId": "11111111-1111-4111-8111-111111111111",
+        "round": "technical",
+        "difficulty": "basic",
+        "durationMinutes": 30
+      }
+    },
+    "planId": "66666666-6666-4666-8666-666666666666",
+    "planRevision": 1,
+    "questionId": "77777777-7777-4777-8777-777777777777",
+    "plannedQuestion": {
+      "prompt": "Describe a production trade-off you made.",
+      "questionType": "projectDeepDive",
+      "assessedCapabilities": ["Ownership", "Evidence"],
+      "objective": "Verify the candidate's personal contribution.",
+      "followUpDirections": ["Probe the decision and its result."],
+      "scoringFocus": ["Specific evidence", "Trade-off quality"]
+    },
+    "mainAnswer": {
+      "id": "88888888-8888-4888-8888-888888888888",
+      "content": "I chose a staged rollout, measured the error rate, and documented the result.",
+      "submittedAt": "2026-08-16T10:00:00Z"
+    },
+    "answeredFollowUps": [
+      {
+        "order": 1,
+        "questionId": "12121212-1212-4121-8121-121212121212",
+        "prompt": "What signal did you monitor?",
+        "answer": {
+          "id": "13131313-1313-4131-8131-131313131313",
+          "content": "I monitored the error rate during the rollout.",
+          "submittedAt": "2026-08-16T10:01:00Z"
+        }
+      }
+    ],
+    "remainingFollowUpSlots": 0,
+    "careerProfile": {
+      "profileId": "99999999-9999-4999-8999-999999999999",
+      "version": 4,
+      "summary": "Backend engineer with API experience.",
+      "education": [],
+      "workExperiences": [],
+      "projectExperiences": [],
+      "skills": ["Python"]
+    },
+    "targetRole": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "title": "Backend Engineer",
+      "company": "Example Labs",
+      "recruitmentType": "experienced",
+      "location": "Shanghai",
+      "version": 3,
+      "jobDescriptionVersion": 2
+    },
+    "jobDescriptionAnalysis": {
+      "jobDescriptionVersion": 2,
+      "analysisVersion": 1,
+      "rivaSummary": "Build reliable APIs.",
+      "responsibilities": ["Design APIs"],
+      "qualificationRequirements": {
+        "education": [],
+        "graduation_cohorts": [],
+        "majors": [],
+        "experience": [],
+        "languages": [],
+        "certifications": [],
+        "other": []
+      },
+      "requiredSkills": {
+        "programming_languages": ["Python"],
+        "frameworks_and_libraries": [],
+        "platforms": [],
+        "tools": [],
+        "concepts_and_methods": [],
+        "databases_and_middleware": [],
+        "other": []
+      },
+      "preferredQualifications": [],
+      "softSkills": [],
+      "businessDomains": []
+    },
+    "matchingAnalysis": null
+  },
+  "assertions": [
+    { "operator": "exact", "path": "/nextAction/type", "expected": "completeQuestion" },
+    { "operator": "numberRange", "path": "/assessment/score", "min": 0, "max": 100 },
+    { "operator": "itemCount", "path": "/assessment/strengths", "max": 5 },
+    { "operator": "itemCount", "path": "/assessment/issues", "max": 5 }
+  ],
+  "tags": ["smoke", "complete"]
+}

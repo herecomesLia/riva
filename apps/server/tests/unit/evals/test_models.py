@@ -1,0 +1,97 @@
+import pytest
+from pydantic import ValidationError
+
+from riva.evals.models import AgentEvalCase
+
+
+def _case(**overrides: object) -> dict[str, object]:
+    value: dict[str, object] = {
+        "id": "case-1",
+        "agentId": "question-generator",
+        "promptVersion": "2",
+        "input": {"value": 3},
+        "assertions": [
+            {"operator": "exact", "path": "/value", "expected": 3},
+            {"operator": "contains", "path": "/items", "expected": "x"},
+            {
+                "operator": "containsAll",
+                "path": "/items",
+                "expected": ["x", "y"],
+            },
+            {
+                "operator": "notContains",
+                "path": "/items",
+                "forbidden": ["z"],
+            },
+            {"operator": "itemCount", "path": "/items", "min": 1, "max": 3},
+            {"operator": "numberRange", "path": "/value", "min": 0, "max": 10},
+        ],
+    }
+    value.update(overrides)
+    return value
+
+
+def test_case_and_assertions_use_strict_wire_schema() -> None:
+    case = AgentEvalCase.model_validate(_case())
+
+    assert case.agent_id == "question-generator"
+    assert case.prompt_version == "2"
+    assert case.tags == []
+    assert [assertion.operator for assertion in case.assertions] == [
+        "exact",
+        "contains",
+        "containsAll",
+        "notContains",
+        "itemCount",
+        "numberRange",
+    ]
+    assert case.model_dump(mode="json", by_alias=True)["agentId"] == (
+        "question-generator"
+    )
+
+
+@pytest.mark.parametrize("path", ["value", "$.value", "/value~2"])
+def test_assertion_path_must_be_a_simple_json_pointer(path: str) -> None:
+    with pytest.raises(ValidationError):
+        AgentEvalCase.model_validate(
+            _case(assertions=[{"operator": "exact", "path": path, "expected": 3}])
+        )
+
+
+def test_unknown_operator_and_extra_fields_are_rejected() -> None:
+    with pytest.raises(ValidationError):
+        AgentEvalCase.model_validate(
+            _case(
+                assertions=[
+                    {"operator": "python", "path": "/value", "expected": 3}
+                ]
+            )
+        )
+
+    with pytest.raises(ValidationError):
+        AgentEvalCase.model_validate(_case(unexpected=True))
+
+    with pytest.raises(ValidationError):
+        AgentEvalCase.model_validate(
+            _case(
+                assertions=[
+                    {
+                        "operator": "exact",
+                        "path": "/value",
+                        "expected": 3,
+                        "expression": "value + 1",
+                    }
+                ]
+            )
+        )
+
+
+def test_count_and_range_require_a_valid_bound() -> None:
+    for assertion in (
+        {"operator": "itemCount", "path": "/items"},
+        {"operator": "itemCount", "path": "/items", "min": 3, "max": 1},
+        {"operator": "numberRange", "path": "/value"},
+        {"operator": "numberRange", "path": "/value", "min": 3, "max": 1},
+    ):
+        with pytest.raises(ValidationError):
+            AgentEvalCase.model_validate(_case(assertions=[assertion]))
