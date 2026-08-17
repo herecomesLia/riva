@@ -10,6 +10,7 @@ import {
   retryInterviewCandidateAnswer,
   retryInterviewReview,
   retryInterviewTurn,
+  prepareInterviewTrainingEntry,
   submitCandidateQuestion,
   startInterview,
   submitInterviewAnswer,
@@ -18,7 +19,66 @@ import {
 const roleId = "11111111-1111-4111-8111-111111111111"
 const sessionId = "22222222-2222-4222-8222-222222222222"
 
-function response(session: NonNullable<InterviewPageResponse["session"]>): InterviewPageResponse {
+function trainableRole(overrides: Record<string, unknown> = {}) {
+  return {
+    id: roleId,
+    title: "Backend Engineer",
+    company: "Riva",
+    recruitmentType: "experienced",
+    location: "Shanghai",
+    experienceRange: { minYears: 2, maxYears: 5 },
+    preparationStatus: "paused",
+    createdAt: "2026-08-10T08:00:00Z",
+    updatedAt: "2026-08-10T09:00:00Z",
+    version: 1,
+    matchingAnalysis: null,
+    jobDescription: {
+      status: "ready",
+      rawText: "Build reliable customer-facing products.",
+      version: 1,
+      parsingFailureReason: null,
+    },
+    jobDescriptionAnalysis: {
+      jobDescriptionVersion: 1,
+      analysisVersion: 1,
+      parsedAt: "2026-08-10T09:30:00Z",
+      rivaSummary: "Build reliable products.",
+      responsibilities: [],
+      qualificationRequirements: {
+        education: [],
+        graduationCohorts: [],
+        majors: [],
+        experience: [],
+        languages: [],
+        certifications: [],
+        other: [],
+      },
+      requiredSkills: {
+        programmingLanguages: [],
+        frameworksAndLibraries: [],
+        platforms: [],
+        tools: [],
+        conceptsAndMethods: [],
+        databasesAndMiddleware: [],
+        other: [],
+      },
+      preferredQualifications: [],
+      softSkills: [],
+      businessDomains: [],
+    },
+    ...overrides,
+  }
+}
+
+function rolesPage(
+  roles: unknown[] = [trainableRole()],
+  profileContext: Record<string, unknown> = { exists: true, version: 1, completed: true },
+  currentRoleId: string | null = roleId,
+) {
+  return { roles, currentRoleId, profileContext }
+}
+
+function response(session: InterviewPageResponse["session"]): InterviewPageResponse {
   return {
     setup: {
       availability: { status: "available" },
@@ -257,5 +317,88 @@ describe("interview service API", () => {
     await expect(getInterviewReview({ sessionId })).resolves.toEqual(review)
     expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/interview/sessions/${sessionId}/review`)
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: "include" })
+  })
+
+  it("prepares a real history entry from current roles and interview setup", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") return new Response(JSON.stringify(rolesPage()))
+      if (input === "/api/interview") return new Response(JSON.stringify(response(null)))
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const prepared = await prepareInterviewTrainingEntry({
+      targetRoleId: roleId,
+      round: "technical",
+      difficulty: "pressure",
+      durationMinutes: 45,
+    })
+
+    expect(prepared.page.session).toBeNull()
+    expect(prepared.resolution).toEqual({
+      status: "available",
+      configuration: {
+        targetRoleId: roleId,
+        round: "technical",
+        difficulty: "pressure",
+        durationMinutes: 45,
+      },
+      adjustments: [],
+    })
+    expect(fetchMock.mock.calls.map(([input]) => input)).toEqual(
+      expect.arrayContaining(["/api/roles", "/api/interview"]),
+    )
+  })
+
+  it("adjusts unsupported history settings and reports unavailable roles", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") return new Response(JSON.stringify(rolesPage()))
+      if (input === "/api/interview") return new Response(JSON.stringify(response(null)))
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const adjusted = await prepareInterviewTrainingEntry({
+      targetRoleId: roleId,
+      round: "hr",
+      difficulty: "basic",
+      durationMinutes: 15,
+    })
+    expect(adjusted.resolution).toMatchObject({
+      status: "adjusted",
+      adjustments: ["interviewRoundUnsupported"],
+      configuration: { targetRoleId: roleId, round: "technical" },
+    })
+
+    fetchMock.mockReset()
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") {
+        return new Response(
+          JSON.stringify(
+            rolesPage([trainableRole({ preparationStatus: "archived" })], undefined, null),
+          ),
+        )
+      }
+      if (input === "/api/interview") return new Response(JSON.stringify(response(null)))
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const unavailable = await prepareInterviewTrainingEntry({ targetRoleId: roleId })
+    expect(unavailable.resolution).toMatchObject({
+      status: "roleUnavailable",
+      reason: "targetRoleArchived",
+      configuration: { targetRoleId: null },
+    })
+  })
+
+  it("rejects history preparation while a real interview is active", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") return new Response(JSON.stringify(rolesPage()))
+      if (input === "/api/interview") return new Response(JSON.stringify(opening()))
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    await expect(prepareInterviewTrainingEntry({ targetRoleId: roleId })).rejects.toThrow(
+      "interview session is active",
+    )
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false)
   })
 })

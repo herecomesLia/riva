@@ -89,7 +89,7 @@ const interviewCandidateQuestionSchema = z
   })
   .strict()
 
-const interviewCandidateQuestionExchangeSchema = z
+export const interviewCandidateQuestionExchangeSchema = z
   .object({
     question: interviewCandidateQuestionSchema,
     interviewerAnswer: z.string().trim().min(1).max(20_000),
@@ -321,7 +321,7 @@ const interviewQuestionRecordSchema = z.discriminatedUnion("status", [
     .strict(),
 ])
 
-const interviewQuestionLearningDetailSchema = z
+export const interviewQuestionLearningDetailSchema = z
   .object({
     record: interviewQuestionRecordSchema,
     performance: interviewQuestionReviewSchema.nullable(),
@@ -381,7 +381,7 @@ const interviewCompleteReviewSchema = interviewNarrativeSchema
   })
   .strict()
 
-const interviewSessionReviewSchema = z.discriminatedUnion("status", [
+export const interviewSessionReviewSchema = z.discriminatedUnion("status", [
   z
     .object({
       status: z.literal("unavailable"),

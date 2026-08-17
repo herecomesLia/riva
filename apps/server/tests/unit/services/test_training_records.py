@@ -34,7 +34,11 @@ from riva.services.training_records import (
     TrainingRecordService,
     TrainingRecordStateError,
 )
-from riva.schemas.training_records import TrainingRecordKind
+from riva.schemas.training_records import (
+    MockInterviewTrainingRecordSummaryResponse,
+    TrainingRecordKind,
+    TrainingRecordStatus,
+)
 
 
 NOW = datetime(2026, 8, 15, 9, 0, tzinfo=UTC)
@@ -290,20 +294,6 @@ class FakeListResult:
         return iter(self.rows)
 
 
-class FakeOverviewResult:
-    def __init__(self, rows: list[dict[str, object]]) -> None:
-        self.rows = rows
-
-    def mappings(self):
-        return self
-
-    def one(self):
-        return self.rows[0]
-
-    def __iter__(self):
-        return iter(self.rows)
-
-
 class FakeListSession:
     def __init__(self, rows: list[dict[str, object]], total_items: int) -> None:
         self.rows = rows
@@ -320,20 +310,40 @@ class FakeListSession:
         return FakeListResult(self.rows)
 
 
-class FakeOverviewSession:
-    def __init__(
-        self,
-        metrics: dict[str, object],
-        roles: list[dict[str, object]],
-    ) -> None:
-        self.results = [metrics, *roles]
-        self.execute_calls: list[object] = []
+class FakeInterviewTrainingRecordService:
+    def __init__(self, summaries: list[object] | None = None) -> None:
+        self.summaries = summaries or []
 
-    async def execute(self, statement: object) -> FakeOverviewResult:
-        self.execute_calls.append(statement)
-        if len(self.execute_calls) == 1:
-            return FakeOverviewResult([self.results[0]])
-        return FakeOverviewResult(self.results[1:])
+    async def list_summaries(self, **_: object) -> list[object]:
+        return self.summaries
+
+    async def get_record(self, **_: object):
+        raise AssertionError("The interview detail projection was not expected.")
+
+
+def interview_summary(
+    *,
+    record_id: UUID | None = None,
+    started_at: datetime = NOW + timedelta(hours=1),
+    status: TrainingRecordStatus = TrainingRecordStatus.COMPLETED,
+    overall_score: float | None = 88,
+) -> MockInterviewTrainingRecordSummaryResponse:
+    return MockInterviewTrainingRecordSummaryResponse(
+        record_id=record_id or uuid4(),
+        kind=TrainingRecordKind.MOCK_INTERVIEW,
+        language="en",
+        status=status,
+        started_at=started_at,
+        ended_at=started_at + timedelta(seconds=300),
+        duration_seconds=300,
+        target_role={"id": uuid4(), "title": "Interview Engineer", "company": "Riva"},
+        answered_question_count=2 if status != TrainingRecordStatus.ENDED_EARLY else 0,
+        total_question_count=2,
+        overall_score=overall_score,
+        review_summary="Good evidence.",
+        round="technical",
+        difficulty="pressure",
+    )
 
 
 def test_list_training_records_projects_summary_and_rounds_average_score() -> None:
@@ -364,9 +374,12 @@ def test_list_training_records_projects_summary_and_rounds_average_score() -> No
     )
 
     result = asyncio.run(
-        TrainingRecordService(fake_session).list_training_records(
+        TrainingRecordService(
+            fake_session,
+            interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(),
+        ).list_training_records(
             user_id=uuid4(),
-            page=2,
+            page=1,
             page_size=2,
         )
     )
@@ -376,12 +389,12 @@ def test_list_training_records_projects_summary_and_rounds_average_score() -> No
     assert result.items[0].overall_score == 81.3
     assert result.items[0].review_summary == "Needs more evidence."
     assert result.pagination.model_dump() == {
-        "page": 2,
+        "page": 1,
         "pageSize": 2,
-        "totalItems": 3,
-        "totalPages": 2,
+        "totalItems": 1,
+        "totalPages": 1,
     }
-    assert len(fake_session.scalar_calls) == 1
+    assert len(fake_session.scalar_calls) == 0
     assert len(fake_session.execute_calls) == 1
 
 
@@ -389,7 +402,10 @@ def test_list_training_records_mock_only_filter_is_an_empty_page() -> None:
     fake_session = FakeListSession(rows=[], total_items=99)
 
     result = asyncio.run(
-        TrainingRecordService(fake_session).list_training_records(
+        TrainingRecordService(
+            fake_session,
+            interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(),
+        ).list_training_records(
             user_id=uuid4(),
             kinds=[TrainingRecordKind.MOCK_INTERVIEW],
         )
@@ -402,33 +418,124 @@ def test_list_training_records_mock_only_filter_is_an_empty_page() -> None:
     assert fake_session.execute_calls == []
 
 
+def test_list_training_records_merges_interview_records_before_global_pagination() -> None:
+    practice_id = uuid4()
+    interview_id = uuid4()
+    fake_session = FakeListSession(
+        rows=[
+            {
+                "record_id": practice_id,
+                "language": "en",
+                "started_at": NOW,
+                "ended_at": NOW + timedelta(seconds=60),
+                "question_type": "behavioral",
+                "difficulty": "basic",
+                "target_role_id": uuid4(),
+                "target_role_title": "Backend Engineer",
+                "target_role_company": "Riva",
+                "answered_question_count": 1,
+                "total_question_count": 1,
+                "overall_score": 70,
+                "review_summary": "Practice review.",
+                "record_status": "completed",
+            }
+        ],
+        total_items=1,
+    )
+    interview = interview_summary(record_id=interview_id)
+    service = TrainingRecordService(
+        fake_session,
+        interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(
+            [interview]
+        ),
+    )
+
+    first_page = asyncio.run(
+        service.list_training_records(user_id=uuid4(), page=1, page_size=1)
+    )
+    second_page = asyncio.run(
+        service.list_training_records(user_id=uuid4(), page=2, page_size=1)
+    )
+
+    assert first_page.items[0].kind == TrainingRecordKind.MOCK_INTERVIEW
+    assert second_page.items[0].kind == TrainingRecordKind.TARGETED_PRACTICE
+    assert first_page.pagination.total_items == 2
+    assert first_page.pagination.total_pages == 2
+    assert second_page.pagination.total_items == 2
+
+    mock_only = asyncio.run(
+        service.list_training_records(
+            user_id=uuid4(),
+            kinds=[TrainingRecordKind.MOCK_INTERVIEW],
+            page=1,
+            page_size=20,
+        )
+    )
+    assert [item.record_id for item in mock_only.items] == [interview_id]
+
+
 def test_get_training_records_overview_aggregates_record_scores_and_roles() -> None:
     role_a = uuid4()
     role_b = uuid4()
-    fake_session = FakeOverviewSession(
-        metrics={
-            "total_record_count": 3,
-            "completed_record_count": 1,
-            "total_duration_seconds": 1_200,
-            "answered_question_count": 4,
-            "average_score": 75.0,
-        },
-        roles=[
+    fake_session = FakeListSession(
+        rows=[
             {
+                "record_id": uuid4(),
+                "language": "en",
+                "started_at": NOW,
+                "ended_at": NOW + timedelta(seconds=400),
+                "question_type": "behavioral",
+                "difficulty": "basic",
                 "target_role_id": role_a,
                 "target_role_title": "Backend Engineer",
                 "target_role_company": "Riva",
+                "answered_question_count": 1,
+                "total_question_count": 1,
+                "overall_score": 70,
+                "review_summary": "First",
+                "record_status": "completed",
             },
             {
+                "record_id": uuid4(),
+                "language": "en",
+                "started_at": NOW + timedelta(hours=1),
+                "ended_at": NOW + timedelta(hours=1, seconds=400),
+                "question_type": "behavioral",
+                "difficulty": "basic",
                 "target_role_id": role_b,
                 "target_role_title": "Product Engineer",
                 "target_role_company": None,
+                "answered_question_count": 2,
+                "total_question_count": 2,
+                "overall_score": 80,
+                "review_summary": "Second",
+                "record_status": "partiallyCompleted",
+            },
+            {
+                "record_id": uuid4(),
+                "language": "en",
+                "started_at": NOW + timedelta(hours=2),
+                "ended_at": NOW + timedelta(hours=2, seconds=400),
+                "question_type": "behavioral",
+                "difficulty": "basic",
+                "target_role_id": role_a,
+                "target_role_title": "Backend Engineer",
+                "target_role_company": "Riva",
+                "answered_question_count": 1,
+                "total_question_count": 1,
+                "overall_score": None,
+                "review_summary": None,
+                "record_status": "endedEarly",
             },
         ],
+        total_items=3,
     )
 
     result = asyncio.run(
-        TrainingRecordService(fake_session).get_training_records_overview(
+        TrainingRecordService(
+            fake_session,
+            interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(),
+        ).get_training_records_overview(
             user_id=uuid4(),
         )
     )
@@ -445,7 +552,52 @@ def test_get_training_records_overview_aggregates_record_scores_and_roles() -> N
     assert result.by_kind["mockInterview"].record_count == 0
     assert result.by_kind["mockInterview"].completed_record_count == 0
     assert result.by_kind["mockInterview"].average_score is None
-    assert len(fake_session.execute_calls) == 2
+    assert len(fake_session.execute_calls) == 1
+
+
+def test_get_training_records_overview_includes_interview_projection() -> None:
+    fake_session = FakeListSession(
+        rows=[
+            {
+                "record_id": uuid4(),
+                "language": "en",
+                "started_at": NOW,
+                "ended_at": NOW + timedelta(seconds=400),
+                "question_type": "behavioral",
+                "difficulty": "basic",
+                "target_role_id": uuid4(),
+                "target_role_title": "Backend Engineer",
+                "target_role_company": "Riva",
+                "answered_question_count": 1,
+                "total_question_count": 1,
+                "overall_score": 70,
+                "review_summary": "Practice review.",
+                "record_status": "completed",
+            }
+        ],
+        total_items=1,
+    )
+    interview = interview_summary(
+        started_at=NOW + timedelta(hours=1),
+        overall_score=90,
+    )
+    service = TrainingRecordService(
+        fake_session,
+        interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(
+            [interview]
+        ),
+    )
+
+    result = asyncio.run(service.get_training_records_overview(user_id=uuid4()))
+
+    assert result.total_record_count == 2
+    assert result.completed_record_count == 2
+    assert result.total_duration_seconds == 700
+    assert result.answered_question_count == 3
+    assert result.average_score == 80
+    assert result.by_kind["targetedPractice"].record_count == 1
+    assert result.by_kind["mockInterview"].record_count == 1
+    assert result.by_kind["mockInterview"].average_score == 90
 
 
 def completed_session(owner_id: UUID, session_id: UUID) -> PracticeSession:

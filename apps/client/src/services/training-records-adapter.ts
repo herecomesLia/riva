@@ -1,4 +1,6 @@
 import type {
+  MockInterviewRecordDetailResponse,
+  MockInterviewRecordSummary,
   TargetedPracticeRecordSummary,
   TargetedPracticeRecordDetailResponse,
   TargetedPracticeQuestion,
@@ -6,6 +8,7 @@ import type {
   TrainingRecordEvaluation,
   TrainingRecordRecommendation,
   TrainingRecordReview,
+  TrainingRecordQuestion,
   TrainingRecordsOverviewResponse,
   TrainingRecordsPageResponse,
 } from "@/models/training-records"
@@ -15,14 +18,17 @@ import type {
   TargetedPracticeTrainingRecordEvaluationWire,
   TargetedPracticeTrainingRecordFollowUpWire,
   TargetedPracticeTrainingRecordReviewWire,
-  TargetedPracticeTrainingRecordSummaryWire,
+  MockInterviewTrainingRecordDetailWire,
+  MockInterviewTrainingRecordSummaryWire,
+  TrainingRecordSummaryWire,
   TrainingRecordsOverviewWire,
   TrainingRecordsPageWire,
 } from "@/schemas/training-records"
 
 export function adaptTrainingRecordSummary(
-  wire: TargetedPracticeTrainingRecordSummaryWire,
-): TargetedPracticeRecordSummary {
+  wire: TrainingRecordSummaryWire,
+): TargetedPracticeRecordSummary | MockInterviewRecordSummary {
+  if (wire.kind === "mockInterview") return adaptMockInterviewRecordSummary(wire)
   return {
     id: wire.recordId,
     kind: "targetedPractice",
@@ -41,6 +47,29 @@ export function adaptTrainingRecordSummary(
     overallScore: wire.overallScore,
     reviewSummary: wire.reviewSummary,
     questionType: wire.questionType,
+    difficulty: wire.difficulty,
+  }
+}
+
+function adaptMockInterviewRecordSummary(wire: MockInterviewTrainingRecordSummaryWire) {
+  return {
+    id: wire.recordId,
+    kind: "mockInterview" as const,
+    language: wire.language,
+    status: wire.status,
+    startedAt: wire.startedAt,
+    endedAt: wire.endedAt,
+    durationSeconds: wire.durationSeconds,
+    targetRole: {
+      id: wire.targetRole.id,
+      title: wire.targetRole.title,
+      company: wire.targetRole.company,
+    },
+    answeredQuestionCount: wire.answeredQuestionCount,
+    totalQuestionCount: wire.totalQuestionCount,
+    overallScore: wire.overallScore,
+    reviewSummary: wire.reviewSummary,
+    round: wire.round,
     difficulty: wire.difficulty,
   }
 }
@@ -225,5 +254,195 @@ export function adaptTargetedPracticeRecord(
       source: wire.setup.source,
       prioritizedWeaknesses: wire.setup.prioritizeWeaknesses,
     },
+  }
+}
+
+function adaptInterviewReferenceAnswer(
+  referenceAnswer: MockInterviewTrainingRecordDetailWire["questionDetails"][number]["referenceAnswer"],
+) {
+  if (referenceAnswer.status !== "ready") {
+    throw new TypeError("A Mock Interview training record requires ready reference answers.")
+  }
+  return {
+    status: "ready" as const,
+    content: referenceAnswer.content,
+  }
+}
+
+function adaptInterviewEvaluation(score: number, evaluatedAt: string): TrainingRecordEvaluation {
+  return { overallScore: score, dimensions: [], evaluatedAt }
+}
+
+function adaptMockInterviewQuestion(
+  detail: MockInterviewTrainingRecordDetailWire["questionDetails"][number],
+  evaluatedAt: string,
+  suggestions: readonly string[],
+): TrainingRecordQuestion {
+  const { record } = detail
+  return {
+    id: record.question.id,
+    prompt: record.question.prompt,
+    type: record.question.type,
+    order: record.question.order,
+    attemptNumber: 1,
+    retryOfQuestionId: null,
+    assessedCapabilities: record.question.assessedCapabilities,
+    isSaved: false,
+    isMarkedWeak: false,
+    answer: record.answer
+      ? {
+          id: record.answer.id,
+          content: record.answer.content,
+          submittedAt: record.answer.submittedAt,
+        }
+      : null,
+    evaluation:
+      detail.performance === null
+        ? null
+        : adaptInterviewEvaluation(detail.performance.score, evaluatedAt),
+    review:
+      detail.performance === null
+        ? null
+        : {
+            summary: detail.performance.summary,
+            strengths: detail.performance.strengths,
+            issues: detail.performance.issues,
+            improvementSuggestions: [...suggestions],
+            reusableAnswerStructure: [],
+          },
+    referenceAnswer: adaptInterviewReferenceAnswer(detail.referenceAnswer),
+    followUps: detail.followUps.map((followUp) => ({
+      id: followUp.record.question.id,
+      prompt: followUp.record.question.prompt,
+      order: followUp.record.question.order,
+      askedAt: followUp.record.question.createdAt,
+      answer: followUp.record.answer
+        ? {
+            id: followUp.record.answer.id,
+            content: followUp.record.answer.content,
+            submittedAt: followUp.record.answer.submittedAt,
+          }
+        : null,
+      evaluation:
+        followUp.performance === null
+          ? null
+          : adaptInterviewEvaluation(followUp.performance.score, evaluatedAt),
+      review:
+        followUp.performance === null
+          ? null
+          : {
+              summary: followUp.performance.summary,
+              strengths: followUp.performance.strengths,
+              issues: followUp.performance.issues,
+              improvementSuggestions: [...suggestions],
+              reusableAnswerStructure: [],
+            },
+      referenceAnswer: adaptInterviewReferenceAnswer(followUp.referenceAnswer),
+    })),
+  }
+}
+
+function adaptMockInterviewRecommendation(
+  record: MockInterviewTrainingRecordDetailWire,
+): TrainingRecordRecommendation {
+  if (record.review.status === "complete") {
+    const nextTraining = record.review.review.nextTraining
+    return nextTraining.action === "targetedPractice"
+      ? {
+          action: "targetedPractice",
+          reason: nextTraining.reason,
+          questionType: nextTraining.questionType,
+          difficulty: nextTraining.difficulty,
+          focusAreas: nextTraining.focusAreas,
+        }
+      : {
+          action: "mockInterview",
+          reason: nextTraining.reason,
+          round: nextTraining.round,
+          difficulty: nextTraining.difficulty,
+          focusAreas: nextTraining.focusAreas,
+        }
+  }
+  if (record.review.status === "partial") {
+    const firstAnswered = record.questionDetails.find(
+      (detail) => detail.record.status === "answered",
+    )
+    return firstAnswered === undefined
+      ? { action: "none", reason: record.review.review.overallPerformance }
+      : {
+          action: "targetedPractice",
+          reason:
+            record.review.review.preparationSuggestions[0] ??
+            record.review.review.overallPerformance,
+          questionType: firstAnswered.record.question.type,
+          difficulty: record.setup.difficulty,
+          focusAreas: firstAnswered.performance?.issues ?? [],
+        }
+  }
+  return {
+    action: "mockInterview",
+    reason: "有效回答不足，建议重新完成一轮模拟面试。",
+    round: record.setup.round,
+    difficulty: record.setup.difficulty,
+    focusAreas: [],
+  }
+}
+
+export function adaptMockInterviewRecord(
+  wire: MockInterviewTrainingRecordDetailWire,
+): MockInterviewRecordDetailResponse {
+  const review = wire.review.status === "unavailable" ? null : wire.review.review
+  const evaluatedAt = review?.generatedAt ?? wire.endedAt
+  const suggestions =
+    review === null ? [] : [...review.communicationSuggestions, ...review.preparationSuggestions]
+  const questions = wire.questionDetails.map((detail) =>
+    adaptMockInterviewQuestion(detail, evaluatedAt, suggestions),
+  )
+  const overallReview =
+    wire.review.status === "unavailable"
+      ? { status: "unavailable" as const, content: null, reason: "insufficientAnswers" as const }
+      : {
+          status: wire.review.status,
+          content: {
+            summary: wire.review.review.overallPerformance,
+            mainStrengths: wire.review.review.mainStrengths,
+            frequentIssues: wire.review.review.frequentIssues,
+            riskPoints: wire.review.review.riskPoints,
+            communicationSuggestions: wire.review.review.communicationSuggestions,
+            preparationSuggestions: wire.review.review.preparationSuggestions,
+            generatedAt: wire.review.review.generatedAt,
+          },
+        }
+
+  return {
+    id: wire.recordId,
+    kind: "mockInterview",
+    language: wire.language,
+    status: wire.status,
+    startedAt: wire.startedAt,
+    endedAt: wire.endedAt,
+    durationSeconds: wire.durationSeconds,
+    targetRole: wire.targetRole,
+    answeredQuestionCount: questions.filter((question) => question.answer !== null).length,
+    totalQuestionCount: questions.length,
+    overallScore: wire.review.status === "complete" ? wire.review.review.overallScore : null,
+    setup: wire.setup,
+    questions,
+    exposedWeaknesses: review?.exposedWeaknesses ?? [],
+    recommendation: adaptMockInterviewRecommendation(wire),
+    overallReview,
+    completionReason: wire.completionReason,
+    candidateQuestionExchanges: wire.candidateQuestionExchanges.map((exchange) => ({
+      id: exchange.question.id,
+      question: exchange.question.content,
+      interviewerAnswer: exchange.interviewerAnswer,
+      feedback: [
+        exchange.feedback.summary,
+        ...exchange.feedback.strengths,
+        ...exchange.feedback.improvementSuggestions,
+        ...exchange.feedback.suggestedAlternatives,
+      ].join("\n"),
+      submittedAt: exchange.question.submittedAt,
+    })),
   }
 }

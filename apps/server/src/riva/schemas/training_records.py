@@ -11,6 +11,15 @@ from riva.schemas.evaluation import (
     PracticeDimensionScore,
     PracticeEvaluationScore,
 )
+from riva.schemas.interview import (
+    InterviewCandidateQuestionExchangeResponse,
+    InterviewCompletionReason,
+    InterviewDifficulty,
+    InterviewDurationMinutes,
+    InterviewQuestionLearningDetailResponse,
+    InterviewRound,
+    InterviewSessionReviewResponse,
+)
 from riva.schemas.job_description_parsing import Company, RoleTitle
 from riva.schemas.practice_recommendation import PracticeRecommendationOutput
 from riva.schemas.practice_sessions import (
@@ -82,6 +91,33 @@ class TargetedPracticeTrainingRecordSummaryResponse(TrainingRecordAPIModel):
     _validate_ended_at = field_validator("ended_at")(_validate_aware_timestamp)
 
 
+class MockInterviewTrainingRecordSummaryResponse(TrainingRecordAPIModel):
+    record_id: StandardUUID
+    kind: Literal[TrainingRecordKind.MOCK_INTERVIEW]
+    language: InteractionLanguage
+    status: TrainingRecordStatus
+    started_at: datetime
+    ended_at: datetime
+    duration_seconds: Annotated[int, Field(ge=0)]
+    target_role: TrainingRecordTargetRoleResponse
+    answered_question_count: Annotated[int, Field(ge=0)]
+    total_question_count: Annotated[int, Field(ge=0)]
+    overall_score: float | None = Field(default=None, ge=0, le=100)
+    review_summary: str | None
+    round: InterviewRound
+    difficulty: InterviewDifficulty
+
+    _validate_started_at = field_validator("started_at")(_validate_aware_timestamp)
+    _validate_ended_at = field_validator("ended_at")(_validate_aware_timestamp)
+
+
+TrainingRecordSummaryResponse = Annotated[
+    TargetedPracticeTrainingRecordSummaryResponse
+    | MockInterviewTrainingRecordSummaryResponse,
+    Field(discriminator="kind"),
+]
+
+
 class TrainingRecordsPaginationResponse(TrainingRecordAPIModel):
     page: Annotated[int, Field(ge=1)]
     page_size: Annotated[int, Field(ge=1, le=100)]
@@ -90,7 +126,7 @@ class TrainingRecordsPaginationResponse(TrainingRecordAPIModel):
 
 
 class TrainingRecordsPageResponse(TrainingRecordAPIModel):
-    items: list[TargetedPracticeTrainingRecordSummaryResponse]
+    items: list[TrainingRecordSummaryResponse]
     pagination: TrainingRecordsPaginationResponse
 
 
@@ -275,11 +311,45 @@ class TargetedPracticeTrainingRecordDetailResponse(TrainingRecordAPIModel):
         return self
 
 
+class MockInterviewTrainingRecordSetupResponse(TrainingRecordAPIModel):
+    round: InterviewRound
+    difficulty: InterviewDifficulty
+    planned_duration_minutes: InterviewDurationMinutes
+
+
+class MockInterviewTrainingRecordDetailResponse(TrainingRecordAPIModel):
+    record_id: StandardUUID
+    kind: Literal[TrainingRecordKind.MOCK_INTERVIEW]
+    status: TrainingRecordStatus
+    language: InteractionLanguage
+    started_at: datetime
+    ended_at: datetime
+    duration_seconds: Annotated[int, Field(ge=0)]
+    target_role: TrainingRecordTargetRoleResponse
+    completion_reason: InterviewCompletionReason
+    setup: MockInterviewTrainingRecordSetupResponse
+    question_details: list[InterviewQuestionLearningDetailResponse] = Field(
+        default_factory=list
+    )
+    review: InterviewSessionReviewResponse
+    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
+        default_factory=list
+    )
+
+    _validate_started_at = field_validator("started_at")(_validate_aware_timestamp)
+    _validate_ended_at = field_validator("ended_at")(_validate_aware_timestamp)
+
+    @model_validator(mode="after")
+    def validate_timeline(self) -> "MockInterviewTrainingRecordDetailResponse":
+        if self.ended_at < self.started_at:
+            raise ValueError("ended_at cannot be before started_at")
+        return self
+
+
 # These aliases make the record-specific names discoverable without creating
 # a second wire contract for the same projections.
 TrainingRecordQuestionResponse = TargetedPracticeQuestionRecordResponse
 TrainingRecordAttemptResponse = TargetedPracticeAttemptRecordResponse
-TrainingRecordSummaryResponse = TargetedPracticeTrainingRecordSummaryResponse
 
 __all__ = [
     "TargetedPracticeAttemptRecordResponse",
@@ -287,6 +357,9 @@ __all__ = [
     "TargetedPracticeTrainingRecordSummaryResponse",
     "TargetedPracticeSetupResponse",
     "TargetedPracticeTrainingRecordDetailResponse",
+    "MockInterviewTrainingRecordDetailResponse",
+    "MockInterviewTrainingRecordSetupResponse",
+    "MockInterviewTrainingRecordSummaryResponse",
     "TargetedPracticeFollowUpReferenceAnswerRequest",
     "TargetedPracticeFollowUpReferenceAnswerTargetResponse",
     "TargetedPracticeMainReferenceAnswerRequest",

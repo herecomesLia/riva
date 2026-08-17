@@ -292,6 +292,9 @@ from riva.schemas.practice_reference_answer import (
     ReferenceAnswerText,
 )
 from riva.schemas.training_records import (
+    MockInterviewTrainingRecordDetailResponse,
+    MockInterviewTrainingRecordSetupResponse,
+    MockInterviewTrainingRecordSummaryResponse,
     TargetedPracticeAttemptRecordResponse,
     TargetedPracticeQuestionRecordResponse,
     TargetedPracticeTrainingRecordSummaryResponse,
@@ -591,6 +594,9 @@ __all__ = [
     "TargetedPracticeTrainingRecordSummaryResponse",
     "TargetedPracticeSetupResponse",
     "TargetedPracticeTrainingRecordDetailResponse",
+    "MockInterviewTrainingRecordDetailResponse",
+    "MockInterviewTrainingRecordSetupResponse",
+    "MockInterviewTrainingRecordSummaryResponse",
     "TargetedPracticeMainReferenceAnswerRequest",
     "TargetedPracticeFollowUpReferenceAnswerRequest",
     "TargetedPracticeReferenceAnswerRequest",
@@ -605,6 +611,7 @@ __all__ = [
     "TrainingRecordReferenceAnswerResponse",
     "TrainingRecordQuestionResponse",
     "TrainingRecordReviewResponse",
+    "TrainingRecordSummaryResponse",
     "TrainingRecordStatus",
     "TrainingRecordTargetRoleResponse",
     "FailedResumeDocumentResponse",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { targetedPracticeTrainingRecordDetailResponseSchema } from "@/schemas/training-records"
 
-import { adaptTargetedPracticeRecord } from "./training-records-adapter"
+import { adaptTargetedPracticeRecord, adaptTrainingRecordSummary } from "./training-records-adapter"
 
 const roleId = "11111111-1111-4111-8111-111111111111"
 const cardId = "22222222-2222-4222-8222-222222222222"
@@ -243,6 +243,44 @@ describe("adaptTargetedPracticeRecord", () => {
       status: "generating",
       content: null,
       viewedBeforeSubmission: false,
+    })
+  })
+})
+
+describe("adaptTrainingRecordSummary", () => {
+  it("accepts the mixed Mock Interview summary union", () => {
+    const summary = adaptTrainingRecordSummary({
+      recordId: "99999999-9999-4999-8999-999999999999",
+      kind: "mockInterview",
+      language: "en",
+      status: "partiallyCompleted",
+      startedAt: timestamp,
+      endedAt: timestamp,
+      durationSeconds: 120,
+      targetRole: { id: roleId, title: "Backend Engineer", company: "Riva" },
+      answeredQuestionCount: 1,
+      totalQuestionCount: 2,
+      overallScore: null,
+      reviewSummary: "The saved answer was useful.",
+      round: "technical",
+      difficulty: "pressure",
+    })
+
+    expect(summary).toEqual({
+      id: "99999999-9999-4999-8999-999999999999",
+      kind: "mockInterview",
+      language: "en",
+      status: "partiallyCompleted",
+      startedAt: timestamp,
+      endedAt: timestamp,
+      durationSeconds: 120,
+      targetRole: { id: roleId, title: "Backend Engineer", company: "Riva" },
+      answeredQuestionCount: 1,
+      totalQuestionCount: 2,
+      overallScore: null,
+      reviewSummary: "The saved answer was useful.",
+      round: "technical",
+      difficulty: "pressure",
     })
   })
 })

@@ -19,6 +19,12 @@ import type {
   InterviewTrainingEntryParameters,
   InterviewTrainingEntryPreparationResponse,
 } from "@/models/training-entry"
+import {
+  resolveInterviewTrainingEntry,
+  resolveTrainingEntryRoleAvailability,
+} from "@/models/training-entry"
+import type { RolesPageResponse } from "@/models/roles"
+import { getRolesPage } from "@/services/roles"
 import { getInterviewReviewResponseSchema, interviewPageResponseSchema } from "@/schemas/interview"
 import { apiRequest } from "@/services/api"
 
@@ -48,7 +54,50 @@ export function startInterview(input: StartInterviewInput): Promise<InterviewMut
 export function prepareInterviewTrainingEntry(
   input: InterviewTrainingEntryParameters,
 ): Promise<InterviewTrainingEntryPreparationResponse> {
-  return env.mock ? interviewMockService.prepareInterviewTrainingEntry(input) : realApiUnavailable()
+  if (env.mock) return interviewMockService.prepareInterviewTrainingEntry(input)
+  return prepareRealInterviewTrainingEntry(input)
+}
+
+async function prepareRealInterviewTrainingEntry(
+  input: InterviewTrainingEntryParameters,
+): Promise<InterviewTrainingEntryPreparationResponse> {
+  const [rolesResponse, interviewPage] = await Promise.all([getRolesPage(), getInterviewPage()])
+  if (interviewPage.session !== null && interviewPage.session.status !== "completed") {
+    throw new Error("Cannot prepare a history entry while an interview session is active.")
+  }
+
+  const setup = interviewPage.setup
+  const roleAvailability = resolveTrainingEntryRoleAvailability(
+    rolesResponse.roles,
+    getTrainableInterviewRoleIds(rolesResponse, setup),
+    input.targetRoleId,
+    setup.availability.status === "available" && rolesResponse.profileContext.completed,
+  )
+  const resolution = resolveInterviewTrainingEntry(setup, input, roleAvailability)
+
+  return {
+    page: { setup, session: null },
+    resolution,
+  }
+}
+
+function getTrainableInterviewRoleIds(
+  rolesResponse: RolesPageResponse,
+  setup: InterviewPageResponse["setup"],
+): string[] {
+  if (setup.availability.status !== "available" || !rolesResponse.profileContext.completed) {
+    return []
+  }
+  const setupRoleIds = new Set(setup.targetRoles.map((role) => role.id))
+  return rolesResponse.roles
+    .filter(
+      (role) =>
+        setupRoleIds.has(role.id) &&
+        role.preparationStatus !== "archived" &&
+        role.jobDescription.status === "ready" &&
+        role.jobDescriptionAnalysis !== null,
+    )
+    .map((role) => role.id)
 }
 
 export function beginInterviewQuestions(

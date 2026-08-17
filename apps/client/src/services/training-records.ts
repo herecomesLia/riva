@@ -11,6 +11,7 @@ import type {
   TrainingRecordReferenceAnswerTarget,
 } from "@/models/training-records"
 import {
+  mockInterviewTrainingRecordDetailResponseSchema,
   targetedPracticeTrainingRecordDetailResponseSchema,
   targetedPracticeTrainingRecordReferenceAnswerResponseSchema,
   trainingRecordsOverviewResponseSchema,
@@ -18,6 +19,7 @@ import {
 } from "@/schemas/training-records"
 import { apiRequest, ApiError } from "@/services/api"
 import {
+  adaptMockInterviewRecord,
   adaptTargetedPracticeRecord,
   adaptTrainingRecordsOverview,
   adaptTrainingRecordsPage,
@@ -106,9 +108,19 @@ export async function getTargetedPracticeRecord(
 export async function getMockInterviewRecord(
   recordId: string,
 ): Promise<MockInterviewRecordDetailResponse> {
-  return env.mock
-    ? trainingRecordsMockService.getMockInterviewRecord(recordId)
-    : realApiUnavailable()
+  if (env.mock) return trainingRecordsMockService.getMockInterviewRecord(recordId)
+
+  try {
+    const wire = mockInterviewTrainingRecordDetailResponseSchema.parse(
+      await apiRequest<unknown>(`/training-records/interview/${encodeURIComponent(recordId)}`),
+    )
+    return adaptMockInterviewRecord(wire)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      throw new TrainingRecordNotFoundError("mockInterview", recordId)
+    }
+    throw error
+  }
 }
 
 export async function requestTrainingRecordReferenceAnswer(

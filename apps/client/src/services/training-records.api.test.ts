@@ -8,6 +8,7 @@ import {
 
 import {
   getTargetedPracticeRecord,
+  getMockInterviewRecord,
   getTrainingRecordsOverview,
   getTrainingRecordReferenceAnswerGenerationStatus,
   listTrainingRecords,
@@ -74,6 +75,126 @@ function recordResponse(): Record<string, unknown> {
     ],
     exposedWeaknesses: [],
     recommendation: null,
+  }
+}
+
+function mockInterviewRecordResponse(): Record<string, unknown> {
+  const questionId = "33333333-3333-4333-8333-333333333333"
+  const answerId = "44444444-4444-4444-8444-444444444444"
+  const referenceAnswer = {
+    status: "ready",
+    content: {
+      recommendedStructure: ["Context", "Action", "Result"],
+      keyPoints: ["Name the measurable result."],
+      exampleAnswer: "I describe the context, my contribution, and the result.",
+      usageGuidance: "Adapt this structure to your own evidence.",
+      generatedAt: timestamp,
+    },
+  }
+  return {
+    recordId,
+    kind: "mockInterview",
+    status: "completed",
+    language: "en",
+    startedAt: timestamp,
+    endedAt: timestamp,
+    durationSeconds: 0,
+    targetRole: {
+      id: "22222222-2222-4222-8222-222222222222",
+      title: "Backend Engineer",
+      company: "Riva",
+    },
+    completionReason: "formalQuestionsCompleted",
+    setup: { round: "technical", difficulty: "pressure", plannedDurationMinutes: 30 },
+    questionDetails: [
+      {
+        record: {
+          status: "answered",
+          question: {
+            id: questionId,
+            prompt: "Describe a project you owned.",
+            type: "projectDeepDive",
+            assessedCapabilities: ["Ownership"],
+            order: 1,
+          },
+          answer: {
+            id: answerId,
+            content: "I owned the delivery and measured the outcome.",
+            submittedAt: timestamp,
+          },
+          followUps: [],
+        },
+        performance: {
+          questionId,
+          score: 84,
+          summary: "The answer was relevant.",
+          strengths: ["Clear ownership"],
+          issues: ["Add one more metric."],
+        },
+        referenceAnswer,
+        followUps: [],
+      },
+    ],
+    review: {
+      status: "complete",
+      review: {
+        overallPerformance: "The answer was structured and relevant.",
+        questionReviews: [
+          {
+            questionId,
+            score: 84,
+            summary: "The answer was relevant.",
+            strengths: ["Clear ownership"],
+            issues: ["Add one more metric."],
+          },
+        ],
+        mainStrengths: ["Clear ownership"],
+        frequentIssues: ["Quantify outcomes."],
+        exposedWeaknesses: ["Metrics"],
+        riskPoints: ["Probe scale."],
+        communicationSuggestions: ["Lead with the result."],
+        preparationSuggestions: ["Prepare two quantified examples."],
+        generatedAt: timestamp,
+        overallScore: 84,
+        dimensionScores: [
+          "relevance",
+          "structure",
+          "specificity",
+          "personalContribution",
+          "resultsAndEvidence",
+          "roleAlignment",
+          "communication",
+          "riskControl",
+        ].map((dimension) => ({
+          dimension,
+          score: 84,
+          explanation: "The evidence supports this score.",
+        })),
+        nextTraining: {
+          action: "targetedPractice",
+          reason: "Strengthen quantified outcomes.",
+          focusAreas: ["Results"],
+          questionType: "projectDeepDive",
+          difficulty: "pressure",
+        },
+      },
+    },
+    candidateQuestionExchanges: [
+      {
+        question: {
+          id: "55555555-5555-4555-8555-555555555555",
+          content: "How does the team define success?",
+          submittedAt: timestamp,
+        },
+        interviewerAnswer: "The team uses role-relevant delivery and quality signals.",
+        feedback: {
+          summary: "Specific and role-relevant.",
+          strengths: ["Specific"],
+          improvementSuggestions: [],
+          suggestedAlternatives: [],
+        },
+      },
+    ],
   }
 }
 
@@ -165,7 +286,7 @@ function followUpReferenceAnswerResponse(): Record<string, unknown> {
   }
 }
 
-function pageResponse(items = [summaryResponse()]) {
+function pageResponse(items: Array<Record<string, unknown>> = [summaryResponse()]) {
   return {
     items,
     pagination: {
@@ -218,6 +339,40 @@ describe("targeted practice training record API service", () => {
       }),
     )
     await expect(request).rejects.toBeInstanceOf(TrainingRecordNotFoundError)
+  })
+
+  it("requests and adapts a real Mock Interview training record", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(mockInterviewRecordResponse()))
+
+    const record = await getMockInterviewRecord(recordId)
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/training-records/interview/${recordId}`)
+    expect(record).toMatchObject({
+      id: recordId,
+      kind: "mockInterview",
+      overallScore: 84,
+      overallReview: {
+        status: "complete",
+        content: { summary: "The answer was structured and relevant." },
+      },
+      candidateQuestionExchanges: [{ question: "How does the team define success?" }],
+    })
+    expect(record.questions[0]).toMatchObject({
+      answer: { content: "I owned the delivery and measured the outcome." },
+      referenceAnswer: { status: "ready" },
+      evaluation: { overallScore: 84 },
+    })
+  })
+
+  it("maps a Mock Interview detail 404 to the structured not-found error", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "training_record_not_found" }, 404))
+
+    await expect(getMockInterviewRecord(recordId)).rejects.toEqual(
+      expect.objectContaining({
+        recordId,
+        recordKind: "mockInterview",
+      }),
+    )
   })
 
   it("preserves non-404 API errors", async () => {
@@ -301,6 +456,45 @@ describe("targeted practice training record API service", () => {
     const request = new URL(String(fetchMock.mock.calls[0]?.[0]), "http://localhost")
     expect(request.searchParams.getAll("kinds")).toEqual(["mockInterview"])
     expect(request.searchParams.has("statuses")).toBe(false)
+  })
+
+  it("adapts mixed targeted-practice and Mock Interview summaries", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        pageResponse([
+          summaryResponse(),
+          {
+            recordId: "99999999-9999-4999-8999-999999999999",
+            kind: "mockInterview",
+            language: "en",
+            status: "partiallyCompleted",
+            startedAt: timestamp,
+            endedAt: timestamp,
+            durationSeconds: 300,
+            targetRole: {
+              id: "22222222-2222-4222-8222-222222222222",
+              title: "Backend Engineer",
+              company: "Riva",
+            },
+            answeredQuestionCount: 1,
+            totalQuestionCount: 2,
+            overallScore: null,
+            reviewSummary: "Useful evidence was captured.",
+            round: "technical",
+            difficulty: "pressure",
+          },
+        ]),
+      ),
+    )
+
+    const result = await listTrainingRecords({ page: 1, pageSize: 20 })
+
+    expect(result.items.map((item) => item.kind)).toEqual(["targetedPractice", "mockInterview"])
+    expect(result.items[1]).toMatchObject({
+      id: "99999999-9999-4999-8999-999999999999",
+      round: "technical",
+      difficulty: "pressure",
+    })
   })
 
   it("rejects a malformed list response", async () => {

@@ -10,6 +10,11 @@ import {
   practiceQuestionSourceSchema,
   practiceRecommendationSchema,
 } from "@/schemas/practice"
+import {
+  interviewCandidateQuestionExchangeSchema,
+  interviewQuestionLearningDetailSchema,
+  interviewSessionReviewSchema,
+} from "@/schemas/interview"
 
 const uuidSchema = z.uuid()
 const dateTimeSchema = z.iso.datetime({ offset: true })
@@ -162,6 +167,65 @@ export const targetedPracticeTrainingRecordSummarySchema = z
   })
   .strict()
 
+export const mockInterviewTrainingRecordSummarySchema = z
+  .object({
+    recordId: uuidSchema,
+    kind: z.literal("mockInterview"),
+    language: interactionLanguageSchema,
+    status: z.enum(["completed", "endedEarly", "partiallyCompleted"]),
+    startedAt: dateTimeSchema,
+    endedAt: dateTimeSchema,
+    durationSeconds: z.number().int().nonnegative(),
+    targetRole: targetedPracticeTrainingRecordTargetRoleSchema,
+    answeredQuestionCount: z.number().int().nonnegative(),
+    totalQuestionCount: z.number().int().nonnegative(),
+    overallScore: z.number().min(0).max(100).nullable(),
+    reviewSummary: z.string().nullable(),
+    round: z.enum(["hr", "firstBusiness", "technical", "manager", "final", "comprehensive"]),
+    difficulty: z.enum(["basic", "pressure"]),
+  })
+  .strict()
+
+export const trainingRecordSummarySchema = z.discriminatedUnion("kind", [
+  targetedPracticeTrainingRecordSummarySchema,
+  mockInterviewTrainingRecordSummarySchema,
+])
+
+export const mockInterviewTrainingRecordSetupSchema = z
+  .object({
+    round: z.enum(["hr", "firstBusiness", "technical", "manager", "final", "comprehensive"]),
+    difficulty: z.enum(["basic", "pressure"]),
+    plannedDurationMinutes: z.union([z.literal(15), z.literal(30), z.literal(45)]),
+  })
+  .strict()
+
+export const mockInterviewTrainingRecordDetailResponseSchema = z
+  .object({
+    recordId: uuidSchema,
+    kind: z.literal("mockInterview"),
+    status: z.enum(["completed", "endedEarly", "partiallyCompleted"]),
+    language: interactionLanguageSchema,
+    startedAt: dateTimeSchema,
+    endedAt: dateTimeSchema,
+    durationSeconds: z.number().int().nonnegative(),
+    targetRole: targetedPracticeTrainingRecordTargetRoleSchema,
+    completionReason: z.enum(["formalQuestionsCompleted", "userEndedEarly"]),
+    setup: mockInterviewTrainingRecordSetupSchema,
+    questionDetails: z.array(interviewQuestionLearningDetailSchema),
+    review: interviewSessionReviewSchema,
+    candidateQuestionExchanges: z.array(interviewCandidateQuestionExchangeSchema),
+  })
+  .strict()
+  .superRefine((record, context) => {
+    if (record.endedAt < record.startedAt) {
+      context.addIssue({
+        code: "custom",
+        message: "endedAt cannot be before startedAt",
+        path: ["endedAt"],
+      })
+    }
+  })
+
 export const trainingRecordsPaginationSchema = z
   .object({
     page: z.number().int().min(1),
@@ -173,7 +237,7 @@ export const trainingRecordsPaginationSchema = z
 
 export const trainingRecordsPageResponseSchema = z
   .object({
-    items: z.array(targetedPracticeTrainingRecordSummarySchema),
+    items: z.array(trainingRecordSummarySchema),
     pagination: trainingRecordsPaginationSchema,
   })
   .strict()
@@ -252,10 +316,17 @@ export const targetedPracticeReferenceAnswerResponseSchema =
 export type TargetedPracticeTrainingRecordSummaryWire = z.infer<
   typeof targetedPracticeTrainingRecordSummarySchema
 >
+export type MockInterviewTrainingRecordSummaryWire = z.infer<
+  typeof mockInterviewTrainingRecordSummarySchema
+>
+export type TrainingRecordSummaryWire = z.infer<typeof trainingRecordSummarySchema>
 export type TrainingRecordsPaginationWire = z.infer<typeof trainingRecordsPaginationSchema>
 export type TrainingRecordsPageWire = z.infer<typeof trainingRecordsPageResponseSchema>
 export type TrainingRecordKindOverviewWire = z.infer<typeof trainingRecordKindOverviewSchema>
 export type TrainingRecordsOverviewWire = z.infer<typeof trainingRecordsOverviewResponseSchema>
+export type MockInterviewTrainingRecordDetailWire = z.infer<
+  typeof mockInterviewTrainingRecordDetailResponseSchema
+>
 export type TargetedPracticeTrainingRecordReferenceAnswerWire = z.infer<
   typeof targetedPracticeTrainingRecordReferenceAnswerResponseSchema
 >

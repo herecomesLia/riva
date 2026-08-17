@@ -13,6 +13,7 @@ from riva.core.training_records import (
 )
 from riva.models import User
 from riva.schemas.training_records import (
+    MockInterviewTrainingRecordDetailResponse,
     TargetedPracticeReferenceAnswerRequest,
     TargetedPracticeTrainingRecordDetailResponse,
     TrainingRecordKind,
@@ -177,6 +178,34 @@ async def get_targeted_practice_training_record(
 ) -> TargetedPracticeTrainingRecordDetailResponse:
     try:
         return await training_record_service.get_targeted_practice_record(
+            user_id=current_user.id,
+            record_id=record_id,
+        )
+    except TrainingRecordStateError as error:
+        if error.code == TRAINING_RECORD_NOT_FOUND:
+            raise APIError(status.HTTP_404_NOT_FOUND, TRAINING_RECORD_NOT_FOUND) from None
+        if error.code == TRAINING_RECORD_STATE_CONFLICT:
+            raise APIError(
+                status.HTTP_409_CONFLICT,
+                TRAINING_RECORD_STATE_CONFLICT,
+            ) from None
+        raise
+
+
+@router.get(
+    "/interview/{recordId}",
+    response_model=MockInterviewTrainingRecordDetailResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_mock_interview_training_record(
+    record_id: TrainingRecordId,
+    current_user: User = Depends(require_current_user),
+    training_record_service: TrainingRecordService = Depends(
+        get_training_record_service
+    ),
+) -> MockInterviewTrainingRecordDetailResponse:
+    try:
+        return await training_record_service.get_mock_interview_record(
             user_id=current_user.id,
             record_id=record_id,
         )

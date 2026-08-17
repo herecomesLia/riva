@@ -5,7 +5,7 @@ from typing import Literal
 from uuid import UUID
 
 from pydantic import ValidationError
-from sqlalchemy import Integer, and_, case, cast, extract, func, literal, select
+from sqlalchemy import and_, case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.models import (
@@ -23,6 +23,7 @@ from riva.schemas.practice_sessions import (
     PracticeQuestionSource,
 )
 from riva.schemas.training_records import (
+    MockInterviewTrainingRecordDetailResponse,
     TargetedPracticeAttemptRecordResponse,
     TargetedPracticeQuestionRecordResponse,
     TargetedPracticeSetupResponse,
@@ -37,6 +38,7 @@ from riva.schemas.training_records import (
     TrainingRecordTargetRoleResponse,
     TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
+    TargetedPracticeTrainingRecordSummaryResponse,
 )
 from riva.services.evaluation_generation import (
     practice_evaluation_output_from_artifact,
@@ -61,36 +63,26 @@ from riva.services.practice_api import (
     build_practice_main_reference_answer_response,
 )
 from riva.services.review_generation import practice_review_output_from_artifact
-
-
-TrainingRecordStateErrorCode = Literal[
-    "training_record_not_found",
-    "training_record_state_conflict",
-]
-TRAINING_RECORD_NOT_FOUND: TrainingRecordStateErrorCode = (
-    "training_record_not_found"
+from riva.services.interview_training_records import (
+    TRAINING_RECORD_NOT_FOUND,
+    TRAINING_RECORD_STATE_CONFLICT,
+    InterviewTrainingRecordService,
+    TrainingRecordStateError,
+    TrainingRecordStateErrorCode,
 )
-TRAINING_RECORD_STATE_CONFLICT: TrainingRecordStateErrorCode = (
-    "training_record_state_conflict"
-)
-
-
-class TrainingRecordStateError(RuntimeError):
-    safe_message = "The training record state is invalid."
-
-    def __init__(self, code: TrainingRecordStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 PracticeSessionServiceFactory = Callable[..., PracticeSessionService]
 ReferenceAnswerGenerationServiceFactory = Callable[
     ..., ReferenceAnswerGenerationService
 ]
+InterviewTrainingRecordServiceFactory = Callable[
+    [AsyncSession], InterviewTrainingRecordService
+]
 
 
 class TrainingRecordService:
-    """Read-only projections for completed practice sessions."""
+    """Coordinate read-only projections for completed training sessions."""
 
     def __init__(
         self,
@@ -102,11 +94,17 @@ class TrainingRecordService:
         reference_answer_generation_service_factory: (
             ReferenceAnswerGenerationServiceFactory
         ) = ReferenceAnswerGenerationService,
+        interview_training_record_service_factory: (
+            InterviewTrainingRecordServiceFactory
+        ) = InterviewTrainingRecordService,
     ) -> None:
         self.session = session
         self.practice_service_factory = practice_service_factory
         self.reference_answer_generation_service_factory = (
             reference_answer_generation_service_factory
+        )
+        self.interview_training_record_service_factory = (
+            interview_training_record_service_factory
         )
 
     async def list_training_records(
@@ -121,7 +119,7 @@ class TrainingRecordService:
         page: int = 1,
         page_size: int = 20,
     ) -> TrainingRecordsPageResponse:
-        """Return paginated summaries without hydrating training-record details."""
+        """Return one globally sorted page across both record projections."""
 
         _validate_pagination(page=page, page_size=page_size)
         if started_at_from is not None:
@@ -130,49 +128,38 @@ class TrainingRecordService:
             _require_aware_timestamp(started_at_to)
 
         requested_kinds = {kind.value for kind in kinds or ()}
-        if requested_kinds and TrainingRecordKind.TARGETED_PRACTICE.value not in (
+        items: list[TrainingRecordSummaryResponse] = []
+        if not requested_kinds or TrainingRecordKind.TARGETED_PRACTICE.value in (
             requested_kinds
         ):
-            return _empty_training_records_page(page=page, page_size=page_size)
-
-        eligible_records = _build_eligible_training_records_subquery(
-            user_id=user_id
-        )
-        filtered_statement = select(eligible_records)
-        if statuses:
-            filtered_statement = filtered_statement.where(
-                eligible_records.c.record_status.in_([status.value for status in statuses])
-            )
-        if target_role_id is not None:
-            filtered_statement = filtered_statement.where(
-                eligible_records.c.target_role_id == target_role_id
-            )
-        if started_at_from is not None:
-            filtered_statement = filtered_statement.where(
-                eligible_records.c.started_at >= started_at_from
-            )
-        if started_at_to is not None:
-            filtered_statement = filtered_statement.where(
-                eligible_records.c.started_at <= started_at_to
-            )
-
-        total_statement = select(func.count()).select_from(
-            filtered_statement.order_by(None).subquery("filtered_training_records")
-        )
-        total_items = int((await self.session.scalar(total_statement)) or 0)
-        records = (
-            await self.session.execute(
-                filtered_statement
-                .order_by(
-                    eligible_records.c.started_at.desc(),
-                    eligible_records.c.record_id.desc(),
+            items.extend(
+                await self._list_targeted_practice_summaries(
+                    user_id=user_id,
+                    statuses=statuses,
+                    target_role_id=target_role_id,
+                    started_at_from=started_at_from,
+                    started_at_to=started_at_to,
                 )
-                .offset((page - 1) * page_size)
-                .limit(page_size)
             )
-        ).mappings()
+        if not requested_kinds or TrainingRecordKind.MOCK_INTERVIEW.value in (
+            requested_kinds
+        ):
+            items.extend(
+                await self._interview_training_record_service().list_summaries(
+                    user_id=user_id,
+                    statuses=statuses,
+                    target_role_id=target_role_id,
+                    started_at_from=started_at_from,
+                    started_at_to=started_at_to,
+                )
+            )
 
-        items = [self._build_summary(row) for row in records]
+        items.sort(
+            key=lambda item: (item.started_at, str(item.record_id)),
+            reverse=True,
+        )
+        total_items = len(items)
+        items = items[(page - 1) * page_size : page * page_size]
         total_pages = (
             (total_items + page_size - 1) // page_size if total_items else 0
         )
@@ -191,95 +178,99 @@ class TrainingRecordService:
         *,
         user_id: UUID,
     ) -> TrainingRecordsOverviewResponse:
-        """Return aggregate metrics for the user's eligible practice records."""
+        """Return aggregate metrics across both completed record projections."""
 
+        targeted = await self._list_targeted_practice_summaries(user_id=user_id)
+        interviews = await self._interview_training_record_service().list_summaries(
+            user_id=user_id
+        )
+        records: list[TrainingRecordSummaryResponse] = [*targeted, *interviews]
+        scores = [
+            float(record.overall_score)
+            for record in records
+            if record.overall_score is not None
+        ]
+        average_score = _round_optional_average_score(
+            sum(scores) / len(scores) if scores else None
+        )
+        by_kind = {
+            kind: _build_kind_overview(
+                [record for record in records if record.kind == kind]
+            )
+            for kind in TrainingRecordKind
+        }
+        roles_by_id = {
+            str(record.target_role.id): record.target_role for record in records
+        }
+        target_roles = sorted(
+            roles_by_id.values(),
+            key=lambda role: (role.title, str(role.id)),
+        )
+        return TrainingRecordsOverviewResponse(
+            total_record_count=len(records),
+            completed_record_count=sum(
+                1 for record in records if record.status == TrainingRecordStatus.COMPLETED
+            ),
+            total_duration_seconds=sum(record.duration_seconds for record in records),
+            answered_question_count=sum(
+                record.answered_question_count for record in records
+            ),
+            average_score=average_score,
+            target_roles=target_roles,
+            by_kind=by_kind,
+        )
+
+    async def get_mock_interview_record(
+        self,
+        *,
+        user_id: UUID,
+        record_id: UUID,
+    ) -> MockInterviewTrainingRecordDetailResponse:
+        return await self._interview_training_record_service().get_record(
+            user_id=user_id,
+            record_id=record_id,
+        )
+
+    async def _list_targeted_practice_summaries(
+        self,
+        *,
+        user_id: UUID,
+        statuses: Sequence[TrainingRecordStatus] | None = None,
+        target_role_id: UUID | None = None,
+        started_at_from: datetime | None = None,
+        started_at_to: datetime | None = None,
+    ) -> list[TrainingRecordSummaryResponse]:
         eligible_records = _build_eligible_training_records_subquery(
             user_id=user_id
         )
-        duration_seconds = func.greatest(
-            literal(0),
-            extract(
-                "epoch",
-                eligible_records.c.ended_at - eligible_records.c.started_at,
-            ),
-        )
-        duration_seconds = cast(func.floor(duration_seconds), Integer)
-        completed_record = case(
-            (
-                eligible_records.c.record_status
-                == TrainingRecordStatus.COMPLETED.value,
-                1,
-            ),
-            else_=0,
-        )
-        metrics = (
+        statement = select(eligible_records)
+        if statuses:
+            statement = statement.where(
+                eligible_records.c.record_status.in_([status.value for status in statuses])
+            )
+        if target_role_id is not None:
+            statement = statement.where(
+                eligible_records.c.target_role_id == target_role_id
+            )
+        if started_at_from is not None:
+            statement = statement.where(eligible_records.c.started_at >= started_at_from)
+        if started_at_to is not None:
+            statement = statement.where(eligible_records.c.started_at <= started_at_to)
+        rows = (
             await self.session.execute(
-                select(
-                    func.count(eligible_records.c.record_id).label(
-                        "total_record_count"
-                    ),
-                    func.coalesce(func.sum(completed_record), 0).label(
-                        "completed_record_count"
-                    ),
-                    func.coalesce(func.sum(duration_seconds), 0).label(
-                        "total_duration_seconds"
-                    ),
-                    func.coalesce(
-                        func.sum(eligible_records.c.answered_question_count),
-                        0,
-                    ).label("answered_question_count"),
-                    func.avg(eligible_records.c.overall_score).label(
-                        "average_score"
-                    ),
-                ).select_from(eligible_records)
-            )
-        ).mappings().one()
-        target_roles = [
-            TrainingRecordTargetRoleResponse(
-                id=row["target_role_id"],
-                title=row["target_role_title"],
-                company=row["target_role_company"],
-            )
-            for row in (
-                await self.session.execute(
-                    select(
-                        eligible_records.c.target_role_id,
-                        eligible_records.c.target_role_title,
-                        eligible_records.c.target_role_company,
-                    )
-                    .distinct()
-                    .order_by(
-                        eligible_records.c.target_role_title.asc(),
-                        eligible_records.c.target_role_id.asc(),
-                    )
+                statement.order_by(
+                    eligible_records.c.started_at.desc(),
+                    eligible_records.c.record_id.desc(),
                 )
-            ).mappings()
-        ]
-        average_score = _round_optional_average_score(metrics["average_score"])
-        targeted_overview = TrainingRecordKindOverviewResponse(
-            record_count=int(metrics["total_record_count"] or 0),
-            completed_record_count=int(metrics["completed_record_count"] or 0),
-            average_score=average_score,
-        )
-        return TrainingRecordsOverviewResponse(
-            total_record_count=int(metrics["total_record_count"] or 0),
-            completed_record_count=int(metrics["completed_record_count"] or 0),
-            total_duration_seconds=int(metrics["total_duration_seconds"] or 0),
-            answered_question_count=int(metrics["answered_question_count"] or 0),
-            average_score=average_score,
-            target_roles=target_roles,
-            by_kind={
-                TrainingRecordKind.TARGETED_PRACTICE: targeted_overview,
-                TrainingRecordKind.MOCK_INTERVIEW: TrainingRecordKindOverviewResponse(
-                    record_count=0,
-                    completed_record_count=0,
-                    average_score=None,
-                ),
-            },
-        )
+            )
+        ).mappings()
+        return [self._build_summary(row) for row in rows]
+
+    def _interview_training_record_service(self) -> InterviewTrainingRecordService:
+        return self.interview_training_record_service_factory(self.session)
 
     @staticmethod
-    def _build_summary(row) -> TrainingRecordSummaryResponse:
+    def _build_summary(row) -> TargetedPracticeTrainingRecordSummaryResponse:
         started_at = row["started_at"]
         ended_at = row["ended_at"]
         if ended_at is None:
@@ -288,7 +279,7 @@ class TrainingRecordService:
         _require_aware_timestamp(ended_at)
         duration_seconds = max(0, int((ended_at - started_at).total_seconds()))
         average_score = _round_optional_average_score(row["overall_score"])
-        return TrainingRecordSummaryResponse(
+        return TargetedPracticeTrainingRecordSummaryResponse(
             record_id=row["record_id"],
             kind=TrainingRecordKind.TARGETED_PRACTICE,
             language=row["language"],
@@ -1042,6 +1033,25 @@ def _empty_training_records_page(
             "totalItems": 0,
             "totalPages": 0,
         },
+    )
+
+
+def _build_kind_overview(
+    records: Sequence[TrainingRecordSummaryResponse],
+) -> TrainingRecordKindOverviewResponse:
+    scores = [
+        float(record.overall_score)
+        for record in records
+        if record.overall_score is not None
+    ]
+    return TrainingRecordKindOverviewResponse(
+        record_count=len(records),
+        completed_record_count=sum(
+            1 for record in records if record.status == TrainingRecordStatus.COMPLETED
+        ),
+        average_score=_round_optional_average_score(
+            sum(scores) / len(scores) if scores else None
+        ),
     )
 
 
