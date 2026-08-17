@@ -22,43 +22,70 @@ def _configure_env(monkeypatch) -> None:
     monkeypatch.setenv("RIVA_LLM_BASE_URL", "https://example.invalid/v1")
 
 
-def _write_case(path, *, expected: str = "projectDeepDive"):
+def _write_case(
+    path,
+    *,
+    expected: str = "projectDeepDive",
+    with_rubric: bool = False,
+):
     input_model = valid_question_generation_input()
-    path.write_text(
-        json.dumps(
+    payload = {
+        "id": "cli.question",
+        "agentId": "question-generator",
+        "promptVersion": "2",
+        "input": input_model.model_dump(mode="json"),
+        "assertions": [
             {
-                "id": "cli.question",
-                "agentId": "question-generator",
-                "promptVersion": "2",
-                "input": input_model.model_dump(mode="json"),
-                "assertions": [
-                    {
-                        "operator": "exact",
-                        "path": "/question_type",
-                        "expected": expected,
-                    }
-                ],
+                "operator": "exact",
+                "path": "/question_type",
+                "expected": expected,
             }
-        )
-    )
+        ],
+    }
+    if with_rubric:
+        payload["rubrics"] = [
+            {
+                "id": "quality",
+                "criteria": "The question fits the requested context.",
+            }
+        ]
+    path.write_text(json.dumps(payload))
     return input_model
 
 
-def _provider(input_model, output_type: str = "projectDeepDive") -> FakeLLMProvider:
-    return FakeLLMProvider(
-        [
+def _provider(
+    input_model,
+    output_type: str = "projectDeepDive",
+    *,
+    include_judge: bool = False,
+) -> FakeLLMProvider:
+    responses: list[object] = [
+        {
+            "prompt": "Describe the payment decision?",
+            "question_type": output_type,
+            "difficulty": input_model.difficulty.value,
+            "assessed_capabilities": ["Ownership"],
+            "recommended_materials": [],
+            "answer_hints": ["Use evidence."],
+            "answer_framework": ["Context", "Action"],
+            "follow_up_directions": ["Probe details."],
+            "scoring_focus": ["Evidence"],
+        }
+    ]
+    if include_judge:
+        responses.append(
             {
-                "prompt": "Describe the payment decision?",
-                "question_type": output_type,
-                "difficulty": input_model.difficulty.value,
-                "assessed_capabilities": ["Ownership"],
-                "recommended_materials": [],
-                "answer_hints": ["Use evidence."],
-                "answer_framework": ["Context", "Action"],
-                "follow_up_directions": ["Probe details."],
-                "scoring_focus": ["Evidence"],
+                "scores": [
+                    {
+                        "rubricId": "quality",
+                        "score": 4,
+                        "evidence": "The question fits the supplied context.",
+                    }
+                ]
             }
-        ],
+        )
+    return FakeLLMProvider(
+        responses,
         usage=LLMUsage(input_tokens=4, output_tokens=6),
     )
 
@@ -133,6 +160,35 @@ def test_cli_writes_stable_json_output(monkeypatch, tmp_path) -> None:
     assert payload["inputTokens"] == 4
     assert payload["outputTokens"] == 6
     assert payload["cases"][0]["caseId"] == "cli.question"
+
+
+def test_cli_uses_optional_judge_model_and_prints_quality(monkeypatch, tmp_path) -> None:
+    _configure_env(monkeypatch)
+    input_model = _write_case(tmp_path / "case.json", with_rubric=True)
+    provider = _provider(input_model, include_judge=True)
+    monkeypatch.setattr(
+        eval_module,
+        "build_llm_provider",
+        lambda _settings: provider,
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "eval",
+            "run",
+            "--cases-dir",
+            str(tmp_path),
+            "--judge-model",
+            "judge-model",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "PASS cli.question quality=4.00/4" in result.output
+    assert "average quality=4.00/4" in result.output
+    assert provider.calls[0].model == "eval-model"
+    assert provider.calls[1].model == "judge-model"
 
 
 @pytest.mark.parametrize("missing", ["RIVA_LLM_PROVIDER", "RIVA_LLM_MODEL"])

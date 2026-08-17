@@ -89,5 +89,19 @@
     { "operator": "itemCount", "path": "/answer_framework", "min": 1, "max": 5 },
     { "operator": "itemCount", "path": "/scoring_focus", "min": 1, "max": 5 }
   ],
+  "rubrics": [
+    {
+      "id": "role-context-relevance",
+      "criteria": "The question is relevant to the supplied Backend Engineer role and context."
+    },
+    {
+      "id": "evidence-grounding",
+      "criteria": "The output stays grounded in the supplied profile and does not invent candidate experience."
+    },
+    {
+      "id": "requested-fit",
+      "criteria": "The question fits the requested behavioral type and basic difficulty."
+    }
+  ],
   "tags": ["smoke", "behavioral"]
 }

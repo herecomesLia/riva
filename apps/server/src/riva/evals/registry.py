@@ -7,11 +7,29 @@ from typing import Any
 from pydantic import BaseModel
 
 from riva.agents.base import Agent
+from riva.agents.evaluation import PracticeEvaluationAgent
+from riva.agents.interview_planning import InterviewPlanningAgent
+from riva.agents.interview_review import InterviewReviewAgent
 from riva.agents.interview_turn import InterviewTurnAgent
+from riva.agents.practice_recommendation import PracticeRecommendationAgent
+from riva.agents.practice_review import PracticeReviewAgent
 from riva.agents.question_generation import QuestionGenerationAgent
 from riva.integrations import LLMProvider
-from riva.prompts import INTERVIEW_TURN_PROMPT, QUESTION_GENERATION_PROMPT
+from riva.prompts import (
+    INTERVIEW_PLANNING_PROMPT,
+    INTERVIEW_REVIEW_PROMPT,
+    INTERVIEW_TURN_PROMPT,
+    PRACTICE_EVALUATION_PROMPT,
+    PRACTICE_RECOMMENDATION_PROMPT,
+    PRACTICE_REVIEW_PROMPT,
+    QUESTION_GENERATION_PROMPT,
+)
+from riva.schemas.evaluation import EvaluationInput
+from riva.schemas.interview_planning import InterviewPlanningInput
+from riva.schemas.interview_review import InterviewReviewInput
 from riva.schemas.interview_turn import InterviewTurnInput
+from riva.schemas.practice_recommendation import PracticeRecommendationInput
+from riva.schemas.practice_review import PracticeReviewInput
 from riva.schemas.question_generation import QuestionGenerationInput
 
 
@@ -104,6 +122,41 @@ def _canonical_registrations() -> tuple[AgentEvalRegistration, ...]:
             agent_factory=InterviewTurnAgent,
             prompt_id=INTERVIEW_TURN_PROMPT.prompt_id,
             prompt_version=INTERVIEW_TURN_PROMPT.version,
+        ),
+        AgentEvalRegistration(
+            agent_id="practice-evaluator",
+            input_schema=EvaluationInput,
+            agent_factory=PracticeEvaluationAgent,
+            prompt_id=PRACTICE_EVALUATION_PROMPT.prompt_id,
+            prompt_version=PRACTICE_EVALUATION_PROMPT.version,
+        ),
+        AgentEvalRegistration(
+            agent_id="practice-reviewer",
+            input_schema=PracticeReviewInput,
+            agent_factory=PracticeReviewAgent,
+            prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
+            prompt_version=PRACTICE_REVIEW_PROMPT.version,
+        ),
+        AgentEvalRegistration(
+            agent_id="practice-recommender",
+            input_schema=PracticeRecommendationInput,
+            agent_factory=PracticeRecommendationAgent,
+            prompt_id=PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
+            prompt_version=PRACTICE_RECOMMENDATION_PROMPT.version,
+        ),
+        AgentEvalRegistration(
+            agent_id="interview-planner",
+            input_schema=InterviewPlanningInput,
+            agent_factory=InterviewPlanningAgent,
+            prompt_id=INTERVIEW_PLANNING_PROMPT.prompt_id,
+            prompt_version=INTERVIEW_PLANNING_PROMPT.version,
+        ),
+        AgentEvalRegistration(
+            agent_id="interview-review",
+            input_schema=InterviewReviewInput,
+            agent_factory=InterviewReviewAgent,
+            prompt_id=INTERVIEW_REVIEW_PROMPT.prompt_id,
+            prompt_version=INTERVIEW_REVIEW_PROMPT.version,
         ),
     )
 

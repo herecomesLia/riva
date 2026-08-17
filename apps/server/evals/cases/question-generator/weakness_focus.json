@@ -98,5 +98,23 @@
     { "operator": "itemCount", "path": "/follow_up_directions", "min": 1, "max": 5 },
     { "operator": "itemCount", "path": "/scoring_focus", "min": 1, "max": 5 }
   ],
+  "rubrics": [
+    {
+      "id": "role-context-relevance",
+      "criteria": "The question is relevant to the supplied Backend Engineer role and project context."
+    },
+    {
+      "id": "evidence-grounding",
+      "criteria": "The output uses only supplied profile evidence and does not invent candidate facts."
+    },
+    {
+      "id": "requested-fit",
+      "criteria": "The question fits the requested project deep-dive type and pressure difficulty."
+    },
+    {
+      "id": "weakness-focus",
+      "criteria": "The question genuinely trains the supplied weakness about quantifying personal contribution."
+    }
+  ],
   "tags": ["weakness", "pressure"]
 }

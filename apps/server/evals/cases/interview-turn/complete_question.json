@@ -97,5 +97,15 @@
     { "operator": "itemCount", "path": "/assessment/strengths", "max": 5 },
     { "operator": "itemCount", "path": "/assessment/issues", "max": 5 }
   ],
+  "rubrics": [
+    {
+      "id": "answer-grounded-assessment",
+      "criteria": "The assessment is grounded in the submitted main answer and completed follow-up answer."
+    },
+    {
+      "id": "completion-decision",
+      "criteria": "Completing the question is appropriate because the available follow-up slot has been answered."
+    }
+  ],
   "tags": ["smoke", "complete"]
 }

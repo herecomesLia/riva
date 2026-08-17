@@ -9,6 +9,7 @@ import typer
 from pydantic import ValidationError
 
 from riva.core.config import Settings
+from riva.evals.quality_judge import AgentEvalQualityJudge
 from riva.evals.registry import build_default_registry
 from riva.evals.runner import AgentEvalRunner, load_eval_cases
 from riva.integrations import build_llm_provider
@@ -25,6 +26,13 @@ def run(
     agent: Annotated[
         str | None,
         typer.Option("--agent", help="Run cases for one registered agent."),
+    ] = None,
+    judge_model: Annotated[
+        str | None,
+        typer.Option(
+            "--judge-model",
+            help="Optional model used for semantic rubric judging.",
+        ),
     ] = None,
     cases_dir: Annotated[
         Path,
@@ -90,10 +98,20 @@ def run(
         except ValueError as error:
             _fail(str(error), code=2)
 
+    quality_judge = AgentEvalQualityJudge(
+        provider,
+        (judge_model or "").strip() or model,
+    )
+
     try:
         cases = load_eval_cases(cases_dir)
         result = asyncio.run(
-            AgentEvalRunner(provider, model, registry).run_cases(
+            AgentEvalRunner(
+                provider,
+                model,
+                registry,
+                quality_judge=quality_judge,
+            ).run_cases(
                 cases,
                 agent_id=agent,
             )
@@ -103,15 +121,26 @@ def run(
 
     for case in result.cases:
         status = "PASS" if case.passed else "FAIL"
-        typer.echo(f"{status} {case.case_id}")
+        quality = (
+            f" quality={case.average_rubric_score:.2f}/4"
+            if case.average_rubric_score is not None
+            else ""
+        )
+        typer.echo(f"{status} {case.case_id}{quality}")
         if not case.passed:
             for failure in case.failed_assertions:
                 typer.echo(f"  {failure}")
 
+    average_quality = (
+        f"{result.average_rubric_score:.2f}/4"
+        if result.average_rubric_score is not None
+        else "n/a"
+    )
     typer.echo(
         "Summary: "
         f"{result.passed}/{result.total} passed "
         f"(pass rate {result.pass_rate:.2%}); "
+        f"average quality={average_quality}; "
         f"input tokens={result.input_tokens}, "
         f"output tokens={result.output_tokens}"
     )

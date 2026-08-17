@@ -86,5 +86,19 @@
     { "operator": "numberRange", "path": "/assessment/score", "min": 0, "max": 100 },
     { "operator": "itemCount", "path": "/assessment/issues", "min": 1, "max": 5 }
   ],
+  "rubrics": [
+    {
+      "id": "answer-grounded-assessment",
+      "criteria": "The assessment is grounded in the submitted vague main answer."
+    },
+    {
+      "id": "follow-up-decision",
+      "criteria": "Requesting a follow-up is appropriate because important evidence is still missing."
+    },
+    {
+      "id": "follow-up-relevance",
+      "criteria": "The follow-up prompt directly probes the evidence gap in the submitted answer."
+    }
+  ],
   "tags": ["follow-up", "pressure"]
 }

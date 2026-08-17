@@ -21,6 +21,10 @@ from riva.schemas.dashboard import (
     DashboardTargetedPracticeRecommendationResponse,
     DashboardWeaknessResponse,
 )
+from riva.schemas.eval_quality_judge import (
+    QualityJudgeOutput,
+    QualityJudgeRubricScore,
+)
 from riva.schemas.health import HealthResponse
 from riva.schemas.health import DependencyHealthStatus, ServiceHealthStatus
 from riva.schemas.interview import (
@@ -466,6 +470,8 @@ __all__ = [
     "DashboardScoreMetricSnapshotResponse",
     "DashboardTargetedPracticeRecommendationResponse",
     "DashboardWeaknessResponse",
+    "QualityJudgeOutput",
+    "QualityJudgeRubricScore",
     "DependencyHealthStatus",
     "HealthResponse",
     "InteractionLanguage",

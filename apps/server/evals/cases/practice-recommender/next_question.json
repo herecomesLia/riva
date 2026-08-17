@@ -1,0 +1,78 @@
+{
+  "id": "practice-recommender.next-question",
+  "agentId": "practice-recommender",
+  "promptVersion": "1",
+  "input": {
+    "interactionLanguage": "en",
+    "question": {
+      "prompt": "Describe how you designed the payment service boundary.",
+      "questionType": "projectDeepDive",
+      "difficulty": "basic",
+      "assessedCapabilities": ["service design"],
+      "scoringFocus": ["personal contribution", "result evidence"]
+    },
+    "followUpCompletionReason": "noFollowUpRequired",
+    "evaluation": {
+      "overallScore": 88,
+      "dimensionScores": [
+        {
+          "dimension": "relevance",
+          "score": 90,
+          "explanation": "The answer directly addresses the design question."
+        },
+        {
+          "dimension": "structure",
+          "score": 86,
+          "explanation": "The answer has a clear action and result sequence."
+        },
+        {
+          "dimension": "specificity",
+          "score": 85,
+          "explanation": "The answer gives an ownership boundary and observed error-rate result."
+        },
+        {
+          "dimension": "communication",
+          "score": 90,
+          "explanation": "The answer is concise and clear."
+        }
+      ],
+      "focusAssessments": [
+        { "focusIndex": 0, "status": "demonstrated", "explanation": "Ownership is explicit." },
+        {
+          "focusIndex": 1,
+          "status": "demonstrated",
+          "explanation": "The answer states the measured error-rate result."
+        }
+      ]
+    },
+    "review": {
+      "overallPerformance": "The answer meets the current question's main goal.",
+      "highlights": ["Ownership and a measurable result are clear."],
+      "mainIssues": ["The trade-off rationale could be explored in a later question."],
+      "improvementSuggestions": ["Keep the same evidence standard in the next project question."],
+      "reusableAnswerStructure": ["Decision", "Trade-off", "Result"],
+      "exposedWeaknesses": ["trade-off rationale"]
+    }
+  },
+  "assertions": [
+    { "operator": "exact", "path": "/action", "expected": "nextQuestion" },
+    { "operator": "exact", "path": "/nextQuestion/questionType", "expected": "projectDeepDive" },
+    { "operator": "exact", "path": "/nextQuestion/difficulty", "expected": "basic" },
+    { "operator": "itemCount", "path": "/nextQuestion/focusAreas", "max": 3 }
+  ],
+  "rubrics": [
+    {
+      "id": "action-consistency",
+      "criteria": "nextQuestion is consistent with the strong evaluation and the review that the current goal is sufficiently addressed."
+    },
+    {
+      "id": "focus-area-grounding",
+      "criteria": "Any focusAreas are relevant to the supplied exposed weakness and do not invent a different taxonomy."
+    },
+    {
+      "id": "question-policy-fit",
+      "criteria": "The next question preserves the supplied projectDeepDive type and basic difficulty and remains a recommendation only."
+    }
+  ],
+  "tags": ["practice", "recommendation", "next"]
+}

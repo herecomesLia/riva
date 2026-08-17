@@ -1,0 +1,97 @@
+{
+  "id": "interview-planner.technical-round",
+  "agentId": "interview-planner",
+  "promptVersion": "1",
+  "input": {
+    "session": {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "version": 1,
+      "status": "opening",
+      "language": "en",
+      "configuration": {
+        "targetRoleId": "20000000-0000-4000-8000-000000000002",
+        "round": "technical",
+        "difficulty": "pressure",
+        "durationMinutes": 30
+      }
+    },
+    "configuration": {
+      "targetRoleId": "20000000-0000-4000-8000-000000000002",
+      "round": "technical",
+      "difficulty": "pressure",
+      "durationMinutes": 30
+    },
+    "interactionLanguage": "en",
+    "careerProfile": {
+      "profileId": "20000000-0000-4000-8000-000000000003",
+      "version": 4,
+      "summary": "Backend engineer with Python API experience.",
+      "education": [],
+      "workExperiences": [],
+      "projectExperiences": [],
+      "skills": ["Python"]
+    },
+    "targetRole": {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "title": "Backend Engineer",
+      "company": "Example Labs",
+      "recruitmentType": "experienced",
+      "location": "Shanghai",
+      "version": 3,
+      "jobDescriptionVersion": 2
+    },
+    "jobDescriptionAnalysis": {
+      "jobDescriptionVersion": 2,
+      "analysisVersion": 1,
+      "rivaSummary": "Build reliable Python APIs.",
+      "responsibilities": ["Design and operate backend APIs"],
+      "qualificationRequirements": {
+        "education": [],
+        "graduation_cohorts": [],
+        "majors": [],
+        "experience": ["Backend service experience"],
+        "languages": [],
+        "certifications": [],
+        "other": []
+      },
+      "requiredSkills": {
+        "programming_languages": ["Python"],
+        "frameworks_and_libraries": [],
+        "platforms": [],
+        "tools": [],
+        "concepts_and_methods": ["Distributed systems"],
+        "databases_and_middleware": [],
+        "other": []
+      },
+      "preferredQualifications": [],
+      "softSkills": ["Clear communication"],
+      "businessDomains": ["Payments"]
+    },
+    "matchingAnalysis": null
+  },
+  "assertions": [
+    { "operator": "numberRange", "path": "/totalMainQuestions", "min": 3, "max": 5 },
+    { "operator": "itemCount", "path": "/questions", "min": 3, "max": 5 },
+    { "operator": "exact", "path": "/questions/0/order", "expected": 1 },
+    { "operator": "exact", "path": "/questions/1/order", "expected": 2 }
+  ],
+  "rubrics": [
+    {
+      "id": "technical-coverage",
+      "criteria": "The plan covers technical API and distributed-systems capabilities relevant to the supplied technical round and JD."
+    },
+    {
+      "id": "distinct-questions",
+      "criteria": "The questions have distinct objectives and do not substantially repeat one another."
+    },
+    {
+      "id": "context-relevance",
+      "criteria": "The plan is grounded in the supplied Backend Engineer profile and payment API context."
+    },
+    {
+      "id": "duration-fit",
+      "criteria": "The number and depth of questions are reasonable for a 30-minute interview."
+    }
+  ],
+  "tags": ["interview", "planning", "technical"]
+}

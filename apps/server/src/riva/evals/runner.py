@@ -11,12 +11,18 @@ from riva.evals.models import (
     AgentEvalCase,
     AgentEvalCaseResult,
     AgentEvalRunResult,
+    AgentEvalRubricResult,
     ContainsAllAssertion,
     ContainsAssertion,
     ExactAssertion,
     ItemCountAssertion,
     NotContainsAssertion,
     NumberRangeAssertion,
+)
+from riva.evals.quality_judge import (
+    AgentEvalQualityJudge,
+    QualityJudgeInput,
+    QualityJudgeRubricMismatchError,
 )
 from riva.evals.registry import AgentEvalRegistry, UnknownAgentError
 from riva.integrations import LLMProvider
@@ -31,12 +37,14 @@ class AgentEvalRunner:
         provider: LLMProvider,
         model: str,
         registry: AgentEvalRegistry,
+        quality_judge: AgentEvalQualityJudge | None = None,
     ) -> None:
         if not model.strip():
             raise ValueError("eval model must not be empty")
         self.provider = provider
         self.model = model
         self.registry = registry
+        self.quality_judge = quality_judge
 
     async def run_case(self, case: AgentEvalCase) -> AgentEvalCaseResult:
         try:
@@ -95,14 +103,60 @@ class AgentEvalRunner:
             if failure is not None:
                 failures.append(failure)
 
+        rubric_results: list[AgentEvalRubricResult] = []
+        average_rubric_score: float | None = None
+        input_tokens = result.usage.input_tokens
+        output_tokens = result.usage.output_tokens
+        if case.rubrics:
+            if self.quality_judge is None:
+                failures.append(
+                    "quality judge is required for cases with rubrics"
+                )
+            else:
+                judge_input = QualityJudgeInput(
+                    caseId=case.id,
+                    targetAgentId=case.agent_id,
+                    targetPromptVersion=case.prompt_version,
+                    input=case.input,
+                    output=output,
+                    rubrics=case.rubrics,
+                )
+                try:
+                    judge_result = await self.quality_judge.run(judge_input)
+                    _validate_quality_judge_scores(
+                        case.rubrics,
+                        judge_result.output,
+                        usage=judge_result.usage,
+                    )
+                except Exception as error:
+                    judge_usage = getattr(error, "usage", None)
+                    if judge_usage is not None:
+                        input_tokens += judge_usage.input_tokens
+                        output_tokens += judge_usage.output_tokens
+                    failures.append(
+                        _exception_message("quality judge failed", error)
+                    )
+                else:
+                    input_tokens += judge_result.usage.input_tokens
+                    output_tokens += judge_result.usage.output_tokens
+                    rubric_results, average_rubric_score = _rubric_results(
+                        case.rubrics,
+                        judge_result.output,
+                    )
+                    failures.extend(
+                        _rubric_failures(case.rubrics, rubric_results)
+                    )
+
         return AgentEvalCaseResult(
             caseId=case.id,
             agentId=case.agent_id,
             promptVersion=case.prompt_version,
             passed=not failures,
             failedAssertions=failures,
-            inputTokens=result.usage.input_tokens,
-            outputTokens=result.usage.output_tokens,
+            inputTokens=input_tokens,
+            outputTokens=output_tokens,
+            rubricResults=rubric_results,
+            averageRubricScore=average_rubric_score,
         )
 
     async def run_cases(
@@ -125,6 +179,11 @@ class AgentEvalRunner:
         passed = sum(result.passed for result in results)
         input_tokens = sum(result.input_tokens for result in results)
         output_tokens = sum(result.output_tokens for result in results)
+        rubric_scores = [
+            rubric.score
+            for result in results
+            for rubric in result.rubric_results
+        ]
         total = len(results)
         return AgentEvalRunResult(
             agentId=agent_id or "all",
@@ -134,6 +193,11 @@ class AgentEvalRunner:
             passRate=passed / total if total else 0.0,
             inputTokens=input_tokens,
             outputTokens=output_tokens,
+            averageRubricScore=(
+                sum(rubric_scores) / len(rubric_scores)
+                if rubric_scores
+                else None
+            ),
             cases=results,
         )
 
@@ -190,6 +254,56 @@ def _failed_case(case: AgentEvalCase, failures: list[str]) -> AgentEvalCaseResul
         passed=False,
         failedAssertions=failures,
     )
+
+
+def _validate_quality_judge_scores(
+    rubrics: Sequence[Any],
+    output: Any,
+    *,
+    usage: Any,
+) -> None:
+    expected_ids = [rubric.id for rubric in rubrics]
+    actual_ids = [score.rubric_id for score in output.scores]
+    if (
+        len(actual_ids) != len(set(actual_ids))
+        or len(actual_ids) != len(expected_ids)
+        or set(actual_ids) != set(expected_ids)
+    ):
+        raise QualityJudgeRubricMismatchError(
+            expected_ids,
+            actual_ids,
+            usage=usage,
+        )
+
+
+def _rubric_results(
+    rubrics: Sequence[Any],
+    output: Any,
+) -> tuple[list[AgentEvalRubricResult], float]:
+    scores = {score.rubric_id: score for score in output.scores}
+    results = [
+        AgentEvalRubricResult(
+            rubricId=rubric.id,
+            score=scores[rubric.id].score,
+            passed=scores[rubric.id].score >= rubric.min_score,
+            evidence=scores[rubric.id].evidence,
+        )
+        for rubric in rubrics
+    ]
+    return results, sum(result.score for result in results) / len(results)
+
+
+def _rubric_failures(
+    rubrics: Sequence[Any],
+    results: Sequence[AgentEvalRubricResult],
+) -> list[str]:
+    minimums = {rubric.id: rubric.min_score for rubric in rubrics}
+    return [
+        f"rubric[{result.rubric_id}] score={result.score}/"
+        f"{minimums[result.rubric_id]}: {result.evidence}"
+        for result in results
+        if not result.passed
+    ]
 
 
 def _exception_message(prefix: str, error: Exception) -> str:

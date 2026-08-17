@@ -1,9 +1,11 @@
-"""Offline, deterministic evaluation support for Riva agents."""
+"""Offline evaluation support for Riva agents."""
 
 from riva.evals.models import (
     AgentEvalAssertion,
     AgentEvalCase,
     AgentEvalCaseResult,
+    AgentEvalRubric,
+    AgentEvalRubricResult,
     AgentEvalRunResult,
     ContainsAllAssertion,
     ContainsAssertion,
@@ -19,14 +21,22 @@ from riva.evals.registry import (
     UnknownAgentError,
     build_default_registry,
 )
+from riva.evals.quality_judge import (
+    AgentEvalQualityJudge,
+    QualityJudgeInput,
+    QualityJudgeRubricMismatchError,
+)
 from riva.evals.runner import AgentEvalRunner, load_eval_cases
 
 __all__ = [
     "AgentEvalAssertion",
     "AgentEvalCase",
     "AgentEvalCaseResult",
+    "AgentEvalQualityJudge",
     "AgentEvalRegistration",
     "AgentEvalRegistry",
+    "AgentEvalRubric",
+    "AgentEvalRubricResult",
     "AgentEvalRunResult",
     "AgentEvalRunner",
     "ContainsAllAssertion",
@@ -36,6 +46,8 @@ __all__ = [
     "ItemCountAssertion",
     "NotContainsAssertion",
     "NumberRangeAssertion",
+    "QualityJudgeInput",
+    "QualityJudgeRubricMismatchError",
     "UnknownAgentError",
     "build_default_registry",
     "load_eval_cases",

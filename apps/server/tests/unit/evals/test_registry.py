@@ -14,7 +14,15 @@ from riva.schemas.question_generation import QuestionGenerationInput
 def test_default_registry_contains_two_canonical_agents() -> None:
     registry = build_default_registry()
 
-    assert registry.agent_ids == ("interview-turn", "question-generator")
+    assert registry.agent_ids == (
+        "interview-planner",
+        "interview-review",
+        "interview-turn",
+        "practice-evaluator",
+        "practice-recommender",
+        "practice-reviewer",
+        "question-generator",
+    )
     question = registry.get("question-generator")
     interview = registry.get("interview-turn")
     assert question.input_schema is QuestionGenerationInput
@@ -23,6 +31,11 @@ def test_default_registry_contains_two_canonical_agents() -> None:
     assert interview.input_schema is InterviewTurnInput
     assert interview.prompt_id == INTERVIEW_TURN_PROMPT.prompt_id
     assert interview.prompt_version == INTERVIEW_TURN_PROMPT.version
+
+    for agent_id in registry.agent_ids:
+        registration = registry.get(agent_id)
+        assert registration.agent_id == agent_id
+        assert registration.prompt_version
 
 
 def test_registry_rejects_duplicate_and_unknown_agents() -> None:

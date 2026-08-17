@@ -29,6 +29,16 @@ def _non_empty(value: str, field_name: str) -> str:
     return value
 
 
+class AgentEvalRubric(EvalModel):
+    id: StrictStr = Field(min_length=1)
+    criteria: StrictStr = Field(min_length=1)
+    min_score: StrictInt = Field(alias="minScore", default=3, ge=0, le=4)
+
+    def model_post_init(self, __context: Any) -> None:
+        _non_empty(self.id, "rubric id")
+        _non_empty(self.criteria, "rubric criteria")
+
+
 class EvalAssertionModel(EvalModel):
     path: StrictStr = Field(min_length=1)
 
@@ -113,11 +123,25 @@ class AgentEvalCase(EvalModel):
     input: dict[str, Any]
     assertions: list[AgentEvalAssertion]
     tags: list[StrictStr] = Field(default_factory=list)
+    rubrics: list[AgentEvalRubric] = Field(default_factory=list)
 
     def model_post_init(self, __context: Any) -> None:
         _non_empty(self.id, "id")
         _non_empty(self.agent_id, "agentId")
         _non_empty(self.prompt_version, "promptVersion")
+        rubric_ids = [rubric.id for rubric in self.rubrics]
+        if len(rubric_ids) != len(set(rubric_ids)):
+            raise ValueError("rubrics must contain unique ids")
+
+
+class AgentEvalRubricResult(EvalModel):
+    rubric_id: StrictStr = Field(alias="rubricId", min_length=1)
+    score: StrictInt = Field(ge=0, le=4)
+    passed: bool
+    evidence: StrictStr = Field(min_length=1, max_length=500)
+
+    def model_post_init(self, __context: Any) -> None:
+        _non_empty(self.evidence, "rubric evidence")
 
 
 class AgentEvalCaseResult(EvalModel):
@@ -131,6 +155,16 @@ class AgentEvalCaseResult(EvalModel):
     )
     input_tokens: StrictInt = Field(alias="inputTokens", default=0, ge=0)
     output_tokens: StrictInt = Field(alias="outputTokens", default=0, ge=0)
+    rubric_results: list[AgentEvalRubricResult] = Field(
+        alias="rubricResults",
+        default_factory=list,
+    )
+    average_rubric_score: float | None = Field(
+        alias="averageRubricScore",
+        default=None,
+        ge=0,
+        le=4,
+    )
 
 
 class AgentEvalRunResult(EvalModel):
@@ -141,6 +175,12 @@ class AgentEvalRunResult(EvalModel):
     pass_rate: float = Field(alias="passRate", ge=0, le=1)
     input_tokens: StrictInt = Field(alias="inputTokens", ge=0)
     output_tokens: StrictInt = Field(alias="outputTokens", ge=0)
+    average_rubric_score: float | None = Field(
+        alias="averageRubricScore",
+        default=None,
+        ge=0,
+        le=4,
+    )
     cases: list[AgentEvalCaseResult]
 
 
@@ -148,6 +188,8 @@ __all__ = [
     "AgentEvalAssertion",
     "AgentEvalCase",
     "AgentEvalCaseResult",
+    "AgentEvalRubric",
+    "AgentEvalRubricResult",
     "AgentEvalRunResult",
     "ContainsAllAssertion",
     "ContainsAssertion",

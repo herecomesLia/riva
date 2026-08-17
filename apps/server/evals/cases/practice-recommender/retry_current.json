@@ -1,0 +1,78 @@
+{
+  "id": "practice-recommender.retry-current",
+  "agentId": "practice-recommender",
+  "promptVersion": "1",
+  "input": {
+    "interactionLanguage": "en",
+    "question": {
+      "prompt": "Describe how you designed the payment service boundary.",
+      "questionType": "projectDeepDive",
+      "difficulty": "basic",
+      "assessedCapabilities": ["service design"],
+      "scoringFocus": ["personal contribution", "result evidence"]
+    },
+    "followUpCompletionReason": "noFollowUpRequired",
+    "evaluation": {
+      "overallScore": 45,
+      "dimensionScores": [
+        {
+          "dimension": "relevance",
+          "score": 60,
+          "explanation": "The answer mentions the project but does not answer the design question."
+        },
+        {
+          "dimension": "structure",
+          "score": 40,
+          "explanation": "The answer has no clear action sequence."
+        },
+        {
+          "dimension": "specificity",
+          "score": 30,
+          "explanation": "No concrete action or result is provided."
+        },
+        {
+          "dimension": "communication",
+          "score": 55,
+          "explanation": "The answer is understandable but too vague."
+        }
+      ],
+      "focusAssessments": [
+        {
+          "focusIndex": 0,
+          "status": "missing",
+          "explanation": "No personal contribution is stated."
+        },
+        { "focusIndex": 1, "status": "missing", "explanation": "No result evidence is stated." }
+      ]
+    },
+    "review": {
+      "overallPerformance": "The answer does not yet expose the candidate's design work.",
+      "highlights": ["The answer stays on the payment project."],
+      "mainIssues": ["Personal action and result evidence are missing."],
+      "improvementSuggestions": [
+        "State the boundary decision, personal trade-off, and observed result."
+      ],
+      "reusableAnswerStructure": ["Context", "Personal decision", "Evidence"],
+      "exposedWeaknesses": ["personal contribution evidence", "result evidence"]
+    }
+  },
+  "assertions": [
+    { "operator": "exact", "path": "/action", "expected": "retryCurrent" },
+    { "operator": "itemCount", "path": "/reason", "min": 1, "max": 2000 }
+  ],
+  "rubrics": [
+    {
+      "id": "action-consistency",
+      "criteria": "retryCurrent is consistent with the low evaluation and the review's unresolved evidence gaps."
+    },
+    {
+      "id": "weakness-focus",
+      "criteria": "The recommendation addresses the supplied exposed weaknesses without inventing a new weakness."
+    },
+    {
+      "id": "bounded-recommendation",
+      "criteria": "The output is a recommendation based on the supplied evaluation and review, not a claim that an action was executed."
+    }
+  ],
+  "tags": ["practice", "recommendation", "retry"]
+}

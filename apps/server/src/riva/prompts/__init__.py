@@ -15,6 +15,7 @@ from riva.prompts.interview_candidate_question import (
     INTERVIEW_CANDIDATE_QUESTION_PROMPT,
 )
 from riva.prompts.interview_review import INTERVIEW_REVIEW_PROMPT
+from riva.prompts.eval_quality_judge import EVAL_QUALITY_JUDGE_PROMPT
 from riva.prompts.practice_evaluation import PRACTICE_EVALUATION_PROMPT
 from riva.prompts.practice_review import PRACTICE_REVIEW_PROMPT
 from riva.prompts.practice_recommendation import PRACTICE_RECOMMENDATION_PROMPT
@@ -36,6 +37,7 @@ __all__ = [
     "INTERVIEW_TURN_PROMPT",
     "INTERVIEW_CANDIDATE_QUESTION_PROMPT",
     "INTERVIEW_REVIEW_PROMPT",
+    "EVAL_QUALITY_JUDGE_PROMPT",
     "PRACTICE_EVALUATION_PROMPT",
     "PRACTICE_REVIEW_PROMPT",
     "PRACTICE_RECOMMENDATION_PROMPT",
