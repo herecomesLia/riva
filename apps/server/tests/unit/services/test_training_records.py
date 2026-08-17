@@ -474,6 +474,48 @@ def test_list_training_records_merges_interview_records_before_global_pagination
     assert [item.record_id for item in mock_only.items] == [interview_id]
 
 
+def test_list_all_summaries_merges_both_kinds_without_pagination() -> None:
+    practice_id = uuid4()
+    interview_id = uuid4()
+    fake_session = FakeListSession(
+        rows=[
+            {
+                "record_id": practice_id,
+                "language": "en",
+                "started_at": NOW,
+                "ended_at": NOW + timedelta(seconds=60),
+                "question_type": "behavioral",
+                "difficulty": "basic",
+                "target_role_id": uuid4(),
+                "target_role_title": "Backend Engineer",
+                "target_role_company": "Riva",
+                "answered_question_count": 1,
+                "total_question_count": 1,
+                "overall_score": 70,
+                "review_summary": None,
+                "record_status": "completed",
+            }
+        ],
+        total_items=1,
+    )
+    interview = interview_summary(record_id=interview_id)
+    service = TrainingRecordService(
+        fake_session,
+        interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(
+            [interview]
+        ),
+    )
+
+    summaries = asyncio.run(service.list_all_summaries(uuid4()))
+
+    assert {item.record_id for item in summaries} == {practice_id, interview_id}
+    assert {item.kind for item in summaries} == {
+        TrainingRecordKind.TARGETED_PRACTICE,
+        TrainingRecordKind.MOCK_INTERVIEW,
+    }
+    assert len(fake_session.execute_calls) == 1
+
+
 def test_get_training_records_overview_aggregates_record_scores_and_roles() -> None:
     role_a = uuid4()
     role_b = uuid4()

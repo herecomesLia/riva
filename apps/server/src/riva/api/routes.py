@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from riva.api.auth import router as auth_router
 from riva.api.competencies import router as competencies_router
+from riva.api.dashboard import router as dashboard_router
 from riva.api.health import router as health_router
 from riva.api.interview import router as interview_router
 from riva.api.profile import router as profile_router
@@ -15,6 +16,7 @@ from riva.api.users import router as users_router
 router = APIRouter()
 router.include_router(auth_router)
 router.include_router(competencies_router)
+router.include_router(dashboard_router)
 router.include_router(health_router)
 router.include_router(interview_router)
 router.include_router(profile_router)

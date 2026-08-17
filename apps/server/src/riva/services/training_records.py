@@ -173,6 +173,23 @@ class TrainingRecordService:
             },
         )
 
+    async def list_all_summaries(
+        self,
+        user_id: UUID,
+    ) -> list[TrainingRecordSummaryResponse]:
+        """Return the complete read-only summary projection for a user.
+
+        This intentionally does not paginate or impose dashboard ordering.
+        Consumers that need a window or a latest-record projection should do
+        that from the same summaries returned here.
+        """
+
+        targeted = await self._list_targeted_practice_summaries(user_id=user_id)
+        interviews = await self._interview_training_record_service().list_summaries(
+            user_id=user_id
+        )
+        return [*targeted, *interviews]
+
     async def get_training_records_overview(
         self,
         *,
