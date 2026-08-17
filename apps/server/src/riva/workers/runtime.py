@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -104,7 +104,12 @@ class AgentWorker:
             raise RuntimeError("Claimed agent run is missing its lease token.")
 
         fields = _log_fields(self.worker_id, run)
-        self.logger.info("agent.worker.run", status="running", **fields)
+        self.logger.info(
+            "agent.worker.run",
+            status="running",
+            first_queue_latency_ms=_duration_ms(run.created_at, run.started_at),
+            **fields,
+        )
 
         try:
             handler = self.registry.get(run.agent_id)
@@ -137,7 +142,11 @@ class AgentWorker:
             raise RuntimeError("Agent handler completed without a result.")
 
         try:
-            await self._mark_succeeded(run.id, run.lease_token, outcome.result)
+            canonical_run = await self._mark_succeeded(
+                run.id,
+                run.lease_token,
+                outcome.result,
+            )
         except AgentRunResultMismatchError:
             await self._record_failure(
                 run,
@@ -152,7 +161,26 @@ class AgentWorker:
                 **fields,
             )
         else:
-            self.logger.info("agent.worker.run", status="succeeded", **fields)
+            self.logger.info(
+                "agent.worker.run",
+                status="succeeded",
+                provider=canonical_run.provider,
+                input_tokens=canonical_run.input_tokens,
+                output_tokens=canonical_run.output_tokens,
+                total_tokens=(
+                    (canonical_run.input_tokens or 0)
+                    + (canonical_run.output_tokens or 0)
+                ),
+                terminal_latency_ms=_duration_ms(
+                    canonical_run.created_at,
+                    canonical_run.finished_at,
+                ),
+                processing_span_ms=_duration_ms(
+                    canonical_run.started_at,
+                    canonical_run.finished_at,
+                ),
+                **_log_fields(self.worker_id, canonical_run),
+            )
         return True
 
     async def run(self, stop_event: asyncio.Event) -> None:
@@ -253,9 +281,9 @@ class AgentWorker:
         run_id: UUID,
         lease_token: UUID,
         result: AgentResult[BaseModel],
-    ) -> None:
+    ) -> AgentRun:
         async with self.session_factory() as session:
-            await self.service_factory(session).mark_succeeded(
+            return await self.service_factory(session).mark_succeeded(
                 run_id=run_id,
                 lease_token=lease_token,
                 result=result,
@@ -294,12 +322,19 @@ class AgentWorker:
             "agent.worker.run",
             status=failed.status.value,
             error_code=failure.code,
+            retryable=failure.retryable,
+            retry_delay_ms=_timedelta_ms(delay),
+            **(
+                {"next_available_at": failed.available_at}
+                if failed.status.value == "queued"
+                else {}
+            ),
             **(
                 failure.diagnostics.as_log_fields()
                 if failure.diagnostics is not None
                 else {}
             ),
-            **_log_fields(self.worker_id, run),
+            **_log_fields(self.worker_id, failed),
         )
 
     async def _requeue_expired(self) -> int:
@@ -390,5 +425,32 @@ def _log_fields(worker_id: str, run: AgentRun) -> dict[str, object]:
         "worker_id": worker_id,
         "run_id": str(run.id),
         "agent_id": run.agent_id,
+        "prompt_id": run.prompt_id,
+        "prompt_version": run.prompt_version,
+        "model": run.model,
         "attempt_count": run.attempt_count,
+        "max_attempts": run.max_attempts,
     }
+
+
+def _duration_ms(start: datetime | None, end: datetime | None) -> int | None:
+    if start is None or end is None:
+        return None
+    delta = end - start
+    if delta <= timedelta(0):
+        return 0
+    microseconds = (
+        delta.days * 86_400 * 1_000_000
+        + delta.seconds * 1_000_000
+        + delta.microseconds
+    )
+    return (microseconds + 500) // 1_000
+
+
+def _timedelta_ms(value: timedelta) -> int:
+    microseconds = (
+        value.days * 86_400 * 1_000_000
+        + value.seconds * 1_000_000
+        + value.microseconds
+    )
+    return max(0, microseconds // 1_000)

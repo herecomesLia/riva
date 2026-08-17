@@ -21,6 +21,14 @@ from riva.schemas.dashboard import (
     DashboardTargetedPracticeRecommendationResponse,
     DashboardWeaknessResponse,
 )
+from riva.schemas.agent_observability import (
+    AgentErrorCount,
+    AgentLatencySummary,
+    AgentObservabilityReport,
+    AgentRunStatusCounts,
+    AgentRuntimeSummary,
+    AgentTokenSummary,
+)
 from riva.schemas.eval_quality_judge import (
     QualityJudgeOutput,
     QualityJudgeRubricScore,
@@ -470,6 +478,12 @@ __all__ = [
     "DashboardScoreMetricSnapshotResponse",
     "DashboardTargetedPracticeRecommendationResponse",
     "DashboardWeaknessResponse",
+    "AgentErrorCount",
+    "AgentLatencySummary",
+    "AgentObservabilityReport",
+    "AgentRunStatusCounts",
+    "AgentRuntimeSummary",
+    "AgentTokenSummary",
     "QualityJudgeOutput",
     "QualityJudgeRubricScore",
     "DependencyHealthStatus",

@@ -115,6 +115,7 @@ class FakeAgentRunService:
         run.model = result.model
         run.input_tokens = result.usage.input_tokens
         run.output_tokens = result.usage.output_tokens
+        run.finished_at = NOW
         return run
 
     async def mark_failed(
@@ -142,6 +143,11 @@ class FakeAgentRunService:
             if retryable and run.attempt_count < run.max_attempts
             else AgentRunStatus.FAILED
         )
+        if run.status == AgentRunStatus.QUEUED:
+            run.available_at = NOW + retry_delay
+            run.finished_at = None
+        else:
+            run.finished_at = NOW
         return run
 
     async def requeue_expired(self, *, batch_size: int) -> int:
@@ -296,6 +302,115 @@ def test_process_one_saves_success_metadata_outside_handler_transaction() -> Non
     assert run.output_tokens == 3
     assert sessions.enter_count == 2
     assert sessions.active == 0
+
+
+def test_success_log_uses_canonical_run_metadata_and_safe_timing_fields() -> None:
+    run = agent_run()
+    service = FakeAgentRunService([run])
+    sessions = FakeSessionFactory()
+    logger = FakeLogger()
+    registry = AgentHandlerRegistry()
+    registry.register(FakeHandler(result(run), sessions))
+
+    assert asyncio.run(
+        worker(service, sessions, registry, logger=logger).process_one()
+    ) is True
+
+    running_event = next(
+        fields
+        for _level, event, fields in logger.events
+        if event == "agent.worker.run" and fields["status"] == "running"
+    )
+    assert running_event["first_queue_latency_ms"] == 0
+    assert running_event["prompt_id"] == "example-prompt"
+    assert running_event["prompt_version"] == "1"
+    assert running_event["model"] == "queued-model"
+    assert running_event["attempt_count"] == 1
+    assert running_event["max_attempts"] == 3
+
+    success_event = next(
+        fields
+        for _level, event, fields in logger.events
+        if event == "agent.worker.run" and fields["status"] == "succeeded"
+    )
+    assert success_event["prompt_id"] == "example-prompt"
+    assert success_event["prompt_version"] == "1"
+    assert success_event["model"] == "fake-model"
+    assert success_event["provider"] == "fake-provider"
+    assert success_event["input_tokens"] == 7
+    assert success_event["output_tokens"] == 3
+    assert success_event["total_tokens"] == 10
+    assert success_event["terminal_latency_ms"] == 0
+    assert success_event["processing_span_ms"] == 0
+    assert success_event["attempt_count"] == 1
+    assert success_event["max_attempts"] == 3
+    assert not {
+        "payload",
+        "result",
+        "user_id",
+        "idempotency_key",
+    } & success_event.keys()
+
+
+def test_retry_failure_log_contains_retry_metadata_and_next_available_at() -> None:
+    run = agent_run(max_attempts=3)
+    service = FakeAgentRunService([run])
+    sessions = FakeSessionFactory()
+    logger = FakeLogger()
+    registry = AgentHandlerRegistry()
+    registry.register(FakeHandler(ProviderUnavailableError(), sessions))
+
+    assert asyncio.run(
+        worker(service, sessions, registry, logger=logger).process_one()
+    ) is True
+
+    failure_event = next(
+        fields
+        for _level, event, fields in logger.events
+        if event == "agent.worker.run" and fields["status"] == "queued"
+    )
+    assert failure_event["retryable"] is True
+    assert failure_event["error_code"] == "provider_unavailable"
+    assert failure_event["retry_delay_ms"] == 10_000
+    assert failure_event["next_available_at"] == NOW + timedelta(seconds=10)
+    assert failure_event["attempt_count"] == 1
+    assert failure_event["max_attempts"] == 3
+    assert not {
+        "payload",
+        "result",
+        "user_id",
+        "idempotency_key",
+    } & failure_event.keys()
+
+
+def test_terminal_failure_log_is_safe_and_marks_retryable_exhaustion() -> None:
+    run = agent_run(max_attempts=1)
+    service = FakeAgentRunService([run])
+    sessions = FakeSessionFactory()
+    logger = FakeLogger()
+    registry = AgentHandlerRegistry()
+    registry.register(FakeHandler(RuntimeError("PRIVATE_EXCEPTION_MESSAGE"), sessions))
+
+    assert asyncio.run(
+        worker(service, sessions, registry, logger=logger).process_one()
+    ) is True
+
+    failure_event = next(
+        fields
+        for _level, event, fields in logger.events
+        if event == "agent.worker.run" and fields["status"] == "failed"
+    )
+    assert failure_event["retryable"] is True
+    assert failure_event["error_code"] == "agent_execution_error"
+    assert failure_event["retry_delay_ms"] == 10_000
+    assert "next_available_at" not in failure_event
+    assert "PRIVATE_EXCEPTION_MESSAGE" not in repr(logger.events)
+    assert not {
+        "payload",
+        "result",
+        "user_id",
+        "idempotency_key",
+    } & failure_event.keys()
 
 
 def test_missing_handler_marks_run_as_permanent_failure() -> None:
@@ -503,6 +618,7 @@ def test_heartbeat_failure_cancels_handler_without_submitting_result() -> None:
         service.renew_results = [AgentRunLeaseError()]
         sessions = FakeSessionFactory()
         handler = LongHandler()
+        logger = FakeLogger()
         registry = AgentHandlerRegistry()
         registry.register(handler)
         runtime = worker(
@@ -510,6 +626,7 @@ def test_heartbeat_failure_cancels_handler_without_submitting_result() -> None:
             sessions,
             registry,
             heartbeat_interval=timedelta(milliseconds=5),
+            logger=logger,
         )
 
         assert await asyncio.wait_for(runtime.process_one(), timeout=1) is True
@@ -517,6 +634,20 @@ def test_heartbeat_failure_cancels_handler_without_submitting_result() -> None:
         assert handler.cancelled.is_set()
         assert service.succeeded == []
         assert service.failures == []
+        abandoned_event = next(
+            fields
+            for _level, event, fields in logger.events
+            if event == "agent.worker.run" and fields["status"] == "abandoned"
+        )
+        assert abandoned_event["prompt_id"] == "example-prompt"
+        assert abandoned_event["prompt_version"] == "1"
+        assert abandoned_event["model"] == "queued-model"
+        assert not {
+            "payload",
+            "result",
+            "user_id",
+            "idempotency_key",
+        } & abandoned_event.keys()
         assert not _worker_tasks()
 
     asyncio.run(run_test())
