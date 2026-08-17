@@ -30,6 +30,7 @@ from riva.schemas.question_generation import (
     MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
     QuestionGenerationWeaknessEvidence,
 )
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.schemas.interview_planning import InterviewPlanningInput
 from riva.schemas.interview_turn import InterviewTurnInput
 from riva.schemas.interview_candidate_question import (
@@ -473,6 +474,8 @@ def _serialize_payload(
             serialized[key] = _serialize_previous_follow_ups(value)
         elif key == "weaknessFocus":
             serialized[key] = _serialize_weakness_focus(value)
+        elif key == "trainingMemory":
+            serialized[key] = _serialize_training_memory(value)
         elif key == "interviewPlanningInput":
             serialized[key] = _serialize_interview_planning_input(value)
         elif key == "interviewTurnInput":
@@ -658,6 +661,19 @@ def _serialize_weakness_focus(value: object) -> list[JSONValue]:
     except (TypeError, ValueError, ValidationError):
         raise ValueError(
             "payload.weaknessFocus must contain valid weakness evidence"
+        ) from None
+
+
+def _serialize_training_memory(value: object) -> dict[str, JSONValue]:
+    try:
+        context = TrainingMemoryContext.model_validate(value)
+        return cast(
+            dict[str, JSONValue],
+            context.model_dump(mode="json", by_alias=True),
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.trainingMemory must contain a valid training memory snapshot"
         ) from None
 
 

@@ -62,6 +62,7 @@ from riva.services.question_generation_prompt_versions import (
     QUESTION_GENERATION_ACCEPTED_PROMPT_VERSIONS,
     get_question_generation_prompt,
 )
+from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
 
@@ -315,6 +316,7 @@ def build_question_generation_input(
         question_type=payload.question_type,
         difficulty=payload.difficulty,
         weakness_focus=list(payload.weakness_focus),
+        training_memory=payload.training_memory,
         target_role=build_question_generation_target_role_context(role),
         career_profile=build_question_generation_profile_context(profile),
         job_description_analysis=build_question_generation_job_context(
@@ -354,11 +356,15 @@ class QuestionGenerationService:
         agent_run_service_factory: Callable[[AsyncSession], AgentRunService] = (
             AgentRunService
         ),
+        training_memory_service_factory: Callable[
+            [AsyncSession], TrainingMemoryService
+        ] = TrainingMemoryService,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.agent_run_service_factory = agent_run_service_factory
+        self.training_memory_service_factory = training_memory_service_factory
         self.clock = clock
 
     async def enqueue_generation(
@@ -401,11 +407,20 @@ class QuestionGenerationService:
     ) -> AgentRun:
         self._require_configuration()
         await self._lock_user(user_id)
+        existing = await self._find_existing_generation_run(
+            user_id=user_id,
+            idempotency_key=idempotency_key,
+        )
+        if existing is not None:
+            return existing
         context = await self._load_context(
             user_id=user_id,
             role_id=target_role_id,
             for_update=True,
         )
+        training_memory = await self.training_memory_service_factory(
+            self.session
+        ).get_context(user_id)
         payload = QuestionGenerationRunPayload(
             role_id=context.role.id,
             profile_id=context.profile.profile_id,
@@ -424,6 +439,7 @@ class QuestionGenerationService:
             question_type=question_type,
             difficulty=difficulty,
             weakness_focus=_snapshot_weakness_focus(weakness_focus),
+            training_memory=training_memory,
         )
         _build_context_input(context, payload)
         prompt = QUESTION_GENERATION_PROMPT
@@ -595,6 +611,25 @@ class QuestionGenerationService:
         await self.session.scalar(
             select(User.id).where(User.id == user_id).with_for_update()
         )
+
+    async def _find_existing_generation_run(
+        self,
+        *,
+        user_id: UUID,
+        idempotency_key: str,
+    ) -> AgentRun | None:
+        result = await self.session.scalars(
+            select(AgentRun)
+            .where(
+                AgentRun.user_id == user_id,
+                AgentRun.agent_id == "question-generator",
+                AgentRun.prompt_id == QUESTION_GENERATION_PROMPT.prompt_id,
+                AgentRun.idempotency_key == idempotency_key,
+            )
+            .order_by(AgentRun.created_at.asc(), AgentRun.id.asc())
+            .with_for_update()
+        )
+        return next(iter(result.all()), None)
 
     async def _load_context(
         self,
@@ -772,6 +807,7 @@ def _build_context_input(
             question_type=payload.question_type,
             difficulty=payload.difficulty,
             weakness_focus=list(payload.weakness_focus),
+            training_memory=payload.training_memory,
             target_role=target_role,
             career_profile=career_profile,
             job_description_analysis=job_description_analysis,

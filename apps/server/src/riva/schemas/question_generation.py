@@ -23,6 +23,7 @@ from riva.schemas.question_cards import (
     QuestionCardTextList,
 )
 from riva.schemas.roles import TargetRoleRecruitmentType
+from riva.schemas.training_memory import TrainingMemoryContext
 
 MAX_QUESTION_GENERATION_EDUCATION_ITEMS = 20
 MAX_QUESTION_GENERATION_WORK_EXPERIENCE_ITEMS = 20
@@ -147,6 +148,9 @@ class QuestionGenerationInput(_QuestionGenerationModel):
         default_factory=list,
         max_length=MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
     )
+    training_memory: TrainingMemoryContext = Field(
+        default_factory=TrainingMemoryContext,
+    )
     target_role: QuestionGenerationTargetRoleContext
     career_profile: QuestionGenerationProfileContext
     job_description_analysis: QuestionGenerationJobContext
@@ -195,6 +199,10 @@ class QuestionGenerationRunPayload(BaseModel):
         default_factory=list,
         max_length=MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
     )
+    training_memory: TrainingMemoryContext = Field(
+        alias="trainingMemory",
+        default_factory=TrainingMemoryContext,
+    )
 
 
 __all__ = [
@@ -216,6 +224,7 @@ __all__ = [
     "QuestionGenerationSkill",
     "QuestionGenerationSkillList",
     "QuestionGenerationTargetRoleContext",
+    "TrainingMemoryContext",
     "QuestionGenerationWeaknessEvidence",
     "QuestionGenerationWorkExperienceContext",
 ]

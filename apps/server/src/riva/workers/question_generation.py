@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,20 +32,50 @@ class QuestionGenerationHandler:
         self,
         *,
         session_factory: SessionFactory,
-        agent: QuestionGenerationAgent,
+        agent: QuestionGenerationAgent | None = None,
         legacy_agent: QuestionGenerationAgent | None = None,
+        agents: Mapping[str, QuestionGenerationAgent] | None = None,
         generation_service_factory: QuestionGenerationServiceFactory = (
             QuestionGenerationService
         ),
     ) -> None:
-        if agent.agent_id != self.agent_id:
-            raise ValueError("agent must be the question generation agent")
         self.session_factory = session_factory
-        self.agent = agent
-        self.legacy_agent = legacy_agent
-        self._agents = {agent.prompt_version: agent}
-        if legacy_agent is not None:
-            self._agents[legacy_agent.prompt_version] = legacy_agent
+        if agents is None:
+            if agent is None:
+                raise ValueError("at least one question generation agent is required")
+            resolved_agents = {agent.prompt_version: agent}
+            if legacy_agent is not None:
+                resolved_agents[legacy_agent.prompt_version] = legacy_agent
+        else:
+            resolved_agents = dict(agents)
+            if agent is not None:
+                resolved_agents.setdefault(agent.prompt_version, agent)
+            if legacy_agent is not None:
+                resolved_agents.setdefault(legacy_agent.prompt_version, legacy_agent)
+        if not resolved_agents:
+            raise ValueError("at least one question generation agent is required")
+        for version, current_agent in resolved_agents.items():
+            try:
+                prompt = get_question_generation_prompt(version)
+            except ValueError:
+                raise ValueError(
+                    "question generation agent mapping contains an unsupported version"
+                ) from None
+            if (
+                current_agent.agent_id != self.agent_id
+                or current_agent.prompt_version != version
+                or current_agent.prompt is not prompt
+                or current_agent.prompt_id != prompt.prompt_id
+            ):
+                raise ValueError(
+                    "question generation agent mapping must match agent identity and version"
+                )
+        self._agents = resolved_agents
+        self.agents = dict(resolved_agents)
+        self.agent = self._agents.get(
+            get_question_generation_prompt("3").version
+        ) or next(iter(self._agents.values()))
+        self.legacy_agent = self._agents.get("1")
         self.generation_service_factory = generation_service_factory
 
     async def execute(

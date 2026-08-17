@@ -153,7 +153,7 @@ def test_personalized_priority_snapshots_focus_and_runs_v2_worker() -> None:
                         attempt.question_generation_run_id,
                     )
                     assert run is not None
-                    assert run.prompt_version == "2"
+                    assert run.prompt_version == "3"
                     assert run.payload["weaknessFocus"][0]["sourceAttemptId"] == str(
                         reviewed_attempt_id
                     )
@@ -521,7 +521,7 @@ def test_personalized_priority_continue_completes_current_attempt_before_snapsho
                         next_attempt.question_generation_run_id,
                     )
                     assert generation_run is not None
-                    assert generation_run.prompt_version == "2"
+                    assert generation_run.prompt_version == "3"
                     focus = generation_run.payload["weaknessFocus"]
                     assert any(
                         item["sourceAttemptId"] == str(current_attempt_id)
@@ -595,7 +595,7 @@ def test_personalized_priority_skip_replaces_attempt_with_focus_snapshot() -> No
                         replacement.question_generation_run_id,
                     )
                     assert generation_run is not None
-                    assert generation_run.prompt_version == "2"
+                    assert generation_run.prompt_version == "3"
                     assert generation_run.payload["weaknessFocus"] == expected_focus
 
                 assert await session_count_question_runs(database, owner.id) == (

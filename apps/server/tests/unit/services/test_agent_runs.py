@@ -328,6 +328,11 @@ def test_question_generation_run_payload_is_strict_and_camel_case() -> None:
         "questionType": "projectDeepDive",
         "difficulty": "pressure",
         "weaknessFocus": [],
+        "trainingMemory": {
+            "version": "1",
+            "focusCompetencies": [],
+            "establishedCompetencies": [],
+        },
     }
 
     with pytest.raises(ValueError):

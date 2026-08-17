@@ -32,6 +32,7 @@ from riva.schemas.question_generation import (
     QuestionGenerationRunPayload,
     QuestionGenerationWeaknessEvidence,
 )
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.schemas.practice_reference_answer import PracticeReferenceFrozenContext
 from riva.services.practice_weaknesses import (
     PracticeWeaknessEvidence,
@@ -76,6 +77,10 @@ class ScriptedSession:
             raise AssertionError("unexpected scalar query")
         return self.scalar_values.pop(0)
 
+    async def scalars(self, statement: Any) -> "EmptyScalarResult":
+        self.statements.append(statement)
+        return EmptyScalarResult()
+
     def add(self, value: object) -> None:
         self.added.append(value)
 
@@ -84,6 +89,11 @@ class ScriptedSession:
 
     async def rollback(self) -> None:
         self.rollback_count += 1
+
+
+class EmptyScalarResult:
+    def all(self) -> list[object]:
+        return []
 
 
 class FakeAgentRunService:
@@ -477,7 +487,7 @@ def test_enqueue_generation_freezes_only_snapshot_and_controls() -> None:
     call = fake_agent_runs.calls[0]
     assert call["agent_id"] == "question-generator"
     assert call["prompt_id"] == QUESTION_GENERATION_PROMPT.prompt_id
-    assert call["prompt_version"] == "2"
+    assert call["prompt_version"] == "3"
     assert call["output_schema_id"] == "question-generation-v1"
     assert call["model"] == "test-model"
     assert call["max_attempts"] == 3
@@ -493,6 +503,11 @@ def test_enqueue_generation_freezes_only_snapshot_and_controls() -> None:
         "questionType": "projectDeepDive",
         "difficulty": "basic",
         "weaknessFocus": [],
+        "trainingMemory": {
+            "version": "1",
+            "focusCompetencies": [],
+            "establishedCompetencies": [],
+        },
     }
 
 
@@ -541,6 +556,60 @@ def test_enqueue_generation_snapshots_weakness_focus_without_requerying_it() -> 
             "reviewedAt": NOW.isoformat().replace("+00:00", "Z"),
         }
     ]
+
+
+def test_enqueue_generation_snapshots_injected_training_memory() -> None:
+    owner, role, profile, analysis, matching = graph()
+    expected_run = run_for(owner, payload(role, profile, analysis, matching))
+    fake_agent_runs = FakeAgentRunService(expected_run)
+    session = ScriptedSession(owner.id, role, profile, analysis, matching)
+    memory = TrainingMemoryContext.model_validate(
+        {
+            "focusCompetencies": [
+                {
+                    "competencyKey": "results_and_evidence",
+                    "displayName": "Results and Evidence",
+                    "level": 55,
+                    "confidence": 60,
+                    "trend": "stable",
+                    "evidenceCount": 4,
+                    "lastEvidenceAt": NOW,
+                }
+            ]
+        }
+    )
+
+    class FakeTrainingMemoryService:
+        async def get_context(self, user_id):
+            assert user_id == owner.id
+            return memory
+
+    asyncio.run(
+        QuestionGenerationService(
+            session,  # type: ignore[arg-type]
+            llm_model="test-model",
+            agent_run_service_factory=lambda _session: fake_agent_runs,  # type: ignore[arg-type]
+            training_memory_service_factory=lambda _session: FakeTrainingMemoryService(),  # type: ignore[arg-type]
+        ).enqueue_generation(
+            user_id=owner.id,
+            target_role_id=role.id,
+            question_type=QuestionCardQuestionType.PROJECT_DEEP_DIVE,
+            difficulty=QuestionCardDifficulty.BASIC,
+            interaction_language="en",
+            idempotency_key="memory-snapshot-request",
+        )
+    )
+
+    call = fake_agent_runs.calls[0]
+    assert call["payload"]["trainingMemory"]["focusCompetencies"][0] == {
+        "competencyKey": "results_and_evidence",
+        "displayName": "Results and Evidence",
+        "level": 55,
+        "confidence": 60,
+        "trend": "stable",
+        "evidenceCount": 4,
+        "lastEvidenceAt": NOW.isoformat().replace("+00:00", "Z"),
+    }
 
 
 def test_v1_run_without_weakness_focus_keeps_empty_backward_compatible_snapshot() -> None:

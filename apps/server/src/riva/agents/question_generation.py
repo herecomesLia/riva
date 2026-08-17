@@ -96,7 +96,7 @@ class QuestionGenerationAgent(
             "matching_analysis": _stable_json(input.matching_analysis),
         }
         resolved_prompt = get_question_generation_prompt(self.prompt.version)
-        if resolved_prompt.version == QUESTION_GENERATION_PROMPT.version:
+        if resolved_prompt.version in {"2", QUESTION_GENERATION_PROMPT.version}:
             values["weakness_focus"] = json.dumps(
                 [
                     evidence.model_dump(mode="json", by_alias=True)
@@ -106,6 +106,8 @@ class QuestionGenerationAgent(
                 sort_keys=True,
                 separators=(",", ":"),
             )
+        if resolved_prompt.version == QUESTION_GENERATION_PROMPT.version:
+            values["training_memory"] = _stable_json(input.training_memory)
         return values
 
     async def run(

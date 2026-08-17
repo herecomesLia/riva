@@ -427,6 +427,10 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
     QuestionGenerationWorkExperienceContext,
 )
+from riva.schemas.training_memory import (
+    TrainingMemoryCompetency,
+    TrainingMemoryContext,
+)
 from riva.schemas.roles import (
     ActiveTargetRolePreparationStatus,
     ArchiveTargetRoleRequest,
@@ -736,6 +740,8 @@ __all__ = [
     "QuestionGenerationWeaknessEvidence",
     "QuestionGenerationWorkExperienceContext",
     "MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS",
+    "TrainingMemoryCompetency",
+    "TrainingMemoryContext",
     "StartQuestionGenerationRequest",
     "StartPracticeSessionRequest",
     "ActiveTargetRolePreparationStatus",

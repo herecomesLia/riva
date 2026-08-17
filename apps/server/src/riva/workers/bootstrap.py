@@ -194,10 +194,20 @@ def build_agent_handler_registry(
         model=model,
         prompt=get_question_generation_prompt("1"),
     )
+    question_generation_v2_agent = QuestionGenerationAgent(
+        provider=provider,
+        model=model,
+        prompt=get_question_generation_prompt("2"),
+    )
     question_generation_handler = question_generation_handler_factory(
         session_factory=session_factory,
         agent=question_generation_agent,
         legacy_agent=question_generation_legacy_agent,
+        agents={
+            "1": question_generation_legacy_agent,
+            "2": question_generation_v2_agent,
+            "3": question_generation_agent,
+        },
     )
     follow_up_agent = follow_up_agent_factory(
         provider=provider,

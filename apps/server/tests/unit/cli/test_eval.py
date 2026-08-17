@@ -32,7 +32,7 @@ def _write_case(
     payload = {
         "id": "cli.question",
         "agentId": "question-generator",
-        "promptVersion": "2",
+        "promptVersion": "3",
         "input": input_model.model_dump(mode="json"),
         "assertions": [
             {

@@ -12,6 +12,7 @@ CASES_DIR = Path(__file__).resolve().parents[3] / "evals" / "cases"
 EXPECTED_CASE_IDS = {
     "question-generator.basic-behavioral",
     "question-generator.weakness-focus",
+    "question-generator.training-memory",
     "interview-turn.complete-question",
     "interview-turn.follow-up",
     "practice-evaluator.strong-answer",

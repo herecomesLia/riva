@@ -20,6 +20,7 @@ from riva.schemas.question_generation import (
 )
 from riva.services.question_generation_prompt_versions import (
     QUESTION_GENERATION_LEGACY_PROMPT,
+    get_question_generation_prompt,
 )
 from tests.helpers.llm import FakeLLMProvider
 from tests.helpers.question_generation import (
@@ -42,10 +43,10 @@ def test_agent_uses_fixed_identity_prompt_schema_and_parameters() -> None:
 
     assert agent.agent_id == "question-generator"
     assert agent.prompt_id == "question-generator"
-    assert agent.prompt_version == "2"
+    assert agent.prompt_version == "3"
     assert result.agent_id == "question-generator"
     assert result.prompt_id == "question-generator"
-    assert result.prompt_version == "2"
+    assert result.prompt_version == "3"
 
     request = provider.calls[0]
     assert request.output_schema is QuestionGenerationOutput
@@ -76,11 +77,15 @@ def test_agent_renders_selected_controls_and_stable_utf8_context_without_mutatio
         "job_description_analysis",
         "matching_analysis",
         "weakness_focus",
+        "training_memory",
     }
     assert values["interaction_language"] == "zh-CN"
     assert values["question_type"] == "projectDeepDive"
     assert values["difficulty"] == "basic"
     assert values["weakness_focus"] == "[]"
+    assert values["training_memory"] == (
+        '{"establishedCompetencies":[],"focusCompetencies":[],"version":"1"}'
+    )
     assert values["career_profile"] == json.dumps(
         input.career_profile.model_dump(mode="json"),
         ensure_ascii=False,
@@ -153,6 +158,21 @@ def test_v1_agent_uses_exact_legacy_prompt_without_weakness_template_values() ->
     assert agent.prompt is QUESTION_GENERATION_LEGACY_PROMPT
     assert "weakness_focus" not in agent.prompt_values(input)
     assert agent.prompt_version == "1"
+
+
+def test_v2_agent_uses_weakness_without_training_memory_template_values() -> None:
+    input = valid_question_generation_input()
+    agent = QuestionGenerationAgent(
+        FakeLLMProvider([valid_question_generation_output(input)]),
+        model="test-model",
+        prompt=get_question_generation_prompt("2"),
+    )
+
+    values = agent.prompt_values(input)
+
+    assert agent.prompt_version == "2"
+    assert "weakness_focus" in values
+    assert "training_memory" not in values
 
 
 def test_agent_returns_output_and_canonicalizes_material_label() -> None:

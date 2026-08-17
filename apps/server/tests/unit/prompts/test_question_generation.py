@@ -5,6 +5,7 @@ from riva.prompts.base import PromptRenderError
 from riva.schemas.question_generation import QuestionGenerationOutput
 from riva.services.question_generation_prompt_versions import (
     QUESTION_GENERATION_LEGACY_PROMPT,
+    QUESTION_GENERATION_V2_PROMPT,
     get_question_generation_prompt,
 )
 
@@ -13,14 +14,15 @@ def test_question_generation_prompt_has_current_identity_and_output_contract() -
     prompt = QUESTION_GENERATION_PROMPT
 
     assert prompt.prompt_id == "question-generator"
-    assert prompt.version == "2"
+    assert prompt.version == "3"
     assert prompt.output_schema_id == "question-generation-v1"
     assert prompt.output_schema is QuestionGenerationOutput
     assert (
         get_question_generation_prompt("1")
         is QUESTION_GENERATION_LEGACY_PROMPT
     )
-    assert get_question_generation_prompt("2") is prompt
+    assert get_question_generation_prompt("2") is QUESTION_GENERATION_V2_PROMPT
+    assert get_question_generation_prompt("3") is prompt
 
 
 def test_question_generation_prompt_defines_task_evidence_and_injection_boundaries() -> None:
@@ -68,6 +70,8 @@ def test_question_generation_prompt_defines_difficulty_language_and_internal_fie
     assert "not a score, evaluation" in system
     assert "Weakness focus is a training signal" in system
     assert "untrusted structured data" in system
+    assert "Training Memory is an aggregate signal" in system
+    assert "not an objective fact" in system
 
 
 def test_question_generation_user_prompt_has_untrusted_context_regions() -> None:
@@ -80,6 +84,7 @@ def test_question_generation_user_prompt_has_untrusted_context_regions() -> None
         "job_description_analysis": '{"riva_summary":"Build APIs"}',
         "matching_analysis": '{"overall_match_score":80}',
         "weakness_focus": "[]",
+        "training_memory": '{"version":"1"}',
     }
     rendered = QUESTION_GENERATION_PROMPT.render(values)
 
@@ -90,6 +95,7 @@ def test_question_generation_user_prompt_has_untrusted_context_regions() -> None
     assert "<BEGIN_UNTRUSTED_CAREER_PROFILE>" in rendered.user
     assert "<BEGIN_UNTRUSTED_JOB_DESCRIPTION_ANALYSIS>" in rendered.user
     assert "<BEGIN_UNTRUSTED_MATCHING_ANALYSIS>" in rendered.user
+    assert "<BEGIN_UNTRUSTED_TRAINING_MEMORY>" in rendered.user
     assert "candidate-secret-marker" in rendered.user
     assert "candidate-secret-marker" not in rendered.system
 
@@ -104,5 +110,6 @@ def test_question_generation_prompt_requires_all_template_values() -> None:
                 "target_role": "{}",
                 "career_profile": "{}",
                 "job_description_analysis": "{}",
+                "training_memory": "{}",
             }
         )

@@ -290,6 +290,25 @@ def test_handler_routes_v1_and_v2_runs_to_matching_agents() -> None:
     asyncio.run(run_test())
 
 
+def test_handler_routes_v3_run_to_current_agent() -> None:
+    async def run_test() -> None:
+        sessions = FakeSessionFactory()
+        state = GenerationState(sessions)
+        current = FakeAgent(
+            sessions,
+            agent_result(prompt_version="3"),
+            prompt_version="3",
+        )
+        run = running_agent_run()
+        run.prompt_version = "3"
+
+        await handler(sessions, state, current).execute(run)
+
+        assert len(current.inputs) == 1
+
+    asyncio.run(run_test())
+
+
 def test_handler_rejects_unsupported_prompt_version_as_non_retryable() -> None:
     sessions = FakeSessionFactory()
     state = GenerationState(sessions)

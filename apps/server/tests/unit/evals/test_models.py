@@ -12,7 +12,7 @@ def _case(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
         "id": "case-1",
         "agentId": "question-generator",
-        "promptVersion": "2",
+        "promptVersion": "3",
         "input": {"value": 3},
         "assertions": [
             {"operator": "exact", "path": "/value", "expected": 3},
@@ -39,7 +39,7 @@ def test_case_and_assertions_use_strict_wire_schema() -> None:
     case = AgentEvalCase.model_validate(_case())
 
     assert case.agent_id == "question-generator"
-    assert case.prompt_version == "2"
+    assert case.prompt_version == "3"
     assert case.tags == []
     assert [assertion.operator for assertion in case.assertions] == [
         "exact",

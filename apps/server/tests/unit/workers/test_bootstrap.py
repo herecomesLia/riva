@@ -323,7 +323,7 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(question_generation, QuestionGenerationHandler)
     assert isinstance(question_generation.agent, QuestionGenerationAgent)
     assert question_generation.agent.provider is provider
-    assert question_generation.agent.prompt_version == "2"
+    assert question_generation.agent.prompt_version == "3"
     assert question_generation.agent.prompt is QUESTION_GENERATION_PROMPT
     assert question_generation.legacy_agent is not None
     assert question_generation.legacy_agent.prompt_version == "1"
@@ -331,6 +331,8 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
         question_generation.legacy_agent.prompt
         is get_question_generation_prompt("1")
     )
+    assert question_generation.agents.keys() == {"1", "2", "3"}
+    assert question_generation.agents["2"].prompt is get_question_generation_prompt("2")
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)
@@ -411,6 +413,7 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
         question_generation.legacy_agent.prompt
         is get_question_generation_prompt("1")
     )
+    assert question_generation.agents.keys() == {"1", "2", "3"}
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)

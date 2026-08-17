@@ -12,7 +12,7 @@ from tests.helpers.question_generation import valid_question_generation_input
 def _question_case(
     case_id: str,
     *,
-    prompt_version: str = "2",
+    prompt_version: str = "3",
     assertions: list[dict[str, object]] | None = None,
     input_value: object | None = None,
     rubrics: list[dict[str, object]] | None = None,
