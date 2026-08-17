@@ -34,6 +34,20 @@ from riva.services.evaluation_generation import (
 from riva.services.follow_up_generation import practice_follow_up_idempotency_key
 
 
+class NoopCompetencyIngestionService:
+    async def ingest_practice_evaluation(self, **_: object) -> list[object]:
+        return []
+
+    async def ingest_practice_review(self, **_: object) -> list[object]:
+        return []
+
+
+def noop_competency_ingestion_service_factory(
+    _session: object,
+) -> NoopCompetencyIngestionService:
+    return NoopCompetencyIngestionService()
+
+
 NOW = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
 
 
@@ -76,6 +90,9 @@ class ScriptedSession:
 
     async def commit(self) -> None:
         self.commit_count += 1
+
+    async def flush(self) -> None:
+        return None
 
     async def rollback(self) -> None:
         self.rollback_count += 1
@@ -828,6 +845,9 @@ def test_persist_success_writes_one_canonical_artifact_without_status_mutation(
     result = asyncio.run(
         EvaluationGenerationService(
             db,  # type: ignore[arg-type]
+            competency_ingestion_service_factory=(
+                noop_competency_ingestion_service_factory
+            ),
             clock=lambda: NOW,
         ).persist_success(run, output)
     )
@@ -873,7 +893,12 @@ def test_retry_with_same_source_run_returns_first_canonical_artifact() -> None:
     )
 
     result = asyncio.run(
-        EvaluationGenerationService(db).persist_success(  # type: ignore[arg-type]
+        EvaluationGenerationService(
+            db,  # type: ignore[arg-type]
+            competency_ingestion_service_factory=(
+                noop_competency_ingestion_service_factory
+            ),
+        ).persist_success(
             run,
             cast(PracticeEvaluationOutput, object()),
         )

@@ -106,6 +106,66 @@ def test_get_or_create_updates_display_name_without_creating_duplicate() -> None
     session.commit.assert_awaited_once()
 
 
+def test_get_or_create_rejects_empty_display_name_when_creating() -> None:
+    session = _session(None)
+
+    with pytest.raises(ValueError, match="non-empty"):
+        asyncio.run(
+            CompetencyService(session).get_or_create_competency(
+                uuid4(),
+                "communication",
+                "  ",
+            )
+        )
+
+    session.add.assert_not_called()
+    session.commit.assert_not_awaited()
+    session.rollback.assert_awaited_once()
+
+
+def test_transaction_methods_do_not_commit_or_rollback() -> None:
+    user_id = uuid4()
+    competency_id = uuid4()
+    competency = UserCompetency(
+        id=competency_id,
+        user_id=user_id,
+        competency_key="communication",
+        display_name="Communication",
+        evidence_count=0,
+    )
+    session = _session(None)
+    service = CompetencyService(session)
+
+    created = asyncio.run(
+        service.get_or_create_competency_in_transaction(
+            user_id,
+            " communication ",
+            "Communication",
+        )
+    )
+    assert created.competency_key == "communication"
+    assert not session.commit.await_count
+    assert not session.rollback.await_count
+
+    session.scalar = AsyncMock(side_effect=[competency, None])
+    evidence = asyncio.run(
+        service.add_evidence_in_transaction(
+            user_id=user_id,
+            competency_id=competency_id,
+            source_type="practice",
+            source_session_id=uuid4(),
+            source_entity_type="practiceAttempt",
+            source_entity_id=uuid4(),
+            signal_type="score",
+            occurred_at=datetime.now(UTC),
+            score=80,
+        )
+    )
+    assert evidence.user_id == user_id
+    assert not session.commit.await_count
+    assert not session.rollback.await_count
+
+
 def test_add_evidence_rejects_competency_owned_by_another_user() -> None:
     session = _session(None)
 

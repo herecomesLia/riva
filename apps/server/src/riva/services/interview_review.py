@@ -50,6 +50,7 @@ from riva.schemas.interview_review import (
     InterviewReviewTurnAssessmentSnapshot,
 )
 from riva.services.agent_runs import AgentRunService
+from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.utils import utc_now
 
 
@@ -104,10 +105,16 @@ class InterviewReviewService:
         *,
         llm_model: str | None = None,
         clock: Clock = utc_now,
+        competency_ingestion_service_factory: Callable[
+            [AsyncSession], CompetencyIngestionService
+        ] = CompetencyIngestionService,
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.clock = clock
+        self.competency_ingestion_service_factory = (
+            competency_ingestion_service_factory
+        )
 
     async def enqueue_review_in_transaction(
         self,
@@ -352,6 +359,13 @@ class InterviewReviewService:
                     raise InterviewReviewStateError(
                         INTERVIEW_REVIEW_ARTIFACT_CONFLICT
                     )
+                await self.competency_ingestion_service_factory(
+                    self.session
+                ).ingest_interview_review(
+                    user_id=run.user_id,
+                    interview_session=interview_session,
+                    review=existing,
+                )
                 await self.session.commit()
                 return validated_output
 
@@ -362,16 +376,23 @@ class InterviewReviewService:
                 now=now,
             )
             review_json = _review_json(validated_output, payload.review_mode, now)
-            self.session.add(
-                InterviewReview(
-                    id=uuid4(),
-                    session_id=interview_session.id,
-                    source_agent_run_id=run.id,
-                    status=payload.review_mode.value,
-                    review=review_json,
-                    question_details=question_details,
-                    created_at=now,
-                )
+            review = InterviewReview(
+                id=uuid4(),
+                session_id=interview_session.id,
+                source_agent_run_id=run.id,
+                status=payload.review_mode.value,
+                review=review_json,
+                question_details=question_details,
+                created_at=now,
+            )
+            self.session.add(review)
+            await self.session.flush()
+            await self.competency_ingestion_service_factory(
+                self.session
+            ).ingest_interview_review(
+                user_id=run.user_id,
+                interview_session=interview_session,
+                review=review,
             )
             interview_session.status = "completed"
             interview_session.completion_reason = payload.completion_reason.value
@@ -413,6 +434,14 @@ class InterviewReviewService:
                 created_at=now,
             )
             self.session.add(review)
+            await self.session.flush()
+            await self.competency_ingestion_service_factory(
+                self.session
+            ).ingest_interview_review(
+                user_id=interview_session.user_id,
+                interview_session=interview_session,
+                review=review,
+            )
             interview_session.status = "completed"
             interview_session.completion_reason = completion_reason.value
             interview_session.completed_at = now

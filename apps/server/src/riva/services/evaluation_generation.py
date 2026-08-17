@@ -39,6 +39,7 @@ from riva.schemas.practice_interactions import (
     PracticeAnswerKind,
 )
 from riva.services.agent_runs import AgentRunService
+from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.services.follow_up_generation import (
     FollowUpGenerationStateError,
     practice_follow_up_idempotency_key,
@@ -193,11 +194,17 @@ class EvaluationGenerationService:
         agent_run_service_factory: Callable[[AsyncSession], AgentRunService] = (
             AgentRunService
         ),
+        competency_ingestion_service_factory: Callable[
+            [AsyncSession], CompetencyIngestionService
+        ] = CompetencyIngestionService,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.agent_run_service_factory = agent_run_service_factory
+        self.competency_ingestion_service_factory = (
+            competency_ingestion_service_factory
+        )
         self.clock = clock
 
     async def enqueue_generation(
@@ -336,6 +343,14 @@ class EvaluationGenerationService:
                     raise EvaluationGenerationStateError(
                         PRACTICE_EVALUATION_ARTIFACT_CONFLICT
                     ) from None
+                await self.competency_ingestion_service_factory(
+                    self.session
+                ).ingest_practice_evaluation(
+                    user_id=run.user_id,
+                    practice_session=context.session,
+                    attempt=context.attempt,
+                    evaluation=existing,
+                )
                 await self.session.commit()
                 return canonical
 
@@ -362,6 +377,15 @@ class EvaluationGenerationService:
                 evaluated_at=now,
             )
             self.session.add(evaluation)
+            await self.session.flush()
+            await self.competency_ingestion_service_factory(
+                self.session
+            ).ingest_practice_evaluation(
+                user_id=run.user_id,
+                practice_session=context.session,
+                attempt=context.attempt,
+                evaluation=evaluation,
+            )
             await self.session.commit()
             return validated_output
         except Exception:

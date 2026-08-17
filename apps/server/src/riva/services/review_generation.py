@@ -27,6 +27,7 @@ from riva.schemas.practice_review import (
     ReviewRunPayload,
 )
 from riva.services.agent_runs import AgentRunService
+from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.services.evaluation_generation import (
     EvaluationGenerationService,
     EvaluationGenerationStateError,
@@ -140,11 +141,17 @@ class ReviewGenerationService:
         agent_run_service_factory: Callable[[AsyncSession], AgentRunService] = (
             AgentRunService
         ),
+        competency_ingestion_service_factory: Callable[
+            [AsyncSession], CompetencyIngestionService
+        ] = CompetencyIngestionService,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.agent_run_service_factory = agent_run_service_factory
+        self.competency_ingestion_service_factory = (
+            competency_ingestion_service_factory
+        )
         self.clock = clock
 
     async def enqueue_generation(
@@ -282,6 +289,14 @@ class ReviewGenerationService:
                     raise ReviewGenerationStateError(
                         PRACTICE_REVIEW_ARTIFACT_CONFLICT
                     ) from None
+                await self.competency_ingestion_service_factory(
+                    self.session
+                ).ingest_practice_review(
+                    user_id=run.user_id,
+                    practice_session=context.session,
+                    attempt=context.attempt,
+                    review=existing,
+                )
                 await self.session.commit()
                 return canonical
 
@@ -305,6 +320,15 @@ class ReviewGenerationService:
                 reviewed_at=now,
             )
             self.session.add(review)
+            await self.session.flush()
+            await self.competency_ingestion_service_factory(
+                self.session
+            ).ingest_practice_review(
+                user_id=run.user_id,
+                practice_session=context.session,
+                attempt=context.attempt,
+                review=review,
+            )
             await self.session.commit()
             try:
                 return practice_review_output_from_artifact(review)

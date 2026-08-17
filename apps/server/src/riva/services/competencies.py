@@ -48,42 +48,57 @@ class CompetencyService:
         competency_key: str,
         display_name: str,
     ) -> UserCompetency:
-        key = normalize_competency_key(competency_key)
-        name = self._display_name(display_name)
-
         try:
-            competency = await self._find_competency(
+            competency = await self.get_or_create_competency_in_transaction(
                 user_id=user_id,
-                competency_key=key,
-                for_update=True,
+                competency_key=competency_key,
+                display_name=display_name,
             )
-            if competency is None:
-                competency = UserCompetency(
-                    user_id=user_id,
-                    competency_key=key,
-                    display_name=name,
-                )
-                try:
-                    async with self.session.begin_nested():
-                        self.session.add(competency)
-                        await self.session.flush()
-                except IntegrityError:
-                    competency = await self._find_competency(
-                        user_id=user_id,
-                        competency_key=key,
-                        for_update=True,
-                    )
-                    if competency is None:
-                        raise
-
-            if name and competency.display_name != name:
-                competency.display_name = name
-
             await self.session.commit()
             return competency
         except Exception:
             await self.session.rollback()
             raise
+
+    async def get_or_create_competency_in_transaction(
+        self,
+        user_id: UUID,
+        competency_key: str,
+        display_name: str,
+    ) -> UserCompetency:
+        """Get or create a competency without committing or rolling back."""
+
+        key = normalize_competency_key(competency_key)
+        name = self._display_name(display_name)
+        competency = await self._find_competency(
+            user_id=user_id,
+            competency_key=key,
+            for_update=True,
+        )
+        if competency is None:
+            if not name:
+                raise ValueError("display_name must be non-empty when creating")
+            competency = UserCompetency(
+                user_id=user_id,
+                competency_key=key,
+                display_name=name,
+            )
+            try:
+                async with self.session.begin_nested():
+                    self.session.add(competency)
+                    await self.session.flush()
+            except IntegrityError:
+                competency = await self._find_competency(
+                    user_id=user_id,
+                    competency_key=key,
+                    for_update=True,
+                )
+                if competency is None:
+                    raise
+
+        if name and competency.display_name != name:
+            competency.display_name = name
+        return competency
 
     async def list_competencies(self, user_id: UUID) -> list[UserCompetency]:
         result = await self.session.scalars(
@@ -108,6 +123,43 @@ class CompetencyService:
         evidence_text: str | None = None,
         details: Mapping[str, object] | None = None,
     ) -> CompetencyEvidence:
+        try:
+            evidence = await self.add_evidence_in_transaction(
+                user_id=user_id,
+                competency_id=competency_id,
+                source_type=source_type,
+                source_session_id=source_session_id,
+                source_entity_type=source_entity_type,
+                source_entity_id=source_entity_id,
+                signal_type=signal_type,
+                occurred_at=occurred_at,
+                score=score,
+                evidence_text=evidence_text,
+                details=details,
+            )
+            await self.session.commit()
+            return evidence
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def add_evidence_in_transaction(
+        self,
+        *,
+        user_id: UUID,
+        competency_id: UUID,
+        source_type: str,
+        source_session_id: UUID,
+        source_entity_type: str,
+        source_entity_id: UUID,
+        signal_type: str,
+        occurred_at: datetime,
+        score: int | None = None,
+        evidence_text: str | None = None,
+        details: Mapping[str, object] | None = None,
+    ) -> CompetencyEvidence:
+        """Persist evidence within the caller's transaction."""
+
         normalized_text = self._validate_evidence(
             source_type=source_type,
             source_entity_type=source_entity_type,
@@ -118,18 +170,46 @@ class CompetencyService:
         )
         normalized_details = self._details(details)
 
-        try:
-            competency = await self.session.scalar(
-                select(UserCompetency)
-                .where(
-                    UserCompetency.id == competency_id,
-                    UserCompetency.user_id == user_id,
-                )
-                .with_for_update()
+        competency = await self.session.scalar(
+            select(UserCompetency)
+            .where(
+                UserCompetency.id == competency_id,
+                UserCompetency.user_id == user_id,
             )
-            if competency is None:
-                raise ValueError("competency does not belong to user")
+            .with_for_update()
+        )
+        if competency is None:
+            raise ValueError("competency does not belong to user")
 
+        existing = await self._find_evidence(
+            user_id=user_id,
+            competency_id=competency_id,
+            source_entity_type=source_entity_type,
+            source_entity_id=source_entity_id,
+            signal_type=signal_type,
+            for_update=True,
+        )
+        if existing is not None:
+            return existing
+
+        evidence = CompetencyEvidence(
+            user_id=user_id,
+            competency_id=competency_id,
+            source_type=source_type,
+            source_session_id=source_session_id,
+            source_entity_type=source_entity_type,
+            source_entity_id=source_entity_id,
+            signal_type=signal_type,
+            score=score,
+            evidence_text=normalized_text,
+            details=normalized_details,
+            occurred_at=occurred_at,
+        )
+        try:
+            async with self.session.begin_nested():
+                self.session.add(evidence)
+                await self.session.flush()
+        except IntegrityError:
             existing = await self._find_evidence(
                 user_id=user_id,
                 competency_id=competency_id,
@@ -138,53 +218,17 @@ class CompetencyService:
                 signal_type=signal_type,
                 for_update=True,
             )
-            if existing is not None:
-                await self.session.commit()
-                return existing
+            if existing is None:
+                raise
+            return existing
 
-            evidence = CompetencyEvidence(
-                user_id=user_id,
-                competency_id=competency_id,
-                source_type=source_type,
-                source_session_id=source_session_id,
-                source_entity_type=source_entity_type,
-                source_entity_id=source_entity_id,
-                signal_type=signal_type,
-                score=score,
-                evidence_text=normalized_text,
-                details=normalized_details,
-                occurred_at=occurred_at,
-            )
-            try:
-                async with self.session.begin_nested():
-                    self.session.add(evidence)
-                    await self.session.flush()
-            except IntegrityError:
-                existing = await self._find_evidence(
-                    user_id=user_id,
-                    competency_id=competency_id,
-                    source_entity_type=source_entity_type,
-                    source_entity_id=source_entity_id,
-                    signal_type=signal_type,
-                    for_update=True,
-                )
-                if existing is None:
-                    raise
-                await self.session.commit()
-                return existing
-
-            competency.evidence_count += 1
-            if (
-                competency.last_evidence_at is None
-                or occurred_at > competency.last_evidence_at
-            ):
-                competency.last_evidence_at = occurred_at
-
-            await self.session.commit()
-            return evidence
-        except Exception:
-            await self.session.rollback()
-            raise
+        competency.evidence_count += 1
+        if (
+            competency.last_evidence_at is None
+            or occurred_at > competency.last_evidence_at
+        ):
+            competency.last_evidence_at = occurred_at
+        return evidence
 
     async def list_evidence(
         self,

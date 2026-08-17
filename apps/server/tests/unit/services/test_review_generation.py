@@ -30,6 +30,7 @@ from tests.unit.services.test_evaluation_generation import (
     ScriptedSession,
     context_graph,
     follow_up_source_runs,
+    noop_competency_ingestion_service_factory,
     run_for,
     valid_output as valid_evaluation_output,
 )
@@ -224,6 +225,9 @@ def service_context(
     service = ReviewGenerationService(
         db,  # type: ignore[arg-type]
         llm_model="review-test-model",
+        competency_ingestion_service_factory=(
+            noop_competency_ingestion_service_factory
+        ),
         clock=lambda: NOW,
     )
     return service, db, review, session, attempt, evaluation

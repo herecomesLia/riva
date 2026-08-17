@@ -47,6 +47,7 @@ from riva.schemas.interview_turn import (
     MAX_INTERVIEW_FOLLOW_UPS_PRESSURE,
 )
 from riva.services.agent_runs import AgentRunService
+from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.utils import utc_now
 
 
@@ -109,10 +110,16 @@ class InterviewTurnService:
         *,
         llm_model: str | None = None,
         clock: Clock = utc_now,
+        competency_ingestion_service_factory: Callable[
+            [AsyncSession], CompetencyIngestionService
+        ] = CompetencyIngestionService,
     ) -> None:
         self.session = session
         self.llm_model = llm_model
         self.clock = clock
+        self.competency_ingestion_service_factory = (
+            competency_ingestion_service_factory
+        )
 
     async def submit_answer(
         self,
@@ -382,6 +389,13 @@ class InterviewTurnService:
                     existing_assessment,
                     await self._follow_up_for_assessment(existing_assessment),
                 )
+                await self.competency_ingestion_service_factory(
+                    self.session
+                ).ingest_interview_turn(
+                    user_id=run.user_id,
+                    interview_session=interview_session,
+                    assessment=existing_assessment,
+                )
                 await self.session.commit()
                 return canonical
 
@@ -445,6 +459,13 @@ class InterviewTurnService:
             )
             self.session.add(assessment)
             await self.session.flush()
+            await self.competency_ingestion_service_factory(
+                self.session
+            ).ingest_interview_turn(
+                user_id=run.user_id,
+                interview_session=interview_session,
+                assessment=assessment,
+            )
 
             if isinstance(effective_action, InterviewTurnFollowUpAction):
                 self.session.add(
