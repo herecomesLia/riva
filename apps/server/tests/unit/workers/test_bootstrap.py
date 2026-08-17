@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from riva.agents import (
+    InterviewPlanningAgent,
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
     PracticeEvaluationAgent,
@@ -19,16 +20,21 @@ from riva.agents import (
 from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
 from riva.prompts import (
+    INTERVIEW_PLANNING_PROMPT,
     JOB_DESCRIPTION_PARSING_PROMPT,
     QUESTION_GENERATION_PROMPT,
 )
 from riva.services.question_generation_prompt_versions import (
     get_question_generation_prompt,
 )
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 from riva.workers import (
     AgentHandlerRegistry,
     DuplicateAgentHandlerError,
     JobDescriptionParsingHandler,
+    InterviewPlanningHandler,
     MatchingAnalysisHandler,
     PracticeEvaluationHandler,
     PracticeRecommendationHandler,
@@ -333,6 +339,18 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     )
     assert question_generation.agents.keys() == {"1", "2", "3"}
     assert question_generation.agents["2"].prompt is get_question_generation_prompt("2")
+    interview_planning = registry.get("interview-planner")
+    assert isinstance(interview_planning, InterviewPlanningHandler)
+    assert isinstance(interview_planning.agent, InterviewPlanningAgent)
+    assert interview_planning.agent.prompt_version == "2"
+    assert interview_planning.agent.prompt is INTERVIEW_PLANNING_PROMPT
+    assert interview_planning.legacy_agent is not None
+    assert interview_planning.legacy_agent.prompt_version == "1"
+    assert (
+        interview_planning.legacy_agent.prompt
+        is get_interview_planning_prompt("1")
+    )
+    assert interview_planning.agents.keys() == {"1", "2"}
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)

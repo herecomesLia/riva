@@ -33,6 +33,9 @@ from riva.integrations import (
 from riva.services.question_generation_prompt_versions import (
     get_question_generation_prompt,
 )
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 from riva.workers.handlers import AgentHandlerRegistry
 from riva.workers.follow_up import FollowUpHandler
 from riva.workers.interview_planning import InterviewPlanningHandler
@@ -221,9 +224,19 @@ def build_agent_handler_registry(
         provider=provider,
         model=model,
     )
+    interview_planning_legacy_agent = InterviewPlanningAgent(
+        provider=provider,
+        model=model,
+        prompt=get_interview_planning_prompt("1"),
+    )
     interview_planning_handler = interview_planning_handler_factory(
         session_factory=session_factory,
         agent=interview_planning_agent,
+        legacy_agent=interview_planning_legacy_agent,
+        agents={
+            "1": interview_planning_legacy_agent,
+            "2": interview_planning_agent,
+        },
     )
     interview_turn_agent = interview_turn_agent_factory(
         provider=provider,

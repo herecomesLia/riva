@@ -19,6 +19,7 @@ from riva.models import (
     User,
 )
 from riva.prompts import INTERVIEW_PLANNING_PROMPT
+from riva.prompts.base import PromptDefinition
 from riva.schemas.interview import (
     InterviewConfiguration,
     InterviewDifficulty,
@@ -37,13 +38,18 @@ from riva.schemas.interview_planning import (
     validate_interview_plan_for_duration,
 )
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services.agent_runs import AgentRunService
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 from riva.services.matching_analyses import (
     _career_profile_loader_options,
     build_matching_career_profile,
     build_matching_job_context,
 )
 from riva.services.profile_completion import career_profile_fully_complete
+from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
 
@@ -109,10 +115,14 @@ class InterviewPlanningService:
         session: AsyncSession,
         *,
         llm_model: str | None = None,
+        training_memory_service_factory: Callable[
+            [AsyncSession], TrainingMemoryService
+        ] = TrainingMemoryService,
         clock: Clock = utc_now,
     ) -> None:
         self.session = session
         self.llm_model = llm_model
+        self.training_memory_service_factory = training_memory_service_factory
         self.clock = clock
 
     async def begin_questions(
@@ -142,6 +152,7 @@ class InterviewPlanningService:
                 )
 
             planning_run = None
+            retry_memory: TrainingMemoryContext | None = None
             if interview_session.status == "generatingQuestion":
                 if interview_session.planning_run_id is None:
                     raise InterviewPlanningStateError(
@@ -166,12 +177,22 @@ class InterviewPlanningService:
                     raise InterviewPlanningStateError(
                         INTERVIEW_PLANNING_STATE_INVALID
                     )
+                if planning_run.payload:
+                    retry_memory = self._validate_run_payload(
+                        planning_run
+                    ).interview_planning_input.training_memory
+                else:
+                    # AgentRunService never persists an empty payload. Keep the
+                    # legacy unit/test shape deterministic if a manually-created
+                    # failed run has no snapshot at all.
+                    retry_memory = TrainingMemoryContext()
             elif interview_session.status != "opening":
                 raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID)
 
             planning_input = await self._build_planning_input(
                 interview_session,
                 user_id=user_id,
+                training_memory=retry_memory,
             )
             payload = self._build_run_payload(
                 interview_session,
@@ -183,14 +204,18 @@ class InterviewPlanningService:
                     INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED
                 )
 
+            prompt = INTERVIEW_PLANNING_PROMPT
             run = await AgentRunService(self.session).enqueue_in_transaction(
                 user_id=user_id,
-                agent_id=INTERVIEW_PLANNING_PROMPT.prompt_id,
-                prompt_id=INTERVIEW_PLANNING_PROMPT.prompt_id,
-                prompt_version=INTERVIEW_PLANNING_PROMPT.version,
-                output_schema_id=INTERVIEW_PLANNING_PROMPT.output_schema_id,
+                agent_id=prompt.prompt_id,
+                prompt_id=prompt.prompt_id,
+                prompt_version=prompt.version,
+                output_schema_id=prompt.output_schema_id,
                 model=model,
-                payload=cast(dict[str, object], payload.model_dump(mode="json", by_alias=True)),
+                payload=cast(
+                    dict[str, object],
+                    payload.model_dump(mode="json", by_alias=True),
+                ),
                 idempotency_key=(
                     f"interview-planner:{interview_session.id}:v{version}"
                 ),
@@ -229,6 +254,7 @@ class InterviewPlanningService:
     ) -> InterviewPlan:
         try:
             payload = self._validate_run_payload(run)
+            prompt = self._prompt_for_run(run)
             if not isinstance(output, InterviewPlanningOutput):
                 output = InterviewPlanningOutput.model_validate(output)
 
@@ -244,11 +270,11 @@ class InterviewPlanningService:
                 raise InterviewPlanningStateError(INTERVIEW_PLANNING_RUN_INVALID)
             if (
                 persisted_run.user_id != run.user_id
-                or persisted_run.agent_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-                or persisted_run.prompt_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-                or persisted_run.prompt_version != INTERVIEW_PLANNING_PROMPT.version
+                or persisted_run.agent_id != prompt.prompt_id
+                or persisted_run.prompt_id != prompt.prompt_id
+                or persisted_run.prompt_version != prompt.version
                 or persisted_run.output_schema_id
-                != INTERVIEW_PLANNING_PROMPT.output_schema_id
+                != prompt.output_schema_id
             ):
                 raise InterviewPlanningStateError(INTERVIEW_PLANNING_RUN_INVALID)
 
@@ -365,6 +391,7 @@ class InterviewPlanningService:
         interview_session: InterviewSession,
         *,
         user_id: UUID,
+        training_memory: TrainingMemoryContext | None = None,
     ) -> InterviewPlanningInput:
         profile = await self.session.scalar(
             select(CareerProfile)
@@ -413,6 +440,11 @@ class InterviewPlanningService:
             career_profile = build_matching_career_profile(profile)
             job_context = build_matching_job_context(role, analysis)
             configuration = _session_configuration(interview_session)
+            matching_snapshot = _matching_snapshot(role, profile)
+            if training_memory is None:
+                training_memory = await self.training_memory_service_factory(
+                    self.session
+                ).get_context(user_id)
             planning_input = InterviewPlanningInput(
                 session=InterviewPlanningSessionSnapshot(
                     id=interview_session.id,
@@ -452,7 +484,8 @@ class InterviewPlanningService:
                         ),
                     )
                 ),
-                matching_analysis=_matching_snapshot(role, profile),
+                matching_analysis=matching_snapshot,
+                training_memory=training_memory,
             )
             return planning_input
         except (AttributeError, TypeError, ValueError, ValidationError):
@@ -489,19 +522,29 @@ class InterviewPlanningService:
 
     @staticmethod
     def _validate_run_payload(run: AgentRun) -> InterviewPlanningRunPayload:
-        if (
-            run.agent_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-            or run.prompt_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-            or run.prompt_version != INTERVIEW_PLANNING_PROMPT.version
-            or run.output_schema_id != INTERVIEW_PLANNING_PROMPT.output_schema_id
-        ):
-            raise InterviewPlanningStateError(INTERVIEW_PLANNING_RUN_INVALID)
+        InterviewPlanningService._prompt_for_run(run)
         try:
             return InterviewPlanningRunPayload.model_validate(run.payload)
         except (TypeError, ValueError, ValidationError):
             raise InterviewPlanningStateError(
                 INTERVIEW_PLANNING_SNAPSHOT_INVALID
             ) from None
+
+    @staticmethod
+    def _prompt_for_run(
+        run: AgentRun,
+    ) -> PromptDefinition[InterviewPlanningOutput]:
+        try:
+            prompt = get_interview_planning_prompt(run.prompt_version)
+        except ValueError:
+            raise InterviewPlanningStateError(INTERVIEW_PLANNING_RUN_INVALID) from None
+        if (
+            run.agent_id != prompt.prompt_id
+            or run.prompt_id != prompt.prompt_id
+            or run.output_schema_id != prompt.output_schema_id
+        ):
+            raise InterviewPlanningStateError(INTERVIEW_PLANNING_RUN_INVALID)
+        return prompt
 
     async def _lock_user(self, user_id: UUID) -> None:
         exists = await self.session.scalar(

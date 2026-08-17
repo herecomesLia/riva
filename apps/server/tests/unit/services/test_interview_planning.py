@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
@@ -7,7 +8,11 @@ import pytest
 
 from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.interview_planning import InterviewPlanningOutput
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services import interview_planning as planning_module
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 from riva.services.interview_planning import (
     INTERVIEW_PLANNING_VERSION_CONFLICT,
     InterviewPlanningService,
@@ -29,6 +34,13 @@ class ScriptedSession:
 
     async def scalar(self, _statement):
         return self.responses.pop(0)
+
+    async def scalars(self, _statement):
+        class EmptyResult:
+            def all(self):
+                return []
+
+        return EmptyResult()
 
     def add(self, value: object) -> None:
         self.added.append(value)
@@ -160,14 +172,22 @@ def _session(user_id, role_id, *, status="opening", version=1, run_id=None):
     )
 
 
-def _run(*, user_id, status=AgentRunStatus.QUEUED, run_id=None, payload=None):
+def _run(
+    *,
+    user_id,
+    status=AgentRunStatus.QUEUED,
+    run_id=None,
+    payload=None,
+    prompt_version="2",
+):
+    prompt = get_interview_planning_prompt(prompt_version)
     return AgentRun(
         id=run_id or uuid4(),
         user_id=user_id,
         agent_id="interview-planner",
         prompt_id="interview-planner",
-        prompt_version="1",
-        output_schema_id="interview-plan-v1",
+        prompt_version=prompt_version,
+        output_schema_id=prompt.output_schema_id,
         status=status,
         payload=payload or {},
         idempotency_key="interview-test",
@@ -202,6 +222,39 @@ class FakeAgentRunService:
         return self.next_run
 
 
+class FakeTrainingMemoryService:
+    context = TrainingMemoryContext(
+        focus_competencies=[
+            {
+                "competencyKey": "results_and_evidence",
+                "displayName": "Results and Evidence",
+                "level": 55,
+                "confidence": 60,
+                "trend": "stable",
+                "evidenceCount": 4,
+                "lastEvidenceAt": "2026-08-16T10:00:00Z",
+            }
+        ],
+        established_competencies=[],
+    )
+    calls = 0
+
+    def __init__(self, _session) -> None:
+        pass
+
+    async def get_context(self, _user_id):
+        type(self).calls += 1
+        return self.context
+
+
+class ExplodingTrainingMemoryService:
+    def __init__(self, _session) -> None:
+        pass
+
+    async def get_context(self, _user_id):
+        raise AssertionError("retry must use the original memory snapshot")
+
+
 def _output() -> InterviewPlanningOutput:
     return InterviewPlanningOutput.model_validate(
         {
@@ -231,14 +284,18 @@ def test_begin_enqueues_snapshot_and_moves_opening_to_generating(monkeypatch) ->
     run = _run(user_id=user_id)
     FakeAgentRunService.calls = []
     FakeAgentRunService.next_run = run
+    FakeTrainingMemoryService.calls = 0
     monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
     db = ScriptedSession([user_id, session, _profile(uuid4()), role])
 
     result = asyncio.run(
-        InterviewPlanningService(db, llm_model="test-model", clock=lambda: NOW).begin_questions(
-            user_id=user_id,
-            session_id=session.id,
-            version=1,
+        InterviewPlanningService(
+            db,
+            llm_model="test-model",
+            training_memory_service_factory=FakeTrainingMemoryService,
+            clock=lambda: NOW,
+        ).begin_questions(
+            user_id=user_id, session_id=session.id, version=1
         )
     )
 
@@ -252,6 +309,10 @@ def test_begin_enqueues_snapshot_and_moves_opening_to_generating(monkeypatch) ->
     assert payload["sessionVersion"] == 1
     assert "interviewPlanningInput" in payload
     assert payload["interviewPlanningInput"]["careerProfile"]["version"] == 4
+    assert payload["interviewPlanningInput"]["trainingMemory"][
+        "focusCompetencies"
+    ][0]["competencyKey"] == "results_and_evidence"
+    assert FakeTrainingMemoryService.calls == 1
 
 
 def test_begin_rejects_version_conflict_without_enqueue(monkeypatch) -> None:
@@ -281,14 +342,19 @@ def test_in_progress_begin_does_not_enqueue_a_second_run(
     run_status: AgentRunStatus,
 ) -> None:
     user_id = uuid4()
-    run = _run(user_id=user_id, status=run_status)
+    run = _run(user_id=user_id, status=run_status, prompt_version="1")
     session = _session(user_id, uuid4(), status="generatingQuestion", version=2, run_id=run.id)
     FakeAgentRunService.calls = []
+    FakeTrainingMemoryService.calls = 0
     monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
     db = ScriptedSession([user_id, session, run])
 
     result = asyncio.run(
-        InterviewPlanningService(db, llm_model="test-model").begin_questions(
+        InterviewPlanningService(
+            db,
+            llm_model="test-model",
+            training_memory_service_factory=FakeTrainingMemoryService,
+        ).begin_questions(
             user_id=user_id,
             session_id=session.id,
             version=2,
@@ -297,6 +363,7 @@ def test_in_progress_begin_does_not_enqueue_a_second_run(
 
     assert result is session
     assert FakeAgentRunService.calls == []
+    assert FakeTrainingMemoryService.calls == 0
     assert db.commit_count == 1
 
 
@@ -332,6 +399,99 @@ def test_failed_planner_can_retry_with_a_new_idempotent_run(monkeypatch) -> None
     assert FakeAgentRunService.calls[0]["idempotency_key"] == (
         f"interview-planner:{session.id}:v2"
     )
+
+
+def test_failed_retry_reuses_memory_snapshot_without_requery(monkeypatch) -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    session = _session(user_id, role_id)
+    role = _role(role_id)
+    role.user_id = user_id
+    failed_run = _run(user_id=user_id, status=AgentRunStatus.QUEUED)
+    FakeAgentRunService.calls = []
+    FakeAgentRunService.next_run = failed_run
+    FakeTrainingMemoryService.calls = 0
+    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+
+    asyncio.run(
+        InterviewPlanningService(
+            ScriptedSession([user_id, session, _profile(uuid4()), role]),
+            llm_model="test-model",
+            training_memory_service_factory=FakeTrainingMemoryService,
+        ).begin_questions(
+            user_id=user_id, session_id=session.id, version=1
+        )
+    )
+    original_memory = deepcopy(
+        failed_run.payload["interviewPlanningInput"]["trainingMemory"]
+    )
+    failed_run.status = AgentRunStatus.FAILED
+    session.status = "generatingQuestion"
+    session.version = 2
+    session.planning_run_id = failed_run.id
+
+    retry_run = _run(user_id=user_id)
+    FakeAgentRunService.next_run = retry_run
+    asyncio.run(
+        InterviewPlanningService(
+            ScriptedSession(
+                [user_id, session, failed_run, _profile(uuid4()), role]
+            ),
+            llm_model="test-model",
+            training_memory_service_factory=ExplodingTrainingMemoryService,
+        ).begin_questions(
+            user_id=user_id, session_id=session.id, version=2
+        )
+    )
+
+    assert (
+        retry_run.payload["interviewPlanningInput"]["trainingMemory"]
+        == original_memory
+    )
+
+
+def test_v1_snapshot_without_memory_is_accepted_and_unsupported_version_rejected(
+    monkeypatch,
+) -> None:
+    user_id = uuid4()
+    role_id = uuid4()
+    session = _session(user_id, role_id)
+    role = _role(role_id)
+    role.user_id = user_id
+    run = _run(user_id=user_id)
+    FakeAgentRunService.calls = []
+    FakeAgentRunService.next_run = run
+    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    original_service = InterviewPlanningService(
+        ScriptedSession([user_id, session, _profile(uuid4()), role]),
+        llm_model="test-model",
+    )
+    # Build a valid immutable snapshot through the same enqueue path used by
+    # production, then emulate a persisted v1 payload from before memory.
+    async def enqueue() -> None:
+        nonlocal original_service
+        await original_service.begin_questions(
+            user_id=user_id, session_id=session.id, version=1
+        )
+
+    asyncio.run(enqueue())
+    legacy_payload = deepcopy(run.payload)
+    del legacy_payload["interviewPlanningInput"]["trainingMemory"]
+    run.prompt_version = "1"
+    run.payload = legacy_payload
+
+    loaded = asyncio.run(
+        InterviewPlanningService(ScriptedSession([])).load_planning_input(run)
+    )
+    assert loaded.training_memory.focus_competencies == []
+    assert loaded.training_memory.established_competencies == []
+
+    run.prompt_version = "99"
+    with pytest.raises(InterviewPlanningStateError) as error:
+        asyncio.run(
+            InterviewPlanningService(ScriptedSession([])).load_planning_input(run)
+        )
+    assert error.value.code == "interview_planning_run_invalid"
 
 
 def test_success_persists_plan_and_first_question_in_one_transaction(monkeypatch) -> None:

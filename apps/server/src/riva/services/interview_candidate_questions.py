@@ -24,7 +24,6 @@ from riva.models import (
 )
 from riva.prompts import (
     INTERVIEW_CANDIDATE_QUESTION_PROMPT,
-    INTERVIEW_PLANNING_PROMPT,
 )
 from riva.schemas.interview import InterviewConfiguration
 from riva.schemas.interview_candidate_question import (
@@ -40,6 +39,9 @@ from riva.schemas.interview_candidate_question import (
 )
 from riva.schemas.interview_planning import InterviewPlanningRunPayload
 from riva.services.agent_runs import AgentRunService
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 from riva.utils import utc_now
 
 
@@ -363,13 +365,19 @@ class InterviewCandidateQuestionService:
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             )
+        try:
+            planning_prompt = get_interview_planning_prompt(
+                planning_run.prompt_version
+            )
+        except ValueError:
+            raise InterviewCandidateQuestionStateError(
+                INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
+            ) from None
         if (
             planning_run.user_id != interview_session.user_id
-            or planning_run.agent_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-            or planning_run.prompt_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-            or planning_run.prompt_version != INTERVIEW_PLANNING_PROMPT.version
-            or planning_run.output_schema_id
-            != INTERVIEW_PLANNING_PROMPT.output_schema_id
+            or planning_run.agent_id != planning_prompt.prompt_id
+            or planning_run.prompt_id != planning_prompt.prompt_id
+            or planning_run.output_schema_id != planning_prompt.output_schema_id
             or _status_value(planning_run.status) != AgentRunStatus.SUCCEEDED.value
         ):
             raise InterviewCandidateQuestionStateError(

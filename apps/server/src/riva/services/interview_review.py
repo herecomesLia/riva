@@ -23,7 +23,7 @@ from riva.models import (
     InterviewTurnAssessment,
     User,
 )
-from riva.prompts import INTERVIEW_PLANNING_PROMPT, INTERVIEW_REVIEW_PROMPT
+from riva.prompts import INTERVIEW_REVIEW_PROMPT
 from riva.schemas.interview import InterviewConfiguration, InterviewQuestionType
 from riva.schemas.interview_candidate_question import (
     InterviewCandidateQuestionExchangeSnapshot,
@@ -50,6 +50,9 @@ from riva.schemas.interview_review import (
     InterviewReviewTurnAssessmentSnapshot,
 )
 from riva.services.agent_runs import AgentRunService
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.utils import utc_now
 
@@ -219,13 +222,19 @@ class InterviewReviewService:
             planning_run = await self.session.get(AgentRun, plan.source_agent_run_id)
             if planning_run is None:
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
+            try:
+                planning_prompt = get_interview_planning_prompt(
+                    planning_run.prompt_version
+                )
+            except ValueError:
+                raise InterviewReviewStateError(
+                    INTERVIEW_REVIEW_SNAPSHOT_INVALID
+                ) from None
             if (
                 planning_run.user_id != interview_session.user_id
-                or planning_run.agent_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-                or planning_run.prompt_id != INTERVIEW_PLANNING_PROMPT.prompt_id
-                or planning_run.prompt_version != INTERVIEW_PLANNING_PROMPT.version
-                or planning_run.output_schema_id
-                != INTERVIEW_PLANNING_PROMPT.output_schema_id
+                or planning_run.agent_id != planning_prompt.prompt_id
+                or planning_run.prompt_id != planning_prompt.prompt_id
+                or planning_run.output_schema_id != planning_prompt.output_schema_id
                 or _status_value(planning_run.status) != AgentRunStatus.SUCCEEDED.value
             ):
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)

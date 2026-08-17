@@ -1,10 +1,14 @@
 from riva.prompts import INTERVIEW_PLANNING_PROMPT
 from riva.schemas.interview_planning import InterviewPlanningOutput
+from riva.services.interview_planning_prompt_versions import (
+    INTERVIEW_PLANNING_LEGACY_PROMPT,
+    get_interview_planning_prompt,
+)
 
 
 def test_interview_planner_prompt_identity_and_schema() -> None:
     assert INTERVIEW_PLANNING_PROMPT.prompt_id == "interview-planner"
-    assert INTERVIEW_PLANNING_PROMPT.version == "1"
+    assert INTERVIEW_PLANNING_PROMPT.version == "2"
     assert INTERVIEW_PLANNING_PROMPT.output_schema_id == "interview-plan-v1"
     assert INTERVIEW_PLANNING_PROMPT.output_schema is InterviewPlanningOutput
 
@@ -20,6 +24,10 @@ def test_interview_planner_prompt_marks_all_source_context_as_untrusted() -> Non
             "target_role": '{"title":"Backend Engineer"}',
             "job_description_analysis": '{"rivaSummary":"Build APIs"}',
             "matching_analysis": "null",
+            "training_memory": (
+                '{"version":"1","focusCompetencies":[],'
+                '"establishedCompetencies":[]}'
+            ),
         }
     ).user
 
@@ -33,4 +41,28 @@ def test_interview_planner_prompt_marks_all_source_context_as_untrusted() -> Non
     assert "<BEGIN_UNTRUSTED_TARGET_ROLE>" in user
     assert "<BEGIN_UNTRUSTED_JOB_DESCRIPTION_ANALYSIS>" in user
     assert "<BEGIN_UNTRUSTED_MATCHING_ANALYSIS>" in user
+    assert "<BEGIN_UNTRUSTED_TRAINING_MEMORY>" in user
+    assert "Training Memory is an aggregate signal" in system
     assert "ignore previous instructions" in user
+
+
+def test_interview_planner_legacy_prompt_has_no_training_memory_block() -> None:
+    rendered = INTERVIEW_PLANNING_LEGACY_PROMPT.render(
+        {
+            "interaction_language": "en",
+            "configuration": "{}",
+            "session": "{}",
+            "career_profile": "{}",
+            "target_role": "{}",
+            "job_description_analysis": "{}",
+            "matching_analysis": "null",
+        }
+    )
+
+    assert "TRAINING_MEMORY" not in rendered.system
+    assert "TRAINING_MEMORY" not in rendered.user
+
+
+def test_interview_planner_prompt_versions_resolve_to_exact_definitions() -> None:
+    assert get_interview_planning_prompt("1") is INTERVIEW_PLANNING_LEGACY_PROMPT
+    assert get_interview_planning_prompt("2") is INTERVIEW_PLANNING_PROMPT

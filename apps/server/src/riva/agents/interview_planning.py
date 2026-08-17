@@ -6,9 +6,13 @@ from pydantic import BaseModel
 from riva.agents.base import Agent
 from riva.integrations import GenerationParameters, LLMProvider
 from riva.prompts import INTERVIEW_PLANNING_PROMPT
+from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_planning import (
     InterviewPlanningInput,
     InterviewPlanningOutput,
+)
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
 )
 
 
@@ -31,10 +35,24 @@ class InterviewPlanningAgent(
         provider: LLMProvider,
         model: str,
         parameters: GenerationParameters | None = None,
+        *,
+        prompt: PromptDefinition[InterviewPlanningOutput] = (
+            INTERVIEW_PLANNING_PROMPT
+        ),
     ) -> None:
+        try:
+            resolved_prompt = get_interview_planning_prompt(prompt.version)
+        except ValueError:
+            raise ValueError(
+                "unsupported interview planning prompt version"
+            ) from None
+        if resolved_prompt is not prompt:
+            raise ValueError(
+                "interview planning prompt must be the canonical version definition"
+            )
         super().__init__(
             provider=provider,
-            prompt=INTERVIEW_PLANNING_PROMPT,
+            prompt=prompt,
             model=model,
             parameters=parameters,
         )
@@ -47,7 +65,7 @@ class InterviewPlanningAgent(
         self,
         input: InterviewPlanningInput,
     ) -> Mapping[str, object]:
-        return {
+        values: dict[str, object] = {
             "interaction_language": input.interaction_language,
             "configuration": _stable_json(input.configuration),
             "session": _stable_json(input.session),
@@ -58,6 +76,9 @@ class InterviewPlanningAgent(
             ),
             "matching_analysis": _stable_json(input.matching_analysis),
         }
+        if get_interview_planning_prompt(self.prompt.version).version == "2":
+            values["training_memory"] = _stable_json(input.training_memory)
+        return values
 
 
 __all__ = ["InterviewPlanningAgent"]

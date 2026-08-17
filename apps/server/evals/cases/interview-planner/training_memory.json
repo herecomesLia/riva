@@ -1,29 +1,29 @@
 {
-  "id": "interview-planner.technical-round",
+  "id": "interview-planner.training-memory",
   "agentId": "interview-planner",
   "promptVersion": "2",
   "input": {
     "session": {
-      "id": "20000000-0000-4000-8000-000000000001",
+      "id": "20000000-0000-4000-8000-000000000011",
       "version": 1,
       "status": "opening",
       "language": "en",
       "configuration": {
-        "targetRoleId": "20000000-0000-4000-8000-000000000002",
+        "targetRoleId": "20000000-0000-4000-8000-000000000012",
         "round": "technical",
         "difficulty": "pressure",
         "durationMinutes": 30
       }
     },
     "configuration": {
-      "targetRoleId": "20000000-0000-4000-8000-000000000002",
+      "targetRoleId": "20000000-0000-4000-8000-000000000012",
       "round": "technical",
       "difficulty": "pressure",
       "durationMinutes": 30
     },
     "interactionLanguage": "en",
     "careerProfile": {
-      "profileId": "20000000-0000-4000-8000-000000000003",
+      "profileId": "20000000-0000-4000-8000-000000000013",
       "version": 4,
       "summary": "Backend engineer with Python API experience.",
       "education": [],
@@ -32,7 +32,7 @@
       "skills": ["Python"]
     },
     "targetRole": {
-      "id": "20000000-0000-4000-8000-000000000002",
+      "id": "20000000-0000-4000-8000-000000000012",
       "title": "Backend Engineer",
       "company": "Example Labs",
       "recruitmentType": "experienced",
@@ -70,33 +70,63 @@
     "matchingAnalysis": null,
     "trainingMemory": {
       "version": "1",
-      "focusCompetencies": [],
-      "establishedCompetencies": []
+      "focusCompetencies": [
+        {
+          "competencyKey": "results_and_evidence",
+          "displayName": "Results and Evidence",
+          "level": 48,
+          "confidence": 60,
+          "trend": "stable",
+          "evidenceCount": 5,
+          "lastEvidenceAt": "2026-08-16T10:00:00Z"
+        },
+        {
+          "competencyKey": "risk_control",
+          "displayName": "Risk Control",
+          "level": 42,
+          "confidence": 60,
+          "trend": "declining",
+          "evidenceCount": 4,
+          "lastEvidenceAt": "2026-08-15T10:00:00Z"
+        }
+      ],
+      "establishedCompetencies": [
+        {
+          "competencyKey": "communication",
+          "displayName": "Communication",
+          "level": 86,
+          "confidence": 80,
+          "trend": "improving",
+          "evidenceCount": 9,
+          "lastEvidenceAt": "2026-08-14T10:00:00Z"
+        }
+      ]
     }
   },
   "assertions": [
     { "operator": "numberRange", "path": "/totalMainQuestions", "min": 3, "max": 5 },
     { "operator": "itemCount", "path": "/questions", "min": 3, "max": 5 },
     { "operator": "exact", "path": "/questions/0/order", "expected": 1 },
-    { "operator": "exact", "path": "/questions/1/order", "expected": 2 }
+    { "operator": "exact", "path": "/questions/1/order", "expected": 2 },
+    { "operator": "exact", "path": "/questions/2/order", "expected": 3 }
   ],
   "rubrics": [
     {
-      "id": "technical-coverage",
-      "criteria": "The plan covers technical API and distributed-systems capabilities relevant to the supplied technical round and JD."
+      "id": "memory-coverage",
+      "criteria": "The plan gives results and evidence and risk control reasonable opportunities for practice or assessment in the technical round."
     },
     {
-      "id": "distinct-questions",
-      "criteria": "The questions have distinct objectives and do not substantially repeat one another."
+      "id": "balanced-plan",
+      "criteria": "The plan does not make every question repeat one memory focus and preserves distinct objectives."
     },
     {
-      "id": "context-relevance",
-      "criteria": "The plan is grounded in the supplied Backend Engineer profile and payment API context."
+      "id": "memory-grounding",
+      "criteria": "The plan does not expose internal memory scores or present aggregate training signals as candidate facts."
     },
     {
-      "id": "duration-fit",
-      "criteria": "The number and depth of questions are reasonable for a 30-minute interview."
+      "id": "role-round-fit",
+      "criteria": "The plan remains grounded in the Backend Engineer role, supplied JD, and technical pressure round."
     }
   ],
-  "tags": ["interview", "planning", "technical"]
+  "tags": ["interview", "planning", "memory"]
 }

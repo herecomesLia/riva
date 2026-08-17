@@ -19,6 +19,7 @@ from riva.schemas.matching_analysis import (
     MatchingCareerProfile,
 )
 from riva.schemas.profile import OptionalText, RequiredText, StandardUUID
+from riva.schemas.training_memory import TrainingMemoryContext
 
 
 class InterviewPlanningModel(APIModel):
@@ -136,6 +137,9 @@ class InterviewPlanningInput(InterviewPlanningModel):
     target_role: InterviewTargetRoleSnapshot
     job_description_analysis: InterviewJobDescriptionAnalysisSnapshot
     matching_analysis: InterviewMatchingAnalysisSnapshot | None = None
+    training_memory: TrainingMemoryContext = Field(
+        default_factory=TrainingMemoryContext,
+    )
 
     @model_validator(mode="after")
     def validate_lineage(self) -> Self:

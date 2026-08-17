@@ -21,6 +21,7 @@ EXPECTED_CASE_IDS = {
     "practice-recommender.retry-current",
     "practice-recommender.next-question",
     "interview-planner.technical-round",
+    "interview-planner.training-memory",
     "interview-review.completed-interview",
 }
 

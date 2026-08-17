@@ -5,6 +5,9 @@ from uuid import uuid4
 from riva.agents import InterviewPlanningAgent
 from riva.integrations import MessageRole
 from riva.prompts import INTERVIEW_PLANNING_PROMPT
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 from riva.schemas.interview_planning import InterviewPlanningInput, InterviewPlanningOutput
 from tests.helpers.llm import FakeLLMProvider
 
@@ -112,7 +115,7 @@ def test_interview_planner_uses_structured_output_and_stable_snapshot_json() -> 
 
     assert agent.agent_id == "interview-planner"
     assert result.prompt_id == "interview-planner"
-    assert result.prompt_version == "1"
+    assert result.prompt_version == "2"
     assert isinstance(result.output, InterviewPlanningOutput)
     assert result.output.total_main_questions == 3
     request = provider.calls[0]
@@ -125,6 +128,7 @@ def test_interview_planner_uses_structured_output_and_stable_snapshot_json() -> 
 
     values = agent.prompt_values(input)
     assert values["matching_analysis"] == "null"
+    assert "focusCompetencies" in values["training_memory"]
     assert values["career_profile"] == json.dumps(
         input.career_profile.model_dump(mode="json", by_alias=True),
         ensure_ascii=False,
@@ -132,3 +136,20 @@ def test_interview_planner_uses_structured_output_and_stable_snapshot_json() -> 
         separators=(",", ":"),
     )
     assert input.model_dump(mode="json") == before
+
+
+def test_interview_planner_v1_does_not_render_training_memory() -> None:
+    provider = FakeLLMProvider([planning_output()])
+    agent = InterviewPlanningAgent(
+        provider,
+        model="test-interview-model",
+        prompt=get_interview_planning_prompt("1"),
+    )
+
+    result = asyncio.run(agent.run(planning_input()))
+
+    assert result.agent_id == "interview-planner"
+    assert result.prompt_id == "interview-planner"
+    assert result.prompt_version == "1"
+    assert "TRAINING_MEMORY" not in provider.calls[0].messages[0].content
+    assert "TRAINING_MEMORY" not in provider.calls[0].messages[1].content
