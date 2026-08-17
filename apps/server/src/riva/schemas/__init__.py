@@ -1,5 +1,9 @@
 from riva.core.language import InteractionLanguage
 from riva.schemas.auth import AuthCredentials, UserResponse
+from riva.schemas.competencies import (
+    CompetencyListResponse,
+    CompetencySummaryResponse,
+)
 from riva.schemas.health import HealthResponse
 from riva.schemas.health import DependencyHealthStatus, ServiceHealthStatus
 from riva.schemas.interview import (
@@ -428,6 +432,8 @@ from riva.schemas.users import UserAccountResponse, UserAccountUpdate
 
 __all__ = [
     "AuthCredentials",
+    "CompetencyListResponse",
+    "CompetencySummaryResponse",
     "DependencyHealthStatus",
     "HealthResponse",
     "InteractionLanguage",

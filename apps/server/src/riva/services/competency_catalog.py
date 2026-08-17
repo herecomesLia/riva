@@ -16,6 +16,20 @@ COMPETENCY_DISPLAY_NAMES: Final[Mapping[str, str]] = {
     "risk_control": "Risk Control",
 }
 
+# This is the only ordering contract for competency presentation.  Keep it
+# explicit so callers do not depend on database insertion order.
+CANONICAL_COMPETENCY_KEYS: Final[tuple[str, ...]] = (
+    "answer_quality",
+    "relevance",
+    "structure",
+    "specificity",
+    "personal_contribution",
+    "results_and_evidence",
+    "role_alignment",
+    "communication",
+    "risk_control",
+)
+
 DIMENSION_TO_COMPETENCY_KEY: Final[Mapping[str, str]] = {
     "relevance": "relevance",
     "structure": "structure",
@@ -25,6 +39,10 @@ DIMENSION_TO_COMPETENCY_KEY: Final[Mapping[str, str]] = {
     "roleAlignment": "role_alignment",
     "communication": "communication",
     "riskControl": "risk_control",
+}
+
+_CANONICAL_COMPETENCY_INDEX: Final[Mapping[str, int]] = {
+    key: index for index, key in enumerate(CANONICAL_COMPETENCY_KEYS)
 }
 
 
@@ -48,9 +66,23 @@ def display_name_for_competency_key(competency_key: object) -> str:
         raise ValueError(f"unknown competency key: {competency_key!r}") from None
 
 
+def canonical_competency_sort_key(competency_key: str) -> tuple[int, str]:
+    """Return the stable catalog order, placing uncatalogued keys last."""
+
+    return (
+        _CANONICAL_COMPETENCY_INDEX.get(
+            competency_key,
+            len(CANONICAL_COMPETENCY_KEYS),
+        ),
+        competency_key,
+    )
+
+
 __all__ = [
+    "CANONICAL_COMPETENCY_KEYS",
     "COMPETENCY_DISPLAY_NAMES",
     "DIMENSION_TO_COMPETENCY_KEY",
     "competency_key_for_dimension",
+    "canonical_competency_sort_key",
     "display_name_for_competency_key",
 ]

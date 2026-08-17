@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from uuid import UUID
 
@@ -16,6 +16,7 @@ from riva.models import (
     PracticeReview,
     PracticeSession,
 )
+from riva.services.competency_aggregation import CompetencyAggregationService
 from riva.services.competencies import CompetencyService
 from riva.services.competency_catalog import (
     competency_key_for_dimension,
@@ -30,9 +31,19 @@ class CompetencyIngestionService:
     transaction ownership stays with the source-artifact service.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        competency_aggregation_service_factory: Callable[
+            [AsyncSession], CompetencyAggregationService
+        ] = CompetencyAggregationService,
+    ) -> None:
         self.session = session
         self.competency_service = CompetencyService(session)
+        self.competency_aggregation_service = (
+            competency_aggregation_service_factory(session)
+        )
 
     async def ingest_practice_evaluation(
         self,
@@ -84,6 +95,7 @@ class CompetencyIngestionService:
                     details=dimension_details,
                 )
             )
+        await self._recompute(user_id, evidence)
         return evidence
 
     async def ingest_practice_review(
@@ -137,6 +149,7 @@ class CompetencyIngestionService:
                     },
                 )
             )
+        await self._recompute(user_id, evidence)
         return evidence
 
     async def ingest_interview_turn(
@@ -199,6 +212,7 @@ class CompetencyIngestionService:
                     details={**base_details, "items": list(assessment.issues)},
                 )
             )
+        await self._recompute(user_id, evidence)
         return evidence
 
     async def ingest_interview_review(
@@ -210,6 +224,7 @@ class CompetencyIngestionService:
         self._validate_review_context(user_id, interview_session, review)
         status = review.status
         if status == "unavailable":
+            await self._recompute(user_id, [])
             return []
         if status not in {"partial", "complete"}:
             raise ValueError("interview review status is invalid")
@@ -311,7 +326,18 @@ class CompetencyIngestionService:
                     },
                 )
             )
+        await self._recompute(user_id, evidence)
         return evidence
+
+    async def _recompute(
+        self,
+        user_id: UUID,
+        evidence: list[CompetencyEvidence],
+    ) -> None:
+        await self.competency_aggregation_service.recompute_many_in_transaction(
+            user_id=user_id,
+            competency_ids={item.competency_id for item in evidence},
+        )
 
     async def _add(
         self,

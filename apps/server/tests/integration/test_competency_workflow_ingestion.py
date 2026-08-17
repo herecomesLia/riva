@@ -1,15 +1,57 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from riva.db.database import Database
-from riva.models import CompetencyEvidence, User, UserCompetency
+from riva.models import (
+    AgentRun,
+    CompetencyEvidence,
+    InterviewFollowUpQuestion,
+    InterviewQuestion,
+    InterviewReview,
+    InterviewSession,
+    InterviewTurnAssessment,
+    PracticeEvaluation,
+    User,
+    UserCompetency,
+)
+from riva.schemas.evaluation import PracticeEvaluationOutput
+from riva.schemas.interview_review import InterviewReviewOutput
+from riva.schemas.interview_turn import InterviewTurnOutput
+from riva.services.agent_runs import AgentRunService
+from riva.services.evaluation_generation import EvaluationGenerationService
 from riva.services.competency_ingestion import CompetencyIngestionService
+from riva.services.interview_review import InterviewReviewService
+from riva.services.interview_turn import InterviewTurnService
 from tests.helpers.integration_database import get_integration_database_url
+from tests.helpers.llm import FakeLLMProvider
+from tests.integration.test_evaluation_generation import (
+    enqueue as enqueue_evaluation,
+    evaluation_response,
+    prepare_context,
+)
+from tests.integration.test_interview_completion_workflow import (
+    _reach_candidate_questions,
+    _review_output,
+)
+from tests.integration.test_interview_planning_workflow import (
+    _app as interview_app,
+    _headers as interview_headers,
+    _planner_output,
+    _settings as interview_settings,
+    _start_and_begin,
+    _worker as interview_worker,
+)
+from tests.integration.test_interview_turn_workflow import (
+    _answer_request,
+    _seed as seed_interview_context,
+    _turn_output,
+)
 
 
 pytestmark = pytest.mark.integration
@@ -75,6 +117,17 @@ def _interview_review(
         review=review,
         created_at=NOW,
     )
+
+
+class _FailingCompetencyIngestion:
+    async def ingest_practice_evaluation(self, **_kwargs: object) -> None:
+        raise RuntimeError("injected competency ingestion failure")
+
+    async def ingest_interview_turn(self, **_kwargs: object) -> None:
+        raise RuntimeError("injected competency ingestion failure")
+
+    async def ingest_interview_review(self, **_kwargs: object) -> None:
+        raise RuntimeError("injected competency ingestion failure")
 
 
 def test_practice_and_interview_ingestion_is_idempotent_and_atomic() -> None:
@@ -355,3 +408,294 @@ def test_practice_and_interview_ingestion_is_idempotent_and_atomic() -> None:
                 await database.drop_tables()
 
     asyncio.run(run())
+
+
+def test_practice_evaluation_source_transaction_rolls_back_artifact_and_evidence() -> None:
+    async def run() -> None:
+        database_url = get_integration_database_url()
+        async with Database(database_url) as database:
+            await database.reset()
+            try:
+                owner, practice_session, attempt = await prepare_context(
+                    database,
+                    "none",
+                )
+                run = await enqueue_evaluation(
+                    database,
+                    owner.id,
+                    attempt.id,
+                    "noFollowUpRequired",
+                )
+
+                async with database.sessionmaker() as session:
+                    claimed = await AgentRunService(session).claim_next(
+                        lease_owner="competency-rollback-practice",
+                        lease_duration=timedelta(minutes=5),
+                    )
+                    assert claimed is not None
+                    assert claimed.id == run.id
+
+                    with pytest.raises(
+                        RuntimeError,
+                        match="injected competency ingestion failure",
+                    ):
+                        await EvaluationGenerationService(
+                            session,
+                            llm_model="fake-evaluation-model",
+                            competency_ingestion_service_factory=(
+                                lambda _session: _FailingCompetencyIngestion()
+                            ),
+                        ).persist_success(
+                            claimed,
+                            PracticeEvaluationOutput.model_validate(
+                                evaluation_response(88)
+                            ),
+                        )
+
+                    assert (
+                        await session.scalar(
+                            select(PracticeEvaluation).where(
+                                PracticeEvaluation.attempt_id == attempt.id
+                            )
+                        )
+                        is None
+                    )
+                    assert (
+                        await session.scalar(
+                            select(func.count())
+                            .select_from(CompetencyEvidence)
+                            .where(CompetencyEvidence.user_id == owner.id)
+                        )
+                        == 0
+                    )
+            finally:
+                await database.reset()
+
+    asyncio.run(run())
+
+
+def test_interview_turn_source_transaction_rolls_back_all_follow_up_state() -> None:
+    async def run() -> None:
+        database_url = get_integration_database_url()
+        async with Database(database_url) as database:
+            await database.reset()
+            try:
+                owner, role, _profile = await seed_interview_context(
+                    database,
+                    "competency-rollback-turn",
+                )
+                settings = interview_settings(database_url)
+                provider = FakeLLMProvider(
+                    [_planner_output(), _turn_output()],
+                    provider="competency-rollback-turn-provider",
+                )
+                app = interview_app(database_url, owner)
+
+                with TestClient(app) as client:
+                    session_id, _opening, _generating = _start_and_begin(
+                        client,
+                        role.id,
+                    )
+                    assert await interview_worker(
+                        database,
+                        settings,
+                        provider,
+                    ).process_one()
+                    question = await _one_interview_question(
+                        database,
+                        session_id,
+                    )
+                    submitted = _answer_request(
+                        client,
+                        session_id,
+                        version=3,
+                        question_id=question.id,
+                    )
+                    assert submitted.status_code == 202
+
+                async with database.sessionmaker() as session:
+                    queued = await session.scalar(
+                        select(AgentRun).where(
+                            AgentRun.user_id == owner.id,
+                            AgentRun.agent_id == "interview-turn",
+                        )
+                    )
+                    current = await session.get(InterviewSession, session_id)
+                    assert queued is not None
+                    assert current is not None
+                    before_status = current.status
+                    before_version = current.version
+
+                    claimed = await AgentRunService(session).claim_next(
+                        lease_owner="competency-rollback-turn",
+                        lease_duration=timedelta(minutes=5),
+                    )
+                    assert claimed is not None
+                    assert claimed.id == queued.id
+
+                    with pytest.raises(
+                        RuntimeError,
+                        match="injected competency ingestion failure",
+                    ):
+                        await InterviewTurnService(
+                            session,
+                            competency_ingestion_service_factory=(
+                                lambda _session: _FailingCompetencyIngestion()
+                            ),
+                        ).persist_success(
+                            claimed,
+                            InterviewTurnOutput.model_validate(_turn_output()),
+                        )
+
+                    assert (
+                        await session.scalar(
+                            select(InterviewTurnAssessment).where(
+                                InterviewTurnAssessment.session_id == session_id
+                            )
+                        )
+                        is None
+                    )
+                    assert (
+                        await session.scalar(
+                            select(InterviewFollowUpQuestion).where(
+                                InterviewFollowUpQuestion.session_id == session_id
+                            )
+                        )
+                        is None
+                    )
+                    assert (
+                        await session.scalar(
+                            select(InterviewQuestion).where(
+                                InterviewQuestion.session_id == session_id,
+                                InterviewQuestion.order > 1,
+                            )
+                        )
+                        is None
+                    )
+                    current = await session.get(InterviewSession, session_id)
+                    assert current is not None
+                    assert current.status == before_status == "generatingTurn"
+                    assert current.version == before_version == 4
+            finally:
+                await database.reset()
+
+    asyncio.run(run())
+
+
+def test_interview_review_source_transaction_rolls_back_completion_state() -> None:
+    async def run() -> None:
+        database_url = get_integration_database_url()
+        async with Database(database_url) as database:
+            await database.reset()
+            try:
+                owner, role, _profile = await seed_interview_context(
+                    database,
+                    "competency-rollback-review",
+                )
+                settings = interview_settings(database_url)
+                provider = FakeLLMProvider(
+                    [
+                        _planner_output(2),
+                        _turn_output("complete"),
+                        _turn_output("complete"),
+                    ],
+                    provider="competency-rollback-review-provider",
+                )
+                app = interview_app(database_url, owner)
+
+                with TestClient(app) as client:
+                    session_id = await _reach_candidate_questions(
+                        database,
+                        settings,
+                        client,
+                        role.id,
+                        provider,
+                    )
+                    finish = client.post(
+                        f"/api/interview/sessions/{session_id}/finish",
+                        json={"version": 7},
+                        headers=interview_headers(),
+                    )
+                    assert finish.status_code == 202
+                    assert finish.json()["session"]["status"] == (
+                        "generatingReview"
+                    )
+
+                async with database.sessionmaker() as session:
+                    questions = list(
+                        (
+                            await session.scalars(
+                                select(InterviewQuestion)
+                                .where(
+                                    InterviewQuestion.session_id == session_id
+                                )
+                                .order_by(InterviewQuestion.order.asc())
+                            )
+                        ).all()
+                    )
+                    queued = await session.scalar(
+                        select(AgentRun).where(
+                            AgentRun.user_id == owner.id,
+                            AgentRun.agent_id == "interview-review",
+                        )
+                    )
+                    current = await session.get(InterviewSession, session_id)
+                    assert queued is not None
+                    assert current is not None
+                    assert current.status == "generatingReview"
+                    assert current.version == 8
+
+                    claimed = await AgentRunService(session).claim_next(
+                        lease_owner="competency-rollback-review",
+                        lease_duration=timedelta(minutes=5),
+                    )
+                    assert claimed is not None
+                    assert claimed.id == queued.id
+
+                    with pytest.raises(
+                        RuntimeError,
+                        match="injected competency ingestion failure",
+                    ):
+                        await InterviewReviewService(
+                            session,
+                            competency_ingestion_service_factory=(
+                                lambda _session: _FailingCompetencyIngestion()
+                            ),
+                        ).persist_success(
+                            claimed,
+                            InterviewReviewOutput.model_validate(
+                                _review_output([question.id for question in questions])
+                            ),
+                        )
+
+                    assert (
+                        await session.scalar(
+                            select(InterviewReview).where(
+                                InterviewReview.session_id == session_id
+                            )
+                        )
+                        is None
+                    )
+                    current = await session.get(InterviewSession, session_id)
+                    assert current is not None
+                    assert current.status == "generatingReview"
+                    assert current.version == 8
+            finally:
+                await database.reset()
+
+    asyncio.run(run())
+
+
+async def _one_interview_question(
+    database: Database,
+    session_id: UUID,
+) -> InterviewQuestion:
+    async with database.sessionmaker() as session:
+        question = await session.scalar(
+            select(InterviewQuestion).where(
+                InterviewQuestion.session_id == session_id,
+                InterviewQuestion.order == 1,
+            )
+        )
+        assert question is not None
+        return question

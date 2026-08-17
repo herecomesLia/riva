@@ -71,10 +71,28 @@ class FakeCompetencyService:
         return evidence
 
 
+class FakeCompetencyAggregationService:
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, set[object]]] = []
+
+    async def recompute_many_in_transaction(
+        self,
+        *,
+        user_id: object,
+        competency_ids: set[object],
+    ) -> list[object]:
+        self.calls.append((user_id, competency_ids))
+        return []
+
+
 def _service() -> tuple[CompetencyIngestionService, FakeCompetencyService, MagicMock]:
     session = MagicMock()
     competency_service = FakeCompetencyService()
-    service = CompetencyIngestionService(session)  # type: ignore[arg-type]
+    aggregation_service = FakeCompetencyAggregationService()
+    service = CompetencyIngestionService(
+        session,
+        competency_aggregation_service_factory=lambda _session: aggregation_service,
+    )  # type: ignore[arg-type]
     service.competency_service = competency_service  # type: ignore[assignment]
     return service, competency_service, session
 
