@@ -6,6 +6,8 @@ from numbers import Real
 from pathlib import Path
 from typing import Any
 
+from pydantic import TypeAdapter
+
 from riva.evals.models import (
     AgentEvalAssertion,
     AgentEvalCase,
@@ -63,7 +65,9 @@ class AgentEvalRunner:
             )
 
         try:
-            validated_input = registration.input_schema.model_validate(case.input)
+            validated_input = TypeAdapter(
+                registration.input_schema
+            ).validate_python(case.input)
         except Exception as error:
             return _failed_case(
                 case,

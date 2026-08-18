@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 
+from pydantic import TypeAdapter
 import pytest
 
 from riva.evals.registry import build_default_registry
@@ -23,6 +24,18 @@ EXPECTED_CASE_IDS = {
     "interview-planner.technical-round",
     "interview-planner.training-memory",
     "interview-review.completed-interview",
+    "resume-parser.basic-structured",
+    "resume-parser.evidence-boundary",
+    "job-description-parser.basic-structured",
+    "job-description-parser.injection-boundary",
+    "matching-analyzer.match-and-gaps",
+    "matching-analyzer.evidence-boundary",
+    "follow-up-generator.needs-follow-up",
+    "follow-up-generator.complete-answer",
+    "practice-reference-answer-generator.main-question",
+    "practice-reference-answer-generator.follow-up",
+    "interview-candidate-question.safe-company-answer",
+    "interview-candidate-question.question-quality",
 }
 
 EMAIL_PATTERN = re.compile(
@@ -68,7 +81,17 @@ def test_real_cases_match_registry_and_validate_inputs(real_cases, registry) -> 
         assert registration.agent_id == case.agent_id
         assert case.prompt_version == registration.prompt_version
         assert case.assertions
-        registration.input_schema.model_validate(case.input)
+        TypeAdapter(registration.input_schema).validate_python(case.input)
+
+
+def test_real_cases_cover_every_registered_target_agent(real_cases, registry) -> None:
+    case_agent_ids = {case.agent_id for case in real_cases}
+
+    assert "eval-quality-judge" not in registry.agent_ids
+    assert "eval-quality-judge" not in case_agent_ids
+    assert set(registry.agent_ids) <= case_agent_ids
+    for case in real_cases:
+        assert case.prompt_version == registry.get(case.agent_id).prompt_version
 
 
 def test_quality_cases_have_default_rubric_contract(real_cases) -> None:

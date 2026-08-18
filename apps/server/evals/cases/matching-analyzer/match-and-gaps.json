@@ -1,0 +1,102 @@
+{
+  "id": "matching-analyzer.match-and-gaps",
+  "agentId": "matching-analyzer",
+  "promptVersion": "2",
+  "input": {
+    "interaction_language": "en",
+    "career_profile": {
+      "summary": "Backend engineer focused on reliable workflow APIs.",
+      "education": [
+        {
+          "school": "Northwind University",
+          "degree": "Bachelor's degree",
+          "major": "Computer Science",
+          "start_date": "2018-09",
+          "end_date": "2022-06",
+          "is_current": false
+        }
+      ],
+      "work_experiences": [
+        {
+          "company": "Example Labs",
+          "title": "Backend Engineer",
+          "employment_type": "fullTime",
+          "location": "Shanghai",
+          "start_date": "2022-07",
+          "end_date": null,
+          "is_current": true,
+          "responsibilities": ["Designed Python APIs for workflow automation."],
+          "achievements": ["Improved retry reliability for internal services."],
+          "skills": ["Python"]
+        }
+      ],
+      "project_experiences": [
+        {
+          "name": "Invoice Pipeline",
+          "role": "Developer",
+          "start_date": "2023-01",
+          "end_date": "2023-06",
+          "responsibilities": ["Stored workflow records in PostgreSQL."],
+          "achievements": ["Shipped the first version."],
+          "skills": ["PostgreSQL"]
+        }
+      ],
+      "skills": ["Python", "FastAPI", "PostgreSQL"]
+    },
+    "job": {
+      "role_title": "Backend Engineer",
+      "company": "Example Labs",
+      "job_description_analysis": {
+        "riva_summary": "Build reliable workflow services for logistics operations.",
+        "responsibilities": ["Design backend APIs", "Operate data workflows"],
+        "qualification_requirements": {
+          "education": ["Bachelor's degree in Computer Science or a related field"],
+          "graduation_cohorts": [],
+          "majors": [],
+          "experience": ["Backend service experience"],
+          "languages": [],
+          "certifications": [],
+          "other": []
+        },
+        "required_skills": {
+          "programming_languages": ["Python"],
+          "frameworks_and_libraries": ["FastAPI"],
+          "platforms": ["Kubernetes"],
+          "tools": [],
+          "concepts_and_methods": ["API design"],
+          "databases_and_middleware": ["PostgreSQL"],
+          "other": []
+        },
+        "preferred_qualifications": ["Experience with cloud platforms"],
+        "soft_skills": ["Clear communication"],
+        "business_domains": ["Logistics operations"]
+      }
+    }
+  },
+  "assertions": [
+    { "operator": "numberRange", "path": "/overall_match_score", "min": 0, "max": 100 },
+    { "operator": "itemCount", "path": "/matched_capabilities", "min": 1 },
+    { "operator": "itemCount", "path": "/missing_capabilities", "min": 1 },
+    { "operator": "itemCount", "path": "/underrepresented_capabilities", "min": 0 },
+    { "operator": "itemCount", "path": "/high_risk_questions", "min": 1 },
+    { "operator": "itemCount", "path": "/preparation_recommendations", "min": 1 }
+  ],
+  "rubrics": [
+    {
+      "id": "evidence-based-match",
+      "minScore": 3,
+      "criteria": "Matched capabilities are supported by the profile's concrete responsibilities, project evidence, or explicitly listed skills, while missing capabilities come from explicit job requirements."
+    },
+    {
+      "id": "partial-evidence-boundary",
+      "minScore": 3,
+      "criteria": "The analysis distinguishes absent evidence from underrepresented or indirect evidence and does not infer ability, years, scale, or outcomes that are not supplied."
+    },
+    {
+      "id": "preparation-not-hiring",
+      "minScore": 3,
+      "criteria": "The result is framed as preparation support with actionable evidence-focused questions and recommendations, not a hiring, rejection, or recruitment decision."
+    }
+  ],
+  "tags": ["matching", "gaps", "evidence"]
+}

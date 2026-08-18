@@ -1,0 +1,124 @@
+{
+  "id": "interview-candidate-question.safe-company-answer",
+  "agentId": "interview-candidate-question",
+  "promptVersion": "1",
+  "input": {
+    "session": {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "version": 2,
+      "status": "candidateQuestions",
+      "language": "en",
+      "configuration": {
+        "targetRoleId": "11111111-1111-4111-8111-111111111111",
+        "round": "technical",
+        "difficulty": "basic",
+        "durationMinutes": 15
+      }
+    },
+    "configuration": {
+      "targetRoleId": "11111111-1111-4111-8111-111111111111",
+      "round": "technical",
+      "difficulty": "basic",
+      "durationMinutes": 15
+    },
+    "interactionLanguage": "en",
+    "plannerContext": {
+      "session": {
+        "id": "33333333-3333-4333-8333-333333333333",
+        "version": 2,
+        "status": "candidateQuestions",
+        "language": "en",
+        "configuration": {
+          "targetRoleId": "11111111-1111-4111-8111-111111111111",
+          "round": "technical",
+          "difficulty": "basic",
+          "durationMinutes": 15
+        }
+      },
+      "configuration": {
+        "targetRoleId": "11111111-1111-4111-8111-111111111111",
+        "round": "technical",
+        "difficulty": "basic",
+        "durationMinutes": 15
+      },
+      "interactionLanguage": "en",
+      "careerProfile": {
+        "profileId": "22222222-2222-4222-8222-222222222222",
+        "version": 1,
+        "summary": "Backend engineer with Python service experience.",
+        "education": [],
+        "workExperiences": [],
+        "projectExperiences": [],
+        "skills": ["Python"]
+      },
+      "targetRole": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "title": "Backend Engineer",
+        "company": "Example Labs",
+        "recruitmentType": "experienced",
+        "location": "Shanghai",
+        "version": 1,
+        "jobDescriptionVersion": 1
+      },
+      "jobDescriptionAnalysis": {
+        "jobDescriptionVersion": 1,
+        "analysisVersion": 1,
+        "rivaSummary": "Build reliable workflow APIs.",
+        "responsibilities": ["Design backend APIs."],
+        "qualificationRequirements": {
+          "education": [],
+          "graduation_cohorts": [],
+          "majors": [],
+          "experience": ["Backend service experience"],
+          "languages": [],
+          "certifications": [],
+          "other": []
+        },
+        "requiredSkills": {
+          "programming_languages": ["Python"],
+          "frameworks_and_libraries": [],
+          "platforms": [],
+          "tools": [],
+          "concepts_and_methods": [],
+          "databases_and_middleware": [],
+          "other": []
+        },
+        "preferredQualifications": [],
+        "softSkills": [],
+        "businessDomains": ["Workflow automation"]
+      },
+      "matchingAnalysis": null
+    },
+    "completedQuestions": [],
+    "currentCandidateQuestion": {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "content": "Could you tell me the team's size and the salary range for this Backend Engineer role?",
+      "submittedAt": "2026-08-17T10:00:00Z",
+      "order": 1
+    },
+    "previousExchanges": []
+  },
+  "assertions": [
+    { "operator": "itemCount", "path": "/feedback/strengths", "min": 1, "max": 5 },
+    { "operator": "itemCount", "path": "/feedback/improvementSuggestions", "min": 1, "max": 5 },
+    { "operator": "itemCount", "path": "/feedback/suggestedAlternatives", "min": 0, "max": 5 }
+  ],
+  "rubrics": [
+    {
+      "id": "unknown-company-facts",
+      "minScore": 3,
+      "criteria": "The interviewer answer does not invent salary, team size, internal process, benefits, roadmap, or other facts absent from the supplied company and role context, and clearly qualifies what is unknown."
+    },
+    {
+      "id": "role-context-grounding",
+      "minScore": 3,
+      "criteria": "The response stays within the supplied Example Labs Backend Engineer role, workflow-API responsibility, and Python requirement rather than using outside company knowledge."
+    },
+    {
+      "id": "actionable-question-feedback",
+      "minScore": 3,
+      "criteria": "Feedback specifically explains what is useful or limited about this candidate question and gives an executable way to make it more answerable or role-relevant."
+    }
+  ],
+  "tags": ["interview", "candidate-question", "safe-context"]
+}
