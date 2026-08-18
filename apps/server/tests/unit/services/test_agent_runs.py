@@ -5,7 +5,10 @@ from uuid import uuid4
 import pytest
 
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
-from riva.schemas.matching_analysis import MatchingAnalysisRunPayload
+from riva.schemas.matching_analysis import (
+    MatchingAnalysisRunPayload,
+    MatchingProfileWorkExperience,
+)
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
@@ -19,7 +22,7 @@ from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.practice_reference_answer import (
     PracticeMainReferenceAnswerRunPayload,
 )
-from riva.schemas.interview_turn import InterviewTurnRunPayload
+from riva.schemas.interview_turn import InterviewTurnInput, InterviewTurnRunPayload
 from riva.services.agent_runs import AgentRunService, _serialize_payload
 from tests.unit.agents.test_interview_turn import turn_input
 
@@ -212,6 +215,26 @@ def test_current_agent_payloads_are_accepted_after_alias_serialization() -> None
 
 def test_interview_turn_run_payload_is_accepted_after_alias_serialization() -> None:
     input = turn_input()
+    input.career_profile.summary = None
+    input.career_profile.work_experiences = [
+        MatchingProfileWorkExperience(
+            company="Riva",
+            title="Backend Engineer",
+            employment_type="fullTime",
+            location=None,
+            start_date="2021-07",
+            end_date=None,
+            is_current=True,
+            responsibilities=["Build reliable APIs"],
+            achievements=["Improved API reliability"],
+            skills=["Python"],
+        )
+    ]
+    input.target_role.company = None
+    input.target_role.location = None
+    input = InterviewTurnInput.model_validate(
+        input.model_dump(mode="json", by_alias=True)
+    )
     payload = InterviewTurnRunPayload(
         session_id=input.session.id,
         session_version=input.session.version,
@@ -225,13 +248,19 @@ def test_interview_turn_run_payload_is_accepted_after_alias_serialization() -> N
         interaction_language=input.session.language,
         remaining_follow_up_slots=input.remaining_follow_up_slots,
         interview_turn_input=input,
-    ).model_dump(mode="json", by_alias=True, exclude_none=True)
+    ).model_dump(mode="json", by_alias=True)
 
     serialized = _serialize_payload(payload)
-    assert serialized == {
-        **payload,
-        "interviewTurnInput": input.model_dump(mode="json", by_alias=True),
-    }
+    snapshot = serialized["interviewTurnInput"]
+    assert snapshot["careerProfile"]["summary"] is None
+    assert snapshot["targetRole"]["company"] is None
+    assert snapshot["targetRole"]["location"] is None
+    assert snapshot["careerProfile"]["workExperiences"][0]["location"] is None
+    for key in ("followUpQuestionId", "followUpAnswerId"):
+        assert key in serialized
+        assert serialized[key] is None
+    reparsed = InterviewTurnRunPayload.model_validate(serialized)
+    assert reparsed.interview_turn_input.career_profile.summary is None
 
 
 def test_review_run_payload_is_accepted_without_widening_metadata() -> None:

@@ -14,6 +14,7 @@ from riva.models import (
     AgentRun,
     AgentRunStatus,
     CareerProfile,
+    CareerProfileWorkExperience,
     InterviewAnswer,
     InterviewFollowUpAnswer,
     InterviewFollowUpQuestion,
@@ -21,6 +22,7 @@ from riva.models import (
     InterviewQuestion,
     InterviewSession,
     InterviewTurnAssessment,
+    TargetRole,
 )
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_interview_planning_workflow import (
@@ -109,7 +111,11 @@ def test_interview_turn_success_persists_follow_up_and_frozen_snapshot(
 ) -> None:
     async def run_workflow() -> None:
         async with Database(migrated_database_url) as database:
-            owner, role, profile = await _seed(database, "turn-success")
+            owner, role, profile = await _seed(
+                database,
+                "turn-success",
+                nullable_snapshot=True,
+            )
             settings = _settings(migrated_database_url)
             app = _app(migrated_database_url, owner)
             provider = FakeLLMProvider(
@@ -181,9 +187,16 @@ def test_interview_turn_success_persists_follow_up_and_frozen_snapshot(
                     assert turn_run.payload["sessionStateVersion"] == 4
                     assert turn_run.payload["targetType"] == "main"
                     assert "interviewTurnInput" in turn_run.payload
-                    assert turn_run.payload["interviewTurnInput"]["mainAnswer"][
-                        "content"
-                    ].startswith("I made the decision")
+                    turn_snapshot = turn_run.payload["interviewTurnInput"]
+                    assert turn_snapshot["mainAnswer"]["content"].startswith(
+                        "I made the decision"
+                    )
+                    assert turn_snapshot["careerProfile"]["summary"] is None
+                    assert turn_snapshot["targetRole"]["company"] is None
+                    assert turn_snapshot["targetRole"]["location"] is None
+                    assert turn_snapshot["careerProfile"]["workExperiences"][0][
+                        "location"
+                    ] is None
 
                     stored_profile = await session.get(CareerProfile, profile.profile_id)
                     assert stored_profile is not None
@@ -238,7 +251,6 @@ def test_interview_turn_success_persists_follow_up_and_frozen_snapshot(
                 )
                 assert body["currentFollowUp"]["status"] == "awaitingAnswer"
                 assert len(provider.calls) == 2
-                assert "ORIGINAL_PROFILE_SNAPSHOT" in provider.calls[-1].messages[1].content
                 assert "CHANGED_AFTER_ENQUEUE" not in provider.calls[-1].messages[1].content
 
     asyncio.run(run_workflow())
@@ -673,7 +685,12 @@ def test_interview_turn_persist_failure_rolls_back_assessment_and_follow_up(
     asyncio.run(run_workflow())
 
 
-async def _seed(database: Database, label: str):
+async def _seed(
+    database: Database,
+    label: str,
+    *,
+    nullable_snapshot: bool = False,
+):
     from tests.helpers.interview import seed_interview_prerequisites
 
     owner, role, profile = await seed_interview_prerequisites(
@@ -681,6 +698,24 @@ async def _seed(database: Database, label: str):
         label=label,
         summary="ORIGINAL_PROFILE_SNAPSHOT",
     )
+    if nullable_snapshot:
+        async with database.sessionmaker() as session:
+            stored_profile = await session.get(CareerProfile, profile.profile_id)
+            stored_role = await session.get(TargetRole, role.id)
+            work_experience = await session.scalar(
+                select(CareerProfileWorkExperience).where(
+                    CareerProfileWorkExperience.career_profile_id
+                    == profile.profile_id
+                )
+            )
+            assert stored_profile is not None
+            assert stored_role is not None
+            assert work_experience is not None
+            stored_profile.summary = None
+            stored_role.company = None
+            stored_role.location = None
+            work_experience.location = None
+            await session.commit()
     return owner, role, profile
 
 
