@@ -21,6 +21,11 @@ from tests.helpers.llm import FakeLLMProvider
 NOW = datetime(2026, 8, 18, 10, 0, tzinfo=UTC)
 
 
+@pytest.fixture(autouse=True)
+def freeze_worker_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("riva.workers.training_planning.utc_now", lambda: NOW)
+
+
 def planning_input() -> TrainingPlanningInput:
     return TrainingPlanningInput.model_validate(
         {
@@ -152,7 +157,7 @@ def test_handler_rejects_non_running_runs_as_non_retryable(
 
 def test_handler_rejects_expired_lease_as_non_retryable() -> None:
     run = running_run(planning_input())
-    run.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    run.lease_expires_at = NOW - timedelta(seconds=1)
 
     with pytest.raises(AgentExecutionError) as raised:
         asyncio.run(handler(FakeLLMProvider([])).execute(run))
