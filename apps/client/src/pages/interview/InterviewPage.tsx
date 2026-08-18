@@ -20,7 +20,7 @@ export function InterviewPage() {
   const queryClient = useQueryClient()
   const startLock = useRef(false)
   const preparingEntryKey = useRef<string | null>(null)
-  const entryKey = entrySearch.entry === "history" ? JSON.stringify(entrySearch) : null
+  const entryKey = entrySearch.entry === undefined ? null : JSON.stringify(entrySearch)
   const [entryPreparation, setEntryPreparation] = useState<{
     key: string | null
     status: "idle" | "pending" | "success" | "error"
@@ -84,27 +84,25 @@ export function InterviewPage() {
     }
   }
 
-  const historyEntryStatus =
+  function retryTrainingEntry() {
+    preparingEntryKey.current = null
+    setEntryPreparation({ key: null, status: "idle" })
+  }
+
+  const trainingEntryStatus =
     entryKey === null
       ? "inactive"
       : entryPreparation.key === entryKey
         ? entryPreparation.status
         : "pending"
 
-  if (historyEntryStatus === "pending") {
+  if (trainingEntryStatus === "pending") {
     return <InterviewView status="loading" />
   }
 
-  if (historyEntryStatus === "error") {
+  if (trainingEntryStatus === "error") {
     return (
-      <InterviewView
-        isRetrying={false}
-        onRetry={() => {
-          preparingEntryKey.current = null
-          setEntryPreparation({ key: null, status: "idle" })
-        }}
-        status="historyEntryError"
-      />
+      <InterviewView isRetrying={false} onRetry={retryTrainingEntry} status="trainingEntryError" />
     )
   }
 
@@ -118,13 +116,13 @@ export function InterviewPage() {
       return <InterviewView status="empty" />
     }
 
-    const historyEntryResolution =
+    const trainingEntryResolution =
       entryPreparation.key === entryKey && entryPreparation.status === "success"
         ? entryPreparation.resolution
         : undefined
     return (
       <InterviewView
-        historyEntryResolution={historyEntryResolution}
+        trainingEntryResolution={trainingEntryResolution}
         isStarting={startMutation.isPending}
         onStart={handleStart}
         setup={interviewQuery.data.setup}

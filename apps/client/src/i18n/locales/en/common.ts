@@ -21,6 +21,8 @@ export const common = {
         "The original difficulty is unavailable; an available difficulty was selected.",
       durationUnavailable:
         "The original duration is unavailable; an available duration was selected.",
+      weaknessPrioritizationUnavailable:
+        "Weak-area prioritization is no longer available; it was turned off.",
     },
     roleUnavailable: {
       title: "The historical target role is unavailable",

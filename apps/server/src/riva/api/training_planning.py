@@ -10,6 +10,7 @@ from riva.core.language import normalize_interaction_language
 from riva.core.training_planning import get_training_planning_service
 from riva.models import User
 from riva.schemas.training_planning import (
+    EnsureCurrentTrainingPlanningRequest,
     StartTrainingPlanningRequest,
     TrainingPlanningStatusResponse,
 )
@@ -65,6 +66,31 @@ async def start_training_planning(
 ) -> TrainingPlanningStatusResponse:
     try:
         return await training_planning_service.start_planning(
+            current_user,
+            payload,
+            interaction_language=normalize_interaction_language(
+                request.headers.get("accept-language")
+            ),
+        )
+    except TrainingPlanningStateError as error:
+        raise training_planning_state_api_error(error) from None
+
+
+@router.post(
+    "/current",
+    response_model=TrainingPlanningStatusResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def ensure_current_training_planning(
+    payload: EnsureCurrentTrainingPlanningRequest,
+    request: Request,
+    current_user: User = Depends(require_current_user),
+    training_planning_service: TrainingPlanningService = Depends(
+        get_training_planning_service
+    ),
+) -> TrainingPlanningStatusResponse:
+    try:
+        return await training_planning_service.ensure_current_planning(
             current_user,
             payload,
             interaction_language=normalize_interaction_language(

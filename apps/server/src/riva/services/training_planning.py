@@ -1,7 +1,7 @@
 from collections.abc import Callable
 import re
 from typing import Literal, cast
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
@@ -32,6 +32,7 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.schemas.training_planning import (
+    EnsureCurrentTrainingPlanningRequest,
     StartTrainingPlanningRequest,
     TrainingPlanningConstraints,
     TrainingPlanningInput,
@@ -53,8 +54,8 @@ from riva.schemas.training_records import (
 from riva.services.agent_runs import AgentRunService
 from riva.services.interview_sessions import InterviewSessionService
 from riva.services.matching_analyses import _career_profile_loader_options
-from riva.services.practice_weaknesses import PracticeWeaknessService
 from riva.services.profile_completion import career_profile_fully_complete
+from riva.services.practice_sessions import PracticeSessionService
 from riva.services.training_memory import TrainingMemoryService
 from riva.services.training_records import TrainingRecordService
 
@@ -102,6 +103,8 @@ TRAINING_PLANNING_FAILURE_REASON = (
 _SAFE_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 TrainingRecordServiceFactory = Callable[[AsyncSession], TrainingRecordService]
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
+
+_CURRENT_PLANNING_REQUEST_NAMESPACE = NAMESPACE_URL
 
 
 class TrainingPlanningStateError(RuntimeError):
@@ -158,28 +161,76 @@ class TrainingPlanningService:
                 target_role_id=payload.target_role_id,
                 interaction_language=interaction_language,
             )
-            run_payload = self._build_run_payload(
+            run = await self._enqueue_planning(
+                user_id=user.id,
                 request_id=payload.request_id,
                 planning_input=planning_input,
-            )
-            run = await self.agent_run_service_factory(self.session).enqueue(
-                user_id=user.id,
-                agent_id=TRAINING_PLANNING_PROMPT.prompt_id,
-                prompt_id=TRAINING_PLANNING_PROMPT.prompt_id,
-                prompt_version=TRAINING_PLANNING_PROMPT.version,
-                output_schema_id=TRAINING_PLANNING_PROMPT.output_schema_id,
-                model=self._configured_model(),
-                payload=cast(
-                    dict[str, object],
-                    run_payload.model_dump(mode="json", by_alias=True),
-                ),
                 idempotency_key=idempotency_key,
-                max_attempts=3,
             )
             replay_payload = self._validate_replay_payload(run)
             self._require_replay_intent(
                 replay_payload,
                 payload,
+                interaction_language,
+            )
+            return await self._status_response(run)
+        except TrainingPlanningStateError:
+            await self.session.rollback()
+            raise
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def ensure_current_planning(
+        self,
+        user: User,
+        payload: EnsureCurrentTrainingPlanningRequest,
+        *,
+        interaction_language: InteractionLanguage,
+    ) -> TrainingPlanningStatusResponse:
+        try:
+            planning_input = await self._build_authoritative_input(
+                user_id=user.id,
+                target_role_id=payload.target_role_id,
+                interaction_language=interaction_language,
+            )
+            fingerprint = training_planning_context_fingerprint(planning_input)
+            existing = await self._existing_current_run(
+                user_id=user.id,
+                target_role_id=payload.target_role_id,
+                interaction_language=interaction_language,
+                context_fingerprint=fingerprint,
+            )
+            if existing is not None:
+                return await self._status_response(existing)
+
+            request_id = uuid5(
+                _CURRENT_PLANNING_REQUEST_NAMESPACE,
+                ":".join(
+                    (
+                        "riva-training-planner",
+                        str(user.id),
+                        str(payload.target_role_id),
+                        interaction_language,
+                        TRAINING_PLANNING_PROMPT.version,
+                        fingerprint,
+                    )
+                ),
+            )
+            self._configured_model()
+            run = await self._enqueue_planning(
+                user_id=user.id,
+                request_id=request_id,
+                planning_input=planning_input,
+                idempotency_key=f"training-planning:{request_id}",
+            )
+            replay_payload = self._validate_replay_payload(run)
+            self._require_replay_intent(
+                replay_payload,
+                StartTrainingPlanningRequest(
+                    request_id=request_id,
+                    target_role_id=payload.target_role_id,
+                ),
                 interaction_language,
             )
             return await self._status_response(run)
@@ -269,12 +320,36 @@ class TrainingPlanningService:
                 user_id=user_id,
                 target_role_id=target_role_id,
             )
-            can_prioritize_weaknesses = await PracticeWeaknessService(
-                self.session
-            ).has_eligible_weakness(
-                user_id=user_id,
-                interaction_language=interaction_language,
+            targeted_practice = None
+            if matching_analysis is not None:
+                practice_capabilities = await PracticeSessionService(
+                    self.session
+                ).get_setup_capabilities(
+                    user_id=user_id,
+                    interaction_language=interaction_language,
+                )
+                targeted_practice = TrainingPlanningTargetedPracticeConstraints(
+                    question_types=list(QuestionCardQuestionType),
+                    difficulties=list(QuestionCardDifficulty),
+                    can_prioritize_weaknesses=(
+                        practice_capabilities.can_prioritize_weaknesses
+                    ),
+                )
+
+            mock_interview = (
+                TrainingPlanningMockInterviewConstraints(
+                    rounds=list(InterviewRound),
+                    difficulties=list(InterviewDifficulty),
+                    duration_minutes=list(InterviewDurationMinutes),
+                )
+                if any(candidate.id == target_role_id for candidate in setup.target_roles)
+                else None
             )
+            if targeted_practice is None and mock_interview is None:
+                raise TrainingPlanningStateError(
+                    TRAINING_PLANNING_TARGET_UNAVAILABLE
+                )
+
             return TrainingPlanningInput(
                 interaction_language=interaction_language,
                 target_role=TrainingPlanningTargetRole(
@@ -288,16 +363,8 @@ class TrainingPlanningService:
                 training_memory=training_memory,
                 recent_training=recent_training,
                 constraints=TrainingPlanningConstraints(
-                    targeted_practice=TrainingPlanningTargetedPracticeConstraints(
-                        question_types=list(QuestionCardQuestionType),
-                        difficulties=list(QuestionCardDifficulty),
-                        can_prioritize_weaknesses=can_prioritize_weaknesses,
-                    ),
-                    mock_interview=TrainingPlanningMockInterviewConstraints(
-                        rounds=list(InterviewRound),
-                        difficulties=list(InterviewDifficulty),
-                        duration_minutes=list(InterviewDurationMinutes),
-                    ),
+                    targeted_practice=targeted_practice,
+                    mock_interview=mock_interview,
                 ),
             )
         except TrainingPlanningStateError:
@@ -332,6 +399,68 @@ class TrainingPlanningService:
             _training_planning_record(record)
             for record in role_records[:5]
         ]
+
+    async def _enqueue_planning(
+        self,
+        *,
+        user_id: UUID,
+        request_id: UUID,
+        planning_input: TrainingPlanningInput,
+        idempotency_key: str,
+    ) -> AgentRun:
+        run_payload = self._build_run_payload(
+            request_id=request_id,
+            planning_input=planning_input,
+        )
+        return await self.agent_run_service_factory(self.session).enqueue(
+            user_id=user_id,
+            agent_id=TRAINING_PLANNING_PROMPT.prompt_id,
+            prompt_id=TRAINING_PLANNING_PROMPT.prompt_id,
+            prompt_version=TRAINING_PLANNING_PROMPT.version,
+            output_schema_id=TRAINING_PLANNING_PROMPT.output_schema_id,
+            model=self._configured_model(),
+            payload=cast(
+                dict[str, object],
+                run_payload.model_dump(mode="json", by_alias=True),
+            ),
+            idempotency_key=idempotency_key,
+            max_attempts=3,
+        )
+
+    async def _existing_current_run(
+        self,
+        *,
+        user_id: UUID,
+        target_role_id: UUID,
+        interaction_language: InteractionLanguage,
+        context_fingerprint: str,
+    ) -> AgentRun | None:
+        runs = (
+            await self.session.scalars(
+                select(AgentRun)
+                .where(
+                    AgentRun.user_id == user_id,
+                    AgentRun.agent_id == TRAINING_PLANNING_PROMPT.prompt_id,
+                    AgentRun.prompt_id == TRAINING_PLANNING_PROMPT.prompt_id,
+                    AgentRun.prompt_version == TRAINING_PLANNING_PROMPT.version,
+                )
+                .order_by(AgentRun.created_at.desc(), AgentRun.id.desc())
+            )
+        ).all()
+        for run in runs:
+            try:
+                payload = validate_training_planning_run(run)
+                if (
+                    payload.target_role_id != target_role_id
+                    or payload.interaction_language != interaction_language
+                    or payload.context_fingerprint != context_fingerprint
+                ):
+                    continue
+                await self._status_response(run)
+            except TrainingPlanningStateError:
+                continue
+            return run
+        return None
 
     async def _existing_run(
         self,
@@ -535,15 +664,24 @@ def _current_matching_analysis(
     if _status_value(matching_run.status) != AgentRunStatus.SUCCEEDED.value:
         return None
     if (
+        role.job_description_status != "saved"
+        or role.raw_job_description is None
+        or not role.raw_job_description.strip()
+        or role.job_description_version is None
+        or role.job_description_analysis is None
+        or matching.job_description_analysis_version
+        != role.job_description_analysis.analysis_version
+        or role.job_description_analysis.job_description_version
+        != role.job_description_version
+    ):
+        return None
+    if (
         role.matching_analysis_run_id != matching.source_agent_run_id
         or matching.role_id != role.id
         or matching.user_id != role.user_id
         or matching.profile_id != profile.profile_id
         or matching.profile_version != profile.version
         or matching.job_description_version != role.job_description_version
-        or role.job_description_analysis is None
-        or matching.job_description_analysis_version
-        != role.job_description_analysis.analysis_version
     ):
         return None
     try:

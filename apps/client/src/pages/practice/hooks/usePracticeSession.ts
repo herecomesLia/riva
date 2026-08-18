@@ -31,7 +31,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   const queryClient = useQueryClient()
   const prepareNextRoundLock = useRef(false)
   const preparingEntryKey = useRef<string | null>(null)
-  const entryKey = entrySearch.entry === "history" ? JSON.stringify(entrySearch) : null
+  const entryKey = entrySearch.entry === undefined ? null : JSON.stringify(entrySearch)
   const [entryPreparation, setEntryPreparation] = useState<{
     key: string | null
     status: "idle" | "pending" | "success" | "error"
@@ -125,17 +125,17 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     isStarting: startMutation.isPending,
     prepareNextRound,
     isPreparingNextRound: prepareNextRoundMutation.isPending,
-    historyEntryStatus:
+    trainingEntryStatus:
       entryKey === null
         ? "inactive"
         : entryPreparation.key === entryKey
           ? entryPreparation.status
           : "pending",
-    historyEntryResolution:
+    trainingEntryResolution:
       entryPreparation.key === entryKey && entryPreparation.status === "success"
         ? entryPreparation.resolution
         : undefined,
-    retryHistoryEntry: () => {
+    retryTrainingEntry: () => {
       preparingEntryKey.current = null
       setEntryPreparation({ key: null, status: "idle" })
     },

@@ -43,53 +43,69 @@ def validate_training_planning_output_contract(
 
     if isinstance(validated, TrainingPlanningTargetedPracticeOutput):
         constraints = input.constraints.targeted_practice
-        if validated.question_type not in constraints.question_types:
+        if constraints is None:
             violations.append(
                 TrainingPlanningContractViolation(
-                    "question_type",
-                    "training_planning_question_type_not_allowed",
+                    "action",
+                    "training_planning_targeted_practice_unavailable",
                 )
             )
-        if validated.difficulty not in constraints.difficulties:
-            violations.append(
-                TrainingPlanningContractViolation(
-                    "difficulty",
-                    "training_planning_difficulty_not_allowed",
+        else:
+            if validated.question_type not in constraints.question_types:
+                violations.append(
+                    TrainingPlanningContractViolation(
+                        "question_type",
+                        "training_planning_question_type_not_allowed",
+                    )
                 )
-            )
-        if (
-            validated.prioritize_weaknesses
-            and not constraints.can_prioritize_weaknesses
-        ):
-            violations.append(
-                TrainingPlanningContractViolation(
-                    "prioritize_weaknesses",
-                    "training_planning_weakness_prioritization_not_allowed",
+            if validated.difficulty not in constraints.difficulties:
+                violations.append(
+                    TrainingPlanningContractViolation(
+                        "difficulty",
+                        "training_planning_difficulty_not_allowed",
+                    )
                 )
-            )
+            if (
+                validated.prioritize_weaknesses
+                and not constraints.can_prioritize_weaknesses
+            ):
+                violations.append(
+                    TrainingPlanningContractViolation(
+                        "prioritize_weaknesses",
+                        "training_planning_weakness_prioritization_not_allowed",
+                    )
+                )
     elif isinstance(validated, TrainingPlanningMockInterviewOutput):
         constraints = input.constraints.mock_interview
-        if validated.round not in constraints.rounds:
+        if constraints is None:
             violations.append(
                 TrainingPlanningContractViolation(
-                    "round",
-                    "training_planning_round_not_allowed",
+                    "action",
+                    "training_planning_mock_interview_unavailable",
                 )
             )
-        if validated.difficulty not in constraints.difficulties:
-            violations.append(
-                TrainingPlanningContractViolation(
-                    "difficulty",
-                    "training_planning_difficulty_not_allowed",
+        else:
+            if validated.round not in constraints.rounds:
+                violations.append(
+                    TrainingPlanningContractViolation(
+                        "round",
+                        "training_planning_round_not_allowed",
+                    )
                 )
-            )
-        if validated.duration_minutes not in constraints.duration_minutes:
-            violations.append(
-                TrainingPlanningContractViolation(
-                    "duration_minutes",
-                    "training_planning_duration_not_allowed",
+            if validated.difficulty not in constraints.difficulties:
+                violations.append(
+                    TrainingPlanningContractViolation(
+                        "difficulty",
+                        "training_planning_difficulty_not_allowed",
+                    )
                 )
-            )
+            if validated.duration_minutes not in constraints.duration_minutes:
+                violations.append(
+                    TrainingPlanningContractViolation(
+                        "duration_minutes",
+                        "training_planning_duration_not_allowed",
+                    )
+                )
 
     if violations:
         raise TrainingPlanningOutputContractError(tuple(violations))

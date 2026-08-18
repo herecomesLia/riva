@@ -137,8 +137,14 @@ class TrainingPlanningMockInterviewConstraints(TrainingPlanningModel):
 
 
 class TrainingPlanningConstraints(TrainingPlanningModel):
-    targeted_practice: TrainingPlanningTargetedPracticeConstraints
-    mock_interview: TrainingPlanningMockInterviewConstraints
+    targeted_practice: TrainingPlanningTargetedPracticeConstraints | None
+    mock_interview: TrainingPlanningMockInterviewConstraints | None
+
+    @model_validator(mode="after")
+    def validate_available_training_mode(self) -> Self:
+        if self.targeted_practice is None and self.mock_interview is None:
+            raise ValueError("at least one training mode must be available")
+        return self
 
 
 class TrainingPlanningInput(TrainingPlanningModel):
@@ -166,6 +172,10 @@ class TrainingPlanningInput(TrainingPlanningModel):
 
 class StartTrainingPlanningRequest(TrainingPlanningModel):
     request_id: StandardUUID
+    target_role_id: StandardUUID
+
+
+class EnsureCurrentTrainingPlanningRequest(TrainingPlanningModel):
     target_role_id: StandardUUID
 
 
@@ -312,5 +322,6 @@ __all__ = [
     "TrainingPlanningLifecycleStatus",
     "TrainingPlanningRunPayload",
     "TrainingPlanningStatusResponse",
+    "EnsureCurrentTrainingPlanningRequest",
     "StartTrainingPlanningRequest",
 ]

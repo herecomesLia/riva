@@ -31,11 +31,10 @@ async function getCurrentSetupContext(
   rolesResponse?: RolesPageResponse,
 ): Promise<PracticeSetupContext> {
   const currentRoles = rolesResponse ?? (await getRolesPage())
+  const current = getPracticeMockState()
   return buildPracticeSetupContext(currentRoles, {
-    canPrioritizeWeaknesses: true,
-    eligibleQuestionCounts: copyPracticeState(
-      getPracticeMockState().setupContext.eligibleQuestionCounts,
-    ),
+    canPrioritizeWeaknesses: current.setupContext.canPrioritizeWeaknesses,
+    eligibleQuestionCounts: copyPracticeState(current.setupContext.eligibleQuestionCounts),
   })
 }
 

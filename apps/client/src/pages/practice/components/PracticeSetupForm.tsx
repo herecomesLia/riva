@@ -73,7 +73,7 @@ const practiceOptionStateClassName =
 
 type PracticeSetupFormProps = {
   context: PracticeSetupContext
-  historyEntryResolution?: PracticeTrainingEntryResolution
+  trainingEntryResolution?: PracticeTrainingEntryResolution
   initialSelection: PracticeSetupSelection
   isPending: boolean
   onStart: (input: ActivePracticeSelection) => Promise<void>
@@ -81,7 +81,7 @@ type PracticeSetupFormProps = {
 
 export function PracticeSetupForm({
   context,
-  historyEntryResolution,
+  trainingEntryResolution,
   initialSelection,
   isPending,
   onStart,
@@ -89,7 +89,7 @@ export function PracticeSetupForm({
   const { t } = useTranslation()
   const [submitError, setSubmitError] = useState(false)
   const [adjustmentConfirmed, setAdjustmentConfirmed] = useState(
-    historyEntryResolution?.status !== "adjusted",
+    trainingEntryResolution?.status !== "adjusted",
   )
   const form = useForm({
     defaultValues: {
@@ -126,11 +126,11 @@ export function PracticeSetupForm({
         void form.handleSubmit()
       }}
     >
-      {historyEntryResolution && (
+      {trainingEntryResolution && (
         <TrainingEntryPreparationAlert
           confirmed={adjustmentConfirmed}
           onConfirm={() => setAdjustmentConfirmed(true)}
-          resolution={historyEntryResolution}
+          resolution={trainingEntryResolution}
         />
       )}
       <FieldGroup className="gap-0">

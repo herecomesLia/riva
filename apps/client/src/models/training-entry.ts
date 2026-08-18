@@ -14,9 +14,10 @@ import type {
 import type { TrainingRecordQuestionType } from "./training-records"
 import type { TargetRolePreparationStatus } from "./roles"
 
-export type TrainingEntryOrigin = "history"
+export type TrainingEntryOrigin = "history" | "planner"
 
 export type PracticeTrainingEntryParameters = {
+  entry?: TrainingEntryOrigin
   targetRoleId?: string
   questionType?: PracticeQuestionType
   difficulty?: PracticeDifficulty
@@ -25,6 +26,7 @@ export type PracticeTrainingEntryParameters = {
 }
 
 export type InterviewTrainingEntryParameters = {
+  entry?: TrainingEntryOrigin
   targetRoleId?: string
   round?: InterviewRound
   difficulty?: InterviewDifficulty
@@ -36,6 +38,7 @@ export type TrainingEntryAdjustmentReason =
   | "interviewRoundUnsupported"
   | "difficultyUnavailable"
   | "durationUnavailable"
+  | "weaknessPrioritizationUnavailable"
 
 export type TrainingEntryRoleUnavailableReason =
   "targetRoleDeleted" | "targetRoleArchived" | "targetRolePrerequisiteUnavailable"
@@ -172,7 +175,18 @@ export function resolvePracticeTrainingEntry(
     questionType,
     difficulty,
     source: parameters.source ?? current.source,
-    prioritizeWeaknesses: parameters.prioritizeWeaknesses ?? current.prioritizeWeaknesses,
+    prioritizeWeaknesses:
+      context.canPrioritizeWeaknesses &&
+      (parameters.prioritizeWeaknesses ?? current.prioritizeWeaknesses),
+  }
+  const requestedWeaknessPrioritization =
+    parameters.prioritizeWeaknesses ?? current.prioritizeWeaknesses
+  if (
+    parameters.entry === "planner" &&
+    requestedWeaknessPrioritization &&
+    !context.canPrioritizeWeaknesses
+  ) {
+    adjustments.push("weaknessPrioritizationUnavailable")
   }
 
   return adjustments.length === 0

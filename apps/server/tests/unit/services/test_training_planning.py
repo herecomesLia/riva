@@ -7,6 +7,7 @@ import pytest
 from riva.models import AgentRun, AgentRunStatus, User
 from riva.prompts import TRAINING_PLANNING_PROMPT
 from riva.schemas.training_planning import (
+    EnsureCurrentTrainingPlanningRequest,
     StartTrainingPlanningRequest,
     TrainingPlanningInput,
     TrainingPlanningOutput,
@@ -42,6 +43,22 @@ class ScriptedSession:
         self.rollback_count += 1
 
 
+class ScalarRowsSession(ScriptedSession):
+    def __init__(self, *scalar_values: object, rows: list[AgentRun]) -> None:
+        super().__init__(*scalar_values)
+        self.rows = rows
+
+    async def scalars(self, _statement):
+        class Result:
+            def __init__(self, values: list[AgentRun]) -> None:
+                self.values = values
+
+            def all(self) -> list[AgentRun]:
+                return self.values
+
+        return Result(self.rows)
+
+
 class FakeAgentRunService:
     calls: list[dict[str, object]] = []
     next_run: AgentRun | None = None
@@ -54,6 +71,16 @@ class FakeAgentRunService:
         if self.next_run is None:
             raise AssertionError("missing fake AgentRun")
         self.next_run.payload = kwargs["payload"]
+        return self.next_run
+
+
+class CurrentFakeAgentRunService(FakeAgentRunService):
+    async def enqueue(self, **kwargs: object) -> AgentRun:
+        self.calls.append(kwargs)
+        if self.next_run is None:
+            raise AssertionError("missing fake AgentRun")
+        self.next_run.payload = kwargs["payload"]
+        self.next_run.idempotency_key = kwargs["idempotency_key"]
         return self.next_run
 
 
@@ -275,6 +302,87 @@ def test_replay_with_different_role_or_language_is_a_conflict() -> None:
         )
     assert raised.value.code == TRAINING_PLANNING_REQUEST_CONFLICT
 
+
+def test_current_planning_replays_matching_fingerprint_without_llm_configuration(
+    monkeypatch,
+) -> None:
+    current_user = owner()
+    input = planning_input()
+    run = run_for(current_user.id, input, request_id=uuid4())
+    session = ScalarRowsSession(rows=[run])
+    service = TrainingPlanningService(
+        session,  # type: ignore[arg-type]
+        llm_provider=None,
+        llm_model=None,
+    )
+
+    async def build_input(**_kwargs):
+        return input
+
+    monkeypatch.setattr(service, "_build_authoritative_input", build_input)
+    response = asyncio.run(
+        service.ensure_current_planning(
+            current_user,
+            EnsureCurrentTrainingPlanningRequest(
+                targetRoleId=input.target_role.id,
+            ),
+            interaction_language="en",
+        )
+    )
+
+    assert response.run_id == run.id
+    assert response.status == "queued"
+
+
+def test_current_planning_uses_stable_request_id_for_a_new_fingerprint(monkeypatch) -> None:
+    current_user = owner()
+    input = planning_input()
+    run = run_for(current_user.id, input, request_id=uuid4())
+    CurrentFakeAgentRunService.calls = []
+    CurrentFakeAgentRunService.next_run = run
+    session = ScalarRowsSession(rows=[])
+    service = TrainingPlanningService(
+        session,  # type: ignore[arg-type]
+        llm_provider="qwen",
+        llm_model="planner-model",
+        agent_run_service_factory=CurrentFakeAgentRunService,
+    )
+
+    async def build_input(**_kwargs):
+        return input
+
+    monkeypatch.setattr(service, "_build_authoritative_input", build_input)
+    request = EnsureCurrentTrainingPlanningRequest(targetRoleId=input.target_role.id)
+    first = asyncio.run(
+        service.ensure_current_planning(
+            current_user,
+            request,
+            interaction_language="en",
+        )
+    )
+
+    assert first.run_id == run.id
+    assert CurrentFakeAgentRunService.calls[0]["idempotency_key"].startswith(
+        "training-planning:"
+    )
+    first_request_key = CurrentFakeAgentRunService.calls[0]["idempotency_key"]
+
+    CurrentFakeAgentRunService.next_run = run_for(
+        current_user.id,
+        input,
+        request_id=uuid4(),
+    )
+    session.rows = []
+    second = asyncio.run(
+        service.ensure_current_planning(
+            current_user,
+            request,
+            interaction_language="en",
+        )
+    )
+
+    assert second.run_id == CurrentFakeAgentRunService.next_run.id
+    assert CurrentFakeAgentRunService.calls[1]["idempotency_key"] == first_request_key
 
 def test_new_request_without_llm_configuration_is_unavailable() -> None:
     current_user = owner()

@@ -27,7 +27,7 @@ export const DefaultSetup = meta.story({ args: createPracticeViewArgs("setupRead
 export const HistoricalConfigurationAvailable = meta.story({
   args: {
     ...createPracticeViewArgs("setupReady"),
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "available",
       configuration: createPracticeViewArgs("setupReady").content.data.session.selection,
       adjustments: [],
@@ -44,7 +44,7 @@ unavailableRoleArgs.content.data.session.selection.targetRoleId = null
 export const HistoricalRoleUnavailable = meta.story({
   args: {
     ...unavailableRoleArgs,
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "roleUnavailable",
       reason: "targetRoleArchived",
       configuration: unavailableRoleArgs.content.data.session.selection,
@@ -64,7 +64,7 @@ if (adjustedPracticeArgs.content.data.session.status !== "setup") {
 export const HistoricalQuestionTypeAdjusted = meta.story({
   args: {
     ...adjustedPracticeArgs,
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "adjusted",
       configuration: adjustedPracticeArgs.content.data.session.selection,
       adjustments: ["practiceQuestionTypeUnsupported"],
@@ -78,7 +78,7 @@ export const HistoricalQuestionTypeAdjusted = meta.story({
 export const HistoricalDifficultyAdjusted = meta.story({
   args: {
     ...adjustedPracticeArgs,
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "adjusted",
       configuration: adjustedPracticeArgs.content.data.session.selection,
       adjustments: ["difficultyUnavailable"],
@@ -87,7 +87,7 @@ export const HistoricalDifficultyAdjusted = meta.story({
 })
 
 export const HistoricalEntryFailure = meta.story({
-  args: { isRetrying: false, onRetry: fn(), variant: "historyEntryError" },
+  args: { isRetrying: false, onRetry: fn(), variant: "trainingEntryError" },
 })
 
 export const NoSavedQuestions = meta.story({

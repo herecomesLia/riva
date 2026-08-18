@@ -41,7 +41,7 @@ export type InterviewViewProps =
   | {
       status: "ready"
       setup: InterviewSetupViewData
-      historyEntryResolution?: InterviewTrainingEntryResolution
+      trainingEntryResolution?: InterviewTrainingEntryResolution
       isStarting: boolean
       onStart: (input: InterviewConfiguration) => Promise<void>
     }
@@ -58,7 +58,7 @@ export type InterviewViewProps =
       onRetry: () => void
     }
   | {
-      status: "historyEntryError"
+      status: "trainingEntryError"
       isRetrying: boolean
       onRetry: () => void
     }
@@ -94,7 +94,7 @@ function InterviewViewContent(props: InterviewViewProps) {
   if (props.status === "error") {
     return <InterviewErrorState isRetrying={props.isRetrying} onRetry={props.onRetry} />
   }
-  if (props.status === "historyEntryError") {
+  if (props.status === "trainingEntryError") {
     return (
       <InterviewSetupCard>
         <CardContent>
@@ -107,7 +107,7 @@ function InterviewViewContent(props: InterviewViewProps) {
   return (
     <InterviewSetupCard>
       <InterviewSetupForm
-        historyEntryResolution={props.historyEntryResolution}
+        trainingEntryResolution={props.trainingEntryResolution}
         isPending={props.isStarting}
         onStart={props.onStart}
         setup={props.setup}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { createInterviewMockResponse } from "@/mocks/data/interview"
 import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { parseInterviewEntrySearch, parsePracticeEntrySearch } from "@/app/training-entry-search"
 import {
   resolveInterviewTrainingEntry,
   resolvePracticeTrainingEntry,
@@ -10,6 +11,23 @@ import {
 } from "@/models/training-entry"
 
 describe("training entry search application", () => {
+  it("accepts planner origins and preserves their setup parameters", () => {
+    expect(
+      parsePracticeEntrySearch({
+        entry: "planner",
+        targetRoleId: "role-1",
+        questionType: "projectDeepDive",
+        difficulty: "pressure",
+        source: "personalized",
+        prioritizeWeaknesses: "true",
+      }),
+    ).toMatchObject({ entry: "planner", source: "personalized" })
+    expect(parseInterviewEntrySearch({ entry: "planner", durationMinutes: "45" })).toEqual({
+      entry: "planner",
+      durationMinutes: 45,
+    })
+  })
+
   it("centralizes cross-mode history question-type mapping", () => {
     expect(toPracticeQuestionType("selfIntroduction")).toBe("motivation")
     expect(toPracticeQuestionType("roleCapability")).toBe("businessUnderstanding")
@@ -98,6 +116,36 @@ describe("training entry search application", () => {
         targetRoleId: role.id,
         questionType: "behavioral",
         difficulty: "basic",
+      },
+    })
+  })
+
+  it("reports when a planner weakness-priority snapshot is no longer available", () => {
+    const response = createPracticeMockResponse("setupReady")
+    const context = structuredClone(response.setupContext)
+    context.canPrioritizeWeaknesses = false
+
+    expect(
+      resolvePracticeTrainingEntry(
+        context,
+        response.session.selection,
+        {
+          entry: "planner",
+          targetRoleId: response.session.selection.targetRoleId ?? undefined,
+          questionType: response.session.selection.questionType,
+          difficulty: response.session.selection.difficulty,
+          source: "personalized",
+          prioritizeWeaknesses: true,
+        },
+        { status: "available" },
+      ),
+    ).toEqual({
+      status: "adjusted",
+      adjustments: ["weaknessPrioritizationUnavailable"],
+      configuration: {
+        ...response.session.selection,
+        prioritizeWeaknesses: false,
+        source: "personalized",
       },
     })
   })

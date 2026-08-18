@@ -452,6 +452,7 @@ from riva.schemas.training_planning import (
     TrainingPlanningTargetedPracticeOutput,
     TrainingPlanningTargetedPracticeRecord,
     TrainingPlanningText,
+    EnsureCurrentTrainingPlanningRequest,
     StartTrainingPlanningRequest,
 )
 from riva.schemas.roles import (
@@ -785,6 +786,7 @@ __all__ = [
     "TrainingPlanningTargetedPracticeOutput",
     "TrainingPlanningTargetedPracticeRecord",
     "TrainingPlanningText",
+    "EnsureCurrentTrainingPlanningRequest",
     "StartTrainingPlanningRequest",
     "StartQuestionGenerationRequest",
     "StartPracticeSessionRequest",

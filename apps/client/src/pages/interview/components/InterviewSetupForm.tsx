@@ -37,7 +37,7 @@ import type { InterviewTrainingEntryResolution } from "@/models/training-entry"
 
 type InterviewSetupFormProps = {
   setup: InterviewSetupViewData
-  historyEntryResolution?: InterviewTrainingEntryResolution
+  trainingEntryResolution?: InterviewTrainingEntryResolution
   isPending: boolean
   onStart: (input: InterviewConfiguration) => Promise<void>
 }
@@ -47,9 +47,9 @@ const interviewOptionStateClassName =
 
 function getInitialConfiguration(
   setup: InterviewSetupViewData,
-  historyEntryResolution?: InterviewTrainingEntryResolution,
+  trainingEntryResolution?: InterviewTrainingEntryResolution,
 ): InterviewSetupFormState["values"] {
-  if (historyEntryResolution?.status === "roleUnavailable") {
+  if (trainingEntryResolution?.status === "roleUnavailable") {
     return { ...setup.defaultConfiguration, targetRoleId: null }
   }
   const selectedRole =
@@ -78,17 +78,17 @@ function getInitialConfiguration(
 
 export function InterviewSetupForm({
   setup,
-  historyEntryResolution,
+  trainingEntryResolution,
   isPending,
   onStart,
 }: InterviewSetupFormProps) {
   const { t } = useTranslation()
   const [submitError, setSubmitError] = useState(false)
   const [adjustmentConfirmed, setAdjustmentConfirmed] = useState(
-    historyEntryResolution?.status !== "adjusted",
+    trainingEntryResolution?.status !== "adjusted",
   )
   const form = useForm({
-    defaultValues: getInitialConfiguration(setup, historyEntryResolution),
+    defaultValues: getInitialConfiguration(setup, trainingEntryResolution),
     onSubmit: async ({ value }) => {
       if (!value.targetRoleId || !value.round || !value.difficulty || !value.durationMinutes) {
         return
@@ -119,11 +119,11 @@ export function InterviewSetupForm({
       }}
     >
       <CardContent className="flex flex-col gap-6">
-        {historyEntryResolution && (
+        {trainingEntryResolution && (
           <TrainingEntryPreparationAlert
             confirmed={adjustmentConfirmed}
             onConfirm={() => setAdjustmentConfirmed(true)}
-            resolution={historyEntryResolution}
+            resolution={trainingEntryResolution}
           />
         )}
         <FieldGroup className="gap-0">

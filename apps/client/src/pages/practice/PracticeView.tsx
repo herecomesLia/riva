@@ -160,7 +160,7 @@ type PracticeViewProps =
       onRetry: () => void
     }
   | {
-      variant: "historyEntryError"
+      variant: "trainingEntryError"
       isRetrying: boolean
       onRetry: () => void
     }
@@ -190,7 +190,7 @@ type PracticeViewProps =
       onRetryFollowUpGeneration: () => void
       onRetryEvaluation: () => void
       onStart: (input: ActivePracticeSelection) => Promise<void>
-      historyEntryResolution?: PracticeTrainingEntryResolution
+      trainingEntryResolution?: PracticeTrainingEntryResolution
     }
 
 export function PracticeView(props: PracticeViewProps) {
@@ -222,7 +222,7 @@ export function PracticeView(props: PracticeViewProps) {
 
 function getPracticeStateKey(props: PracticeViewProps) {
   if (props.variant === "error") return "load-error"
-  if (props.variant === "historyEntryError") return "history-entry-error"
+  if (props.variant === "trainingEntryError") return "training-entry-error"
   if (props.content.status === "loading") return "loading"
   return `session:${props.content.data.session.status}`
 }
@@ -250,7 +250,7 @@ function PracticeViewContent(props: PracticeViewProps) {
   if (props.variant === "error") {
     return <PracticeLoadErrorState isRetrying={props.isRetrying} onRetry={props.onRetry} />
   }
-  if (props.variant === "historyEntryError") {
+  if (props.variant === "trainingEntryError") {
     return (
       <Card>
         <CardContent>
@@ -271,7 +271,7 @@ function PracticeViewContent(props: PracticeViewProps) {
       if (setupContext.targetRoles.length === 0) return <PracticeNoRolesState />
 
       const selection =
-        props.historyEntryResolution?.status === "roleUnavailable"
+        props.trainingEntryResolution?.status === "roleUnavailable"
           ? session.selection
           : resolveActiveSelection(session.selection, setupContext)
       if (!selection) return <PracticeNoRolesState />
@@ -287,7 +287,7 @@ function PracticeViewContent(props: PracticeViewProps) {
           <CardContent className="flex flex-col gap-6">
             <PracticeSetupForm
               context={setupContext}
-              historyEntryResolution={props.historyEntryResolution}
+              trainingEntryResolution={props.trainingEntryResolution}
               initialSelection={selection}
               isPending={props.isStarting}
               onStart={props.onStart}

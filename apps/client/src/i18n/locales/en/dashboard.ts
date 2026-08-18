@@ -100,10 +100,24 @@ export const dashboard = {
     duration: "About {{minutes}} min",
     actions: {
       retryQuestion: { title: "Retry the current question type" },
-      targetedPractice: { title: "Strengthen a focused skill" },
-      mockInterview: { title: "Validate your skills in a mock interview" },
+      targetedPractice: { title: "Strengthen a focused skill", start: "Start targeted practice" },
+      mockInterview: {
+        title: "Validate your skills in a mock interview",
+        start: "Start mock interview",
+      },
       none: { title: "No further action needed" },
     },
+    generating: {
+      description:
+        "Generating your next recommendation from the current role and training history.",
+    },
+    failed: {
+      title: "Training recommendation failed",
+      description: "We could not generate a training recommendation. Try again.",
+      retry: "Retry",
+      retrying: "Retrying",
+    },
+    prioritizeWeaknesses: "Prioritize weak areas",
     empty: {
       title: "No recommendation yet",
       description: "Complete more training to receive your next recommendation.",

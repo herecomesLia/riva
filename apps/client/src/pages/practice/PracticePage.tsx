@@ -23,9 +23,9 @@ export function PracticePage() {
     isStarting,
     prepareNextRound,
     isPreparingNextRound,
-    historyEntryStatus,
-    historyEntryResolution,
-    retryHistoryEntry,
+    trainingEntryStatus,
+    trainingEntryResolution,
+    retryTrainingEntry,
   } = usePracticeSession(entrySearch)
   const generation = usePracticeGenerationPolling(practiceQuery.data)
   const followUpGeneration = usePracticeFollowUpGenerationPolling(practiceQuery.data)
@@ -36,13 +36,13 @@ export function PracticePage() {
   const followUp = usePracticeFollowUpActions(runAction)
   const review = usePracticeReviewActions(runAction)
 
-  if (historyEntryStatus === "pending") {
+  if (trainingEntryStatus === "pending") {
     return <PracticeView content={{ status: "loading" }} variant="default" />
   }
 
-  if (historyEntryStatus === "error") {
+  if (trainingEntryStatus === "error") {
     return (
-      <PracticeView isRetrying={false} onRetry={retryHistoryEntry} variant="historyEntryError" />
+      <PracticeView isRetrying={false} onRetry={retryTrainingEntry} variant="trainingEntryError" />
     )
   }
 
@@ -66,7 +66,7 @@ export function PracticePage() {
         isEvaluationRetrying={evaluation.isEvaluationRetrying}
         isGenerationRetrying={generation.isGenerationRetrying}
         isStarting={isStarting}
-        historyEntryResolution={historyEntryResolution}
+        trainingEntryResolution={trainingEntryResolution}
         onRetryEvaluation={evaluation.retryEvaluation}
         onRetryFollowUpGeneration={followUpGeneration.retryFollowUpGeneration}
         onRetryGeneration={generation.retryGeneration}

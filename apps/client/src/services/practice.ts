@@ -209,7 +209,7 @@ async function prepareRealPracticeTrainingEntry(
   const resolution = resolvePracticeTrainingEntry(
     setupContext,
     currentSelection,
-    setupContext.canPrioritizeWeaknesses ? input : { ...input, prioritizeWeaknesses: false },
+    input,
     roleAvailability,
   )
 

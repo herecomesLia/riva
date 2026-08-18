@@ -41,6 +41,7 @@ EXPECTED_CASE_IDS = {
     "training-planner.focused-practice",
     "training-planner.mock-interview",
     "training-planner.constraints-boundary",
+    "training-planner.mock-only",
 }
 
 EMAIL_PATTERN = re.compile(

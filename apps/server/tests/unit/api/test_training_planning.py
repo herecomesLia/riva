@@ -10,6 +10,7 @@ from riva.core.training_planning import get_training_planning_service
 from riva.core.errors import APIError
 from riva.models import User
 from riva.schemas.training_planning import (
+    EnsureCurrentTrainingPlanningRequest,
     StartTrainingPlanningRequest,
     TrainingPlanningStatusResponse,
     TrainingPlanningTargetedPracticeOutput,
@@ -67,10 +68,12 @@ class FakeTrainingPlanningService:
         self,
         *,
         start_result: TrainingPlanningStatusResponse | None = None,
+        current_result: TrainingPlanningStatusResponse | None = None,
         status_result: TrainingPlanningStatusResponse | None = None,
         error: TrainingPlanningStateError | APIError | None = None,
     ) -> None:
         self.start_result = start_result or status_response("queued")
+        self.current_result = current_result or self.start_result
         self.status_result = status_result or status_response("queued")
         self.error = error
         self.calls: list[tuple[str, object]] = []
@@ -103,6 +106,22 @@ class FakeTrainingPlanningService:
         if isinstance(self.error, APIError):
             raise self.error
         return self.status_result
+
+    async def ensure_current_planning(
+        self,
+        current_user: User,
+        payload: EnsureCurrentTrainingPlanningRequest,
+        *,
+        interaction_language: str,
+    ) -> TrainingPlanningStatusResponse:
+        self.calls.append(
+            ("current", (current_user, payload, interaction_language))
+        )
+        if isinstance(self.error, TrainingPlanningStateError):
+            raise self.error
+        if isinstance(self.error, APIError):
+            raise self.error
+        return self.current_result
 
 
 def create_client(app, service: FakeTrainingPlanningService) -> tuple[TestClient, User]:
@@ -176,6 +195,25 @@ def test_request_body_cannot_override_language(app) -> None:
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert service.calls == []
+
+
+def test_current_plan_returns_202_and_uses_accept_language(app) -> None:
+    service = FakeTrainingPlanningService()
+    client, current_user = create_client(app, service)
+
+    with client:
+        response = client.post(
+            "/api/training-plans/current",
+            json={"targetRoleId": str(ROLE_ID)},
+            headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "en-US"},
+        )
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    assert response.json()["runId"] == str(RUN_ID)
+    call_user, payload, language = service.calls[0][1]
+    assert call_user is current_user
+    assert payload.target_role_id == ROLE_ID
+    assert language == "en"
 
 
 def test_post_is_csrf_protected_but_get_status_is_not(app) -> None:
@@ -274,6 +312,7 @@ def test_request_conflict_is_not_accepted_as_replay(app) -> None:
 def test_openapi_exposes_training_planning_contract(app) -> None:
     paths = app.openapi()["paths"]
     assert "/api/training-plans" in paths
+    assert "/api/training-plans/current" in paths
     assert "/api/training-plans/{runId}" in paths
     assert (
         paths["/api/training-plans"]["post"]["responses"]["202"][

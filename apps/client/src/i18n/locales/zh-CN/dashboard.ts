@@ -99,10 +99,20 @@ export const dashboard = {
     duration: "预计 {{minutes}} 分钟",
     actions: {
       retryQuestion: { title: "重试当前或同类问题" },
-      targetedPractice: { title: "专项补强薄弱能力" },
-      mockInterview: { title: "通过模拟面试检验能力" },
+      targetedPractice: { title: "专项补强薄弱能力", start: "开始专项训练" },
+      mockInterview: { title: "通过模拟面试检验能力", start: "开始模拟面试" },
       none: { title: "本轮无需后续操作" },
     },
+    generating: {
+      description: "正在根据当前岗位和训练记录生成下一步建议。",
+    },
+    failed: {
+      title: "训练建议生成失败",
+      description: "暂时无法生成训练建议，请稍后重试。",
+      retry: "重试",
+      retrying: "正在重试",
+    },
+    prioritizeWeaknesses: "优先补强薄弱项",
     empty: {
       title: "暂无训练建议",
       description: "完成更多训练后，我们会为你生成下一步建议。",

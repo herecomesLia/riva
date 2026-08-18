@@ -16,6 +16,7 @@ export const common = {
       interviewRoundUnsupported: "原模拟面试轮次已不受支持，已选择当前支持的轮次。",
       difficultyUnavailable: "原训练难度已不可用，已选择当前可用难度。",
       durationUnavailable: "原面试时长已不可用，已选择当前可用时长。",
+      weaknessPrioritizationUnavailable: "当前没有可用的薄弱项优先能力，已关闭薄弱项优先。",
     },
     roleUnavailable: {
       title: "历史岗位当前不可用",

@@ -213,3 +213,18 @@ def test_weakness_prioritization_is_rejected_when_disabled() -> None:
     assert raised.value.diagnostics.validation_errors[0].location == (
         "prioritize_weaknesses"
     )
+
+
+def test_unavailable_training_mode_is_rejected_as_invalid_structured_output() -> None:
+    provider = FakeLLMProvider([targeted_output()])
+    agent = TrainingPlanningAgent(provider, model="test-training-planner-model")
+    input = planning_input()
+    input.constraints.targeted_practice = None
+
+    with pytest.raises(InvalidStructuredOutputError) as raised:
+        asyncio.run(agent.run(input))
+
+    assert raised.value.diagnostics is not None
+    assert raised.value.diagnostics.validation_errors[0].location == (
+        "action"
+    )

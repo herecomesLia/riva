@@ -30,7 +30,7 @@ export const HistoricalConfigurationAvailable = meta.story({
   args: {
     status: "ready",
     setup: createInterviewSetupStoryFixture(),
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "available",
       configuration: createInterviewSetupStoryFixture().defaultConfiguration,
       adjustments: [],
@@ -47,7 +47,7 @@ export const HistoricalRoleUnavailable = meta.story({
   args: {
     status: "ready",
     setup: unavailableRoleSetup,
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "roleUnavailable",
       reason: "targetRolePrerequisiteUnavailable",
       configuration: unavailableRoleSetup.defaultConfiguration,
@@ -67,7 +67,7 @@ export const HistoricalRoundAdjusted = meta.story({
   args: {
     status: "ready",
     setup: createInterviewSetupStoryFixture(),
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "adjusted",
       configuration: createInterviewSetupStoryFixture().defaultConfiguration,
       adjustments: ["interviewRoundUnsupported"],
@@ -81,7 +81,7 @@ export const HistoricalDifficultyAndDurationAdjusted = meta.story({
   args: {
     status: "ready",
     setup: createInterviewSetupStoryFixture(),
-    historyEntryResolution: {
+    trainingEntryResolution: {
       status: "adjusted",
       configuration: createInterviewSetupStoryFixture().defaultConfiguration,
       adjustments: ["difficultyUnavailable", "durationUnavailable"],
@@ -93,7 +93,7 @@ export const HistoricalDifficultyAndDurationAdjusted = meta.story({
 
 export const HistoricalEntryFailure = meta.story({
   args: {
-    status: "historyEntryError",
+    status: "trainingEntryError",
     isRetrying: false,
     onRetry: fn(),
   },

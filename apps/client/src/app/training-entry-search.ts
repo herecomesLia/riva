@@ -44,7 +44,7 @@ export type InterviewEntrySearch = InterviewTrainingEntryParameters & {
 
 export function parsePracticeEntrySearch(search: Record<string, unknown>): PracticeEntrySearch {
   return compact({
-    entry: search.entry === "history" ? "history" : undefined,
+    entry: isTrainingEntryOrigin(search.entry) ? search.entry : undefined,
     targetRoleId: nonEmptyString(search.targetRoleId),
     questionType: includes(practiceQuestionTypes, search.questionType)
       ? search.questionType
@@ -58,7 +58,7 @@ export function parsePracticeEntrySearch(search: Record<string, unknown>): Pract
 export function parseInterviewEntrySearch(search: Record<string, unknown>): InterviewEntrySearch {
   const duration = positiveInteger(search.durationMinutes)
   return compact({
-    entry: search.entry === "history" ? "history" : undefined,
+    entry: isTrainingEntryOrigin(search.entry) ? search.entry : undefined,
     targetRoleId: nonEmptyString(search.targetRoleId),
     round: includes(interviewRounds, search.round) ? search.round : undefined,
     difficulty: includes(interviewDifficulties, search.difficulty) ? search.difficulty : undefined,
@@ -72,15 +72,19 @@ export function parseInterviewEntrySearch(search: Record<string, unknown>): Inte
 export function toPracticeEntryParameters(
   search: PracticeEntrySearch,
 ): PracticeTrainingEntryParameters {
-  const { entry: _, ...parameters } = search
-  return parameters
+  const { entry, ...parameters } = search
+  return entry === "planner" ? { ...parameters, entry } : parameters
 }
 
 export function toInterviewEntryParameters(
   search: InterviewEntrySearch,
 ): InterviewTrainingEntryParameters {
-  const { entry: _, ...parameters } = search
-  return parameters
+  const { entry, ...parameters } = search
+  return entry === "planner" ? { ...parameters, entry } : parameters
+}
+
+function isTrainingEntryOrigin(value: unknown): value is TrainingEntryOrigin {
+  return value === "history" || value === "planner"
 }
 
 function includes<T extends string>(values: readonly T[], value: unknown): value is T {

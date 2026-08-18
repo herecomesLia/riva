@@ -13,12 +13,14 @@ import { DashboardMetrics } from "./components/DashboardMetrics"
 import { PerformanceTrendCard } from "./components/PerformanceTrendCard"
 import { RecommendationCard } from "./components/RecommendationCard"
 import { WeaknessesCard } from "./components/WeaknessesCard"
+import type { TrainingPlanningRecommendationState } from "./hooks/useTrainingPlanningRecommendation"
 
 type DashboardViewProps =
   | {
       variant: "default"
       displayName: string
       content: Loadable<DashboardResponse>
+      trainingPlanning?: TrainingPlanningRecommendationState
     }
   | {
       variant: "error"
@@ -30,15 +32,23 @@ export function DashboardView(props: DashboardViewProps) {
     return <DashboardErrorView onRetry={props.onRetry} />
   }
 
-  return <DashboardDefaultView displayName={props.displayName} content={props.content} />
+  return (
+    <DashboardDefaultView
+      content={props.content}
+      displayName={props.displayName}
+      trainingPlanning={props.trainingPlanning}
+    />
+  )
 }
 
 function DashboardDefaultView({
   content,
   displayName,
+  trainingPlanning,
 }: {
   content: Loadable<DashboardResponse>
   displayName: string
+  trainingPlanning?: TrainingPlanningRecommendationState
 }) {
   const contentState =
     content.status === "loading"
@@ -67,7 +77,7 @@ function DashboardDefaultView({
       >
         <section className="grid gap-4 lg:grid-cols-12">
           <CurrentRoleCard state={contentState.currentRole} />
-          <RecommendationCard state={contentState.recommendation} />
+          <RecommendationCard legacyState={contentState.recommendation} state={trainingPlanning} />
         </section>
 
         <DashboardMetrics state={contentState.metrics} />

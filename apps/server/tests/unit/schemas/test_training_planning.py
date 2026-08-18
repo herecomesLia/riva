@@ -5,6 +5,7 @@ import pytest
 
 from riva.core.training_planning import training_planning_context_fingerprint
 from riva.schemas.training_planning import (
+    EnsureCurrentTrainingPlanningRequest,
     StartTrainingPlanningRequest,
     TrainingPlanningInput,
     TrainingPlanningMockInterviewOutput,
@@ -186,6 +187,38 @@ def test_duration_minutes_is_closed_and_constraints_are_non_empty() -> None:
             TrainingPlanningInput.model_validate(invalid)
 
 
+def test_constraints_allow_one_unavailable_training_mode_but_not_both() -> None:
+    targeted_only = input_payload()
+    targeted_only["constraints"] = {
+        "targetedPractice": input_payload()["constraints"]["targetedPractice"],  # type: ignore[index]
+        "mockInterview": None,
+    }
+    assert (
+        TrainingPlanningInput.model_validate(targeted_only)
+        .constraints.mock_interview
+        is None
+    )
+
+    mock_only = input_payload()
+    mock_only["constraints"] = {
+        "targetedPractice": None,
+        "mockInterview": input_payload()["constraints"]["mockInterview"],  # type: ignore[index]
+    }
+    assert (
+        TrainingPlanningInput.model_validate(mock_only)
+        .constraints.targeted_practice
+        is None
+    )
+
+    unavailable = input_payload()
+    unavailable["constraints"] = {
+        "targetedPractice": None,
+        "mockInterview": None,
+    }
+    with pytest.raises(ValidationError, match="at least one training mode"):
+        TrainingPlanningInput.model_validate(unavailable)
+
+
 def test_ended_at_must_be_timezone_aware() -> None:
     invalid = input_payload()
     invalid["recentTraining"] = [
@@ -223,6 +256,11 @@ def test_lifecycle_request_and_payload_preserve_lineage_and_fingerprint() -> Non
     assert payload.model_dump(mode="json", by_alias=True)["trainingPlanningInput"][
         "targetRole"
     ]["id"] == str(request.target_role_id)
+
+    ensure_request = EnsureCurrentTrainingPlanningRequest.model_validate(
+        {"targetRoleId": request.target_role_id}
+    )
+    assert ensure_request.target_role_id == request.target_role_id
 
     mismatched = payload.model_dump(mode="json", by_alias=True)
     mismatched["targetRoleId"] = "00000000-0000-0000-0000-000000000299"

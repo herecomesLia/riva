@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router"
-import { Clock3Icon, PlayIcon, SparklesIcon } from "lucide-react"
+import { Clock3Icon, PlayIcon, RotateCcwIcon, SparklesIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import { mapTrainingPlanToEntry } from "@/app/training-planning-entry"
 import { mapTrainingRecommendationToEntry } from "@/app/training-recommendation-entry"
 import { Badge } from "@/components/ui/badge"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { defaultHistorySearch } from "@/pages/history/history-navigation"
 import {
   Card,
@@ -16,13 +17,183 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { DashboardResponse } from "@/models/dashboard"
+import type { TrainingPlanningPlan } from "@/models/training-planning"
 import type { Loadable } from "@/types"
 
+import type { TrainingPlanningRecommendationState } from "../hooks/useTrainingPlanningRecommendation"
+
 type RecommendationCardProps = {
-  state: Loadable<DashboardResponse["recommendation"]>
+  state?: TrainingPlanningRecommendationState
+  legacyState?: Loadable<DashboardResponse["recommendation"]>
 }
 
-export function RecommendationCard({ state }: RecommendationCardProps) {
+export function RecommendationCard({ state, legacyState }: RecommendationCardProps) {
+  if (state === undefined) {
+    return <LegacyRecommendationCard state={legacyState ?? { status: "ready", data: null }} />
+  }
+  return <TrainingPlanningRecommendationCard state={state} />
+}
+
+function TrainingPlanningRecommendationCard({
+  state,
+}: {
+  state: TrainingPlanningRecommendationState
+}) {
+  const { t } = useTranslation()
+  const response =
+    state.status === "succeeded" || state.status === "failed" ? state.response : undefined
+  const plan = response?.plan ?? null
+
+  return (
+    <Card className="lg:col-span-7" data-testid="training-planning-recommendation">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <SparklesIcon />
+          {t("dashboard.recommendation.eyebrow")}
+        </CardTitle>
+        {state.status === "loading" ? (
+          <CardDescription>{t("dashboard.recommendation.generating.description")}</CardDescription>
+        ) : state.status === "failed" ? (
+          <CardDescription>{t("dashboard.recommendation.failed.description")}</CardDescription>
+        ) : plan ? (
+          <CardDescription>{plan.reason}</CardDescription>
+        ) : (
+          <CardDescription>{t("dashboard.recommendation.empty.description")}</CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {state.status === "loading" ? (
+          <RecommendationLoadingContent />
+        ) : state.status === "failed" ? (
+          <p className="font-heading text-xl font-medium">
+            {t("dashboard.recommendation.failed.title")}
+          </p>
+        ) : plan ? (
+          <TrainingPlanningDataContent plan={plan} />
+        ) : (
+          <p className="font-heading text-xl font-medium">
+            {t("dashboard.recommendation.empty.title")}
+          </p>
+        )}
+      </CardContent>
+      <CardFooter className="flex flex-wrap gap-2">
+        {state.status === "loading" ? (
+          <RecommendationLoadingFooter />
+        ) : state.status === "failed" ? (
+          <Button disabled={state.isRetrying} onClick={state.onRetry}>
+            <RotateCcwIcon data-icon="inline-start" />
+            {state.isRetrying
+              ? t("dashboard.recommendation.failed.retrying")
+              : t("dashboard.recommendation.failed.retry")}
+          </Button>
+        ) : plan && response ? (
+          <TrainingPlanningDataFooter plan={plan} targetRoleId={response.targetRoleId} />
+        ) : (
+          <Link
+            className={buttonVariants({ variant: "outline" })}
+            search={defaultHistorySearch}
+            to="/history"
+          >
+            {t("dashboard.actions.viewHistory")}
+          </Link>
+        )}
+      </CardFooter>
+    </Card>
+  )
+}
+
+function TrainingPlanningDataContent({ plan }: { plan: TrainingPlanningPlan }) {
+  const { t } = useTranslation()
+
+  return (
+    <>
+      <p className="font-heading text-xl font-medium">
+        {t(`dashboard.recommendation.actions.${plan.action}.title`)}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {plan.focusAreas.map((focusArea) => (
+          <Badge key={focusArea} variant="outline">
+            {focusArea}
+          </Badge>
+        ))}
+        {plan.action === "targetedPractice" ? (
+          <>
+            <Badge variant="outline">{t(`history.questionTypes.${plan.questionType}`)}</Badge>
+            <Badge variant="outline">{t(`history.difficulty.${plan.difficulty}`)}</Badge>
+            {plan.prioritizeWeaknesses && (
+              <Badge variant="secondary">
+                {t("dashboard.recommendation.prioritizeWeaknesses")}
+              </Badge>
+            )}
+          </>
+        ) : (
+          <>
+            <Badge variant="outline">{t(`history.rounds.${plan.round}`)}</Badge>
+            <Badge variant="outline">{t(`history.difficulty.${plan.difficulty}`)}</Badge>
+            <Badge variant="outline">
+              <Clock3Icon />
+              {t("dashboard.recommendation.duration", { minutes: plan.durationMinutes })}
+            </Badge>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
+function TrainingPlanningDataFooter({
+  plan,
+  targetRoleId,
+}: {
+  plan: TrainingPlanningPlan
+  targetRoleId: string
+}) {
+  const { t } = useTranslation()
+  const entry = mapTrainingPlanToEntry(plan, targetRoleId)
+
+  return (
+    <>
+      <Link className={buttonVariants()} search={entry.search} to={entry.to}>
+        <PlayIcon data-icon="inline-start" />
+        {t(`dashboard.recommendation.actions.${plan.action}.start`)}
+      </Link>
+      <Link
+        className={buttonVariants({ variant: "outline" })}
+        search={defaultHistorySearch}
+        to="/history"
+      >
+        {t("dashboard.actions.viewHistory")}
+      </Link>
+    </>
+  )
+}
+
+function RecommendationLoadingContent() {
+  return (
+    <>
+      <Skeleton className="h-6 w-4/5" />
+      <div className="flex gap-2">
+        <Skeleton className="h-6 w-24 rounded-full" />
+        <Skeleton className="h-6 w-28 rounded-full" />
+      </div>
+    </>
+  )
+}
+
+function RecommendationLoadingFooter() {
+  return (
+    <>
+      <Skeleton className="h-9 w-28" />
+      <Skeleton className="h-9 w-24" />
+    </>
+  )
+}
+
+function LegacyRecommendationCard({
+  state,
+}: {
+  state: Loadable<DashboardResponse["recommendation"]>
+}) {
   const { t } = useTranslation()
   const recommendation = state.status === "ready" ? state.data : null
 
@@ -45,7 +216,7 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
         {state.status === "loading" ? (
           <RecommendationLoadingContent />
         ) : recommendation ? (
-          <RecommendationDataContent recommendation={recommendation} />
+          <LegacyRecommendationDataContent recommendation={recommendation} />
         ) : (
           <p className="font-heading text-xl font-medium">
             {t("dashboard.recommendation.empty.title")}
@@ -56,7 +227,7 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
         {state.status === "loading" ? (
           <RecommendationLoadingFooter />
         ) : recommendation ? (
-          <RecommendationDataFooter recommendation={recommendation} />
+          <LegacyRecommendationDataFooter recommendation={recommendation} />
         ) : (
           <Link
             className={buttonVariants({ variant: "outline" })}
@@ -71,19 +242,7 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
   )
 }
 
-function RecommendationLoadingContent() {
-  return (
-    <>
-      <Skeleton className="h-6 w-4/5" />
-      <div className="flex gap-2">
-        <Skeleton className="h-6 w-24 rounded-full" />
-        <Skeleton className="h-6 w-28 rounded-full" />
-      </div>
-    </>
-  )
-}
-
-function RecommendationDataContent({
+function LegacyRecommendationDataContent({
   recommendation,
 }: {
   recommendation: NonNullable<DashboardResponse["recommendation"]>
@@ -114,16 +273,7 @@ function RecommendationDataContent({
   )
 }
 
-function RecommendationLoadingFooter() {
-  return (
-    <>
-      <Skeleton className="h-9 w-28" />
-      <Skeleton className="h-9 w-24" />
-    </>
-  )
-}
-
-function RecommendationDataFooter({
+function LegacyRecommendationDataFooter({
   recommendation,
 }: {
   recommendation: NonNullable<DashboardResponse["recommendation"]>
