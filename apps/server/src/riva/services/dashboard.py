@@ -85,7 +85,7 @@ class DashboardService:
         ).get_for_dashboard(
             user_id=user.id,
             competencies=competencies,
-            current_role=current_role,
+            current_role=current_role_source,
             profile_completed=roles_page.profile_context.completed,
         )
 

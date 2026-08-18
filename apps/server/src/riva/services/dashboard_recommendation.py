@@ -105,7 +105,7 @@ class DashboardRecommendationService:
                 competency,
                 evidence_map.get(
                     competency.id,
-                    getattr(competency, "evidences", ()),
+                    (),
                 ),
             )
             for competency in selected
@@ -194,7 +194,7 @@ class DashboardRecommendationService:
         primary = selected[0]
         evidence = evidence_by_competency.get(
             primary.id,
-            getattr(primary, "evidences", ()),
+            (),
         )
         latest_score = cls._latest_score(evidence)
         if latest_score is None:
