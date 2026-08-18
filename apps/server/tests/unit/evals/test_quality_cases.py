@@ -38,6 +38,9 @@ EXPECTED_CASE_IDS = {
     "practice-reference-answer-generator.follow-up",
     "interview-candidate-question.safe-company-answer",
     "interview-candidate-question.question-quality",
+    "training-planner.focused-practice",
+    "training-planner.mock-interview",
+    "training-planner.constraints-boundary",
 }
 
 EMAIL_PATTERN = re.compile(

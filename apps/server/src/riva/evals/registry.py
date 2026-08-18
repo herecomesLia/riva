@@ -18,6 +18,7 @@ from riva.agents.practice_reference_answer import PracticeReferenceAnswerAgent
 from riva.agents.practice_review import PracticeReviewAgent
 from riva.agents.question_generation import QuestionGenerationAgent
 from riva.agents.resume_parsing import ResumeParsingAgent
+from riva.agents.training_planning import TrainingPlanningAgent
 from riva.integrations import LLMProvider
 from riva.prompts import (
     FOLLOW_UP_PROMPT,
@@ -33,6 +34,7 @@ from riva.prompts import (
     PRACTICE_REVIEW_PROMPT,
     QUESTION_GENERATION_PROMPT,
     RESUME_PARSING_PROMPT,
+    TRAINING_PLANNING_PROMPT,
 )
 from riva.schemas.evaluation import EvaluationInput
 from riva.schemas.follow_up import FollowUpInput
@@ -47,6 +49,7 @@ from riva.schemas.practice_reference_answer import PracticeReferenceAnswerInput
 from riva.schemas.practice_review import PracticeReviewInput
 from riva.schemas.question_generation import QuestionGenerationInput
 from riva.schemas.resume_parsing import ResumeParsingInput
+from riva.schemas.training_planning import TrainingPlanningInput
 
 
 AgentFactory = Callable[[LLMProvider, str], Agent[Any, Any]]
@@ -217,6 +220,13 @@ def _canonical_registrations() -> tuple[AgentEvalRegistration, ...]:
             agent_factory=InterviewReviewAgent,
             prompt_id=INTERVIEW_REVIEW_PROMPT.prompt_id,
             prompt_version=INTERVIEW_REVIEW_PROMPT.version,
+        ),
+        AgentEvalRegistration(
+            agent_id="training-planner",
+            input_schema=TrainingPlanningInput,
+            agent_factory=TrainingPlanningAgent,
+            prompt_id=TRAINING_PLANNING_PROMPT.prompt_id,
+            prompt_version=TRAINING_PLANNING_PROMPT.version,
         ),
     )
 

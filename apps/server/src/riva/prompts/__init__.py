@@ -22,6 +22,7 @@ from riva.prompts.practice_recommendation import PRACTICE_RECOMMENDATION_PROMPT
 from riva.prompts.practice_reference_answer import PRACTICE_REFERENCE_ANSWER_PROMPT
 from riva.prompts.question_generation import QUESTION_GENERATION_PROMPT
 from riva.prompts.resume_parsing import RESUME_PARSING_PROMPT
+from riva.prompts.training_planning import TRAINING_PLANNING_PROMPT
 
 __all__ = [
     "DuplicatePromptError",
@@ -44,4 +45,5 @@ __all__ = [
     "PRACTICE_REFERENCE_ANSWER_PROMPT",
     "QUESTION_GENERATION_PROMPT",
     "RESUME_PARSING_PROMPT",
+    "TRAINING_PLANNING_PROMPT",
 ]

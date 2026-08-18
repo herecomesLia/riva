@@ -12,6 +12,7 @@ from riva.agents.interview_candidate_question import InterviewCandidateQuestionA
 from riva.agents.interview_review import InterviewReviewAgent
 from riva.agents.question_generation import QuestionGenerationAgent
 from riva.agents.resume_parsing import ResumeParsingAgent
+from riva.agents.training_planning import TrainingPlanningAgent
 from riva.schemas.resume_parsing import ResumeParsingInput, ResumeParsingOutput
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
@@ -63,4 +64,5 @@ __all__ = [
     "ResumeParsingInput",
     "ResumeParsingOutput",
     "RequiredSkillGroups",
+    "TrainingPlanningAgent",
 ]

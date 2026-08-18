@@ -1,0 +1,95 @@
+{
+  "id": "training-planner.focused-practice",
+  "agentId": "training-planner",
+  "promptVersion": "1",
+  "tags": ["training-planning", "targeted-practice", "evidence-boundary"],
+  "input": {
+    "interactionLanguage": "en",
+    "targetRole": {
+      "id": "00000000-0000-0000-0000-000000000101",
+      "title": "Backend Engineer",
+      "company": "Example Labs",
+      "recruitmentType": "experienced",
+      "location": "Remote"
+    },
+    "matchingAnalysis": {
+      "overallMatchScore": 68,
+      "matchedCapabilities": ["service boundary design"],
+      "missingCapabilities": ["clear project results evidence"],
+      "underrepresentedCapabilities": ["measurable impact explanation"],
+      "resumeGaps": ["project outcomes are described without a measured result"],
+      "highRiskQuestions": ["What changed after your design decision?"],
+      "preparationRecommendations": ["practice a concise project decision and result explanation"]
+    },
+    "trainingMemory": {
+      "focusCompetencies": [
+        {
+          "competencyKey": "results-and-evidence",
+          "displayName": "Results and evidence",
+          "level": 42,
+          "confidence": 61,
+          "trend": "improving",
+          "evidenceCount": 3,
+          "lastEvidenceAt": "2026-08-15T10:00:00Z"
+        }
+      ],
+      "establishedCompetencies": [
+        {
+          "competencyKey": "service-design",
+          "displayName": "Service design",
+          "level": 82,
+          "confidence": 77,
+          "trend": "stable",
+          "evidenceCount": 6,
+          "lastEvidenceAt": "2026-08-14T10:00:00Z"
+        }
+      ]
+    },
+    "recentTraining": [
+      {
+        "recordId": "00000000-0000-0000-0000-000000000111",
+        "kind": "mockInterview",
+        "status": "completed",
+        "overallScore": 78,
+        "endedAt": "2026-08-16T10:00:00Z",
+        "round": "technical",
+        "difficulty": "basic"
+      }
+    ],
+    "constraints": {
+      "targetedPractice": {
+        "questionTypes": ["projectDeepDive"],
+        "difficulties": ["basic", "pressure"],
+        "canPrioritizeWeaknesses": true
+      },
+      "mockInterview": {
+        "rounds": ["technical"],
+        "difficulties": ["basic"],
+        "durationMinutes": [15, 30]
+      }
+    }
+  },
+  "assertions": [
+    { "path": "/action", "operator": "exact", "expected": "targetedPractice" },
+    { "path": "/questionType", "operator": "exact", "expected": "projectDeepDive" },
+    { "path": "/difficulty", "operator": "exact", "expected": "basic" },
+    { "path": "/focusAreas", "operator": "itemCount", "min": 1, "max": 3 },
+    {
+      "path": "/reason",
+      "operator": "notContains",
+      "forbidden": ["level", "confidence", "evidenceCount", "lastEvidenceAt"]
+    }
+  ],
+  "rubrics": [
+    {
+      "id": "evidence-aligned-focus",
+      "criteria": "The selected targeted practice and focus areas directly address the supplied project-results or evidence gap, rather than inventing a different capability.",
+      "minScore": 3
+    },
+    {
+      "id": "memory-boundary",
+      "criteria": "The user-facing reason uses Training Memory only as a historical signal and does not expose level, confidence, evidenceCount, lastEvidenceAt, or numeric memory values.",
+      "minScore": 3
+    }
+  ]
+}

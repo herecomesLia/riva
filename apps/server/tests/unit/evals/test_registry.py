@@ -19,6 +19,7 @@ from riva.agents.practice_reference_answer import PracticeReferenceAnswerAgent
 from riva.agents.practice_review import PracticeReviewAgent
 from riva.agents.question_generation import QuestionGenerationAgent
 from riva.agents.resume_parsing import ResumeParsingAgent
+from riva.agents.training_planning import TrainingPlanningAgent
 from riva.prompts import (
     FOLLOW_UP_PROMPT,
     INTERVIEW_CANDIDATE_QUESTION_PROMPT,
@@ -33,6 +34,7 @@ from riva.prompts import (
     PRACTICE_REVIEW_PROMPT,
     QUESTION_GENERATION_PROMPT,
     RESUME_PARSING_PROMPT,
+    TRAINING_PLANNING_PROMPT,
 )
 from riva.schemas.evaluation import EvaluationInput
 from riva.schemas.follow_up import FollowUpInput
@@ -47,6 +49,7 @@ from riva.schemas.practice_reference_answer import PracticeReferenceAnswerInput
 from riva.schemas.practice_review import PracticeReviewInput
 from riva.schemas.question_generation import QuestionGenerationInput
 from riva.schemas.resume_parsing import ResumeParsingInput
+from riva.schemas.training_planning import TrainingPlanningInput
 
 
 def test_default_registry_contains_all_canonical_agents() -> None:
@@ -113,6 +116,11 @@ def test_default_registry_contains_all_canonical_agents() -> None:
             InterviewReviewInput,
             InterviewReviewAgent,
             INTERVIEW_REVIEW_PROMPT,
+        ),
+        "training-planner": (
+            TrainingPlanningInput,
+            TrainingPlanningAgent,
+            TRAINING_PLANNING_PROMPT,
         ),
     }
 
