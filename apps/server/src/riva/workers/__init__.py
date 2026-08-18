@@ -17,6 +17,7 @@ from riva.workers.practice_review import PracticeReviewHandler
 from riva.workers.practice_reference_answer import PracticeReferenceAnswerHandler
 from riva.workers.question_generation import QuestionGenerationHandler
 from riva.workers.resume_parsing import ResumeParsingWorkerHandler
+from riva.workers.training_planning import TrainingPlanningHandler
 from riva.workers.runtime import AgentWorker
 
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "PracticeReviewHandler",
     "PracticeReferenceAnswerHandler",
     "ResumeParsingWorkerHandler",
+    "TrainingPlanningHandler",
     "AgentWorker",
     "DuplicateAgentHandlerError",
     "build_agent_handler_registry",

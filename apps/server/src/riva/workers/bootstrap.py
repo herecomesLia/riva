@@ -22,6 +22,7 @@ from riva.agents import (
     PracticeReviewAgent,
     QuestionGenerationAgent,
     ResumeParsingAgent,
+    TrainingPlanningAgent,
 )
 from riva.core.config import Settings
 from riva.db import Database
@@ -60,6 +61,7 @@ from riva.workers.practice_review import PracticeReviewHandler
 from riva.workers.practice_reference_answer import PracticeReferenceAnswerHandler
 from riva.workers.question_generation import QuestionGenerationHandler
 from riva.workers.resume_parsing import ResumeParsingWorkerHandler
+from riva.workers.training_planning import TrainingPlanningHandler
 from riva.workers.runtime import AgentWorker, SessionFactory
 
 
@@ -95,6 +97,8 @@ PracticeReferenceAnswerAgentFactory = Callable[..., PracticeReferenceAnswerAgent
 PracticeReferenceAnswerHandlerFactory = Callable[..., PracticeReferenceAnswerHandler]
 ResumeParsingAgentFactory = Callable[..., ResumeParsingAgent]
 ResumeParsingHandlerFactory = Callable[..., ResumeParsingWorkerHandler]
+TrainingPlanningAgentFactory = Callable[..., TrainingPlanningAgent]
+TrainingPlanningHandlerFactory = Callable[..., TrainingPlanningHandler]
 RegistryFactory = Callable[
     [Settings, SessionFactory],
     AgentHandlerRegistry,
@@ -170,6 +174,12 @@ def build_agent_handler_registry(
     resume_parsing_agent_factory: ResumeParsingAgentFactory = ResumeParsingAgent,
     resume_parsing_handler_factory: ResumeParsingHandlerFactory = (
         ResumeParsingWorkerHandler
+    ),
+    training_planning_agent_factory: TrainingPlanningAgentFactory = (
+        TrainingPlanningAgent
+    ),
+    training_planning_handler_factory: TrainingPlanningHandlerFactory = (
+        TrainingPlanningHandler
     ),
 ) -> AgentHandlerRegistry:
     registry = AgentHandlerRegistry()
@@ -330,6 +340,14 @@ def build_agent_handler_registry(
         session_factory=session_factory,
         agent=resume_parsing_agent,
     )
+    training_planning_agent = training_planning_agent_factory(
+        provider=provider,
+        model=model,
+    )
+    training_planning_handler = training_planning_handler_factory(
+        session_factory=session_factory,
+        agent=training_planning_agent,
+    )
     registry.register(job_description_handler)
     registry.register(matching_handler)
     registry.register(question_generation_handler)
@@ -343,6 +361,7 @@ def build_agent_handler_registry(
     registry.register(practice_review_handler)
     registry.register(practice_reference_answer_handler)
     registry.register(resume_parsing_handler)
+    registry.register(training_planning_handler)
     return registry
 
 

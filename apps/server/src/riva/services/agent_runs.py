@@ -31,6 +31,10 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
 )
 from riva.schemas.training_memory import TrainingMemoryContext
+from riva.schemas.training_planning import (
+    TrainingPlanningContextFingerprint,
+    TrainingPlanningInput,
+)
 from riva.schemas.interview_planning import InterviewPlanningInput
 from riva.schemas.interview_turn import InterviewTurnInput
 from riva.schemas.interview_candidate_question import (
@@ -484,6 +488,17 @@ def _serialize_payload(
             serialized[key] = _serialize_interview_candidate_question_input(value)
         elif key == "interviewReviewInput":
             serialized[key] = _serialize_interview_review_input(value)
+        elif key == "trainingPlanningInput":
+            serialized[key] = _serialize_training_planning_input(value)
+        elif key == "contextFingerprint":
+            try:
+                serialized[key] = TypeAdapter(
+                    TrainingPlanningContextFingerprint
+                ).validate_python(value)
+            except (TypeError, ValueError, ValidationError):
+                raise ValueError(
+                    "payload.contextFingerprint must be a SHA-256 hex digest"
+                ) from None
         elif key == "planRevision":
             if (
                 isinstance(value, bool)
@@ -629,6 +644,19 @@ def _serialize_interview_review_input(value: object) -> dict[str, JSONValue]:
     except (TypeError, ValueError, ValidationError):
         raise ValueError(
             "payload.interviewReviewInput must be a valid frozen review snapshot"
+        ) from None
+
+
+def _serialize_training_planning_input(value: object) -> dict[str, JSONValue]:
+    try:
+        planning_input = TrainingPlanningInput.model_validate(value)
+        return cast(
+            dict[str, JSONValue],
+            planning_input.model_dump(mode="json", by_alias=True),
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise ValueError(
+            "payload.trainingPlanningInput must be a valid planning snapshot"
         ) from None
 
 

@@ -17,6 +17,7 @@ from riva.agents import (
     PracticeReviewAgent,
     QuestionGenerationAgent,
     ResumeParsingAgent,
+    TrainingPlanningAgent,
 )
 from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
@@ -25,6 +26,7 @@ from riva.prompts import (
     INTERVIEW_REVIEW_PROMPT,
     JOB_DESCRIPTION_PARSING_PROMPT,
     QUESTION_GENERATION_PROMPT,
+    TRAINING_PLANNING_PROMPT,
 )
 from riva.services.question_generation_prompt_versions import (
     get_question_generation_prompt,
@@ -45,6 +47,7 @@ from riva.workers import (
     PracticeReviewHandler,
     QuestionGenerationHandler,
     ResumeParsingWorkerHandler,
+    TrainingPlanningHandler,
 )
 from riva.workers.bootstrap import (
     build_agent_handler_registry,
@@ -328,6 +331,12 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert registry.get("job-description-parser") is job_description_handlers[0]
     assert registry.get("matching-analyzer") is matching_handlers[0]
     assert registry.get("resume-parser") is resume_parsing_handlers[0]
+    training_planning = registry.get("training-planner")
+    assert isinstance(training_planning, TrainingPlanningHandler)
+    assert isinstance(training_planning.agent, TrainingPlanningAgent)
+    assert training_planning.agent.provider is provider
+    assert training_planning.agent.prompt is TRAINING_PLANNING_PROMPT
+    assert training_planning.agent.prompt_version == "1"
     question_generation = registry.get("question-generator")
     assert isinstance(question_generation, QuestionGenerationHandler)
     assert isinstance(question_generation.agent, QuestionGenerationAgent)
@@ -406,6 +415,7 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
         "practice-reviewer",
         "question-generator",
         "resume-parser",
+        "training-planner",
     )
 
 
@@ -436,6 +446,12 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(resume_parsing.agent, ResumeParsingAgent)
     assert resume_parsing.agent.provider is handler.agent.provider
     assert resume_parsing.agent.model == "qwen-test-model"
+    training_planning = registry.get("training-planner")
+    assert isinstance(training_planning, TrainingPlanningHandler)
+    assert isinstance(training_planning.agent, TrainingPlanningAgent)
+    assert training_planning.agent.provider is handler.agent.provider
+    assert training_planning.agent.prompt is TRAINING_PLANNING_PROMPT
+    assert training_planning.agent.prompt_version == "1"
     question_generation = registry.get("question-generator")
     assert isinstance(question_generation, QuestionGenerationHandler)
     assert isinstance(question_generation.agent, QuestionGenerationAgent)
@@ -498,6 +514,7 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
         "practice-reviewer",
         "question-generator",
         "resume-parser",
+        "training-planner",
     )
 
 
