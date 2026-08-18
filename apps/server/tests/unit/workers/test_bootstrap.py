@@ -10,6 +10,7 @@ from riva.agents import (
     InterviewPlanningAgent,
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
+    InterviewReviewAgent,
     PracticeEvaluationAgent,
     PracticeRecommendationAgent,
     PracticeReferenceAnswerAgent,
@@ -21,6 +22,7 @@ from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
 from riva.prompts import (
     INTERVIEW_PLANNING_PROMPT,
+    INTERVIEW_REVIEW_PROMPT,
     JOB_DESCRIPTION_PARSING_PROMPT,
     QUESTION_GENERATION_PROMPT,
 )
@@ -35,6 +37,7 @@ from riva.workers import (
     DuplicateAgentHandlerError,
     JobDescriptionParsingHandler,
     InterviewPlanningHandler,
+    InterviewReviewHandler,
     MatchingAnalysisHandler,
     PracticeEvaluationHandler,
     PracticeRecommendationHandler,
@@ -366,6 +369,19 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
     assert practice_recommendation.agent.provider is provider
     assert practice_recommendation.agent.model == "qwen-test-model"
+    assert practice_recommendation.agent.prompt_version == "2"
+    assert practice_recommendation.legacy_agent is not None
+    assert practice_recommendation.legacy_agent.prompt_version == "1"
+    assert practice_recommendation.agents.keys() == {"1", "2"}
+    interview_review = registry.get("interview-review")
+    assert isinstance(interview_review, InterviewReviewHandler)
+    assert isinstance(interview_review.agent, InterviewReviewAgent)
+    assert interview_review.agent.provider is provider
+    assert interview_review.agent.prompt is INTERVIEW_REVIEW_PROMPT
+    assert interview_review.agent.prompt_version == "2"
+    assert interview_review.legacy_agent is not None
+    assert interview_review.legacy_agent.prompt_version == "1"
+    assert interview_review.agents.keys() == {"1", "2"}
     practice_reference_answer = registry.get(
         "practice-reference-answer-generator"
     )
@@ -447,6 +463,17 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
     assert practice_recommendation.agent.provider is handler.agent.provider
     assert practice_recommendation.agent.model == "qwen-test-model"
+    assert practice_recommendation.agent.prompt_version == "2"
+    assert practice_recommendation.legacy_agent is not None
+    assert practice_recommendation.legacy_agent.prompt_version == "1"
+    interview_review = registry.get("interview-review")
+    assert isinstance(interview_review, InterviewReviewHandler)
+    assert isinstance(interview_review.agent, InterviewReviewAgent)
+    assert interview_review.agent.provider is handler.agent.provider
+    assert interview_review.agent.prompt is INTERVIEW_REVIEW_PROMPT
+    assert interview_review.agent.prompt_version == "2"
+    assert interview_review.legacy_agent is not None
+    assert interview_review.legacy_agent.prompt_version == "1"
     practice_reference_answer = registry.get(
         "practice-reference-answer-generator"
     )

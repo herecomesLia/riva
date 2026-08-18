@@ -170,6 +170,11 @@ def test_real_evaluation_review_recommendation_uses_canonical_frozen_context() -
                     owner.id,
                     attempt.id,
                 )
+                assert recommendation_run.prompt_version == "2"
+                assert recommendation_run.payload["trainingMemory"]["version"] == "1"
+                assert "focusCompetencies" in recommendation_run.payload[
+                    "trainingMemory"
+                ]
                 provider = FakeLLMProvider(
                     [recommendation_response("nextQuestion")],
                     usage=LLMUsage(input_tokens=20, output_tokens=10),

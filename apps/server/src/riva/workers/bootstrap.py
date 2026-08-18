@@ -36,6 +36,12 @@ from riva.services.question_generation_prompt_versions import (
 from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
 )
+from riva.services.interview_review_prompt_versions import (
+    get_interview_review_prompt,
+)
+from riva.services.practice_recommendation_prompt_versions import (
+    get_practice_recommendation_prompt,
+)
 from riva.workers.handlers import AgentHandlerRegistry
 from riva.workers.follow_up import FollowUpHandler
 from riva.workers.interview_planning import InterviewPlanningHandler
@@ -258,9 +264,19 @@ def build_agent_handler_registry(
         provider=provider,
         model=model,
     )
+    interview_review_legacy_agent = InterviewReviewAgent(
+        provider=provider,
+        model=model,
+        prompt=get_interview_review_prompt("1"),
+    )
     interview_review_handler = interview_review_handler_factory(
         session_factory=session_factory,
         agent=interview_review_agent,
+        legacy_agent=interview_review_legacy_agent,
+        agents={
+            "1": interview_review_legacy_agent,
+            "2": interview_review_agent,
+        },
     )
     practice_evaluation_agent = practice_evaluation_agent_factory(
         provider=provider,
@@ -274,9 +290,19 @@ def build_agent_handler_registry(
         provider=provider,
         model=model,
     )
+    practice_recommendation_legacy_agent = PracticeRecommendationAgent(
+        provider=provider,
+        model=model,
+        prompt=get_practice_recommendation_prompt("1"),
+    )
     practice_recommendation_handler = practice_recommendation_handler_factory(
         session_factory=session_factory,
         agent=practice_recommendation_agent,
+        legacy_agent=practice_recommendation_legacy_agent,
+        agents={
+            "1": practice_recommendation_legacy_agent,
+            "2": practice_recommendation_agent,
+        },
     )
     practice_review_agent = practice_review_agent_factory(
         provider=provider,

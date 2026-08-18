@@ -216,6 +216,11 @@ def test_recommendation_run_payload_freezes_only_canonical_artifact_ids() -> Non
         "evaluationId": str(evaluation_id),
         "reviewId": str(review_id),
         "interactionLanguage": "en",
+        "trainingMemory": {
+            "version": "1",
+            "focusCompetencies": [],
+            "establishedCompetencies": [],
+        },
     }
 
     for field in (

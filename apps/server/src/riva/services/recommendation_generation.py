@@ -30,7 +30,12 @@ from riva.schemas.practice_recommendation import (
     RecommendationRunPayload,
 )
 from riva.schemas.practice_review import PracticeReviewInput
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services.agent_runs import AgentRunService
+from riva.services.practice_recommendation_prompt_versions import (
+    PRACTICE_RECOMMENDATION_ACCEPTED_PROMPT_VERSIONS,
+    get_practice_recommendation_prompt,
+)
 from riva.services.review_generation import (
     ReviewGenerationStateError,
     ReviewGenerationService,
@@ -38,6 +43,7 @@ from riva.services.review_generation import (
     practice_review_output_from_artifact,
     validate_review_generation_run,
 )
+from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
 
@@ -102,10 +108,16 @@ def validate_recommendation_generation_run(
 ) -> RecommendationRunPayload:
     """Validate the immutable contract shared by recommendation consumers."""
 
-    prompt = PRACTICE_RECOMMENDATION_PROMPT
+    try:
+        prompt = get_practice_recommendation_prompt(run.prompt_version)
+    except ValueError:
+        raise RecommendationGenerationStateError(
+            INVALID_PRACTICE_RECOMMENDATION_RUN
+        ) from None
     if (
         run.agent_id != "practice-recommender"
         or run.prompt_id != prompt.prompt_id
+        or run.prompt_version not in PRACTICE_RECOMMENDATION_ACCEPTED_PROMPT_VERSIONS
         or run.prompt_version != prompt.version
         or run.output_schema_id != prompt.output_schema_id
     ):
@@ -162,11 +174,15 @@ class RecommendationGenerationService:
         agent_run_service_factory: Callable[[AsyncSession], AgentRunService] = (
             AgentRunService
         ),
+        training_memory_service_factory: Callable[
+            [AsyncSession], TrainingMemoryService
+        ] = TrainingMemoryService,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.agent_run_service_factory = agent_run_service_factory
+        self.training_memory_service_factory = training_memory_service_factory
         self.clock = clock
 
     async def enqueue_generation(
@@ -211,11 +227,15 @@ class RecommendationGenerationService:
             payload=None,
             for_update=True,
         )
+        training_memory = await self.training_memory_service_factory(
+            self.session
+        ).get_context(user_id)
         payload = RecommendationRunPayload(
             attempt_id=context.attempt.id,
             evaluation_id=context.evaluation.id,
             review_id=context.review.id,
             interaction_language=context.session.language,
+            training_memory=training_memory,
         )
         return await self.agent_run_service_factory(
             self.session
@@ -514,6 +534,11 @@ class RecommendationGenerationService:
                 ),
                 evaluation=review_input.evaluation,
                 review=canonical_review,
+                training_memory=(
+                    payload.training_memory
+                    if payload is not None
+                    else TrainingMemoryContext()
+                ),
             )
         except (TypeError, ValueError, ValidationError):
             raise RecommendationGenerationStateError(

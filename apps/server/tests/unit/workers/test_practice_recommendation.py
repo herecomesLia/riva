@@ -14,6 +14,9 @@ from riva.integrations import (
 )
 from riva.models import AgentRun, AgentRunStatus
 from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT
+from riva.services.practice_recommendation_prompt_versions import (
+    get_practice_recommendation_prompt,
+)
 from riva.schemas.practice_recommendation import (
     PracticeNextQuestionRecommendation,
     PracticeRecommendationInput,
@@ -85,14 +88,15 @@ def retry_output(reason: str = "Keep practicing the current gap."):
     )
 
 
-def running_run() -> AgentRun:
+def running_run(version: str = PRACTICE_RECOMMENDATION_PROMPT.version) -> AgentRun:
+    prompt = get_practice_recommendation_prompt(version)
     return AgentRun(
         id=uuid4(),
         user_id=uuid4(),
         agent_id="practice-recommender",
-        prompt_id=PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
-        prompt_version=PRACTICE_RECOMMENDATION_PROMPT.version,
-        output_schema_id=PRACTICE_RECOMMENDATION_PROMPT.output_schema_id,
+        prompt_id=prompt.prompt_id,
+        prompt_version=prompt.version,
+        output_schema_id=prompt.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload={
             "attemptId": str(uuid4()),
@@ -172,10 +176,21 @@ class FakeGenerationService:
 
 class FakeAgent:
     agent_id = "practice-recommender"
+    prompt = PRACTICE_RECOMMENDATION_PROMPT
+    prompt_id = PRACTICE_RECOMMENDATION_PROMPT.prompt_id
+    prompt_version = PRACTICE_RECOMMENDATION_PROMPT.version
 
-    def __init__(self, sessions: FakeSessionFactory, response: object) -> None:
+    def __init__(
+        self,
+        sessions: FakeSessionFactory,
+        response: object,
+        prompt_version: str = PRACTICE_RECOMMENDATION_PROMPT.version,
+    ) -> None:
         self.sessions = sessions
         self.response = response
+        self.prompt = get_practice_recommendation_prompt(prompt_version)
+        self.prompt_id = self.prompt.prompt_id
+        self.prompt_version = self.prompt.version
         self.inputs: list[PracticeRecommendationInput] = []
 
     async def run(
@@ -241,6 +256,26 @@ def test_handler_persists_and_returns_canonical_recommendation() -> None:
     assert state.persisted == [agent_result.output]
     assert len(agent.inputs) == 1
     assert sessions.active == 0
+
+
+def test_handler_executes_a_legacy_v1_run_with_the_legacy_agent() -> None:
+    sessions = FakeSessionFactory()
+    state = State()
+    agent = FakeAgent(
+        sessions,
+        result(
+            prompt_id="practice-recommender",
+            prompt_version="1",
+        ),
+        prompt_version="1",
+    )
+
+    returned = asyncio.run(
+        make_handler(sessions, state, agent).execute(running_run("1"))
+    )
+
+    assert returned.prompt_version == "1"
+    assert agent.prompt is get_practice_recommendation_prompt("1")
 
 
 @pytest.mark.parametrize("error_field", ["status", "lease_token", "agent_id"])

@@ -4,7 +4,11 @@ from collections.abc import Mapping
 from riva.agents.base import Agent
 from riva.integrations import GenerationParameters, LLMProvider
 from riva.prompts import INTERVIEW_REVIEW_PROMPT
+from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_review import InterviewReviewInput, InterviewReviewOutput
+from riva.services.interview_review_prompt_versions import (
+    get_interview_review_prompt,
+)
 
 
 def _stable_json(value: object) -> str:
@@ -24,10 +28,12 @@ class InterviewReviewAgent(Agent[InterviewReviewInput, InterviewReviewOutput]):
         provider: LLMProvider,
         model: str,
         parameters: GenerationParameters | None = None,
+        *,
+        prompt: PromptDefinition[InterviewReviewOutput] = INTERVIEW_REVIEW_PROMPT,
     ) -> None:
         super().__init__(
             provider=provider,
-            prompt=INTERVIEW_REVIEW_PROMPT,
+            prompt=prompt,
             model=model,
             parameters=parameters,
         )
@@ -40,12 +46,22 @@ class InterviewReviewAgent(Agent[InterviewReviewInput, InterviewReviewOutput]):
         self,
         input: InterviewReviewInput,
     ) -> Mapping[str, object]:
-        return {
+        resolved_prompt = get_interview_review_prompt(self.prompt.version)
+        input_payload = input.model_dump(mode="json", by_alias=True)
+        input_payload.pop("trainingMemory", None)
+        if resolved_prompt.version == INTERVIEW_REVIEW_PROMPT.version:
+            planner_context = input_payload.get("plannerContext")
+            if isinstance(planner_context, dict):
+                planner_context.pop("trainingMemory", None)
+        values: dict[str, object] = {
             "completion_reason": input.completion_reason.value,
             "review_mode": input.review_mode.value,
             "interaction_language": input.interaction_language,
-            "interview_review_input": _stable_json(input),
+            "interview_review_input": _stable_json(input_payload),
         }
+        if resolved_prompt.version == INTERVIEW_REVIEW_PROMPT.version:
+            values["training_memory"] = _stable_json(input.training_memory)
+        return values
 
 
 __all__ = ["InterviewReviewAgent"]

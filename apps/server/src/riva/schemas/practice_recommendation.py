@@ -25,6 +25,7 @@ from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
+from riva.schemas.training_memory import TrainingMemoryContext
 
 
 MAX_PRACTICE_RECOMMENDATION_REASON_LENGTH = 2_000
@@ -106,6 +107,11 @@ class RecommendationRunPayload(_RecommendationModel):
     interaction_language: InteractionLanguage = Field(
         alias="interactionLanguage"
     )
+    training_memory: TrainingMemoryContext = _alias(
+        "training_memory",
+        "trainingMemory",
+        default_factory=TrainingMemoryContext,
+    )
 
 
 class PracticeRetryCurrentRecommendation(_RecommendationModel):
@@ -157,6 +163,11 @@ class PracticeRecommendationInput(_RecommendationModel):
     )
     evaluation: PracticeEvaluationOutput
     review: PracticeReviewOutput
+    training_memory: TrainingMemoryContext = _alias(
+        "training_memory",
+        "trainingMemory",
+        default_factory=TrainingMemoryContext,
+    )
 
     @model_validator(mode="after")
     def validate_evaluation_focus_indices(self) -> Self:

@@ -20,6 +20,7 @@ from riva.schemas.interview_candidate_question import (
 )
 from riva.schemas.interview_planning import InterviewPlanningInput
 from riva.schemas.profile import RequiredText, StandardUUID
+from riva.schemas.training_memory import TrainingMemoryContext
 
 
 class InterviewReviewModel(APIModel):
@@ -149,6 +150,10 @@ class InterviewReviewInput(InterviewReviewModel):
     candidate_question_exchanges: list[
         InterviewCandidateQuestionExchangeSnapshot
     ] = Field(default_factory=list)
+    training_memory: TrainingMemoryContext = Field(
+        alias="trainingMemory",
+        default_factory=TrainingMemoryContext,
+    )
 
     @model_validator(mode="after")
     def validate_lineage(self) -> Self:

@@ -19,6 +19,7 @@ from riva.schemas.practice_recommendation import (
     PracticeRetryCurrentRecommendation,
     RecommendationRunPayload,
 )
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.schemas.practice_review import ReviewRunPayload
 from riva.services.recommendation_generation import (
     INVALID_PRACTICE_RECOMMENDATION_RUN,
@@ -49,6 +50,16 @@ class FakeAgentRunService:
     async def enqueue_in_transaction(self, **kwargs: object) -> AgentRun:
         self.calls.append(kwargs)
         return self.run
+
+
+class FakeTrainingMemoryService:
+    def __init__(self, context: TrainingMemoryContext | None = None) -> None:
+        self.context = context or TrainingMemoryContext()
+        self.calls: list[object] = []
+
+    async def get_context(self, user_id: object) -> TrainingMemoryContext:
+        self.calls.append(user_id)
+        return self.context
 
 
 def recommendation_output(
@@ -191,6 +202,7 @@ def recommendation_context(
     service = RecommendationGenerationService(
         db,  # type: ignore[arg-type]
         llm_model="recommendation-test-model",
+        training_memory_service_factory=lambda _session: FakeTrainingMemoryService(),
         clock=lambda: NOW,
     )
     return service, db, run, practice_session, attempt, evaluation, review
@@ -296,6 +308,11 @@ def test_enqueue_freezes_evaluation_review_and_language_ids() -> None:
         "evaluationId": str(evaluation.id),
         "reviewId": str(review.id),
         "interactionLanguage": "en",
+        "trainingMemory": {
+            "version": "1",
+            "focusCompetencies": [],
+            "establishedCompetencies": [],
+        },
     }
     assert fake.calls[0]["max_attempts"] == 3
     assert session.version == 7

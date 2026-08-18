@@ -1,0 +1,110 @@
+{
+  "id": "practice-recommender.training-memory",
+  "agentId": "practice-recommender",
+  "promptVersion": "2",
+  "input": {
+    "interactionLanguage": "en",
+    "question": {
+      "prompt": "Explain a trade-off in an API design you worked on.",
+      "questionType": "projectDeepDive",
+      "difficulty": "basic",
+      "assessedCapabilities": ["trade-off reasoning"],
+      "scoringFocus": ["decision rationale", "evidence"]
+    },
+    "followUpCompletionReason": "noFollowUpRequired",
+    "evaluation": {
+      "overallScore": 82,
+      "dimensionScores": [
+        {
+          "dimension": "relevance",
+          "score": 86,
+          "explanation": "The answer addresses the API design decision."
+        },
+        {
+          "dimension": "structure",
+          "score": 80,
+          "explanation": "The answer has a clear decision and consequence."
+        },
+        {
+          "dimension": "specificity",
+          "score": 78,
+          "explanation": "The answer includes one concrete trade-off."
+        },
+        {
+          "dimension": "communication",
+          "score": 84,
+          "explanation": "The explanation is concise and understandable."
+        }
+      ],
+      "focusAssessments": [
+        {
+          "focusIndex": 0,
+          "status": "demonstrated",
+          "explanation": "The decision rationale is stated."
+        },
+        {
+          "focusIndex": 1,
+          "status": "demonstrated",
+          "explanation": "The answer names an observed consequence."
+        }
+      ]
+    },
+    "review": {
+      "overallPerformance": "The current question's main goal is addressed.",
+      "highlights": ["The answer connects a decision to a consequence."],
+      "mainIssues": ["A later answer could compare an alternative explicitly."],
+      "improvementSuggestions": ["Keep making trade-offs and evidence explicit."],
+      "reusableAnswerStructure": ["Decision", "Trade-off", "Evidence"],
+      "exposedWeaknesses": ["alternative comparison"]
+    },
+    "trainingMemory": {
+      "version": "1",
+      "focusCompetencies": [
+        {
+          "competencyKey": "tradeoff_reasoning",
+          "displayName": "Trade-off reasoning",
+          "level": 54,
+          "confidence": 62,
+          "trend": "improving",
+          "evidenceCount": 2,
+          "lastEvidenceAt": "2026-08-01T10:00:00Z"
+        }
+      ],
+      "establishedCompetencies": [
+        {
+          "competencyKey": "api_basics",
+          "displayName": "API basics",
+          "level": 88,
+          "confidence": 90,
+          "trend": "stable",
+          "evidenceCount": 5,
+          "lastEvidenceAt": "2026-07-30T10:00:00Z"
+        }
+      ]
+    }
+  },
+  "assertions": [
+    { "operator": "exact", "path": "/action", "expected": "nextQuestion" },
+    { "operator": "exact", "path": "/nextQuestion/questionType", "expected": "projectDeepDive" },
+    { "operator": "exact", "path": "/nextQuestion/difficulty", "expected": "basic" },
+    { "operator": "itemCount", "path": "/nextQuestion/focusAreas", "max": 3 }
+  ],
+  "rubrics": [
+    {
+      "id": "current-evidence-priority",
+      "minScore": 3,
+      "criteria": "The action is justified primarily by the current Evaluation and Review, while the memory remains a soft future-training signal."
+    },
+    {
+      "id": "memory-direction",
+      "minScore": 3,
+      "criteria": "The recommendation can use the focus competency to guide future practice without repeating established API basics as a current deficiency."
+    },
+    {
+      "id": "memory-boundary",
+      "minScore": 3,
+      "criteria": "The output does not expose memory level, confidence, evidenceCount, or lastEvidenceAt as candidate facts."
+    }
+  ],
+  "tags": ["practice", "recommendation", "training-memory"]
+}

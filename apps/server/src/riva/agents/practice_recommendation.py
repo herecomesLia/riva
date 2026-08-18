@@ -12,10 +12,14 @@ from riva.integrations import (
     StructuredOutputValidationError,
 )
 from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT
+from riva.prompts.base import PromptDefinition
 from riva.schemas.practice_recommendation import (
     PracticeNextQuestionRecommendation,
     PracticeRecommendationInput,
     PracticeRecommendationOutput,
+)
+from riva.services.practice_recommendation_prompt_versions import (
+    get_practice_recommendation_prompt,
 )
 
 
@@ -58,10 +62,14 @@ class PracticeRecommendationAgent(
         provider: LLMProvider,
         model: str,
         parameters: GenerationParameters | None = None,
+        *,
+        prompt: PromptDefinition[PracticeRecommendationOutput] = (
+            PRACTICE_RECOMMENDATION_PROMPT
+        ),
     ) -> None:
         super().__init__(
             provider=provider,
-            prompt=PRACTICE_RECOMMENDATION_PROMPT,
+            prompt=prompt,
             model=model,
             parameters=parameters,
         )
@@ -74,13 +82,18 @@ class PracticeRecommendationAgent(
         self,
         input: PracticeRecommendationInput,
     ) -> Mapping[str, object]:
-        return {
+        values: dict[str, object] = {
             "interaction_language": input.interaction_language,
             "follow_up_completion_reason": input.follow_up_completion_reason.value,
             "question": _stable_json(input.question),
             "evaluation": _stable_json(input.evaluation),
             "review": _stable_json(input.review),
         }
+        if get_practice_recommendation_prompt(
+            self.prompt.version
+        ).version == PRACTICE_RECOMMENDATION_PROMPT.version:
+            values["training_memory"] = _stable_json(input.training_memory)
+        return values
 
     async def run(
         self,

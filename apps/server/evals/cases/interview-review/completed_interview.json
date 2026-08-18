@@ -1,7 +1,7 @@
 {
   "id": "interview-review.completed-interview",
   "agentId": "interview-review",
-  "promptVersion": "1",
+  "promptVersion": "2",
   "input": {
     "completionReason": "formalQuestionsCompleted",
     "reviewMode": "complete",
@@ -151,7 +151,8 @@
         ]
       }
     ],
-    "candidateQuestionExchanges": []
+    "candidateQuestionExchanges": [],
+    "trainingMemory": {}
   },
   "assertions": [
     { "operator": "numberRange", "path": "/overallScore", "min": 0, "max": 100 },
@@ -162,14 +163,17 @@
   "rubrics": [
     {
       "id": "turn-evidence-grounding",
+      "minScore": 3,
       "criteria": "The overall and per-question review is grounded in the two supplied answers and turn assessments."
     },
     {
       "id": "cross-question-synthesis",
+      "minScore": 3,
       "criteria": "Strengths and weaknesses synthesize patterns across both questions instead of inventing unsupported traits."
     },
     {
       "id": "training-alignment",
+      "minScore": 3,
       "criteria": "nextTraining is aligned with the main evidence gap visible across the completed interview."
     }
   ],

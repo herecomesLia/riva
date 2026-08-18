@@ -770,6 +770,11 @@ def test_interview_review_failure_is_retryable_and_old_run_is_retained(
                     assert runs[1].status is AgentRunStatus.QUEUED
                     assert runs[0].id != runs[1].id
                     assert runs[1].payload["retryOfRunId"] == str(runs[0].id)
+                    assert runs[1].payload["interviewReviewInput"][
+                        "trainingMemory"
+                    ] == runs[0].payload["interviewReviewInput"][
+                        "trainingMemory"
+                    ]
 
                 await _process_worker(database, settings, provider)
                 completed = client.get("/api/interview", headers=_headers())

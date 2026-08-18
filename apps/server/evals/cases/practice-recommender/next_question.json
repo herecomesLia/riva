@@ -1,7 +1,7 @@
 {
   "id": "practice-recommender.next-question",
   "agentId": "practice-recommender",
-  "promptVersion": "1",
+  "promptVersion": "2",
   "input": {
     "interactionLanguage": "en",
     "question": {
@@ -52,7 +52,8 @@
       "improvementSuggestions": ["Keep the same evidence standard in the next project question."],
       "reusableAnswerStructure": ["Decision", "Trade-off", "Result"],
       "exposedWeaknesses": ["trade-off rationale"]
-    }
+    },
+    "trainingMemory": {}
   },
   "assertions": [
     { "operator": "exact", "path": "/action", "expected": "nextQuestion" },
@@ -63,14 +64,17 @@
   "rubrics": [
     {
       "id": "action-consistency",
+      "minScore": 3,
       "criteria": "nextQuestion is consistent with the strong evaluation and the review that the current goal is sufficiently addressed."
     },
     {
       "id": "focus-area-grounding",
+      "minScore": 3,
       "criteria": "Any focusAreas are relevant to the supplied exposed weakness and do not invent a different taxonomy."
     },
     {
       "id": "question-policy-fit",
+      "minScore": 3,
       "criteria": "The next question preserves the supplied projectDeepDive type and basic difficulty and remains a recommendation only."
     }
   ],

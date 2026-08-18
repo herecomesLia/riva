@@ -49,11 +49,17 @@ from riva.schemas.interview_review import (
     InterviewReviewSessionSnapshot,
     InterviewReviewTurnAssessmentSnapshot,
 )
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services.agent_runs import AgentRunService
+from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
 )
-from riva.services.competency_ingestion import CompetencyIngestionService
+from riva.services.interview_review_prompt_versions import (
+    INTERVIEW_REVIEW_ACCEPTED_PROMPT_VERSIONS,
+    get_interview_review_prompt,
+)
+from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
 
@@ -111,6 +117,9 @@ class InterviewReviewService:
         competency_ingestion_service_factory: Callable[
             [AsyncSession], CompetencyIngestionService
         ] = CompetencyIngestionService,
+        training_memory_service_factory: Callable[
+            [AsyncSession], TrainingMemoryService
+        ] = TrainingMemoryService,
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
@@ -118,6 +127,7 @@ class InterviewReviewService:
         self.competency_ingestion_service_factory = (
             competency_ingestion_service_factory
         )
+        self.training_memory_service_factory = training_memory_service_factory
 
     async def enqueue_review_in_transaction(
         self,
@@ -133,10 +143,14 @@ class InterviewReviewService:
             raise InterviewReviewStateError(INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED)
         if interview_session.version + 1 != session_state_version:
             raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
+        training_memory = await self.training_memory_service_factory(
+            self.session
+        ).get_context(user_id)
         input_snapshot = await self.build_review_input(
             interview_session,
             completion_reason=completion_reason,
             review_mode=review_mode,
+            training_memory=training_memory,
         )
         payload = InterviewReviewRunPayload(
             session_id=interview_session.id,
@@ -184,12 +198,13 @@ class InterviewReviewService:
                 "retry_of_run_id": failed_run.id,
             }
         )
+        prompt = get_interview_review_prompt(failed_run.prompt_version)
         return await AgentRunService(self.session).enqueue_in_transaction(
             user_id=user_id,
-            agent_id=INTERVIEW_REVIEW_PROMPT.prompt_id,
-            prompt_id=INTERVIEW_REVIEW_PROMPT.prompt_id,
-            prompt_version=INTERVIEW_REVIEW_PROMPT.version,
-            output_schema_id=INTERVIEW_REVIEW_PROMPT.output_schema_id,
+            agent_id=prompt.prompt_id,
+            prompt_id=prompt.prompt_id,
+            prompt_version=prompt.version,
+            output_schema_id=prompt.output_schema_id,
             model=self.llm_model,
             payload=cast(
                 dict[str, object],
@@ -209,6 +224,7 @@ class InterviewReviewService:
         *,
         completion_reason: InterviewReviewCompletionReason,
         review_mode: InterviewReviewMode,
+        training_memory: TrainingMemoryContext | None = None,
     ) -> InterviewReviewInput:
         try:
             plan = await self.session.scalar(
@@ -245,6 +261,8 @@ class InterviewReviewService:
             configuration = _session_configuration(interview_session)
             if planner_context.configuration != configuration:
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
+            if training_memory is None:
+                training_memory = planner_context.training_memory
 
             questions = list(
                 (
@@ -297,6 +315,7 @@ class InterviewReviewService:
                 candidate_question_exchanges=[
                     _review_exchange_snapshot(item) for item in exchanges
                 ],
+                training_memory=training_memory,
             )
         except InterviewReviewStateError:
             raise
@@ -616,12 +635,17 @@ class InterviewReviewService:
 
     @staticmethod
     def _validate_run_metadata(run: AgentRun, user_id: UUID) -> None:
+        try:
+            prompt = get_interview_review_prompt(run.prompt_version)
+        except ValueError:
+            raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID) from None
         if (
             run.user_id != user_id
-            or run.agent_id != INTERVIEW_REVIEW_PROMPT.prompt_id
-            or run.prompt_id != INTERVIEW_REVIEW_PROMPT.prompt_id
-            or run.prompt_version != INTERVIEW_REVIEW_PROMPT.version
-            or run.output_schema_id != INTERVIEW_REVIEW_PROMPT.output_schema_id
+            or run.agent_id != prompt.prompt_id
+            or run.prompt_id != prompt.prompt_id
+            or run.prompt_version not in INTERVIEW_REVIEW_ACCEPTED_PROMPT_VERSIONS
+            or run.prompt_version != prompt.version
+            or run.output_schema_id != prompt.output_schema_id
         ):
             raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID)
 

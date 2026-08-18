@@ -1,7 +1,7 @@
 {
   "id": "practice-recommender.retry-current",
   "agentId": "practice-recommender",
-  "promptVersion": "1",
+  "promptVersion": "2",
   "input": {
     "interactionLanguage": "en",
     "question": {
@@ -54,7 +54,8 @@
       ],
       "reusableAnswerStructure": ["Context", "Personal decision", "Evidence"],
       "exposedWeaknesses": ["personal contribution evidence", "result evidence"]
-    }
+    },
+    "trainingMemory": {}
   },
   "assertions": [
     { "operator": "exact", "path": "/action", "expected": "retryCurrent" },
@@ -63,14 +64,17 @@
   "rubrics": [
     {
       "id": "action-consistency",
+      "minScore": 3,
       "criteria": "retryCurrent is consistent with the low evaluation and the review's unresolved evidence gaps."
     },
     {
       "id": "weakness-focus",
+      "minScore": 3,
       "criteria": "The recommendation addresses the supplied exposed weaknesses without inventing a new weakness."
     },
     {
       "id": "bounded-recommendation",
+      "minScore": 3,
       "criteria": "The output is a recommendation based on the supplied evaluation and review, not a claim that an action was executed."
     }
   ],

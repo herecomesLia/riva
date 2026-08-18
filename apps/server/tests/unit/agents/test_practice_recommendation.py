@@ -6,6 +6,9 @@ import pytest
 from riva.agents import PracticeRecommendationAgent
 from riva.integrations import InvalidStructuredOutputError, MessageRole
 from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT
+from riva.services.practice_recommendation_prompt_versions import (
+    get_practice_recommendation_prompt,
+)
 from riva.schemas.practice_recommendation import (
     PracticeRecommendationInput,
     PracticeRecommendationOutput,
@@ -108,7 +111,7 @@ def test_retry_current_recommendation_returns_metadata() -> None:
     assert result.output.action == "retryCurrent"
     assert result.agent_id == "practice-recommender"
     assert result.prompt_id == "practice-recommender"
-    assert result.prompt_version == "1"
+    assert result.prompt_version == "2"
     assert result.provider == "fake"
     assert result.model == "test-recommendation-model"
     assert provider.calls[0].output_schema is PracticeRecommendationOutput
@@ -217,6 +220,7 @@ def test_prompt_values_have_only_canonical_structured_inputs() -> None:
         "question",
         "evaluation",
         "review",
+        "training_memory",
     }
     assert values["interaction_language"] == "en"
     assert values["follow_up_completion_reason"] == "noFollowUpRequired"
@@ -225,6 +229,22 @@ def test_prompt_values_have_only_canonical_structured_inputs() -> None:
     )
     assert "main_answer" not in values
     assert "follow_up_exchanges" not in values
+    assert json.loads(str(values["training_memory"]))["focusCompetencies"] == []
+
+
+def test_v1_recommendation_agent_keeps_the_legacy_prompt_shape() -> None:
+    provider = FakeLLMProvider([retry_output()])
+    agent = PracticeRecommendationAgent(
+        provider,
+        model="test-recommendation-model",
+        prompt=get_practice_recommendation_prompt("1"),
+    )
+
+    result = asyncio.run(agent.run(recommendation_input()))
+
+    assert result.prompt_version == "1"
+    assert "training_memory" not in agent.prompt_values(recommendation_input())
+    assert "TRAINING_MEMORY" not in provider.calls[0].messages[0].content
 
 
 def test_evaluation_injection_stays_in_untrusted_block() -> None:
@@ -269,7 +289,7 @@ def test_review_injection_stays_in_untrusted_block() -> None:
 
 def test_agent_prompt_identity_is_canonical() -> None:
     assert PRACTICE_RECOMMENDATION_PROMPT.prompt_id == "practice-recommender"
-    assert PRACTICE_RECOMMENDATION_PROMPT.version == "1"
+    assert PRACTICE_RECOMMENDATION_PROMPT.version == "2"
     assert PRACTICE_RECOMMENDATION_PROMPT.output_schema_id == (
         "practice-recommendation-v1"
     )
