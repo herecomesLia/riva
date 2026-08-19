@@ -1,9 +1,19 @@
 import asyncio
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
+from riva.schemas.interview_candidate_question import (
+    InterviewCandidateCompletedFollowUpSnapshot,
+    InterviewCandidateCompletedQuestionSnapshot,
+    InterviewCandidateQuestionInput,
+    InterviewCandidateQuestionRunPayload,
+    InterviewCandidateQuestionSessionSnapshot,
+    InterviewCandidateQuestionSnapshot,
+)
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
 from riva.schemas.matching_analysis import (
     MatchingAnalysisRunPayload,
@@ -268,6 +278,105 @@ def test_interview_turn_run_payload_is_accepted_after_alias_serialization() -> N
         assert serialized[key] is None
     reparsed = InterviewTurnRunPayload.model_validate(serialized)
     assert reparsed.interview_turn_input.career_profile.summary is None
+
+
+def test_interview_candidate_question_run_payload_preserves_nullable_snapshot_fields() -> None:
+    review = review_input()
+    review.planner_context.career_profile.summary = None
+    review.planner_context.target_role.company = None
+    review.planner_context.target_role.location = None
+
+    completed_question_id = uuid4()
+    candidate_question_id = uuid4()
+    candidate_input = InterviewCandidateQuestionInput(
+        session=InterviewCandidateQuestionSessionSnapshot(
+            id=review.session.id,
+            version=review.session.version,
+            status="candidateQuestions",
+            language=review.session.language,
+            configuration=review.configuration,
+        ),
+        configuration=review.configuration,
+        interaction_language=review.interaction_language,
+        planner_context=review.planner_context,
+        completed_questions=[
+            InterviewCandidateCompletedQuestionSnapshot(
+                id=completed_question_id,
+                order=1,
+                prompt="Explain a production API trade-off.",
+                question_type="projectDeepDive",
+                assessed_capabilities=["Ownership"],
+                answer=None,
+                follow_ups=[
+                    InterviewCandidateCompletedFollowUpSnapshot(
+                        id=uuid4(),
+                        parent_question_id=completed_question_id,
+                        prompt="What evidence supports that decision?",
+                        order=1,
+                        answer=None,
+                    )
+                ],
+            )
+        ],
+        current_candidate_question=InterviewCandidateQuestionSnapshot(
+            id=candidate_question_id,
+            content="What would you ask the interviewer about this role?",
+            submitted_at=datetime(2026, 8, 18, 10, 0, tzinfo=UTC),
+            order=2,
+        ),
+    )
+    payload = InterviewCandidateQuestionRunPayload(
+        session_id=candidate_input.session.id,
+        session_version=candidate_input.session.version,
+        session_state_version=candidate_input.session.version + 1,
+        candidate_question_id=candidate_question_id,
+        interaction_language=candidate_input.interaction_language,
+        interview_candidate_question_input=candidate_input,
+    )
+
+    serialized = _serialize_payload(payload.model_dump(mode="json", by_alias=True))
+    snapshot = serialized["interviewCandidateQuestionInput"]
+    planner_context = snapshot["plannerContext"]
+    assert "summary" in planner_context["careerProfile"]
+    assert planner_context["careerProfile"]["summary"] is None
+    assert "company" in planner_context["targetRole"]
+    assert planner_context["targetRole"]["company"] is None
+    assert "location" in planner_context["targetRole"]
+    assert planner_context["targetRole"]["location"] is None
+    completed_question = snapshot["completedQuestions"][0]
+    assert "answer" in completed_question
+    assert completed_question["answer"] is None
+    completed_follow_up = completed_question["followUps"][0]
+    assert "answer" in completed_follow_up
+    assert completed_follow_up["answer"] is None
+
+    reparsed = InterviewCandidateQuestionRunPayload.model_validate(serialized)
+    assert (
+        reparsed.interview_candidate_question_input.planner_context.career_profile.summary
+        is None
+    )
+    assert (
+        reparsed.interview_candidate_question_input.planner_context.target_role.company
+        is None
+    )
+    assert (
+        reparsed.interview_candidate_question_input.planner_context.target_role.location
+        is None
+    )
+    assert reparsed.interview_candidate_question_input.completed_questions[0].answer is None
+    assert (
+        reparsed.interview_candidate_question_input.completed_questions[0]
+        .follow_ups[0]
+        .answer
+        is None
+    )
+
+    missing_summary = deepcopy(serialized)
+    del missing_summary["interviewCandidateQuestionInput"]["plannerContext"][
+        "careerProfile"
+    ]["summary"]
+    with pytest.raises(ValidationError):
+        InterviewCandidateQuestionRunPayload.model_validate(missing_summary)
 
 
 def test_interview_review_run_payload_preserves_nullable_snapshot_fields() -> None:

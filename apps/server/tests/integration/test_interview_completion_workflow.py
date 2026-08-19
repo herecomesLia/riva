@@ -20,6 +20,7 @@ from riva.models import (
     InterviewQuestion,
     InterviewReview,
     InterviewSession,
+    TargetRole,
 )
 from tests.helpers.interview import seed_interview_prerequisites
 from tests.helpers.llm import FakeLLMProvider
@@ -313,8 +314,17 @@ def test_interview_candidate_question_and_review_success_workflow(
             owner, role, profile = await seed_interview_prerequisites(
                 database,
                 label="completion-success",
-                summary="FROZEN_PROFILE",
+                summary=None,
             )
+            async with database.sessionmaker() as session:
+                stored_profile = await session.get(CareerProfile, profile.profile_id)
+                stored_role = await session.get(TargetRole, role.id)
+                assert stored_profile is not None
+                assert stored_role is not None
+                stored_profile.summary = None
+                stored_role.company = None
+                stored_role.location = None
+                await session.commit()
             await _prepare_profile_snapshot(database, profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
@@ -351,6 +361,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     headers=_headers(),
                 )
                 assert candidate_page.status_code == 202
+                assert "interview_candidate_question_snapshot_invalid" not in candidate_page.text
                 assert candidate_page.json()["session"]["status"] == (
                     "generatingCandidateAnswer"
                 )
@@ -383,9 +394,12 @@ def test_interview_candidate_question_and_review_success_workflow(
                         candidate_version + 1
                     )
                     assert candidate_run.payload["interactionLanguage"] == "en"
-                    assert candidate_run.payload["interviewCandidateQuestionInput"][
-                        "plannerContext"
-                    ]["careerProfile"]["summary"] == "FROZEN_PROFILE"
+                    planner_context = candidate_run.payload[
+                        "interviewCandidateQuestionInput"
+                    ]["plannerContext"]
+                    assert planner_context["careerProfile"]["summary"] is None
+                    assert planner_context["targetRole"]["company"] is None
+                    assert planner_context["targetRole"]["location"] is None
 
                     stored_profile = await session.get(
                         CareerProfile,
@@ -403,7 +417,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     assert candidate_question is not None
 
                 await _process_worker(database, settings, provider)
-                assert "FROZEN_PROFILE" in provider.calls[-1].messages[1].content
+                assert '"summary":null' in provider.calls[-1].messages[1].content
                 assert "CHANGED_AFTER_CANDIDATE_ENQUEUE" not in provider.calls[-1].messages[1].content
 
                 async with database.sessionmaker() as session:
