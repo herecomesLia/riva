@@ -90,6 +90,7 @@ function mockInterviewRecordResponse(): Record<string, unknown> {
       usageGuidance: "Adapt this structure to your own evidence.",
       generatedAt: timestamp,
     },
+    reason: null,
   }
   return {
     recordId,
@@ -362,6 +363,7 @@ describe("targeted practice training record API service", () => {
       referenceAnswer: { status: "ready" },
       evaluation: { overallScore: 84 },
     })
+    expect(record.questions[0]?.referenceAnswer).not.toHaveProperty("reason")
   })
 
   it("maps a Mock Interview detail 404 to the structured not-found error", async () => {
