@@ -142,9 +142,11 @@ describe("app router auth redirects", () => {
       }),
     ).toBeInTheDocument()
     expect(window.location.pathname).toBe("/history/practice/targeted-practice-record-001")
-    expect(screen.getByRole("link", { name: i18n.t("appShell.nav.history") })).toHaveAttribute(
-      "data-active",
-    )
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: i18n.t("appShell.nav.history") })).toHaveAttribute(
+        "data-active",
+      )
+    })
   })
 
   it("renders the authenticated mock-interview history detail route", async () => {
@@ -159,9 +161,11 @@ describe("app router auth redirects", () => {
       }),
     ).toBeInTheDocument()
     expect(window.location.pathname).toBe("/history/interview/mock-interview-record-001")
-    expect(screen.getByRole("link", { name: i18n.t("appShell.nav.history") })).toHaveAttribute(
-      "data-active",
-    )
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: i18n.t("appShell.nav.history") })).toHaveAttribute(
+        "data-active",
+      )
+    })
   })
 
   it("preserves list filters and pagination across detail navigation and return", async () => {
