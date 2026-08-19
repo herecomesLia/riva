@@ -9,7 +9,11 @@ import {
 } from "@/mocks/data/interview"
 import { createProfileMockSnapshot } from "@/mocks/data/profile"
 import { createRolesMockResponse } from "@/mocks/data/roles"
-import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
+import type {
+  InterviewConfiguration,
+  InterviewPageResponse,
+  InterviewQuestionResponse,
+} from "@/models/interview"
 import {
   getInterviewPage,
   prepareInterviewTrainingEntry,
@@ -65,6 +69,71 @@ function createStartedResponse(
   }
 }
 
+type ActiveSessionStatus = "opening" | "question" | "generatingTurn" | "generatingReview"
+
+function createActiveSessionResponse(status: ActiveSessionStatus): InterviewPageResponse {
+  const response = createStartedResponse()
+  if (status === "opening") return response
+
+  if (response.session === null || response.session.status !== "opening") {
+    throw new Error("Expected an opening interview session fixture.")
+  }
+
+  const question: InterviewQuestionResponse = {
+    id: "mock-interview-question-recovery",
+    prompt: "Describe the evidence for your decision.",
+    type: "projectDeepDive",
+    assessedCapabilities: ["Evidence"],
+    order: 1,
+  }
+
+  if (status === "question") {
+    return {
+      ...response,
+      session: {
+        ...response.session,
+        status: "question",
+        currentQuestion: {
+          status: "awaitingAnswer",
+          question,
+          answer: null,
+        },
+      },
+    }
+  }
+
+  if (status === "generatingTurn") {
+    return {
+      ...response,
+      session: {
+        ...response.session,
+        status: "generatingTurn",
+        generationStatus: "generating",
+        currentQuestion: {
+          question,
+          answer: {
+            id: "mock-interview-answer-recovery",
+            content: "I owned the rollout and measured the outcome.",
+            submittedAt: "2026-07-24T02:04:00.000Z",
+          },
+          answeredFollowUps: [],
+        },
+      },
+    }
+  }
+
+  return {
+    ...response,
+    session: {
+      ...response.session,
+      status: "generatingReview",
+      generationStatus: "generating",
+      completionReason: "formalQuestionsCompleted",
+      candidateQuestionExchanges: [],
+    },
+  }
+}
+
 function createMultipleReadyRolesResponse(): InterviewPageResponse {
   return {
     setup: createInterviewSetupResponseMock(
@@ -75,9 +144,9 @@ function createMultipleReadyRolesResponse(): InterviewPageResponse {
   }
 }
 
-function renderInterviewPage(initialEntry = "/interview") {
+function renderInterviewPage(initialEntry = "/interview", initialEntries = [initialEntry]) {
   return renderWithProviders(<InterviewPage />, {
-    router: { initialEntries: [initialEntry] },
+    router: { initialEntries },
   })
 }
 
@@ -88,62 +157,108 @@ describe("InterviewPage", () => {
     vi.mocked(startInterview).mockReset()
   })
 
-  it.each(["active", "completed"] as const)(
-    "prepares a fresh history setup from an existing %s session",
-    async (sessionState) => {
-      const current =
-        sessionState === "active"
-          ? createStartedResponse()
-          : createInterviewMockResponse("completed")
-      const prepared = createMultipleReadyRolesResponse()
-      prepared.setup.defaultConfiguration = {
-        targetRoleId: "role_product_manager_meituan",
-        round: "hr",
-        difficulty: "basic",
-        durationMinutes: 45,
-      }
-      vi.mocked(getInterviewPage).mockResolvedValue(current)
-      vi.mocked(prepareInterviewTrainingEntry).mockResolvedValue({
-        page: prepared,
-        resolution: {
-          status: "available",
-          configuration: prepared.setup.defaultConfiguration,
-          adjustments: [],
-        },
-      })
+  it("prepares a fresh history setup from a completed session", async () => {
+    const current = createInterviewMockResponse("completed")
+    const prepared = createMultipleReadyRolesResponse()
+    prepared.setup.defaultConfiguration = {
+      targetRoleId: "role_product_manager_meituan",
+      round: "hr",
+      difficulty: "basic",
+      durationMinutes: 45,
+    }
+    vi.mocked(getInterviewPage).mockResolvedValue(current)
+    vi.mocked(prepareInterviewTrainingEntry).mockResolvedValue({
+      page: prepared,
+      resolution: {
+        status: "available",
+        configuration: prepared.setup.defaultConfiguration,
+        adjustments: [],
+      },
+    })
 
-      renderInterviewPage(
-        "/interview?entry=history&targetRoleId=role_product_manager_meituan&round=hr&difficulty=basic&durationMinutes=45",
+    renderInterviewPage(
+      "/interview?entry=history&targetRoleId=role_product_manager_meituan&round=hr&difficulty=basic&durationMinutes=45",
+    )
+
+    expect(await screen.findByText("Product Manager · Meituan")).toBeInTheDocument()
+    expect(vi.mocked(prepareInterviewTrainingEntry).mock.calls[0]?.[0]).toEqual({
+      targetRoleId: "role_product_manager_meituan",
+      round: "hr",
+      difficulty: "basic",
+      durationMinutes: 45,
+    })
+    expect(screen.getByTestId("interview-target-role-trigger")).toHaveTextContent("Product Manager")
+    expect(screen.getByRole("button", { name: i18n.t("interview.rounds.hr") })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+    expect(
+      screen.getByRole("button", { name: i18n.t("interview.difficulty.basic") }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      screen.getByRole("button", {
+        name: i18n.t("interview.setup.durationMinutes", { minutes: 45 }),
+      }),
+    ).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it.each(["opening", "question", "generatingTurn", "generatingReview"] as const)(
+    "recovers an active %s session without rendering setup",
+    async (status) => {
+      const active = createActiveSessionResponse(status)
+      vi.mocked(getInterviewPage).mockResolvedValue(active)
+      const renderResult = renderInterviewPage("/interview", ["/previous", "/interview"])
+
+      await waitFor(() =>
+        expect(renderResult.router?.state.location.pathname).toBe(
+          "/interview/session/mock-interview-session-page",
+        ),
       )
 
-      expect(await screen.findByText("Product Manager · Meituan")).toBeInTheDocument()
-      expect(vi.mocked(prepareInterviewTrainingEntry).mock.calls[0]?.[0]).toEqual({
-        targetRoleId: "role_product_manager_meituan",
-        round: "hr",
-        difficulty: "basic",
-        durationMinutes: 45,
-      })
-      expect(screen.getByTestId("interview-target-role-trigger")).toHaveTextContent(
-        "Product Manager",
-      )
-      expect(screen.getByRole("button", { name: i18n.t("interview.rounds.hr") })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      )
+      expect(renderResult.router?.history.length).toBe(2)
+      expect(startInterview).not.toHaveBeenCalled()
+      expect(prepareInterviewTrainingEntry).not.toHaveBeenCalled()
+      expect(screen.queryByTestId("interview-target-role-trigger")).not.toBeInTheDocument()
       expect(
-        screen.getByRole("button", { name: i18n.t("interview.difficulty.basic") }),
-      ).toHaveAttribute("aria-pressed", "true")
-      expect(
-        screen.getByRole("button", {
-          name: i18n.t("interview.setup.durationMinutes", { minutes: 45 }),
-        }),
-      ).toHaveAttribute("aria-pressed", "true")
+        screen.queryByRole("button", { name: i18n.t("interview.actions.start") }),
+      ).not.toBeInTheDocument()
     },
   )
 
+  it.each(["history", "planner"] as const)(
+    "prioritizes active session recovery over %s training entry preparation",
+    async (entry) => {
+      const active = createActiveSessionResponse("opening")
+      vi.mocked(getInterviewPage).mockResolvedValue(active)
+
+      const renderResult = renderInterviewPage(
+        `/interview?entry=${entry}&targetRoleId=role_frontend_bytedance&round=technical&difficulty=pressure&durationMinutes=30`,
+      )
+
+      await waitFor(() =>
+        expect(renderResult.router?.state.location.pathname).toBe(
+          "/interview/session/mock-interview-session-page",
+        ),
+      )
+      expect(prepareInterviewTrainingEntry).not.toHaveBeenCalled()
+      expect(startInterview).not.toHaveBeenCalled()
+    },
+  )
+
+  it("keeps a completed session on the normal setup page", async () => {
+    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse("completed"))
+
+    const renderResult = renderInterviewPage()
+
+    expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
+    expect(renderResult.router?.state.location.pathname).toBe("/interview")
+    expect(prepareInterviewTrainingEntry).not.toHaveBeenCalled()
+    expect(startInterview).not.toHaveBeenCalled()
+  })
+
   it("requires confirmation and explains adjusted round, difficulty, and duration", async () => {
     const user = userEvent.setup()
-    const current = createStartedResponse()
+    const current = createInterviewMockResponse("completed")
     const prepared = createMultipleReadyRolesResponse()
     prepared.setup.defaultConfiguration = {
       targetRoleId: "role_product_manager_meituan",
@@ -263,17 +378,19 @@ describe("InterviewPage", () => {
     expect(screen.getByTestId("interview-loading-state")).toBeInTheDocument()
   })
 
-  it("maps service setup data to the ready view", async () => {
+  it("keeps the normal setup page when session is null", async () => {
     const response = createInterviewMockResponse()
     vi.mocked(getInterviewPage).mockResolvedValue(response)
 
-    renderInterviewPage()
+    const renderResult = renderInterviewPage()
 
     expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: i18n.t("interview.rounds.technical") }),
     ).toBeInTheDocument()
+    expect(renderResult.router?.state.location.pathname).toBe("/interview")
     expect(prepareInterviewTrainingEntry).not.toHaveBeenCalled()
+    expect(startInterview).not.toHaveBeenCalled()
   })
 
   it("maps an empty target-role response to the empty view", async () => {

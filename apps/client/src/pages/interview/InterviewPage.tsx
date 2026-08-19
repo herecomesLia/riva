@@ -31,6 +31,13 @@ export function InterviewPage() {
     queryKey: INTERVIEW_QUERY_KEY,
     retry: false,
   })
+  const activeSessionId =
+    interviewQuery.data?.session !== null &&
+    interviewQuery.data?.session !== undefined &&
+    interviewQuery.data.session.status !== "completed"
+      ? interviewQuery.data.session.sessionId
+      : null
+  const activeSessionRecovery = useRef<string | null>(null)
   const startMutation = useMutation({
     mutationFn: startInterview,
     onSuccess: (response) => {
@@ -40,9 +47,23 @@ export function InterviewPage() {
   const prepareEntryMutation = useMutation({ mutationFn: prepareInterviewTrainingEntry })
 
   useEffect(() => {
+    if (activeSessionId === null || activeSessionRecovery.current === activeSessionId) {
+      return
+    }
+
+    activeSessionRecovery.current = activeSessionId
+    void navigate({
+      to: "/interview/session/$sessionId",
+      params: { sessionId: activeSessionId },
+      replace: true,
+    })
+  }, [activeSessionId, navigate])
+
+  useEffect(() => {
     if (
       entryKey === null ||
       interviewQuery.data === undefined ||
+      activeSessionId !== null ||
       preparingEntryKey.current === entryKey ||
       (entryPreparation.key === entryKey && entryPreparation.status === "success")
     ) {
@@ -63,6 +84,7 @@ export function InterviewPage() {
     entryPreparation,
     entrySearch,
     interviewQuery.data,
+    activeSessionId,
     prepareEntryMutation,
     queryClient,
   ])
@@ -95,6 +117,10 @@ export function InterviewPage() {
       : entryPreparation.key === entryKey
         ? entryPreparation.status
         : "pending"
+
+  if (activeSessionId !== null) {
+    return <InterviewView status="loading" />
+  }
 
   if (trainingEntryStatus === "pending") {
     return <InterviewView status="loading" />
