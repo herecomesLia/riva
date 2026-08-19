@@ -65,11 +65,13 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                     assert duplicate.display_name == "Updated communication"
                     assert other_competency.id != competency.id
                     assert other_competency.competency_key == competency.competency_key
+                    competency_id = competency.id
+                    competency_key = competency.competency_key
 
                     occurred_at = datetime(2026, 8, 17, 10, tzinfo=UTC)
                     evidence = await service.add_evidence(
                         user_id=owner_id,
-                        competency_id=competency.id,
+                        competency_id=competency_id,
                         source_type="practice",
                         source_session_id=uuid4(),
                         source_entity_type="practiceAttempt",
@@ -80,7 +82,7 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                     )
                     same_evidence = await service.add_evidence(
                         user_id=owner_id,
-                        competency_id=competency.id,
+                        competency_id=competency_id,
                         source_type="practice",
                         source_session_id=uuid4(),
                         source_entity_type="practiceAttempt",
@@ -91,7 +93,7 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                     )
                     older = await service.add_evidence(
                         user_id=owner_id,
-                        competency_id=competency.id,
+                        competency_id=competency_id,
                         source_type="interview",
                         source_session_id=uuid4(),
                         source_entity_type="interviewReview",
@@ -110,13 +112,13 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                     assert competency.confidence == 0
                     assert competency.trend == "insufficient"
                     assert len(
-                        await service.list_evidence(owner_id, competency.id)
+                        await service.list_evidence(owner_id, competency_id)
                     ) == 2
 
                     with pytest.raises(ValueError, match="does not belong"):
                         await service.add_evidence(
                             user_id=other_id,
-                            competency_id=competency.id,
+                            competency_id=competency_id,
                             source_type="practice",
                             source_session_id=uuid4(),
                             source_entity_type="practiceAttempt",
@@ -131,7 +133,7 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                         UserCompetency(
                             id=uuid4(),
                             user_id=owner_id,
-                            competency_key="communication",
+                            competency_key=competency_key,
                             display_name="Duplicate",
                         )
                     )
@@ -155,7 +157,7 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                     session.add(
                         CompetencyEvidence(
                             user_id=other_id,
-                            competency_id=competency.id,
+                            competency_id=competency_id,
                             source_type="practice",
                             source_session_id=uuid4(),
                             source_entity_type="practiceAttempt",
@@ -173,7 +175,7 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                     session.add(
                         CompetencyEvidence(
                             user_id=owner_id,
-                            competency_id=competency.id,
+                            competency_id=competency_id,
                             source_type="practice",
                             source_session_id=uuid4(),
                             source_entity_type="practiceAttempt",

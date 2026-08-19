@@ -112,6 +112,7 @@ def test_start_retry_status_conflicts_and_concurrency() -> None:
                     assert run.payload == {
                         "roleId": str(target.id),
                         "jobDescriptionVersion": 1,
+                        "interactionLanguage": "zh-CN",
                     }
                     assert run.model == "test-model"
                     assert run.max_attempts == 3

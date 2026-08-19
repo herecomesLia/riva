@@ -63,54 +63,51 @@ async def _schema_details(database_url: str) -> dict[str, object]:
 def test_competency_migration_upgrades_downgrades_and_matches_orm() -> None:
     database_url = get_integration_database_url()
 
-    async def run() -> None:
-        await _clear_database(database_url)
-        try:
-            migrations.upgrade(database_url, PREVIOUS_REVISION)
-            migrations.upgrade(database_url, REVISION)
+    asyncio.run(_clear_database(database_url))
+    try:
+        migrations.upgrade(database_url, PREVIOUS_REVISION)
+        migrations.upgrade(database_url, REVISION)
 
-            details = await _schema_details(database_url)
-            assert {"user_competencies", "competency_evidence"} <= details["tables"]
-            assert {
-                "ck_user_competencies_competency_key",
-                "ck_user_competencies_level",
-                "ck_user_competencies_confidence",
-                "ck_user_competencies_evidence_count",
-                "ck_user_competencies_trend",
-                "ck_competency_evidence_source_type",
-                "ck_competency_evidence_signal_type",
-                "ck_competency_evidence_score",
-                "ck_competency_evidence_signal_payload",
-            } <= details["checks"]
-            assert {
-                "uq_user_competencies_user_key",
-                "uq_user_competencies_user_id_id",
-                "uq_competency_evidence_source_entity_signal",
-            } <= details["uniques"]
-            assert "fk_competency_evidence_competency_owner" in details[
-                "foreign_keys"
-            ]
-            assert {
-                "ix_user_competencies_user_id",
-                "ix_competency_evidence_user_id",
-                "ix_competency_evidence_competency_id",
-            } <= details["indexes"]
+        details = asyncio.run(_schema_details(database_url))
+        assert {"user_competencies", "competency_evidence"} <= details["tables"]
+        assert {
+            "ck_user_competencies_competency_key",
+            "ck_user_competencies_level",
+            "ck_user_competencies_confidence",
+            "ck_user_competencies_evidence_count",
+            "ck_user_competencies_trend",
+            "ck_competency_evidence_source_type",
+            "ck_competency_evidence_signal_type",
+            "ck_competency_evidence_score",
+            "ck_competency_evidence_signal_payload",
+        } <= details["checks"]
+        assert {
+            "uq_user_competencies_user_key",
+            "uq_user_competencies_user_id_id",
+            "uq_competency_evidence_source_entity_signal",
+        } <= details["uniques"]
+        assert "fk_competency_evidence_competency_owner" in details[
+            "foreign_keys"
+        ]
+        assert {
+            "ix_user_competencies_user_id",
+            "ix_competency_evidence_user_id",
+            "ix_competency_evidence_competency_id",
+        } <= details["indexes"]
 
-            migrations.check(database_url)
+        migrations.check(database_url)
 
-            migrations.downgrade(database_url, PREVIOUS_REVISION)
-            after_downgrade = await _schema_details_without_competency_tables(
-                database_url
-            )
-            assert "user_competencies" not in after_downgrade
-            assert "competency_evidence" not in after_downgrade
+        migrations.downgrade(database_url, PREVIOUS_REVISION)
+        after_downgrade = asyncio.run(
+            _schema_details_without_competency_tables(database_url)
+        )
+        assert "user_competencies" not in after_downgrade
+        assert "competency_evidence" not in after_downgrade
 
-            migrations.upgrade(database_url, REVISION)
-            migrations.check(database_url)
-        finally:
-            await _clear_database(database_url)
-
-    asyncio.run(run())
+        migrations.upgrade(database_url, REVISION)
+        migrations.check(database_url)
+    finally:
+        asyncio.run(_clear_database(database_url))
 
 
 async def _schema_details_without_competency_tables(database_url: str) -> set[str]:

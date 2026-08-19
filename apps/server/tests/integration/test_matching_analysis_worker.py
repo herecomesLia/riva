@@ -25,7 +25,10 @@ from riva.models import (
     User,
 )
 from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT
-from riva.schemas.matching_analysis import MatchingAnalysisOutput
+from riva.schemas.matching_analysis import (
+    MatchingAnalysisOutput,
+    MatchingAnalysisRunPayload,
+)
 from riva.schemas.roles import (
     MatchingAnalysisStatusQuery,
     StartMatchingAnalysisRequest,
@@ -102,6 +105,25 @@ def make_user(user_id: UUID) -> User:
     )
 
 
+def matching_payload(
+    *,
+    role_id: UUID,
+    profile_id: UUID,
+    profile_version: int = 1,
+    job_description_version: int = 1,
+    job_description_analysis_version: int = 1,
+    interaction_language: str = "zh-CN",
+) -> dict[str, object]:
+    return MatchingAnalysisRunPayload(
+        role_id=role_id,
+        profile_id=profile_id,
+        profile_version=profile_version,
+        job_description_version=job_description_version,
+        job_description_analysis_version=job_description_analysis_version,
+        interaction_language=interaction_language,
+    ).model_dump(mode="json", by_alias=True)
+
+
 def make_run(
     *,
     user_id: UUID,
@@ -117,13 +139,7 @@ def make_run(
         prompt_id=prompt.prompt_id,
         prompt_version=prompt.version,
         output_schema_id=prompt.output_schema_id,
-        payload={
-            "roleId": str(role_id),
-            "profileId": str(profile_id),
-            "profileVersion": 1,
-            "jobDescriptionVersion": 1,
-            "jobDescriptionAnalysisVersion": 1,
-        },
+        payload=matching_payload(role_id=role_id, profile_id=profile_id),
         idempotency_key=key,
         max_attempts=3,
         model="fake-matching-model",
@@ -266,20 +282,15 @@ async def setup_matching(
         await session.commit()
 
     async with database.sessionmaker() as session:
+        prompt = MATCHING_ANALYSIS_PROMPT
         run = await AgentRunService(session).enqueue(
             user_id=user_id,
-            agent_id="matching-analyzer",
-            prompt_id="matching-analyzer",
-            prompt_version="1",
-            output_schema_id="matching-analysis-v1",
+            agent_id=prompt.prompt_id,
+            prompt_id=prompt.prompt_id,
+            prompt_version=prompt.version,
+            output_schema_id=prompt.output_schema_id,
             model="fake-matching-model",
-            payload={
-                "roleId": role_id,
-                "profileId": profile_id,
-                "profileVersion": 1,
-                "jobDescriptionVersion": 1,
-                "jobDescriptionAnalysisVersion": 1,
-            },
+            payload=matching_payload(role_id=role_id, profile_id=profile_id),
             idempotency_key=f"matching-worker-{role_id}",
             max_attempts=3,
         )
@@ -480,13 +491,10 @@ def test_matching_service_worker_status_e2e_with_fake_provider() -> None:
                         queued_role.matching_analysis_run_id,
                     )
                     assert queued_run is not None
-                    assert queued_run.payload == {
-                        "roleId": str(setup.role.id),
-                        "profileId": str(setup.profile.profile_id),
-                        "profileVersion": 1,
-                        "jobDescriptionVersion": 1,
-                        "jobDescriptionAnalysisVersion": 1,
-                    }
+                    assert queued_run.payload == matching_payload(
+                        role_id=setup.role.id,
+                        profile_id=setup.profile.profile_id,
+                    )
                     assert queued_run.max_attempts == 3
 
                 assert await setup.worker.process_one() is True
@@ -719,13 +727,10 @@ def test_matching_start_concurrent_same_version_creates_one_run() -> None:
                     assert stored_role.version == 2
                     assert stored_role.matching_analysis_run_id == run.id
                     assert run.status is AgentRunStatus.QUEUED
-                    assert run.payload == {
-                        "roleId": str(setup.role.id),
-                        "profileId": str(setup.profile.profile_id),
-                        "profileVersion": 1,
-                        "jobDescriptionVersion": 1,
-                        "jobDescriptionAnalysisVersion": 1,
-                    }
+                    assert run.payload == matching_payload(
+                        role_id=setup.role.id,
+                        profile_id=setup.profile.profile_id,
+                    )
             finally:
                 await database.reset()
 
@@ -910,13 +915,10 @@ def test_matching_enqueue_is_invisible_until_role_binding_commits() -> None:
                         prompt_version=prompt.version,
                         output_schema_id=prompt.output_schema_id,
                         model="fake-matching-model",
-                        payload={
-                            "roleId": setup.role.id,
-                            "profileId": setup.profile.profile_id,
-                            "profileVersion": 1,
-                            "jobDescriptionVersion": 1,
-                            "jobDescriptionAnalysisVersion": 1,
-                        },
+                        payload=matching_payload(
+                            role_id=setup.role.id,
+                            profile_id=setup.profile.profile_id,
+                        ),
                         idempotency_key=f"atomic-matching:{setup.role.id}:1",
                         max_attempts=3,
                     )

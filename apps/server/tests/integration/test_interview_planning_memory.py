@@ -1,5 +1,6 @@
 import asyncio
 from copy import deepcopy
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +15,7 @@ from riva.models import (
     InterviewSession,
     UserCompetency,
 )
+from riva.services.agent_runs import AgentRunService
 from riva.services.interview_planning import InterviewPlanningService
 from tests.helpers.interview import seed_interview_prerequisites
 from tests.helpers.integration_database import get_integration_database_url
@@ -124,14 +126,26 @@ def test_v2_planning_snapshots_memory_and_retries_without_requery(
                         == original_memory
                     )
 
-                    run.status = AgentRunStatus.FAILED
-                    run.error_code = "provider_failed"
+                    claimed = await AgentRunService(session).claim_next(
+                        lease_owner="planning-memory-failure-worker",
+                        lease_duration=timedelta(minutes=5),
+                    )
+                    assert claimed is not None
+                    assert claimed.id == run.id
+                    assert claimed.lease_token is not None
+                    await AgentRunService(session).mark_failed(
+                        run_id=claimed.id,
+                        lease_token=claimed.lease_token,
+                        error_code="provider_failed",
+                        retryable=False,
+                        retry_delay=timedelta(0),
+                    )
+
                     interview_session = await session.get(
                         InterviewSession, session_id
                     )
                     assert interview_session is not None
-                    interview_session.status = "generatingQuestion"
-                    await session.commit()
+                    assert interview_session.status == "generatingQuestion"
 
                 retry = client.post(
                     f"/api/interview/sessions/{session_id}/questions/begin",

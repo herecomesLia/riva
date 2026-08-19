@@ -179,7 +179,7 @@ def test_competency_aggregation_persists_repairs_and_is_session_weighted() -> No
                         )
                     )
                     assert competency is not None
-                    assert competency.level == 75
+                    assert competency.level == 70
                     # One practice session plus one interview session, not
                     # one datapoint per interview turn.
                     assert competency.confidence == 50

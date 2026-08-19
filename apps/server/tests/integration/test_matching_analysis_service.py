@@ -23,7 +23,10 @@ from riva.models import (
     User,
 )
 from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT
-from riva.schemas.matching_analysis import MatchingAnalysisOutput
+from riva.schemas.matching_analysis import (
+    MatchingAnalysisOutput,
+    MatchingAnalysisRunPayload,
+)
 from riva.services.matching_analyses import (
     INVALID_MATCHING_ANALYSIS_RUN,
     MATCHING_ANALYSIS_SUPERSEDED,
@@ -116,6 +119,14 @@ def make_run(
 ) -> AgentRun:
     prompt = MATCHING_ANALYSIS_PROMPT
     identifier = run_id or uuid4()
+    run_payload = MatchingAnalysisRunPayload(
+        role_id=role_id,
+        profile_id=profile_id,
+        profile_version=profile_version,
+        job_description_version=job_description_version,
+        job_description_analysis_version=analysis_version,
+        interaction_language="zh-CN",
+    )
     return AgentRun(
         id=identifier,
         user_id=owner_id,
@@ -123,13 +134,7 @@ def make_run(
         prompt_id=prompt.prompt_id,
         prompt_version=prompt.version,
         output_schema_id=prompt.output_schema_id,
-        payload={
-            "roleId": str(role_id),
-            "profileId": str(profile_id),
-            "profileVersion": profile_version,
-            "jobDescriptionVersion": job_description_version,
-            "jobDescriptionAnalysisVersion": analysis_version,
-        },
+        payload=run_payload.model_dump(mode="json", by_alias=True),
         idempotency_key=f"matching-service-{suffix}-{identifier}",
         max_attempts=3,
         model="test-model",
@@ -766,7 +771,15 @@ def test_matching_service_loads_detached_input_persists_overwrites_and_is_idempo
                     "Python"
                 ]
                 input_dump = matching_input.model_dump()
-                assert set(input_dump) == {"career_profile", "job"}
+                assert set(input_dump) == {
+                    "career_profile",
+                    "job",
+                    "interaction_language",
+                }
+                assert (
+                    input_dump["interaction_language"]
+                    == graph.matching_run.payload["interactionLanguage"]
+                )
                 assert set(input_dump["job"]) == {
                     "role_title",
                     "company",

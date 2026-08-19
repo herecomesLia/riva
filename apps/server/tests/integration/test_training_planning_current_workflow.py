@@ -181,7 +181,8 @@ def test_current_planning_replays_and_refreshes_by_context(
                 headers=headers("zh-CN"),
             )
             assert language_changed.status_code == 202
-            assert language_changed.json()["runId"] != first_run_id
+            language_changed_run_id = language_changed.json()["runId"]
+            assert language_changed_run_id != first_run_id
 
         with TestClient(app_for(migrated_database_url, owner)) as client:
             stale_context = client.post(
@@ -216,9 +217,62 @@ def test_current_planning_replays_and_refreshes_by_context(
                 json={"targetRoleId": str(role.id)},
                 headers=headers("zh-CN"),
             )
-            assert missing_model.status_code == 503
+            assert missing_model.status_code == 202
+            assert missing_model.json()["runId"] == language_changed_run_id
 
     asyncio.run(run_workflow())
+
+
+def test_current_planning_without_existing_run_requires_provider(
+    migrated_database_url: str,
+) -> None:
+    async def seed() -> tuple[object, object]:
+        async with Database(migrated_database_url) as database:
+            owner, role, profile = await seed_interview_prerequisites(
+                database,
+                label="training-planning-current-unconfigured",
+            )
+            from tests.integration.test_training_planning_workflow import (
+                seed_current_context,
+            )
+
+            await seed_current_context(
+                database,
+                owner_id=owner.id,
+                role_id=role.id,
+                profile_id=profile.profile_id,
+            )
+            return owner, role
+
+    owner, role = asyncio.run(seed())
+
+    with TestClient(app_for(migrated_database_url, owner, provider=None)) as client:
+        response = client.post(
+            "/api/training-plans/current",
+            json={"targetRoleId": str(role.id)},
+            headers=headers(),
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {"error": "training_planning_unavailable"}
+
+    async def count_runs() -> int:
+        async with Database(migrated_database_url) as database:
+            async with database.sessionmaker() as session:
+                return len(
+                    list(
+                        (
+                            await session.scalars(
+                                select(AgentRun).where(
+                                    AgentRun.user_id == owner.id,
+                                    AgentRun.agent_id == "training-planner",
+                                )
+                            )
+                        ).all()
+                    )
+                )
+
+    assert asyncio.run(count_runs()) == 0
 
 
 def test_concurrent_current_planning_requests_share_one_run(
