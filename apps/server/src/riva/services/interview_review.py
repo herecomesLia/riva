@@ -170,7 +170,7 @@ class InterviewReviewService:
             model=self.llm_model,
             payload=cast(
                 dict[str, object],
-                payload.model_dump(mode="json", by_alias=True, exclude_none=True),
+                payload.model_dump(mode="json", by_alias=True),
             ),
             idempotency_key=idempotency_key,
             max_attempts=3,
@@ -211,7 +211,6 @@ class InterviewReviewService:
                 retry_payload.model_dump(
                     mode="json",
                     by_alias=True,
-                    exclude_none=True,
                 ),
             ),
             idempotency_key=idempotency_key,

@@ -18,12 +18,19 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
 )
 from riva.schemas.resume_parsing import ResumeParsingRunPayload
+from riva.schemas.interview_review import (
+    InterviewReviewFollowUpSnapshot,
+    InterviewReviewInput,
+    InterviewReviewRunPayload,
+    InterviewReviewTurnAssessmentSnapshot,
+)
+from riva.schemas.interview_turn import InterviewTurnInput, InterviewTurnRunPayload
 from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.practice_reference_answer import (
     PracticeMainReferenceAnswerRunPayload,
 )
-from riva.schemas.interview_turn import InterviewTurnInput, InterviewTurnRunPayload
 from riva.services.agent_runs import AgentRunService, _serialize_payload
+from tests.unit.agents.test_interview_review import review_input
 from tests.unit.agents.test_interview_turn import turn_input
 
 
@@ -261,6 +268,67 @@ def test_interview_turn_run_payload_is_accepted_after_alias_serialization() -> N
         assert serialized[key] is None
     reparsed = InterviewTurnRunPayload.model_validate(serialized)
     assert reparsed.interview_turn_input.career_profile.summary is None
+
+
+def test_interview_review_run_payload_preserves_nullable_snapshot_fields() -> None:
+    input = review_input()
+    input.planner_context.career_profile.summary = None
+    input.planner_context.target_role.company = None
+    input.planner_context.target_role.location = None
+    question = input.questions[0]
+    question.follow_ups = [
+        InterviewReviewFollowUpSnapshot(
+            id=uuid4(),
+            parent_question_id=question.id,
+            order=1,
+            prompt="What evidence supports that decision?",
+            answer=None,
+        )
+    ]
+    question.turn_assessments = [
+        InterviewReviewTurnAssessmentSnapshot(
+            id=uuid4(),
+            question_id=question.id,
+            main_answer_id=uuid4(),
+            follow_up_answer_id=None,
+            score=80,
+            summary="The answer shows a clear decision.",
+            strengths=["Clear decision"],
+            issues=["Add a measurable result."],
+            decision="completeQuestion",
+            created_at=datetime(2026, 8, 18, 10, 0, tzinfo=UTC),
+        )
+    ]
+    input = InterviewReviewInput.model_validate(
+        input.model_dump(mode="json", by_alias=True)
+    )
+    payload = InterviewReviewRunPayload(
+        session_id=input.session.id,
+        session_version=input.session.version,
+        session_state_version=input.session.version + 1,
+        completion_reason=input.completion_reason,
+        review_mode=input.review_mode,
+        interaction_language=input.interaction_language,
+        interview_review_input=input,
+    ).model_dump(mode="json", by_alias=True)
+
+    serialized = _serialize_payload(payload)
+    snapshot = serialized["interviewReviewInput"]
+    assert snapshot["plannerContext"]["careerProfile"]["summary"] is None
+    assert snapshot["plannerContext"]["targetRole"]["company"] is None
+    assert snapshot["plannerContext"]["targetRole"]["location"] is None
+    assert snapshot["questions"][0]["answer"] is None
+    assert snapshot["questions"][0]["followUps"][0]["answer"] is None
+    assert snapshot["questions"][0]["turnAssessments"][0][
+        "followUpAnswerId"
+    ] is None
+
+    reparsed = InterviewReviewRunPayload.model_validate(serialized)
+    assert (
+        reparsed.interview_review_input.planner_context.career_profile.summary
+        is None
+    )
+    assert reparsed.interview_review_input.questions[0].answer is None
 
 
 def test_review_run_payload_is_accepted_without_widening_metadata() -> None:
