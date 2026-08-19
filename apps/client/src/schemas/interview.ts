@@ -270,20 +270,57 @@ const interviewFollowUpReviewSchema = z
   })
   .strict()
 
-const interviewReferenceAnswerSchema = z
+const interviewReferenceAnswerContentSchema = z
   .object({
-    status: z.literal("ready"),
-    content: z
-      .object({
-        recommendedStructure: z.array(z.string().trim().min(1)),
-        keyPoints: z.array(z.string().trim().min(1)),
-        exampleAnswer: z.string().trim().min(1),
-        usageGuidance: z.string().trim().min(1),
-        generatedAt: dateTimeSchema,
-      })
-      .strict(),
+    recommendedStructure: z.array(z.string().trim().min(1)),
+    keyPoints: z.array(z.string().trim().min(1)),
+    exampleAnswer: z.string().trim().min(1),
+    usageGuidance: z.string().trim().min(1),
+    generatedAt: dateTimeSchema,
   })
   .strict()
+
+const interviewReferenceAnswerWireSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("ready"),
+      content: interviewReferenceAnswerContentSchema,
+      reason: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("generating"),
+      content: z.null(),
+      reason: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("unavailable"),
+      content: z.null(),
+      reason: z.literal("generationFailed"),
+    })
+    .strict(),
+])
+
+const interviewReferenceAnswerSchema = interviewReferenceAnswerWireSchema.transform(
+  (referenceAnswer) => {
+    if (referenceAnswer.status === "ready") {
+      return {
+        status: referenceAnswer.status,
+        content: referenceAnswer.content,
+      }
+    }
+    if (referenceAnswer.status === "unavailable") {
+      return {
+        status: referenceAnswer.status,
+        reason: referenceAnswer.reason,
+      }
+    }
+    return { status: referenceAnswer.status }
+  },
+)
 
 const interviewFollowUpRecordSchema = z.discriminatedUnion("status", [
   z

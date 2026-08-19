@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { InterviewPageResponse } from "@/models/interview"
+import { interviewQuestionLearningDetailSchema } from "@/schemas/interview"
 import {
   beginInterviewQuestions,
   endInterview,
@@ -146,6 +147,153 @@ function requestJson(fetchMock: ReturnType<typeof vi.fn<typeof fetch>>) {
   return JSON.parse(body) as unknown
 }
 
+function completedPageWithReferenceAnswerWire() {
+  const question = {
+    id: "33333333-3333-4333-8333-333333333333",
+    prompt: "Describe a production API trade-off.",
+    type: "projectDeepDive" as const,
+    assessedCapabilities: ["Ownership"],
+    order: 1,
+  }
+  const answer = {
+    id: "44444444-4444-4444-8444-444444444444",
+    content: "I chose a staged rollout and measured the error rate.",
+    submittedAt: "2026-08-16T02:04:00Z",
+  }
+  const followUpQuestion = {
+    id: "55555555-5555-4555-8555-555555555555",
+    parentQuestionId: question.id,
+    prompt: "What signal made you choose the staged rollout?",
+    order: 1,
+    createdAt: "2026-08-16T02:05:00Z",
+  }
+  const followUpAnswer = {
+    id: "66666666-6666-4666-8666-666666666666",
+    content: "The error budget and rollback signal defined the rollout boundary.",
+    submittedAt: "2026-08-16T02:06:00Z",
+  }
+  const answeredFollowUp = {
+    status: "answered" as const,
+    question: followUpQuestion,
+    answer: followUpAnswer,
+  }
+  const completedQuestion = {
+    question,
+    answer,
+    followUps: [answeredFollowUp],
+    completedAt: "2026-08-16T02:07:00Z",
+  }
+  const referenceContent = {
+    recommendedStructure: ["Context", "Decision", "Result"],
+    keyPoints: ["State the trade-off", "Give measurable evidence"],
+    exampleAnswer: "I explain the decision, constraints, and measured outcome.",
+    usageGuidance: "Replace this example with your own evidence.",
+    generatedAt: "2026-08-16T02:20:00Z",
+  }
+  const questionDetail = {
+    record: {
+      status: "answered" as const,
+      question,
+      answer,
+      followUps: [answeredFollowUp],
+    },
+    performance: {
+      questionId: question.id,
+      score: 84,
+      summary: "The answer includes a concrete trade-off and result.",
+      strengths: ["Concrete decision"],
+      issues: ["Add more scale"],
+    },
+    referenceAnswer: {
+      status: "ready" as const,
+      content: structuredClone(referenceContent),
+      reason: null,
+    },
+    followUps: [
+      {
+        record: answeredFollowUp,
+        performance: {
+          followUpQuestionId: followUpQuestion.id,
+          score: 82,
+          summary: "The follow-up answer is specific.",
+          strengths: ["Clear signal"],
+          issues: ["Add one metric"],
+        },
+        referenceAnswer: {
+          status: "ready" as const,
+          content: structuredClone(referenceContent),
+          reason: null,
+        },
+      },
+    ],
+  }
+  const review = {
+    status: "complete" as const,
+    review: {
+      overallPerformance: "The completed answer is grounded in a concrete production example.",
+      questionReviews: [
+        {
+          questionId: question.id,
+          score: 84,
+          summary: "The answer includes a concrete trade-off and result.",
+          strengths: ["Concrete decision"],
+          issues: ["Add more scale"],
+        },
+      ],
+      mainStrengths: ["Concrete decision"],
+      frequentIssues: ["Add more scale"],
+      exposedWeaknesses: ["Scale evidence"],
+      riskPoints: ["Probe rollout scope"],
+      communicationSuggestions: ["Lead with the result"],
+      preparationSuggestions: ["Prepare one more quantified example"],
+      generatedAt: "2026-08-16T02:21:00Z",
+      overallScore: 84,
+      dimensionScores: [
+        {
+          dimension: "resultsAndEvidence" as const,
+          score: 84,
+          explanation: "The answer provides a measurable outcome.",
+        },
+      ],
+      nextTraining: {
+        action: "targetedPractice" as const,
+        reason: "Strengthen scale evidence.",
+        focusAreas: ["Scale evidence"],
+        questionType: "projectDeepDive" as const,
+        difficulty: "pressure" as const,
+      },
+    },
+  }
+  const page = response(null)
+  return {
+    ...page,
+    session: {
+      status: "completed" as const,
+      sessionId,
+      language: "en" as const,
+      version: 10,
+      configuration: {
+        targetRoleId: roleId,
+        round: "technical" as const,
+        difficulty: "pressure" as const,
+        durationMinutes: 30 as const,
+      },
+      startedAt: "2026-08-16T02:00:00Z",
+      progress: {
+        completedMainQuestions: 1,
+        totalMainQuestions: 2,
+        planRevision: 1,
+      },
+      completedQuestions: [completedQuestion],
+      completionReason: "formalQuestionsCompleted" as const,
+      completedAt: "2026-08-16T02:18:00Z",
+      candidateQuestionExchanges: [],
+      review,
+      questionDetails: [questionDetail],
+    },
+  }
+}
+
 describe("interview service API", () => {
   const fetchMock = vi.fn<typeof fetch>()
 
@@ -167,6 +315,124 @@ describe("interview service API", () => {
       "/api/interview",
       expect.objectContaining({ credentials: "include" }),
     )
+  })
+
+  it("parses completed reference answers from both real read endpoints", async () => {
+    const page = completedPageWithReferenceAnswerWire()
+    if (page.session === null || page.session.status !== "completed") {
+      throw new Error("Expected a completed interview page.")
+    }
+    const rawDetail = page.session.questionDetails.find(
+      (detail) =>
+        detail.referenceAnswer.status === "ready" &&
+        detail.followUps[0]?.referenceAnswer.status === "ready",
+    )
+    if (rawDetail === undefined) throw new Error("Expected ready question references.")
+    const rawFollowUp = rawDetail.followUps[0]
+    if (rawFollowUp === undefined) throw new Error("Expected a ready follow-up reference.")
+
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page), { status: 200 }))
+    const parsedPage = await getInterviewPage()
+    expect(parsedPage.session?.status).toBe("completed")
+    if (parsedPage.session?.status !== "completed") {
+      throw new Error("Expected a parsed completed interview page.")
+    }
+    const pageDetail = parsedPage.session.questionDetails.find(
+      (detail) =>
+        detail.record.question.id === rawDetail.record.question.id && detail.followUps.length > 0,
+    )
+    if (pageDetail === undefined) throw new Error("Expected parsed question references.")
+    const pageFollowUp = pageDetail.followUps[0]
+    if (pageFollowUp === undefined) throw new Error("Expected parsed follow-up reference.")
+    if (pageDetail.referenceAnswer.status !== "ready") {
+      throw new Error("Expected a parsed ready question reference.")
+    }
+    if (pageFollowUp.referenceAnswer.status !== "ready") {
+      throw new Error("Expected a parsed ready follow-up reference.")
+    }
+    expect(pageDetail.referenceAnswer.content).toEqual(rawDetail.referenceAnswer.content)
+    expect(pageFollowUp.referenceAnswer.content).toEqual(rawFollowUp.referenceAnswer.content)
+    expect(pageDetail.referenceAnswer).not.toHaveProperty("reason")
+    expect(pageFollowUp.referenceAnswer).not.toHaveProperty("reason")
+
+    if (page.session.review.status !== "complete") {
+      throw new Error("Expected a complete review.")
+    }
+    const review = {
+      sessionId: page.session.sessionId,
+      completionReason: page.session.completionReason,
+      status: "complete" as const,
+      review: page.session.review.review,
+      questionDetails: page.session.questionDetails,
+    }
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(review), { status: 200 }))
+
+    const parsedReview = await getInterviewReview({ sessionId: page.session.sessionId })
+    expect(parsedReview.status).toBe("complete")
+    const reviewDetail = parsedReview.questionDetails.find(
+      (detail) => detail.record.question.id === rawDetail.record.question.id,
+    )
+    if (reviewDetail === undefined) throw new Error("Expected parsed review references.")
+    expect(reviewDetail.referenceAnswer.status).toBe("ready")
+    expect(reviewDetail.referenceAnswer).not.toHaveProperty("reason")
+    expect(parsedReview.questionDetails[0]?.followUps[0]?.referenceAnswer).not.toHaveProperty(
+      "reason",
+    )
+  })
+
+  it("maps reference answer wire states and rejects invalid combinations", () => {
+    const page = completedPageWithReferenceAnswerWire()
+    if (page.session === null || page.session.status !== "completed") {
+      throw new Error("Expected a completed interview page.")
+    }
+    const detail = page.session.questionDetails[0]
+    if (detail === undefined) throw new Error("Expected a question detail.")
+    const parseWithReference = (referenceAnswer: unknown) =>
+      interviewQuestionLearningDetailSchema.parse({
+        ...detail,
+        referenceAnswer,
+        followUps: detail.followUps.map((followUp) => ({
+          ...followUp,
+          referenceAnswer,
+        })),
+      })
+
+    const generating = parseWithReference({
+      status: "generating",
+      content: null,
+      reason: null,
+    })
+    expect(generating.referenceAnswer).toEqual({ status: "generating" })
+    expect(generating.followUps[0]?.referenceAnswer).toEqual({ status: "generating" })
+
+    const unavailable = parseWithReference({
+      status: "unavailable",
+      content: null,
+      reason: "generationFailed",
+    })
+    expect(unavailable.referenceAnswer).toEqual({
+      status: "unavailable",
+      reason: "generationFailed",
+    })
+
+    const readyContent =
+      detail.referenceAnswer.status === "ready" ? detail.referenceAnswer.content : null
+    if (readyContent === null) throw new Error("Expected ready reference content.")
+    expect(() => parseWithReference({ status: "ready", content: null, reason: null })).toThrow()
+    expect(() =>
+      parseWithReference({
+        status: "ready",
+        content: readyContent,
+        reason: "generationFailed",
+      }),
+    ).toThrow()
+    expect(() =>
+      parseWithReference({
+        status: "unavailable",
+        content: readyContent,
+        reason: "generationFailed",
+      }),
+    ).toThrow()
   })
 
   it("starts a real interview with the configuration body", async () => {
