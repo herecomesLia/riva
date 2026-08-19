@@ -14,6 +14,7 @@ from riva.models import (
     AgentRun,
     AgentRunStatus,
     CareerProfile,
+    CareerProfileWorkExperience,
     InterviewCandidateQuestion,
     InterviewCandidateQuestionExchange,
     InterviewQuestion,
@@ -200,6 +201,22 @@ async def _process_worker(
     assert await _worker(database, settings, provider).process_one() is True
 
 
+async def _prepare_profile_snapshot(
+    database: Database,
+    profile_id: UUID,
+) -> None:
+    async with database.sessionmaker() as session:
+        work_experience = await session.scalar(
+            select(CareerProfileWorkExperience).where(
+                CareerProfileWorkExperience.career_profile_id == profile_id
+            )
+        )
+        assert work_experience is not None
+        work_experience.end_date = "2025-12"
+        work_experience.is_current = False
+        await session.commit()
+
+
 async def _reach_candidate_questions(
     database: Database,
     settings,
@@ -214,6 +231,65 @@ async def _reach_candidate_questions(
     )
     await _process_worker(database, settings, provider)
 
+    planner_page = client.get("/api/interview", headers=_headers())
+    assert planner_page.status_code == 200
+    assert planner_page.json()["session"]["status"] == "question"
+    async with database.sessionmaker() as session:
+        current = await session.get(InterviewSession, session_id)
+        questions = list(
+            (
+                await session.scalars(
+                    select(InterviewQuestion)
+                    .where(InterviewQuestion.session_id == session_id)
+                    .order_by(InterviewQuestion.order)
+                )
+            ).all()
+        )
+    assert current is not None
+    assert current.status == "question"
+    assert [question.order for question in questions] == [1]
+
+    for expected_order in (1, 2):
+        page = client.get("/api/interview", headers=_headers())
+        assert page.status_code == 200
+        session_state = page.json()["session"]
+        assert session_state["status"] == "question"
+        session_version = session_state["version"]
+        question_id = UUID(
+            session_state["currentQuestion"]["question"]["id"]
+        )
+        submitted = _answer_request(
+            client,
+            session_id,
+            version=session_version,
+            question_id=question_id,
+        )
+        assert submitted.status_code == 202
+        assert submitted.json()["session"]["status"] == "generatingTurn"
+        assert submitted.json()["session"]["version"] == session_version + 1
+        await _process_worker(database, settings, provider)
+
+        after_turn = client.get("/api/interview", headers=_headers())
+        assert after_turn.status_code == 200
+        after_turn_session = after_turn.json()["session"]
+        if expected_order == 1:
+            assert after_turn_session["status"] == "question"
+            assert after_turn_session["version"] == session_version + 2
+            async with database.sessionmaker() as session:
+                questions = list(
+                    (
+                        await session.scalars(
+                            select(InterviewQuestion)
+                            .where(InterviewQuestion.session_id == session_id)
+                            .order_by(InterviewQuestion.order)
+                        )
+                    ).all()
+                )
+            assert [question.order for question in questions] == [1, 2]
+        else:
+            assert after_turn_session["status"] == "candidateQuestions"
+            assert after_turn_session["version"] == session_version + 2
+
     async with database.sessionmaker() as session:
         questions = list(
             (
@@ -225,20 +301,7 @@ async def _reach_candidate_questions(
             ).all()
         )
     assert len(questions) == 2
-    for index, question in enumerate(questions):
-        submitted = _answer_request(
-            client,
-            session_id,
-            version=3 + index * 2,
-            question_id=question.id,
-        )
-        assert submitted.status_code == 202
-        assert submitted.json()["session"]["status"] == "generatingTurn"
-        await _process_worker(database, settings, provider)
-
-    page = client.get("/api/interview", headers=_headers())
-    assert page.status_code == 200
-    assert page.json()["session"]["status"] == "candidateQuestions"
+    assert [question.order for question in questions] == [1, 2]
     return session_id
 
 
@@ -252,6 +315,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                 label="completion-success",
                 summary="FROZEN_PROFILE",
             )
+            await _prepare_profile_snapshot(database, profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [
@@ -272,10 +336,16 @@ def test_interview_candidate_question_and_review_success_workflow(
                     role.id,
                     provider,
                 )
+                candidate_state = client.get("/api/interview", headers=_headers())
+                assert candidate_state.status_code == 200
+                assert candidate_state.json()["session"]["status"] == (
+                    "candidateQuestions"
+                )
+                candidate_version = candidate_state.json()["session"]["version"]
                 candidate_page = client.post(
                     f"/api/interview/sessions/{session_id}/candidate-questions",
                     json={
-                        "version": 7,
+                        "version": candidate_version,
                         "content": "How does the team measure success for this role?",
                     },
                     headers=_headers(),
@@ -287,7 +357,9 @@ def test_interview_candidate_question_and_review_success_workflow(
                 assert candidate_page.json()["session"]["generationStatus"] == (
                     "generating"
                 )
-                assert candidate_page.json()["session"]["version"] == 8
+                assert candidate_page.json()["session"]["version"] == (
+                    candidate_version + 1
+                )
 
                 async with database.sessionmaker() as session:
                     candidate_runs = list(
@@ -306,8 +378,10 @@ def test_interview_candidate_question_and_review_success_workflow(
                     candidate_run = candidate_runs[0]
                     assert candidate_run.status is AgentRunStatus.QUEUED
                     assert candidate_run.payload["sessionId"] == str(session_id)
-                    assert candidate_run.payload["sessionVersion"] == 7
-                    assert candidate_run.payload["sessionStateVersion"] == 8
+                    assert candidate_run.payload["sessionVersion"] == candidate_version
+                    assert candidate_run.payload["sessionStateVersion"] == (
+                        candidate_version + 1
+                    )
                     assert candidate_run.payload["interactionLanguage"] == "en"
                     assert candidate_run.payload["interviewCandidateQuestionInput"][
                         "plannerContext"
@@ -347,7 +421,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     current = await session.get(InterviewSession, session_id)
                     assert current is not None
                     assert current.status == "candidateQuestions"
-                    assert current.version == 9
+                    assert current.version == candidate_version + 2
 
                 candidate_questions = client.get(
                     "/api/interview",
@@ -358,18 +432,23 @@ def test_interview_candidate_question_and_review_success_workflow(
                     "candidateQuestions"
                 )
                 assert len(candidate_questions.json()["session"]["exchanges"]) == 1
+                second_question_version = candidate_questions.json()["session"][
+                    "version"
+                ]
 
                 provider.responses.append(_candidate_output())
                 second_question = client.post(
                     f"/api/interview/sessions/{session_id}/candidate-questions",
                     json={
-                        "version": 9,
+                        "version": second_question_version,
                         "content": "What does collaboration look like across the main partner teams?",
                     },
                     headers=_headers(),
                 )
                 assert second_question.status_code == 202
-                assert second_question.json()["session"]["version"] == 10
+                assert second_question.json()["session"]["version"] == (
+                    second_question_version + 1
+                )
                 await _process_worker(database, settings, provider)
 
                 async with database.sessionmaker() as session:
@@ -403,7 +482,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     current = await session.get(InterviewSession, session_id)
                     assert current is not None
                     assert current.status == "candidateQuestions"
-                    assert current.version == 11
+                    assert current.version == second_question_version + 2
 
                 candidate_questions = client.get(
                     "/api/interview",
@@ -424,15 +503,18 @@ def test_interview_candidate_question_and_review_success_workflow(
                 provider.responses.append(
                     _review_output([question.id for question in questions])
                 )
+                finish_page = client.get("/api/interview", headers=_headers())
+                assert finish_page.status_code == 200
+                finish_version = finish_page.json()["session"]["version"]
                 finish = client.post(
                     f"/api/interview/sessions/{session_id}/finish",
-                    json={"version": 11},
+                    json={"version": finish_version},
                     headers=_headers(),
                 )
                 assert finish.status_code == 202
                 assert finish.json()["session"]["status"] == "generatingReview"
                 assert finish.json()["session"]["generationStatus"] == "generating"
-                assert finish.json()["session"]["version"] == 12
+                assert finish.json()["session"]["version"] == finish_version + 1
 
                 await _process_worker(database, settings, provider)
 
@@ -468,7 +550,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     assert current is not None
                     assert current.status == "completed"
                     assert current.completion_reason == "formalQuestionsCompleted"
-                    assert current.version == 13
+                    assert current.version == finish_version + 2
 
                 completed = client.get("/api/interview", headers=_headers())
                 assert completed.status_code == 200
@@ -492,7 +574,7 @@ def test_interview_candidate_question_and_review_success_workflow(
 
                 immutable_finish = client.post(
                     f"/api/interview/sessions/{session_id}/finish",
-                    json={"version": 13},
+                    json={"version": completed_session["version"]},
                     headers=_headers(),
                 )
                 assert immutable_finish.status_code == 409
@@ -522,7 +604,9 @@ def test_interview_candidate_answer_failure_is_retryable_without_duplicate_run(
             owner, role, _profile = await seed_interview_prerequisites(
                 database,
                 label="candidate-retry",
+                summary="CANDIDATE_RETRY_PROFILE",
             )
+            await _prepare_profile_snapshot(database, _profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [
@@ -544,9 +628,18 @@ def test_interview_candidate_answer_failure_is_retryable_without_duplicate_run(
                     role.id,
                     provider,
                 )
+                candidate_state = client.get("/api/interview", headers=_headers())
+                assert candidate_state.status_code == 200
+                assert candidate_state.json()["session"]["status"] == (
+                    "candidateQuestions"
+                )
+                candidate_version = candidate_state.json()["session"]["version"]
                 submitted = client.post(
                     f"/api/interview/sessions/{session_id}/candidate-questions",
-                    json={"version": 7, "content": "What is the team topology?"},
+                    json={
+                        "version": candidate_version,
+                        "content": "What is the team topology?",
+                    },
                     headers=_headers(),
                 )
                 assert submitted.status_code == 202
@@ -611,7 +704,9 @@ def test_candidate_question_enqueue_rolls_back_question_and_session_mutation(
             owner, role, _profile = await seed_interview_prerequisites(
                 database,
                 label="candidate-rollback",
+                summary="CANDIDATE_ROLLBACK_PROFILE",
             )
+            await _prepare_profile_snapshot(database, _profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [
@@ -631,11 +726,20 @@ def test_candidate_question_enqueue_rolls_back_question_and_session_mutation(
                     role.id,
                     provider,
                 )
+                candidate_state = client.get("/api/interview", headers=_headers())
+                assert candidate_state.status_code == 200
+                assert candidate_state.json()["session"]["status"] == (
+                    "candidateQuestions"
+                )
+                candidate_version = candidate_state.json()["session"]["version"]
 
             with TestClient(_app_without_llm(migrated_database_url, owner)) as client:
                 failed = client.post(
                     f"/api/interview/sessions/{session_id}/candidate-questions",
-                    json={"version": 7, "content": "What is the team topology?"},
+                    json={
+                        "version": candidate_version,
+                        "content": "What is the team topology?",
+                    },
                     headers=_headers(),
                 )
                 assert failed.status_code == 503
@@ -665,7 +769,7 @@ def test_candidate_question_enqueue_rolls_back_question_and_session_mutation(
                 assert candidate_runs == []
                 assert current is not None
                 assert current.status == "candidateQuestions"
-                assert current.version == 7
+                assert current.version == candidate_version
 
     asyncio.run(run_workflow())
 
@@ -678,7 +782,9 @@ def test_interview_review_failure_is_retryable_and_old_run_is_retained(
             owner, role, _profile = await seed_interview_prerequisites(
                 database,
                 label="review-retry",
+                summary="REVIEW_RETRY_PROFILE",
             )
+            await _prepare_profile_snapshot(database, _profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [
@@ -700,23 +806,35 @@ def test_interview_review_failure_is_retryable_and_old_run_is_retained(
                     role.id,
                     provider,
                 )
+                candidate_state = client.get("/api/interview", headers=_headers())
+                assert candidate_state.status_code == 200
+                assert candidate_state.json()["session"]["status"] == (
+                    "candidateQuestions"
+                )
+                candidate_version = candidate_state.json()["session"]["version"]
                 submitted = client.post(
                     f"/api/interview/sessions/{session_id}/candidate-questions",
-                    json={"version": 7, "content": "How do teams collaborate?"},
+                    json={
+                        "version": candidate_version,
+                        "content": "How do teams collaborate?",
+                    },
                     headers=_headers(),
                 )
                 assert submitted.status_code == 202
                 await _process_worker(database, settings, provider)
                 candidate_page = client.get("/api/interview", headers=_headers())
-                assert candidate_page.json()["session"]["version"] == 9
+                assert candidate_page.json()["session"]["version"] == (
+                    candidate_version + 2
+                )
 
+                finish_version = candidate_page.json()["session"]["version"]
                 finish = client.post(
                     f"/api/interview/sessions/{session_id}/finish",
-                    json={"version": 9},
+                    json={"version": finish_version},
                     headers=_headers(),
                 )
                 assert finish.status_code == 202
-                assert finish.json()["session"]["version"] == 10
+                assert finish.json()["session"]["version"] == finish_version + 1
                 await _process_worker(database, settings, provider)
 
                 failed = client.get("/api/interview", headers=_headers())
@@ -867,7 +985,9 @@ def test_interview_end_from_question_records_unanswered_question_as_unavailable(
             owner, role, _profile = await seed_interview_prerequisites(
                 database,
                 label="question-end",
+                summary="QUESTION_END_PROFILE",
             )
+            await _prepare_profile_snapshot(database, _profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [_planner_output(2)],
@@ -879,6 +999,7 @@ def test_interview_end_from_question_records_unanswered_question_as_unavailable(
                 session_id, _opening, _generating = _start_and_begin(
                     client,
                     role.id,
+                    duration_minutes=15,
                 )
                 await _process_worker(database, settings, provider)
                 async with database.sessionmaker() as session:
@@ -925,7 +1046,9 @@ def test_interview_end_during_follow_up_keeps_answered_main_and_unanswered_follo
             owner, role, _profile = await seed_interview_prerequisites(
                 database,
                 label="follow-up-end",
+                summary="FOLLOW_UP_END_PROFILE",
             )
+            await _prepare_profile_snapshot(database, _profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [_planner_output(2), _turn_output("followUp")],
@@ -937,6 +1060,7 @@ def test_interview_end_during_follow_up_keeps_answered_main_and_unanswered_follo
                 session_id, _opening, _generating = _start_and_begin(
                     client,
                     role.id,
+                    duration_minutes=15,
                 )
                 await _process_worker(database, settings, provider)
                 async with database.sessionmaker() as session:

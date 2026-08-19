@@ -15,6 +15,7 @@ from tests.integration.test_interview_completion_workflow import (
     _headers,
     _planner_output,
     _partial_review_output,
+    _prepare_profile_snapshot,
     _process_worker,
     _reach_candidate_questions,
     _review_output,
@@ -34,10 +35,12 @@ def test_mock_interview_training_record_detail_is_a_read_only_projection(
 ) -> None:
     async def run_workflow() -> None:
         async with Database(migrated_database_url) as database:
-            owner, role, _profile = await seed_interview_prerequisites(
+            owner, role, profile = await seed_interview_prerequisites(
                 database,
                 label="training-record-complete",
+                summary="TRAINING_RECORD_COMPLETE_PROFILE",
             )
+            await _prepare_profile_snapshot(database, profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [
@@ -58,10 +61,16 @@ def test_mock_interview_training_record_detail_is_a_read_only_projection(
                     role.id,
                     provider,
                 )
+                candidate_state = client.get("/api/interview", headers=_headers())
+                assert candidate_state.status_code == 200
+                assert candidate_state.json()["session"]["status"] == (
+                    "candidateQuestions"
+                )
+                candidate_version = candidate_state.json()["session"]["version"]
                 candidate = client.post(
                     f"/api/interview/sessions/{session_id}/candidate-questions",
                     json={
-                        "version": 7,
+                        "version": candidate_version,
                         "content": "How does the team define success for this role?",
                     },
                     headers=_headers(),
@@ -80,9 +89,12 @@ def test_mock_interview_training_record_detail_is_a_read_only_projection(
                         ).all()
                     )
                 provider.responses.append(_review_output([item.id for item in questions]))
+                finish_page = client.get("/api/interview", headers=_headers())
+                assert finish_page.status_code == 200
+                finish_version = finish_page.json()["session"]["version"]
                 finish = client.post(
                     f"/api/interview/sessions/{session_id}/finish",
-                    json={"version": 9},
+                    json={"version": finish_version},
                     headers=_headers(),
                 )
                 assert finish.status_code == 202
@@ -156,10 +168,12 @@ def test_mock_interview_training_record_preserves_unanswered_question_on_early_e
 ) -> None:
     async def run_workflow() -> None:
         async with Database(migrated_database_url) as database:
-            owner, role, _profile = await seed_interview_prerequisites(
+            owner, role, profile = await seed_interview_prerequisites(
                 database,
                 label="training-record-ended-early",
+                summary="TRAINING_RECORD_EARLY_END_PROFILE",
             )
+            await _prepare_profile_snapshot(database, profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
                 [_planner_output(2)],
@@ -168,7 +182,11 @@ def test_mock_interview_training_record_preserves_unanswered_question_on_early_e
             app = _app(migrated_database_url, owner)
 
             with TestClient(app) as client:
-                session_id, _opening, _generating = _start_and_begin(client, role.id)
+                session_id, _opening, _generating = _start_and_begin(
+                    client,
+                    role.id,
+                    duration_minutes=15,
+                )
                 await _process_worker(database, settings, provider)
                 async with database.sessionmaker() as session:
                     question = await session.scalar(
@@ -211,19 +229,25 @@ def test_mock_interview_training_record_partial_projection_keeps_main_answer_and
 ) -> None:
     async def run_workflow() -> None:
         async with Database(migrated_database_url) as database:
-            owner, role, _profile = await seed_interview_prerequisites(
+            owner, role, profile = await seed_interview_prerequisites(
                 database,
                 label="training-record-partial",
+                summary="TRAINING_RECORD_PARTIAL_PROFILE",
             )
+            await _prepare_profile_snapshot(database, profile.profile_id)
             settings = _settings(migrated_database_url)
             provider = FakeLLMProvider(
-                [_planner_output(1), _turn_output("followUp")],
+                [_planner_output(2), _turn_output("followUp")],
                 provider="fake-training-record-partial-provider",
             )
             app = _app(migrated_database_url, owner)
 
             with TestClient(app) as client:
-                session_id, _opening, _generating = _start_and_begin(client, role.id)
+                session_id, _opening, _generating = _start_and_begin(
+                    client,
+                    role.id,
+                    duration_minutes=15,
+                )
                 await _process_worker(database, settings, provider)
                 async with database.sessionmaker() as session:
                     question = await session.scalar(
