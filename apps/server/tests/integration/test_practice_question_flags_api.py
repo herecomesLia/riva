@@ -5,24 +5,28 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from riva.agents import PracticeRecommendationAgent, PracticeReviewAgent
 from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
-from riva.integrations import LLMUsage
 from riva.models import PracticeAttempt, QuestionCard
+from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
+from tests.integration.test_practice_answer_workflow import (
+    build_evaluation_worker,
+    build_follow_up_worker,
+    evaluation_response,
+    seed_answering_session,
 )
 from tests.integration.test_practice_answer_api import start_answering
-from tests.integration.test_question_generation import database_url, seed_context
-from tests.integration.test_recommendation_generation import (
-    build_recommendation_worker,
-    enqueue_recommendation,
-    produce_review,
-    recommendation_response,
+from tests.integration.test_practice_review_workflow import (
+    build_worker,
+    complete_required_reference_answers,
+    recommendation_output,
+    review_output,
 )
+from tests.integration.test_question_generation import database_url, seed_context
 
 
 pytestmark = pytest.mark.integration
@@ -44,22 +48,87 @@ async def prepare_review_session(
     database: Database,
     url: str,
 ) -> tuple[object, UUID, UUID, object]:
-    owner, practice_session, attempt, _review_run = await produce_review(database)
-    await enqueue_recommendation(database, owner.id, attempt.id)
-    assert await build_recommendation_worker(
+    owner, practice_session, _attempt, card = await seed_answering_session(
+        database
+    )
+    async with database.sessionmaker() as session:
+        submitted = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).submit_primary_answer(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=2,
+            question_id=card.id,
+            content="I owned the rollout and reduced failures.",
+        )
+    assert submitted.session.version == 3
+    assert await build_follow_up_worker(
         database,
-        FakeLLMProvider(
-            [recommendation_response("retryCurrent")],
-            usage=LLMUsage(input_tokens=20, output_tokens=10),
+        FakeLLMProvider([{"action": "complete"}]),
+    ).process_one()
+    async with database.sessionmaker() as session:
+        evaluating = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).refresh_follow_up_generation(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=3,
+        )
+    assert evaluating.session.version == 4
+    assert await build_evaluation_worker(
+        database,
+        FakeLLMProvider([evaluation_response()]),
+    ).process_one()
+    async with database.sessionmaker() as session:
+        review_pending = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).refresh_evaluation_generation(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=4,
+        )
+    assert review_pending.attempt.status == "evaluating"
+    assert await build_worker(
+        database,
+        PracticeReviewAgent(
+            FakeLLMProvider([review_output()]),
+            model="fake-review-model",
         ),
     ).process_one()
-    await complete_queued_reference_answers(database)
-
-    question_id = attempt.question_card_id
-    assert question_id is not None
+    async with database.sessionmaker() as session:
+        recommendation_pending = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).refresh_evaluation_generation(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=4,
+        )
+    assert recommendation_pending.attempt.status == "evaluating"
+    assert await build_worker(
+        database,
+        PracticeRecommendationAgent(
+            FakeLLMProvider([recommendation_output("retryCurrent")]),
+            model="fake-recommendation-model",
+        ),
+    ).process_one()
+    async with database.sessionmaker() as session:
+        references_pending = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).refresh_evaluation_generation(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=4,
+        )
+    assert references_pending.attempt.status == "evaluating"
+    await complete_required_reference_answers(database)
     app = create_app(settings(url))
     app.dependency_overrides[require_current_user] = lambda: owner
-    return app, practice_session.id, question_id, owner
+    return app, practice_session.id, card.id, owner
 
 
 def test_practice_question_flags_persist_from_answering_over_http() -> None:
@@ -85,7 +154,7 @@ def test_practice_question_flags_persist_from_answering_over_http() -> None:
                         f"/api/practice/sessions/{session_id}/questions/saved",
                         json={
                             "version": answering["version"],
-                            "questionId": question_id,
+                            "questionId": str(question_id),
                             "isSaved": True,
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
@@ -99,7 +168,7 @@ def test_practice_question_flags_persist_from_answering_over_http() -> None:
                         f"/api/practice/sessions/{session_id}/questions/weak",
                         json={
                             "version": saved.json()["version"],
-                            "questionId": question_id,
+                            "questionId": str(question_id),
                             "isMarkedWeak": True,
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
@@ -166,7 +235,7 @@ def test_practice_question_flags_enter_review_summary_from_real_data() -> None:
                         f"/api/practice/sessions/{session_id}/questions/saved",
                         json={
                             "version": review_body["version"],
-                            "questionId": question_id,
+                            "questionId": str(question_id),
                             "isSaved": True,
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
@@ -176,7 +245,7 @@ def test_practice_question_flags_enter_review_summary_from_real_data() -> None:
                         f"/api/practice/sessions/{session_id}/questions/weak",
                         json={
                             "version": saved.json()["version"],
-                            "questionId": question_id,
+                            "questionId": str(question_id),
                             "isMarkedWeak": True,
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
@@ -223,12 +292,13 @@ def test_practice_question_flags_follow_retry_without_cloning_the_card() -> None
                 with TestClient(app) as client:
                     evaluating = client.get("/api/practice/sessions/current")
                     assert evaluating.status_code == 200
+                    assert evaluating.json()["session"]["status"] == "evaluating"
                     review = client.post(
                         f"/api/practice/sessions/{session_id}/evaluation/refresh",
                         json={"version": evaluating.json()["session"]["version"]},
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
-                    assert review.status_code == 200
+                    assert review.status_code == 200, review.json()
                     review_body = review.json()
 
                     async with database.sessionmaker() as session:
@@ -246,19 +316,19 @@ def test_practice_question_flags_follow_retry_without_cloning_the_card() -> None
                         f"/api/practice/sessions/{session_id}/questions/retry",
                         json={
                             "version": review_body["version"],
-                            "questionId": question_id,
+                            "questionId": str(question_id),
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
-                    assert retried.status_code == 200
+                    assert retried.status_code == 200, retried.json()
                     assert retried.json()["status"] == "answering"
-                    assert retried.json()["question"]["id"] == question_id
+                    assert retried.json()["question"]["id"] == str(question_id)
 
                     saved = client.patch(
                         f"/api/practice/sessions/{session_id}/questions/saved",
                         json={
                             "version": retried.json()["version"],
-                            "questionId": question_id,
+                            "questionId": str(question_id),
                             "isSaved": True,
                         },
                         headers={"Origin": TRUSTED_ORIGIN},

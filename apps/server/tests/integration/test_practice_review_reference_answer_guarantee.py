@@ -5,7 +5,6 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import (
-    PracticeEvaluationAgent,
     PracticeRecommendationAgent,
     PracticeReviewAgent,
 )
@@ -161,37 +160,34 @@ def test_review_reference_answers_are_guaranteed_without_user_requests() -> None
 
                 assert await build_evaluation_worker(
                     database,
-                    PracticeEvaluationAgent(
-                        FakeLLMProvider(
-                            [
-                                {
-                                    "overallScore": 82,
-                                    "dimensionScores": [
-                                        {
-                                            "dimension": dimension,
-                                            "score": 82,
-                                            "explanation": "Evidence is present.",
-                                        }
-                                        for dimension in (
-                                            "relevance",
-                                            "structure",
-                                            "specificity",
-                                            "communication",
-                                        )
-                                    ],
-                                    "focusAssessments": [
-                                        {
-                                            "focusIndex": 0,
-                                            "status": "demonstrated",
-                                            "explanation": "The answer provides evidence.",
-                                        }
-                                    ],
-                                }
-                            ],
-                            provider="guarantee-evaluation-provider",
-                            usage=LLMUsage(input_tokens=10, output_tokens=10),
-                        ),
-                        model="fake-evaluation-model",
+                    FakeLLMProvider(
+                        [
+                            {
+                                "overallScore": 82,
+                                "dimensionScores": [
+                                    {
+                                        "dimension": dimension,
+                                        "score": 82,
+                                        "explanation": "Evidence is present.",
+                                    }
+                                    for dimension in (
+                                        "relevance",
+                                        "structure",
+                                        "specificity",
+                                        "communication",
+                                    )
+                                ],
+                                "focusAssessments": [
+                                    {
+                                        "focusIndex": 0,
+                                        "status": "demonstrated",
+                                        "explanation": "The answer provides evidence.",
+                                    }
+                                ],
+                            }
+                        ],
+                        provider="guarantee-evaluation-provider",
+                        usage=LLMUsage(input_tokens=10, output_tokens=10),
                     ),
                 ).process_one()
                 async with database.sessionmaker() as session:

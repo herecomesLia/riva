@@ -139,7 +139,10 @@ def test_question_card_http_flow_with_real_worker() -> None:
                     replay = client.post(
                         "/api/question-cards/generations",
                         json=body,
-                        headers={"Origin": TRUSTED_ORIGIN},
+                        headers={
+                            "Origin": TRUSTED_ORIGIN,
+                            "Accept-Language": "en-US",
+                        },
                     )
                     assert replay.status_code == 202
                     assert replay.json()["runId"] == run_id

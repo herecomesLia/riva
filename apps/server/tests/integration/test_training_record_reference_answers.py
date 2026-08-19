@@ -28,9 +28,6 @@ from riva.models import (
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
-)
 from tests.integration.test_practice_next_question_workflow import (
     produce_first_review,
 )
@@ -39,6 +36,7 @@ from tests.integration.test_practice_reference_answer_workflow import (
 )
 from tests.integration.test_practice_review_workflow import (
     build_worker,
+    complete_required_reference_answers,
     evaluation_output,
     recommendation_output,
     review_output,
@@ -199,7 +197,7 @@ async def complete_follow_up_record(
         database,
         PracticeRecommendationAgent(
             FakeLLMProvider(
-                [recommendation_output("nextQuestion")],
+                [recommendation_output("retryCurrent")],
                 provider="training-record-recommendation-provider",
                 usage=LLMUsage(input_tokens=10, output_tokens=10),
             ),
@@ -219,7 +217,7 @@ async def complete_follow_up_record(
         assert queued.session.version == 6
         assert queued.attempt.status == "evaluating"
 
-    await complete_queued_reference_answers(database)
+    await complete_required_reference_answers(database)
     async with database.sessionmaker() as session:
         review = await PracticeSessionService(
             session,
@@ -267,7 +265,10 @@ def test_training_record_reference_answer_main_lifecycle() -> None:
                         expected_version=5,
                     )
                     assert completed.session.status == "completed"
-                    card = await session.get(QuestionCard, completed.attempt.question_card_id)
+                    card = await session.get(
+                        QuestionCard,
+                        completed.final_attempt.question_card_id,
+                    )
                     assert card is not None
                     original_source_run_id = card.source_agent_run_id
                     original_saved = card.is_saved
@@ -319,7 +320,7 @@ def test_training_record_reference_answer_main_lifecycle() -> None:
                 assert repeated.json()["referenceAnswer"]["status"] == "generating"
                 assert await reference_run_count(database, user_id=user_id) == 1
 
-                assert await complete_queued_reference_answers(database)
+                assert await complete_required_reference_answers(database)
                 with TestClient(app) as client:
                     refreshed = client.post(
                         f"/api/training-records/practice/{session_id}/reference-answer/refresh",
@@ -446,7 +447,7 @@ def test_training_record_reference_answer_follow_up_lifecycle() -> None:
                 assert requested.json()["referenceAnswer"]["status"] == "generating"
                 assert await reference_run_count(database, user_id=user_id) == 1
 
-                assert await complete_queued_reference_answers(database)
+                assert await complete_required_reference_answers(database)
                 with TestClient(app) as client:
                     refreshed = client.post(
                         f"/api/training-records/practice/{session_id}/reference-answer/refresh",

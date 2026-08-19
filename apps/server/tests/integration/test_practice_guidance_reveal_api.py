@@ -15,12 +15,9 @@ from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMUsage
-from riva.models import AgentRun, PracticeFollowUpQuestion, QuestionCard
+from riva.models import AgentRun, AgentRunStatus, PracticeFollowUpQuestion, QuestionCard
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
-)
 from tests.integration.test_practice_answer_workflow import seed_answering_session
 from tests.integration.test_practice_follow_up_answer_workflow import (
     follow_up_question_output,
@@ -31,8 +28,10 @@ from tests.integration.test_practice_follow_up_answer_workflow import (
 from tests.integration.test_practice_next_question_workflow import (
     build_worker,
     evaluation_output,
-    recommendation_output,
     review_output,
+)
+from tests.integration.test_practice_review_workflow import (
+    complete_required_reference_answers,
 )
 from tests.integration.test_question_generation import database_url
 
@@ -406,7 +405,7 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
 
                     await run_follow_up_worker(
                         database,
-                        follow_up_question_output(1),
+                        {"action": "complete"},
                     )
                     async with database.sessionmaker() as session:
                         follow_up_ready = await PracticeSessionService(
@@ -452,20 +451,22 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
                             model="fake-practice-model",
                         ),
                     ).process_one()
-                    assert await build_worker(
-                        database,
-                        PracticeRecommendationAgent(
-                            FakeLLMProvider(
-                                [recommendation_output()],
-                                provider="practice-guidance-recommendation-provider",
-                                usage=LLMUsage(input_tokens=20, output_tokens=10),
-                            ),
-                            model="fake-practice-model",
-                        ),
-                    ).process_one()
-                    await complete_queued_reference_answers(database)
                     async with database.sessionmaker() as session:
-                        review = await PracticeSessionService(
+                        review_runs = list(
+                            (
+                                await session.scalars(
+                                    select(AgentRun).where(
+                                        AgentRun.agent_id == "practice-reviewer"
+                                    )
+                                )
+                            ).all()
+                        )
+                        assert len(review_runs) == 1
+                        assert review_runs[0].status is AgentRunStatus.SUCCEEDED, (
+                            review_runs[0].error_code
+                        )
+                    async with database.sessionmaker() as session:
+                        recommendation_pending = await PracticeSessionService(
                             session,
                             llm_model="fake-practice-model",
                         ).refresh_evaluation_generation(
@@ -473,6 +474,51 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
                             session_id=practice_session.id,
                             expected_version=evaluation_ready.session.version,
                         )
+                    assert recommendation_pending.attempt.status == "evaluating"
+                    assert await build_worker(
+                        database,
+                        PracticeRecommendationAgent(
+                            FakeLLMProvider(
+                                [
+                                    {
+                                        "action": "retryCurrent",
+                                        "reason": "Repeat the current question to strengthen the evidence.",
+                                    }
+                                ],
+                                provider="practice-guidance-recommendation-provider",
+                                usage=LLMUsage(input_tokens=20, output_tokens=10),
+                            ),
+                            model="fake-practice-model",
+                        ),
+                    ).process_one()
+                    async with database.sessionmaker() as session:
+                        references_pending = await PracticeSessionService(
+                            session,
+                            llm_model="fake-practice-model",
+                        ).refresh_evaluation_generation(
+                            user_id=owner.id,
+                            session_id=practice_session.id,
+                            expected_version=evaluation_ready.session.version,
+                        )
+                    assert references_pending.attempt.status == "evaluating"
+                    assert references_pending.session.version == (
+                        evaluation_ready.session.version
+                    )
+                    review = None
+                    for _ in range(5):
+                        await complete_required_reference_answers(database)
+                        async with database.sessionmaker() as session:
+                            review = await PracticeSessionService(
+                                session,
+                                llm_model="fake-practice-model",
+                            ).refresh_evaluation_generation(
+                                user_id=owner.id,
+                                session_id=practice_session.id,
+                                expected_version=evaluation_ready.session.version,
+                            )
+                        if review.attempt.status == "review":
+                            break
+                    assert review is not None
                     assert review.attempt.status == "review"
 
                     retried = client.post(
@@ -483,7 +529,7 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
                         },
                         headers=headers,
                     )
-                    assert retried.status_code == 200
+                    assert retried.status_code == 200, retried.json()
                     retried_body = retried.json()
                     assert retried_body["status"] == "answering"
                     assert retried_body["version"] == review.session.version + 1

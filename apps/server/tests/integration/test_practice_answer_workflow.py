@@ -34,6 +34,7 @@ from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PracticeSessionService,
     PracticeSessionStateError,
+    practice_question_generation_idempotency_key,
     practice_follow_up_idempotency_key,
 )
 from riva.services.evaluation_generation import practice_evaluation_idempotency_key
@@ -57,11 +58,16 @@ pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
 
 
-def question_response(project_id: UUID) -> dict[str, object]:
+def question_response(
+    project_id: UUID,
+    *,
+    question_type: str = "behavioral",
+    difficulty: str = "basic",
+) -> dict[str, object]:
     return {
         "prompt": "Tell me how you improved reliability.",
-        "question_type": "behavioral",
-        "difficulty": "basic",
+        "question_type": question_type,
+        "difficulty": difficulty,
         "assessed_capabilities": ["Ownership"],
         "recommended_materials": [
             {
@@ -248,6 +254,12 @@ async def seed_answering_session(
             question_card_id=card.id,
             created_at=START,
             updated_at=START,
+        )
+        question_run = await session.get(AgentRun, question_run.id)
+        assert question_run is not None
+        question_run.idempotency_key = practice_question_generation_idempotency_key(
+            practice_session.id,
+            attempt.id,
         )
         session.add_all([practice_session, attempt])
         await session.commit()
@@ -748,7 +760,7 @@ def test_practice_follow_up_failed_refresh_does_not_change_session() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, _, card = (
+                owner, practice_session, attempt, card = (
                     await seed_answering_session(database)
                 )
                 _, _, run = await submit_answer(

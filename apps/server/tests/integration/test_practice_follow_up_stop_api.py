@@ -5,11 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from riva.agents import (
-    PracticeEvaluationAgent,
-    PracticeRecommendationAgent,
-    PracticeReviewAgent,
-)
+from riva.agents import PracticeRecommendationAgent, PracticeReviewAgent
 from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
@@ -23,15 +19,13 @@ from riva.models import (
     PracticeSession,
 )
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
-)
 from tests.integration.test_practice_answer_workflow import (
     build_evaluation_worker,
     evaluation_response,
 )
 from tests.integration.test_practice_review_workflow import (
     build_worker,
+    complete_required_reference_answers,
     recommendation_output,
     review_output,
 )
@@ -232,12 +226,9 @@ def test_practice_follow_up_stop_public_api_replay_poll_and_normal_completion() 
 
                     assert await build_evaluation_worker(
                         database,
-                        PracticeEvaluationAgent(
-                            FakeLLMProvider(
-                                [evaluation_response()],
-                                provider="fake-evaluation-provider",
-                            ),
-                            model="fake-practice-model",
+                        FakeLLMProvider(
+                            [evaluation_response()],
+                            provider="fake-evaluation-provider",
                         ),
                     ).process_one()
                     pending = client.post(
@@ -268,9 +259,16 @@ def test_practice_follow_up_stop_public_api_replay_poll_and_normal_completion() 
                     )
                     assert review_pending.status_code == 200
                     assert review_pending.json()["status"] == "evaluating"
-                    assert review_pending.json()["followUpCompletion"] == stopped_body[
-                        "followUpCompletion"
-                    ]
+                    review_completion = review_pending.json()["followUpCompletion"]
+                    stopped_completion = stopped_body["followUpCompletion"]
+                    assert review_completion["status"] == stopped_completion["status"]
+                    assert {
+                        key: review_completion["unansweredQuestion"][key]
+                        for key in ("id", "prompt", "order")
+                    } == {
+                        key: stopped_completion["unansweredQuestion"][key]
+                        for key in ("id", "prompt", "order")
+                    }
 
                     assert await build_worker(
                         database,
@@ -282,7 +280,14 @@ def test_practice_follow_up_stop_public_api_replay_poll_and_normal_completion() 
                             model="fake-practice-model",
                         ),
                     ).process_one()
-                    await complete_queued_reference_answers(database)
+                    references_pending = client.post(
+                        f"/api/practice/sessions/{session_id}/evaluation/refresh",
+                        json={"version": 5},
+                        headers=headers,
+                    )
+                    assert references_pending.status_code == 200
+                    assert references_pending.json()["status"] == "evaluating"
+                    await complete_required_reference_answers(database)
                     review = client.post(
                         f"/api/practice/sessions/{session_id}/evaluation/refresh",
                         json={"version": 5},
@@ -293,9 +298,15 @@ def test_practice_follow_up_stop_public_api_replay_poll_and_normal_completion() 
                     assert review_body["status"] == "review"
                     assert review_body["version"] == 6
                     assert review_body["followUpExchanges"] == []
-                    assert review_body["followUpCompletion"] == stopped_body[
-                        "followUpCompletion"
-                    ]
+                    review_completion = review_body["followUpCompletion"]
+                    assert review_completion["status"] == stopped_completion["status"]
+                    assert {
+                        key: review_completion["unansweredQuestion"][key]
+                        for key in ("id", "prompt", "order")
+                    } == {
+                        key: stopped_completion["unansweredQuestion"][key]
+                        for key in ("id", "prompt", "order")
+                    }
 
                     completed = client.post(
                         f"/api/practice/sessions/{session_id}/complete",

@@ -122,7 +122,7 @@ async def start_http_answering(
     assert await build_question_worker(
         database,
         FakeLLMProvider(
-            [question_response(project_id)],
+            [question_response(project_id, question_type="projectDeepDive")],
             provider="fake-question-provider",
             usage=LLMUsage(input_tokens=20, output_tokens=10),
         ),
@@ -342,17 +342,37 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     )
                     session_id = answering["sessionId"]
                     question_id = answering["question"]["id"]
+                    main_requested = client.post(
+                        f"/api/practice/sessions/{session_id}/questions/reference-answer",
+                        json={"version": 2, "questionId": question_id},
+                        headers={"Origin": TRUSTED_ORIGIN},
+                    )
+                    assert main_requested.status_code == 202
+                    assert main_requested.json()["version"] == 3
+                    assert await build_reference_worker(
+                        database,
+                        FakeLLMProvider([main_reference_response()]),
+                    ).process_one()
+                    main_revealed = client.post(
+                        f"/api/practice/sessions/{session_id}/questions/reference-answer/refresh",
+                        json={"version": 3, "questionId": question_id},
+                        headers={"Origin": TRUSTED_ORIGIN},
+                    )
+                    assert main_revealed.status_code == 200
+                    assert main_revealed.json()["question"]["referenceAnswer"][
+                        "status"
+                    ] == "revealed"
                     main_submitted = client.post(
                         f"/api/practice/sessions/{session_id}/answers/main",
                         json={
-                            "version": 2,
+                            "version": 3,
                             "questionId": question_id,
                             "content": "I owned the rollout and measured the result.",
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
                     assert main_submitted.status_code == 202
-                    assert main_submitted.json()["version"] == 3
+                    assert main_submitted.json()["version"] == 4
 
                     assert await build_follow_up_worker(
                         database,
@@ -363,13 +383,13 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     ).process_one()
                     q1_ready = client.post(
                         f"/api/practice/sessions/{session_id}/follow-up-generation/refresh",
-                        json={"version": 3},
+                        json={"version": 4},
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
                     assert q1_ready.status_code == 200
                     q1_ready_body = q1_ready.json()
                     assert q1_ready_body["status"] == "answeringFollowUp"
-                    assert q1_ready_body["version"] == 4
+                    assert q1_ready_body["version"] == 5
                     q1_id = q1_ready_body["currentFollowUp"]["question"]["id"]
                     assert q1_ready_body["currentFollowUp"]["question"][
                         "referenceAnswer"
@@ -378,14 +398,14 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     q1_requested = client.post(
                         f"/api/practice/sessions/{session_id}/follow-ups/reference-answer",
                         json={
-                            "version": 4,
+                            "version": 5,
                             "questionId": question_id,
                             "followUpQuestionId": q1_id,
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
-                    assert q1_requested.status_code == 202
-                    assert q1_requested.json()["version"] == 5
+                    assert q1_requested.status_code == 202, q1_requested.json()
+                    assert q1_requested.json()["version"] == 6
                     assert q1_requested.json()["currentFollowUp"]["question"][
                         "referenceAnswer"
                     ]["status"] == "generating"
@@ -400,7 +420,7 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     q1_revealed = client.post(
                         f"/api/practice/sessions/{session_id}/follow-ups/reference-answer/refresh",
                         json={
-                            "version": 5,
+                            "version": 6,
                             "questionId": question_id,
                             "followUpQuestionId": q1_id,
                         },
@@ -419,7 +439,7 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     q1_answered = client.post(
                         f"/api/practice/sessions/{session_id}/answers/follow-up",
                         json={
-                            "version": 5,
+                            "version": 6,
                             "questionId": question_id,
                             "followUpQuestionId": q1_id,
                             "content": "I measured the result against the baseline.",
@@ -427,7 +447,7 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
                     assert q1_answered.status_code == 202
-                    assert q1_answered.json()["version"] == 6
+                    assert q1_answered.json()["version"] == 7
                     assert q1_answered.json()["followUpExchanges"][0]["question"][
                         "referenceAnswer"
                     ]["status"] == "revealed"
@@ -441,12 +461,12 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     ).process_one()
                     q2_ready = client.post(
                         f"/api/practice/sessions/{session_id}/follow-up-generation/refresh",
-                        json={"version": 6},
+                        json={"version": 7},
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
                     assert q2_ready.status_code == 200
                     q2_body = q2_ready.json()
-                    assert q2_body["version"] == 7
+                    assert q2_body["version"] == 8
                     q2_id = q2_body["currentFollowUp"]["question"]["id"]
                     assert q2_id != q1_id
                     assert q2_body["followUpExchanges"][0]["question"][

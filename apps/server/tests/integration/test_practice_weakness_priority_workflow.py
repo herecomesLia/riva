@@ -14,6 +14,7 @@ from riva.db.database import Database
 from riva.models import (
     AgentRun,
     PracticeAttempt,
+    PracticeRecommendation,
     PracticeReview,
     PracticeSession,
     QuestionCard,
@@ -158,14 +159,10 @@ def test_personalized_priority_snapshots_focus_and_runs_v2_worker() -> None:
                         reviewed_attempt_id
                     )
 
-                assert len(
-                    question_runs_before
-                ) + 1 == len(
-                    (
-                        await session_count_question_runs(
-                            database,
-                            owner_id,
-                        )
+                assert len(question_runs_before) + 1 == (
+                    await session_count_question_runs(
+                        database,
+                        owner_id,
                     )
                 )
 
@@ -235,6 +232,13 @@ async def prepare_completed_reviewed_card(
         )
         assert previous_review is not None
         previous_review.exposed_weaknesses = ["Previous weakness"]
+        previous_recommendation = await session.scalar(
+            select(PracticeRecommendation).where(
+                PracticeRecommendation.attempt_id == reviewed_attempt_id
+            )
+        )
+        assert previous_recommendation is not None
+        previous_recommendation.focus_areas = ["Previous weakness"]
         completed = await PracticeSessionService(
             session,
             llm_model="fake-practice-model",

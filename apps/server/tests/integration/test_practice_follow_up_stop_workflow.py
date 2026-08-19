@@ -4,11 +4,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
-from riva.agents import (
-    PracticeEvaluationAgent,
-    PracticeRecommendationAgent,
-    PracticeReviewAgent,
-)
+from riva.agents import PracticeRecommendationAgent, PracticeReviewAgent
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -35,9 +31,6 @@ from riva.services.practice_sessions import (
     PracticeSessionService,
 )
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
-)
 from tests.integration.test_practice_answer_workflow import (
     build_evaluation_worker,
     build_follow_up_worker,
@@ -47,6 +40,7 @@ from tests.integration.test_practice_answer_workflow import (
 )
 from tests.integration.test_practice_review_workflow import (
     build_worker,
+    complete_required_reference_answers,
     recommendation_output,
     review_output,
 )
@@ -180,10 +174,7 @@ async def finish_evaluation_pipeline(
 ) -> PracticeReviewWorkflowContext:
     assert await build_evaluation_worker(
         database,
-        PracticeEvaluationAgent(
-            FakeLLMProvider([evaluation_response()]),
-            model="fake-evaluation-model",
-        ),
+        FakeLLMProvider([evaluation_response()]),
     ).process_one()
     async with database.sessionmaker() as session:
         evaluation_refresh = await PracticeSessionService(
@@ -221,7 +212,18 @@ async def finish_evaluation_pipeline(
             model="fake-recommendation-model",
         ),
     ).process_one()
-    await complete_queued_reference_answers(database)
+    async with database.sessionmaker() as session:
+        references_pending = await PracticeSessionService(
+            session,
+            llm_model="fake-evaluation-model",
+        ).refresh_evaluation_generation(
+            user_id=owner_id,
+            session_id=session_id,
+            expected_version=5,
+        )
+    assert references_pending.attempt.status == "evaluating"
+    assert references_pending.session.version == 5
+    await complete_required_reference_answers(database)
     async with database.sessionmaker() as session:
         final = await PracticeSessionService(
             session,

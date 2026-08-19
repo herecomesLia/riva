@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import (
-    PracticeEvaluationAgent,
     PracticeRecommendationAgent,
     PracticeReviewAgent,
 )
@@ -31,9 +30,6 @@ from riva.services.practice_sessions import (
     PracticeSessionStateError,
 )
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
-)
 from tests.integration.test_practice_answer_workflow import (
     build_evaluation_worker,
     build_follow_up_worker,
@@ -44,6 +40,7 @@ from tests.integration.test_practice_answer_workflow import (
 )
 from tests.integration.test_practice_review_workflow import (
     build_worker,
+    complete_required_reference_answers,
     evaluation_output,
     recommendation_output,
     review_output,
@@ -112,6 +109,7 @@ async def follow_up_refresh(
     async with database.sessionmaker() as session:
         return await PracticeSessionService(
             session,
+            llm_model="fake-practice-model",
             clock=lambda: START,
         ).refresh_follow_up_generation(
             user_id=user_id,
@@ -131,6 +129,7 @@ async def submit_follow_up(
     content: str,
     **service_kwargs: object,
 ):
+    service_kwargs.setdefault("llm_model", "fake-follow-up-model")
     async with database.sessionmaker() as session:
         return await PracticeSessionService(
             session,
@@ -295,25 +294,28 @@ def test_practice_follow_up_one_exchange_reaches_real_evaluation_review_recommen
                 assert evaluation_payload.follow_up_question_2_id is None
                 assert evaluation_payload.follow_up_answer_2_id is None
 
+                evaluation_provider = FakeLLMProvider([evaluation_response()])
                 assert await build_evaluation_worker(
                     database,
-                    PracticeEvaluationAgent(
-                        FakeLLMProvider([evaluation_response()]),
-                        model="fake-evaluation-model",
-                    ),
+                    evaluation_provider,
                 ).process_one()
                 async with database.sessionmaker() as session:
+                    stored_run = await session.get(AgentRun, evaluation_run.id)
                     evaluation = await session.scalar(
                         select(AgentRun).where(
                             AgentRun.id == evaluation_run.id,
                             AgentRun.status == AgentRunStatus.SUCCEEDED,
                         )
                     )
-                    assert evaluation is not None
+                    assert evaluation is not None, (
+                        stored_run.error_code if stored_run is not None else None,
+                        len(evaluation_provider.calls),
+                    )
 
                 async with database.sessionmaker() as session:
                     review_started = await PracticeSessionService(
                         session,
+                        llm_model="fake-practice-model",
                         clock=lambda: START,
                     ).refresh_evaluation_generation(
                         user_id=owner.id,
@@ -335,6 +337,7 @@ def test_practice_follow_up_one_exchange_reaches_real_evaluation_review_recommen
                 async with database.sessionmaker() as session:
                     recommendation_started = await PracticeSessionService(
                         session,
+                        llm_model="fake-practice-model",
                         clock=lambda: START,
                     ).refresh_evaluation_generation(
                         user_id=owner.id,
@@ -349,11 +352,24 @@ def test_practice_follow_up_one_exchange_reaches_real_evaluation_review_recommen
                         model="fake-recommendation-model",
                     ),
                 ).process_one()
-                await complete_queued_reference_answers(database)
+                async with database.sessionmaker() as session:
+                    references_pending = await PracticeSessionService(
+                        session,
+                        llm_model="fake-practice-model",
+                        clock=lambda: START,
+                    ).refresh_evaluation_generation(
+                        user_id=owner.id,
+                        session_id=session_id,
+                        expected_version=6,
+                    )
+                assert references_pending.attempt.status == "evaluating"
+                assert references_pending.session.version == 6
+                await complete_required_reference_answers(database)
 
                 async with database.sessionmaker() as session:
                     final = await PracticeSessionService(
                         session,
+                        llm_model="fake-practice-model",
                         clock=lambda: START,
                     ).refresh_evaluation_generation(
                         user_id=owner.id,
@@ -375,7 +391,6 @@ def test_practice_follow_up_one_exchange_reaches_real_evaluation_review_recommen
 
 def test_practice_follow_up_two_exchanges_freezes_q1_a1_q2_a2_without_order3() -> None:
     async def run_test() -> None:
-        from riva.agents import PracticeEvaluationAgent
         from riva.db.database import Database
 
         async with Database(database_url()) as database:
@@ -444,21 +459,17 @@ def test_practice_follow_up_two_exchanges_freezes_q1_a1_q2_a2_without_order3() -
                 assert payload.follow_up_question_2_id == graph["questions"][1].id  # type: ignore[union-attr]
                 assert payload.follow_up_answer_2_id == graph["answers"][2].id  # type: ignore[union-attr]
 
+                evaluation_provider = FakeLLMProvider([evaluation_response()])
                 assert await build_evaluation_worker(
                     database,
-                    PracticeEvaluationAgent(
-                        FakeLLMProvider([evaluation_response()]),
-                        model="fake-evaluation-model",
-                    ),
+                    evaluation_provider,
                 ).process_one()
                 async with database.sessionmaker() as session:
-                    stored = await session.scalar(
-                        select(AgentRun).where(
-                            AgentRun.id == evaluation_run.id,
-                            AgentRun.status == AgentRunStatus.SUCCEEDED,
-                        )
-                    )
+                    stored = await session.get(AgentRun, evaluation_run.id)
                     assert stored is not None
+                    assert stored.status is AgentRunStatus.SUCCEEDED, (
+                        stored.error_code
+                    )
             finally:
                 await database.reset()
 

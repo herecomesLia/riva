@@ -34,9 +34,6 @@ from riva.services.follow_up_generation import practice_follow_up_idempotency_ke
 from riva.services.practice_api import PracticeAPIService
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
-)
 from tests.integration.test_practice_answer_api import (
     TRUSTED_ORIGIN,
     ask_output,
@@ -47,6 +44,7 @@ from tests.integration.test_practice_answer_api import (
 )
 from tests.integration.test_practice_review_workflow import (
     build_worker as build_review_worker,
+    complete_required_reference_answers,
     recommendation_output,
     review_output,
 )
@@ -215,7 +213,14 @@ async def complete_downstream_pipeline(
             model="fake-practice-model",
         ),
     ).process_one()
-    await complete_queued_reference_answers(database)
+    references_pending = client.post(
+        f"/api/practice/sessions/{session_id}/evaluation/refresh",
+        json={"version": evaluation_version},
+        headers=headers(),
+    )
+    assert references_pending.status_code == 200
+    assert references_pending.json()["status"] == "evaluating"
+    await complete_required_reference_answers(database)
     final = client.post(
         f"/api/practice/sessions/{session_id}/evaluation/refresh",
         json={"version": evaluation_version},
@@ -399,10 +404,33 @@ def test_follow_up_answer_api_two_exchanges_replays_a2_without_order3() -> None:
                     assert await build_answer_worker(
                         database,
                         agent=FollowUpAgent(
-                            FakeLLMProvider([ask_output()], provider="fake-follow-up-provider"),
+                            FakeLLMProvider(
+                                [
+                                    {
+                                        **ask_output(),
+                                        "prompt": "What result stayed reliable after the improvement?",
+                                    }
+                                ],
+                                provider="fake-follow-up-provider",
+                            ),
                             model="fake-practice-model",
                         ),
                     ).process_one()
+                    async with database.sessionmaker() as session:
+                        follow_up_runs = list(
+                            (
+                                await session.scalars(
+                                    select(AgentRun)
+                                    .where(AgentRun.agent_id == "follow-up-generator")
+                                    .order_by(AgentRun.created_at)
+                                )
+                            ).all()
+                        )
+                        assert len(follow_up_runs) == 2
+                        follow_up_run = follow_up_runs[-1]
+                        assert follow_up_run.status is AgentRunStatus.SUCCEEDED, (
+                            follow_up_run.error_code
+                        )
                     q2_response = client.post(
                         f"/api/practice/sessions/{session_id}/follow-up-generation/refresh",
                         json={"version": 5},

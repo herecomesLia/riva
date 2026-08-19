@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import func, select
 
 from riva.agents import (
-    PracticeEvaluationAgent,
     PracticeRecommendationAgent,
     PracticeReferenceAnswerAgent,
     PracticeReviewAgent,
@@ -580,6 +579,7 @@ def test_practice_reference_answer_follow_up_request_refresh_and_q2_not_requeste
                 async with database.sessionmaker() as session:
                     q1_answer_context = await PracticeSessionService(
                         session,
+                        llm_model="fake-follow-up-model",
                         clock=lambda: datetime.now(UTC) + timedelta(days=1),
                     ).submit_follow_up_answer(
                         user_id=owner.id,
@@ -711,6 +711,7 @@ def test_practice_reference_answer_follow_up_worker_after_progress_uses_enqueued
                 async with database.sessionmaker() as session:
                     submitted = await PracticeSessionService(
                         session,
+                        llm_model="fake-follow-up-model",
                         clock=lambda: datetime.now(UTC) - timedelta(days=1),
                     ).submit_follow_up_answer(
                         user_id=owner.id,
@@ -804,6 +805,7 @@ def test_practice_reference_answer_retry_reuses_main_run_and_artifact() -> None:
                 async with database.sessionmaker() as session:
                     evaluating = await PracticeSessionService(
                         session,
+                        llm_model="fake-evaluation-model",
                         clock=lambda: START,
                     ).refresh_follow_up_generation(
                         user_id=owner.id,
@@ -813,14 +815,12 @@ def test_practice_reference_answer_retry_reuses_main_run_and_artifact() -> None:
                 assert evaluating.session.version == 5
                 assert await build_evaluation_worker(
                     database,
-                    PracticeEvaluationAgent(
-                        FakeLLMProvider([evaluation_response()]),
-                        model="fake-evaluation-model",
-                    ),
+                    FakeLLMProvider([evaluation_response()]),
                 ).process_one()
                 async with database.sessionmaker() as session:
                     await PracticeSessionService(
                         session,
+                        llm_model="fake-review-model",
                         clock=lambda: START,
                     ).refresh_evaluation_generation(
                         user_id=owner.id,
@@ -837,6 +837,7 @@ def test_practice_reference_answer_retry_reuses_main_run_and_artifact() -> None:
                 async with database.sessionmaker() as session:
                     await PracticeSessionService(
                         session,
+                        llm_model="fake-recommendation-model",
                         clock=lambda: START,
                     ).refresh_evaluation_generation(
                         user_id=owner.id,
@@ -853,6 +854,7 @@ def test_practice_reference_answer_retry_reuses_main_run_and_artifact() -> None:
                 async with database.sessionmaker() as session:
                     review = await PracticeSessionService(
                         session,
+                        llm_model="fake-practice-model",
                         clock=lambda: START,
                     ).refresh_evaluation_generation(
                         user_id=owner.id,

@@ -50,14 +50,34 @@ from tests.helpers.llm import FakeLLMProvider
 from tests.helpers.practice_reference_answers import (
     complete_queued_reference_answers,
 )
+from tests.integration.test_practice_answer_workflow import (
+    build_evaluation_worker,
+    build_follow_up_worker,
+    evaluation_response,
+    seed_answering_session,
+)
 from tests.integration.test_question_generation import database_url, seed_context
-from tests.integration.test_recommendation_generation import produce_review
-from tests.integration.test_review_generation import produce_evaluation
 
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 START = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
+
+
+async def complete_required_reference_answers(
+    database: Database,
+    *,
+    max_rounds: int = 5,
+) -> list[AgentRun]:
+    completed: list[AgentRun] = []
+    for _ in range(max_rounds):
+        runs = await complete_queued_reference_answers(database)
+        completed.extend(runs)
+        if not runs:
+            return completed
+    raise AssertionError(
+        "reference-answer generation did not settle within the test limit"
+    )
 
 
 class SilentLogger:
@@ -74,6 +94,67 @@ class FailingEnqueueService:
         **kwargs: object,
     ) -> AgentRun:
         raise ValueError("missing downstream model")
+
+
+async def prepare_evaluation_ready_attempt(
+    database: Database,
+) -> tuple[object, PracticeSession, PracticeAttempt]:
+    owner, practice_session, attempt, card = await seed_answering_session(database)
+    async with database.sessionmaker() as session:
+        submitted = await PracticeSessionService(
+            session,
+            llm_model="fake-follow-up-model",
+        ).submit_primary_answer(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=2,
+            question_id=card.id,
+            content="I owned the rollout and reduced failures.",
+        )
+    assert submitted.session.version == 3
+    assert await build_follow_up_worker(
+        database,
+        FakeLLMProvider([{"action": "complete"}]),
+    ).process_one()
+    async with database.sessionmaker() as session:
+        evaluating = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).refresh_follow_up_generation(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=3,
+        )
+    assert evaluating.session.version == 4
+    assert await build_evaluation_worker(
+        database,
+        FakeLLMProvider([evaluation_response()]),
+    ).process_one()
+    return owner, practice_session, attempt
+
+
+async def prepare_review_ready_attempt(
+    database: Database,
+) -> tuple[object, PracticeSession, PracticeAttempt]:
+    owner, practice_session, attempt = await prepare_evaluation_ready_attempt(database)
+    async with database.sessionmaker() as session:
+        review_pending = await PracticeSessionService(
+            session,
+            llm_model="fake-practice-model",
+        ).refresh_evaluation_generation(
+            user_id=owner.id,
+            session_id=practice_session.id,
+            expected_version=4,
+        )
+    assert review_pending.attempt.status == "evaluating"
+    assert await build_worker(
+        database,
+        PracticeReviewAgent(
+            FakeLLMProvider([review_output()]),
+            model="fake-review-model",
+        ),
+    ).process_one()
+    return owner, practice_session, attempt
 
 
 def settings(url: str) -> Settings:
@@ -558,7 +639,14 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                             model="fake-practice-model",
                         ),
                     ).process_one()
-                    await complete_queued_reference_answers(database)
+                    references_pending = client.post(
+                        f"/api/practice/sessions/{session_id}/evaluation/refresh",
+                        json={"version": 4},
+                        headers={"Origin": TRUSTED_ORIGIN},
+                    )
+                    assert references_pending.status_code == 200
+                    assert references_pending.json()["status"] == "evaluating"
+                    await complete_required_reference_answers(database)
                     async with database.sessionmaker() as session:
                         stored_recommendation = await session.scalar(
                             select(PracticeRecommendation).where(
@@ -834,12 +922,7 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                             QuestionCard,
                             UUID(next_answering_body["question"]["id"]),
                         )
-                        question_runs = await runs_for(
-                            database,
-                            user_id=owner.id,
-                            agent_id="question-generator",
-                            attempt_id=next_attempt_id,
-                        )
+                        question_run = await session.get(AgentRun, next_run_id)
                         assert old_attempt is not None
                         assert next_attempt is not None
                         assert next_card is not None
@@ -848,7 +931,9 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                         assert next_attempt.question_card_id == next_card.id
                         assert next_attempt.question_generation_run_id == next_run_id
                         assert old_attempt.question_card_id != next_card.id
-                        assert len(question_runs) == 1
+                        assert question_run is not None
+                        assert question_run.agent_id == "question-generator"
+                        assert question_run.status is AgentRunStatus.SUCCEEDED
             finally:
                 await database.reset()
 
@@ -861,18 +946,9 @@ def test_review_enqueue_failure_rolls_back_real_db_without_losing_evaluation() -
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt = await produce_evaluation(
-                    database,
-                    "none",
+                owner, practice_session, attempt = (
+                    await prepare_evaluation_ready_attempt(database)
                 )
-                async with database.sessionmaker() as session:
-                    stored_session = await session.get(
-                        PracticeSession,
-                        practice_session.id,
-                    )
-                    assert stored_session is not None
-                    stored_session.version = 4
-                    await session.commit()
 
                 async with database.sessionmaker() as session:
                     with pytest.raises(PracticeSessionStateError) as error:
@@ -932,17 +1008,9 @@ def test_recommendation_enqueue_failure_rolls_back_real_db_with_prior_artifacts(
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, _review_run = await produce_review(
-                    database
+                owner, practice_session, attempt = (
+                    await prepare_review_ready_attempt(database)
                 )
-                async with database.sessionmaker() as session:
-                    stored_session = await session.get(
-                        PracticeSession,
-                        practice_session.id,
-                    )
-                    assert stored_session is not None
-                    stored_session.version = 4
-                    await session.commit()
 
                 async with database.sessionmaker() as session:
                     with pytest.raises(PracticeSessionStateError) as error:
