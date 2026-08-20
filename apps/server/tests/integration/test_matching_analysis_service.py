@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
 
 from riva.db.database import Database
 from riva.models import (
@@ -41,6 +42,7 @@ from riva.services.matching_analyses import (
     MatchingAnalysisService,
     MatchingAnalysisStateError,
 )
+from riva.services.profile_completion import career_profile_completed
 
 
 pytestmark = pytest.mark.integration
@@ -395,16 +397,6 @@ RESOURCE_ERROR_CASES = [
         id="profile-other-user",
     ),
     pytest.param(
-        "profile_without_skills",
-        MATCHING_PROFILE_INCOMPLETE,
-        id="profile-without-skills",
-    ),
-    pytest.param(
-        "profile_only_skills",
-        MATCHING_PROFILE_INCOMPLETE,
-        id="profile-only-skills",
-    ),
-    pytest.param(
         "profile_version_stale",
         MATCHING_PROFILE_VERSION_STALE,
         id="profile-version-stale",
@@ -482,30 +474,6 @@ async def apply_resource_mutation(
         )
         session.add_all([other, other_profile])  # type: ignore[attr-defined]
         graph.matching_run.payload["profileId"] = str(other_profile.profile_id)
-    elif case == "profile_without_skills":
-        await session.execute(  # type: ignore[attr-defined]
-            delete(CareerProfileSkill).where(
-                CareerProfileSkill.career_profile_id == graph.profile.profile_id
-            )
-        )
-    elif case == "profile_only_skills":
-        await session.execute(  # type: ignore[attr-defined]
-            delete(CareerProfileEducation).where(
-                CareerProfileEducation.career_profile_id == graph.profile.profile_id
-            )
-        )
-        await session.execute(  # type: ignore[attr-defined]
-            delete(CareerProfileWorkExperience).where(
-                CareerProfileWorkExperience.career_profile_id
-                == graph.profile.profile_id
-            )
-        )
-        await session.execute(  # type: ignore[attr-defined]
-            delete(CareerProfileProjectExperience).where(
-                CareerProfileProjectExperience.career_profile_id
-                == graph.profile.profile_id
-            )
-        )
     elif case == "profile_version_stale":
         stored_profile = await session.get(  # type: ignore[attr-defined]
             CareerProfile,
@@ -600,11 +568,6 @@ INVALID_STRUCTURE_CASES = [
         id="invalid-date-relation",
     ),
     pytest.param(
-        "blank_skill_name",
-        MATCHING_PROFILE_INCOMPLETE,
-        id="blank-skill-name",
-    ),
-    pytest.param(
         "analysis_missing_category",
         MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY,
         id="analysis-missing-category",
@@ -644,14 +607,6 @@ async def apply_invalid_structure_mutation(
             work.start_date = "2024-12"
             work.end_date = "2024-01"
             work.is_current = False
-    elif case == "blank_skill_name":
-        skill = await session.scalar(  # type: ignore[attr-defined]
-            select(CareerProfileSkill)
-            .where(CareerProfileSkill.career_profile_id == graph.profile.profile_id)
-            .order_by(CareerProfileSkill.position.asc())
-        )
-        assert skill is not None
-        skill.name = "   "
     elif case == "analysis_missing_category":
         analysis = await session.get(  # type: ignore[attr-defined]
             JobDescriptionAnalysis,
@@ -705,6 +660,195 @@ def test_matching_service_invalid_database_structure_is_safe(
                 role = await session.get(TargetRole, graph.role.id)
                 assert role is not None
                 assert role.version == 10
+
+    asyncio.run(run())
+
+
+MINIMAL_PROFILE_CASES = [
+    pytest.param("skills_only", id="skills-only"),
+    pytest.param("work_only", id="work-only"),
+    pytest.param("project_only", id="project-only"),
+]
+
+
+async def apply_minimal_profile_mutation(
+    session: object,
+    graph: Graph,
+    case: str,
+) -> None:
+    await session.execute(  # type: ignore[attr-defined]
+        delete(CareerProfileEducation).where(
+            CareerProfileEducation.career_profile_id == graph.profile.profile_id
+        )
+    )
+    if case == "skills_only":
+        await session.execute(  # type: ignore[attr-defined]
+            delete(CareerProfileWorkExperience).where(
+                CareerProfileWorkExperience.career_profile_id
+                == graph.profile.profile_id
+            )
+        )
+        await session.execute(  # type: ignore[attr-defined]
+            delete(CareerProfileProjectExperience).where(
+                CareerProfileProjectExperience.career_profile_id
+                == graph.profile.profile_id
+            )
+        )
+    elif case == "work_only":
+        await session.execute(  # type: ignore[attr-defined]
+            delete(CareerProfileProjectExperience).where(
+                CareerProfileProjectExperience.career_profile_id
+                == graph.profile.profile_id
+            )
+        )
+        await session.execute(  # type: ignore[attr-defined]
+            delete(CareerProfileSkill).where(
+                CareerProfileSkill.career_profile_id == graph.profile.profile_id
+            )
+        )
+    elif case == "project_only":
+        await session.execute(  # type: ignore[attr-defined]
+            delete(CareerProfileWorkExperience).where(
+                CareerProfileWorkExperience.career_profile_id
+                == graph.profile.profile_id
+            )
+        )
+        await session.execute(  # type: ignore[attr-defined]
+            delete(CareerProfileSkill).where(
+                CareerProfileSkill.career_profile_id == graph.profile.profile_id
+            )
+        )
+    else:
+        raise AssertionError(f"unknown minimal profile case: {case}")
+
+
+@pytest.mark.parametrize("case", MINIMAL_PROFILE_CASES)
+def test_matching_service_accepts_each_minimal_profile(case: str) -> None:
+    async def run() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            graph, _ = await seed(database, f"minimal-{case}")
+            async with database.sessionmaker() as session:
+                await apply_minimal_profile_mutation(session, graph, case)
+                await session.commit()
+
+            async with database.sessionmaker() as session:
+                service = MatchingAnalysisService(
+                    session,
+                    clock=lambda: GENERATED_AT,
+                )
+                matching_input = await service.load_matching_input(
+                    graph.matching_run
+                )
+                snapshot = matching_input.career_profile
+                assert snapshot.education == []
+
+                if case == "skills_only":
+                    assert snapshot.skills == ["Python", "FastAPI"]
+                    assert snapshot.work_experiences == []
+                    assert snapshot.project_experiences == []
+                elif case == "work_only":
+                    assert snapshot.skills == []
+                    assert [
+                        experience.company
+                        for experience in snapshot.work_experiences
+                    ] == ["Riva", "Riva Labs"]
+                    assert snapshot.project_experiences == []
+                else:
+                    assert snapshot.skills == []
+                    assert snapshot.work_experiences == []
+                    assert [
+                        experience.name
+                        for experience in snapshot.project_experiences
+                    ] == ["Payment Platform", "Profile Project"]
+
+                persisted = await service.persist_success(
+                    graph.matching_run,
+                    output(),
+                )
+                assert persisted.role_id == graph.role.id
+                assert persisted.profile_id == graph.profile.profile_id
+                assert persisted.source_agent_run_id == graph.matching_run.id
+
+            async with database.sessionmaker() as session:
+                stored = await session.get(MatchingAnalysis, graph.role.id)
+                assert stored is not None
+                assert stored.source_agent_run_id == graph.matching_run.id
+                assert stored.overall_match_score == 87
+
+    asyncio.run(run())
+
+
+def test_matching_service_ignores_blank_skill_when_other_evidence_is_valid() -> None:
+    async def run() -> None:
+        async with Database(database_url()) as database:
+            await database.reset()
+            graph, _ = await seed(database, "blank-skill-valid-evidence")
+            async with database.sessionmaker() as session:
+                skills = list(
+                    (
+                        await session.scalars(
+                            select(CareerProfileSkill)
+                            .where(
+                                CareerProfileSkill.career_profile_id
+                                == graph.profile.profile_id
+                            )
+                            .order_by(CareerProfileSkill.position.asc())
+                        )
+                    ).all()
+                )
+                assert len(skills) == 2
+                skills[0].name = "   "
+                await session.delete(skills[1])
+                await session.commit()
+
+            async with database.sessionmaker() as session:
+                profile = await session.scalar(
+                    select(CareerProfile)
+                    .options(
+                        selectinload(CareerProfile.skills),
+                        selectinload(CareerProfile.work_experiences),
+                        selectinload(CareerProfile.project_experiences),
+                    )
+                    .where(CareerProfile.profile_id == graph.profile.profile_id)
+                )
+                assert profile is not None
+                assert [skill.name for skill in profile.skills] == ["   "]
+                assert profile.work_experiences
+                assert profile.project_experiences
+                assert career_profile_completed(profile) is True
+
+                service = MatchingAnalysisService(
+                    session,
+                    clock=lambda: GENERATED_AT,
+                )
+                matching_input = await service.load_matching_input(
+                    graph.matching_run
+                )
+                snapshot = matching_input.career_profile
+                assert snapshot.skills == []
+                assert "" not in snapshot.skills
+                assert all(skill.strip() for skill in snapshot.skills)
+                assert snapshot.work_experiences
+                assert snapshot.project_experiences
+                assert all(
+                    experience.skills == []
+                    for experience in (
+                        *snapshot.work_experiences,
+                        *snapshot.project_experiences,
+                    )
+                )
+
+                persisted = await service.persist_success(
+                    graph.matching_run,
+                    output(),
+                )
+                assert persisted.role_id == graph.role.id
+
+            async with database.sessionmaker() as session:
+                stored = await session.get(MatchingAnalysis, graph.role.id)
+                assert stored is not None
+                assert stored.source_agent_run_id == graph.matching_run.id
 
     asyncio.run(run())
 
