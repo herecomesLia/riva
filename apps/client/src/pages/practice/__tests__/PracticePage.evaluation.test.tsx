@@ -1,14 +1,41 @@
 import * as testing from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import "./practice-page-service-mock"
 import { i18n } from "@/i18n/i18n"
+import { AGENT_POLLING_TIMEOUT_MS } from "@/lib/agent-polling"
 
 import { PRACTICE_QUERY_KEY } from "../hooks/usePracticeSession"
 import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 
 describe("PracticePage: evaluation", () => {
+  it("rechecks a timed-out evaluation without invoking the mock retry mutation", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const evaluating = api.createPracticeMockResponse("evaluatingAnswer")
+    if (evaluating.session.status !== "evaluating") {
+      throw new Error("An evaluating fixture is required.")
+    }
+    vi.mocked(api.getPracticePage).mockResolvedValue(evaluating)
+    vi.mocked(api.getPracticeEvaluationStatus).mockResolvedValue(evaluating)
+    context.renderPracticePage()
+    await testing.screen.findByTestId("practice-evaluating-state")
+
+    await testing.act(async () => vi.advanceTimersByTimeAsync(AGENT_POLLING_TIMEOUT_MS))
+    expect(testing.screen.getByText(i18n.t("common.agentPolling.timeoutTitle"))).toBeVisible()
+    const callsAtTimeout = vi.mocked(api.getPracticeEvaluationStatus).mock.calls.length
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("common.agentPolling.recheck") }),
+    )
+    expect(vi.mocked(api.getPracticeEvaluationStatus).mock.calls.length).toBeGreaterThan(
+      callsAtTimeout,
+    )
+    expect(api.retryPracticeEvaluation).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
   it("polls an evaluating snapshot into a review without calculating scores locally", async () => {
     const evaluating = api.createPracticeMockResponse("evaluatingAnswer")
     const review = api.createPracticeMockResponse("reviewBalanced")

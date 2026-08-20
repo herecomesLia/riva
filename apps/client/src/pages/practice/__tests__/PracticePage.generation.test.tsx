@@ -4,12 +4,44 @@ import { describe, expect, it, vi } from "vitest"
 
 import "./practice-page-service-mock"
 import { i18n } from "@/i18n/i18n"
+import { AGENT_POLLING_TIMEOUT_MS } from "@/lib/agent-polling"
 
 import { PRACTICE_QUERY_KEY } from "../hooks/usePracticeSession"
 import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 
 describe("PracticePage: generation", () => {
+  it("stops a long-running poll and rechecks without creating or retrying an Agent task", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const generating = api.createPracticeMockResponse("generatingQuestion")
+    if (generating.session.status !== "generatingQuestion") {
+      throw new Error("A generating fixture is required.")
+    }
+    vi.mocked(api.getPracticePage).mockResolvedValue(generating)
+    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating.session)
+
+    context.renderPracticePage()
+    await testing.screen.findByTestId("practice-generating-state")
+    await testing.act(async () => vi.advanceTimersByTimeAsync(AGENT_POLLING_TIMEOUT_MS))
+
+    expect(testing.screen.getByText(i18n.t("common.agentPolling.timeoutTitle"))).toBeVisible()
+    const callsAtTimeout = vi.mocked(api.getQuestionGenerationStatus).mock.calls.length
+    await testing.act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(api.getQuestionGenerationStatus).toHaveBeenCalledTimes(callsAtTimeout)
+    expect(api.startPracticeSession).not.toHaveBeenCalled()
+    expect(api.retryPracticeEvaluation).not.toHaveBeenCalled()
+
+    await user.click(
+      testing.screen.getByRole("button", { name: i18n.t("common.agentPolling.recheck") }),
+    )
+    await testing.waitFor(() =>
+      expect(api.getQuestionGenerationStatus).toHaveBeenCalledTimes(callsAtTimeout + 1),
+    )
+    expect(api.startPracticeSession).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
   it("polls question generation into an answering snapshot", async () => {
     const generating = api.createPracticeMockResponse("generatingQuestion")
     const answering = api.createPracticeMockResponse("answeringQuestion")

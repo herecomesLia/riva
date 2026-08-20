@@ -1,12 +1,17 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useRef, useState } from "react"
 
+import {
+  AGENT_POLLING_FAST_INTERVAL_MS,
+  AGENT_POLLING_TIMEOUT_MS,
+  getAgentPollingInterval,
+} from "@/lib/agent-polling"
 import type { GetMatchingAnalysisStatusInput, RolesPageResponse, TargetRole } from "@/models/roles"
 import { getMatchingAnalysisStatus } from "@/services/roles"
 
 import { ROLES_QUERY_KEY } from "./useJobDescriptionSynchronization"
 
-export const MATCHING_ANALYSIS_POLL_INTERVAL_MS = 1000
+export const MATCHING_ANALYSIS_POLL_INTERVAL_MS = AGENT_POLLING_FAST_INTERVAL_MS
 
 type MatchingAnalysisOperation = {
   input: GetMatchingAnalysisStatusInput
@@ -16,13 +21,20 @@ type MatchingAnalysisOperation = {
 }
 
 type PollingController = {
+  deadlineTimer: ReturnType<typeof setTimeout> | null
   operation: MatchingAnalysisOperation
+  startedAt: number
   timer: ReturnType<typeof setTimeout> | null
 }
 
 function createOperationKey(operation: MatchingAnalysisOperation) {
   const { input, profileVersion, jobDescriptionVersion, jobDescriptionAnalysisVersion } = operation
   return `${input.roleId}:${input.version}:${profileVersion}:${jobDescriptionVersion}:${jobDescriptionAnalysisVersion}`
+}
+
+function createDeadlineKey(operation: MatchingAnalysisOperation) {
+  const { input, profileVersion, jobDescriptionVersion, jobDescriptionAnalysisVersion } = operation
+  return `${input.roleId}:${profileVersion}:${jobDescriptionVersion}:${jobDescriptionAnalysisVersion}`
 }
 
 function getGeneratingOperation(role: TargetRole): MatchingAnalysisOperation | null {
@@ -79,6 +91,7 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
 
   const stopController = useCallback((roleId: string, controller: PollingController) => {
     if (controller.timer !== null) clearTimeout(controller.timer)
+    if (controller.deadlineTimer !== null) clearTimeout(controller.deadlineTimer)
     if (activeControllersRef.current.get(roleId) === controller) {
       activeControllersRef.current.delete(roleId)
     }
@@ -159,6 +172,15 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
         return
       }
 
+      if (getAgentPollingInterval(Date.now() - controller.startedAt) === false) {
+        failedOperationKeysRef.current.add(createOperationKey(operation))
+        stopController(input.roleId, controller)
+        setSynchronizationErrorRoleIds((current) =>
+          current.includes(input.roleId) ? current : [...current, input.roleId],
+        )
+        return
+      }
+
       let role: TargetRole
       try {
         role = await getMatchingAnalysisStatus(input)
@@ -198,17 +220,23 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
         return
       }
       controller.operation = nextOperation
-      controller.timer = setTimeout(
-        () => void pollRef.current(controller),
-        MATCHING_ANALYSIS_POLL_INTERVAL_MS,
-      )
+      const interval = getAgentPollingInterval(Date.now() - controller.startedAt)
+      if (interval === false) {
+        failedOperationKeysRef.current.add(createOperationKey(nextOperation))
+        stopController(input.roleId, controller)
+        setSynchronizationErrorRoleIds((current) =>
+          current.includes(input.roleId) ? current : [...current, input.roleId],
+        )
+        return
+      }
+      controller.timer = setTimeout(() => void pollRef.current(controller), interval)
     },
     [clearSynchronizationError, isCurrentOperation, mergeRoleSnapshot, stopController],
   )
   pollRef.current = poll
 
   const startPolling = useCallback(
-    (operation: MatchingAnalysisOperation) => {
+    (operation: MatchingAnalysisOperation, startedAt = Date.now()) => {
       if (
         !mountedRef.current ||
         failedOperationKeysRef.current.has(createOperationKey(operation))
@@ -221,11 +249,35 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
       }
       if (existing) stopController(operation.input.roleId, existing)
 
-      const controller: PollingController = { operation, timer: null }
+      const controller: PollingController = {
+        deadlineTimer: null,
+        operation,
+        startedAt,
+        timer: null,
+      }
       activeControllersRef.current.set(operation.input.roleId, controller)
+      controller.deadlineTimer = setTimeout(
+        () => {
+          const currentOperation = controller.operation
+          const { input } = currentOperation
+          if (
+            !mountedRef.current ||
+            activeControllersRef.current.get(input.roleId) !== controller ||
+            !isCurrentOperation(currentOperation)
+          ) {
+            return
+          }
+          failedOperationKeysRef.current.add(createOperationKey(currentOperation))
+          stopController(input.roleId, controller)
+          setSynchronizationErrorRoleIds((current) =>
+            current.includes(input.roleId) ? current : [...current, input.roleId],
+          )
+        },
+        Math.max(0, AGENT_POLLING_TIMEOUT_MS - (Date.now() - startedAt)),
+      )
       void pollRef.current(controller)
     },
-    [stopController],
+    [isCurrentOperation, stopController],
   )
 
   const restartSynchronization = useCallback(
@@ -248,6 +300,7 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
       mountedRef.current = false
       for (const controller of activeControllers.values()) {
         if (controller.timer !== null) clearTimeout(controller.timer)
+        if (controller.deadlineTimer !== null) clearTimeout(controller.deadlineTimer)
       }
       activeControllers.clear()
     }
@@ -255,15 +308,29 @@ export function useMatchingAnalysisSynchronization(data: RolesPageResponse | und
 
   useEffect(() => {
     if (!data) return
+    const replacements: Array<{
+      operation: MatchingAnalysisOperation
+      startedAt: number
+    }> = []
     for (const [roleId, controller] of activeControllersRef.current) {
       const role = data.roles.find((candidate) => candidate.id === roleId)
       const operation = role ? getGeneratingOperation(role) : null
       if (
-        !operation ||
+        operation &&
+        createDeadlineKey(operation) === createDeadlineKey(controller.operation) &&
         createOperationKey(operation) !== createOperationKey(controller.operation)
       ) {
         stopController(roleId, controller)
+        replacements.push({ operation, startedAt: controller.startedAt })
+      } else if (
+        !operation ||
+        createDeadlineKey(operation) !== createDeadlineKey(controller.operation)
+      ) {
+        stopController(roleId, controller)
       }
+    }
+    for (const replacement of replacements) {
+      startPolling(replacement.operation, replacement.startedAt)
     }
     for (const role of data.roles) {
       const operation = getGeneratingOperation(role)

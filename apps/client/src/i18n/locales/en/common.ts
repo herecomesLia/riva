@@ -1,5 +1,12 @@
 export const common = {
   close: "Close",
+  agentPolling: {
+    timeoutTitle: "Taking longer than expected",
+    timeoutDescription:
+      "The task may still be running, but its latest state cannot be confirmed right now.",
+    recheck: "Check again",
+    rechecking: "Checking...",
+  },
   trainingEntry: {
     available: {
       title: "Historical configuration is available",

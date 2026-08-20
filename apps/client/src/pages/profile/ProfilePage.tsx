@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 
 import { useAuthenticationInvalidation } from "@/hooks/use-authentication-invalidation"
+import { useAgentPolling } from "@/lib/agent-polling"
 import type {
   JobProfileSnapshot,
   ResumeImportDraft,
@@ -70,6 +71,14 @@ export function ProfilePage() {
     retry: false,
   })
   const hasResumeDocuments = (resumeDocumentsQuery.data?.length ?? 0) > 0
+  const cachedParsing = activeResume
+    ? queryClient.getQueryData<ResumeParsingStatus>(resumeParsingQueryKey(activeResume.id))
+    : undefined
+  const parsingOperationKey =
+    activeResume && (cachedParsing?.status === "queued" || cachedParsing?.status === "running")
+      ? `resume-parsing:${activeResume.id}`
+      : null
+  const parsingPolling = useAgentPolling(parsingOperationKey)
 
   useEffect(() => {
     invalidateAuthentication(profileQuery.error)
@@ -85,12 +94,14 @@ export function ProfilePage() {
   }
 
   const parsingQuery = useQuery({
-    enabled: activeResume !== null && !resumeSynchronizationError,
+    enabled: activeResume !== null && !resumeSynchronizationError && !parsingPolling.isTimedOut,
     queryFn: () => getResumeParsingStatus(activeResume!.id),
     queryKey: resumeParsingQueryKey(activeResume?.id ?? "inactive"),
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      return status === "queued" || status === "running" ? 1500 : false
+      return status === "queued" || status === "running"
+        ? parsingPolling.getPollingInterval()
+        : false
     },
     refetchIntervalInBackground: false,
     retry: false,
@@ -118,6 +129,10 @@ export function ProfilePage() {
     if (!draftQuery.error || invalidateAuthentication(draftQuery.error)) return
     setResumeSynchronizationError(true)
   }, [draftQuery.error, invalidateAuthentication])
+
+  useEffect(() => {
+    if (parsingPolling.isTimedOut) setResumeSynchronizationError(true)
+  }, [parsingPolling.isTimedOut])
 
   const saveMutation = useMutation({
     mutationFn: saveProfileSection,
@@ -306,6 +321,7 @@ export function ProfilePage() {
   async function retryResumeWorkflow() {
     if (!activeResume) return
     const parsing = parsingQuery.data
+    parsingPolling.reset()
     try {
       if (parsing?.status === "failed" && parsing.canRetry) {
         await resumeRetryMutation.mutateAsync(activeResume.id)

@@ -40,6 +40,69 @@ function questionProps(
 }
 
 describe("InterviewSessionView", () => {
+  it.each([
+    {
+      status: "generatingQuestion",
+      summary,
+      generationStatus: "generating",
+      isRetrying: false,
+      pollingTimedOut: true,
+      retryFailed: false,
+      onRetry: vi.fn(async () => undefined),
+      onBack: vi.fn(),
+    },
+    {
+      status: "generatingTurn",
+      summary,
+      generationStatus: "generating",
+      history: [],
+      isRetrying: false,
+      pollingTimedOut: true,
+      retryFailed: false,
+      onRetry: vi.fn(async () => undefined),
+      onBack: vi.fn(),
+    },
+    {
+      status: "generatingCandidateAnswer",
+      summary,
+      generationStatus: "generating",
+      currentCandidateQuestion: {
+        id: "candidate-question",
+        content: "团队当前最重要的目标是什么？",
+        submittedAt: "2026-08-20T00:00:00Z",
+      },
+      history: [],
+      isRetrying: false,
+      pollingTimedOut: true,
+      retryFailed: false,
+      onRetry: vi.fn(async () => undefined),
+      onBack: vi.fn(),
+    },
+    {
+      status: "generatingReview",
+      summary,
+      generationStatus: "generating",
+      history: [],
+      isRetrying: false,
+      pollingTimedOut: true,
+      retryFailed: false,
+      onRetry: vi.fn(async () => undefined),
+      onBack: vi.fn(),
+    },
+  ] satisfies InterviewSessionViewProps[])(
+    "shows local timeout recovery for $status without changing server generation status",
+    async (props) => {
+      const user = userEvent.setup()
+      renderWithProviders(<InterviewSessionView {...props} />, { router: false })
+
+      expect(
+        screen.getAllByText(i18n.t("common.agentPolling.timeoutTitle")).length,
+      ).toBeGreaterThan(0)
+      await user.click(screen.getByRole("button", { name: i18n.t("common.agentPolling.recheck") }))
+      expect(props.onRetry).toHaveBeenCalledOnce()
+    },
+  )
+
   it("keeps the session structure visible while loading", () => {
     renderWithProviders(<InterviewSessionView status="loading" />, { router: false })
 

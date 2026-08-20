@@ -143,11 +143,13 @@ export function PracticeGenerationErrorState({
   context,
   isRetrying,
   onRetry,
+  pollingTimedOut = false,
   selection,
 }: {
   context: PracticeSetupContext
   isRetrying: boolean
   onRetry: () => void
+  pollingTimedOut?: boolean
   selection: ActivePracticeSelection
 }) {
   const { t } = useTranslation()
@@ -163,8 +165,16 @@ export function PracticeGenerationErrorState({
       <CardContent className="flex flex-col gap-5">
         <Alert variant="destructive">
           <AlertCircleIcon />
-          <AlertTitle>{t("practice.errors.generationTitle")}</AlertTitle>
-          <AlertDescription>{t("practice.errors.generationDescription")}</AlertDescription>
+          <AlertTitle>
+            {pollingTimedOut
+              ? t("common.agentPolling.timeoutTitle")
+              : t("practice.errors.generationTitle")}
+          </AlertTitle>
+          <AlertDescription>
+            {pollingTimedOut
+              ? t("common.agentPolling.timeoutDescription")
+              : t("practice.errors.generationDescription")}
+          </AlertDescription>
         </Alert>
         <PracticeSelectionSummary context={context} selection={selection} />
       </CardContent>
@@ -173,7 +183,9 @@ export function PracticeGenerationErrorState({
           {isRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
           {isRetrying
             ? t("practice.actions.retryingGeneration")
-            : t("practice.actions.retryGeneration")}
+            : pollingTimedOut
+              ? t("common.agentPolling.recheck")
+              : t("practice.actions.retryGeneration")}
         </Button>
       </CardFooter>
     </Card>

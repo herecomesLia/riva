@@ -29,7 +29,7 @@ export function PracticePage() {
   } = usePracticeSession(entrySearch)
   const generation = usePracticeGenerationPolling(practiceQuery.data)
   const followUpGeneration = usePracticeFollowUpGenerationPolling(practiceQuery.data)
-  usePracticeReferenceAnswerPolling(practiceQuery.data)
+  const referenceAnswer = usePracticeReferenceAnswerPolling(practiceQuery.data)
   const evaluation = usePracticeEvaluationPolling(practiceQuery.data)
   const runAction = usePracticeActionLock()
   const answering = usePracticeAnsweringActions(runAction)
@@ -58,11 +58,14 @@ export function PracticePage() {
           data: practiceQuery.data,
         }}
         evaluationError={evaluation.evaluationError}
+        evaluationPollingTimedOut={evaluation.evaluationPollingTimedOut}
         followUpActions={followUp.actions}
         followUpPending={followUp.pending}
         followUpGenerationError={followUpGeneration.followUpGenerationError}
+        followUpGenerationPollingTimedOut={followUpGeneration.followUpGenerationPollingTimedOut}
         isFollowUpGenerationRetrying={followUpGeneration.isFollowUpGenerationRetrying}
         generationError={generation.generationError}
+        generationPollingTimedOut={generation.generationPollingTimedOut}
         isEvaluationRetrying={evaluation.isEvaluationRetrying}
         isGenerationRetrying={generation.isGenerationRetrying}
         isStarting={isStarting}
@@ -70,6 +73,10 @@ export function PracticePage() {
         onRetryEvaluation={evaluation.retryEvaluation}
         onRetryFollowUpGeneration={followUpGeneration.retryFollowUpGeneration}
         onRetryGeneration={generation.retryGeneration}
+        isReferenceAnswerRetrying={referenceAnswer.isReferenceAnswerRetrying}
+        onRetryReferenceAnswer={referenceAnswer.retryReferenceAnswer}
+        referenceAnswerError={referenceAnswer.referenceAnswerError}
+        referenceAnswerPollingTimedOut={referenceAnswer.referenceAnswerPollingTimedOut}
         onStart={start}
         reviewActions={review.actions}
         reviewPending={review.pending}

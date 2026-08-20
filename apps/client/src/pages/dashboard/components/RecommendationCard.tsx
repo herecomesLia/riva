@@ -54,7 +54,11 @@ function TrainingPlanningRecommendationCard({
         {state.status === "loading" ? (
           <CardDescription>{t("dashboard.recommendation.generating.description")}</CardDescription>
         ) : state.status === "failed" ? (
-          <CardDescription>{t("dashboard.recommendation.failed.description")}</CardDescription>
+          <CardDescription>
+            {state.pollingTimedOut
+              ? t("common.agentPolling.timeoutDescription")
+              : t("dashboard.recommendation.failed.description")}
+          </CardDescription>
         ) : plan ? (
           <CardDescription>{plan.reason}</CardDescription>
         ) : (
@@ -66,7 +70,9 @@ function TrainingPlanningRecommendationCard({
           <RecommendationLoadingContent />
         ) : state.status === "failed" ? (
           <p className="font-heading text-xl font-medium">
-            {t("dashboard.recommendation.failed.title")}
+            {state.pollingTimedOut
+              ? t("common.agentPolling.timeoutTitle")
+              : t("dashboard.recommendation.failed.title")}
           </p>
         ) : plan ? (
           <TrainingPlanningDataContent plan={plan} />
@@ -83,8 +89,12 @@ function TrainingPlanningRecommendationCard({
           <Button disabled={state.isRetrying} onClick={state.onRetry}>
             <RotateCcwIcon data-icon="inline-start" />
             {state.isRetrying
-              ? t("dashboard.recommendation.failed.retrying")
-              : t("dashboard.recommendation.failed.retry")}
+              ? state.pollingTimedOut
+                ? t("common.agentPolling.rechecking")
+                : t("dashboard.recommendation.failed.retrying")
+              : state.pollingTimedOut
+                ? t("common.agentPolling.recheck")
+                : t("dashboard.recommendation.failed.retry")}
           </Button>
         ) : plan && response ? (
           <TrainingPlanningDataFooter plan={plan} targetRoleId={response.targetRoleId} />

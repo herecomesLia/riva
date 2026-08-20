@@ -1,5 +1,11 @@
 export const common = {
   close: "关闭",
+  agentPolling: {
+    timeoutTitle: "生成时间异常",
+    timeoutDescription: "任务可能仍在运行，但暂时无法确认最新结果。",
+    recheck: "重新检查",
+    rechecking: "正在检查...",
+  },
   trainingEntry: {
     available: {
       title: "历史训练配置完整可用",

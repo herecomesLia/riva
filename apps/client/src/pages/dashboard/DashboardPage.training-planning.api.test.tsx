@@ -1,9 +1,10 @@
-import { screen, waitFor } from "@testing-library/react"
+import { act, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
+import { AGENT_POLLING_TIMEOUT_MS } from "@/lib/agent-polling"
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
 import type { TrainingPlanningStatusResponse } from "@/models/training-planning"
 import {
@@ -82,6 +83,10 @@ describe("Dashboard Planner integration", () => {
     vi.mocked(startTrainingPlanning).mockReset()
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it("ensures once and displays a succeeded targeted plan", async () => {
     const response = planningResponse("succeeded")
     vi.mocked(getDashboardData).mockResolvedValue(dashboardResponse())
@@ -113,6 +118,31 @@ describe("Dashboard Planner integration", () => {
       await screen.findByText(i18n.t("dashboard.recommendation.generating.description")),
     ).toBeInTheDocument()
     await waitFor(() => expect(getTrainingPlanningStatus).toHaveBeenCalledWith(firstRunId))
+  })
+
+  it("stops a queued plan poll and rechecks without creating another plan", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const queued = planningResponse("queued")
+    vi.mocked(getDashboardData).mockResolvedValue(dashboardResponse())
+    vi.mocked(ensureCurrentTrainingPlanning).mockResolvedValue(queued)
+    vi.mocked(getTrainingPlanningStatus).mockResolvedValue(queued)
+
+    renderWithProviders(<DashboardPage />, { router: { initialEntries: ["/dashboard"] } })
+    await waitFor(() => expect(getTrainingPlanningStatus).toHaveBeenCalled())
+    await act(async () => vi.advanceTimersByTimeAsync(AGENT_POLLING_TIMEOUT_MS))
+
+    expect(screen.getByText(i18n.t("common.agentPolling.timeoutTitle"))).toBeVisible()
+    const callsAtTimeout = vi.mocked(getTrainingPlanningStatus).mock.calls.length
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(getTrainingPlanningStatus).toHaveBeenCalledTimes(callsAtTimeout)
+    expect(ensureCurrentTrainingPlanning).toHaveBeenCalledOnce()
+    expect(startTrainingPlanning).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole("button", { name: i18n.t("common.agentPolling.recheck") }))
+    await waitFor(() => expect(getTrainingPlanningStatus).toHaveBeenCalledTimes(callsAtTimeout + 1))
+    expect(ensureCurrentTrainingPlanning).toHaveBeenCalledOnce()
+    expect(startTrainingPlanning).not.toHaveBeenCalled()
   })
 
   it("retries a failed plan with a new request id", async () => {

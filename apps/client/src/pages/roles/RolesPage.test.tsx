@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
+import { AGENT_POLLING_TIMEOUT_MS } from "@/lib/agent-polling"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 import { RolesPage } from "@/pages/roles"
 import { JOB_DESCRIPTION_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useJobDescriptionSynchronization"
@@ -288,6 +289,27 @@ describe("RolesPage", () => {
     expect(getJobDescriptionParsingStatus).toHaveBeenNthCalledWith(3, pollingInput(parsingTwo))
     expect(queryClient.getQueryData(["roles"])).toEqual(ready)
     expect(screen.queryByText(i18n.t("roles.jd.synchronization.title"))).not.toBeInTheDocument()
+  })
+
+  it("stops JD synchronization at the shared deadline and restarts on demand", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { initial } = createJobDescriptionPollingResponses()
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getJobDescriptionParsingStatus).mockResolvedValue(initial.roles[0]!)
+    renderRolesPage()
+    await openJobDescriptionTab()
+    await vi.waitFor(() => expect(getJobDescriptionParsingStatus).toHaveBeenCalled())
+
+    await act(async () => vi.advanceTimersByTimeAsync(AGENT_POLLING_TIMEOUT_MS))
+    expect(screen.getByText(i18n.t("roles.jd.synchronization.title"))).toBeVisible()
+    const callsAtTimeout = vi.mocked(getJobDescriptionParsingStatus).mock.calls.length
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(callsAtTimeout)
+
+    fireEvent.click(screen.getByRole("button", { name: i18n.t("roles.jd.actions.resynchronize") }))
+    await vi.waitFor(() =>
+      expect(getJobDescriptionParsingStatus).toHaveBeenCalledTimes(callsAtTimeout + 1),
+    )
   })
 
   it("stops after consecutive parsing responses reach a business failure", async () => {
@@ -639,6 +661,29 @@ describe("RolesPage", () => {
       matchingPollingInput(generatingThree),
     )
     expect(queryClient.getQueryData(["roles"])).toEqual(current)
+  })
+
+  it("stops Matching synchronization at the shared deadline and restarts on demand", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const initial = createRolesMockResponse("matchingAnalysisGenerating")
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(getMatchingAnalysisStatus).mockResolvedValue(initial.roles[0]!)
+    renderRolesPage()
+    await openMatchingAnalysisTab()
+    await vi.waitFor(() => expect(getMatchingAnalysisStatus).toHaveBeenCalled())
+
+    await act(async () => vi.advanceTimersByTimeAsync(AGENT_POLLING_TIMEOUT_MS))
+    expect(screen.getByText(i18n.t("roles.matching.synchronization.title"))).toBeVisible()
+    const callsAtTimeout = vi.mocked(getMatchingAnalysisStatus).mock.calls.length
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(callsAtTimeout)
+
+    fireEvent.click(
+      screen.getByRole("button", { name: i18n.t("roles.matching.actions.resynchronize") }),
+    )
+    await vi.waitFor(() =>
+      expect(getMatchingAnalysisStatus).toHaveBeenCalledTimes(callsAtTimeout + 1),
+    )
   })
 
   it("normalizes a completed result to stale when the profile advances during generation", async () => {

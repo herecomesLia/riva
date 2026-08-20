@@ -1,9 +1,10 @@
 import { focusManager } from "@tanstack/react-query"
 import { act, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
+import { AGENT_POLLING_TIMEOUT_MS } from "@/lib/agent-polling"
 import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/profile"
 import type {
   ResumeDocument,
@@ -152,6 +153,10 @@ function renderPage() {
   return renderWithProviders(<ProfilePage />, { router: { initialEntries: ["/profile"] } })
 }
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 async function submitInitialResume(user = userEvent.setup()) {
   await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
   await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
@@ -285,6 +290,30 @@ describe("ProfilePage resume import orchestration", () => {
     expect(profileService.getResumeParsingStatus).toHaveBeenCalledTimes(callsAfterSuccess)
     expect(screen.getByTestId("profile-resume-draft-review")).toBeInTheDocument()
     vi.useRealTimers()
+  })
+
+  it("stops parsing polling at the deadline and recovers by checking the same run", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.mocked(profileService.getResumeParsingStatus).mockResolvedValue(parsingStatus("running"))
+    renderPage()
+    await submitInitialResume(user)
+    await vi.waitFor(() => expect(profileService.getResumeParsingStatus).toHaveBeenCalled())
+
+    await act(async () => vi.advanceTimersByTimeAsync(AGENT_POLLING_TIMEOUT_MS))
+    expect(await screen.findByTestId("profile-synchronization-error")).toBeVisible()
+    const callsAtTimeout = vi.mocked(profileService.getResumeParsingStatus).mock.calls.length
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(profileService.getResumeParsingStatus).toHaveBeenCalledTimes(callsAtTimeout)
+    expect(profileService.retryResumeParsing).not.toHaveBeenCalled()
+
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("profile.lifecycle.syncFailed.retry") }),
+    )
+    expect(vi.mocked(profileService.getResumeParsingStatus).mock.calls.length).toBeGreaterThan(
+      callsAtTimeout,
+    )
+    expect(profileService.retryResumeParsing).not.toHaveBeenCalled()
   })
 
   it("shows Draft review and never applies before confirmation", async () => {

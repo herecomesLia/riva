@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { trainingRecordQueryKeys } from "@/app/training-record-query"
+import { AGENT_POLLING_FAST_INTERVAL_MS, useAgentPolling } from "@/lib/agent-polling"
 import type {
   ActiveInterviewSessionResponse,
   InterviewConversationRecordViewData,
@@ -31,7 +32,7 @@ import {
 } from "./InterviewSessionView"
 import { INTERVIEW_QUERY_KEY } from "./interview-query"
 
-export const INTERVIEW_GENERATING_POLL_INTERVAL_MS = 500
+export const INTERVIEW_GENERATING_POLL_INTERVAL_MS = AGENT_POLLING_FAST_INTERVAL_MS
 
 export function InterviewSessionPage() {
   const { sessionId } = useParams({ from: "/app/interview/session/$sessionId" })
@@ -52,21 +53,26 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const [candidateAnswerRetryFailed, setCandidateAnswerRetryFailed] = useState(false)
   const [reviewRetryFailed, setReviewRetryFailed] = useState(false)
   const completedReviewNavigation = useRef(false)
+  const cachedSession =
+    queryClient.getQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY)?.session
+  const pollingOperationKey = getInterviewPollingOperationKey(cachedSession, sessionId)
+  const polling = useAgentPolling(pollingOperationKey)
 
   const interviewQuery = useQuery({
     queryFn: getInterviewPage,
     queryKey: INTERVIEW_QUERY_KEY,
     retry: false,
     refetchInterval: (query) =>
-      (query.state.data?.session?.status === "generatingQuestion" &&
+      !polling.isTimedOut &&
+      ((query.state.data?.session?.status === "generatingQuestion" &&
         query.state.data.session.generationStatus === "generating") ||
-      (query.state.data?.session?.status === "generatingTurn" &&
-        query.state.data.session.generationStatus === "generating") ||
-      (query.state.data?.session?.status === "generatingCandidateAnswer" &&
-        query.state.data.session.generationStatus === "generating") ||
-      (query.state.data?.session?.status === "generatingReview" &&
-        query.state.data.session.generationStatus === "generating")
-        ? INTERVIEW_GENERATING_POLL_INTERVAL_MS
+        (query.state.data?.session?.status === "generatingTurn" &&
+          query.state.data.session.generationStatus === "generating") ||
+        (query.state.data?.session?.status === "generatingCandidateAnswer" &&
+          query.state.data.session.generationStatus === "generating") ||
+        (query.state.data?.session?.status === "generatingReview" &&
+          query.state.data.session.generationStatus === "generating"))
+        ? polling.getPollingInterval()
         : false,
     refetchIntervalInBackground: false,
   })
@@ -225,6 +231,11 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     } catch {
       setReviewRetryFailed(true)
     }
+  }
+
+  async function handlePollingRecheck() {
+    polling.reset()
+    await interviewQuery.refetch()
   }
 
   async function handleSubmit(content: string) {
@@ -415,12 +426,14 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   if (session.status === "generatingQuestion") {
+    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
     return (
       <InterviewSessionView
         generationStatus={session.generationStatus}
-        isRetrying={beginMutation.isPending}
+        isRetrying={pollingTimedOut ? interviewQuery.isFetching : beginMutation.isPending}
         onBack={() => void backToSetup()}
-        onRetry={handleRetryPlanning}
+        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryPlanning}
+        pollingTimedOut={pollingTimedOut}
         retryFailed={beginFailed}
         status="generatingQuestion"
         summary={summary}
@@ -429,13 +442,15 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   if (session.status === "generatingTurn") {
+    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
     return (
       <InterviewSessionView
         generationStatus={session.generationStatus}
         history={history}
-        isRetrying={turnRetryMutation.isPending}
+        isRetrying={pollingTimedOut ? interviewQuery.isFetching : turnRetryMutation.isPending}
         onBack={() => void backToSetup()}
-        onRetry={handleRetryTurn}
+        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryTurn}
+        pollingTimedOut={pollingTimedOut}
         retryFailed={turnRetryFailed}
         status="generatingTurn"
         summary={summary}
@@ -444,14 +459,18 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   if (session.status === "generatingCandidateAnswer") {
+    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
     return (
       <InterviewSessionView
         currentCandidateQuestion={session.currentCandidateQuestion}
         generationStatus={session.generationStatus}
         history={history}
-        isRetrying={candidateAnswerRetryMutation.isPending}
+        isRetrying={
+          pollingTimedOut ? interviewQuery.isFetching : candidateAnswerRetryMutation.isPending
+        }
         onBack={() => void backToSetup()}
-        onRetry={handleRetryCandidateAnswer}
+        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryCandidateAnswer}
+        pollingTimedOut={pollingTimedOut}
         retryFailed={candidateAnswerRetryFailed}
         status="generatingCandidateAnswer"
         summary={summary}
@@ -460,13 +479,15 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   if (session.status === "generatingReview") {
+    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
     return (
       <InterviewSessionView
         generationStatus={session.generationStatus}
         history={history}
-        isRetrying={reviewRetryMutation.isPending}
+        isRetrying={pollingTimedOut ? interviewQuery.isFetching : reviewRetryMutation.isPending}
         onBack={() => void backToSetup()}
-        onRetry={handleRetryReview}
+        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryReview}
+        pollingTimedOut={pollingTimedOut}
         retryFailed={reviewRetryFailed}
         status="generatingReview"
         summary={summary}
@@ -505,6 +526,25 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
       summary={summary}
     />
   )
+}
+
+function getInterviewPollingOperationKey(
+  session: InterviewSessionResponse | null | undefined,
+  routeSessionId: string,
+): string | null {
+  if (!session || session.sessionId !== routeSessionId || session.status === "completed") {
+    return null
+  }
+  if (
+    session.status !== "generatingQuestion" &&
+    session.status !== "generatingTurn" &&
+    session.status !== "generatingCandidateAnswer" &&
+    session.status !== "generatingReview"
+  ) {
+    return null
+  }
+  if (session.generationStatus !== "generating") return null
+  return `${session.status}:${session.sessionId}:${session.version}`
 }
 
 function toSummary(

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 
 import { getCurrentInteractionLanguage } from "@/i18n/language"
+import { useAgentPolling } from "@/lib/agent-polling"
 import type {
   StartTrainingPlanningInput,
   TrainingPlanningStatusResponse,
@@ -12,8 +13,6 @@ import {
   startTrainingPlanning,
 } from "@/services/training-planning"
 import type { DashboardResponse } from "@/models/dashboard"
-
-const POLL_INTERVAL_MS = 1_000
 
 type CurrentRole = DashboardResponse["currentRole"]
 
@@ -26,6 +25,7 @@ export type TrainingPlanningRecommendationState =
       response?: TrainingPlanningStatusResponse
       isRetrying: boolean
       onRetry: () => void
+      pollingTimedOut?: boolean
     }
 
 export function useTrainingPlanningRecommendation(
@@ -52,15 +52,16 @@ export function useTrainingPlanningRecommendation(
     retry: false,
   })
   const runId = ensureQuery.data?.runId ?? null
+  const polling = useAgentPolling(runId ? `training-planning:${runId}` : null)
   const statusQueryKey = ["training-planning", "status", runId ?? "inactive"] as const
   const statusQuery = useQuery({
-    enabled: enabled && runId !== null,
+    enabled: enabled && runId !== null && !polling.isTimedOut,
     initialData: ensureQuery.data,
     queryFn: () => getTrainingPlanningStatus(runId!),
     queryKey: statusQueryKey,
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      return status === "queued" || status === "running" ? POLL_INTERVAL_MS : false
+      return status === "queued" || status === "running" ? polling.getPollingInterval() : false
     },
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
@@ -75,7 +76,30 @@ export function useTrainingPlanningRecommendation(
   const response = statusQuery.data ?? ensureQuery.data
 
   if (!enabled) return { status: "inactive" }
-  if (ensureQuery.isError || statusQuery.isError) {
+  if (polling.isTimedOut) {
+    return {
+      status: "failed",
+      response,
+      isRetrying: statusQuery.isFetching,
+      pollingTimedOut: true,
+      onRetry: () => {
+        polling.reset()
+        void statusQuery.refetch()
+      },
+    }
+  }
+  if (statusQuery.isError) {
+    return {
+      status: "failed",
+      response,
+      isRetrying: statusQuery.isFetching,
+      onRetry: () => {
+        polling.reset()
+        void statusQuery.refetch()
+      },
+    }
+  }
+  if (ensureQuery.isError) {
     return {
       status: "failed",
       response,

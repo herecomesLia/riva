@@ -17,10 +17,12 @@ export function PracticeEvaluationStatus({
   error,
   isRetrying,
   onRetry,
+  pollingTimedOut = false,
 }: {
   error: boolean
   isRetrying: boolean
   onRetry: () => void
+  pollingTimedOut?: boolean
 }) {
   const { t } = useTranslation()
 
@@ -34,14 +36,26 @@ export function PracticeEvaluationStatus({
         <CardContent>
           <Alert variant="destructive">
             <AlertCircleIcon />
-            <AlertTitle>{t("practice.errors.evaluationTitle")}</AlertTitle>
-            <AlertDescription>{t("practice.errors.evaluationDescription")}</AlertDescription>
+            <AlertTitle>
+              {pollingTimedOut
+                ? t("common.agentPolling.timeoutTitle")
+                : t("practice.errors.evaluationTitle")}
+            </AlertTitle>
+            <AlertDescription>
+              {pollingTimedOut
+                ? t("common.agentPolling.timeoutDescription")
+                : t("practice.errors.evaluationDescription")}
+            </AlertDescription>
           </Alert>
         </CardContent>
         <CardFooter>
           <Button disabled={isRetrying} onClick={onRetry}>
             {isRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
-            {isRetrying ? t("practice.evaluating.retrying") : t("practice.evaluating.retry")}
+            {isRetrying
+              ? t("practice.evaluating.retrying")
+              : pollingTimedOut
+                ? t("common.agentPolling.recheck")
+                : t("practice.evaluating.retry")}
           </Button>
         </CardFooter>
       </Card>

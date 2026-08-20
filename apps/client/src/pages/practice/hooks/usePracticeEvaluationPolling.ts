@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef } from "react"
 
 import { env } from "@/app/env"
+import { useAgentPolling } from "@/lib/agent-polling"
 import type {
   GetPracticeEvaluationStatusInput,
   PracticePageResponse,
@@ -23,8 +24,13 @@ export function usePracticeEvaluationPolling(data: PracticePageResponse | undefi
   const sessionId = evaluationSession?.sessionId
   const version = evaluationSession?.version
   const questionId = evaluationSession?.question.id
+  const polling = useAgentPolling(
+    sessionId && version !== undefined && questionId
+      ? `practice-evaluation:${sessionId}:${version}:${questionId}`
+      : null,
+  )
   const evaluationQuery = useQuery({
-    enabled: evaluationSession !== null,
+    enabled: evaluationSession !== null && !polling.isTimedOut,
     queryFn: () => {
       if (!sessionId || version === undefined || !questionId) {
         throw new Error("An evaluating practice session is required.")
@@ -34,7 +40,7 @@ export function usePracticeEvaluationPolling(data: PracticePageResponse | undefi
     queryKey: [...PRACTICE_QUERY_KEY, "evaluation", sessionId, version, questionId],
     refetchInterval: (query) =>
       query.state.data && getPracticeResponseSession(query.state.data).status === "evaluating"
-        ? 500
+        ? polling.getPollingInterval()
         : false,
     retry: false,
   })
@@ -51,8 +57,9 @@ export function usePracticeEvaluationPolling(data: PracticePageResponse | undefi
   function retryEvaluation() {
     if (evaluationSession === null || retryMutation.isPending || retryLock.current) return
 
-    if (!env.mock) {
+    if (polling.isTimedOut || !env.mock) {
       retryLock.current = true
+      polling.reset()
       void evaluationQuery.refetch().finally(() => {
         retryLock.current = false
       })
@@ -75,9 +82,11 @@ export function usePracticeEvaluationPolling(data: PracticePageResponse | undefi
 
   return {
     evaluationError:
+      polling.isTimedOut ||
       evaluationQuery.isError ||
       evaluationQuery.errorUpdatedAt > evaluationQuery.dataUpdatedAt ||
       retryMutation.isError,
+    evaluationPollingTimedOut: polling.isTimedOut,
     isEvaluationRetrying: env.mock ? retryMutation.isPending : evaluationQuery.isFetching,
     retryEvaluation,
   }

@@ -1,10 +1,11 @@
 import { act, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { i18n } from "@/i18n/i18n"
+import { AGENT_POLLING_TIMEOUT_MS } from "@/lib/agent-polling"
 import {
   createCandidateQuestionExchange,
   createInterviewAgentPlanMock,
@@ -32,6 +33,7 @@ import {
 import { renderWithProviders } from "@/test/render"
 
 import { InterviewSessionContainer } from "./InterviewSessionPage"
+import { INTERVIEW_QUERY_KEY } from "./interview-query"
 
 vi.mock("@/services/interview", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/interview")>()),
@@ -330,6 +332,10 @@ describe("InterviewSessionContainer", () => {
     vi.mocked(retryInterviewReview).mockReset()
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it("maps a pending session query to the structured loading view", async () => {
     vi.mocked(getInterviewPage).mockReturnValue(new Promise(() => undefined))
     renderSession()
@@ -394,6 +400,33 @@ describe("InterviewSessionContainer", () => {
       ),
     ).toBeVisible()
     expect(getInterviewPage).toHaveBeenCalledTimes(2)
+  })
+
+  it("times out locally and rechecks without retrying or forging a failed session", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const generating = generatingResponse()
+    vi.mocked(getInterviewPage).mockResolvedValue(generating)
+    const result = renderSession()
+
+    await screen.findByText(i18n.t("interview.session.planning.title"))
+    await act(async () => vi.advanceTimersByTimeAsync(AGENT_POLLING_TIMEOUT_MS))
+
+    expect(screen.getAllByText(i18n.t("common.agentPolling.timeoutTitle")).length).toBeGreaterThan(
+      0,
+    )
+    const callsAtTimeout = vi.mocked(getInterviewPage).mock.calls.length
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(getInterviewPage).toHaveBeenCalledTimes(callsAtTimeout)
+    expect(beginInterviewQuestions).not.toHaveBeenCalled()
+    expect(retryInterviewTurn).not.toHaveBeenCalled()
+    expect(retryInterviewCandidateAnswer).not.toHaveBeenCalled()
+    expect(retryInterviewReview).not.toHaveBeenCalled()
+    expect(result.queryClient.getQueryData(INTERVIEW_QUERY_KEY)).toEqual(generating)
+
+    await user.click(screen.getByRole("button", { name: i18n.t("common.agentPolling.recheck") }))
+    await waitFor(() => expect(getInterviewPage).toHaveBeenCalledTimes(callsAtTimeout + 1))
+    expect(beginInterviewQuestions).not.toHaveBeenCalled()
   })
 
   it("polls a generating turn until the next question is available", async () => {

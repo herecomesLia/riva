@@ -178,17 +178,24 @@ type PracticeViewProps =
       followUpActions: PracticeFollowUpActions
       followUpPending: PracticeFollowUpPending
       followUpGenerationError: boolean
+      followUpGenerationPollingTimedOut?: boolean
       isFollowUpGenerationRetrying: boolean
       reviewActions: PracticeReviewActions
       reviewPending: PracticeReviewPending
       evaluationError: boolean
+      evaluationPollingTimedOut?: boolean
       isEvaluationRetrying: boolean
       generationError: boolean
+      generationPollingTimedOut?: boolean
       isGenerationRetrying: boolean
       isStarting: boolean
       onRetryGeneration: () => void
       onRetryFollowUpGeneration: () => void
       onRetryEvaluation: () => void
+      isReferenceAnswerRetrying?: boolean
+      onRetryReferenceAnswer?: () => void
+      referenceAnswerError?: boolean
+      referenceAnswerPollingTimedOut?: boolean
       onStart: (input: ActivePracticeSelection) => Promise<void>
       trainingEntryResolution?: PracticeTrainingEntryResolution
     }
@@ -304,6 +311,7 @@ function PracticeViewContent(props: PracticeViewProps) {
             context={setupContext}
             isRetrying={props.isGenerationRetrying}
             onRetry={props.onRetryGeneration}
+            pollingTimedOut={props.generationPollingTimedOut}
             selection={session.selection}
           />
         )
@@ -317,6 +325,10 @@ function PracticeViewContent(props: PracticeViewProps) {
           actions={props.answeringActions}
           context={setupContext}
           pending={props.answeringPending}
+          isReferenceAnswerRetrying={props.isReferenceAnswerRetrying}
+          onRetryReferenceAnswer={props.onRetryReferenceAnswer}
+          referenceAnswerError={props.referenceAnswerError}
+          referenceAnswerPollingTimedOut={props.referenceAnswerPollingTimedOut}
           session={session}
         />
       )
@@ -329,6 +341,7 @@ function PracticeViewContent(props: PracticeViewProps) {
           onRetry={props.onRetryFollowUpGeneration}
           session={session}
           showError={props.followUpGenerationError}
+          pollingTimedOut={props.followUpGenerationPollingTimedOut}
         />
       )
 
@@ -338,6 +351,10 @@ function PracticeViewContent(props: PracticeViewProps) {
           actions={props.followUpActions}
           context={setupContext}
           pending={props.followUpPending}
+          isReferenceAnswerRetrying={props.isReferenceAnswerRetrying}
+          onRetryReferenceAnswer={props.onRetryReferenceAnswer}
+          referenceAnswerError={props.referenceAnswerError}
+          referenceAnswerPollingTimedOut={props.referenceAnswerPollingTimedOut}
           session={session}
         />
       )
@@ -347,6 +364,7 @@ function PracticeViewContent(props: PracticeViewProps) {
         <PracticeEvaluatingView
           context={setupContext}
           evaluationError={props.evaluationError}
+          evaluationPollingTimedOut={props.evaluationPollingTimedOut}
           isEvaluationRetrying={props.isEvaluationRetrying}
           onRetryEvaluation={props.onRetryEvaluation}
           session={session}
@@ -382,12 +400,14 @@ function PracticeGeneratingFollowUpView({
   onRetry,
   session,
   showError,
+  pollingTimedOut = false,
 }: {
   context: PracticePageResponse["setupContext"]
   isRetrying: boolean
   onRetry: () => void
   session: PracticeGeneratingFollowUpState
   showError: boolean
+  pollingTimedOut?: boolean
 }) {
   const { t } = useTranslation()
 
@@ -403,9 +423,15 @@ function PracticeGeneratingFollowUpView({
         <Card data-testid="practice-generating-follow-up-error">
           <CardContent className="pt-6">
             <Alert variant="destructive">
-              <AlertTitle>{t("practice.errors.followUpGenerationTitle")}</AlertTitle>
+              <AlertTitle>
+                {pollingTimedOut
+                  ? t("common.agentPolling.timeoutTitle")
+                  : t("practice.errors.followUpGenerationTitle")}
+              </AlertTitle>
               <AlertDescription>
-                {t("practice.errors.followUpGenerationDescription")}
+                {pollingTimedOut
+                  ? t("common.agentPolling.timeoutDescription")
+                  : t("practice.errors.followUpGenerationDescription")}
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -414,7 +440,9 @@ function PracticeGeneratingFollowUpView({
               {isRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
               {isRetrying
                 ? t("practice.followUp.retryingProcessing")
-                : t("practice.followUp.retryProcessing")}
+                : pollingTimedOut
+                  ? t("common.agentPolling.recheck")
+                  : t("practice.followUp.retryProcessing")}
             </Button>
           </CardFooter>
         </Card>
@@ -437,11 +465,19 @@ function PracticeFollowUpView({
   actions,
   context,
   pending,
+  isReferenceAnswerRetrying,
+  onRetryReferenceAnswer,
+  referenceAnswerError,
+  referenceAnswerPollingTimedOut,
   session,
 }: {
   actions: PracticeFollowUpActions
   context: PracticePageResponse["setupContext"]
   pending: PracticeFollowUpPending
+  isReferenceAnswerRetrying?: boolean
+  onRetryReferenceAnswer?: () => void
+  referenceAnswerError?: boolean
+  referenceAnswerPollingTimedOut?: boolean
   session: PracticeAnsweringFollowUpState
 }) {
   const { t } = useTranslation()
@@ -484,6 +520,10 @@ function PracticeFollowUpView({
         onRequestHint={() => actions.onRequestHint(mutationInput)}
         onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
         pending={pending}
+        isPollingRetrying={isReferenceAnswerRetrying}
+        onRecheck={onRetryReferenceAnswer}
+        pollingError={referenceAnswerError}
+        pollingTimedOut={referenceAnswerPollingTimedOut}
         question={session.currentFollowUp.question}
       />
 
@@ -512,12 +552,14 @@ function PracticeFollowUpView({
 function PracticeEvaluatingView({
   context,
   evaluationError,
+  evaluationPollingTimedOut,
   isEvaluationRetrying,
   onRetryEvaluation,
   session,
 }: {
   context: PracticePageResponse["setupContext"]
   evaluationError: boolean
+  evaluationPollingTimedOut?: boolean
   isEvaluationRetrying: boolean
   onRetryEvaluation: () => void
   session: PracticeEvaluatingState
@@ -533,6 +575,7 @@ function PracticeEvaluatingView({
       />
       <PracticeEvaluationStatus
         error={evaluationError}
+        pollingTimedOut={evaluationPollingTimedOut}
         isRetrying={isEvaluationRetrying}
         onRetry={onRetryEvaluation}
       />
@@ -680,11 +723,19 @@ function PracticeAnsweringView({
   actions,
   context,
   pending,
+  isReferenceAnswerRetrying,
+  onRetryReferenceAnswer,
+  referenceAnswerError,
+  referenceAnswerPollingTimedOut,
   session,
 }: {
   actions: PracticeAnsweringActions
   context: PracticePageResponse["setupContext"]
   pending: PracticeAnsweringPending
+  isReferenceAnswerRetrying?: boolean
+  onRetryReferenceAnswer?: () => void
+  referenceAnswerError?: boolean
+  referenceAnswerPollingTimedOut?: boolean
   session: PracticeAnsweringState
 }) {
   const { t } = useTranslation()
@@ -734,6 +785,10 @@ function PracticeAnsweringView({
           isPending={pending.referenceAnswer}
           mode="answering"
           onRequest={() => actions.onRequestReferenceAnswer(mutationInput)}
+          isPollingRetrying={isReferenceAnswerRetrying}
+          onRecheck={onRetryReferenceAnswer}
+          pollingError={referenceAnswerError}
+          pollingTimedOut={referenceAnswerPollingTimedOut}
           state={session.question.referenceAnswer}
         />
       </div>

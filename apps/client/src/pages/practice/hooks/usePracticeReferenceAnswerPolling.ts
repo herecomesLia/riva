@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 
+import { useAgentPolling } from "@/lib/agent-polling"
 import type {
   GetPracticeFollowUpReferenceAnswerStatusInput,
   GetPracticeReferenceAnswerStatusInput,
@@ -30,24 +31,42 @@ export function usePracticeReferenceAnswerPolling(data: PracticePageResponse | u
       ? data.session
       : null
 
-  const mainInput: GetPracticeReferenceAnswerStatusInput | null = mainSession
-    ? {
-        sessionId: mainSession.sessionId,
-        version: mainSession.version,
-        questionId: mainSession.question.id,
-      }
-    : null
-  const followUpInput: GetPracticeFollowUpReferenceAnswerStatusInput | null = followUpSession
-    ? {
-        sessionId: followUpSession.sessionId,
-        version: followUpSession.version,
-        questionId: followUpSession.question.id,
-        followUpQuestionId: followUpSession.currentFollowUp.question.id,
-      }
-    : null
+  const mainInput: GetPracticeReferenceAnswerStatusInput | null = useMemo(
+    () =>
+      mainSession
+        ? {
+            sessionId: mainSession.sessionId,
+            version: mainSession.version,
+            questionId: mainSession.question.id,
+          }
+        : null,
+    [mainSession],
+  )
+  const followUpInput: GetPracticeFollowUpReferenceAnswerStatusInput | null = useMemo(
+    () =>
+      followUpSession
+        ? {
+            sessionId: followUpSession.sessionId,
+            version: followUpSession.version,
+            questionId: followUpSession.question.id,
+            followUpQuestionId: followUpSession.currentFollowUp.question.id,
+          }
+        : null,
+    [followUpSession],
+  )
+  const mainPolling = useAgentPolling(
+    mainInput
+      ? `practice-reference-main:${mainInput.sessionId}:${mainInput.version}:${mainInput.questionId}`
+      : null,
+  )
+  const followUpPolling = useAgentPolling(
+    followUpInput
+      ? `practice-reference-follow-up:${followUpInput.sessionId}:${followUpInput.version}:${followUpInput.questionId}:${followUpInput.followUpQuestionId}`
+      : null,
+  )
 
   const mainQuery = useQuery({
-    enabled: mainInput !== null,
+    enabled: mainInput !== null && !mainPolling.isTimedOut,
     queryFn: () => {
       if (mainInput === null) throw new Error("A generating main reference answer is required.")
       return getPracticeReferenceAnswerStatus(mainInput)
@@ -62,16 +81,18 @@ export function usePracticeReferenceAnswerPolling(data: PracticePageResponse | u
     ],
     refetchInterval: (query) => {
       const response = query.state.data
-      if (!response) return mainInput === null ? false : 500
+      if (!response) return mainInput === null ? false : mainPolling.getPollingInterval()
       const responseSession = getPracticeResponseSession(response)
       if (responseSession.status !== "answering") return false
-      return responseSession.question.referenceAnswer.status === "generating" ? 500 : false
+      return responseSession.question.referenceAnswer.status === "generating"
+        ? mainPolling.getPollingInterval()
+        : false
     },
     retry: true,
   })
 
   const followUpQuery = useQuery({
-    enabled: followUpInput !== null,
+    enabled: followUpInput !== null && !followUpPolling.isTimedOut,
     queryFn: () => {
       if (followUpInput === null) {
         throw new Error("A generating follow-up reference answer is required.")
@@ -89,11 +110,11 @@ export function usePracticeReferenceAnswerPolling(data: PracticePageResponse | u
     ],
     refetchInterval: (query) => {
       const response = query.state.data
-      if (!response) return followUpInput === null ? false : 500
+      if (!response) return followUpInput === null ? false : followUpPolling.getPollingInterval()
       const responseSession = getPracticeResponseSession(response)
       return responseSession.status === "answeringFollowUp" &&
         responseSession.currentFollowUp.question.referenceAnswer.status === "generating"
-        ? 500
+        ? followUpPolling.getPollingInterval()
         : false
     },
     retry: true,
@@ -114,6 +135,22 @@ export function usePracticeReferenceAnswerPolling(data: PracticePageResponse | u
   }, [followUpInput, followUpQuery.data, queryClient])
 
   return {
-    referenceAnswerError: mainQuery.isError || followUpQuery.isError,
+    referenceAnswerError:
+      mainPolling.isTimedOut ||
+      followUpPolling.isTimedOut ||
+      mainQuery.isError ||
+      followUpQuery.isError,
+    referenceAnswerPollingTimedOut: mainPolling.isTimedOut || followUpPolling.isTimedOut,
+    isReferenceAnswerRetrying: mainQuery.isFetching || followUpQuery.isFetching,
+    retryReferenceAnswer: () => {
+      if (mainInput !== null) {
+        mainPolling.reset()
+        void mainQuery.refetch()
+      }
+      if (followUpInput !== null) {
+        followUpPolling.reset()
+        void followUpQuery.refetch()
+      }
+    },
   }
 }

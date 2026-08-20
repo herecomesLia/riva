@@ -109,6 +109,7 @@ export type InterviewSessionViewProps =
       summary: InterviewSessionSummary
       generationStatus: "generating" | "failed"
       isRetrying: boolean
+      pollingTimedOut?: boolean
       retryFailed: boolean
       onRetry: () => Promise<void>
       onBack: () => void
@@ -119,6 +120,7 @@ export type InterviewSessionViewProps =
       generationStatus: "generating" | "failed"
       history: readonly InterviewConversationRecordViewData[]
       isRetrying: boolean
+      pollingTimedOut?: boolean
       retryFailed: boolean
       onRetry: () => Promise<void>
       onBack: () => void
@@ -130,6 +132,7 @@ export type InterviewSessionViewProps =
       currentCandidateQuestion: InterviewCandidateQuestionResponse
       history: readonly InterviewConversationRecordViewData[]
       isRetrying: boolean
+      pollingTimedOut?: boolean
       retryFailed: boolean
       onRetry: () => Promise<void>
       onBack: () => void
@@ -140,6 +143,7 @@ export type InterviewSessionViewProps =
       generationStatus: "generating" | "failed"
       history: readonly InterviewConversationRecordViewData[]
       isRetrying: boolean
+      pollingTimedOut?: boolean
       retryFailed: boolean
       onRetry: () => Promise<void>
       onBack: () => void
@@ -228,7 +232,7 @@ function GeneratingQuestionContent(
   props: Extract<InterviewSessionViewProps, { status: "generatingQuestion" }>,
 ) {
   const { t } = useTranslation()
-  const failed = props.generationStatus === "failed"
+  const failed = props.generationStatus === "failed" || props.pollingTimedOut === true
 
   return (
     <main className="w-full max-w-4xl">
@@ -238,24 +242,34 @@ function GeneratingQuestionContent(
             <BotIcon aria-hidden="true" className="size-5" />
           </div>
           <CardTitle>
-            {failed
-              ? t("interview.session.planning.failedTitle")
-              : t("interview.session.planning.title")}
+            {props.pollingTimedOut
+              ? t("common.agentPolling.timeoutTitle")
+              : failed
+                ? t("interview.session.planning.failedTitle")
+                : t("interview.session.planning.title")}
           </CardTitle>
           <CardDescription>
-            {failed
-              ? t("interview.session.planning.failedDescription")
-              : t("interview.session.planning.description")}
+            {props.pollingTimedOut
+              ? t("common.agentPolling.timeoutDescription")
+              : failed
+                ? t("interview.session.planning.failedDescription")
+                : t("interview.session.planning.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {failed ? (
             <Alert variant="destructive">
-              <AlertTitle>{t("interview.session.errors.beginTitle")}</AlertTitle>
+              <AlertTitle>
+                {props.pollingTimedOut
+                  ? t("common.agentPolling.timeoutTitle")
+                  : t("interview.session.errors.beginTitle")}
+              </AlertTitle>
               <AlertDescription>
-                {props.retryFailed
-                  ? t("interview.session.errors.beginDescription")
-                  : t("interview.session.planning.failedDescription")}
+                {props.pollingTimedOut
+                  ? t("common.agentPolling.timeoutDescription")
+                  : props.retryFailed
+                    ? t("interview.session.errors.beginDescription")
+                    : t("interview.session.planning.failedDescription")}
               </AlertDescription>
             </Alert>
           ) : (
@@ -273,7 +287,9 @@ function GeneratingQuestionContent(
               ) : (
                 <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
               )}
-              {t("interview.actions.retry")}
+              {props.pollingTimedOut
+                ? t("common.agentPolling.recheck")
+                : t("interview.actions.retry")}
             </Button>
             <Button onClick={props.onBack} variant="outline">
               <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
@@ -290,7 +306,7 @@ function GeneratingTurnContent(
   props: Extract<InterviewSessionViewProps, { status: "generatingTurn" }>,
 ) {
   const { t } = useTranslation()
-  const failed = props.generationStatus === "failed"
+  const failed = props.generationStatus === "failed" || props.pollingTimedOut === true
 
   return (
     <main className="grid min-w-0 gap-6">
@@ -301,22 +317,34 @@ function GeneratingTurnContent(
             <BotIcon aria-hidden="true" className="size-5" />
           </div>
           <CardTitle>
-            {failed ? t("interview.session.turn.failedTitle") : t("interview.session.turn.title")}
+            {props.pollingTimedOut
+              ? t("common.agentPolling.timeoutTitle")
+              : failed
+                ? t("interview.session.turn.failedTitle")
+                : t("interview.session.turn.title")}
           </CardTitle>
           <CardDescription>
-            {failed
-              ? t("interview.session.turn.failedDescription")
-              : t("interview.session.turn.description")}
+            {props.pollingTimedOut
+              ? t("common.agentPolling.timeoutDescription")
+              : failed
+                ? t("interview.session.turn.failedDescription")
+                : t("interview.session.turn.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {failed ? (
             <Alert variant="destructive">
-              <AlertTitle>{t("interview.session.errors.turnTitle")}</AlertTitle>
+              <AlertTitle>
+                {props.pollingTimedOut
+                  ? t("common.agentPolling.timeoutTitle")
+                  : t("interview.session.errors.turnTitle")}
+              </AlertTitle>
               <AlertDescription>
-                {props.retryFailed
-                  ? t("interview.session.errors.turnDescription")
-                  : t("interview.session.turn.failedDescription")}
+                {props.pollingTimedOut
+                  ? t("common.agentPolling.timeoutDescription")
+                  : props.retryFailed
+                    ? t("interview.session.errors.turnDescription")
+                    : t("interview.session.turn.failedDescription")}
               </AlertDescription>
             </Alert>
           ) : (
@@ -334,7 +362,9 @@ function GeneratingTurnContent(
               ) : (
                 <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
               )}
-              {t("interview.actions.retry")}
+              {props.pollingTimedOut
+                ? t("common.agentPolling.recheck")
+                : t("interview.actions.retry")}
             </Button>
             <Button onClick={props.onBack} variant="outline">
               <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
@@ -372,6 +402,7 @@ function GeneratingCandidateAnswerContent(
         failedDescription={t("interview.session.candidateAnswer.failedDescription")}
         failedTitle={t("interview.session.candidateAnswer.failedTitle")}
         isRetrying={props.isRetrying}
+        pollingTimedOut={props.pollingTimedOut}
         onBack={props.onBack}
         onRetry={props.onRetry}
         retryFailed={props.retryFailed}
@@ -398,6 +429,7 @@ function GeneratingReviewContent(
         failedDescription={t("interview.session.reviewGeneration.failedDescription")}
         failedTitle={t("interview.session.reviewGeneration.failedTitle")}
         isRetrying={props.isRetrying}
+        pollingTimedOut={props.pollingTimedOut}
         onBack={props.onBack}
         onRetry={props.onRetry}
         retryFailed={props.retryFailed}
@@ -416,6 +448,7 @@ function GenerationStateCard({
   failedDescription,
   failedTitle,
   isRetrying,
+  pollingTimedOut = false,
   onBack,
   onRetry,
   retryFailed,
@@ -429,6 +462,7 @@ function GenerationStateCard({
   failedDescription: string
   failedTitle: string
   isRetrying: boolean
+  pollingTimedOut?: boolean
   onBack: () => void
   onRetry: () => Promise<void>
   retryFailed: boolean
@@ -437,20 +471,34 @@ function GenerationStateCard({
   const { t } = useTranslation()
 
   return (
-    <Card aria-busy={!failed} data-testid={dataTestId}>
+    <Card aria-busy={!failed && !pollingTimedOut} data-testid={dataTestId}>
       <CardHeader>
         <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
           <BotIcon aria-hidden="true" className="size-5" />
         </div>
-        <CardTitle>{failed ? failedTitle : title}</CardTitle>
-        <CardDescription>{failed ? failedDescription : description}</CardDescription>
+        <CardTitle>
+          {pollingTimedOut ? t("common.agentPolling.timeoutTitle") : failed ? failedTitle : title}
+        </CardTitle>
+        <CardDescription>
+          {pollingTimedOut
+            ? t("common.agentPolling.timeoutDescription")
+            : failed
+              ? failedDescription
+              : description}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {failed ? (
+        {failed || pollingTimedOut ? (
           <Alert variant="destructive">
-            <AlertTitle>{errorTitle}</AlertTitle>
+            <AlertTitle>
+              {pollingTimedOut ? t("common.agentPolling.timeoutTitle") : errorTitle}
+            </AlertTitle>
             <AlertDescription>
-              {retryFailed ? errorDescription : failedDescription}
+              {pollingTimedOut
+                ? t("common.agentPolling.timeoutDescription")
+                : retryFailed
+                  ? errorDescription
+                  : failedDescription}
             </AlertDescription>
           </Alert>
         ) : (
@@ -460,7 +508,7 @@ function GenerationStateCard({
           </div>
         )}
       </CardContent>
-      {failed ? (
+      {failed || pollingTimedOut ? (
         <CardFooter className="flex flex-wrap gap-2 border-t">
           <Button disabled={isRetrying} onClick={() => void onRetry()}>
             {isRetrying ? (
@@ -468,7 +516,7 @@ function GenerationStateCard({
             ) : (
               <RotateCcwIcon aria-hidden="true" data-icon="inline-start" />
             )}
-            {t("interview.actions.retry")}
+            {pollingTimedOut ? t("common.agentPolling.recheck") : t("interview.actions.retry")}
           </Button>
           <Button onClick={onBack} variant="outline">
             <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
