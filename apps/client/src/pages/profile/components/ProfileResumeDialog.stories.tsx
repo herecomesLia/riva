@@ -16,7 +16,6 @@ function createArgs(snapshot: JobProfileSnapshot, mode: "details" | "import") {
     onSubmit: fn(async () => undefined),
     open: true,
     profile: snapshot.profile!,
-    resumeUpdate: snapshot.resumeUpdate,
   }
 }
 

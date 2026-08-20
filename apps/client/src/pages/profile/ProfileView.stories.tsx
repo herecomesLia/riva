@@ -31,13 +31,11 @@ function createStoryActions(): ProfileViewActions {
   return {
     applyResumeDraft: fn(async () => undefined),
     createManualProfile: fn(async () => createProfileMockSnapshot("emptyManualProfile")),
-    resetInitialResumeImport: fn(async () => createProfileMockSnapshot("noProfile")),
     resetResumeWorkflow: fn(),
-    retryRecognition: fn(async () => createProfileMockSnapshot("initialResumeRecognizing")),
     retryResumeWorkflow: fn(async () => undefined),
     saveSection: fn(async () => undefined),
-    uploadInitialResume: fn(async () => createProfileMockSnapshot("initialResumeUploading")),
-    uploadUpdatedResume: fn(async () => createProfileMockSnapshot("resumeUpdateUploading")),
+    uploadResumeForInitialImport: fn(async () => createProfileMockSnapshot("noProfile")),
+    uploadResumeForUpdate: fn(async () => createProfileMockSnapshot("complete")),
   }
 }
 
@@ -148,10 +146,6 @@ export const ExistingProfileDraftReady = resumeWorkflowStory(
   },
   true,
 )
-export const AfterInitialImport = pageStory("initialResumeRecognitionSucceeded", true)
-export const AfterResumeUpdate = pageStory("resumeUpdateSucceeded", true)
-export const MatchingAnalysisStale = pageStory("matchingAnalysisStale")
-
 export const EditableProfile = meta.story({
   render: () => <ProfileStoryHarness scenario="complete" />,
   play: async ({ canvas, userEvent }) => {

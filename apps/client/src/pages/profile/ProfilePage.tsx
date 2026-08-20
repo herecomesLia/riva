@@ -408,23 +408,11 @@ export function ProfilePage() {
   const actions: ProfileViewActions = {
     applyResumeDraft,
     createManualProfile: () => manualProfileMutation.mutateAsync(),
-    resetInitialResumeImport: async () => {
-      resetResumeWorkflow()
-      return currentSnapshot()
-    },
     resetResumeWorkflow,
-    retryRecognition: async () => {
-      await retryResumeWorkflow()
-      return currentSnapshot()
-    },
     retryResumeWorkflow,
-    retrySynchronization: async () => {
-      await retryResumeWorkflow()
-      return currentSnapshot()
-    },
     saveSection: (input) => saveMutation.mutateAsync(input),
-    uploadInitialResume: (input) => uploadForMode(input, "initial"),
-    uploadUpdatedResume: (input) => uploadForMode(input, "update"),
+    uploadResumeForInitialImport: (input) => uploadForMode(input, "initial"),
+    uploadResumeForUpdate: (input) => uploadForMode(input, "update"),
   }
 
   if (profileQuery.data !== undefined) {

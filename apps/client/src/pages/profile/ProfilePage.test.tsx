@@ -28,18 +28,13 @@ vi.mock("@/services/profile", async (importOriginal) => ({
   listResumeDocuments: vi.fn(),
   profileCapabilities: {
     credentials: true,
-    matchingAnalysis: true,
     resumeImport: true,
-    resumeRecognition: true,
-    resumeUpdate: true,
     targetRoles: true,
   },
   retryResumeParsing: vi.fn(),
   saveProfileSection: vi.fn(),
   startResumeParsing: vi.fn(),
-  uploadInitialResume: vi.fn(),
   uploadResume: vi.fn(),
-  uploadUpdatedResume: vi.fn(),
 }))
 
 const resumeId = "11111111-1111-4111-8111-111111111111"
@@ -207,7 +202,6 @@ describe("ProfilePage resume import orchestration", () => {
 
     expect(profileService.uploadResume).toHaveBeenCalledWith({ text: "resume text" })
     expect(profileService.startResumeParsing).toHaveBeenCalledWith(resumeId)
-    expect(profileService.uploadInitialResume).not.toHaveBeenCalled()
     expect(result.queryClient.getQueryData(parsingQueryKey(resumeId))).toEqual(
       parsingStatus("running"),
     )
@@ -346,7 +340,7 @@ describe("ProfilePage resume import orchestration", () => {
   })
 
   it("applies only resumeId and draftVersion, refreshes Profile, invalidates roles, and clears workflow", async () => {
-    const refreshed = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
+    const refreshed = createProfileMockSnapshot("complete")
     refreshed.profile!.resume = null
     const result = await reachDraftReview()
     vi.mocked(profileService.applyResumeImportDraft).mockResolvedValue(application())
@@ -368,7 +362,7 @@ describe("ProfilePage resume import orchestration", () => {
 
   it("recovers when Profile synchronization fails after a successful apply without reapplying", async () => {
     const initial = createProfileMockSnapshot("noProfile")
-    const refreshed = createProfileMockSnapshot("initialResumeRecognitionSucceeded")
+    const refreshed = createProfileMockSnapshot("complete")
 
     const result = await reachDraftReview(initial)
 
@@ -423,7 +417,6 @@ describe("ProfilePage resume import orchestration", () => {
     await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
 
     expect(profileService.uploadResume).toHaveBeenCalledWith({ text: "updated resume" })
-    expect(profileService.uploadUpdatedResume).not.toHaveBeenCalled()
     expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: i18n.t("profile.title") })).toBeInTheDocument()
   })

@@ -17,9 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { JobProfile, ResumeProcessingStatus, ResumeUpdate } from "@/models/profile"
+import type { JobProfile, ResumeProcessingStatus } from "@/models/profile"
 
-import { ResumeImportForm, ResumeUpdateSummary } from "./ProfileImportPanels"
+import { ResumeImportForm } from "./ProfileImportPanels"
 import { ResumeProcessingBadge } from "./ProfileStatusBadge"
 import { formatDate, formatFileSize } from "./profile-formatters"
 
@@ -34,7 +34,6 @@ type ProfileResumeDialogProps = {
   onSubmit: (input: { file?: File; text?: string }) => Promise<void>
   open: boolean
   profile: JobProfile
-  resumeUpdate: ResumeUpdate | null
 }
 
 function attachmentState(status: ResumeProcessingStatus) {
@@ -62,7 +61,6 @@ export function ProfileResumeDialog({
   onSubmit,
   open,
   profile,
-  resumeUpdate,
 }: ProfileResumeDialogProps) {
   const { i18n, t } = useTranslation()
   const resume = profile.resume
@@ -133,12 +131,6 @@ export function ProfileResumeDialog({
                 {t("profile.actions.updateResume")}
               </Button>
             </div>
-
-            {resumeUpdate && (
-              <div className="border-t pt-5">
-                <ResumeUpdateSummary resumeUpdate={resumeUpdate} />
-              </div>
-            )}
           </div>
         )}
       </DialogContent>

@@ -1,9 +1,4 @@
-import type {
-  JobProfile,
-  JobProfileSnapshot,
-  ResumeFile,
-  ResumeRecognition,
-} from "@/models/profile"
+import type { JobProfile, JobProfileSnapshot, ResumeFile } from "@/models/profile"
 
 function createResume(overrides: Partial<ResumeFile> = {}): ResumeFile {
   return {
@@ -19,16 +14,6 @@ function createResume(overrides: Partial<ResumeFile> = {}): ResumeFile {
   }
 }
 
-function createRecognition(resume: ResumeFile, overrides: Partial<ResumeRecognition> = {}) {
-  return {
-    resumeId: resume.id,
-    processingStatus: resume.processingStatus,
-    completedAt: resume.parsedAt,
-    failureReason: resume.failureReason,
-    ...overrides,
-  } satisfies ResumeRecognition
-}
-
 function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile {
   return {
     profileId: "profile_lin_chen",
@@ -40,7 +25,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
     },
     updatedAt: "2026-07-10T09:15:00.000Z",
     version: 7,
-    matchingAnalysisStale: false,
     resume: createResume(),
     education: [
       {
@@ -181,314 +165,71 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
 }
 
 function createCompleteSnapshot(): JobProfileSnapshot {
-  const profile = createCompleteProfile()
-
-  return {
-    profile,
-    recognition: createRecognition(profile.resume!),
-    resumeUpdate: null,
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
-  }
+  return { profile: createCompleteProfile() }
 }
 
 function createProfileWithoutResumeSnapshot(): JobProfileSnapshot {
-  const profile = createCompleteProfile({ resume: null })
-
-  return {
-    profile,
-    recognition: null,
-    resumeUpdate: null,
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
-  }
+  return { profile: createCompleteProfile({ resume: null }) }
 }
 
 function createEmptyManualProfileSnapshot(): JobProfileSnapshot {
-  const profile = createCompleteProfile({
-    completeness: {
-      percentage: 0,
-      missingSections: [
-        "education",
-        "workExperience",
-        "projectExperience",
-        "skills",
-        "credentials",
-        "targetRoles",
-      ],
-    },
-    credentials: [],
-    education: [],
-    matchingAnalysisStale: false,
-    profileId: "profile_manual_empty",
-    projectExperiences: [],
-    resume: null,
-    skills: [],
-    status: "active",
-    summary: null,
-    targetRoles: [],
-    updatedAt: "2026-07-11T09:00:00.000Z",
-    version: 1,
-    workExperiences: [],
-  })
-
-  return { profile, recognition: null, resumeUpdate: null, matchingAnalysis: null }
-}
-
-function createInitialResumeSnapshot(
-  status: "uploadingResume" | "parsingResume" | "recognitionFailed",
-  failureReason = status === "recognitionFailed"
-    ? "The resume could not be recognized because its text layer is unavailable."
-    : null,
-): JobProfileSnapshot {
-  const processingStatus =
-    status === "uploadingResume" ? "uploaded" : status === "parsingResume" ? "parsing" : "failed"
-  const resume = createResume({
-    failureReason,
-    id: `resume_initial_${processingStatus}`,
-    parsedAt: null,
-    processingStatus,
-  })
-  const profile = createCompleteProfile({
-    completeness: {
-      percentage: 0,
-      missingSections: [
-        "education",
-        "workExperience",
-        "projectExperience",
-        "skills",
-        "credentials",
-        "targetRoles",
-      ],
-    },
-    credentials: [],
-    education: [],
-    matchingAnalysisStale: false,
-    projectExperiences: [],
-    resume,
-    skills: [],
-    status,
-    summary: null,
-    targetRoles: [],
-    updatedAt: "2026-07-13T08:00:00.000Z",
-    version: 1,
-    workExperiences: [],
-  })
-
   return {
-    profile,
-    recognition: createRecognition(resume),
-    resumeUpdate: null,
-    matchingAnalysis: null,
-  }
-}
-
-function createInitialResumeRecognitionSucceededSnapshot(): JobProfileSnapshot {
-  const resume = createResume({
-    id: "resume_initial_succeeded",
-    parsedAt: "2026-07-13T08:02:00.000Z",
-    processingStatus: "succeeded",
-  })
-  const profile = createCompleteProfile({
-    resume,
-    updatedAt: resume.parsedAt!,
-    version: 2,
-  })
-
-  return {
-    profile,
-    recognition: createRecognition(resume),
-    resumeUpdate: null,
-    matchingAnalysis: null,
+    profile: createCompleteProfile({
+      completeness: {
+        percentage: 0,
+        missingSections: [
+          "education",
+          "workExperience",
+          "projectExperience",
+          "skills",
+          "credentials",
+          "targetRoles",
+        ],
+      },
+      credentials: [],
+      education: [],
+      profileId: "profile_manual_empty",
+      projectExperiences: [],
+      resume: null,
+      skills: [],
+      summary: null,
+      targetRoles: [],
+      updatedAt: "2026-07-11T09:00:00.000Z",
+      version: 1,
+      workExperiences: [],
+    }),
   }
 }
 
 function createPartialProfileSnapshot(): JobProfileSnapshot {
   const completeProfile = createCompleteProfile()
-  const profile = createCompleteProfile({
-    completeness: {
-      percentage: 75,
-      missingSections: ["projectExperience", "credentials"],
-    },
-    credentials: [],
-    education: completeProfile.education.map((education, index) =>
-      index === 0 ? { ...education, degree: null } : education,
-    ),
-    projectExperiences: [],
-    workExperiences: completeProfile.workExperiences.map((experience, index) =>
-      index === 0 ? { ...experience, location: null } : experience,
-    ),
-  })
-
   return {
-    profile,
-    recognition: createRecognition(profile.resume!),
-    resumeUpdate: null,
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
-  }
-}
-
-function createResumeUpdateSucceededSnapshot(): JobProfileSnapshot {
-  const resume = createResume({
-    id: "resume_update_2026_07_succeeded",
-    parsedAt: "2026-07-13T08:04:00.000Z",
-    processingStatus: "succeeded",
-    uploadedAt: "2026-07-13T08:00:00.000Z",
-  })
-  const profile = createCompleteProfile({
-    matchingAnalysisStale: true,
-    resume,
-    updatedAt: "2026-07-13T08:04:00.000Z",
-    version: 8,
-  })
-
-  return {
-    profile,
-    recognition: createRecognition(profile.resume!),
-    resumeUpdate: {
-      id: "resume_update_2026_07",
-      createdAt: "2026-07-13T08:00:00.000Z",
-      status: "succeeded",
-      resume,
-      changeSummary: { changedItems: 2, missingItems: 1, newItems: 1 },
-      failureReason: null,
-      preservesManualChanges: true,
-    },
-    matchingAnalysis: {
-      status: "stale",
-      profileVersion: 7,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
-  }
-}
-
-function createResumeUpdateProcessingSnapshot(status: "uploading" | "parsing"): JobProfileSnapshot {
-  const profile = createCompleteProfile()
-  const resume = createResume({
-    id: "resume_update_2026_07",
-    parsedAt: null,
-    processingStatus: status === "uploading" ? "uploaded" : "parsing",
-  })
-
-  return {
-    profile,
-    recognition: createRecognition(profile.resume!),
-    resumeUpdate: {
-      id: "resume_update_2026_07",
-      createdAt: "2026-07-13T08:00:00.000Z",
-      status,
-      resume,
-      changeSummary: null,
-      failureReason: null,
-      preservesManualChanges: true,
-    },
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
-  }
-}
-
-function createResumeUpdateFailedSnapshot(): JobProfileSnapshot {
-  const profile = createCompleteProfile()
-  const failureReason =
-    "The updated resume could not be recognized because its text layer is unavailable."
-  const resume = createResume({
-    failureReason,
-    id: "resume_update_2026_07",
-    parsedAt: null,
-    processingStatus: "failed",
-  })
-
-  return {
-    profile,
-    recognition: createRecognition(profile.resume!),
-    resumeUpdate: {
-      id: "resume_update_2026_07",
-      createdAt: "2026-07-13T08:00:00.000Z",
-      status: "failed",
-      resume,
-      changeSummary: null,
-      failureReason,
-      preservesManualChanges: true,
-    },
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
-  }
-}
-
-function createMatchingAnalysisStaleSnapshot(): JobProfileSnapshot {
-  const profile = createCompleteProfile({ matchingAnalysisStale: true, version: 8 })
-
-  return {
-    profile,
-    recognition: createRecognition(profile.resume!),
-    resumeUpdate: null,
-    matchingAnalysis: {
-      status: "stale",
-      profileVersion: 7,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
+    profile: createCompleteProfile({
+      completeness: {
+        percentage: 75,
+        missingSections: ["projectExperience", "credentials"],
+      },
+      credentials: [],
+      education: completeProfile.education.map((education, index) =>
+        index === 0 ? { ...education, degree: null } : education,
+      ),
+      projectExperiences: [],
+      workExperiences: completeProfile.workExperiences.map((experience, index) =>
+        index === 0 ? { ...experience, location: null } : experience,
+      ),
+    }),
   }
 }
 
 export type ProfileMockScenario =
-  | "complete"
-  | "noProfile"
-  | "emptyManualProfile"
-  | "profileWithoutResume"
-  | "initialResumeUploading"
-  | "initialResumeRecognizing"
-  | "initialResumeRecognitionSucceeded"
-  | "initialResumeRecognitionFailed"
-  | "initialResumeRecognitionFailedWithoutReason"
-  | "partial"
-  | "resumeUpdateUploading"
-  | "resumeUpdateRecognizing"
-  | "resumeUpdateSucceeded"
-  | "resumeUpdateFailed"
-  | "matchingAnalysisStale"
+  "complete" | "noProfile" | "emptyManualProfile" | "profileWithoutResume" | "partial"
 
 const profileMockScenarios = {
   complete: createCompleteSnapshot(),
-  noProfile: { profile: null, recognition: null, resumeUpdate: null, matchingAnalysis: null },
+  noProfile: { profile: null },
   emptyManualProfile: createEmptyManualProfileSnapshot(),
   profileWithoutResume: createProfileWithoutResumeSnapshot(),
-  initialResumeUploading: createInitialResumeSnapshot("uploadingResume"),
-  initialResumeRecognizing: createInitialResumeSnapshot("parsingResume"),
-  initialResumeRecognitionSucceeded: createInitialResumeRecognitionSucceededSnapshot(),
-  initialResumeRecognitionFailed: createInitialResumeSnapshot("recognitionFailed"),
-  initialResumeRecognitionFailedWithoutReason: createInitialResumeSnapshot(
-    "recognitionFailed",
-    null,
-  ),
   partial: createPartialProfileSnapshot(),
-  resumeUpdateUploading: createResumeUpdateProcessingSnapshot("uploading"),
-  resumeUpdateRecognizing: createResumeUpdateProcessingSnapshot("parsing"),
-  resumeUpdateSucceeded: createResumeUpdateSucceededSnapshot(),
-  resumeUpdateFailed: createResumeUpdateFailedSnapshot(),
-  matchingAnalysisStale: createMatchingAnalysisStaleSnapshot(),
 } satisfies Record<ProfileMockScenario, JobProfileSnapshot>
 
 export const profileResponseMock = profileMockScenarios.complete

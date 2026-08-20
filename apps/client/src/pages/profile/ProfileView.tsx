@@ -4,7 +4,7 @@ import { useCallback, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,14 +44,11 @@ import type { ProfileResumeWorkflowState } from "./profile-resume-workflow"
 export type ProfileViewActions = {
   applyResumeDraft: () => Promise<void>
   createManualProfile: () => Promise<JobProfileSnapshot>
-  resetInitialResumeImport: (profileId: string, resumeId: string) => Promise<JobProfileSnapshot>
-  retryRecognition: (profileId: string, resumeId: string) => Promise<JobProfileSnapshot>
   retryResumeWorkflow: () => Promise<void>
-  retrySynchronization?: () => Promise<JobProfileSnapshot | undefined>
   resetResumeWorkflow: () => void
   saveSection: (input: SaveProfileSectionInput) => Promise<unknown>
-  uploadInitialResume: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
-  uploadUpdatedResume: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
+  uploadResumeForInitialImport: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
+  uploadResumeForUpdate: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
 }
 
 export type ProfileViewProps =
@@ -65,17 +62,13 @@ export type ProfileViewProps =
         data: JobProfileSnapshot
         hasResumeDocuments?: boolean
         resumeWorkflow?: ProfileResumeWorkflowState
-        synchronizationError?: "initialRecognition" | "resumeUpdate" | null
       }
       actions: ProfileViewActions
     }
 
 const defaultProfileCapabilities: ProfileCapabilities = {
   credentials: true,
-  matchingAnalysis: true,
   resumeImport: true,
-  resumeRecognition: true,
-  resumeUpdate: true,
   targetRoles: true,
 }
 
@@ -95,7 +88,6 @@ export function ProfileView(props: ProfileViewProps) {
       hasResume={props.content.hasResumeDocuments ?? Boolean(props.content.data.profile?.resume)}
       snapshot={props.content.data}
       resumeWorkflow={props.content.resumeWorkflow ?? { status: "idle" }}
-      synchronizationError={props.content.synchronizationError ?? null}
     />
   )
 }
@@ -106,14 +98,12 @@ function ProfileReadyView({
   hasResume,
   resumeWorkflow,
   snapshot,
-  synchronizationError,
 }: {
   actions: ProfileViewActions
   capabilities: ProfileCapabilities
   hasResume: boolean
   resumeWorkflow: ProfileResumeWorkflowState
   snapshot: JobProfileSnapshot
-  synchronizationError: "initialRecognition" | "resumeUpdate" | null
 }) {
   const { t } = useTranslation()
   const [editingSection, setEditingSection] = useState<EditableProfileSection | null>(null)
@@ -126,7 +116,6 @@ function ProfileReadyView({
   const [resumeImportError, setResumeImportError] = useState<string | null>(null)
   const [lifecycleActionError, setLifecycleActionError] = useState<string | null>(null)
   const [pendingLifecycleAction, setPendingLifecycleAction] = useState(false)
-  const [isSynchronizing, setIsSynchronizing] = useState(false)
   const blocker = useBlocker({
     disabled: !isDirty,
     enableBeforeUnload: isDirty,
@@ -194,16 +183,6 @@ function ProfileReadyView({
       setLifecycleActionError(t("profile.lifecycle.actionFailed"))
     } finally {
       setPendingLifecycleAction(false)
-    }
-  }
-
-  async function retrySynchronization() {
-    if (isSynchronizing) return
-    setIsSynchronizing(true)
-    try {
-      await actions.retrySynchronization?.()
-    } finally {
-      setIsSynchronizing(false)
     }
   }
 
@@ -297,7 +276,9 @@ function ProfileReadyView({
         <ProfileEmptyState />
         <ResumeImportForm
           isSubmitting={isImportSubmitting}
-          onSubmit={(input) => runImport(input, actions.uploadInitialResume, setInitialImportError)}
+          onSubmit={(input) =>
+            runImport(input, actions.uploadResumeForInitialImport, setInitialImportError)
+          }
           title={t("profile.import.title")}
         />
         {initialImportError && <ImportError message={initialImportError} />}
@@ -306,16 +287,6 @@ function ProfileReadyView({
   }
 
   const { profile } = snapshot
-  const processingStatus =
-    profile.status === "uploadingResume" || profile.status === "parsingResume"
-      ? profile.status
-      : snapshot.resumeUpdate?.status === "uploading"
-        ? "uploadingResume"
-        : snapshot.resumeUpdate?.status === "parsing"
-          ? "parsingResume"
-          : null
-  const isProcessing = processingStatus !== null
-  const isRecognitionFailure = profile.status === "recognitionFailed"
 
   function closeResumeDialog() {
     setIsResumeDialogOpen(false)
@@ -337,26 +308,19 @@ function ProfileReadyView({
   }
 
   async function submitResumeImport(input: ResumeUploadInput) {
-    await runImport(input, actions.uploadUpdatedResume, setResumeImportError, closeResumeDialog)
+    await runImport(input, actions.uploadResumeForUpdate, setResumeImportError, closeResumeDialog)
   }
-
-  const summary = snapshot.resumeUpdate?.changeSummary
-  const showsInitialImportFeedback =
-    snapshot.recognition?.processingStatus === "succeeded" &&
-    snapshot.matchingAnalysis === null &&
-    snapshot.resumeUpdate === null
-  const showsResumeUpdateFeedback = snapshot.resumeUpdate?.status === "succeeded"
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <ProfileHeader
         hasResume={hasResume}
         onOpenResume={
-          capabilities.resumeUpdate ? () => handleResumeDialogOpenChange(true) : undefined
+          capabilities.resumeImport ? () => handleResumeDialogOpenChange(true) : undefined
         }
         profile={profile}
       />
-      {capabilities.resumeUpdate && (
+      {capabilities.resumeImport && (
         <ProfileResumeDialog
           importError={resumeImportError}
           isSubmitting={isImportSubmitting}
@@ -369,86 +333,24 @@ function ProfileReadyView({
           onSubmit={submitResumeImport}
           open={isResumeDialogOpen}
           profile={profile}
-          resumeUpdate={snapshot.resumeUpdate}
         />
       )}
-
-      {showsInitialImportFeedback && (
-        <Alert data-testid="profile-import-success">
-          <AlertTitle>{t("profile.import.success")}</AlertTitle>
-          <AlertDescription>{t("profile.import.successDescription")}</AlertDescription>
-        </Alert>
-      )}
-      {showsResumeUpdateFeedback && summary && (
-        <Alert data-testid="profile-resume-update-success">
-          <AlertTitle>{t("profile.import.updateSuccess")}</AlertTitle>
-          <AlertDescription>
-            {t("profile.import.updateSummary", {
-              changedItems: summary.changedItems,
-              missingItems: summary.missingItems,
-              newItems: summary.newItems,
-            })}
-          </AlertDescription>
-          {snapshot.resumeUpdate?.preservesManualChanges && (
-            <AlertDescription>{t("profile.import.manualChangesProtected")}</AlertDescription>
-          )}
-        </Alert>
-      )}
-      {processingStatus && (
-        <ProfileProcessingState
-          isRetrying={isSynchronizing}
-          onRetry={retrySynchronization}
-          status={processingStatus}
-          synchronizationError={synchronizationError}
-        />
-      )}
-      {isRecognitionFailure && (
-        <ProfileRecognitionFailureState
-          isActionPending={pendingLifecycleAction}
-          failureReason={
-            snapshot.recognition?.failureReason ?? profile.resume?.failureReason ?? null
-          }
-          onManualEntry={() => runLifecycleAction(actions.createManualProfile)}
-          onRetry={() => {
-            if (profile.resume) {
-              return runLifecycleAction(() =>
-                actions.retryRecognition(profile.profileId, profile.resume!.id),
-              )
-            }
-          }}
-          onReupload={() => {
-            if (profile.resume) {
-              return runLifecycleAction(() =>
-                actions.resetInitialResumeImport(profile.profileId, profile.resume!.id),
-              )
-            }
-          }}
-        />
-      )}
-      {isRecognitionFailure && lifecycleActionError && (
-        <ImportError message={lifecycleActionError} />
-      )}
-
-      {!isProcessing && !isRecognitionFailure && (
-        <>
-          <ProfileSections onStartEditing={startEditing} profile={profile} />
-          <ProfileSectionEditDialog
-            onDirtyChange={handleDirtyChange}
-            onOpenChange={handleEditorOpenChange}
-            onSave={async (input) => {
-              await actions.saveSection(input)
-              closeEditor()
-              toast.success(t("profile.editor.saveSuccess"), {
-                duration: 2500,
-                id: "profile-save-success",
-              })
-            }}
-            open={editingSection !== null}
-            profile={profile}
-            section={editingSection}
-          />
-        </>
-      )}
+      <ProfileSections onStartEditing={startEditing} profile={profile} />
+      <ProfileSectionEditDialog
+        onDirtyChange={handleDirtyChange}
+        onOpenChange={handleEditorOpenChange}
+        onSave={async (input) => {
+          await actions.saveSection(input)
+          closeEditor()
+          toast.success(t("profile.editor.saveSuccess"), {
+            duration: 2500,
+            id: "profile-save-success",
+          })
+        }}
+        open={editingSection !== null}
+        profile={profile}
+        section={editingSection}
+      />
 
       <AlertDialog open={isDiscardDialogOpen}>
         <AlertDialogContent>

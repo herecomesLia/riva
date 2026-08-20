@@ -5,58 +5,19 @@ import {
   type ProfileMockScenario,
   profileResponseMock,
 } from "@/mocks/data/profile"
-import type { JobProfileSnapshot, ProfileStatus, ResumeProcessingStatus } from "@/models/profile"
+import type { JobProfileSnapshot } from "@/models/profile"
 
 const scenarios: ProfileMockScenario[] = [
   "complete",
   "noProfile",
   "emptyManualProfile",
   "profileWithoutResume",
-  "initialResumeUploading",
-  "initialResumeRecognizing",
-  "initialResumeRecognitionSucceeded",
-  "initialResumeRecognitionFailed",
-  "initialResumeRecognitionFailedWithoutReason",
   "partial",
-  "resumeUpdateUploading",
-  "resumeUpdateRecognizing",
-  "resumeUpdateSucceeded",
-  "resumeUpdateFailed",
-  "matchingAnalysisStale",
 ]
 
-const processingStatusByProfileStatus: Partial<Record<ProfileStatus, ResumeProcessingStatus>> = {
-  uploadingResume: "uploaded",
-  parsingResume: "parsing",
-  recognitionFailed: "failed",
-}
-
 function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
-  const { matchingAnalysis, profile, recognition, resumeUpdate } = snapshot
-
-  if (!profile) {
-    expect(recognition).toBeNull()
-    expect(resumeUpdate).toBeNull()
-    expect(matchingAnalysis).toBeNull()
-    return
-  }
-
-  if (!profile.resume) {
-    expect(recognition).toBeNull()
-  } else {
-    expect(recognition).toMatchObject({
-      resumeId: profile.resume.id,
-      processingStatus: profile.resume.processingStatus,
-      completedAt: profile.resume.parsedAt,
-      failureReason: profile.resume.failureReason,
-    })
-  }
-
-  const expectedProcessingStatus = processingStatusByProfileStatus[profile.status]
-  if (expectedProcessingStatus) {
-    expect(profile.resume?.processingStatus).toBe(expectedProcessingStatus)
-    expect(recognition?.processingStatus).toBe(expectedProcessingStatus)
-  }
+  const { profile } = snapshot
+  if (!profile) return
 
   if (
     profile.education.length === 0 &&
@@ -77,34 +38,6 @@ function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
         "targetRoles",
       ],
     })
-  }
-
-  if (resumeUpdate?.status === "succeeded") {
-    expect(resumeUpdate.changeSummary).not.toBeNull()
-    expect(resumeUpdate.failureReason).toBeNull()
-    expect(profile.resume).not.toBeNull()
-    expect(profile.resume).toMatchObject({
-      id: resumeUpdate.resume.id,
-      parsedAt: resumeUpdate.resume.parsedAt,
-      processingStatus: "succeeded",
-      uploadedAt: resumeUpdate.resume.uploadedAt,
-    })
-    expect(resumeUpdate.resume.parsedAt).not.toBeNull()
-    expect(new Date(resumeUpdate.resume.parsedAt!).getTime()).toBeGreaterThanOrEqual(
-      new Date(resumeUpdate.resume.uploadedAt).getTime(),
-    )
-  }
-
-  if (matchingAnalysis) {
-    expect(matchingAnalysis.status === "stale").toBe(profile.matchingAnalysisStale)
-    if (matchingAnalysis.status === "current") {
-      expect(matchingAnalysis.profileVersion).toBe(profile.version)
-    }
-    if (matchingAnalysis.status === "stale") {
-      expect(matchingAnalysis.profileVersion).toBeLessThan(profile.version)
-    }
-  } else {
-    expect(profile.matchingAnalysisStale).toBe(false)
   }
 }
 

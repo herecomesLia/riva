@@ -108,10 +108,7 @@ describe("profile service API", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ profile: null }))
 
     await expect(getJobProfile()).resolves.toEqual({
-      matchingAnalysis: null,
       profile: null,
-      recognition: null,
-      resumeUpdate: null,
     })
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/profile")
   })
@@ -123,11 +120,9 @@ describe("profile service API", () => {
     const snapshot = await getJobProfile()
 
     expect(snapshot).toMatchObject({
-      matchingAnalysis: null,
       profile: {
         completeness: { missingSections: [], percentage: 100 },
         credentials: [],
-        matchingAnalysisStale: false,
         profileId,
         resume: null,
         summary: "Backend engineer",
@@ -135,18 +130,13 @@ describe("profile service API", () => {
         updatedAt: careerProfile.updatedAt,
         version: 3,
       },
-      recognition: null,
-      resumeUpdate: null,
     })
     expect(snapshot.profile?.education[0]?.source).toBe("resumeExtracted")
     expect(snapshot.profile?.workExperiences[0]?.source).toBe("userEdited")
     expect("source" in snapshot.profile!).toBe(false)
     expect(profileCapabilities).toEqual({
       credentials: false,
-      matchingAnalysis: false,
       resumeImport: true,
-      resumeRecognition: true,
-      resumeUpdate: true,
       targetRoles: false,
     })
   })

@@ -427,23 +427,4 @@ describe("resume profile service in mock mode", () => {
 
     await expectConflict(retryResumeParsing(document.id), "resume_parsing_not_started")
   })
-
-  it("keeps an existing matching analysis stale after a changing apply", async () => {
-    resetProfileMockState("complete")
-
-    const before = await settle(getJobProfile())
-    const { document } = await uploadAndComplete()
-    const draft = await settle(getResumeImportDraft(document.id))
-
-    await settle(applyResumeImportDraft(document.id, draft.draftVersion))
-
-    const after = await settle(getJobProfile())
-
-    expect(after.matchingAnalysis).toMatchObject({
-      profileVersion: before.profile!.version,
-      status: "stale",
-    })
-    expect(after.profile!.version).toBeGreaterThan(before.profile!.version)
-    expect(after.profile!.matchingAnalysisStale).toBe(true)
-  })
 })

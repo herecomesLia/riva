@@ -26,14 +26,11 @@ function createActions(): ProfileViewActions {
   return {
     applyResumeDraft: vi.fn(async () => undefined),
     createManualProfile: vi.fn(async () => structuredClone(profileResponseMock)),
-    resetInitialResumeImport: vi.fn(async () => structuredClone(profileResponseMock)),
     resetResumeWorkflow: vi.fn(() => undefined),
-    retryRecognition: vi.fn(async () => structuredClone(profileResponseMock)),
     retryResumeWorkflow: vi.fn(async () => undefined),
-    retrySynchronization: vi.fn(async () => structuredClone(profileResponseMock)),
     saveSection: vi.fn(async () => structuredClone(profileResponseMock.profile!)),
-    uploadInitialResume: vi.fn(async () => structuredClone(profileResponseMock)),
-    uploadUpdatedResume: vi.fn(async () => structuredClone(profileResponseMock)),
+    uploadResumeForInitialImport: vi.fn(async () => structuredClone(profileResponseMock)),
+    uploadResumeForUpdate: vi.fn(async () => structuredClone(profileResponseMock)),
   }
 }
 
@@ -418,10 +415,7 @@ describe("ProfileView", () => {
         actions={actions}
         capabilities={{
           credentials: false,
-          matchingAnalysis: false,
           resumeImport: false,
-          resumeRecognition: false,
-          resumeUpdate: false,
           targetRoles: false,
         }}
         content={{ status: "ready", data: createProfileMockSnapshot("noProfile") }}
@@ -443,10 +437,7 @@ describe("ProfileView", () => {
         actions={actions}
         capabilities={{
           credentials: false,
-          matchingAnalysis: false,
           resumeImport: false,
-          resumeRecognition: false,
-          resumeUpdate: false,
           targetRoles: false,
         }}
         content={{ status: "ready", data: structuredClone(profileResponseMock) }}
@@ -476,8 +467,8 @@ describe("ProfileView", () => {
     await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
     await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
 
-    expect(actions.uploadInitialResume).toHaveBeenCalledOnce()
-    expect(actions.uploadUpdatedResume).not.toHaveBeenCalled()
+    expect(actions.uploadResumeForInitialImport).toHaveBeenCalledOnce()
+    expect(actions.uploadResumeForUpdate).not.toHaveBeenCalled()
   })
 
   it("renders the complete ready-page lifecycle and header", async () => {
@@ -507,104 +498,6 @@ describe("ProfileView", () => {
     expect(screen.queryByText("Frontend Technical Lead")).not.toBeInTheDocument()
     expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
     expect(screen.queryByText(/已确认/)).not.toBeInTheDocument()
-  })
-
-  it("keeps recognition-failure actions with the supplied failure reason", async () => {
-    const user = userEvent.setup()
-    const snapshot = createProfileMockSnapshot("initialResumeRecognitionFailed")
-    const { actions } = renderReady(snapshot)
-    const alert = await screen.findByTestId("profile-recognition-failure")
-
-    expect(alert).toHaveTextContent(i18n.t("profile.lifecycle.failed.title"))
-    expect(alert).toHaveTextContent(
-      "The resume could not be recognized because its text layer is unavailable.",
-    )
-
-    await user.click(
-      within(alert).getByRole("button", { name: i18n.t("profile.actions.retryRecognition") }),
-    )
-    await user.click(
-      within(alert).getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    await user.click(
-      within(alert).getByRole("button", { name: i18n.t("profile.actions.manualEntry") }),
-    )
-
-    expect(actions.retryRecognition).toHaveBeenCalledWith(
-      snapshot.profile!.profileId,
-      snapshot.profile!.resume!.id,
-    )
-    expect(actions.resetInitialResumeImport).toHaveBeenCalledWith(
-      snapshot.profile!.profileId,
-      snapshot.profile!.resume!.id,
-    )
-    expect(actions.createManualProfile).toHaveBeenCalledOnce()
-  })
-
-  it("uses the default recognition-failure description when no reason is available", async () => {
-    const snapshot = createProfileMockSnapshot("initialResumeRecognitionFailedWithoutReason")
-    renderReady(snapshot)
-
-    expect(await screen.findByTestId("profile-recognition-failure")).toHaveTextContent(
-      i18n.t("profile.lifecycle.failed.description"),
-    )
-  })
-
-  it("keeps the recognition failure page and shows safe feedback when manual entry fails", async () => {
-    const user = userEvent.setup()
-    const actions = createActions()
-    actions.createManualProfile = vi.fn(async () => {
-      throw new Error("manual profile request failed")
-    })
-    renderReady(createProfileMockSnapshot("initialResumeRecognitionFailed"), actions)
-
-    await user.click(
-      within(await screen.findByTestId("profile-recognition-failure")).getByRole("button", {
-        name: i18n.t("profile.actions.manualEntry"),
-      }),
-    )
-
-    expect(await screen.findByText(i18n.t("profile.lifecycle.actionFailed"))).toBeInTheDocument()
-    expect(screen.getByTestId("profile-recognition-failure")).toBeInTheDocument()
-    expect(screen.queryByText("manual profile request failed")).not.toBeInTheDocument()
-  })
-
-  it("keeps the recognition failure page and shows safe feedback when reupload reset fails", async () => {
-    const user = userEvent.setup()
-    const actions = createActions()
-    actions.resetInitialResumeImport = vi.fn(async () => {
-      throw new Error("reset request failed")
-    })
-    renderReady(createProfileMockSnapshot("initialResumeRecognitionFailed"), actions)
-
-    await user.click(
-      within(await screen.findByTestId("profile-recognition-failure")).getByRole("button", {
-        name: i18n.t("profile.actions.updateResume"),
-      }),
-    )
-
-    expect(await screen.findByText(i18n.t("profile.lifecycle.actionFailed"))).toBeInTheDocument()
-    expect(screen.getByTestId("profile-recognition-failure")).toBeInTheDocument()
-    expect(screen.queryByText("reset request failed")).not.toBeInTheDocument()
-  })
-
-  it("keeps the recognition failure page and shows safe feedback when recognition retry fails", async () => {
-    const user = userEvent.setup()
-    const actions = createActions()
-    actions.retryRecognition = vi.fn(async () => {
-      throw new Error("recognition retry request failed")
-    })
-    renderReady(createProfileMockSnapshot("initialResumeRecognitionFailed"), actions)
-
-    await user.click(
-      within(await screen.findByTestId("profile-recognition-failure")).getByRole("button", {
-        name: i18n.t("profile.actions.retryRecognition"),
-      }),
-    )
-
-    expect(await screen.findByText(i18n.t("profile.lifecycle.actionFailed"))).toBeInTheDocument()
-    expect(screen.getByTestId("profile-recognition-failure")).toBeInTheDocument()
-    expect(screen.queryByText("recognition retry request failed")).not.toBeInTheDocument()
   })
 
   it("groups only education and skills in the summary sections", async () => {
@@ -672,8 +565,8 @@ describe("ProfileView", () => {
     await user.type(within(dialog).getByLabelText(i18n.t("profile.import.text")), "resume text")
     await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.import.submit") }))
 
-    expect(actions.uploadUpdatedResume).toHaveBeenCalledOnce()
-    expect(actions.uploadInitialResume).not.toHaveBeenCalled()
+    expect(actions.uploadResumeForUpdate).toHaveBeenCalledOnce()
+    expect(actions.uploadResumeForInitialImport).not.toHaveBeenCalled()
     expect(screen.getByText("Fudan University")).toBeInTheDocument()
   })
 
@@ -696,22 +589,8 @@ describe("ProfileView", () => {
     expect(screen.getByText("updated-resume.pdf")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
 
-    expect(actions.uploadUpdatedResume).toHaveBeenCalledOnce()
-    expect(actions.uploadInitialResume).not.toHaveBeenCalled()
-  })
-
-  it("keeps the completed resume update summary inside the resume dialog", async () => {
-    const user = userEvent.setup()
-    const snapshot = createProfileMockSnapshot("resumeUpdateSucceeded")
-    renderReady(snapshot)
-
-    expect(screen.queryByTestId("profile-resume-update-summary")).not.toBeInTheDocument()
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    const dialog = await screen.findByRole("dialog")
-    expect(within(dialog).getByTestId("profile-resume-update-summary")).toBeInTheDocument()
-    expect(within(dialog).getByText(i18n.t("profile.import.updateTitle"))).toBeInTheDocument()
+    expect(actions.uploadResumeForUpdate).toHaveBeenCalledOnce()
+    expect(actions.uploadResumeForInitialImport).not.toHaveBeenCalled()
   })
 
   it("renders partial nullable data without failing the page", async () => {
@@ -728,8 +607,7 @@ describe("ProfileView", () => {
   })
 
   it("does not render matching-analysis regeneration controls", async () => {
-    const snapshot = createProfileMockSnapshot("matchingAnalysisStale")
-    renderReady(snapshot)
+    renderReady()
 
     expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
     expect(screen.queryByTestId("profile-matching-analysis-stale")).not.toBeInTheDocument()

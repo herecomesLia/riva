@@ -1,5 +1,4 @@
-export type ProfileStatus =
-  "draft" | "uploadingResume" | "parsingResume" | "recognitionFailed" | "active"
+export type ProfileStatus = "active"
 
 export type ProfileSource = "resumeExtracted" | "userEdited" | "userAdded"
 
@@ -99,7 +98,6 @@ export type JobProfile = {
   completeness: ProfileCompleteness
   updatedAt: string
   version: number
-  matchingAnalysisStale: boolean
   resume: ResumeFile | null
   education: EducationExperience[]
   workExperiences: WorkExperience[]
@@ -107,13 +105,6 @@ export type JobProfile = {
   skills: ProfileSkill[]
   credentials: Credential[]
   targetRoles: TargetRoleSummary[]
-}
-
-export type ResumeRecognition = {
-  resumeId: string
-  processingStatus: ResumeProcessingStatus
-  completedAt: string | null
-  failureReason: string | null
 }
 
 export type ResumeDocumentSourceType = "file" | "pastedText"
@@ -232,37 +223,13 @@ export type ResumeImportApplication = {
 
 export type ResumeImportApplicationDto = ResumeImportApplication
 
-export type MatchingAnalysis = {
-  failureReason: string | null
-  generatedAt: string | null
-  /** Profile version used when this analysis was generated; stale analyses intentionally lag behind. */
-  profileVersion: number
-  status: "current" | "stale" | "regenerating" | "failed"
-}
-
-export type ResumeUpdate = {
-  id: string
-  resume: ResumeFile
-  createdAt: string
-  status: "uploading" | "parsing" | "succeeded" | "failed"
-  changeSummary: ResumeImportChangeSummary | null
-  failureReason: string | null
-  preservesManualChanges: boolean
-}
-
 export type JobProfileSnapshot = {
   profile: JobProfile | null
-  recognition: ResumeRecognition | null
-  resumeUpdate: ResumeUpdate | null
-  matchingAnalysis: MatchingAnalysis | null
 }
 
 export type ProfileCapabilities = {
   credentials: boolean
-  matchingAnalysis: boolean
   resumeImport: boolean
-  resumeRecognition: boolean
-  resumeUpdate: boolean
   targetRoles: boolean
 }
 
