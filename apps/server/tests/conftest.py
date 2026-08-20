@@ -28,6 +28,13 @@ SLOW_TEST_PATHS = frozenset(
         "unit/evals/test_runner.py",
     }
 )
+TEST_CLASSIFICATION_MARKERS = {
+    "unit": pytest.mark.unit,
+    "integration": pytest.mark.integration,
+    "migration": pytest.mark.migration,
+    "eval": pytest.mark.eval,
+    "slow": pytest.mark.slow,
+}
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -52,7 +59,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 def _add_marker(item: pytest.Item, marker_name: str) -> None:
     if item.get_closest_marker(marker_name) is None:
-        item.add_marker(getattr(pytest.mark, marker_name))
+        item.add_marker(TEST_CLASSIFICATION_MARKERS[marker_name])
 
 
 @pytest.fixture
