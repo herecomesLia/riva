@@ -61,12 +61,15 @@ def test_migration_commands_forward_revision_message_and_env_file(
     tmp_path: Path,
 ) -> None:
     runner = CliRunner()
+    monkeypatch.delenv("RIVA_DATABASE_URL", raising=False)
+    monkeypatch.delenv("RIVA_SESSION_DIGEST_KEY", raising=False)
     env_file = tmp_path / "riva.env"
     env_file.write_text(
         "RIVA_DATABASE_URL=postgresql+asyncpg://file_user:file_pass@localhost/file_db\n"
         "RIVA_SESSION_DIGEST_KEY=file-session-digest-key\n"
     )
     file_database_url = "postgresql+asyncpg://file_user:file_pass@localhost/file_db"
+    forwarded_revision = "requested-upgrade-target"
     calls: list[tuple[object, ...]] = []
     monkeypatch.setattr(
         db_module.migrations,
@@ -97,7 +100,14 @@ def test_migration_commands_forward_revision_message_and_env_file(
     )
 
     commands = [
-        ["db", "upgrade", "--revision", "202608160001", "--env-file", str(env_file)],
+        [
+            "db",
+            "upgrade",
+            "--revision",
+            forwarded_revision,
+            "--env-file",
+            str(env_file),
+        ],
         ["db", "downgrade", "--revision", "base", "--env-file", str(env_file)],
         ["db", "revision", "add interview tables", "--env-file", str(env_file)],
         ["db", "revision", "manual marker", "--empty", "--env-file", str(env_file)],
@@ -109,8 +119,11 @@ def test_migration_commands_forward_revision_message_and_env_file(
     assert all(result.exit_code == 0 for result in results), [
         result.output for result in results
     ]
+    migration_config = db_module.migrations.create_config(file_database_url)
+    assert migration_config.get_main_option("script_location") == "riva:migrations"
+    assert migration_config.attributes["database_url"] == file_database_url
     assert calls == [
-        ("upgrade", file_database_url, "202608160001"),
+        ("upgrade", file_database_url, forwarded_revision),
         ("downgrade", file_database_url, "base"),
         ("revision", file_database_url, "add interview tables", True),
         ("revision", file_database_url, "manual marker", False),
@@ -130,15 +143,16 @@ def test_stamp_forwards_revision_after_explicit_confirmation(monkeypatch) -> Non
     )
 
     cancelled = runner.invoke(app, ["db", "stamp"], input="n\n")
+    forwarded_revision = "requested-stamp-target"
     result = runner.invoke(
         app,
-        ["db", "stamp", "--revision", "202608160001", "-y"],
+        ["db", "stamp", "--revision", forwarded_revision, "-y"],
     )
 
     assert cancelled.exit_code == 1
     assert "does not execute" in cancelled.output
     assert result.exit_code == 0, result.output
-    assert calls == [(DATABASE_URL, "202608160001")]
+    assert calls == [(DATABASE_URL, forwarded_revision)]
 
 
 def test_reset_requires_confirmation(monkeypatch) -> None:
