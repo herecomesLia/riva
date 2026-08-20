@@ -1,6 +1,10 @@
 import { getCurrentInteractionLanguage } from "@/i18n/language"
 import { getRolesPage } from "@/mocks/services/roles"
-import { buildPracticeSetupContext, reconcilePracticeSetupSelection } from "@/models/practice-setup"
+import {
+  buildPracticeSetupContext,
+  getEligiblePracticeQuestionCount,
+  reconcilePracticeSetupSelection,
+} from "@/models/practice-setup"
 import type {
   PracticeMutationResponse,
   PracticePageResponse,
@@ -35,6 +39,7 @@ async function getCurrentSetupContext(
   return buildPracticeSetupContext(currentRoles, {
     canPrioritizeWeaknesses: current.setupContext.canPrioritizeWeaknesses,
     eligibleQuestionCounts: copyPracticeState(current.setupContext.eligibleQuestionCounts),
+    questionSourceAvailability: copyPracticeState(current.setupContext.questionSourceAvailability),
   })
 }
 
@@ -54,7 +59,9 @@ function withSetupContext(setupContext: PracticeSetupContext): PracticePageRespo
     setupContext,
     session: {
       ...current.session,
-      selection: reconcilePracticeSetupSelection(setupContext, current.session.selection),
+      selection: reconcilePracticeSetupSelection(setupContext, current.session.selection, {
+        preserveUnavailableSource: true,
+      }),
     },
   }
 }
@@ -74,11 +81,8 @@ function requireValidSelection(
   if (!role.supportedQuestionTypes.includes(input.questionType)) {
     throw new Error("Question type is not supported by the selected role.")
   }
-  if (input.source === "saved" && setupContext.eligibleQuestionCounts.saved === 0) {
-    throw new Error("No eligible saved questions are available.")
-  }
-  if (input.source === "history" && setupContext.eligibleQuestionCounts.history === 0) {
-    throw new Error("No eligible history questions are available.")
+  if (getEligiblePracticeQuestionCount(setupContext, input) === 0) {
+    throw new Error(`No eligible ${input.source} questions are available.`)
   }
 }
 
@@ -129,7 +133,9 @@ export async function prepareNextPracticeSession(
     setupContext,
     session: {
       status: "setup",
-      selection: reconcilePracticeSetupSelection(setupContext, session.selection),
+      selection: reconcilePracticeSetupSelection(setupContext, session.selection, {
+        preserveUnavailableSource: true,
+      }),
     },
   })
 }

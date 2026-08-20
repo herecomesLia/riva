@@ -80,11 +80,22 @@ class PracticeSessionSelection(APIModel):
     prioritize_weaknesses: bool
 
 
+class PracticeQuestionSourceAvailability(APIModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target_role_id: StandardUUID
+    question_type: QuestionCardQuestionType
+    difficulty: QuestionCardDifficulty
+    saved_question_count: Annotated[int, Field(ge=0)]
+    history_question_count: Annotated[int, Field(ge=0)]
+
+
 class PracticeSetupCapabilitiesResponse(APIModel):
     model_config = ConfigDict(extra="forbid")
 
     saved_question_count: Annotated[int, Field(ge=0)]
     history_question_count: Annotated[int, Field(ge=0)]
+    question_source_availability: list[PracticeQuestionSourceAvailability]
     can_prioritize_weaknesses: bool
 
 
@@ -806,6 +817,7 @@ __all__ = [
     "PracticeGuidanceResponse",
     "PracticeGuidanceUnavailableResponse",
     "PracticeQuestionSource",
+    "PracticeQuestionSourceAvailability",
     "PracticeQuestionResponse",
     "PracticeQuestionReferenceAnswerRequest",
     "PracticeFollowUpReferenceAnswerRequest",

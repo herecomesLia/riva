@@ -1,4 +1,6 @@
 import type {
+  PracticeQuestionSource,
+  PracticeQuestionSourceAvailability,
   PracticeQuestionType,
   PracticeSetupContext,
   PracticeSetupSelection,
@@ -12,6 +14,8 @@ type PracticeEligibleQuestionCounts = PracticeSetupContext["eligibleQuestionCoun
 type PracticeSetupContextOptions = {
   canPrioritizeWeaknesses?: boolean
   eligibleQuestionCounts?: PracticeEligibleQuestionCounts
+  eligibleTargetRoleIds?: readonly string[]
+  questionSourceAvailability?: PracticeQuestionSourceAvailability[]
 }
 
 function toPracticeRoleOption(role: TargetRole): PracticeTargetRoleOption {
@@ -28,7 +32,12 @@ export function buildPracticeSetupContext(
   options: PracticeSetupContextOptions = {},
 ): PracticeSetupContext {
   const targetRoles = rolesResponse.roles
-    .filter((role) => role.preparationStatus !== "archived")
+    .filter(
+      (role) =>
+        role.preparationStatus !== "archived" &&
+        (options.eligibleTargetRoleIds === undefined ||
+          options.eligibleTargetRoleIds.includes(role.id)),
+    )
     .map(toPracticeRoleOption)
   const defaultTargetRoleId = targetRoles.some((role) => role.id === rolesResponse.currentRoleId)
     ? rolesResponse.currentRoleId
@@ -40,7 +49,28 @@ export function buildPracticeSetupContext(
     availableDifficulties: ["basic", "pressure"],
     canPrioritizeWeaknesses: options.canPrioritizeWeaknesses ?? false,
     eligibleQuestionCounts: options.eligibleQuestionCounts ?? { saved: 0, history: 0 },
+    questionSourceAvailability: options.questionSourceAvailability ?? [],
   }
+}
+
+export function getEligiblePracticeQuestionCount(
+  context: PracticeSetupContext,
+  selection: Pick<
+    PracticeSetupSelection,
+    "targetRoleId" | "questionType" | "difficulty" | "source"
+  >,
+): number {
+  if (selection.source === "personalized") return 1
+  if (selection.targetRoleId === null) return 0
+  const availability = context.questionSourceAvailability.find(
+    (candidate) =>
+      candidate.targetRoleId === selection.targetRoleId &&
+      candidate.questionType === selection.questionType &&
+      candidate.difficulty === selection.difficulty,
+  )
+  return selection.source === "saved"
+    ? (availability?.savedQuestionCount ?? 0)
+    : (availability?.historyQuestionCount ?? 0)
 }
 
 export function createDefaultPracticeSelection(
@@ -66,6 +96,7 @@ export function createDefaultPracticeSelection(
 export function reconcilePracticeSetupSelection(
   context: PracticeSetupContext,
   selection: PracticeSetupSelection,
+  options: { preserveUnavailableSource?: boolean } = {},
 ): PracticeSetupSelection {
   const existingRole = context.targetRoles.find((role) => role.id === selection.targetRoleId)
   const defaultRole = context.targetRoles.find((role) => role.id === context.defaultTargetRoleId)
@@ -81,12 +112,24 @@ export function reconcilePracticeSetupSelection(
     }
   }
 
+  const questionType = selectedRole.supportedQuestionTypes.includes(selection.questionType)
+    ? selection.questionType
+    : (selectedRole.supportedQuestionTypes[0] ?? selection.questionType)
+  const source: PracticeQuestionSource =
+    options.preserveUnavailableSource ||
+    getEligiblePracticeQuestionCount(context, {
+      ...selection,
+      targetRoleId: selectedRole.id,
+      questionType,
+    }) > 0
+      ? selection.source
+      : "personalized"
+
   return {
     ...selection,
     targetRoleId: selectedRole.id,
-    questionType: selectedRole.supportedQuestionTypes.includes(selection.questionType)
-      ? selection.questionType
-      : (selectedRole.supportedQuestionTypes[0] ?? selection.questionType),
+    questionType,
+    source,
     prioritizeWeaknesses: context.canPrioritizeWeaknesses ? selection.prioritizeWeaknesses : false,
   }
 }

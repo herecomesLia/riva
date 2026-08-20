@@ -13,6 +13,7 @@ export const common = {
     },
     adjustments: {
       practiceQuestionTypeUnsupported: "原专项训练题型已不受支持，已选择当前支持的题型。",
+      questionSourceUnavailable: "原题目来源在当前岗位、题型和难度下不可用，已改用个性化出题。",
       interviewRoundUnsupported: "原模拟面试轮次已不受支持，已选择当前支持的轮次。",
       difficultyUnavailable: "原训练难度已不可用，已选择当前可用难度。",
       durationUnavailable: "原面试时长已不可用，已选择当前可用时长。",

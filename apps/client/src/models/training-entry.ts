@@ -13,6 +13,7 @@ import type {
 } from "./practice"
 import type { TrainingRecordQuestionType } from "./training-records"
 import type { TargetRolePreparationStatus } from "./roles"
+import { getEligiblePracticeQuestionCount } from "./practice-setup"
 
 export type TrainingEntryOrigin = "history" | "planner"
 
@@ -38,6 +39,7 @@ export type TrainingEntryAdjustmentReason =
   | "interviewRoundUnsupported"
   | "difficultyUnavailable"
   | "durationUnavailable"
+  | "questionSourceUnavailable"
   | "weaknessPrioritizationUnavailable"
 
 export type TrainingEntryRoleUnavailableReason =
@@ -170,11 +172,23 @@ export function resolvePracticeTrainingEntry(
   if (!difficulty) throw new Error("Practice setup has no available difficulty.")
   if (difficulty !== requestedDifficulty) adjustments.push("difficultyUnavailable")
 
+  const requestedSource = parameters.source ?? current.source
+  const source =
+    getEligiblePracticeQuestionCount(context, {
+      targetRoleId: selectedRole.id,
+      questionType,
+      difficulty,
+      source: requestedSource,
+    }) > 0
+      ? requestedSource
+      : "personalized"
+  if (source !== requestedSource) adjustments.push("questionSourceUnavailable")
+
   const configuration = {
     targetRoleId: selectedRole.id,
     questionType,
     difficulty,
-    source: parameters.source ?? current.source,
+    source,
     prioritizeWeaknesses:
       context.canPrioritizeWeaknesses &&
       (parameters.prioritizeWeaknesses ?? current.prioritizeWeaknesses),

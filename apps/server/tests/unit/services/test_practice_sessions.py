@@ -107,9 +107,11 @@ class ScriptedSession:
         self,
         *scalar_values: object,
         execute_rows: list[tuple[object, ...]] | None = None,
+        execute_results: list[list[tuple[object, ...]]] | None = None,
     ) -> None:
         self.scalar_values = list(scalar_values)
         self.execute_rows = execute_rows or []
+        self.execute_results = execute_results
         self.consumed_values: list[object] = []
         self.statements: list[Any] = []
         self.added: list[object] = []
@@ -148,7 +150,11 @@ class ScriptedSession:
 
     async def execute(self, statement: Any) -> Any:
         self.statements.append(statement)
-        rows = self.execute_rows
+        rows = (
+            self.execute_results.pop(0)
+            if self.execute_results is not None
+            else self.execute_rows
+        )
 
         class Result:
             def all(self) -> list[tuple[object, ...]]:
@@ -2605,9 +2611,16 @@ def test_start_session_rejects_saved_without_an_eligible_question_card() -> None
 
 
 def test_setup_capabilities_expose_only_currently_supported_sources() -> None:
+    role_id = uuid4()
     result = asyncio.run(
         PracticeSessionService(
-            ScriptedSession(3, 0),  # type: ignore[arg-type]
+            ScriptedSession(
+                execute_results=[
+                    [(role_id, "projectDeepDive", "basic", 3)],
+                    [],
+                    [],
+                ]
+            ),  # type: ignore[arg-type]
         ).get_setup_capabilities(
             user_id=uuid4(),
             interaction_language="en",
@@ -2617,22 +2630,36 @@ def test_setup_capabilities_expose_only_currently_supported_sources() -> None:
     assert result.saved_question_count == 3
     assert result.history_question_count == 0
     assert result.can_prioritize_weaknesses is False
+    assert [
+        item.model_dump(mode="json")
+        for item in result.question_source_availability
+    ] == [
+        {
+            "targetRoleId": str(role_id),
+            "questionType": "projectDeepDive",
+            "difficulty": "basic",
+            "savedQuestionCount": 3,
+            "historyQuestionCount": 0,
+        }
+    ]
 
 
 def test_setup_capabilities_enable_weakness_prioritization_for_eligible_review() -> None:
     user_id = uuid4()
     role_id = uuid4()
     session = ScriptedSession(
-        0,
-        0,
-        execute_rows=[
-            (
-                uuid4(),
-                role_id,
-                "projectDeepDive",
-                NOW,
-                ["Ownership evidence"],
-            )
+        execute_results=[
+            [],
+            [],
+            [
+                (
+                    uuid4(),
+                    role_id,
+                    "projectDeepDive",
+                    NOW,
+                    ["Ownership evidence"],
+                )
+            ],
         ],
     )
 

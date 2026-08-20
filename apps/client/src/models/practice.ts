@@ -28,6 +28,14 @@ export type PracticeTargetRoleOption = {
   supportedQuestionTypes: PracticeQuestionType[]
 }
 
+export type PracticeQuestionSourceAvailability = {
+  targetRoleId: string
+  questionType: PracticeQuestionType
+  difficulty: PracticeDifficulty
+  savedQuestionCount: number
+  historyQuestionCount: number
+}
+
 export type PracticeReferenceAnswerKind = "personalizedExample" | "technicalReference"
 
 export type PracticeReferenceAnswer = {
@@ -57,6 +65,7 @@ export type PracticeSetupContext = {
     saved: number
     history: number
   }
+  questionSourceAvailability: PracticeQuestionSourceAvailability[]
 }
 
 export type PracticeRecommendedMaterial = {

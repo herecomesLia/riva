@@ -198,6 +198,7 @@ const practiceMockScenarios = {
       availableDifficulties: ["basic", "pressure"],
       canPrioritizeWeaknesses: true,
       eligibleQuestionCounts: { saved: 0, history: 0 },
+      questionSourceAvailability: [],
     },
     session: {
       status: "setup",
@@ -207,7 +208,15 @@ const practiceMockScenarios = {
   noEligibleSavedQuestions: {
     setupContext: {
       ...setupContext,
-      eligibleQuestionCounts: { ...setupContext.eligibleQuestionCounts, saved: 0 },
+      questionSourceAvailability: setupContext.questionSourceAvailability.map((availability) => ({
+        ...availability,
+        savedQuestionCount:
+          availability.targetRoleId === defaultSelection.targetRoleId &&
+          availability.questionType === defaultSelection.questionType &&
+          availability.difficulty === defaultSelection.difficulty
+            ? 0
+            : availability.savedQuestionCount,
+      })),
     },
     session: {
       status: "setup",
@@ -217,7 +226,15 @@ const practiceMockScenarios = {
   noEligibleHistoryQuestions: {
     setupContext: {
       ...setupContext,
-      eligibleQuestionCounts: { ...setupContext.eligibleQuestionCounts, history: 0 },
+      questionSourceAvailability: setupContext.questionSourceAvailability.map((availability) => ({
+        ...availability,
+        historyQuestionCount:
+          availability.targetRoleId === defaultSelection.targetRoleId &&
+          availability.questionType === defaultSelection.questionType &&
+          availability.difficulty === defaultSelection.difficulty
+            ? 0
+            : availability.historyQuestionCount,
+      })),
     },
     session: {
       status: "setup",

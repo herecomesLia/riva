@@ -376,6 +376,7 @@ function setupCapabilitiesResponse() {
   return {
     canPrioritizeWeaknesses: false,
     historyQuestionCount: 0,
+    questionSourceAvailability: [],
     savedQuestionCount: 0,
   }
 }

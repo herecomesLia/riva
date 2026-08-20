@@ -166,14 +166,50 @@ function createSetupCapabilitiesResponse(
   overrides: Partial<{
     canPrioritizeWeaknesses: boolean
     historyQuestionCount: number
+    questionSourceAvailability: Array<{
+      difficulty: "basic" | "pressure"
+      historyQuestionCount: number
+      questionType:
+        | "projectDeepDive"
+        | "behavioral"
+        | "businessUnderstanding"
+        | "motivation"
+        | "technicalFoundation"
+      savedQuestionCount: number
+      targetRoleId: string
+    }>
     savedQuestionCount: number
   }> = {},
 ) {
-  return {
+  const aggregate = {
     canPrioritizeWeaknesses: false,
     historyQuestionCount: 0,
     savedQuestionCount: 0,
     ...overrides,
+  }
+  return {
+    ...aggregate,
+    questionSourceAvailability:
+      overrides.questionSourceAvailability ??
+      (aggregate.savedQuestionCount === 0 && aggregate.historyQuestionCount === 0
+        ? []
+        : (
+            [
+              "projectDeepDive",
+              "behavioral",
+              "businessUnderstanding",
+              "motivation",
+              "technicalFoundation",
+            ] as const
+          ).flatMap((questionType) =>
+            (["basic", "pressure"] as const).map((difficulty) => ({
+              difficulty,
+              historyQuestionCount: aggregate.historyQuestionCount,
+              questionType,
+              savedQuestionCount: aggregate.savedQuestionCount,
+              targetRoleId: roleId,
+            })),
+          )),
   }
 }
 
@@ -405,17 +441,17 @@ describe("practice service API", () => {
     )
     expect(page.setupContext).toMatchObject({
       canPrioritizeWeaknesses: false,
-      defaultTargetRoleId: roleId,
+      defaultTargetRoleId: null,
       eligibleQuestionCounts: { history: 0, saved: 0 },
     })
-    expect(page.setupContext.targetRoles).toHaveLength(1)
+    expect(page.setupContext.targetRoles).toHaveLength(0)
     expect(page.session).toEqual({
       selection: {
         difficulty: "basic",
         prioritizeWeaknesses: false,
         questionType: "projectDeepDive",
         source: "personalized",
-        targetRoleId: roleId,
+        targetRoleId: null,
       },
       status: "setup",
     })

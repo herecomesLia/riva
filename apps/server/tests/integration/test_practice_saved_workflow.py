@@ -239,6 +239,15 @@ def test_saved_setup_start_skip_and_rollback_without_question_generation() -> No
                     assert setup.json() == {
                         "savedQuestionCount": 2,
                         "historyQuestionCount": 0,
+                        "questionSourceAvailability": [
+                            {
+                                "targetRoleId": str(role.id),
+                                "questionType": "projectDeepDive",
+                                "difficulty": "basic",
+                                "savedQuestionCount": 2,
+                                "historyQuestionCount": 0,
+                            }
+                        ],
                         "canPrioritizeWeaknesses": False,
                     }
 

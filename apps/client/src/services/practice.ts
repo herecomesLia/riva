@@ -102,10 +102,12 @@ function buildRealPracticeSetupContext(
 ) {
   return buildPracticeSetupContext(rolesResponse, {
     canPrioritizeWeaknesses: capabilities.canPrioritizeWeaknesses,
+    eligibleTargetRoleIds: getTrainablePracticeRoleIds(rolesResponse),
     eligibleQuestionCounts: {
       history: capabilities.historyQuestionCount,
       saved: capabilities.savedQuestionCount,
     },
+    questionSourceAvailability: capabilities.questionSourceAvailability,
   })
 }
 

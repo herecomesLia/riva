@@ -775,7 +775,9 @@ function resolveActiveSelection(
   selection: PracticeSetupSelection,
   context: PracticePageResponse["setupContext"],
 ): ActivePracticeSelection | null {
-  const reconciled = reconcilePracticeSetupSelection(context, selection)
+  const reconciled = reconcilePracticeSetupSelection(context, selection, {
+    preserveUnavailableSource: true,
+  })
   const targetRoleId = reconciled.targetRoleId
   if (!targetRoleId) return null
   return { ...reconciled, targetRoleId }

@@ -45,6 +45,7 @@ import type {
   PracticeSetupSelection,
 } from "@/models/practice"
 import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
+import { getEligiblePracticeQuestionCount } from "@/models/practice-setup"
 
 const setupSchema = z.object({
   targetRoleId: z.string().min(1),
@@ -100,6 +101,7 @@ export function PracticeSetupForm({
     validators: { onSubmit: setupSchema },
     onSubmit: async ({ value }) => {
       if (!value.targetRoleId) return
+      if (getEligiblePracticeQuestionCount(context, value) === 0) return
       setSubmitError(false)
       try {
         await onStart({
@@ -340,11 +342,24 @@ export function PracticeSetupForm({
         </form.Field>
       </FieldGroup>
 
-      <form.Subscribe selector={(state) => state.values.source}>
-        {(source) => {
+      <form.Subscribe
+        selector={(state) =>
+          [
+            state.values.targetRoleId,
+            state.values.questionType,
+            state.values.difficulty,
+            state.values.source,
+          ] as const
+        }
+      >
+        {([targetRoleId, questionType, difficulty, source]) => {
           const unavailable =
-            (source === "saved" && context.eligibleQuestionCounts.saved === 0) ||
-            (source === "history" && context.eligibleQuestionCounts.history === 0)
+            getEligiblePracticeQuestionCount(context, {
+              targetRoleId,
+              questionType,
+              difficulty,
+              source,
+            }) === 0
           if (!unavailable) return null
 
           return (
@@ -377,12 +392,23 @@ export function PracticeSetupForm({
       )}
 
       <form.Subscribe
-        selector={(state) => [state.values.source, state.values.targetRoleId] as const}
+        selector={(state) =>
+          [
+            state.values.targetRoleId,
+            state.values.questionType,
+            state.values.difficulty,
+            state.values.source,
+          ] as const
+        }
       >
-        {([source, targetRoleId]) => {
+        {([targetRoleId, questionType, difficulty, source]) => {
           const sourceUnavailable =
-            (source === "saved" && context.eligibleQuestionCounts.saved === 0) ||
-            (source === "history" && context.eligibleQuestionCounts.history === 0)
+            getEligiblePracticeQuestionCount(context, {
+              targetRoleId,
+              questionType,
+              difficulty,
+              source,
+            }) === 0
 
           return (
             <Button

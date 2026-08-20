@@ -46,6 +46,7 @@ from riva.schemas.practice_interactions import (
 from riva.schemas.practice_reference_answer import PracticeReferenceAnswerTargetType
 from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
+    PracticeQuestionSourceAvailability,
     PracticeSessionCompletionReason,
     PracticeSessionSelection,
     PracticeSetupCapabilitiesResponse,
@@ -435,8 +436,13 @@ class PracticeSessionService:
         user_id: UUID,
         interaction_language: InteractionLanguage,
     ) -> PracticeSetupCapabilitiesResponse:
-        saved_question_count = await self.session.scalar(
-            select(func.count(QuestionCard.id))
+        grouping = (
+            QuestionCard.target_role_id,
+            QuestionCard.question_type,
+            QuestionCard.difficulty,
+        )
+        saved_statement = (
+            select(*grouping, func.count(QuestionCard.id))
             .select_from(QuestionCard)
             .join(
                 TargetRole,
@@ -451,9 +457,14 @@ class PracticeSessionService:
                 QuestionCard.is_saved.is_(True),
                 TargetRole.preparation_status != "archived",
             )
+            .group_by(*grouping)
         )
-        history_question_count = await self.session.scalar(
-            select(func.count(func.distinct(QuestionCard.id)))
+        saved_rows = (await self.session.execute(saved_statement)).all()
+        history_statement = (
+            select(
+                *grouping,
+                func.count(func.distinct(QuestionCard.id)),
+            )
             .select_from(QuestionCard)
             .join(
                 TargetRole,
@@ -477,7 +488,33 @@ class PracticeSessionService:
                 QuestionCard.language == interaction_language,
                 TargetRole.preparation_status != "archived",
             )
+            .group_by(*grouping)
         )
+        history_rows = (await self.session.execute(history_statement)).all()
+        availability_counts: dict[tuple[UUID, str, str], dict[str, int]] = {}
+        for target_role_id, question_type, difficulty, count in saved_rows:
+            availability_counts[
+                (target_role_id, question_type, difficulty)
+            ] = {"saved": int(count), "history": 0}
+        for target_role_id, question_type, difficulty, count in history_rows:
+            counts = availability_counts.setdefault(
+                (target_role_id, question_type, difficulty),
+                {"saved": 0, "history": 0},
+            )
+            counts["history"] = int(count)
+        question_source_availability = [
+            PracticeQuestionSourceAvailability(
+                target_role_id=target_role_id,
+                question_type=question_type,
+                difficulty=difficulty,
+                saved_question_count=counts["saved"],
+                history_question_count=counts["history"],
+            )
+            for (target_role_id, question_type, difficulty), counts in sorted(
+                availability_counts.items(),
+                key=lambda item: tuple(str(value) for value in item[0]),
+            )
+        ]
         can_prioritize_weaknesses = await PracticeWeaknessService(
             self.session
         ).has_eligible_weakness(
@@ -485,8 +522,15 @@ class PracticeSessionService:
             interaction_language=interaction_language,
         )
         return PracticeSetupCapabilitiesResponse(
-            saved_question_count=int(saved_question_count or 0),
-            history_question_count=int(history_question_count or 0),
+            saved_question_count=sum(
+                item.saved_question_count
+                for item in question_source_availability
+            ),
+            history_question_count=sum(
+                item.history_question_count
+                for item in question_source_availability
+            ),
+            question_source_availability=question_source_availability,
             can_prioritize_weaknesses=can_prioritize_weaknesses,
         )
 

@@ -24,6 +24,7 @@ import type {
   PracticeQuestionType,
   PracticeScoreDimension,
 } from "@/models/practice"
+import { getEligiblePracticeQuestionCount } from "@/models/practice-setup"
 
 const scenarios: PracticeMockScenario[] = [
   "setupReady",
@@ -762,6 +763,24 @@ describe("practice mock scenarios", () => {
     expect(defaultRole).toBeDefined()
     expect(defaultRole?.supportedQuestionTypes).toContain(response.session.selection.questionType)
     expect(response.session.selection.prioritizeWeaknesses).toBe(false)
+    expect(response.setupContext.questionSourceAvailability).toHaveLength(
+      response.setupContext.targetRoles.reduce(
+        (count, role) => count + role.supportedQuestionTypes.length * 2,
+        0,
+      ),
+    )
+    expect(
+      getEligiblePracticeQuestionCount(response.setupContext, {
+        ...response.session.selection,
+        source: "saved",
+      }),
+    ).toBeGreaterThan(0)
+    expect(
+      getEligiblePracticeQuestionCount(response.setupContext, {
+        ...response.session.selection,
+        source: "history",
+      }),
+    ).toBeGreaterThan(0)
   })
 
   it("declares role-specific supported question types", () => {
@@ -789,9 +808,25 @@ describe("practice mock scenarios", () => {
     const history = createPracticeMockResponse("noEligibleHistoryQuestions")
 
     expect(saved.session.selection.source).toBe("saved")
-    expect(saved.setupContext.eligibleQuestionCounts.saved).toBe(0)
+    expect(saved.setupContext.eligibleQuestionCounts.saved).toBeGreaterThan(0)
+    expect(getEligiblePracticeQuestionCount(saved.setupContext, saved.session.selection)).toBe(0)
+    expect(
+      getEligiblePracticeQuestionCount(saved.setupContext, {
+        ...saved.session.selection,
+        difficulty: "pressure",
+      }),
+    ).toBeGreaterThan(0)
     expect(history.session.selection.source).toBe("history")
-    expect(history.setupContext.eligibleQuestionCounts.history).toBe(0)
+    expect(history.setupContext.eligibleQuestionCounts.history).toBeGreaterThan(0)
+    expect(getEligiblePracticeQuestionCount(history.setupContext, history.session.selection)).toBe(
+      0,
+    )
+    expect(
+      getEligiblePracticeQuestionCount(history.setupContext, {
+        ...history.session.selection,
+        difficulty: "pressure",
+      }),
+    ).toBeGreaterThan(0)
   })
 
   it("does not select a default role when no roles exist", () => {

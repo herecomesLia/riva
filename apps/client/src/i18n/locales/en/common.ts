@@ -15,6 +15,8 @@ export const common = {
     adjustments: {
       practiceQuestionTypeUnsupported:
         "The original question type is unsupported; a supported type was selected.",
+      questionSourceUnavailable:
+        "The original source has no questions for this role, type, and difficulty; personalized generation was selected.",
       interviewRoundUnsupported:
         "The original interview round is unsupported; a supported round was selected.",
       difficultyUnavailable:

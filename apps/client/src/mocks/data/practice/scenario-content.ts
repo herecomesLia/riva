@@ -37,6 +37,17 @@ export const setupContext = {
     saved: 3,
     history: 5,
   },
+  questionSourceAvailability: targetRoles.flatMap((role) =>
+    role.supportedQuestionTypes.flatMap((questionType) =>
+      (["basic", "pressure"] as const).map((difficulty) => ({
+        targetRoleId: role.id,
+        questionType,
+        difficulty,
+        savedQuestionCount: 3,
+        historyQuestionCount: 5,
+      })),
+    ),
+  ),
 } satisfies PracticeSetupContext
 
 export const defaultSelection = {

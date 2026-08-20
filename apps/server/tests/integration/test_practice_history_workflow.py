@@ -519,11 +519,11 @@ def test_history_setup_distinct_count_filters_and_starts_without_llm() -> None:
                 with TestClient(app) as client:
                     setup = client.get("/api/practice/setup", headers=headers)
                     assert setup.status_code == 200
-                    assert setup.json() == {
-                        "savedQuestionCount": 0,
-                        "historyQuestionCount": 3,
-                        "canPrioritizeWeaknesses": False,
-                    }
+                    setup_body = setup.json()
+                    assert setup_body["savedQuestionCount"] == 0
+                    assert setup_body["historyQuestionCount"] == 3
+                    assert setup_body["canPrioritizeWeaknesses"] is False
+                    assert setup_body["questionSourceAvailability"]
 
                     before = await session_count(database, owner.id)
                     unavailable = client.post(

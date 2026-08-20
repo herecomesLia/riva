@@ -42,6 +42,17 @@ export const practiceSetupCapabilitiesResponseSchema = z
   .object({
     canPrioritizeWeaknesses: z.boolean(),
     historyQuestionCount: z.number().int().nonnegative(),
+    questionSourceAvailability: z.array(
+      z
+        .object({
+          difficulty: practiceDifficultySchema,
+          historyQuestionCount: z.number().int().nonnegative(),
+          questionType: practiceQuestionTypeSchema,
+          savedQuestionCount: z.number().int().nonnegative(),
+          targetRoleId: uuidSchema,
+        })
+        .strict(),
+    ),
     savedQuestionCount: z.number().int().nonnegative(),
   })
   .strict()
