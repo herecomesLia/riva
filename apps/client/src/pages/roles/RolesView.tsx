@@ -30,8 +30,13 @@ import type {
   UpdateTargetRolePreparationStatusInput,
   UpdateJobDescriptionAnalysisModuleInput,
 } from "@/models/roles"
+import type {
+  CreateJobDescriptionImportDraftInput,
+  JobDescriptionImportDraft,
+} from "@/services/job-description-import"
 import type { Loadable } from "@/types"
 
+import { JobDescriptionImportDialog } from "./components/JobDescriptionImportDialog"
 import { MobileTargetRoleSelector } from "./components/MobileTargetRoleSelector"
 import { RoleDetails, type TargetRoleTab } from "./components/RoleDetails"
 import { RoleEditorDialog } from "./components/RoleEditorDialog"
@@ -39,6 +44,7 @@ import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDia
 import { JobDescriptionAnalysisEditorDialog } from "./components/JobDescriptionAnalysisEditorDialog"
 import { RolesHeader } from "./components/RolesHeader"
 import { RolesList } from "./components/RolesList"
+import { RoleCreationMethodDialog } from "./components/RoleCreationMethodDialog"
 import { getRolesForCategory, type TargetRoleListCategory } from "./components/roles-list-utils"
 import {
   RolesEmptyState,
@@ -56,6 +62,12 @@ export type RolesViewActions = {
   generateMatchingAnalysis?: (
     input: GenerateOrRegenerateMatchingAnalysisInput,
   ) => Promise<RolesPageResponse>
+  jobDescriptionImport: {
+    applyDraft: (draftId: string) => Promise<JobDescriptionImportDraft>
+    createDraft: (input: CreateJobDescriptionImportDraftInput) => Promise<JobDescriptionImportDraft>
+    getDraft: (draftId: string) => Promise<JobDescriptionImportDraft>
+    refreshRoles: (roleId: string) => Promise<RolesPageResponse>
+  }
   startJobDescriptionParsing?: (
     input: StartOrRetryJobDescriptionParsingInput,
   ) => Promise<RolesPageResponse>
@@ -155,6 +167,8 @@ function RolesReadyView({
       : (initialActiveTab ?? "overview"),
   )
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null)
+  const [isCreationMethodDialogOpen, setIsCreationMethodDialogOpen] = useState(false)
+  const [isJobDescriptionImportOpen, setIsJobDescriptionImportOpen] = useState(false)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
   const [jobDescriptionAnalysisEditorField, setJobDescriptionAnalysisEditorField] =
     useState<JobDescriptionAnalysisModuleField | null>(null)
@@ -174,6 +188,8 @@ function RolesReadyView({
 
   function closeEditor() {
     setEditorMode(null)
+    setIsCreationMethodDialogOpen(false)
+    setIsJobDescriptionImportOpen(false)
     setIsJobDescriptionEditorOpen(false)
     setJobDescriptionAnalysisEditorField(null)
     setIsDirty(false)
@@ -216,7 +232,7 @@ function RolesReadyView({
     <div className="flex flex-col gap-4">
       <RolesHeader
         disabled={pendingAction}
-        onAdd={actions ? () => setEditorMode("create") : undefined}
+        onAdd={actions ? () => setIsCreationMethodDialogOpen(true) : undefined}
       />
       {data.roles.length === 0 ? (
         <RolesEmptyState />
@@ -405,6 +421,18 @@ function RolesReadyView({
 
       {actions && (
         <>
+          <RoleCreationMethodDialog
+            onChooseImport={() => {
+              setIsCreationMethodDialogOpen(false)
+              setIsJobDescriptionImportOpen(true)
+            }}
+            onChooseManual={() => {
+              setIsCreationMethodDialogOpen(false)
+              setEditorMode("create")
+            }}
+            onOpenChange={setIsCreationMethodDialogOpen}
+            open={isCreationMethodDialogOpen}
+          />
           <RoleEditorDialog
             mode={editorMode ?? "create"}
             onCreate={async (input) => {
@@ -418,6 +446,21 @@ function RolesReadyView({
             }}
             open={editorMode !== null}
             role={editorMode === "edit" ? selectedRole : null}
+          />
+          <JobDescriptionImportDialog
+            applyDraft={actions.jobDescriptionImport.applyDraft}
+            createDraft={actions.jobDescriptionImport.createDraft}
+            getDraft={actions.jobDescriptionImport.getDraft}
+            onApplied={async (roleId) => {
+              await actions.jobDescriptionImport.refreshRoles(roleId)
+              setRoleCategory("saved")
+              setSelectedRoleId(roleId)
+              setActiveTab("overview")
+              closeEditor()
+            }}
+            onDirtyChange={handleDirtyChange}
+            onOpenChange={(open) => !open && requestCloseEditor()}
+            open={isJobDescriptionImportOpen}
           />
           <JobDescriptionEditorDialog
             onDirtyChange={handleDirtyChange}

@@ -90,6 +90,7 @@ export default defineConfig({
         plugins: [storybookTest({ configDir: path.resolve(dirname, ".storybook") })],
         test: {
           name: "storybook",
+          isolate: false,
           setupFiles: [path.resolve(dirname, "src/test/setup.ts")],
           browser: {
             enabled: true,

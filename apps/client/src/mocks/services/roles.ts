@@ -252,6 +252,46 @@ export async function createTargetRole(input: CreateTargetRoleInput): Promise<Ro
   })
 }
 
+export function addImportedTargetRole(input: {
+  company: string | null
+  location: string | null
+  rawText: string
+  title: string
+}): string {
+  const createdAt = nextTimestamp()
+  createdRoleCount += 1
+  const roleId = `30000000-0000-4000-8000-${createdRoleCount.toString().padStart(12, "0")}`
+  const role: ReadyTargetRole = {
+    company: input.company,
+    createdAt,
+    experienceRange: null,
+    id: roleId,
+    jobDescription: {
+      parsingFailureReason: null,
+      rawText: input.rawText,
+      status: "ready",
+      version: 1,
+    },
+    jobDescriptionAnalysis: createJobDescriptionAnalysisFixture({
+      jobDescriptionVersion: 1,
+      parsedAt: createdAt,
+    }),
+    location: input.location,
+    matchingAnalysis: null,
+    preparationStatus: "preparing",
+    recruitmentType: null,
+    title: input.title,
+    updatedAt: createdAt,
+    version: 1,
+  }
+  setMockResponse({
+    ...mockResponse,
+    currentRoleId: mockResponse.roles.length === 0 ? roleId : mockResponse.currentRoleId,
+    roles: [...mockResponse.roles, role],
+  })
+  return roleId
+}
+
 export async function updateTargetRole(input: UpdateTargetRoleInput): Promise<RolesPageResponse> {
   await waitForMockDelay()
   const role = requireRole(input.roleId)

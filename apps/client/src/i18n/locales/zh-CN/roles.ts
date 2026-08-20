@@ -11,6 +11,63 @@ export const roles = {
     retry: "重新加载",
     setCurrent: "设为当前岗位",
   },
+  creationMethod: {
+    title: "选择岗位创建方式",
+    description: "可以继续手动填写岗位信息，也可以粘贴 JD 让 RIVA 先识别再确认创建。",
+    manual: {
+      title: "手动创建岗位",
+      description: "沿用现有岗位创建流程。",
+      detail: "自行填写岗位名称、公司、地点、招聘类型和准备状态。",
+      action: "手动创建岗位",
+    },
+    import: {
+      title: "RIVA识别岗位",
+      description: "从岗位 JD 中识别关键信息。",
+      detail: "解析完成后先预览公司、岗位名称、地点和 JD 摘要，确认后才会创建岗位。",
+      action: "RIVA识别岗位",
+    },
+    cancel: "取消",
+  },
+  import: {
+    title: "RIVA识别岗位",
+    description: "粘贴完整岗位 JD。RIVA 会先生成可确认的岗位草稿，不会自动创建目标岗位。",
+    input: {
+      label: "岗位 JD 原文",
+      placeholder: "在这里粘贴岗位名称、公司、地点、岗位职责和任职要求……",
+      required: "请粘贴岗位 JD 文本。",
+    },
+    parsing: {
+      title: "正在解析 JD",
+      description: "RIVA 正在识别岗位名称、公司、地点和 JD 内容。",
+      preserve: "解析完成前不会创建目标岗位。",
+    },
+    ready: {
+      title: "JD 解析完成",
+      description: "请检查识别结果，确认无误后再创建目标岗位。",
+      company: "公司",
+      roleTitle: "岗位名称",
+      location: "地点",
+      summary: "JD 内容摘要",
+    },
+    failed: {
+      title: "JD 解析失败",
+      defaultReason: "暂时无法从这段 JD 中识别岗位信息。",
+      requestDescription: "暂时无法完成 JD 解析请求，请检查文本后重试。",
+      unexpectedState: "岗位草稿状态异常，请重新输入 JD。",
+    },
+    applyFailed: {
+      title: "岗位创建未完成",
+      description: "识别结果仍已保留，请稍后再次确认创建。",
+    },
+    actions: {
+      start: "开始识别",
+      cancel: "取消",
+      back: "返回修改",
+      reenter: "重新输入",
+      apply: "确认创建岗位",
+      applying: "正在创建岗位",
+    },
+  },
   editor: {
     create: {
       title: "添加目标岗位",

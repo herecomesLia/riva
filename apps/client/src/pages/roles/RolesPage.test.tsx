@@ -10,6 +10,11 @@ import { RolesPage } from "@/pages/roles"
 import { JOB_DESCRIPTION_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useJobDescriptionSynchronization"
 import { MATCHING_ANALYSIS_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useMatchingAnalysisSynchronization"
 import {
+  applyJobDescriptionImportDraft,
+  createJobDescriptionImportDraft,
+  getJobDescriptionImportDraft,
+} from "@/services/job-description-import"
+import {
   archiveTargetRole,
   createTargetRole,
   deleteTargetRole,
@@ -26,6 +31,13 @@ import {
 } from "@/services/roles"
 import { ApiError } from "@/services/api"
 import { renderWithProviders } from "@/test/render"
+
+vi.mock("@/services/job-description-import", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/job-description-import")>()),
+  applyJobDescriptionImportDraft: vi.fn(),
+  createJobDescriptionImportDraft: vi.fn(),
+  getJobDescriptionImportDraft: vi.fn(),
+}))
 
 vi.mock("@/services/roles", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/roles")>()),
@@ -63,10 +75,13 @@ function renderRolesPage() {
 }
 
 const mutationMocks = [
+  applyJobDescriptionImportDraft,
   archiveTargetRole,
+  createJobDescriptionImportDraft,
   createTargetRole,
   deleteTargetRole,
   generateMatchingAnalysis,
+  getJobDescriptionImportDraft,
   saveJobDescription,
   setCurrentTargetRole,
   startJobDescriptionParsing,
@@ -158,7 +173,17 @@ describe("RolesPage", () => {
 
     await screen.findByTestId("roles-empty-state")
     await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const chooser = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creationMethod.title"),
+    })
+    await user.click(
+      within(chooser).getByRole("button", {
+        name: i18n.t("roles.creationMethod.manual.action"),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.editor.create.title"),
+    })
     await user.type(
       within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")),
       created.roles[0]!.title,
@@ -169,6 +194,77 @@ describe("RolesPage", () => {
       await screen.findByRole("button", { name: new RegExp(`^${created.roles[0]!.title}`) }),
     ).toBeInTheDocument()
     expect(queryClient.getQueryData(["roles"])).toEqual(created)
+  })
+
+  it("creates no role before import confirmation, then opens the applied role details", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("noRoles")
+    const imported = createRolesMockResponse("roleWithParsedJobDescription")
+    const importedRole = imported.roles[0]!
+    const rawText = importedRole.jobDescription.rawText
+    if (!rawText) throw new TypeError("Expected the imported role fixture to include JD text.")
+    const draftId = "20000000-0000-4000-8000-000000000001"
+    const readyDraft = {
+      agentRunId: "20000000-0000-4000-8000-000000000002",
+      appliedRoleId: null,
+      canApply: true,
+      createdAt: "2026-08-21T08:00:00.000Z",
+      failureReason: null,
+      id: draftId,
+      parsedCompany: importedRole.company,
+      parsedDescription: rawText,
+      parsedLocation: importedRole.location,
+      parsedTitle: importedRole.title,
+      rawText,
+      status: "ready" as const,
+      updatedAt: "2026-08-21T08:00:05.000Z",
+    }
+    vi.mocked(getRolesPage).mockResolvedValueOnce(initial).mockResolvedValueOnce(imported)
+    vi.mocked(createJobDescriptionImportDraft).mockResolvedValue(readyDraft)
+    vi.mocked(applyJobDescriptionImportDraft).mockResolvedValue({
+      ...readyDraft,
+      appliedRoleId: importedRole.id,
+      canApply: false,
+      status: "applied",
+    })
+    renderRolesPage()
+
+    await screen.findByTestId("roles-empty-state")
+    await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.add") }))
+    const chooser = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creationMethod.title"),
+    })
+    await user.click(
+      within(chooser).getByRole("button", {
+        name: i18n.t("roles.creationMethod.import.action"),
+      }),
+    )
+    const importDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.import.title"),
+    })
+    await user.type(
+      within(importDialog).getByLabelText(i18n.t("roles.import.input.label")),
+      readyDraft.rawText,
+    )
+    await user.click(
+      within(importDialog).getByRole("button", {
+        name: i18n.t("roles.import.actions.start"),
+      }),
+    )
+
+    expect(
+      await within(importDialog).findByText(i18n.t("roles.import.ready.title")),
+    ).toBeInTheDocument()
+    expect(getRolesPage).toHaveBeenCalledTimes(1)
+    await user.click(
+      within(importDialog).getByRole("button", {
+        name: i18n.t("roles.import.actions.apply"),
+      }),
+    )
+
+    expect(await screen.findByRole("heading", { name: importedRole.title })).toBeInTheDocument()
+    expect(getRolesPage).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(applyJobDescriptionImportDraft).mock.calls[0]?.[0]).toBe(draftId)
   })
 
   it("stores only the returned current role ID after setting a different current role", async () => {

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
+import { createJobDescriptionImportDraftFixture } from "@/mocks/data/job-description-import"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 import type { RolesPageResponse } from "@/models/roles"
 import { renderWithProviders } from "@/test/render"
@@ -16,11 +17,23 @@ function createActions(
   data: RolesPageResponse,
   overrides: Partial<RolesViewActions> = {},
 ): RolesViewActions {
+  const readyDraft = createJobDescriptionImportDraftFixture("ready")
   return {
     archiveTargetRole: vi.fn(async () => data),
     createTargetRole: vi.fn(async () => data),
     deleteTargetRole: vi.fn(async () => data),
     generateMatchingAnalysis: vi.fn(async () => data),
+    jobDescriptionImport: {
+      applyDraft: vi.fn(async () => ({
+        ...readyDraft,
+        appliedRoleId: "30000000-0000-4000-8000-000000000001",
+        canApply: false,
+        status: "applied" as const,
+      })),
+      createDraft: vi.fn(async () => readyDraft),
+      getDraft: vi.fn(async () => readyDraft),
+      refreshRoles: vi.fn(async () => data),
+    },
     startJobDescriptionParsing: vi.fn(async () => data),
     retryJobDescriptionSynchronization: vi.fn(async () => data),
     retryMatchingAnalysisSynchronization: vi.fn(async () => data),
@@ -31,6 +44,17 @@ function createActions(
     updateTargetRole: vi.fn(async () => data),
     ...overrides,
   }
+}
+
+async function openManualRoleEditor(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+  const chooser = await screen.findByRole("dialog", {
+    name: i18n.t("roles.creationMethod.title"),
+  })
+  await user.click(
+    within(chooser).getByRole("button", { name: i18n.t("roles.creationMethod.manual.action") }),
+  )
+  return screen.findByRole("dialog", { name: i18n.t("roles.editor.create.title") })
 }
 
 function renderReadyView(
@@ -452,8 +476,7 @@ describe("RolesView", () => {
     const actions = createActions(data)
     renderReadyView(data, { actions })
 
-    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const dialog = await openManualRoleEditor(user)
     const minimumExperience = within(dialog).getByLabelText(i18n.t("roles.editor.fields.minYears"))
     fireEvent.change(minimumExperience, { target: { value: "-1" } })
     await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
@@ -509,8 +532,7 @@ describe("RolesView", () => {
     const createTargetRole = vi.fn(() => pendingSave)
     renderReadyView(data, { actions: createActions(data, { createTargetRole }) })
 
-    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const dialog = await openManualRoleEditor(user)
     await user.type(
       within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")),
       "Data Engineer",
@@ -590,8 +612,7 @@ describe("RolesView", () => {
     const data = createRolesMockResponse("noRoles")
     renderReadyView(data)
 
-    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const dialog = await openManualRoleEditor(user)
     await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "Draft")
     await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.cancel") }))
 
@@ -608,8 +629,7 @@ describe("RolesView", () => {
     const data = createRolesMockResponse("noRoles")
     const { router } = renderReadyView(data)
 
-    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const dialog = await openManualRoleEditor(user)
     await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "Draft")
 
     act(() => {

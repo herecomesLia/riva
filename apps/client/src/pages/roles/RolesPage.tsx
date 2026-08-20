@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect } from "react"
+import { useCallback, useEffect } from "react"
 
 import { useAuthenticationInvalidation } from "@/hooks/use-authentication-invalidation"
 import type { RolesPageResponse } from "@/models/roles"
+import {
+  applyJobDescriptionImportDraft,
+  createJobDescriptionImportDraft,
+  getJobDescriptionImportDraft,
+} from "@/services/job-description-import"
 import {
   archiveTargetRole,
   createTargetRole,
@@ -43,10 +48,13 @@ export function RolesPage() {
     synchronizationErrorRoleIds: matchingAnalysisSynchronizationErrorRoleIds,
   } = useMatchingAnalysisSynchronization(rolesQuery.data)
 
-  function setRolesResponse(response: RolesPageResponse) {
-    queryClient.setQueryData(ROLES_QUERY_KEY, response)
-    return response
-  }
+  const setRolesResponse = useCallback(
+    (response: RolesPageResponse) => {
+      queryClient.setQueryData(ROLES_QUERY_KEY, response)
+      return response
+    },
+    [queryClient],
+  )
 
   const createMutation = useMutation({ mutationFn: createTargetRole, onSuccess: setRolesResponse })
   const updateMutation = useMutation({ mutationFn: updateTargetRole, onSuccess: setRolesResponse })
@@ -98,6 +106,46 @@ export function RolesPage() {
     }
   }
 
+  const runImportDraftRequest = useCallback(
+    async <Output,>(request: () => Promise<Output>) => {
+      try {
+        return await request()
+      } catch (error) {
+        invalidateAuthentication(error)
+        throw error
+      }
+    },
+    [invalidateAuthentication],
+  )
+  const createImportDraft = useCallback(
+    (input: Parameters<typeof createJobDescriptionImportDraft>[0]) =>
+      runImportDraftRequest(() => createJobDescriptionImportDraft(input)),
+    [runImportDraftRequest],
+  )
+  const getImportDraft = useCallback(
+    (draftId: string) => runImportDraftRequest(() => getJobDescriptionImportDraft(draftId)),
+    [runImportDraftRequest],
+  )
+  const applyImportDraft = useCallback(
+    (draftId: string) => runImportDraftRequest(() => applyJobDescriptionImportDraft(draftId)),
+    [runImportDraftRequest],
+  )
+  const refreshRolesAfterImport = useCallback(
+    async (roleId: string) => {
+      try {
+        const response = await getRolesPage()
+        if (!response.roles.some((role) => role.id === roleId)) {
+          throw new RolesActionError("requestFailed")
+        }
+        return setRolesResponse(response)
+      } catch (error) {
+        invalidateAuthentication(error)
+        throw error
+      }
+    },
+    [invalidateAuthentication, setRolesResponse],
+  )
+
   const actions: RolesViewActions = {
     archiveTargetRole: (input) => runMutation(archiveMutation.mutateAsync, input),
     createTargetRole: (input) => runMutation(createMutation.mutateAsync, input),
@@ -147,6 +195,12 @@ export function RolesPage() {
       setRolesResponse(parsingResponse)
       clearSynchronizationError(input.roleId)
       return parsingResponse
+    },
+    jobDescriptionImport: {
+      applyDraft: applyImportDraft,
+      createDraft: createImportDraft,
+      getDraft: getImportDraft,
+      refreshRoles: refreshRolesAfterImport,
     },
     setCurrentTargetRole: (input) => runMutation(setCurrentMutation.mutateAsync, input),
     ...(rolesCapabilities.jobDescriptionAnalysis && {

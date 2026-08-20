@@ -12,6 +12,67 @@ export const roles = {
     retry: "Reload",
     setCurrent: "Set as current role",
   },
+  creationMethod: {
+    title: "Choose how to create the role",
+    description:
+      "Continue with the existing manual form, or paste a JD for RIVA to identify before you confirm.",
+    manual: {
+      title: "Create manually",
+      description: "Use the existing role creation flow.",
+      detail: "Enter the role title, company, location, recruitment type, and preparation status.",
+      action: "Create manually",
+    },
+    import: {
+      title: "Identify with RIVA",
+      description: "Identify key details from a job description.",
+      detail: "Review the company, role title, location, and JD summary before a role is created.",
+      action: "Identify with RIVA",
+    },
+    cancel: "Cancel",
+  },
+  import: {
+    title: "Identify role with RIVA",
+    description:
+      "Paste the complete job description. RIVA prepares a role draft for review and will not create a target role automatically.",
+    input: {
+      label: "Job description text",
+      placeholder:
+        "Paste the role title, company, location, responsibilities, and requirements here…",
+      required: "Paste the job description text.",
+    },
+    parsing: {
+      title: "Parsing the JD",
+      description: "RIVA is identifying the role title, company, location, and JD content.",
+      preserve: "No target role will be created until you confirm.",
+    },
+    ready: {
+      title: "JD parsing complete",
+      description: "Review the identified details before creating the target role.",
+      company: "Company",
+      roleTitle: "Role title",
+      location: "Location",
+      summary: "JD summary",
+    },
+    failed: {
+      title: "JD parsing failed",
+      defaultReason: "RIVA could not identify role details from this JD.",
+      requestDescription:
+        "The JD parsing request could not be completed. Review the text and try again.",
+      unexpectedState: "The role draft has an unexpected status. Enter the JD again.",
+    },
+    applyFailed: {
+      title: "Role creation did not complete",
+      description: "The identified result is still available. Confirm creation again in a moment.",
+    },
+    actions: {
+      start: "Start identification",
+      cancel: "Cancel",
+      back: "Back to edit",
+      reenter: "Enter JD again",
+      apply: "Confirm and create role",
+      applying: "Creating role",
+    },
+  },
   editor: {
     create: {
       title: "Add target role",
