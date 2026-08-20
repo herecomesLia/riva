@@ -10,7 +10,7 @@ from tests.helpers.integration_database import get_integration_database_url
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "202608170006"
+HEAD_REVISION = "202608200007"
 
 
 async def _clear_database(database_url: str) -> None:
@@ -53,6 +53,9 @@ def test_migrations_build_and_rebuild_the_current_schema() -> None:
         migrations.current(database_url)
         assert asyncio.run(_current_revision(database_url)) == HEAD_REVISION
         migrations.check(database_url)
+        assert "job_description_import_drafts" in asyncio.run(
+            _table_names(database_url)
+        )
 
         migrations.downgrade(database_url, "base")
         tables_after_downgrade = asyncio.run(_table_names(database_url))

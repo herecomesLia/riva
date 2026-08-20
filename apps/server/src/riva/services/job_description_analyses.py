@@ -2,6 +2,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, cast
+from uuid import UUID
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -45,6 +46,41 @@ PARSE_SUPERSEDED: JobDescriptionParsingStateErrorCode = (
     "job_description_parse_superseded"
 )
 RIVA_SUMMARY_FALLBACK = "No specific structured requirements were identified."
+
+
+def new_job_description_analysis(
+    *,
+    role: TargetRole,
+    source_agent_run_id: UUID,
+    output: JobDescriptionParsingOutput,
+    parsed_at: datetime,
+) -> JobDescriptionAnalysis:
+    """Build a new analysis shared by parser and import workflows."""
+
+    values = output.model_dump(mode="json")
+    return JobDescriptionAnalysis(
+        role_id=role.id,
+        user_id=role.user_id,
+        job_description_version=cast(int, role.job_description_version),
+        analysis_version=1,
+        source_agent_run_id=source_agent_run_id,
+        parsed_at=parsed_at,
+        riva_summary=output.riva_summary,
+        responsibilities=cast(list[str], values["responsibilities"]),
+        qualification_requirements=cast(
+            dict[str, list[str]],
+            values["qualification_requirements"],
+        ),
+        required_skills=cast(
+            dict[str, list[str]],
+            values["required_skills"],
+        ),
+        preferred_qualifications=cast(
+            list[str], values["preferred_qualifications"]
+        ),
+        soft_skills=cast(list[str], values["soft_skills"]),
+        business_domains=cast(list[str], values["business_domains"]),
+    )
 
 
 def build_riva_summary(
@@ -198,33 +234,16 @@ class JobDescriptionAnalysisService:
 
             now = self.clock()
             _require_aware_datetime(now)
-            values = output.model_dump(mode="json")
             if existing is None:
-                analysis = JobDescriptionAnalysis(
-                    role_id=context.role.id,
-                    user_id=context.role.user_id,
-                    job_description_version=context.payload.job_description_version,
-                    analysis_version=1,
+                analysis = new_job_description_analysis(
+                    role=context.role,
                     source_agent_run_id=run.id,
+                    output=output,
                     parsed_at=now,
-                    riva_summary=output.riva_summary,
-                    responsibilities=cast(list[str], values["responsibilities"]),
-                    qualification_requirements=cast(
-                        dict[str, list[str]],
-                        values["qualification_requirements"],
-                    ),
-                    required_skills=cast(
-                        dict[str, list[str]],
-                        values["required_skills"],
-                    ),
-                    preferred_qualifications=cast(
-                        list[str], values["preferred_qualifications"]
-                    ),
-                    soft_skills=cast(list[str], values["soft_skills"]),
-                    business_domains=cast(list[str], values["business_domains"]),
                 )
                 self.session.add(analysis)
             else:
+                values = output.model_dump(mode="json")
                 analysis = existing
                 analysis.job_description_version = (
                     context.payload.job_description_version
@@ -278,6 +297,8 @@ class JobDescriptionAnalysisService:
             payload = JobDescriptionParsingRunPayload.model_validate(run.payload)
         except ValidationError:
             raise JobDescriptionParsingStateError(INVALID_PARSE_RUN) from None
+        if payload.role_id is None or payload.job_description_version is None:
+            raise JobDescriptionParsingStateError(INVALID_PARSE_RUN)
 
         statement = select(TargetRole).where(
             TargetRole.id == payload.role_id,
@@ -305,3 +326,11 @@ class JobDescriptionAnalysisService:
 def _require_aware_datetime(value: datetime) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("clock must return a timezone-aware datetime")
+
+
+__all__ = [
+    "JobDescriptionAnalysisService",
+    "JobDescriptionParsingStateError",
+    "build_riva_summary",
+    "new_job_description_analysis",
+]

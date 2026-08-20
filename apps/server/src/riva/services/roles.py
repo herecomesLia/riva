@@ -122,54 +122,61 @@ class TargetRoleService:
         payload: CreateTargetRoleRequest,
     ) -> RolesPageResponse:
         try:
-            await self._lock_user(user.id)
-            current = await self._current_mapping(user.id)
-            has_active_role = await self.session.scalar(
-                select(TargetRole.id)
-                .where(
-                    TargetRole.user_id == user.id,
-                    TargetRole.preparation_status.in_(("preparing", "paused")),
-                )
-                .limit(1)
-            )
-            role = TargetRole(
-                user_id=user.id,
-                title=payload.title,
-                company=payload.company,
-                recruitment_type=(
-                    payload.recruitment_type.value
-                    if payload.recruitment_type is not None
-                    else None
-                ),
-                location=payload.location,
-                min_experience_years=(
-                    payload.experience_range.min_years
-                    if payload.experience_range is not None
-                    else None
-                ),
-                max_experience_years=(
-                    payload.experience_range.max_years
-                    if payload.experience_range is not None
-                    else None
-                ),
-                preparation_status=payload.preparation_status.value,
-                job_description_status="missing",
-                raw_job_description=None,
-                job_description_version=None,
-                version=1,
-            )
-            self.session.add(role)
-            await self.session.flush()
-
-            if current is None and has_active_role is None:
-                self.session.add(
-                    CurrentTargetRole(user_id=user.id, role_id=role.id)
-                )
-
+            await self.create_role_in_transaction(user.id, payload)
             return await self._commit_page(user.id)
         except Exception:
             await self.session.rollback()
             raise
+
+    async def create_role_in_transaction(
+        self,
+        user_id: UUID,
+        payload: CreateTargetRoleRequest,
+    ) -> TargetRole:
+        """Create a role without committing so compound workflows can reuse it."""
+
+        await self._lock_user(user_id)
+        current = await self._current_mapping(user_id)
+        has_active_role = await self.session.scalar(
+            select(TargetRole.id)
+            .where(
+                TargetRole.user_id == user_id,
+                TargetRole.preparation_status.in_(("preparing", "paused")),
+            )
+            .limit(1)
+        )
+        role = TargetRole(
+            user_id=user_id,
+            title=payload.title,
+            company=payload.company,
+            recruitment_type=(
+                payload.recruitment_type.value
+                if payload.recruitment_type is not None
+                else None
+            ),
+            location=payload.location,
+            min_experience_years=(
+                payload.experience_range.min_years
+                if payload.experience_range is not None
+                else None
+            ),
+            max_experience_years=(
+                payload.experience_range.max_years
+                if payload.experience_range is not None
+                else None
+            ),
+            preparation_status=payload.preparation_status.value,
+            job_description_status="missing",
+            raw_job_description=None,
+            job_description_version=None,
+            version=1,
+        )
+        self.session.add(role)
+        await self.session.flush()
+
+        if current is None and has_active_role is None:
+            self.session.add(CurrentTargetRole(user_id=user_id, role_id=role.id))
+        return role
 
     async def update_role(
         self,
@@ -319,27 +326,35 @@ class TargetRoleService:
         try:
             role = await self._locked_role(user.id, role_id)
             self._require_version(role, payload.version)
-            if (
-                role.job_description_status != "saved"
-                or role.raw_job_description != payload.raw_text
-            ):
-                role.job_description_status = "saved"
-                role.raw_job_description = payload.raw_text
-                role.job_description_version = (
-                    (role.job_description_version or 0) + 1
-                )
-                role.job_description_parsing_run_id = None
-                await self.session.execute(
-                    delete(JobDescriptionAnalysis).where(
-                        JobDescriptionAnalysis.role_id == role.id
-                    )
-                )
-                role.version += 1
+            await self.save_job_description_in_transaction(role, payload.raw_text)
 
             return await self._commit_page(user.id)
         except Exception:
             await self.session.rollback()
             raise
+
+    async def save_job_description_in_transaction(
+        self,
+        role: TargetRole,
+        raw_text: str,
+    ) -> None:
+        """Save JD text without committing so import can apply atomically."""
+
+        if (
+            role.job_description_status == "saved"
+            and role.raw_job_description == raw_text
+        ):
+            return
+        role.job_description_status = "saved"
+        role.raw_job_description = raw_text
+        role.job_description_version = (role.job_description_version or 0) + 1
+        role.job_description_parsing_run_id = None
+        await self.session.execute(
+            delete(JobDescriptionAnalysis).where(
+                JobDescriptionAnalysis.role_id == role.id
+            )
+        )
+        role.version += 1
 
     async def update_job_description_analysis_module(
         self,
@@ -445,7 +460,11 @@ class TargetRoleService:
                 prompt_version=prompt.version,
                 output_schema_id=prompt.output_schema_id,
                 model=self.llm_model,
-                payload=run_payload.model_dump(mode="json", by_alias=True),
+                payload=run_payload.model_dump(
+                    mode="json",
+                    by_alias=True,
+                    exclude_none=True,
+                ),
                 idempotency_key=(
                     f"job-description-parsing:{role.id}:"
                     f"{role.job_description_version}:{role.version}:"

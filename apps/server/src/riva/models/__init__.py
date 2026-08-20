@@ -2,6 +2,7 @@ from riva.models.agent_runs import AgentRun, AgentRunStatus
 from riva.models.auth import AuthSession
 from riva.models.competencies import CompetencyEvidence, UserCompetency
 from riva.models.job_description_analyses import JobDescriptionAnalysis
+from riva.models.job_description_import_drafts import JobDescriptionImportDraft
 from riva.models.interviews import (
     InterviewAnswer,
     InterviewCandidateQuestion,
@@ -58,6 +59,7 @@ __all__ = [
     "CareerProfileWorkSkill",
     "CurrentTargetRole",
     "JobDescriptionAnalysis",
+    "JobDescriptionImportDraft",
     "InterviewSession",
     "InterviewAnswer",
     "InterviewCandidateQuestion",

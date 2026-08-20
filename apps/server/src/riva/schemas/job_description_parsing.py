@@ -1,7 +1,14 @@
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BeforeValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
@@ -170,6 +177,39 @@ class RequiredSkillGroups(BaseModel):
 class JobDescriptionParsingOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    parsed_title: RoleTitle | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "The job title explicitly stated by the job description, or null "
+            "when it is not stated."
+        ),
+    )
+    parsed_company: Company = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "The hiring company explicitly stated by the job description, or "
+            "null when it is not stated."
+        ),
+    )
+    parsed_location: Company = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "The work location explicitly stated by the job description, or "
+            "null when it is not stated."
+        ),
+    )
+    parsed_description: RawJobDescription | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "The job-description body with title, company, and location header "
+            "text omitted when they are separately identifiable, or null when "
+            "there is no distinct body."
+        ),
+    )
     riva_summary: Summary
     responsibilities: AnalysisItemList
     qualification_requirements: QualificationRequirements
@@ -187,7 +227,7 @@ class JobDescriptionParsingOutput(BaseModel):
 class JobDescriptionParsingInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    role_title: RoleTitle
+    role_title: RoleTitle | None
     company: Company
     raw_job_description: RawJobDescription
     interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE
@@ -200,9 +240,35 @@ class JobDescriptionParsingRunPayload(BaseModel):
         validate_by_name=True,
     )
 
-    role_id: UUID = Field(alias="roleId")
-    job_description_version: int = Field(alias="jobDescriptionVersion", ge=1)
+    role_id: UUID | None = Field(
+        default=None,
+        alias="roleId",
+        exclude_if=lambda value: value is None,
+    )
+    job_description_import_draft_id: UUID | None = Field(
+        default=None,
+        alias="jobDescriptionImportDraftId",
+        exclude_if=lambda value: value is None,
+    )
+    job_description_version: int | None = Field(
+        default=None,
+        alias="jobDescriptionVersion",
+        ge=1,
+        exclude_if=lambda value: value is None,
+    )
     interaction_language: InteractionLanguage = Field(
         default=DEFAULT_INTERACTION_LANGUAGE,
         alias="interactionLanguage",
     )
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "JobDescriptionParsingRunPayload":
+        has_role = self.role_id is not None
+        has_draft = self.job_description_import_draft_id is not None
+        if has_role == has_draft:
+            raise ValueError("exactly one job description parsing target is required")
+        if has_role != (self.job_description_version is not None):
+            raise ValueError(
+                "job_description_version is required only for role parsing"
+            )
+        return self

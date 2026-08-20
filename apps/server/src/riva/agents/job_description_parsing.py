@@ -33,7 +33,7 @@ class JobDescriptionParsingAgent(
         self, input: JobDescriptionParsingInput
     ) -> Mapping[str, object]:
         return {
-            "role_title": input.role_title,
+            "role_title": input.role_title or "",
             "company": input.company or "",
             "raw_job_description": input.raw_job_description,
             "interaction_language": input.interaction_language,

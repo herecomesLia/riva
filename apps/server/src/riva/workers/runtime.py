@@ -18,7 +18,7 @@ from riva.integrations import (
     ProviderUnavailableError,
     StructuredOutputDiagnostics,
 )
-from riva.models import AgentRun
+from riva.models import AgentRun, AgentRunStatus
 from riva.services.agent_runs import (
     AgentRunLeaseError,
     AgentRunResultMismatchError,
@@ -131,11 +131,13 @@ class AgentWorker:
             )
             return True
         if outcome.error is not None:
-            await self._record_failure(
+            failure = _failure_for(outcome.error)
+            failed = await self._record_failure(
                 run,
                 run.lease_token,
-                _failure_for(outcome.error),
+                failure,
             )
+            await self._persist_terminal_failure(handler, failed, failure.code)
             return True
 
         if outcome.result is None:
@@ -148,11 +150,13 @@ class AgentWorker:
                 outcome.result,
             )
         except AgentRunResultMismatchError:
-            await self._record_failure(
+            failure = _Failure("agent_run_result_mismatch", retryable=False)
+            failed = await self._record_failure(
                 run,
                 run.lease_token,
-                _Failure("agent_run_result_mismatch", retryable=False),
+                failure,
             )
+            await self._persist_terminal_failure(handler, failed, failure.code)
         except AgentRunLeaseError:
             self.logger.warning(
                 "agent.worker.run",
@@ -294,7 +298,7 @@ class AgentWorker:
         run: AgentRun,
         lease_token: UUID,
         failure: _Failure,
-    ) -> None:
+    ) -> AgentRun | None:
         delay = (
             self.retry_delay(run.attempt_count)
             if failure.retryable
@@ -316,7 +320,7 @@ class AgentWorker:
                 error_code=AgentRunLeaseError.code,
                 **_log_fields(self.worker_id, run),
             )
-            return
+            return None
 
         self.logger.info(
             "agent.worker.run",
@@ -336,6 +340,19 @@ class AgentWorker:
             ),
             **_log_fields(self.worker_id, failed),
         )
+        return failed
+
+    @staticmethod
+    async def _persist_terminal_failure(
+        handler: object,
+        run: AgentRun | None,
+        error_code: str,
+    ) -> None:
+        if run is None or run.status is not AgentRunStatus.FAILED:
+            return
+        callback = getattr(handler, "persist_terminal_failure", None)
+        if callback is not None:
+            await callback(run, error_code)
 
     async def _requeue_expired(self) -> int:
         async with self.session_factory() as session:

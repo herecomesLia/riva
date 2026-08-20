@@ -5,6 +5,9 @@ from riva.api.competencies import router as competencies_router
 from riva.api.dashboard import router as dashboard_router
 from riva.api.health import router as health_router
 from riva.api.interview import router as interview_router
+from riva.api.job_description_import_drafts import (
+    router as job_description_import_drafts_router,
+)
 from riva.api.profile import router as profile_router
 from riva.api.practice import router as practice_router
 from riva.api.question_cards import router as question_cards_router
@@ -20,6 +23,7 @@ router.include_router(competencies_router)
 router.include_router(dashboard_router)
 router.include_router(health_router)
 router.include_router(interview_router)
+router.include_router(job_description_import_drafts_router)
 router.include_router(profile_router)
 router.include_router(practice_router)
 router.include_router(question_cards_router)

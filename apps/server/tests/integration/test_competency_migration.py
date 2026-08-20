@@ -1,10 +1,13 @@
 import asyncio
 
+from alembic.autogenerate import compare_metadata
+from alembic.migration import MigrationContext
 import pytest
 from sqlalchemy import inspect, text
 
 from riva.db import migrations
-from riva.db.database import Database
+from riva.db.base import Base
+from riva.db.database import Database, load_models
 from tests.helpers.integration_database import get_integration_database_url
 
 
@@ -12,6 +15,7 @@ pytestmark = pytest.mark.integration
 
 REVISION = "202608170006"
 PREVIOUS_REVISION = "202608160005"
+COMPETENCY_TABLES = {"user_competencies", "competency_evidence"}
 
 
 async def _clear_database(database_url: str) -> None:
@@ -60,7 +64,44 @@ async def _schema_details(database_url: str) -> dict[str, object]:
             return await connection.run_sync(inspect_schema)
 
 
+async def _competency_orm_differences(database_url: str) -> list[object]:
+    load_models()
+
+    def include_competency_object(
+        object_,
+        name: str | None,
+        type_: str,
+        reflected: bool,
+        compare_to,
+    ) -> bool:
+        del reflected, compare_to
+        table_name = (
+            name
+            if type_ == "table"
+            else getattr(getattr(object_, "table", None), "name", None)
+        )
+        return table_name in COMPETENCY_TABLES
+
+    async with Database(database_url) as database:
+        async with database.engine.connect() as connection:
+            def compare_competency_schema(sync_connection):
+                context = MigrationContext.configure(
+                    sync_connection,
+                    opts={
+                        "compare_type": True,
+                        "compare_server_default": True,
+                        "include_object": include_competency_object,
+                    },
+                )
+                return compare_metadata(context, Base.metadata)
+
+            return await connection.run_sync(compare_competency_schema)
+
+
 def test_competency_migration_upgrades_downgrades_and_matches_orm() -> None:
+    # This test is intentionally scoped to the competency revision. A global
+    # `alembic check` requires the database to be at the current head and would
+    # incorrectly couple this migration coverage to every future migration.
     database_url = get_integration_database_url()
 
     asyncio.run(_clear_database(database_url))
@@ -95,7 +136,7 @@ def test_competency_migration_upgrades_downgrades_and_matches_orm() -> None:
             "ix_competency_evidence_competency_id",
         } <= details["indexes"]
 
-        migrations.check(database_url)
+        assert asyncio.run(_competency_orm_differences(database_url)) == []
 
         migrations.downgrade(database_url, PREVIOUS_REVISION)
         after_downgrade = asyncio.run(
@@ -105,7 +146,7 @@ def test_competency_migration_upgrades_downgrades_and_matches_orm() -> None:
         assert "competency_evidence" not in after_downgrade
 
         migrations.upgrade(database_url, REVISION)
-        migrations.check(database_url)
+        assert asyncio.run(_competency_orm_differences(database_url)) == []
     finally:
         asyncio.run(_clear_database(database_url))
 
