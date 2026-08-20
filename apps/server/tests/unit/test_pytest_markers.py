@@ -3,16 +3,24 @@ import warnings
 import pytest
 
 
-REQUIRED_MARKERS = {"unit", "integration", "migration", "eval", "slow"}
+REQUIRED_MARKERS = {
+    "unit": "unit tests",
+    "integration": "integration tests",
+    "migration": "database migration tests",
+    "eval": "agent evaluation tests",
+    "slow": "slow running tests",
+}
 
 
 def test_pytest_config_registers_server_test_markers(pytestconfig) -> None:
     configured_markers = {
-        marker.partition(":")[0].strip()
+        marker.partition(":")[0].strip(): marker.partition(":")[2].strip()
         for marker in pytestconfig.getini("markers")
     }
 
-    assert REQUIRED_MARKERS <= configured_markers
+    assert {
+        name: configured_markers.get(name) for name in REQUIRED_MARKERS
+    } == REQUIRED_MARKERS
 
 
 @pytest.mark.parametrize("marker_name", sorted(REQUIRED_MARKERS))
