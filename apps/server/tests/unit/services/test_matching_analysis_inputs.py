@@ -437,7 +437,7 @@ def test_matching_career_profile_uses_uuid_as_tie_breaker() -> None:
     [
         (False, False, False),
         (False, True, False),
-        (True, False, False),
+        (True, False, True),
         (True, True, True),
     ],
 )
@@ -554,4 +554,4 @@ def test_matching_completion_rule_ignores_blank_skill_names() -> None:
             normalized_name="python",
         )
     )
-    assert career_profile_completed(profile) is False
+    assert career_profile_completed(profile) is True

@@ -53,7 +53,7 @@ def profile(*, has_skills: bool, has_section: bool) -> CareerProfile:
     [
         (False, False, False),
         (False, True, False),
-        (True, False, False),
+        (True, False, True),
         (True, True, True),
     ],
 )

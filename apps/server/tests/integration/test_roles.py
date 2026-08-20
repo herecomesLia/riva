@@ -658,7 +658,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                 assert no_skills_context.profile_context.version == 2
                 assert no_skills_context.profile_context.completed is False
                 assert skills_only_context.profile_context.version == 3
-                assert skills_only_context.profile_context.completed is False
+                assert skills_only_context.profile_context.completed is True
                 assert complete_context.profile_context.version == 4
                 assert complete_context.profile_context.completed is True
 

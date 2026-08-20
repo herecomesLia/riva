@@ -54,7 +54,7 @@ from riva.schemas.training_records import (
 from riva.services.agent_runs import AgentRunService
 from riva.services.interview_sessions import InterviewSessionService
 from riva.services.matching_analyses import _career_profile_loader_options
-from riva.services.profile_completion import career_profile_fully_complete
+from riva.services.profile_completion import career_profile_completed
 from riva.services.practice_sessions import PracticeSessionService
 from riva.services.training_memory import TrainingMemoryService
 from riva.services.training_records import TrainingRecordService
@@ -306,7 +306,7 @@ class TrainingPlanningService:
             .options(*_career_profile_loader_options())
             .where(CareerProfile.user_id == user_id)
         )
-        if profile is None or not career_profile_fully_complete(profile):
+        if profile is None or not career_profile_completed(profile):
             raise TrainingPlanningStateError(
                 TRAINING_PLANNING_TARGET_UNAVAILABLE
             )

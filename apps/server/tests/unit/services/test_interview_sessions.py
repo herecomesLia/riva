@@ -135,15 +135,17 @@ def test_setup_filters_archived_and_requires_current_jd_analysis() -> None:
 
 
 @pytest.mark.parametrize(
-    "missing_section",
-    ["education", "work_experiences", "project_experiences", "skills"],
+    "present_section",
+    ["skills", "work_experiences", "project_experiences"],
 )
-def test_setup_reports_profile_incomplete_when_section_is_missing(
-    missing_section: str,
+def test_setup_accepts_each_minimal_profile(
+    present_section: str,
 ) -> None:
     target_role_id = uuid4()
     profile = complete_profile()
-    setattr(profile, missing_section, [])
+    for section in ("skills", "work_experiences", "project_experiences"):
+        if section != present_section:
+            setattr(profile, section, [])
     session = ScriptedSession(
         profile=profile,
         roles=[role(role_id=target_role_id)],
@@ -152,10 +154,11 @@ def test_setup_reports_profile_incomplete_when_section_is_missing(
 
     setup = asyncio.run(InterviewSessionService(session).get_setup(user_id=uuid4()))
 
-    assert setup.blocked_reason == "profileIncomplete"
+    assert setup.profile_complete is True
+    assert setup.blocked_reason is None
 
 
-def test_profile_with_no_summary_can_be_fully_complete() -> None:
+def test_profile_with_no_summary_can_be_ready() -> None:
     target_role = role()
     session = ScriptedSession(
         profile=complete_profile(),

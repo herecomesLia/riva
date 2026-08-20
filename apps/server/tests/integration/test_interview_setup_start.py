@@ -77,7 +77,9 @@ async def _run_workflow(url: str) -> None:
             await seed_interview_prerequisites(
                 database,
                 label="incomplete",
+                include_work_experience=False,
                 include_project_experience=False,
+                include_skill=False,
                 role_title="Incomplete Profile Role",
             )
         )

@@ -48,7 +48,7 @@ from riva.services.matching_analyses import (
     build_matching_career_profile,
     build_matching_job_context,
 )
-from riva.services.profile_completion import career_profile_fully_complete
+from riva.services.profile_completion import career_profile_completed
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
@@ -402,7 +402,7 @@ class InterviewPlanningService:
         )
         if profile is None:
             raise InterviewPlanningStateError(INTERVIEW_PLANNING_PROFILE_NOT_FOUND)
-        if not career_profile_fully_complete(profile):
+        if not career_profile_completed(profile):
             raise InterviewPlanningStateError(
                 INTERVIEW_PLANNING_PROFILE_INCOMPLETE
             )
