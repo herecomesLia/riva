@@ -41,6 +41,30 @@ export const Complete = meta.story({
     onRetry: fn(),
     state: { status: "ready", data: completeMockInterviewHistoryStoryFixture },
   },
+  play: async ({ canvas }) => {
+    const exchange = completeMockInterviewHistoryStoryFixture.candidateQuestionExchanges[0]!
+    await expect(canvas.getByText(exchange.question)).toBeVisible()
+    await expect(canvas.getByText(/^RIVA 提问分析$|^RIVA Question Analysis$/i)).toBeVisible()
+    await expect(
+      canvas.getByText(/不代表真实公司内部信息|does not represent real company/i),
+    ).toBeVisible()
+    await expect(canvas.queryByText(/面试官回答|interviewer answer/i)).not.toBeInTheDocument()
+  },
+})
+
+const noCandidateAnalysisFixture = structuredClone(completeMockInterviewHistoryStoryFixture)
+noCandidateAnalysisFixture.candidateQuestionExchanges[0]!.interviewerAnswer = ""
+noCandidateAnalysisFixture.candidateQuestionExchanges[0]!.feedback = ""
+
+export const CandidateAnalysisUnavailable = meta.story({
+  args: {
+    historySearch: defaultHistorySearch,
+    onRetry: fn(),
+    state: { status: "ready", data: noCandidateAnalysisFixture },
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/暂无提问分析|No question analysis available/i)).toBeVisible()
+  },
 })
 
 export const EndedEarlyWithPartialReview = meta.story({

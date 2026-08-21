@@ -1,4 +1,11 @@
-import { CheckCircle2Icon, LightbulbIcon } from "lucide-react"
+import {
+  CheckCircle2Icon,
+  CircleAlertIcon,
+  CompassIcon,
+  LightbulbIcon,
+  ShieldAlertIcon,
+  SparklesIcon,
+} from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -75,7 +82,12 @@ export function CandidateQuestionsStage({
               {t("interview.session.candidate.exchangesDescription")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-5">
+            <Alert>
+              <ShieldAlertIcon aria-hidden="true" />
+              <AlertTitle>{t("interview.session.candidate.disclaimerTitle")}</AlertTitle>
+              <AlertDescription>{t("interview.session.candidate.disclaimer")}</AlertDescription>
+            </Alert>
             <ol className="flex flex-col gap-6">
               {exchanges.map((exchange, index) => (
                 <li className="flex min-w-0 flex-col gap-4" key={exchange.question.id}>
@@ -88,28 +100,7 @@ export function CandidateQuestionsStage({
                     </p>
                     <p className="break-words font-medium leading-7">{exchange.question.content}</p>
                   </div>
-                  <div className="rounded-lg bg-muted p-4">
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">
-                      {t("interview.session.candidate.interviewerAnswer")}
-                    </p>
-                    <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                      {exchange.interviewerAnswer}
-                    </p>
-                  </div>
-                  <Alert>
-                    <CheckCircle2Icon aria-hidden="true" />
-                    <AlertTitle>{t("interview.session.candidate.feedback")}</AlertTitle>
-                    <AlertDescription>{exchange.feedback.summary}</AlertDescription>
-                  </Alert>
-                  {exchange.feedback.suggestedAlternatives.length > 0 ? (
-                    <Alert>
-                      <LightbulbIcon aria-hidden="true" />
-                      <AlertTitle>{t("interview.session.candidate.betterQuestion")}</AlertTitle>
-                      <AlertDescription>
-                        {exchange.feedback.suggestedAlternatives.join("；")}
-                      </AlertDescription>
-                    </Alert>
-                  ) : null}
+                  <CandidateQuestionAnalysis exchange={exchange} />
                 </li>
               ))}
             </ol>
@@ -154,5 +145,93 @@ export function CandidateQuestionsStage({
         </AlertDialogContent>
       </AlertDialog>
     </main>
+  )
+}
+
+function CandidateQuestionAnalysis({
+  exchange,
+}: {
+  exchange: InterviewCandidateQuestionExchangeResponse
+}) {
+  const { t } = useTranslation()
+  const { feedback } = exchange
+  const hasAnalysis =
+    feedback.summary.trim().length > 0 ||
+    feedback.strengths.length > 0 ||
+    feedback.improvementSuggestions.length > 0 ||
+    feedback.suggestedAlternatives.length > 0 ||
+    exchange.interviewerAnswer.trim().length > 0
+
+  if (!hasAnalysis) {
+    return (
+      <Alert>
+        <CircleAlertIcon aria-hidden="true" />
+        <AlertTitle>{t("interview.session.candidate.noAnalysisTitle")}</AlertTitle>
+        <AlertDescription>
+          {t("interview.session.candidate.noAnalysisDescription")}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {feedback.summary.trim().length > 0 ? (
+        <Alert className="md:col-span-2">
+          <SparklesIcon aria-hidden="true" />
+          <AlertTitle>{t("interview.session.candidate.analysis")}</AlertTitle>
+          <AlertDescription>{feedback.summary}</AlertDescription>
+        </Alert>
+      ) : null}
+      {feedback.strengths.length > 0 ? (
+        <Alert>
+          <CheckCircle2Icon aria-hidden="true" />
+          <AlertTitle>{t("interview.session.candidate.strengths")}</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc space-y-1 pl-4">
+              {feedback.strengths.map((strength) => (
+                <li key={strength}>{strength}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {feedback.improvementSuggestions.length > 0 ? (
+        <Alert>
+          <LightbulbIcon aria-hidden="true" />
+          <AlertTitle>{t("interview.session.candidate.improvementSuggestions")}</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc space-y-1 pl-4">
+              {feedback.improvementSuggestions.map((suggestion) => (
+                <li key={suggestion}>{suggestion}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {exchange.interviewerAnswer.trim().length > 0 ? (
+        <Alert>
+          <CompassIcon aria-hidden="true" />
+          <AlertTitle>{t("interview.session.candidate.recommendedFocus")}</AlertTitle>
+          <AlertDescription>
+            <p>{t("interview.session.candidate.recommendedFocusLead")}</p>
+            <p>{exchange.interviewerAnswer}</p>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {feedback.suggestedAlternatives.length > 0 ? (
+        <Alert>
+          <LightbulbIcon aria-hidden="true" />
+          <AlertTitle>{t("interview.session.candidate.betterQuestion")}</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc space-y-1 pl-4">
+              {feedback.suggestedAlternatives.map((alternative) => (
+                <li key={alternative}>{alternative}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
   )
 }

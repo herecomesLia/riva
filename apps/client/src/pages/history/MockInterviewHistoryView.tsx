@@ -7,6 +7,7 @@ import {
   CircleAlertIcon,
   CircleOffIcon,
   ClipboardCheckIcon,
+  CompassIcon,
   LightbulbIcon,
   MessageCircleQuestionIcon,
   RotateCcwIcon,
@@ -358,29 +359,61 @@ function CandidateQuestions({
           {t("history.mockDetail.noCandidateQuestions")}
         </p>
       ) : (
-        exchanges.map((exchange, index) => (
-          <Card key={exchange.id} size="sm">
-            <CardHeader>
-              <Badge className="w-fit" variant="outline">
-                {t("history.mockDetail.candidateQuestion", { order: index + 1 })}
-              </Badge>
-              <CardTitle className="text-base leading-7">{exchange.question}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <section className="flex flex-col gap-2">
-                <h3 className="font-medium">{t("history.mockDetail.interviewerAnswer")}</h3>
-                <p className="text-sm leading-7 text-muted-foreground">
-                  {exchange.interviewerAnswer}
-                </p>
-              </section>
-              <Alert>
-                <MessageCircleQuestionIcon aria-hidden="true" />
-                <AlertTitle>{t("history.mockDetail.feedback")}</AlertTitle>
-                <AlertDescription>{exchange.feedback}</AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-        ))
+        <>
+          <Alert>
+            <ShieldAlertIcon aria-hidden="true" />
+            <AlertTitle>{t("history.mockDetail.disclaimerTitle")}</AlertTitle>
+            <AlertDescription>{t("history.mockDetail.disclaimer")}</AlertDescription>
+          </Alert>
+          {exchanges.map((exchange, index) => {
+            const hasAnalysis =
+              exchange.feedback.trim().length > 0 || exchange.interviewerAnswer.trim().length > 0
+
+            return (
+              <Card key={exchange.id} size="sm">
+                <CardHeader>
+                  <Badge className="w-fit" variant="outline">
+                    {t("history.mockDetail.candidateQuestion", { order: index + 1 })}
+                  </Badge>
+                  <CardTitle className="text-base leading-7">{exchange.question}</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  {hasAnalysis ? (
+                    <>
+                      {exchange.feedback.trim().length > 0 ? (
+                        <Alert>
+                          <MessageCircleQuestionIcon aria-hidden="true" />
+                          <AlertTitle>{t("history.mockDetail.analysis")}</AlertTitle>
+                          <AlertDescription className="whitespace-pre-line">
+                            {exchange.feedback}
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
+                      {exchange.interviewerAnswer.trim().length > 0 ? (
+                        <Alert>
+                          <CompassIcon aria-hidden="true" />
+                          <AlertTitle>{t("history.mockDetail.recommendedFocus")}</AlertTitle>
+                          <AlertDescription>
+                            <p>{t("history.mockDetail.recommendedFocusLead")}</p>
+                            <p>{exchange.interviewerAnswer}</p>
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
+                    </>
+                  ) : (
+                    <Alert className="md:col-span-2">
+                      <CircleAlertIcon aria-hidden="true" />
+                      <AlertTitle>{t("history.mockDetail.noAnalysisTitle")}</AlertTitle>
+                      <AlertDescription>
+                        {t("history.mockDetail.noAnalysisDescription")}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </>
       )}
     </section>
   )

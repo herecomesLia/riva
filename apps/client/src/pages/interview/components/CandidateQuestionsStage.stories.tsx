@@ -26,6 +26,33 @@ const defaultArgs = {
 
 export const WithFeedback = meta.story({
   args: defaultArgs,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(fixture.candidateExchange.question.content)).toBeVisible()
+    await expect(canvas.getByText(/RIVA 提问分析|RIVA Question Analysis/i)).toBeVisible()
+    await expect(
+      canvas.getByText(/不代表真实公司内部信息|does not represent real company/i),
+    ).toBeVisible()
+    await expect(canvas.queryByText(/面试官回答|interviewer answer/i)).not.toBeInTheDocument()
+  },
+})
+
+const exchangeWithoutAnalysis = structuredClone(fixture.candidateExchange)
+exchangeWithoutAnalysis.interviewerAnswer = ""
+exchangeWithoutAnalysis.feedback = {
+  summary: "",
+  strengths: [],
+  improvementSuggestions: [],
+  suggestedAlternatives: [],
+}
+
+export const NoAnalysis = meta.story({
+  args: {
+    ...defaultArgs,
+    exchanges: [exchangeWithoutAnalysis],
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/暂无提问分析|No question analysis available/i)).toBeVisible()
+  },
 })
 
 export const NoQuestionsYet = meta.story({

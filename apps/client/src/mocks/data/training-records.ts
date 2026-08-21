@@ -471,7 +471,8 @@ export const mockInterviewRecordDetailsMock = [
       {
         id: "history-candidate-question-001",
         question: "团队如何衡量前端架构工作的业务价值？",
-        interviewerAnswer: "团队会结合交付效率、稳定性、用户体验和核心业务指标综合评估。",
+        interviewerAnswer:
+          "重点核实团队如何连接工程投入与业务结果，以及交付效率、稳定性和用户体验分别采用哪些衡量标准。",
         feedback: "问题能够帮助判断团队的工程文化和结果导向。",
         submittedAt: "2026-07-16T03:25:00.000Z",
       },

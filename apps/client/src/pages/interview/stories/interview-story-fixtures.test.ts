@@ -38,7 +38,7 @@ describe("interview Story fixtures", () => {
     expect(fixture.openingMessage).toContain("Welcome")
     expect(fixture.candidatePrompt).toContain("formal questions")
     expect(fixture.candidateExchange.question.content).toContain("岗位")
-    expect(fixture.candidateExchange.interviewerAnswer).toContain("This role")
+    expect(fixture.candidateExchange.interviewerAnswer).toContain("Focus on verifying")
     expect(fixture.history[0]?.answer).toContain("我")
   })
 

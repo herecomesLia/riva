@@ -137,7 +137,7 @@ export function createEnglishInterviewSessionStoryFixture() {
     candidateExchange: {
       ...fixture.candidateExchange,
       interviewerAnswer:
-        "This role works closely with the recommendations, search, and commerce teams. The initial focus is learning the core flows and gradually taking ownership of cross-team technical projects.",
+        "Focus on verifying the role's core partner teams, onboarding goals, ownership boundaries, and success criteria for cross-team projects.",
       feedback: {
         summary:
           "The question focuses on collaboration and onboarding goals, which helps clarify the practical scope of the role.",

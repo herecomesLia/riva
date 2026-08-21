@@ -93,7 +93,7 @@ export function createCandidateQuestionExchange(
       submittedAt: `2026-07-24T02:${String(10 + order).padStart(2, "0")}:00.000Z`,
     },
     interviewerAnswer:
-      "这个岗位会与推荐、搜索和交易团队长期协作。入职后的首要目标是熟悉核心链路，并逐步承担跨团队技术项目。",
+      "重点核实岗位的核心协作团队、入职阶段目标，以及跨团队项目中的职责边界和成功标准。",
     feedback: {
       summary: "问题聚焦岗位协作和入职目标，能够帮助候选人判断实际工作边界。",
       strengths: ["关注真实职责", "体现长期投入意愿"],

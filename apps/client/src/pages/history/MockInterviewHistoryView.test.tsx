@@ -55,6 +55,11 @@ describe("MockInterviewHistoryView", () => {
     expect(screen.getByText(record.questions[1].followUps[0].prompt)).toBeInTheDocument()
     expect(screen.getByText(record.candidateQuestionExchanges[0].question)).toBeInTheDocument()
     expect(screen.getByText(record.candidateQuestionExchanges[0].feedback)).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("history.mockDetail.disclaimer"))).toBeVisible()
+    expect(screen.getByText(i18n.t("history.mockDetail.recommendedFocus"))).toBeVisible()
+    expect(
+      screen.queryByText(/HR回答|公司回答|面试官回答|HR answer|company answer|interviewer answer/i),
+    ).not.toBeInTheDocument()
     const retryLink = screen.getByRole("button", { name: i18n.t("history.mockDetail.retry") })
     const retryHref = retryLink.getAttribute("href") ?? ""
     expect(retryHref).toContain("entry=history")
