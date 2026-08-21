@@ -10,11 +10,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from riva.agents.runtime.runs import AgentRunService
+from riva.agents.interview.candidate_question import (
+    INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED,
+    INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID,
+    INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID,
+    InterviewCandidateQuestionWorkflow,
+    InterviewCandidateQuestionWorkflowError,
+)
 from riva.models import (
     AgentRun,
     AgentRunStatus,
-    InterviewAnswer,
     InterviewCandidateQuestion,
     InterviewCandidateQuestionExchange,
     InterviewFollowUpQuestion,
@@ -23,24 +28,9 @@ from riva.models import (
     InterviewSession,
     User,
 )
-from riva.prompts import (
-    INTERVIEW_CANDIDATE_QUESTION_PROMPT,
-)
-from riva.schemas.interview import InterviewConfiguration
 from riva.schemas.interview_candidate_question import (
-    InterviewCandidateCompletedFollowUpSnapshot,
-    InterviewCandidateCompletedQuestionSnapshot,
-    InterviewCandidateQuestionAnswerSnapshot,
-    InterviewCandidateQuestionExchangeSnapshot,
     InterviewCandidateQuestionInput,
     InterviewCandidateQuestionOutput,
-    InterviewCandidateQuestionRunPayload,
-    InterviewCandidateQuestionSessionSnapshot,
-    InterviewCandidateQuestionSnapshot,
-)
-from riva.schemas.interview_planning import InterviewPlanningRunPayload
-from riva.services.interview_planning_prompt_versions import (
-    get_interview_planning_prompt,
 )
 from riva.utils import utc_now
 
@@ -53,18 +43,20 @@ InterviewCandidateQuestionStateErrorCode = Literal[
     "interview_candidate_question_model_not_configured",
     "interview_candidate_question_content_invalid",
 ]
+_StateErrorCode = InterviewCandidateQuestionStateErrorCode
 
-INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND: InterviewCandidateQuestionStateErrorCode = "interview_session_not_found"
-INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_version_conflict"
+INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND: _StateErrorCode = (
+    "interview_session_not_found"
+)
+INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT: _StateErrorCode = (
+    "interview_candidate_question_version_conflict"
+)
 INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID: InterviewCandidateQuestionStateErrorCode = (
     "interview_candidate_question_state_invalid"
 )
-INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID: InterviewCandidateQuestionStateErrorCode = (
-    "interview_candidate_question_run_invalid"
+INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID: _StateErrorCode = (
+    "interview_candidate_question_content_invalid"
 )
-INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_snapshot_invalid"
-INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_model_not_configured"
-INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_content_invalid"
 
 
 class InterviewCandidateQuestionStateError(RuntimeError):
@@ -131,11 +123,13 @@ class InterviewCandidateQuestionService:
             )
             self.session.add(question)
             await self.session.flush()
-            input_snapshot = await self._build_input(
+            workflow = self._workflow()
+            input_snapshot = await self._load_workflow_input(
                 interview_session,
                 question,
+                workflow=workflow,
             )
-            run = await self._enqueue(
+            run = await workflow.enqueue_question_run(
                 user_id=user_id,
                 input_snapshot=input_snapshot,
                 session_version=version,
@@ -153,6 +147,9 @@ class InterviewCandidateQuestionService:
         except InterviewCandidateQuestionStateError:
             await self.session.rollback()
             raise
+        except InterviewCandidateQuestionWorkflowError as error:
+            await self.session.rollback()
+            raise _state_error(error) from None
         except TypeError, ValueError, ValidationError:
             await self.session.rollback()
             raise InterviewCandidateQuestionStateError(
@@ -193,7 +190,8 @@ class InterviewCandidateQuestionService:
                 raise InterviewCandidateQuestionStateError(
                     INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID
                 )
-            payload = self._validate_run_payload(failed_run)
+            workflow = self._workflow()
+            payload = workflow.validate_run_payload(failed_run)
             if (
                 payload.session_id != session_id
                 or payload.session_state_version != interview_session.version
@@ -201,15 +199,11 @@ class InterviewCandidateQuestionService:
                 raise InterviewCandidateQuestionStateError(
                     INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID
                 )
-            retry_payload = payload.model_copy(
-                update={
-                    "session_state_version": interview_session.version + 1,
-                    "retry_of_run_id": failed_run.id,
-                }
-            )
-            run = await self._enqueue_payload(
+            run = await workflow.enqueue_retry_run(
                 user_id=user_id,
-                payload=retry_payload,
+                payload=payload,
+                session_state_version=interview_session.version + 1,
+                retry_of_run_id=failed_run.id,
                 idempotency_key=(
                     f"interview-candidate-question-retry:{session_id}:run:{failed_run.id}"
                 ),
@@ -221,6 +215,9 @@ class InterviewCandidateQuestionService:
         except InterviewCandidateQuestionStateError:
             await self.session.rollback()
             raise
+        except InterviewCandidateQuestionWorkflowError as error:
+            await self.session.rollback()
+            raise _state_error(error) from None
         except TypeError, ValueError, ValidationError:
             await self.session.rollback()
             raise InterviewCandidateQuestionStateError(
@@ -234,8 +231,10 @@ class InterviewCandidateQuestionService:
         self,
         run: AgentRun,
     ) -> InterviewCandidateQuestionInput:
-        payload = self._validate_run_payload(run)
-        return payload.interview_candidate_question_input
+        try:
+            return self._workflow().load_question_input(run)
+        except InterviewCandidateQuestionWorkflowError as error:
+            raise _state_error(error) from None
 
     async def persist_success(
         self,
@@ -243,8 +242,9 @@ class InterviewCandidateQuestionService:
         output: InterviewCandidateQuestionOutput,
     ) -> InterviewCandidateQuestionOutput:
         try:
-            payload = self._validate_run_payload(run)
-            validated_output = _validate_output(output)
+            workflow = self._workflow()
+            payload = workflow.validate_run_payload(run)
+            validated_output = workflow.validate_output(output)
             await self._lock_user(run.user_id)
             persisted_run = await self.session.scalar(
                 select(AgentRun).where(AgentRun.id == run.id).with_for_update()
@@ -255,7 +255,7 @@ class InterviewCandidateQuestionService:
                 raise InterviewCandidateQuestionStateError(
                     INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID
                 )
-            self._validate_run_metadata(persisted_run, run.user_id)
+            workflow.validate_run_metadata(persisted_run, run.user_id)
             interview_session = await self._locked_session(
                 run.user_id,
                 payload.session_id,
@@ -278,9 +278,13 @@ class InterviewCandidateQuestionService:
             )
             if question is None or (
                 question.content
-                != payload.interview_candidate_question_input.current_candidate_question.content
+                != (
+                    payload.interview_candidate_question_input.current_candidate_question.content
+                )
                 or question.order
-                != payload.interview_candidate_question_input.current_candidate_question.order
+                != (
+                    payload.interview_candidate_question_input.current_candidate_question.order
+                )
             ):
                 raise InterviewCandidateQuestionStateError(
                     INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID
@@ -324,6 +328,9 @@ class InterviewCandidateQuestionService:
         except InterviewCandidateQuestionStateError:
             await self.session.rollback()
             raise
+        except InterviewCandidateQuestionWorkflowError as error:
+            await self.session.rollback()
+            raise _state_error(error) from None
         except TypeError, ValueError, ValidationError:
             await self.session.rollback()
             raise InterviewCandidateQuestionStateError(
@@ -333,10 +340,12 @@ class InterviewCandidateQuestionService:
             await self.session.rollback()
             raise
 
-    async def _build_input(
+    async def _load_workflow_input(
         self,
         interview_session: InterviewSession,
         question: InterviewCandidateQuestion,
+        *,
+        workflow: InterviewCandidateQuestionWorkflow,
     ) -> InterviewCandidateQuestionInput:
         plan = await self.session.scalar(
             select(InterviewPlan).where(
@@ -353,145 +362,52 @@ class InterviewCandidateQuestionService:
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             )
-        try:
-            planning_prompt = get_interview_planning_prompt(planning_run.prompt_version)
-        except ValueError:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
-            ) from None
-        if (
-            planning_run.user_id != interview_session.user_id
-            or planning_run.agent_id != planning_prompt.prompt_id
-            or planning_run.prompt_id != planning_prompt.prompt_id
-            or planning_run.output_schema_id != planning_prompt.output_schema_id
-            or _status_value(planning_run.status) != AgentRunStatus.SUCCEEDED.value
-        ):
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
-            )
-        try:
-            planner_payload = InterviewPlanningRunPayload.model_validate(
-                planning_run.payload
-            )
-            planner_context = planner_payload.interview_planning_input
-            configuration = _session_configuration(interview_session)
-            if planner_context.configuration != configuration:
-                raise ValueError
-            questions = list(
-                (
-                    await self.session.scalars(
-                        select(InterviewQuestion)
-                        .options(
-                            selectinload(InterviewQuestion.answer),
-                            selectinload(
-                                InterviewQuestion.follow_up_questions
-                            ).selectinload(InterviewFollowUpQuestion.answer),
-                        )
-                        .where(
-                            InterviewQuestion.session_id == interview_session.id,
-                        )
-                        .order_by(InterviewQuestion.order.asc())
-                    )
-                ).all()
-            )
-            exchanges = list(
-                (
-                    await self.session.scalars(
-                        select(InterviewCandidateQuestionExchange)
-                        .options(
-                            selectinload(InterviewCandidateQuestionExchange.question)
-                        )
-                        .where(
-                            InterviewCandidateQuestionExchange.session_id
-                            == interview_session.id,
-                        )
-                        .order_by(
-                            InterviewCandidateQuestionExchange.created_at.asc(),
-                            InterviewCandidateQuestionExchange.id.asc(),
-                        )
-                    )
-                ).all()
-            )
-            exchanges.sort(key=lambda item: item.question.order)
-            return InterviewCandidateQuestionInput(
-                session=InterviewCandidateQuestionSessionSnapshot(
-                    id=interview_session.id,
-                    version=interview_session.version,
-                    status=interview_session.status,
-                    language=interview_session.language,
-                    configuration=configuration,
-                ),
-                configuration=configuration,
-                interaction_language=interview_session.language,
-                planner_context=planner_context,
-                completed_questions=[
-                    _candidate_question_snapshot(item) for item in questions
-                ],
-                current_candidate_question=InterviewCandidateQuestionSnapshot(
-                    id=question.id,
-                    content=question.content,
-                    submitted_at=question.submitted_at,
-                    order=question.order,
-                ),
-                previous_exchanges=[
-                    _candidate_exchange_snapshot(item) for item in exchanges
-                ],
-            )
-        except InterviewCandidateQuestionStateError:
-            raise
-        except TypeError, ValueError, ValidationError, AttributeError:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
-            ) from None
 
-    async def _enqueue(
-        self,
-        *,
-        user_id: UUID,
-        input_snapshot: InterviewCandidateQuestionInput,
-        session_version: int,
-        session_state_version: int,
-        candidate_question_id: UUID,
-        idempotency_key: str,
-    ) -> AgentRun:
-        payload = InterviewCandidateQuestionRunPayload(
-            session_id=input_snapshot.session.id,
-            session_version=session_version,
-            session_state_version=session_state_version,
-            candidate_question_id=candidate_question_id,
-            interaction_language=input_snapshot.interaction_language,
-            interview_candidate_question_input=input_snapshot,
+        questions = list(
+            (
+                await self.session.scalars(
+                    select(InterviewQuestion)
+                    .options(
+                        selectinload(InterviewQuestion.answer),
+                        selectinload(
+                            InterviewQuestion.follow_up_questions
+                        ).selectinload(InterviewFollowUpQuestion.answer),
+                    )
+                    .where(
+                        InterviewQuestion.session_id == interview_session.id,
+                    )
+                    .order_by(InterviewQuestion.order.asc())
+                )
+            ).all()
         )
-        return await self._enqueue_payload(
-            user_id=user_id,
-            payload=payload,
-            idempotency_key=idempotency_key,
+        exchanges = list(
+            (
+                await self.session.scalars(
+                    select(InterviewCandidateQuestionExchange)
+                    .options(selectinload(InterviewCandidateQuestionExchange.question))
+                    .where(
+                        InterviewCandidateQuestionExchange.session_id
+                        == interview_session.id,
+                    )
+                    .order_by(
+                        InterviewCandidateQuestionExchange.created_at.asc(),
+                        InterviewCandidateQuestionExchange.id.asc(),
+                    )
+                )
+            ).all()
+        )
+        return workflow.build_input_snapshot(
+            interview_session=interview_session,
+            question=question,
+            planning_run=planning_run,
+            completed_questions=questions,
+            previous_exchanges=exchanges,
         )
 
-    async def _enqueue_payload(
-        self,
-        *,
-        user_id: UUID,
-        payload: InterviewCandidateQuestionRunPayload,
-        idempotency_key: str,
-    ) -> AgentRun:
-        if not self.llm_model:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED
-            )
-        return await AgentRunService(self.session).enqueue_in_transaction(
-            user_id=user_id,
-            agent_id=INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id,
-            prompt_id=INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id,
-            prompt_version=INTERVIEW_CANDIDATE_QUESTION_PROMPT.version,
-            output_schema_id=INTERVIEW_CANDIDATE_QUESTION_PROMPT.output_schema_id,
-            model=self.llm_model,
-            payload=cast(
-                dict[str, object],
-                payload.model_dump(mode="json", by_alias=True),
-            ),
-            idempotency_key=idempotency_key,
-            max_attempts=3,
+    def _workflow(self) -> InterviewCandidateQuestionWorkflow:
+        return InterviewCandidateQuestionWorkflow(
+            self.session,
+            llm_model=self.llm_model,
         )
 
     async def _lock_user(self, user_id: UUID) -> None:
@@ -537,92 +453,12 @@ class InterviewCandidateQuestionService:
             raise ValueError("clock must return a timezone-aware datetime")
         return value.astimezone(UTC)
 
-    @staticmethod
-    def _validate_run_metadata(run: AgentRun, user_id: UUID) -> None:
-        if (
-            run.user_id != user_id
-            or run.agent_id != INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id
-            or run.prompt_id != INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id
-            or run.prompt_version != INTERVIEW_CANDIDATE_QUESTION_PROMPT.version
-            or run.output_schema_id
-            != INTERVIEW_CANDIDATE_QUESTION_PROMPT.output_schema_id
-        ):
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID
-            )
 
-    @classmethod
-    def _validate_run_payload(
-        cls,
-        run: AgentRun,
-    ) -> InterviewCandidateQuestionRunPayload:
-        cls._validate_run_metadata(run, run.user_id)
-        try:
-            return InterviewCandidateQuestionRunPayload.model_validate(run.payload)
-        except TypeError, ValueError, ValidationError:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
-            ) from None
-
-
-def _candidate_question_snapshot(
-    question: InterviewQuestion,
-) -> InterviewCandidateCompletedQuestionSnapshot:
-    answer = question.answer
-    return InterviewCandidateCompletedQuestionSnapshot(
-        id=question.id,
-        order=question.order,
-        prompt=question.prompt,
-        question_type=question.question_type,
-        assessed_capabilities=list(question.assessed_capabilities),
-        answer=(
-            None
-            if answer is None
-            else InterviewCandidateQuestionAnswerSnapshot(
-                id=answer.id,
-                content=answer.content,
-                submitted_at=answer.submitted_at,
-            )
-        ),
-        follow_ups=[
-            InterviewCandidateCompletedFollowUpSnapshot(
-                id=follow_up.id,
-                parent_question_id=follow_up.parent_question_id,
-                prompt=follow_up.prompt,
-                order=follow_up.order,
-                answer=(
-                    None
-                    if follow_up.answer is None
-                    else InterviewCandidateQuestionAnswerSnapshot(
-                        id=follow_up.answer.id,
-                        content=follow_up.answer.content,
-                        submitted_at=follow_up.answer.submitted_at,
-                    )
-                ),
-            )
-            for follow_up in sorted(
-                question.follow_up_questions,
-                key=lambda item: item.order,
-            )
-        ],
-    )
-
-
-def _candidate_exchange_snapshot(
-    exchange: InterviewCandidateQuestionExchange,
-) -> InterviewCandidateQuestionExchangeSnapshot:
-    return InterviewCandidateQuestionExchangeSnapshot(
-        question=InterviewCandidateQuestionSnapshot(
-            id=exchange.question.id,
-            content=exchange.question.content,
-            submitted_at=exchange.question.submitted_at,
-            order=exchange.question.order,
-        ),
-        interviewer_answer=exchange.interviewer_answer,
-        feedback_summary=exchange.feedback_summary,
-        strengths=list(exchange.strengths),
-        improvement_suggestions=list(exchange.improvement_suggestions),
-        suggested_alternatives=list(exchange.suggested_alternatives),
+def _state_error(
+    error: InterviewCandidateQuestionWorkflowError,
+) -> InterviewCandidateQuestionStateError:
+    return InterviewCandidateQuestionStateError(
+        cast(InterviewCandidateQuestionStateErrorCode, error.code)
     )
 
 
@@ -640,15 +476,6 @@ def _output_from_exchange(
     )
 
 
-def _validate_output(output: object) -> InterviewCandidateQuestionOutput:
-    try:
-        return InterviewCandidateQuestionOutput.model_validate(output)
-    except TypeError, ValueError, ValidationError:
-        raise InterviewCandidateQuestionStateError(
-            INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
-        ) from None
-
-
 def _normalized_content(value: str) -> str:
     normalized = value.strip()
     if not normalized or len(normalized) > 4_000:
@@ -656,15 +483,6 @@ def _normalized_content(value: str) -> str:
             INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID
         )
     return normalized
-
-
-def _session_configuration(session: InterviewSession) -> InterviewConfiguration:
-    return InterviewConfiguration(
-        target_role_id=session.target_role_id,
-        round=session.round,
-        difficulty=session.difficulty,
-        duration_minutes=session.duration_minutes,
-    )
 
 
 def _status_value(value: object) -> str:
