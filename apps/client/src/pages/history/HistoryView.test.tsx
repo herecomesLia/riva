@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react"
+import { screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
@@ -83,6 +83,11 @@ describe("HistoryView", () => {
     })
     expect(detailLink.getAttribute("href")).toContain(`/history/practice/${record.id}`)
     expect(detailLink.getAttribute("href")).toContain("page=1")
+    const recordCard = detailLink.closest('[data-slot="card"]')
+    if (!(recordCard instanceof HTMLElement)) throw new Error("History record card required.")
+    expect(
+      within(recordCard).getByText(record.targetRole.title, { exact: false }).parentElement,
+    ).toHaveClass("min-w-0", "flex-1")
   })
 
   it("keeps the training type control fitted to its buttons", async () => {

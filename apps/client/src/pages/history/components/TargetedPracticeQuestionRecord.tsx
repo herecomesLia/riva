@@ -40,7 +40,7 @@ export function TargetedPracticeQuestionRecord({
     <Card data-testid={`history-question-${question.id}`}>
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>{t("history.detail.question", { order: question.order })}</Badge>
               <Badge variant="outline">
@@ -207,7 +207,7 @@ function AnswerSection({ answer }: { answer: TrainingRecordAnswer | null }) {
     <section className="flex min-w-0 flex-col gap-2">
       <h3 className="font-heading text-base font-semibold">{t("history.detail.answer")}</h3>
       {answer ? (
-        <p className="max-w-prose whitespace-pre-wrap rounded-xl bg-muted/60 p-4 text-sm leading-7">
+        <p className="w-full min-w-0 whitespace-pre-wrap rounded-xl bg-muted/60 p-4 text-sm leading-7">
           {answer.content}
         </p>
       ) : (

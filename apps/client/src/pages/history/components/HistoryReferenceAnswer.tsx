@@ -32,7 +32,7 @@ export function HistoryReferenceAnswer({
         <CardTitle>{t("history.detail.reference.title")}</CardTitle>
         <CardDescription>{t("history.detail.reference.description")}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="min-w-0">
         {referenceAnswer.status === "ready" && (
           <div className="flex min-w-0 flex-col gap-5">
             <ReferenceList
@@ -44,11 +44,11 @@ export function HistoryReferenceAnswer({
               items={referenceAnswer.content.keyPoints}
               title={t("history.detail.reference.keyPoints")}
             />
-            <section className="flex flex-col gap-2">
+            <section className="flex min-w-0 flex-col gap-2">
               <h4 className="font-heading text-sm font-medium">
                 {t("history.detail.reference.example")}
               </h4>
-              <p className="max-w-prose whitespace-pre-wrap text-sm leading-7">
+              <p className="w-full min-w-0 whitespace-pre-wrap text-sm leading-7">
                 {referenceAnswer.content.exampleAnswer}
               </p>
             </section>

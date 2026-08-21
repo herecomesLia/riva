@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
 import type {
   MockInterviewOverallReview,
   MockInterviewRecordDetailResponse,
@@ -298,8 +299,8 @@ function ReviewCards({
         <CardHeader>
           <CardTitle>{t("history.mockDetail.overallPerformance")}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="max-w-prose text-sm leading-7">{review.summary}</p>
+        <CardContent className="min-w-0">
+          <p className="w-full min-w-0 text-sm leading-7">{review.summary}</p>
         </CardContent>
       </Card>
       <div className="grid gap-4 md:grid-cols-2">
@@ -366,8 +367,9 @@ function CandidateQuestions({
             <AlertDescription>{t("history.mockDetail.disclaimer")}</AlertDescription>
           </Alert>
           {exchanges.map((exchange, index) => {
-            const hasAnalysis =
-              exchange.feedback.trim().length > 0 || exchange.interviewerAnswer.trim().length > 0
+            const hasFeedback = exchange.feedback.trim().length > 0
+            const hasRecommendedFocus = exchange.interviewerAnswer.trim().length > 0
+            const hasAnalysis = hasFeedback || hasRecommendedFocus
 
             return (
               <Card key={exchange.id} size="sm">
@@ -377,11 +379,11 @@ function CandidateQuestions({
                   </Badge>
                   <CardTitle className="text-base leading-7">{exchange.question}</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+                <CardContent className="grid min-w-0 gap-4 md:grid-cols-2">
                   {hasAnalysis ? (
                     <>
-                      {exchange.feedback.trim().length > 0 ? (
-                        <Alert>
+                      {hasFeedback ? (
+                        <Alert className={cn("min-w-0", !hasRecommendedFocus && "md:col-span-2")}>
                           <MessageCircleQuestionIcon aria-hidden="true" />
                           <AlertTitle>{t("history.mockDetail.analysis")}</AlertTitle>
                           <AlertDescription className="whitespace-pre-line">
@@ -389,8 +391,8 @@ function CandidateQuestions({
                           </AlertDescription>
                         </Alert>
                       ) : null}
-                      {exchange.interviewerAnswer.trim().length > 0 ? (
-                        <Alert>
+                      {hasRecommendedFocus ? (
+                        <Alert className={cn("min-w-0", !hasFeedback && "md:col-span-2")}>
                           <CompassIcon aria-hidden="true" />
                           <AlertTitle>{t("history.mockDetail.recommendedFocus")}</AlertTitle>
                           <AlertDescription>

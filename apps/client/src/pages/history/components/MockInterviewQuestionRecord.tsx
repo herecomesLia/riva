@@ -27,7 +27,7 @@ export function MockInterviewQuestionRecord({
     <Card data-testid={`mock-history-question-${question.id}`}>
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
             <Badge className="w-fit" variant="outline">
               {t("history.mockDetail.question", { order: question.order })}
             </Badge>
@@ -93,7 +93,7 @@ function FollowUpRecord({
     <Card size="sm">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
             <Badge className="w-fit" variant="outline">
               {t("history.mockDetail.followUp", { order: followUp.order })}
             </Badge>

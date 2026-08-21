@@ -51,7 +51,7 @@ export function HistoryRecordList({
   return (
     <section aria-labelledby="history-records-title" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="font-heading text-lg font-semibold" id="history-records-title">
             {t("history.records.title")}
           </h2>
@@ -141,7 +141,7 @@ function HistoryRecordCard({
     <Card size="sm">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>
                 <KindIcon aria-hidden="true" data-icon="inline-start" />

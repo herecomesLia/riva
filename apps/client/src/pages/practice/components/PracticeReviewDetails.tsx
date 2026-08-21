@@ -56,7 +56,7 @@ export function PracticeReusableStructure({ items }: { items: string[] }) {
           {items.map((item, index) => (
             <li className="flex min-w-0 items-start gap-2 rounded-xl bg-muted/60 p-3" key={item}>
               <Badge variant="outline">{index + 1}</Badge>
-              <span className="wrap-break-word text-sm leading-6">{item}</span>
+              <span className="min-w-0 flex-1 wrap-break-word text-sm leading-6">{item}</span>
             </li>
           ))}
         </ol>

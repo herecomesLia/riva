@@ -47,6 +47,14 @@ describe("TargetedPracticeHistoryView", () => {
     renderView({ status: "ready", data: record })
 
     expect(await screen.findAllByText(record.questions[0].prompt)).toHaveLength(2)
+    const question = record.questions[0]
+    if (!question.answer) throw new Error("Answered question fixture required.")
+    const questionCard = screen.getByTestId(`history-question-${question.id}`)
+    const prompt = within(questionCard).getByText(question.prompt)
+    expect(prompt.parentElement).toHaveClass("min-w-0", "flex-1")
+    const answer = within(questionCard).getByText(question.answer.content)
+    expect(answer).toHaveClass("w-full", "min-w-0")
+    expect(answer).not.toHaveClass("max-w-prose")
     expect(screen.getByText(i18n.t("history.detail.retryAttempt"))).toBeInTheDocument()
     expect(screen.getByText(record.questions[1].followUps[0].prompt)).toBeInTheDocument()
     expect(
