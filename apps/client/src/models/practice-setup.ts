@@ -12,9 +12,11 @@ import type { RolesPageResponse, TargetRole } from "@/models/roles"
 type PracticeEligibleQuestionCounts = PracticeSetupContext["eligibleQuestionCounts"]
 
 type PracticeSetupContextOptions = {
+  availability?: PracticeSetupContext["availability"]
   canPrioritizeWeaknesses?: boolean
   eligibleQuestionCounts?: PracticeEligibleQuestionCounts
   eligibleTargetRoleIds?: readonly string[]
+  personalizedQuestionGenerationTargetRoleIds?: readonly string[]
   questionSourceAvailability?: PracticeQuestionSourceAvailability[]
 }
 
@@ -31,23 +33,50 @@ export function buildPracticeSetupContext(
   rolesResponse: RolesPageResponse,
   options: PracticeSetupContextOptions = {},
 ): PracticeSetupContext {
-  const targetRoles = rolesResponse.roles
-    .filter(
-      (role) =>
-        role.preparationStatus !== "archived" &&
-        (options.eligibleTargetRoleIds === undefined ||
-          options.eligibleTargetRoleIds.includes(role.id)),
-    )
-    .map(toPracticeRoleOption)
+  const nonArchivedRoles = rolesResponse.roles.filter(
+    (role) => role.preparationStatus !== "archived",
+  )
+  const profileComplete =
+    rolesResponse.profileContext.exists && rolesResponse.profileContext.completed
+  const eligibleTargetRoleIds =
+    options.eligibleTargetRoleIds ??
+    (profileComplete
+      ? nonArchivedRoles
+          .filter(
+            (role) =>
+              role.jobDescription.status === "ready" && role.jobDescriptionAnalysis !== null,
+          )
+          .map(({ id }) => id)
+      : [])
+  const targetRoleModels = nonArchivedRoles.filter((role) =>
+    eligibleTargetRoleIds.includes(role.id),
+  )
+  const targetRoles = targetRoleModels.map(toPracticeRoleOption)
   const defaultTargetRoleId = targetRoles.some((role) => role.id === rolesResponse.currentRoleId)
     ? rolesResponse.currentRoleId
     : null
+  const availability =
+    options.availability ??
+    (nonArchivedRoles.length === 0
+      ? { status: "blocked" as const, reason: "noTargetRoles" as const }
+      : !profileComplete
+        ? { status: "blocked" as const, reason: "profileIncomplete" as const }
+        : targetRoles.length === 0
+          ? { status: "blocked" as const, reason: "jobDescriptionMissing" as const }
+          : { status: "available" as const })
+  const personalizedQuestionGenerationTargetRoleIds =
+    options.personalizedQuestionGenerationTargetRoleIds ??
+    targetRoleModels
+      .filter((role) => role.matchingAnalysis?.status === "current")
+      .map(({ id }) => id)
 
   return {
+    availability,
     targetRoles,
     defaultTargetRoleId,
     availableDifficulties: ["basic", "pressure"],
     canPrioritizeWeaknesses: options.canPrioritizeWeaknesses ?? false,
+    personalizedQuestionGenerationTargetRoleIds: [...personalizedQuestionGenerationTargetRoleIds],
     eligibleQuestionCounts: options.eligibleQuestionCounts ?? { saved: 0, history: 0 },
     questionSourceAvailability: options.questionSourceAvailability ?? [],
   }
@@ -60,8 +89,12 @@ export function getEligiblePracticeQuestionCount(
     "targetRoleId" | "questionType" | "difficulty" | "source"
   >,
 ): number {
-  if (selection.source === "personalized") return 1
   if (selection.targetRoleId === null) return 0
+  if (selection.source === "personalized") {
+    return context.personalizedQuestionGenerationTargetRoleIds.includes(selection.targetRoleId)
+      ? 1
+      : 0
+  }
   const availability = context.questionSourceAvailability.find(
     (candidate) =>
       candidate.targetRoleId === selection.targetRoleId &&

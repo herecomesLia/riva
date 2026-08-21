@@ -52,11 +52,13 @@ export function createInterviewSetupResponseMock(
     profileSnapshot.profile?.status === "active" &&
     profileSnapshot.profile.completeness.percentage === 100
   const availability: InterviewSetupResponse["availability"] =
-    !profileComplete && domainRoles.length > 0
-      ? { status: "blocked", reason: "profileIncomplete" }
-      : domainRoles.length > 0 && targetRoles.length === 0
-        ? { status: "blocked", reason: "jobDescriptionMissing" }
-        : { status: "available" }
+    domainRoles.length === 0
+      ? { status: "blocked", reason: "noTargetRoles" }
+      : !profileComplete
+        ? { status: "blocked", reason: "profileIncomplete" }
+        : targetRoles.length === 0
+          ? { status: "blocked", reason: "jobDescriptionMissing" }
+          : { status: "available" }
 
   return structuredClone({
     availability,

@@ -134,6 +134,9 @@ export function InterviewPage() {
 
   if (interviewQuery.data !== undefined) {
     if (interviewQuery.data.setup.availability.status === "blocked") {
+      if (interviewQuery.data.setup.availability.reason === "noTargetRoles") {
+        return <InterviewView status="empty" />
+      }
       return (
         <InterviewView reason={interviewQuery.data.setup.availability.reason} status="blocked" />
       )

@@ -115,6 +115,7 @@ function rolesResponse(profileCompleted = true) {
 
 function setupCapabilitiesResponse() {
   return {
+    availability: { status: "available" as const },
     canPrioritizeWeaknesses: false,
     historyQuestionCount: 2,
     questionSourceAvailability: [
@@ -134,6 +135,7 @@ function setupCapabilitiesResponse() {
       },
     ],
     savedQuestionCount: 1,
+    trainingAvailableTargetRoleIds: [roleAId, roleBId],
   }
 }
 
@@ -220,7 +222,13 @@ describe("real practice setup selection availability", () => {
     fetchMock.mockImplementation(async (input) => {
       if (input === "/api/roles") return jsonResponse(rolesResponse(false))
       if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
-      if (input === "/api/practice/setup") return jsonResponse(setupCapabilitiesResponse())
+      if (input === "/api/practice/setup") {
+        return jsonResponse({
+          ...setupCapabilitiesResponse(),
+          availability: { status: "blocked", reason: "profileIncomplete" },
+          trainingAvailableTargetRoleIds: [],
+        })
+      }
       throw new Error(`Unexpected request: ${String(input)}`)
     })
 

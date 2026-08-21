@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -12,13 +11,10 @@ from sqlalchemy.orm import selectinload
 
 from riva.models import (
     InterviewCandidateQuestion,
-    CareerProfile,
-    CurrentTargetRole,
     InterviewCandidateQuestionExchange,
     InterviewFollowUpQuestion,
     InterviewQuestion,
     InterviewSession,
-    TargetRole,
     User,
 )
 from riva.schemas.interview import (
@@ -28,7 +24,11 @@ from riva.schemas.interview import (
     InterviewRound,
 )
 from riva.core.language import InteractionLanguage
-from riva.services.profile_completion import career_profile_completed
+from riva.services.training_role_eligibility import (
+    TrainingRoleEligibilityBlockedReason,
+    TrainingRoleEligibilityContext,
+    TrainingRoleEligibilityService,
+)
 from riva.utils import utc_now
 
 
@@ -60,19 +60,8 @@ INTERVIEW_SESSION_CONFIGURATION_INVALID: InterviewSessionStateErrorCode = (
     "interview_session_configuration_invalid"
 )
 
-InterviewSetupAvailabilityReason = Literal[
-    "profileIncomplete",
-    "jobDescriptionMissing",
-]
-
-
-@dataclass(frozen=True)
-class InterviewSetupContext:
-    target_roles: tuple[TargetRole, ...]
-    current_target_role_id: UUID | None
-    has_non_archived_role: bool
-    profile_complete: bool
-    blocked_reason: InterviewSetupAvailabilityReason | None
+InterviewSetupAvailabilityReason = TrainingRoleEligibilityBlockedReason
+InterviewSetupContext = TrainingRoleEligibilityContext
 
 
 class InterviewSessionStateError(RuntimeError):
@@ -94,47 +83,10 @@ class InterviewSessionService:
         self.clock = clock
 
     async def get_setup(self, *, user_id: UUID) -> InterviewSetupContext:
-        profile = await self._profile(user_id)
-        roles = [
-            role
-            for role in (
-                await self.session.scalars(
-                    select(TargetRole)
-                    .options(selectinload(TargetRole.job_description_analysis))
-                    .where(
-                        TargetRole.user_id == user_id,
-                        TargetRole.preparation_status != "archived",
-                    )
-                    .order_by(TargetRole.created_at.asc(), TargetRole.id.asc())
-                )
-            ).all()
-            if role.preparation_status != "archived"
-        ]
-        eligible_roles = tuple(
-            role for role in roles if self._job_description_ready(role)
-        )
-        current_target_role_id = await self.session.scalar(
-            select(CurrentTargetRole.role_id).where(
-                CurrentTargetRole.user_id == user_id
-            )
-        )
-        profile_complete = profile is not None and career_profile_completed(profile)
-
-        if not roles:
-            blocked_reason = None
-        elif not profile_complete:
-            blocked_reason = "profileIncomplete"
-        elif not eligible_roles:
-            blocked_reason = "jobDescriptionMissing"
-        else:
-            blocked_reason = None
-
-        return InterviewSetupContext(
-            target_roles=eligible_roles,
-            current_target_role_id=current_target_role_id,
-            has_non_archived_role=bool(roles),
-            profile_complete=profile_complete,
-            blocked_reason=blocked_reason,
+        return await TrainingRoleEligibilityService(
+            self.session
+        ).get_training_available_target_roles(
+            user_id=user_id,
         )
 
     async def get_active_session(
@@ -257,33 +209,9 @@ class InterviewSessionService:
             await self.session.rollback()
             raise
 
-    async def _profile(self, user_id: UUID) -> CareerProfile | None:
-        return await self.session.scalar(
-            select(CareerProfile)
-            .options(
-                selectinload(CareerProfile.education),
-                selectinload(CareerProfile.work_experiences),
-                selectinload(CareerProfile.project_experiences),
-                selectinload(CareerProfile.skills),
-            )
-            .where(CareerProfile.user_id == user_id)
-        )
-
     async def _lock_user(self, user_id: UUID) -> None:
         await self.session.execute(
             select(User.id).where(User.id == user_id).with_for_update()
-        )
-
-    @staticmethod
-    def _job_description_ready(role: TargetRole) -> bool:
-        analysis = role.job_description_analysis
-        return bool(
-            role.job_description_status == "saved"
-            and role.raw_job_description is not None
-            and role.raw_job_description.strip()
-            and role.job_description_version is not None
-            and analysis is not None
-            and analysis.job_description_version == role.job_description_version
         )
 
     @staticmethod

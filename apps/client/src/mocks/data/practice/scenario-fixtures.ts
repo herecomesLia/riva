@@ -193,10 +193,12 @@ const practiceMockScenarios = {
   },
   noRoles: {
     setupContext: {
+      availability: { status: "blocked", reason: "noTargetRoles" },
       targetRoles: [],
       defaultTargetRoleId: null,
       availableDifficulties: ["basic", "pressure"],
       canPrioritizeWeaknesses: true,
+      personalizedQuestionGenerationTargetRoleIds: [],
       eligibleQuestionCounts: { saved: 0, history: 0 },
       questionSourceAvailability: [],
     },

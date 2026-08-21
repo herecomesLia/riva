@@ -39,6 +39,11 @@ export const practice = {
     manageRoles: "Go to target roles",
   },
   availability: {
+    personalized: {
+      title: "Personalized generation is not ready",
+      description:
+        "Complete matching analysis for this role before generating personalized questions. Other eligible sources remain available.",
+    },
     saved: {
       title: "No eligible saved questions",
       description:
@@ -50,10 +55,25 @@ export const practice = {
         "There are no previous questions for this role and question type. Switch to personalized questions to continue.",
     },
   },
-  noRoles: {
-    title: "Add a target role first",
-    description:
-      "Targeted practice needs a role for question context. Add one to start single-question training.",
+  prerequisites: {
+    noTargetRoles: {
+      title: "Add a target role first",
+      description:
+        "Targeted practice needs a role for question context. Add one to start single-question training.",
+      action: "Add target role",
+    },
+    profileIncomplete: {
+      title: "Complete your job-search profile first",
+      description:
+        "Targeted practice uses your real experience to generate training content. Complete your profile to continue.",
+      action: "Complete profile",
+    },
+    jobDescriptionMissing: {
+      title: "This role is still being prepared",
+      description:
+        "Complete the job-description analysis for your existing target role before entering practice setup.",
+      action: "Go to target roles",
+    },
   },
   loading: {
     cardDescription: "Loading target roles and available question sources.",

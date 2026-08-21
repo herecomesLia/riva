@@ -99,6 +99,33 @@ class PracticeSetupCapabilitiesResponse(APIModel):
     can_prioritize_weaknesses: bool
 
 
+PracticeSetupBlockedReason = Literal[
+    "noTargetRoles",
+    "profileIncomplete",
+    "jobDescriptionMissing",
+]
+
+
+class PracticeSetupAvailableResponse(APIModel):
+    status: Literal["available"]
+
+
+class PracticeSetupBlockedResponse(APIModel):
+    status: Literal["blocked"]
+    reason: PracticeSetupBlockedReason
+
+
+PracticeSetupAvailabilityResponse = Annotated[
+    PracticeSetupAvailableResponse | PracticeSetupBlockedResponse,
+    Field(discriminator="status"),
+]
+
+
+class PracticeSetupResponse(PracticeSetupCapabilitiesResponse):
+    availability: PracticeSetupAvailabilityResponse
+    training_available_target_role_ids: list[StandardUUID]
+
+
 class StartPracticeSessionRequest(PracticeSessionSelection):
     """The client-controlled selection for a new practice session."""
 
@@ -842,6 +869,7 @@ __all__ = [
     "PracticeSessionCompletionReason",
     "PracticeSessionSelection",
     "PracticeSetupCapabilitiesResponse",
+    "PracticeSetupResponse",
     "PracticeSessionStatus",
     "CompletePracticeSessionRequest",
     "EndPracticeSessionEarlyRequest",

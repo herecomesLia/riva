@@ -40,6 +40,15 @@ export const practiceSessionSelectionSchema = z
 
 export const practiceSetupCapabilitiesResponseSchema = z
   .object({
+    availability: z.discriminatedUnion("status", [
+      z.object({ status: z.literal("available") }).strict(),
+      z
+        .object({
+          reason: z.enum(["noTargetRoles", "profileIncomplete", "jobDescriptionMissing"]),
+          status: z.literal("blocked"),
+        })
+        .strict(),
+    ]),
     canPrioritizeWeaknesses: z.boolean(),
     historyQuestionCount: z.number().int().nonnegative(),
     questionSourceAvailability: z.array(
@@ -54,6 +63,7 @@ export const practiceSetupCapabilitiesResponseSchema = z
         .strict(),
     ),
     savedQuestionCount: z.number().int().nonnegative(),
+    trainingAvailableTargetRoleIds: z.array(uuidSchema),
   })
   .strict()
 

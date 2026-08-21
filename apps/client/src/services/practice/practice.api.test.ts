@@ -164,6 +164,12 @@ function createTrainableRolesResponse(
 
 function createSetupCapabilitiesResponse(
   overrides: Partial<{
+    availability:
+      | { status: "available" }
+      | {
+          status: "blocked"
+          reason: "noTargetRoles" | "profileIncomplete" | "jobDescriptionMissing"
+        }
     canPrioritizeWeaknesses: boolean
     historyQuestionCount: number
     questionSourceAvailability: Array<{
@@ -179,12 +185,15 @@ function createSetupCapabilitiesResponse(
       targetRoleId: string
     }>
     savedQuestionCount: number
+    trainingAvailableTargetRoleIds: string[]
   }> = {},
 ) {
   const aggregate = {
+    availability: { status: "blocked", reason: "jobDescriptionMissing" } as const,
     canPrioritizeWeaknesses: false,
     historyQuestionCount: 0,
     savedQuestionCount: 0,
+    trainingAvailableTargetRoleIds: [],
     ...overrides,
   }
   return {
@@ -440,6 +449,7 @@ describe("practice service API", () => {
       expect.arrayContaining(["/api/roles", "/api/practice/sessions/current"]),
     )
     expect(page.setupContext).toMatchObject({
+      availability: { status: "blocked", reason: "jobDescriptionMissing" },
       canPrioritizeWeaknesses: false,
       defaultTargetRoleId: null,
       eligibleQuestionCounts: { history: 0, saved: 0 },
@@ -455,6 +465,31 @@ describe("practice service API", () => {
       },
       status: "setup",
     })
+  })
+
+  it("allows setup with a ready JD when matching analysis is absent", async () => {
+    const role = createTrainableRole(roleId)
+    role.matchingAnalysis = null
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/roles") return jsonResponse(createTrainableRolesResponse([role]))
+      if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
+      if (input === "/api/practice/setup") {
+        return jsonResponse(
+          createSetupCapabilitiesResponse({
+            availability: { status: "available" },
+            trainingAvailableTargetRoleIds: [roleId],
+          }),
+        )
+      }
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    const page = await getPracticePage()
+
+    expect(page.setupContext.availability).toEqual({ status: "available" })
+    expect(page.setupContext.targetRoles.map(({ id }) => id)).toEqual([roleId])
+    expect(page.setupContext.canPrioritizeWeaknesses).toBe(false)
+    expect(page.setupContext.personalizedQuestionGenerationTargetRoleIds).toEqual([])
   })
 
   it("uses the real setup capability count for saved questions", async () => {
@@ -497,8 +532,10 @@ describe("practice service API", () => {
       if (input === "/api/practice/setup") {
         return jsonResponse(
           createSetupCapabilitiesResponse({
+            availability: { status: "available" },
             canPrioritizeWeaknesses: true,
             historyQuestionCount: 2,
+            trainingAvailableTargetRoleIds: [roleId],
           }),
         )
       }
@@ -733,7 +770,13 @@ describe("practice service API", () => {
       }
       if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
       if (input === "/api/practice/setup") {
-        return jsonResponse(createSetupCapabilitiesResponse({ historyQuestionCount: 4 }))
+        return jsonResponse(
+          createSetupCapabilitiesResponse({
+            availability: { status: "available" },
+            historyQuestionCount: 4,
+            trainingAvailableTargetRoleIds: [roleId],
+          }),
+        )
       }
       throw new Error(`Unexpected request: ${String(input)}`)
     })
@@ -776,7 +819,13 @@ describe("practice service API", () => {
       }
       if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
       if (input === "/api/practice/setup") {
-        return jsonResponse(createSetupCapabilitiesResponse({ savedQuestionCount: 2 }))
+        return jsonResponse(
+          createSetupCapabilitiesResponse({
+            availability: { status: "available" },
+            savedQuestionCount: 2,
+            trainingAvailableTargetRoleIds: [roleId],
+          }),
+        )
       }
       throw new Error(`Unexpected request: ${String(input)}`)
     })
@@ -813,7 +862,14 @@ describe("practice service API", () => {
         )
       }
       if (input === "/api/practice/sessions/current") return jsonResponse({ session: null })
-      if (input === "/api/practice/setup") return jsonResponse(createSetupCapabilitiesResponse())
+      if (input === "/api/practice/setup") {
+        return jsonResponse(
+          createSetupCapabilitiesResponse({
+            availability: { status: "available" },
+            trainingAvailableTargetRoleIds: [roleId],
+          }),
+        )
+      }
       throw new Error(`Unexpected request: ${String(input)}`)
     })
 

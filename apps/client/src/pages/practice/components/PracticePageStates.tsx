@@ -1,5 +1,11 @@
 import { Link } from "@tanstack/react-router"
-import { AlertCircleIcon, BriefcaseBusinessIcon, LoaderCircleIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  BriefcaseBusinessIcon,
+  FileTextIcon,
+  LoaderCircleIcon,
+  UserRoundPenIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -82,11 +88,26 @@ export function PracticeLoadErrorState({
   )
 }
 
-export function PracticeNoRolesState() {
+export function PracticeSetupBlockedState({
+  reason,
+}: {
+  reason: "noTargetRoles" | "profileIncomplete" | "jobDescriptionMissing"
+}) {
   const { t } = useTranslation()
+  const destination = reason === "profileIncomplete" ? "/profile" : "/roles"
+  const Icon =
+    reason === "profileIncomplete"
+      ? UserRoundPenIcon
+      : reason === "jobDescriptionMissing"
+        ? FileTextIcon
+        : BriefcaseBusinessIcon
 
   return (
-    <Card data-testid="practice-no-roles-state">
+    <Card
+      data-testid={
+        reason === "noTargetRoles" ? "practice-no-roles-state" : `practice-${reason}-state`
+      }
+    >
       <CardHeader className="border-b">
         <CardTitle>
           <h2>{t("practice.setup.title")}</h2>
@@ -97,14 +118,15 @@ export function PracticeNoRolesState() {
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <BriefcaseBusinessIcon />
+              <Icon aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle>{t("practice.noRoles.title")}</EmptyTitle>
-            <EmptyDescription>{t("practice.noRoles.description")}</EmptyDescription>
+            <EmptyTitle>{t(`practice.prerequisites.${reason}.title`)}</EmptyTitle>
+            <EmptyDescription>{t(`practice.prerequisites.${reason}.description`)}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button nativeButton={false} render={<Link to="/roles" />}>
-              {t("practice.actions.manageRoles")}
+            <Button nativeButton={false} render={<Link to={destination} />}>
+              <Icon aria-hidden="true" data-icon="inline-start" />
+              {t(`practice.prerequisites.${reason}.action`)}
             </Button>
           </EmptyContent>
         </Empty>

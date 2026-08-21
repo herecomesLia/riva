@@ -41,7 +41,7 @@ export type InterviewSetupAvailabilityResponse =
   | { status: "available" }
   | {
       status: "blocked"
-      reason: "profileIncomplete" | "jobDescriptionMissing"
+      reason: "noTargetRoles" | "profileIncomplete" | "jobDescriptionMissing"
     }
 
 export type InterviewSetupResponse = {

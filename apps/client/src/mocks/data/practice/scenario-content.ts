@@ -29,10 +29,12 @@ export const targetRoles = rolesFixture.roles
   })) satisfies PracticeSetupContext["targetRoles"]
 
 export const setupContext = {
+  availability: { status: "available" },
   targetRoles,
   defaultTargetRoleId: rolesFixture.currentRoleId,
   availableDifficulties: ["basic", "pressure"],
   canPrioritizeWeaknesses: true,
+  personalizedQuestionGenerationTargetRoleIds: targetRoles.map(({ id }) => id),
   eligibleQuestionCounts: {
     saved: 3,
     history: 5,

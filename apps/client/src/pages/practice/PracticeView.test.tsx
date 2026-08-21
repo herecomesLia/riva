@@ -594,6 +594,41 @@ describe("PracticeView", () => {
     ).not.toBeChecked()
   })
 
+  it("allows setup entry when weakness prioritization is unavailable", async () => {
+    const data = createPracticeMockResponse("setupReady")
+    data.setupContext.canPrioritizeWeaknesses = false
+
+    renderReadyView(data)
+
+    expect(await screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+    expect(
+      screen.getByRole("switch", {
+        name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
+      }),
+    ).toHaveAttribute("aria-disabled", "true")
+    expect(
+      screen.queryByText(i18n.t("practice.prerequisites.noTargetRoles.title")),
+    ).not.toBeInTheDocument()
+  })
+
+  it("distinguishes a role whose JD is not ready from a missing role", async () => {
+    const data = createPracticeMockResponse("setupReady")
+    data.setupContext.availability = {
+      status: "blocked",
+      reason: "jobDescriptionMissing",
+    }
+
+    renderReadyView(data)
+
+    expect(await screen.findByTestId("practice-jobDescriptionMissing-state")).toBeInTheDocument()
+    expect(
+      screen.getByText(i18n.t("practice.prerequisites.jobDescriptionMissing.title")),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(i18n.t("practice.prerequisites.noTargetRoles.title")),
+    ).not.toBeInTheDocument()
+  })
+
   it("keeps the selected option styling after focus moves away", async () => {
     const user = userEvent.setup()
     renderReadyView(createPracticeMockResponse("setupReady"))

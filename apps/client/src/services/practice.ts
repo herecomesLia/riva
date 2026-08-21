@@ -74,13 +74,7 @@ async function requestPracticeSetupCapabilities(): Promise<PracticeSetupCapabili
   return practiceSetupCapabilitiesResponseSchema.parse(await apiRequest<unknown>("/practice/setup"))
 }
 
-function hasPracticeTrainingPrerequisites(rolesResponse: RolesPageResponse): boolean {
-  return rolesResponse.profileContext.exists && rolesResponse.profileContext.completed
-}
-
-function getTrainablePracticeRoleIds(rolesResponse: RolesPageResponse): string[] {
-  if (!hasPracticeTrainingPrerequisites(rolesResponse)) return []
-
+function getPersonalizedPracticeRoleIds(rolesResponse: RolesPageResponse): string[] {
   return rolesResponse.roles
     .filter(
       (role) =>
@@ -101,12 +95,14 @@ function buildRealPracticeSetupContext(
   capabilities: PracticeSetupCapabilitiesResponseWire,
 ) {
   return buildPracticeSetupContext(rolesResponse, {
+    availability: capabilities.availability,
     canPrioritizeWeaknesses: capabilities.canPrioritizeWeaknesses,
-    eligibleTargetRoleIds: getTrainablePracticeRoleIds(rolesResponse),
+    eligibleTargetRoleIds: capabilities.trainingAvailableTargetRoleIds,
     eligibleQuestionCounts: {
       history: capabilities.historyQuestionCount,
       saved: capabilities.savedQuestionCount,
     },
+    personalizedQuestionGenerationTargetRoleIds: getPersonalizedPracticeRoleIds(rolesResponse),
     questionSourceAvailability: capabilities.questionSourceAvailability,
   })
 }
@@ -204,9 +200,9 @@ async function prepareRealPracticeTrainingEntry(
   const currentSelection = createRealPracticeSetupSelection(setupContext)
   const roleAvailability = resolveTrainingEntryRoleAvailability(
     rolesResponse.roles,
-    getTrainablePracticeRoleIds(rolesResponse),
+    capabilities.trainingAvailableTargetRoleIds,
     input.targetRoleId,
-    hasPracticeTrainingPrerequisites(rolesResponse),
+    capabilities.availability.status === "available",
   )
   const resolution = resolvePracticeTrainingEntry(
     setupContext,

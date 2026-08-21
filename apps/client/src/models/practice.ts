@@ -57,10 +57,17 @@ export type PracticeReferenceAnswerState =
   | { status: "unavailable"; content: null; viewedBeforeSubmission: false }
 
 export type PracticeSetupContext = {
+  availability:
+    | { status: "available" }
+    | {
+        status: "blocked"
+        reason: "noTargetRoles" | "profileIncomplete" | "jobDescriptionMissing"
+      }
   targetRoles: PracticeTargetRoleOption[]
   defaultTargetRoleId: string | null
   availableDifficulties: PracticeDifficulty[]
   canPrioritizeWeaknesses: boolean
+  personalizedQuestionGenerationTargetRoleIds: string[]
   eligibleQuestionCounts: {
     saved: number
     history: number

@@ -60,7 +60,7 @@ import {
   PracticeGenerationErrorState,
   PracticeLoadErrorState,
   PracticeLoadingState,
-  PracticeNoRolesState,
+  PracticeSetupBlockedState,
 } from "./components/PracticePageStates"
 import { PracticeSetupForm } from "./components/PracticeSetupForm"
 import { PracticeAnswerComposer } from "./components/PracticeAnswerComposer"
@@ -275,13 +275,18 @@ function PracticeViewContent(props: PracticeViewProps) {
 
   switch (session.status) {
     case "setup": {
-      if (setupContext.targetRoles.length === 0) return <PracticeNoRolesState />
+      if (setupContext.availability.status === "blocked") {
+        return <PracticeSetupBlockedState reason={setupContext.availability.reason} />
+      }
+      if (setupContext.targetRoles.length === 0) {
+        return <PracticeSetupBlockedState reason="noTargetRoles" />
+      }
 
       const selection =
         props.trainingEntryResolution?.status === "roleUnavailable"
           ? session.selection
           : resolveActiveSelection(session.selection, setupContext)
-      if (!selection) return <PracticeNoRolesState />
+      if (!selection) return <PracticeSetupBlockedState reason="noTargetRoles" />
 
       return (
         <Card data-testid="practice-setup-state">

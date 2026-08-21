@@ -50,7 +50,9 @@ from riva.schemas.practice_sessions import (
     PracticeReviewContentResponse,
     PracticeReviewResponse,
     PracticeSessionSelection,
-    PracticeSetupCapabilitiesResponse,
+    PracticeSetupAvailableResponse,
+    PracticeSetupBlockedResponse,
+    PracticeSetupResponse,
     PracticeSessionResponse,
     RetryPracticeQuestionRequest,
     SkipPracticeQuestionRequest,
@@ -104,6 +106,7 @@ from riva.services.reference_answer_generation import (
     ReferenceAnswerGenerationStateError,
     PracticeReferenceAnswerTargetType,
 )
+from riva.services.training_role_eligibility import TrainingRoleEligibilityService
 
 
 PRACTICE_EVALUATION_GENERATION_UNAVAILABLE = (
@@ -111,6 +114,9 @@ PRACTICE_EVALUATION_GENERATION_UNAVAILABLE = (
 )
 
 PracticeSessionServiceFactory = Callable[..., PracticeSessionService]
+TrainingRoleEligibilityServiceFactory = Callable[
+    [AsyncSession], TrainingRoleEligibilityService
+]
 ReferenceAnswerGenerationServiceFactory = Callable[
     ..., ReferenceAnswerGenerationService
 ]
@@ -134,6 +140,9 @@ class PracticeAPIService:
         practice_service_factory: PracticeSessionServiceFactory = (
             PracticeSessionService
         ),
+        training_role_eligibility_service_factory: TrainingRoleEligibilityServiceFactory = (
+            TrainingRoleEligibilityService
+        ),
         reference_answer_generation_service_factory: ReferenceAnswerGenerationServiceFactory
         | None = None,
     ) -> None:
@@ -141,6 +150,9 @@ class PracticeAPIService:
         self.llm_provider = (llm_provider or "").strip().lower()
         self.llm_model = (llm_model or "").strip()
         self.practice_service_factory = practice_service_factory
+        self.training_role_eligibility_service_factory = (
+            training_role_eligibility_service_factory
+        )
         self.reference_answer_generation_service_factory = (
             reference_answer_generation_service_factory
             or ReferenceAnswerGenerationService
@@ -178,11 +190,31 @@ class PracticeAPIService:
         *,
         user_id: UUID,
         interaction_language: InteractionLanguage,
-    ) -> PracticeSetupCapabilitiesResponse:
+    ) -> PracticeSetupResponse:
         try:
-            return await self._practice_service().get_setup_capabilities(
+            capabilities = await self._practice_service().get_setup_capabilities(
                 user_id=user_id,
                 interaction_language=interaction_language,
+            )
+            eligibility = await self.training_role_eligibility_service_factory(
+                self.session
+            ).get_training_available_target_roles(user_id=user_id)
+            availability = (
+                PracticeSetupAvailableResponse(status="available")
+                if eligibility.blocked_reason is None
+                else PracticeSetupBlockedResponse(
+                    status="blocked",
+                    reason=eligibility.blocked_reason,
+                )
+            )
+            return PracticeSetupResponse(
+                **capabilities.model_dump(mode="python"),
+                availability=availability,
+                training_available_target_role_ids=(
+                    [role.id for role in eligibility.target_roles]
+                    if eligibility.blocked_reason is None
+                    else []
+                ),
             )
         except PracticeSessionStateError as error:
             raise practice_session_state_api_error(error) from None

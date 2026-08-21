@@ -36,7 +36,9 @@ import {
 import {
   createTargetRole,
   deleteTargetRole,
+  getJobDescriptionParsingStatus,
   getRolesPage,
+  saveJobDescription,
   setCurrentTargetRole,
   updateTargetRole,
 } from "@/services/roles"
@@ -48,11 +50,12 @@ import type {
   PracticeReviewState,
   PracticeServiceResponse,
 } from "@/models/practice"
+import type { TargetRole } from "@/models/roles"
 import { isCurrentPracticeAttemptRetry } from "@/pages/practice/practice-attempt"
 
 beforeEach(() => {
   vi.useFakeTimers()
-  resetRolesMockState("multipleRoles")
+  resetRolesMockState("multipleRolesReady")
   resetPracticeMockState()
 })
 
@@ -63,6 +66,26 @@ afterEach(() => {
 export async function settle<T>(promise: Promise<T>) {
   await vi.runAllTimersAsync()
   return promise
+}
+
+export async function completeTargetRoleJobDescription(role: TargetRole) {
+  const saved = await saveJobDescription({
+    rawText: "Build reliable customer-facing products.",
+    roleId: role.id,
+    version: role.version,
+  })
+  const parsingRole = saved.roles.find((candidate) => candidate.id === role.id)
+  if (
+    parsingRole?.jobDescription.status !== "parsing" ||
+    parsingRole.jobDescription.version === null
+  ) {
+    throw new Error("The target role must be parsing its job description.")
+  }
+  return getJobDescriptionParsingStatus({
+    jobDescriptionVersion: parsingRole.jobDescription.version,
+    roleId: parsingRole.id,
+    version: parsingRole.version,
+  })
 }
 
 export function requireMockPageResponse(response: PracticeServiceResponse): PracticePageResponse {

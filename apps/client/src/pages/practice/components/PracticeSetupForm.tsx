@@ -368,15 +368,17 @@ export function PracticeSetupForm({
               <AlertTitle>{t(`practice.availability.${source}.title`)}</AlertTitle>
               <AlertDescription className="flex flex-col items-start gap-3">
                 <span>{t(`practice.availability.${source}.description`)}</span>
-                <Button
-                  disabled={pending}
-                  onClick={() => form.setFieldValue("source", "personalized")}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  {t("practice.actions.usePersonalized")}
-                </Button>
+                {source !== "personalized" ? (
+                  <Button
+                    disabled={pending}
+                    onClick={() => form.setFieldValue("source", "personalized")}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {t("practice.actions.usePersonalized")}
+                  </Button>
+                ) : null}
               </AlertDescription>
             </Alert>
           )

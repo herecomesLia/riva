@@ -200,7 +200,10 @@ async def _run_workflow(url: str) -> None:
             app.dependency_overrides[require_current_user] = lambda: other_user
             isolated = client.get("/api/interview")
             assert isolated.status_code == 200
-            assert isolated.json()["setup"]["availability"] == {"status": "available"}
+            assert isolated.json()["setup"]["availability"] == {
+                "status": "blocked",
+                "reason": "noTargetRoles",
+            }
             assert isolated.json()["setup"]["targetRoles"] == []
 
             app.dependency_overrides[require_current_user] = lambda: owner

@@ -62,6 +62,7 @@ class InterviewGenerationStatus(StrEnum):
 
 
 InterviewSetupBlockedReason = Literal[
+    "noTargetRoles",
     "profileIncomplete",
     "jobDescriptionMissing",
 ]

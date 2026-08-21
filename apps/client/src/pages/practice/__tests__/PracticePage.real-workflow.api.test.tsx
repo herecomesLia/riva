@@ -374,10 +374,12 @@ function rolesResponse() {
 
 function setupCapabilitiesResponse() {
   return {
+    availability: { status: "blocked", reason: "jobDescriptionMissing" },
     canPrioritizeWeaknesses: false,
     historyQuestionCount: 0,
     questionSourceAvailability: [],
     savedQuestionCount: 0,
+    trainingAvailableTargetRoleIds: [],
   }
 }
 

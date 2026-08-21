@@ -507,6 +507,11 @@ def build_interview_setup_response(
             status="blocked",
             reason="jobDescriptionMissing",
         )
+    elif setup.blocked_reason == "noTargetRoles":
+        availability = InterviewSetupBlockedResponse(
+            status="blocked",
+            reason="noTargetRoles",
+        )
     else:
         availability = InterviewSetupAvailableResponse(status="available")
 

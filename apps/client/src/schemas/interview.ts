@@ -119,7 +119,7 @@ const interviewSetupSchema = z
       z
         .object({
           status: z.literal("blocked"),
-          reason: z.enum(["profileIncomplete", "jobDescriptionMissing"]),
+          reason: z.enum(["noTargetRoles", "profileIncomplete", "jobDescriptionMissing"]),
         })
         .strict(),
     ]),

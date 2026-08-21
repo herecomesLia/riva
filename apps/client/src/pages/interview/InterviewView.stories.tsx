@@ -133,7 +133,10 @@ export const Empty = meta.story({
 })
 
 const blockedSetup = createInterviewSetupStoryFixture("prerequisiteNotMet")
-if (blockedSetup.availability.status !== "blocked") {
+if (
+  blockedSetup.availability.status !== "blocked" ||
+  blockedSetup.availability.reason !== "profileIncomplete"
+) {
   throw new Error("Blocked interview setup fixture required.")
 }
 
@@ -206,7 +209,10 @@ export const ProductHrBasic = meta.story({
 })
 
 const missingJobDescriptionSetup = createInterviewSetupStoryFixture("jobDescriptionMissing")
-if (missingJobDescriptionSetup.availability.status !== "blocked") {
+if (
+  missingJobDescriptionSetup.availability.status !== "blocked" ||
+  missingJobDescriptionSetup.availability.reason !== "jobDescriptionMissing"
+) {
   throw new Error("Missing job description fixture must be blocked.")
 }
 

@@ -271,6 +271,7 @@ describe("practice stateful mock service: answering", () => {
     )
     const createdRole = roles.roles.find((role) => role.title === "Backend Engineer")
     if (!createdRole) throw new Error("Expected the newly created Backend role.")
+    const readyRole = await context.settle(context.completeTargetRoleJobDescription(createdRole))
 
     const beforeEdit = await context.settle(context.getPracticePage())
     expect(
@@ -280,13 +281,13 @@ describe("practice stateful mock service: answering", () => {
 
     await context.settle(
       context.updateTargetRole({
-        roleId: createdRole.id,
-        version: createdRole.version,
+        roleId: readyRole.id,
+        version: readyRole.version,
         title: "Business Operations Manager",
-        company: createdRole.company,
-        recruitmentType: createdRole.recruitmentType,
-        location: createdRole.location,
-        experienceRange: createdRole.experienceRange,
+        company: readyRole.company,
+        recruitmentType: readyRole.recruitmentType,
+        location: readyRole.location,
+        experienceRange: readyRole.experienceRange,
       }),
     )
     const afterEdit = await context.settle(context.getPracticePage())
@@ -316,6 +317,7 @@ describe("practice stateful mock service: answering", () => {
     )
     const createdRole = roles.roles.find((role) => role.title === "HR Business Partner")
     if (!createdRole) throw new Error("Expected the newly created role.")
+    await context.settle(context.completeTargetRoleJobDescription(createdRole))
 
     const response = await context.settle(context.getPracticePage())
     const practiceRole = response.setupContext.targetRoles.find(

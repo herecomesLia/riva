@@ -237,6 +237,8 @@ def test_saved_setup_start_skip_and_rollback_without_question_generation() -> No
                     )
                     assert setup.status_code == 200
                     assert setup.json() == {
+                        "availability": {"status": "available"},
+                        "trainingAvailableTargetRoleIds": [str(role.id)],
                         "savedQuestionCount": 2,
                         "historyQuestionCount": 0,
                         "questionSourceAvailability": [

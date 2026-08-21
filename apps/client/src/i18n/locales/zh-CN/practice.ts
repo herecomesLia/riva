@@ -38,6 +38,10 @@ export const practice = {
     manageRoles: "前往目标岗位",
   },
   availability: {
+    personalized: {
+      title: "个性化出题尚未准备完成",
+      description: "该岗位仍需完成匹配分析后才能生成个性化题目，其他已具备条件的题源仍可使用。",
+    },
     saved: {
       title: "暂无可练习的收藏题",
       description: "当前岗位和题型下没有符合条件的收藏题，可以切换到个性化题目。",
@@ -47,9 +51,22 @@ export const practice = {
       description: "当前岗位和题型下没有符合条件的历史题，可以切换到个性化题目。",
     },
   },
-  noRoles: {
-    title: "请先添加目标岗位",
-    description: "专项练习需要目标岗位作为出题上下文。添加岗位后即可开始单题训练。",
+  prerequisites: {
+    noTargetRoles: {
+      title: "请先添加目标岗位",
+      description: "专项练习需要目标岗位作为出题上下文。添加岗位后即可开始单题训练。",
+      action: "添加目标岗位",
+    },
+    profileIncomplete: {
+      title: "请先完善求职档案",
+      description: "专项练习会结合你的真实经历生成训练内容，完成求职档案后即可继续。",
+      action: "完善求职档案",
+    },
+    jobDescriptionMissing: {
+      title: "岗位正在准备中，请完成 JD 分析",
+      description: "已有目标岗位尚未完成 JD 解析。解析完成后即可进入专项练习设置。",
+      action: "前往目标岗位",
+    },
   },
   loading: {
     cardDescription: "正在加载岗位和可用题目来源。",
