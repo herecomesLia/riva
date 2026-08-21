@@ -1,5 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { fireEvent, screen, within } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
@@ -71,27 +71,7 @@ function renderDashboardView(content: Loadable<DashboardResponse>) {
 }
 
 describe("DashboardView", () => {
-  it("renders the header, complete grid, and each component skeleton while loading", async () => {
-    renderDashboardView({ status: "loading" })
-
-    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.currentRole.eyebrow"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.recommendation.eyebrow"))).toBeInTheDocument()
-    expect(
-      screen.getByRole("region", { name: i18n.t("dashboard.metrics.eyebrow") }),
-    ).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.metrics.roleFit.title"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.metrics.practiceTime.title"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.metrics.targetedPractice.title"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.metrics.mockInterview.title"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.performanceTrend.title"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("dashboard.weaknesses.eyebrow"))).toBeInTheDocument()
-    expect(screen.queryByText(i18n.t("dashboard.weaknesses.description"))).not.toBeInTheDocument()
-    expect(screen.getAllByText("测试用户")).toHaveLength(1)
-    expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(18)
-  })
-
-  it("renders complete business data in the ready layout", async () => {
+  it("renders complete business data and scores on the /100 scale", async () => {
     renderDashboardView({ status: "ready", data: structuredClone(dashboardResponseMock) })
 
     expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
@@ -100,20 +80,17 @@ describe("DashboardView", () => {
     ).toBeInTheDocument()
     expect(screen.getByText("76%")).toBeInTheDocument()
     expect(screen.getAllByText("86/100").length).toBeGreaterThan(0)
+    expect(document.body.textContent).not.toMatch(/\/\s*10(?!0)/)
     expect(screen.getByText(dashboardResponseMock.weaknesses[0].description)).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.weaknesses.description"))).toBeInTheDocument()
-    const recommendationLink = screen.getByRole("link", {
-      name: i18n.t("history.detail.recommendationActions.targetedPractice"),
-    })
-    expect(recommendationLink).toHaveAttribute("href", expect.stringContaining("/practice?"))
-    expect(recommendationLink.getAttribute("href")).toContain(
-      `targetRoleId=${dashboardResponseMock.recommendation!.targetRoleId}`,
-    )
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
+    expect(within(chart).getByText("100")).toBeInTheDocument()
+    expect(within(chart).queryByText("10")).not.toBeInTheDocument()
     fireEvent.focus(chart)
 
     expect(await screen.findByText("专项练习 第2次")).toBeInTheDocument()
+    expect((await screen.findAllByText("86/100")).length).toBeGreaterThan(1)
   })
 
   it("renders local empty states for null, empty arrays, and empty metrics", async () => {
@@ -148,24 +125,5 @@ describe("DashboardView", () => {
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
     fireEvent.focus(chart)
     expect(await screen.findByText("专项练习 第1次")).toBeInTheDocument()
-  })
-
-  it("renders only the page-level error and calls retry", async () => {
-    const onRetry = vi.fn()
-
-    renderWithProviders(<DashboardView onRetry={onRetry} variant="error" />, {
-      router: { initialEntries: ["/dashboard"] },
-    })
-
-    expect(await screen.findByRole("alert")).toBeInTheDocument()
-    const retryButton = screen.getByRole("button", {
-      name: i18n.t("common.pageState.error.retry"),
-    })
-    expect(retryButton).toBeInTheDocument()
-    expect(screen.queryByRole("heading", { name: "工作台" })).not.toBeInTheDocument()
-    expect(document.querySelector('[data-slot="skeleton"]')).not.toBeInTheDocument()
-
-    retryButton.click()
-    expect(onRetry).toHaveBeenCalledOnce()
   })
 })

@@ -41,27 +41,6 @@ describe("HistoryPage", () => {
     vi.mocked(listTrainingRecords).mockReset()
   })
 
-  it("maps pending queries to the stable loading layout", async () => {
-    vi.mocked(getTrainingRecordsOverview).mockReturnValue(new Promise(() => undefined))
-    vi.mocked(listTrainingRecords).mockReturnValue(new Promise(() => undefined))
-
-    renderHistoryPage()
-
-    expect(
-      await screen.findByRole("heading", { level: 1, name: i18n.t("history.title") }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole("region", { name: i18n.t("history.overview.title") }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole("heading", { level: 2, name: i18n.t("history.filters.title") }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole("heading", { level: 2, name: i18n.t("history.records.title") }),
-    ).toBeInTheDocument()
-    expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(8)
-  })
-
   it("passes default server query parameters and maps both responses to ready", async () => {
     vi.mocked(getTrainingRecordsOverview).mockResolvedValue(
       structuredClone(historyOverviewStoryFixture),

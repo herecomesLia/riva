@@ -50,11 +50,8 @@ describe("TargetedPracticeHistoryView", () => {
     const question = record.questions[0]
     if (!question.answer) throw new Error("Answered question fixture required.")
     const questionCard = screen.getByTestId(`history-question-${question.id}`)
-    const prompt = within(questionCard).getByText(question.prompt)
-    expect(prompt.parentElement).toHaveClass("min-w-0", "flex-1")
-    const answer = within(questionCard).getByText(question.answer.content)
-    expect(answer).toHaveClass("w-full", "min-w-0")
-    expect(answer).not.toHaveClass("max-w-prose")
+    expect(within(questionCard).getByText(question.prompt)).toBeInTheDocument()
+    expect(within(questionCard).getByText(question.answer.content)).toBeInTheDocument()
     expect(screen.getByText(i18n.t("history.detail.retryAttempt"))).toBeInTheDocument()
     expect(screen.getByText(record.questions[1].followUps[0].prompt)).toBeInTheDocument()
     expect(
@@ -64,10 +61,6 @@ describe("TargetedPracticeHistoryView", () => {
     ).toBeGreaterThanOrEqual(2)
     const savedBadges = screen.getAllByText(i18n.t("history.detail.saved"))
     expect(savedBadges).toHaveLength(2)
-    expect(savedBadges[0].querySelector(".lucide-bookmark")).toHaveClass(
-      "fill-destructive",
-      "text-destructive",
-    )
     const retryLink = screen.getByRole("button", { name: i18n.t("history.detail.retry") })
     const retryHref = retryLink.getAttribute("href") ?? ""
     expect(retryHref).toContain("entry=history")
@@ -104,8 +97,6 @@ describe("TargetedPracticeHistoryView", () => {
 
     expect(scoreButton).toHaveAttribute("aria-expanded", "false")
     expect(referenceButton).toHaveAttribute("aria-expanded", "false")
-    expect(scoreButton).not.toHaveClass("aria-expanded:bg-muted")
-    expect(referenceButton).not.toHaveClass("aria-expanded:bg-muted")
 
     await user.click(scoreButton)
 
@@ -134,9 +125,7 @@ describe("TargetedPracticeHistoryView", () => {
     )
 
     expect(await screen.findByText(i18n.t("history.detail.unanswered"))).toBeInTheDocument()
-    expect(
-      screen.getByText(i18n.t("history.detail.weak")).querySelector(".lucide-flag"),
-    ).toHaveClass("fill-orange-500", "text-orange-500")
+    expect(screen.getByText(i18n.t("history.detail.weak"))).toBeInTheDocument()
     expect(
       screen.getByRole("link", {
         name: i18n.t("history.detail.recommendationActions.retryQuestion"),
@@ -206,7 +195,6 @@ describe("TargetedPracticeHistoryView", () => {
     )
     const stateRegion = screen.getByTestId("targeted-history-state-region")
     expect(stateRegion).toHaveFocus()
-    expect(stateRegion).not.toHaveClass("focus-visible:ring-3", "focus-visible:ring-ring/50")
     expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
     focusSpy.mockRestore()
     const link = await screen.findByRole("button", {

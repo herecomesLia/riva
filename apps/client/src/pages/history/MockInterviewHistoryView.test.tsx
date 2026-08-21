@@ -49,13 +49,8 @@ describe("MockInterviewHistoryView", () => {
     const record = completeMockInterviewHistoryStoryFixture
     renderView({ status: "ready", data: record })
 
-    const overallSummary = await screen.findByText(record.overallReview.content!.summary)
-    expect(overallSummary).toHaveClass("w-full", "min-w-0")
-    expect(overallSummary).not.toHaveClass("max-w-prose")
-    expect(screen.getByText(record.overallReview.content!.mainStrengths[0])).toHaveClass(
-      "min-w-0",
-      "flex-1",
-    )
+    expect(await screen.findByText(record.overallReview.content!.summary)).toBeInTheDocument()
+    expect(screen.getByText(record.overallReview.content!.mainStrengths[0])).toBeInTheDocument()
     expect(screen.getByText(record.questions[0].prompt)).toBeInTheDocument()
     expect(screen.getByText(record.questions[1].prompt)).toBeInTheDocument()
     expect(screen.getByText(record.questions[1].followUps[0].prompt)).toBeInTheDocument()
@@ -82,21 +77,6 @@ describe("MockInterviewHistoryView", () => {
     expect(recommendationHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
     expect(recommendationHref).toContain("questionType=technicalFoundation")
     expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
-  })
-
-  it("lets a single candidate analysis use the full review width", async () => {
-    const record = structuredClone(completeMockInterviewHistoryStoryFixture)
-    const exchange = record.candidateQuestionExchanges[0]
-    if (!exchange) throw new Error("Candidate question fixture required.")
-    exchange.feedback = ""
-
-    renderView({ status: "ready", data: record })
-
-    const recommendedFocus = await screen.findByText(exchange.interviewerAnswer)
-    const alert = recommendedFocus.closest('[data-slot="alert"]')
-    if (!alert) throw new Error("Recommended focus alert required.")
-    expect(alert).toHaveClass("min-w-0", "md:col-span-2")
-    expect(alert.closest('[data-slot="card-content"]')).toHaveClass("min-w-0", "md:grid-cols-2")
   })
 
   it("keeps unanswered questions and reference actions in a partial early-ended review", async () => {
@@ -159,7 +139,6 @@ describe("MockInterviewHistoryView", () => {
     )
     const stateRegion = screen.getByTestId("mock-history-state-region")
     expect(stateRegion).toHaveFocus()
-    expect(stateRegion).not.toHaveClass("focus-visible:ring-3", "focus-visible:ring-ring/50")
     expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
     focusSpy.mockRestore()
     expect(

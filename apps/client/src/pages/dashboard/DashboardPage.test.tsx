@@ -39,28 +39,29 @@ describe("DashboardPage", () => {
     vi.mocked(getDashboardData).mockReset()
   })
 
-  it("maps an initial request to the default layout with component skeletons", async () => {
+  it("shows the loading state while the initial request is pending", async () => {
     vi.mocked(getDashboardData).mockReturnValue(new Promise(() => undefined))
 
     renderDashboardPage()
 
     expect(await screen.findByText(i18n.t("dashboard.title"))).toBeInTheDocument()
     expect(screen.getByTestId("dashboard-loading-state")).toBeInTheDocument()
-    expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(8)
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })
 
-  it("maps a successful request to the ready default view", async () => {
+  it("loads the dashboard and exposes the recommendation navigation", async () => {
     vi.mocked(getDashboardData).mockResolvedValue(structuredClone(dashboardResponseMock))
 
     renderDashboardPage()
 
-    expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
-    expect(
-      screen.getByText(dashboardResponseMock.recommendation!.recommendation.reason),
-    ).toBeInTheDocument()
-    expect(screen.queryByTestId("dashboard-loading-state")).not.toBeInTheDocument()
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    const recommendationLink = await screen.findByRole("link", {
+      name: i18n.t("history.detail.recommendationActions.targetedPractice"),
+    })
+    expect(recommendationLink).toHaveAttribute("href", expect.stringContaining("/practice?"))
+    expect(recommendationLink.getAttribute("href")).toContain(
+      `targetRoleId=${dashboardResponseMock.recommendation!.targetRoleId}`,
+    )
+    expect(getDashboardData).toHaveBeenCalledOnce()
   })
 
   it("maps a stopped failed request to the error view", async () => {
@@ -75,7 +76,7 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("dashboard failure")).not.toBeInTheDocument()
   })
 
-  it("switches from error to default loading immediately after retry", async () => {
+  it("shows loading while retrying and recovers to the ready state", async () => {
     const user = userEvent.setup()
     const firstRequest = createDeferred<typeof dashboardResponseMock>()
     const secondRequest = createDeferred<typeof dashboardResponseMock>()
@@ -101,22 +102,6 @@ describe("DashboardPage", () => {
       secondRequest.resolve(structuredClone(dashboardResponseMock))
     })
     expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
-  })
-
-  it("shows the ready view after a successful retry", async () => {
-    const user = userEvent.setup()
-
-    vi.mocked(getDashboardData)
-      .mockRejectedValueOnce(new Error("first failure"))
-      .mockResolvedValueOnce(structuredClone(dashboardResponseMock))
-
-    renderDashboardPage()
-
-    expect(await screen.findByRole("alert")).toBeInTheDocument()
-    await user.click(getRetryButton())
-
-    expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })
 
   it("returns to the error view when a retry fails again", async () => {

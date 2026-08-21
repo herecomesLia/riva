@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react"
+import { screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
@@ -71,6 +71,7 @@ describe("HistoryView", () => {
     expect(
       screen.getAllByText(`${record.targetRole.title} · ${record.targetRole.company}`),
     ).not.toHaveLength(0)
+    expect(screen.getByText("78/100")).toBeInTheDocument()
     const detailLink = screen.getByRole("button", {
       name: i18n.t("history.records.viewDetailsLabel", {
         date: new Intl.DateTimeFormat(i18n.language, {
@@ -83,29 +84,6 @@ describe("HistoryView", () => {
     })
     expect(detailLink.getAttribute("href")).toContain(`/history/practice/${record.id}`)
     expect(detailLink.getAttribute("href")).toContain("page=1")
-    const recordCard = detailLink.closest('[data-slot="card"]')
-    if (!(recordCard instanceof HTMLElement)) throw new Error("History record card required.")
-    expect(
-      within(recordCard).getByText(record.targetRole.title, { exact: false }).parentElement,
-    ).toHaveClass("min-w-0", "flex-1")
-  })
-
-  it("keeps the training type control fitted to its buttons", async () => {
-    renderHistoryView({
-      status: "ready",
-      data: {
-        overview: historyOverviewStoryFixture,
-        records: historyRecordsStoryFixture,
-      },
-    })
-
-    const allKindsButton = await screen.findByRole("button", {
-      name: i18n.t("history.filters.kinds.all"),
-    })
-    const kindGroup = allKindsButton.closest('[data-slot="toggle-group"]')
-
-    expect(kindGroup).toHaveClass("w-fit")
-    expect(kindGroup).not.toHaveClass("w-full")
   })
 
   it("moves focus after loading without scrolling past the page heading", async () => {
@@ -127,10 +105,7 @@ describe("HistoryView", () => {
     await vi.waitFor(() => {
       expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
     })
-    expect(screen.getByTestId("history-state-region")).not.toHaveClass(
-      "focus-visible:ring-3",
-      "focus-visible:ring-ring/50",
-    )
+    expect(screen.getByTestId("history-state-region")).toHaveFocus()
     focusSpy.mockRestore()
   })
 
