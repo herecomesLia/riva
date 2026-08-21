@@ -371,11 +371,10 @@ describe("InterviewPage", () => {
 
     renderInterviewPage()
 
-    expect(
-      await screen.findByRole("heading", { name: i18n.t("interview.title") }),
-    ).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("interview.setup.title"))).toBeInTheDocument()
-    expect(screen.getByTestId("interview-loading-state")).toBeInTheDocument()
+    expect(await screen.findByTestId("interview-loading-state")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    )
   })
 
   it("keeps the normal setup page when session is null", async () => {

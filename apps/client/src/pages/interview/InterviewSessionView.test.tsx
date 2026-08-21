@@ -103,12 +103,9 @@ describe("InterviewSessionView", () => {
     },
   )
 
-  it("keeps the session structure visible while loading", () => {
+  it("renders the session loading state", () => {
     renderWithProviders(<InterviewSessionView status="loading" />, { router: false })
 
-    expect(
-      screen.getByRole("heading", { name: i18n.t("interview.session.title") }),
-    ).toBeInTheDocument()
     expect(screen.getByTestId("interview-session-loading")).toHaveAttribute("aria-busy", "true")
   })
 

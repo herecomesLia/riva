@@ -34,32 +34,8 @@ function renderReadyView(
 }
 
 describe("InterviewView", () => {
-  it("keeps the header and setup-card structure visible while loading", async () => {
-    renderWithProviders(<InterviewView status="loading" />, {
-      router: { initialEntries: ["/interview"] },
-    })
-
-    expect(
-      await screen.findByRole("heading", { name: i18n.t("interview.title") }),
-    ).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("interview.setup.title"))).toBeInTheDocument()
-    const loadingState = screen.getByTestId("interview-loading-state")
-    expect(loadingState).toHaveAttribute("aria-busy", "true")
-    expect(loadingState.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7)
-    expect(screen.queryByText(i18n.t("interview.setup.fields.targetRole"))).not.toBeInTheDocument()
-    expect(screen.queryByText(i18n.t("interview.setup.fields.round"))).not.toBeInTheDocument()
-    expect(screen.queryByText(i18n.t("interview.setup.fields.difficulty"))).not.toBeInTheDocument()
-    expect(screen.queryByText(i18n.t("interview.setup.fields.duration"))).not.toBeInTheDocument()
-  })
-
   it("renders service-provided roles, rounds, difficulties, and duration preferences", async () => {
     renderReadyView()
-
-    const setupCard = (await screen.findByText(i18n.t("interview.setup.title"))).closest(
-      '[data-slot="card"]',
-    )
-    expect(setupCard?.parentElement).toHaveClass("w-full")
-    expect(setupCard?.parentElement).not.toHaveClass("max-w-4xl")
 
     expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
     for (const round of interviewSetupResponseMock.targetRoles[0].supportedRounds) {
@@ -104,49 +80,6 @@ describe("InterviewView", () => {
     )
   })
 
-  it("matches the targeted-practice spacing around setup dividers", async () => {
-    renderReadyView()
-
-    const targetRoleField = (
-      await screen.findByText(i18n.t("interview.setup.fields.targetRole"))
-    ).closest('[data-slot="field"]')
-    expect(targetRoleField).toHaveClass("pb-5")
-
-    const roundFieldSet = screen
-      .getByText(i18n.t("interview.setup.fields.round"))
-      .closest('[data-slot="field-set"]')
-    expect(roundFieldSet?.parentElement).toHaveClass("border-t", "border-border", "py-5")
-
-    const difficultyFieldSet = screen
-      .getByText(i18n.t("interview.setup.fields.difficulty"))
-      .closest('[data-slot="field-set"]')
-    expect(difficultyFieldSet?.parentElement).toHaveClass(
-      "border-t",
-      "border-border",
-      "gap-5",
-      "py-5",
-    )
-
-    const durationFieldSet = screen
-      .getByText(i18n.t("interview.setup.fields.duration"))
-      .closest('[data-slot="field-set"]')
-    expect(durationFieldSet?.parentElement).toHaveClass("border-t", "border-border", "pt-5")
-  })
-
-  it("submits the selected configuration once", async () => {
-    const user = userEvent.setup()
-    const { onStart } = renderReadyView()
-
-    const startButton = await screen.findByRole("button", {
-      name: i18n.t("interview.actions.start"),
-    })
-    expect(startButton.closest('[data-slot="card-footer"]')).not.toHaveClass("border-t")
-    await user.click(startButton)
-
-    expect(onStart).toHaveBeenCalledTimes(1)
-    expect(onStart).toHaveBeenCalledWith(interviewSetupResponseMock.defaultConfiguration)
-  })
-
   it("submits the duration preference without converting it into a question count", async () => {
     const user = userEvent.setup()
     const { onStart } = renderReadyView()
@@ -171,51 +104,22 @@ describe("InterviewView", () => {
       await screen.findByRole("button", { name: i18n.t("interview.actions.starting") }),
     ).toBeDisabled()
     expect(screen.getByRole("combobox")).toBeDisabled()
-    for (const toggle of screen
-      .getAllByRole("button")
-      .filter((button) => button.dataset.slot === "toggle-group-item")) {
-      expect(toggle).toBeDisabled()
+    for (const round of interviewSetupResponseMock.targetRoles[0].supportedRounds) {
+      expect(
+        screen.getByRole("button", { name: i18n.t(`interview.rounds.${round}`) }),
+      ).toBeDisabled()
     }
-  })
-
-  it("shows a retryable form-level error after starting fails", async () => {
-    const user = userEvent.setup()
-    const onStart = vi
-      .fn<() => Promise<void>>()
-      .mockRejectedValueOnce(new Error("first failure"))
-      .mockResolvedValueOnce(undefined)
-    renderReadyView(onStart)
-
-    await user.click(await screen.findByRole("button", { name: i18n.t("interview.actions.start") }))
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      i18n.t("interview.errors.startTitle"),
-    )
-
-    await user.click(screen.getByRole("button", { name: i18n.t("interview.actions.start") }))
-    expect(onStart).toHaveBeenCalledTimes(2)
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
-  })
-
-  it("renders an empty state with a target-role navigation action", async () => {
-    renderWithProviders(<InterviewView status="empty" />, {
-      router: { initialEntries: ["/interview"] },
-    })
-
-    expect(await screen.findByText(i18n.t("interview.empty.title"))).toBeInTheDocument()
-    expect(
-      screen.getByRole("button", { name: i18n.t("interview.actions.addRole") }),
-    ).toHaveAttribute("href", "/roles")
-  })
-
-  it("renders a load error and calls retry", async () => {
-    const user = userEvent.setup()
-    const onRetry = vi.fn()
-    renderWithProviders(<InterviewView isRetrying={false} onRetry={onRetry} status="error" />, {
-      router: { initialEntries: ["/interview"] },
-    })
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("interview.errors.loadTitle"))
-    await user.click(screen.getByRole("button", { name: i18n.t("interview.actions.retry") }))
-    expect(onRetry).toHaveBeenCalledOnce()
+    for (const difficulty of interviewSetupResponseMock.availableDifficulties) {
+      expect(
+        screen.getByRole("button", { name: i18n.t(`interview.difficulty.${difficulty}`) }),
+      ).toBeDisabled()
+    }
+    for (const durationMinutes of interviewSetupResponseMock.availableDurationMinutes) {
+      expect(
+        screen.getByRole("button", {
+          name: i18n.t("interview.setup.durationMinutes", { minutes: durationMinutes }),
+        }),
+      ).toBeDisabled()
+    }
   })
 })

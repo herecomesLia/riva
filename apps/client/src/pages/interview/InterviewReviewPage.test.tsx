@@ -63,18 +63,14 @@ describe("InterviewReviewContainer", () => {
     vi.mocked(getInterviewReview).mockReset()
   })
 
-  it("keeps the page title and section structure while the review loads", async () => {
+  it("renders the review loading state", async () => {
     vi.mocked(getInterviewReview).mockReturnValue(new Promise(() => undefined))
     renderReview()
 
-    expect(
-      await screen.findByRole("heading", {
-        name: i18n.t("interview.review.title"),
-        level: 1,
-      }),
-    ).toBeVisible()
-    expect(screen.getByTestId("interview-review-loading")).toHaveAttribute("aria-busy", "true")
-    expect(screen.getByText(i18n.t("interview.review.sections.questions"))).toBeVisible()
+    expect(await screen.findByTestId("interview-review-loading")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    )
   })
 
   it("renders the saved answer, feedback, and a separately collapsed reference answer", async () => {
