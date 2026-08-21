@@ -1,6 +1,6 @@
 import asyncio
-from io import BytesIO
 import zipfile
+from io import BytesIO
 
 import pytest
 from pypdf import PdfWriter
@@ -67,29 +67,21 @@ def make_pdf(pages: list[str]) -> bytes:
         contents_id = page_id + 1
         page_ids.append(page_id)
         escaped_text = (
-            page_text.replace("\\", "\\\\")
-            .replace("(", "\\(")
-            .replace(")", "\\)")
+            page_text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
         )
-        stream = f"BT /F1 12 Tf 72 720 Td ({escaped_text}) Tj ET".encode(
-            "latin-1"
-        )
+        stream = f"BT /F1 12 Tf 72 720 Td ({escaped_text}) Tj ET".encode("latin-1")
         objects[page_id] = (
             f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
             f"/Resources << /Font << /F1 3 0 R >> >> "
             f"/Contents {contents_id} 0 R >>"
         ).encode()
         objects[contents_id] = (
-            f"<< /Length {len(stream)} >>\nstream\n".encode()
-            + stream
-            + b"\nendstream"
+            f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream"
         )
         next_object_id += 2
 
     kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
-    objects[2] = (
-        f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>"
-    ).encode()
+    objects[2] = (f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>").encode()
     max_object_id = max(objects)
 
     pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
@@ -187,7 +179,7 @@ def paragraph(text: str) -> str:
 def word_part(text: str) -> bytes:
     return (
         "<w:hdr "
-        "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
+        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         f"{paragraph(text)}</w:hdr>"
     ).encode()
 
@@ -250,7 +242,10 @@ def test_empty_data_and_invalid_limits() -> None:
     [
         ("plain UTF-8 中文".encode(), "plain UTF-8 中文"),
         (b"\xef\xbb\xbfwith UTF-8 BOM", "with UTF-8 BOM"),
-        ("UTF-16 LE 中文".encode("utf-16-le").join([b"\xff\xfe", b""]), "UTF-16 LE 中文"),
+        (
+            "UTF-16 LE 中文".encode("utf-16-le").join([b"\xff\xfe", b""]),
+            "UTF-16 LE 中文",
+        ),
         (b"\xfe\xff" + "UTF-16 BE 中文".encode("utf-16-be"), "UTF-16 BE 中文"),
     ],
 )
@@ -264,9 +259,7 @@ def test_txt_encoding_and_unicode_are_preserved(data: bytes, expected: str) -> N
 def test_text_normalization_preserves_tabs_and_structure() -> None:
     value = "  A\r\n\rB\r\n\r\n\r\nC \t\n\tD\x00\x01  "
 
-    assert normalize_resume_text(value, max_characters=100) == (
-        "A\n\nB\n\n\nC\n\tD"
-    )
+    assert normalize_resume_text(value, max_characters=100) == ("A\n\nB\n\n\nC\n\tD")
 
 
 def test_txt_rejects_invalid_utf8_and_binary_controls() -> None:
@@ -500,9 +493,8 @@ def test_docx_rejects_damaged_utf16_as_invalid() -> None:
 
 
 def test_docx_internal_entity_cannot_reach_extracted_text() -> None:
-    document = (
-        b'<!ENTITY secret "must not appear">'
-        + DOCUMENT_XML.replace(b"Resume", b"&secret;")
+    document = b'<!ENTITY secret "must not appear">' + DOCUMENT_XML.replace(
+        b"Resume", b"&secret;"
     )
 
     assert_error(make_docx(document_xml=document), "resume_docx_unsafe")

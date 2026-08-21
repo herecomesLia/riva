@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Index, JSON, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Index, Text, UniqueConstraint
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db import Base
@@ -65,7 +65,9 @@ def test_reference_answer_artifact_has_target_constraints_and_indexes() -> None:
         "practice_follow_up_questions.id"
     )
     assert foreign_keys["source_agent_run_id"].target_fullname == "agent_runs.id"
-    assert all(foreign_key.ondelete == "CASCADE" for foreign_key in foreign_keys.values())
+    assert all(
+        foreign_key.ondelete == "CASCADE" for foreign_key in foreign_keys.values()
+    )
 
     unique_source = next(
         constraint
@@ -73,9 +75,7 @@ def test_reference_answer_artifact_has_target_constraints_and_indexes() -> None:
         if isinstance(constraint, UniqueConstraint)
         and constraint.name == "uq_practice_reference_answers_source_run"
     )
-    assert [column.name for column in unique_source.columns] == [
-        "source_agent_run_id"
-    ]
+    assert [column.name for column in unique_source.columns] == ["source_agent_run_id"]
 
     checks = [
         constraint
@@ -92,11 +92,7 @@ def test_reference_answer_artifact_has_target_constraints_and_indexes() -> None:
     assert "addressed_gap IS NULL" in str(target_check.sqltext)
     assert "addressed_gap IS NOT NULL" in str(target_check.sqltext)
 
-    indexes = {
-        index.name: index
-        for index in table.indexes
-        if isinstance(index, Index)
-    }
+    indexes = {index.name: index for index in table.indexes if isinstance(index, Index)}
     main_index = indexes["uq_practice_reference_answers_main_target"]
     follow_up_index = indexes["uq_practice_reference_answers_follow_up_target"]
     assert main_index.unique is True

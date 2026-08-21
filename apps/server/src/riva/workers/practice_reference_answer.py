@@ -19,7 +19,6 @@ from riva.services.reference_answer_generation import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 ReferenceAnswerGenerationServiceFactory = Callable[
     [AsyncSession], ReferenceAnswerGenerationService
 ]

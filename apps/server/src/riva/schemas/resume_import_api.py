@@ -27,7 +27,6 @@ from riva.schemas.resume_parsing_lifecycle import (
     ResumeImportDraftLifecycleStatus,
 )
 
-
 ResumeImportDraftStatus = ResumeImportDraftLifecycleStatus
 
 
@@ -69,9 +68,7 @@ class ResumeImportDraftResponse(_ResumeImportAPIModel):
 
     summary: Summary
     summary_action: ResumeImportSummaryAction
-    education: list[CareerProfileEducationInput] = Field(
-        max_length=MAX_SECTION_ITEMS
-    )
+    education: list[CareerProfileEducationInput] = Field(max_length=MAX_SECTION_ITEMS)
     work_experiences: list[CareerProfileWorkExperienceInput] = Field(
         max_length=MAX_SECTION_ITEMS
     )
@@ -96,9 +93,7 @@ class ResumeImportDraftResponse(_ResumeImportAPIModel):
         if self.updated_at < self.created_at:
             raise ValueError("updated_at cannot be before created_at")
 
-        if (self.base_profile_id is None) != (
-            self.base_profile_version is None
-        ):
+        if (self.base_profile_id is None) != (self.base_profile_version is None):
             raise ValueError("base profile fields must be provided together")
 
         if self.summary_action == "set" and (
@@ -134,7 +129,7 @@ class ResumeImportDraftResponse(_ResumeImportAPIModel):
 
         try:
             ResumeImportDraftData.model_validate(_draft_data_payload(self))
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise ValueError("draft contents are invalid") from None
         return self
 

@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
-from pydantic import BaseModel
 import pytest
+from pydantic import BaseModel
 
 from riva.agents import AgentResult, JobDescriptionParsingAgent
 from riva.integrations import (
@@ -158,9 +158,7 @@ class FakeAnalysisService:
         self.session = session
         self.state = state
 
-    async def load_parsing_input(
-        self, run: AgentRun
-    ) -> JobDescriptionParsingInput:
+    async def load_parsing_input(self, run: AgentRun) -> JobDescriptionParsingInput:
         assert self.state.sessions.active == 1
         self.state.load_sessions.append(self.session.identifier)
         if self.state.load_error is not None:
@@ -291,9 +289,7 @@ def test_handler_maps_state_error_without_exception_chain(phase: str) -> None:
     agent = FakeAgent(sessions, agent_result())
 
     with pytest.raises(AgentExecutionError) as exc_info:
-        asyncio.run(
-            handler(sessions, state, agent).execute(running_agent_run())
-        )
+        asyncio.run(handler(sessions, state, agent).execute(running_agent_run()))
 
     assert exc_info.value.code == "job_description_version_stale"
     assert exc_info.value.retryable is False
@@ -316,9 +312,7 @@ def test_handler_preserves_provider_error(provider_error: Exception) -> None:
     agent = FakeAgent(sessions, provider_error)
 
     with pytest.raises(type(provider_error)) as exc_info:
-        asyncio.run(
-            handler(sessions, state, agent).execute(running_agent_run())
-        )
+        asyncio.run(handler(sessions, state, agent).execute(running_agent_run()))
 
     assert exc_info.value is provider_error
     assert sessions.entered == [1]
@@ -343,9 +337,7 @@ def test_handler_rejects_result_mismatch_before_persist(
     agent = FakeAgent(sessions, mismatched_result)
 
     with pytest.raises(AgentExecutionError) as exc_info:
-        asyncio.run(
-            handler(sessions, state, agent).execute(running_agent_run())
-        )
+        asyncio.run(handler(sessions, state, agent).execute(running_agent_run()))
 
     assert exc_info.value.code == "agent_run_result_mismatch"
     assert exc_info.value.retryable is False
@@ -365,9 +357,7 @@ def test_handler_preserves_unknown_database_error(phase: str) -> None:
     agent = FakeAgent(sessions, agent_result())
 
     with pytest.raises(RuntimeError) as exc_info:
-        asyncio.run(
-            handler(sessions, state, agent).execute(running_agent_run())
-        )
+        asyncio.run(handler(sessions, state, agent).execute(running_agent_run()))
 
     assert exc_info.value is error
     assert sessions.active == 0

@@ -15,7 +15,6 @@ from riva.integrations import (
 )
 from riva.prompts import PromptDefinition
 
-
 AgentInputT = TypeVar("AgentInputT")
 AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
 AgentResultT = TypeVar("AgentResultT", bound=BaseModel, covariant=True)

@@ -14,27 +14,44 @@ from riva.schemas.practice_reference_answer import (
     PracticeMainReferenceAnswerOutput,
     PracticeReferenceAnswerTargetType,
 )
+from riva.schemas.practice_sessions import (
+    ContinuePracticeQuestionRequest,
+    CurrentPracticeSessionResponse,
+    EndPracticeFollowUpsRequest,
+    PracticeFollowUpReferenceAnswerRequest,
+    PracticeQuestionReferenceAnswerRequest,
+    RefreshPracticeEvaluationRequest,
+    RefreshPracticeFollowUpGenerationRequest,
+    RefreshPracticeQuestionGenerationRequest,
+    RetryPracticeQuestionRequest,
+    RevealPracticeFollowUpGuidanceRequest,
+    RevealPracticeQuestionGuidanceRequest,
+    SetPracticeQuestionSavedRequest,
+    SetPracticeQuestionWeakRequest,
+    StartPracticeSessionRequest,
+    SubmitFollowUpAnswerRequest,
+    SubmitPrimaryAnswerRequest,
+)
 from riva.services.practice_api import (
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
+    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
     PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
-    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PracticeAPIService,
-    build_practice_follow_up_reference_answer_response,
     build_practice_completed_session_response,
     build_practice_follow_up_question_response,
+    build_practice_follow_up_reference_answer_response,
     build_practice_main_reference_answer_response,
     build_practice_question_response,
 )
 from riva.services.practice_sessions import (
-    PRACTICE_EVALUATION_GENERATION_UNAVAILABLE as PRACTICE_EVALUATION_STATE_UNAVAILABLE,
     PRACTICE_EVALUATION_GENERATION_FAILED,
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
-    PRACTICE_RECOMMENDATION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
+    PRACTICE_RECOMMENDATION_GENERATION_FAILED,
     PRACTICE_REVIEW_GENERATION_FAILED,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_STATE_CONFLICT,
@@ -46,46 +63,31 @@ from riva.services.practice_sessions import (
     PracticeSessionStateError,
     PracticeSessionWorkflowContext,
 )
+from riva.services.practice_sessions import (
+    PRACTICE_EVALUATION_GENERATION_UNAVAILABLE as PRACTICE_EVALUATION_STATE_UNAVAILABLE,
+)
 from riva.services.reference_answer_generation import (
     PracticeReferenceAnswerLifecycleStatus,
     PracticeReferenceAnswerWorkflowState,
 )
-from riva.schemas.practice_sessions import (
-    ContinuePracticeQuestionRequest,
-    CurrentPracticeSessionResponse,
-    EndPracticeFollowUpsRequest,
-    RefreshPracticeEvaluationRequest,
-    RefreshPracticeFollowUpGenerationRequest,
-    RefreshPracticeQuestionGenerationRequest,
-    PracticeFollowUpReferenceAnswerRequest,
-    PracticeQuestionReferenceAnswerRequest,
-    RevealPracticeFollowUpGuidanceRequest,
-    RevealPracticeQuestionGuidanceRequest,
-    RetryPracticeQuestionRequest,
-    SetPracticeQuestionSavedRequest,
-    SetPracticeQuestionWeakRequest,
-    StartPracticeSessionRequest,
-    SubmitFollowUpAnswerRequest,
-    SubmitPrimaryAnswerRequest,
-)
 from tests.unit.services.test_practice_sessions import (
+    evaluation_artifact,
+    evaluation_run,
     follow_up_decision,
     follow_up_question,
     follow_up_run,
     generation_payload,
     generation_run,
     main_answer,
-    primary_answer_context,
     practice_attempt,
     practice_session,
+    primary_answer_context,
     question_card,
-    selection,
-    evaluation_artifact,
-    evaluation_run,
     recommendation_artifact,
     recommendation_run,
     review_artifact,
     review_run,
+    selection,
 )
 
 
@@ -513,14 +515,10 @@ def ended_early_evaluation_context(
         follow_up_completion_reason=PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY,
         unanswered_follow_up_question_id=primary.follow_up_question.id,
         follow_up_question_1_id=(
-            primary.follow_up_exchanges[0].question.id
-            if exchange_count == 1
-            else None
+            primary.follow_up_exchanges[0].question.id if exchange_count == 1 else None
         ),
         follow_up_answer_1_id=(
-            primary.follow_up_exchanges[0].answer.id
-            if exchange_count == 1
-            else None
+            primary.follow_up_exchanges[0].answer.id if exchange_count == 1 else None
         ),
     )
     return PracticeEvaluationWorkflowContext(
@@ -615,7 +613,9 @@ class FakeReferenceAnswerGenerationService:
         return self.follow_up_state
 
 
-def test_reference_answer_converters_map_all_lifecycle_states_without_raw_fields() -> None:
+def test_reference_answer_converters_map_all_lifecycle_states_without_raw_fields() -> (
+    None
+):
     for status in (
         PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED,
         PracticeReferenceAnswerLifecycleStatus.GENERATING,
@@ -698,7 +698,9 @@ def test_ordinary_mutation_and_current_session_hydrate_reference_state() -> None
     assert all(call["question_card_id"] == question_id for call in resolver.main_calls)
 
 
-def test_failed_reference_state_hydrates_as_unavailable_without_internal_fields() -> None:
+def test_failed_reference_state_hydrates_as_unavailable_without_internal_fields() -> (
+    None
+):
     domain = FakePracticeSessionService(context=context(answering=True))
     resolver = FakeReferenceAnswerGenerationService(
         reference_answer_state(
@@ -841,16 +843,16 @@ def test_refresh_and_get_do_not_require_llm_configuration() -> None:
             payload=RefreshPracticeQuestionGenerationRequest(version=1),
         )
     )
-    fetched = asyncio.run(
-        service.get_session(user_id=user_id, session_id=session_id)
-    )
+    fetched = asyncio.run(service.get_session(user_id=user_id, session_id=session_id))
 
     assert refreshed.status == "answering"
     assert fetched.status == "answering"
     assert [call[0] for call in domain.calls] == ["refresh", "get"]
 
 
-def test_continue_to_next_question_forwards_public_provenance_without_llm_precheck() -> None:
+def test_continue_to_next_question_forwards_public_provenance_without_llm_precheck() -> (
+    None
+):
     domain = FakePracticeSessionService(context=context(answering=False))
     domain.context.session.version = 6
     service = PracticeAPIService(
@@ -955,7 +957,9 @@ def test_continue_to_next_question_maps_state_errors(
     assert error.value.error == code
 
 
-def test_retry_current_question_forwards_public_provenance_without_llm_precheck() -> None:
+def test_retry_current_question_forwards_public_provenance_without_llm_precheck() -> (
+    None
+):
     domain = FakePracticeSessionService(context=context(answering=True))
     domain.context.session.version = 6
     domain.context.attempt.attempt_number = 2
@@ -1220,7 +1224,9 @@ def test_follow_up_guidance_reveal_service_methods_forward_exact_domain_args_wit
     expected_call: str,
 ) -> None:
     domain = FakePracticeSessionService(
-        context=primary_context(attempt_status="answeringFollowUp", action="askFollowUp")
+        context=primary_context(
+            attempt_status="answeringFollowUp", action="askFollowUp"
+        )
     )
     assert isinstance(domain.context, PracticePrimaryAnswerWorkflowContext)
     assert domain.context.follow_up_question is not None
@@ -1506,7 +1512,9 @@ def test_submit_primary_answer_checks_configuration_and_projects_main_answer() -
     ]
 
 
-def test_submit_primary_answer_fails_before_domain_when_follow_up_llm_unavailable() -> None:
+def test_submit_primary_answer_fails_before_domain_when_follow_up_llm_unavailable() -> (
+    None
+):
     domain = FakePracticeSessionService(context=primary_context())
     service = PracticeAPIService(
         object(),
@@ -1694,7 +1702,9 @@ def test_end_follow_ups_forwards_exact_args_without_llm_precheck_and_projects_en
     ]
 
 
-def test_ended_early_evaluation_and_review_hydration_use_evaluation_run_cutoff() -> None:
+def test_ended_early_evaluation_and_review_hydration_use_evaluation_run_cutoff() -> (
+    None
+):
     evaluation_context = ended_early_evaluation_context(exchange_count=0)
     cutoff = datetime(2026, 8, 14, 10, 0, tzinfo=UTC)
     evaluation_context.evaluation_generation_run.created_at = cutoff
@@ -2077,9 +2087,7 @@ def test_current_session_wraps_active_context(answering: bool) -> None:
     result = asyncio.run(service.get_current_session(user_id=uuid4()))
 
     assert result.session is not None
-    assert result.session.status == (
-        "answering" if answering else "generatingQuestion"
-    )
+    assert result.session.status == ("answering" if answering else "generatingQuestion")
     if answering:
         assert result.session.question.answer_hints.content is None
         assert result.session.question.reference_answer.status == "notRequested"

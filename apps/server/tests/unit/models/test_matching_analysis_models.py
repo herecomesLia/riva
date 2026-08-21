@@ -1,4 +1,10 @@
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, JSON, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKeyConstraint,
+    Index,
+    UniqueConstraint,
+)
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db import Base
@@ -93,9 +99,7 @@ def test_matching_analysis_has_unique_source_and_named_checks() -> None:
         if isinstance(constraint, UniqueConstraint)
         and constraint.name == "uq_matching_analyses_source_run"
     )
-    assert [column.name for column in unique_source.columns] == [
-        "source_agent_run_id"
-    ]
+    assert [column.name for column in unique_source.columns] == ["source_agent_run_id"]
 
     checks = {
         constraint.name: str(constraint.sqltext)
@@ -103,9 +107,7 @@ def test_matching_analysis_has_unique_source_and_named_checks() -> None:
         if isinstance(constraint, CheckConstraint)
     }
     assert checks["ck_matching_analyses_profile_version"] == "profile_version >= 1"
-    assert checks["ck_matching_analyses_jd_version"] == (
-        "job_description_version >= 1"
-    )
+    assert checks["ck_matching_analyses_jd_version"] == ("job_description_version >= 1")
     assert checks["ck_matching_analyses_analysis_version"] == (
         "job_description_analysis_version >= 1"
     )
@@ -128,8 +130,7 @@ def test_matching_analysis_has_non_redundant_lookup_indexes() -> None:
         column.name for column in indexes["ix_matching_analyses_user_role"].columns
     ] == ["user_id", "role_id"]
     assert [
-        column.name
-        for column in indexes["ix_matching_analyses_user_profile"].columns
+        column.name for column in indexes["ix_matching_analyses_user_profile"].columns
     ] == ["user_id", "profile_id"]
 
 

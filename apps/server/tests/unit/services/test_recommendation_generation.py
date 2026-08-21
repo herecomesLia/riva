@@ -19,8 +19,8 @@ from riva.schemas.practice_recommendation import (
     PracticeRetryCurrentRecommendation,
     RecommendationRunPayload,
 )
-from riva.schemas.training_memory import TrainingMemoryContext
 from riva.schemas.practice_review import ReviewRunPayload
+from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services.recommendation_generation import (
     INVALID_PRACTICE_RECOMMENDATION_RUN,
     PRACTICE_RECOMMENDATION_ARTIFACT_CONFLICT,
@@ -35,9 +35,10 @@ from tests.unit.services.test_evaluation_generation import (
     context_graph,
     follow_up_source_runs,
     run_for,
+)
+from tests.unit.services.test_evaluation_generation import (
     valid_output as valid_evaluation_output,
 )
-
 
 NOW = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
 
@@ -271,8 +272,8 @@ def _evaluation_context():
 
 
 def test_enqueue_freezes_evaluation_review_and_language_ids() -> None:
-    service, db, _run, session, attempt, evaluation, review = (
-        recommendation_context(for_update=True)
+    service, db, _run, session, attempt, evaluation, review = recommendation_context(
+        for_update=True
     )
     expected_run = AgentRun(
         id=uuid4(),
@@ -289,9 +290,7 @@ def test_enqueue_freezes_evaluation_review_and_language_ids() -> None:
         model="recommendation-test-model",
     )
     fake = FakeAgentRunService(expected_run)
-    service.agent_run_service_factory = lambda _session: cast(
-        object, fake
-    )  # type: ignore[assignment]
+    service.agent_run_service_factory = lambda _session: cast(object, fake)  # type: ignore[assignment]
 
     result = asyncio.run(
         service.enqueue_generation_in_transaction(
@@ -321,8 +320,8 @@ def test_enqueue_freezes_evaluation_review_and_language_ids() -> None:
 
 
 def test_load_reconstructs_recommendation_input_without_raw_answer_chain() -> None:
-    service, db, run, _session, _attempt, _evaluation, review = (
-        recommendation_context(for_update=False)
+    service, db, run, _session, _attempt, _evaluation, review = recommendation_context(
+        for_update=False
     )
 
     result = asyncio.run(service.load_generation_input_in_transaction(run))
@@ -335,11 +334,9 @@ def test_load_reconstructs_recommendation_input_without_raw_answer_chain() -> No
 
 
 def test_persist_retry_then_retrying_with_next_question_keeps_first_artifact() -> None:
-    service, db, run, _session, attempt, _evaluation, _review = (
-        recommendation_context(
-            for_update=True,
-            existing_scalars=[None, None],
-        )
+    service, db, run, _session, attempt, _evaluation, _review = recommendation_context(
+        for_update=True,
+        existing_scalars=[None, None],
     )
     first = recommendation_output()
 
@@ -387,11 +384,9 @@ def test_persist_retry_then_retrying_with_next_question_keeps_first_artifact() -
 
 
 def test_persist_rejects_next_question_v1_contract_mismatch() -> None:
-    service, db, run, _session, _attempt, _evaluation, _review = (
-        recommendation_context(
-            for_update=True,
-            existing_scalars=[None, None],
-        )
+    service, db, run, _session, _attempt, _evaluation, _review = recommendation_context(
+        for_update=True,
+        existing_scalars=[None, None],
     )
     invalid = PracticeNextQuestionRecommendation.model_validate(
         {
@@ -413,11 +408,9 @@ def test_persist_rejects_next_question_v1_contract_mismatch() -> None:
 
 
 def test_enqueue_rejects_transient_review_artifact() -> None:
-    service, db, _run, _session, attempt, _evaluation, _review = (
-        recommendation_context(
-            for_update=True,
-            review_status=AgentRunStatus.QUEUED,
-        )
+    service, db, _run, _session, attempt, _evaluation, _review = recommendation_context(
+        for_update=True,
+        review_status=AgentRunStatus.QUEUED,
     )
 
     with pytest.raises(RecommendationGenerationStateError) as captured:
@@ -426,9 +419,7 @@ def test_enqueue_rejects_transient_review_artifact() -> None:
                 user_id=attempt.user_id,
                 attempt_id=attempt.id,
                 interaction_language="en",
-                idempotency_key=practice_recommendation_idempotency_key(
-                    attempt.id
-                ),
+                idempotency_key=practice_recommendation_idempotency_key(attempt.id),
             )
         )
 
@@ -437,8 +428,8 @@ def test_enqueue_rejects_transient_review_artifact() -> None:
 
 
 def test_recommendation_run_metadata_and_key_are_canonical() -> None:
-    service, db, run, _session, _attempt, _evaluation, _review = (
-        recommendation_context(for_update=False)
+    service, db, run, _session, _attempt, _evaluation, _review = recommendation_context(
+        for_update=False
     )
     run.agent_id = "practice-reviewer"
 
@@ -448,8 +439,8 @@ def test_recommendation_run_metadata_and_key_are_canonical() -> None:
     assert captured.value.code == INVALID_PRACTICE_RECOMMENDATION_RUN
     assert db.rollback_count == 1
 
-    service, db, run, _session, attempt, _evaluation, _review = (
-        recommendation_context(for_update=False)
+    service, db, run, _session, attempt, _evaluation, _review = recommendation_context(
+        for_update=False
     )
     run.idempotency_key = "wrong-key"
 

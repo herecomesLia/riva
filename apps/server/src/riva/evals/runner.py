@@ -12,8 +12,8 @@ from riva.evals.models import (
     AgentEvalAssertion,
     AgentEvalCase,
     AgentEvalCaseResult,
-    AgentEvalRunResult,
     AgentEvalRubricResult,
+    AgentEvalRunResult,
     ContainsAllAssertion,
     ContainsAssertion,
     ExactAssertion,
@@ -28,7 +28,6 @@ from riva.evals.quality_judge import (
 )
 from riva.evals.registry import AgentEvalRegistry, UnknownAgentError
 from riva.integrations import LLMProvider
-
 
 _MISSING = object()
 
@@ -65,9 +64,9 @@ class AgentEvalRunner:
             )
 
         try:
-            validated_input = TypeAdapter(
-                registration.input_schema
-            ).validate_python(case.input)
+            validated_input = TypeAdapter(registration.input_schema).validate_python(
+                case.input
+            )
         except Exception as error:
             return _failed_case(
                 case,
@@ -113,9 +112,7 @@ class AgentEvalRunner:
         output_tokens = result.usage.output_tokens
         if case.rubrics:
             if self.quality_judge is None:
-                failures.append(
-                    "quality judge is required for cases with rubrics"
-                )
+                failures.append("quality judge is required for cases with rubrics")
             else:
                 judge_input = QualityJudgeInput(
                     caseId=case.id,
@@ -137,9 +134,7 @@ class AgentEvalRunner:
                     if judge_usage is not None:
                         input_tokens += judge_usage.input_tokens
                         output_tokens += judge_usage.output_tokens
-                    failures.append(
-                        _exception_message("quality judge failed", error)
-                    )
+                    failures.append(_exception_message("quality judge failed", error))
                 else:
                     input_tokens += judge_result.usage.input_tokens
                     output_tokens += judge_result.usage.output_tokens
@@ -147,9 +142,7 @@ class AgentEvalRunner:
                         case.rubrics,
                         judge_result.output,
                     )
-                    failures.extend(
-                        _rubric_failures(case.rubrics, rubric_results)
-                    )
+                    failures.extend(_rubric_failures(case.rubrics, rubric_results))
 
         return AgentEvalCaseResult(
             caseId=case.id,
@@ -172,11 +165,7 @@ class AgentEvalRunner:
             self.registry.get(agent_id)
 
         selected_cases = sorted(
-            (
-                case
-                for case in cases
-                if agent_id is None or case.agent_id == agent_id
-            ),
+            (case for case in cases if agent_id is None or case.agent_id == agent_id),
             key=lambda case: case.id,
         )
         results = [await self.run_case(case) for case in selected_cases]
@@ -184,9 +173,7 @@ class AgentEvalRunner:
         input_tokens = sum(result.input_tokens for result in results)
         output_tokens = sum(result.output_tokens for result in results)
         rubric_scores = [
-            rubric.score
-            for result in results
-            for rubric in result.rubric_results
+            rubric.score for result in results for rubric in result.rubric_results
         ]
         total = len(results)
         return AgentEvalRunResult(
@@ -198,9 +185,7 @@ class AgentEvalRunner:
             inputTokens=input_tokens,
             outputTokens=output_tokens,
             averageRubricScore=(
-                sum(rubric_scores) / len(rubric_scores)
-                if rubric_scores
-                else None
+                sum(rubric_scores) / len(rubric_scores) if rubric_scores else None
             ),
             cases=results,
         )
@@ -359,9 +344,7 @@ def _assertion_failure(
     assertion: AgentEvalAssertion,
     detail: str,
 ) -> str:
-    return (
-        f"assertion[{index}] {assertion.operator} at {assertion.path}: {detail}"
-    )
+    return f"assertion[{index}] {assertion.operator} at {assertion.path}: {detail}"
 
 
 def _resolve_json_pointer(document: object, path: str) -> object:
@@ -420,8 +403,7 @@ def _item_count_result(
         assertion.max is None or count <= assertion.max
     )
     detail = (
-        f"expected count between {assertion.min!r} and {assertion.max!r}, "
-        f"got {count}"
+        f"expected count between {assertion.min!r} and {assertion.max!r}, got {count}"
     )
     return passed, detail
 

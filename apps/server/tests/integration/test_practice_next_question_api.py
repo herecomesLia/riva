@@ -26,7 +26,6 @@ from tests.integration.test_practice_next_question_workflow import (
     question_output,
 )
 
-
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 
@@ -89,12 +88,16 @@ def test_practice_next_question_http_workflow_replay_poll_and_rollback() -> None
                         llm_provider="qwen",
                         llm_model="fake-practice-model",
                         practice_service_factory=(
-                            lambda service_session, **service_kwargs: PracticeSessionService(
-                                service_session,
-                                question_generation_service_factory=(
-                                    lambda _session, **_kwargs: FailingQuestionGenerationService()
-                                ),
-                                **service_kwargs,
+                            lambda service_session, **service_kwargs: (
+                                PracticeSessionService(
+                                    service_session,
+                                    question_generation_service_factory=(
+                                        lambda _session, **_kwargs: (
+                                            FailingQuestionGenerationService()
+                                        )
+                                    ),
+                                    **service_kwargs,
+                                )
                             )
                         ),
                     )
@@ -148,7 +151,9 @@ def test_practice_next_question_http_workflow_replay_poll_and_rollback() -> None
                                 )
                             ).all()
                         )
-                        failed_attempt = await session.get(PracticeAttempt, first_attempt_id)
+                        failed_attempt = await session.get(
+                            PracticeAttempt, first_attempt_id
+                        )
                         failed_session = await session.get(PracticeSession, session_id)
                         assert len(attempts) == 1
                         assert len(question_runs) == 1
@@ -188,9 +193,15 @@ def test_practice_next_question_http_workflow_replay_poll_and_rollback() -> None
                                 )
                             ).all()
                         )
-                        first_attempt = await session.get(PracticeAttempt, first_attempt_id)
-                        second_attempt = await session.get(PracticeAttempt, second_attempt_id)
-                        practice_session = await session.get(PracticeSession, session_id)
+                        first_attempt = await session.get(
+                            PracticeAttempt, first_attempt_id
+                        )
+                        second_attempt = await session.get(
+                            PracticeAttempt, second_attempt_id
+                        )
+                        practice_session = await session.get(
+                            PracticeSession, session_id
+                        )
                         assert len(attempts) == 2
                         assert len(question_runs) == 2
                         assert first_attempt is not None
@@ -236,12 +247,18 @@ def test_practice_next_question_http_workflow_replay_poll_and_rollback() -> None
                                 )
                             ).all()
                         )
-                        second_attempt = await session.get(PracticeAttempt, second_attempt_id)
-                        replayed_session = await session.get(PracticeSession, session_id)
+                        second_attempt = await session.get(
+                            PracticeAttempt, second_attempt_id
+                        )
+                        replayed_session = await session.get(
+                            PracticeSession, session_id
+                        )
                         assert len(attempts) == 2
                         assert len(question_runs) == 2
                         assert second_attempt is not None
-                        assert second_attempt.question_generation_run_id == second_run_id
+                        assert (
+                            second_attempt.question_generation_run_id == second_run_id
+                        )
                         assert replayed_session is not None
                         assert replayed_session.version == 6
 
@@ -277,8 +294,12 @@ def test_practice_next_question_http_workflow_replay_poll_and_rollback() -> None
                     assert second_card_id != first_card_id
 
                     async with database.sessionmaker() as session:
-                        first_attempt = await session.get(PracticeAttempt, first_attempt_id)
-                        second_attempt = await session.get(PracticeAttempt, second_attempt_id)
+                        first_attempt = await session.get(
+                            PracticeAttempt, first_attempt_id
+                        )
+                        second_attempt = await session.get(
+                            PracticeAttempt, second_attempt_id
+                        )
                         first_card = await session.get(QuestionCard, first_card_id)
                         second_card = await session.get(QuestionCard, second_card_id)
                         question_runs = list(
@@ -291,7 +312,9 @@ def test_practice_next_question_http_workflow_replay_poll_and_rollback() -> None
                                 )
                             ).all()
                         )
-                        practice_session = await session.get(PracticeSession, session_id)
+                        practice_session = await session.get(
+                            PracticeSession, session_id
+                        )
                         assert first_attempt is not None
                         assert second_attempt is not None
                         assert first_card is not None

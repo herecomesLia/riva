@@ -15,7 +15,6 @@ from riva.services.interview_candidate_questions import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 CandidateQuestionServiceFactory = Callable[
     [AsyncSession], InterviewCandidateQuestionService
 ]
@@ -37,9 +36,7 @@ class InterviewCandidateQuestionHandler:
             raise ValueError("agent must be the interview candidate-question agent")
         self.session_factory = session_factory
         self.agent = agent
-        self.candidate_question_service_factory = (
-            candidate_question_service_factory
-        )
+        self.candidate_question_service_factory = candidate_question_service_factory
 
     async def execute(
         self,

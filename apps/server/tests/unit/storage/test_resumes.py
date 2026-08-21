@@ -1,9 +1,9 @@
 import asyncio
-from hashlib import sha256
 import io
 import os
-from pathlib import Path
 import threading
+from hashlib import sha256
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -209,9 +209,8 @@ def test_post_publish_temporary_cleanup_failure_removes_new_target(
 
     def fail_post_publish_temporary_cleanup(path) -> None:
         nonlocal temporary_cleanup_failed
-        if (
-            not temporary_cleanup_failed
-            and Path(path).name.startswith(storage._TEMP_PREFIX)
+        if not temporary_cleanup_failed and Path(path).name.startswith(
+            storage._TEMP_PREFIX
         ):
             temporary_cleanup_failed = True
             raise OSError("controlled temporary cleanup failure")

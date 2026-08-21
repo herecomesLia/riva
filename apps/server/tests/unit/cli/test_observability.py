@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
 import json
+from datetime import datetime, timedelta
 
 import pytest
 from typer.testing import CliRunner
@@ -163,12 +163,16 @@ def test_cli_prints_summary_and_writes_stable_json(monkeypatch, tmp_path) -> Non
     assert "Per-agent summary: none" in result.output
     content = output_path.read_text()
     assert content.endswith("\n")
-    assert content == json.dumps(
-        json.loads(content),
-        ensure_ascii=False,
-        sort_keys=True,
-        indent=2,
-    ) + "\n"
+    assert (
+        content
+        == json.dumps(
+            json.loads(content),
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n"
+    )
 
 
 @pytest.mark.parametrize(

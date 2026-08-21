@@ -53,6 +53,8 @@ from tests.integration.test_practice_answer_workflow import (
 )
 from tests.integration.test_practice_review_workflow import (
     build_worker as build_review_or_recommendation_worker,
+)
+from tests.integration.test_practice_review_workflow import (
     recommendation_output,
     review_output,
 )
@@ -61,7 +63,6 @@ from tests.integration.test_question_generation import (
     database_url,
     seed_context,
 )
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 14, 9, 30, tzinfo=UTC)
@@ -227,9 +228,7 @@ async def refresh_main_reference(
 async def prepare_follow_up_question(
     database: Database,
 ) -> tuple[object, UUID, UUID, UUID, UUID]:
-    owner, session_id, attempt_id, question_id = await start_answering_session(
-        database
-    )
+    owner, session_id, attempt_id, question_id = await start_answering_session(database)
     async with database.sessionmaker() as session:
         submitted = await PracticeSessionService(
             session,
@@ -313,9 +312,12 @@ def test_practice_reference_answer_main_request_worker_refresh_and_recovery() ->
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, question_id = (
-                    await start_answering_session(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    question_id,
+                ) = await start_answering_session(database)
                 requested = await request_main_reference(
                     database,
                     user_id=owner.id,
@@ -344,9 +346,7 @@ def test_practice_reference_answer_main_request_worker_refresh_and_recovery() ->
                         question_id,
                     )
                     assert frozen_context is not None
-                assert reference_run.payload["expectedKind"] == (
-                    "personalizedExample"
-                )
+                assert reference_run.payload["expectedKind"] == ("personalizedExample")
                 assert reference_run.payload["referenceContext"] == (
                     frozen_context.frozen_context
                 )
@@ -435,9 +435,12 @@ def test_practice_reference_answer_worker_succeeds_after_main_answer_progress() 
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, _attempt_id, question_id = (
-                    await start_answering_session(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    _attempt_id,
+                    question_id,
+                ) = await start_answering_session(database)
                 await request_main_reference(
                     database,
                     user_id=owner.id,
@@ -487,9 +490,9 @@ def test_practice_reference_answer_worker_succeeds_after_main_answer_progress() 
                         submitted_at=submitted.main_answer.submitted_at,
                     )
                     artifact_count = await session.scalar(
-                        select(func.count()).select_from(
-                            PracticeReferenceAnswerArtifact
-                        ).where(
+                        select(func.count())
+                        .select_from(PracticeReferenceAnswerArtifact)
+                        .where(
                             PracticeReferenceAnswerArtifact.question_card_id
                             == question_id,
                             PracticeReferenceAnswerArtifact.target_type
@@ -507,7 +510,9 @@ def test_practice_reference_answer_worker_succeeds_after_main_answer_progress() 
     asyncio.run(run_test())
 
 
-def test_practice_reference_answer_follow_up_request_refresh_and_q2_not_requested() -> None:
+def test_practice_reference_answer_follow_up_request_refresh_and_q2_not_requested() -> (
+    None
+):
     async def run_test() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -620,9 +625,9 @@ def test_practice_reference_answer_follow_up_request_refresh_and_q2_not_requeste
                         submitted_at=None,
                     )
                     artifact_count = await session.scalar(
-                        select(func.count()).select_from(
-                            PracticeReferenceAnswerArtifact
-                        ).where(
+                        select(func.count())
+                        .select_from(PracticeReferenceAnswerArtifact)
+                        .where(
                             PracticeReferenceAnswerArtifact.question_card_id
                             == question_id,
                             PracticeReferenceAnswerArtifact.target_type
@@ -684,7 +689,9 @@ async def refresh_follow_up_reference(
         )
 
 
-def test_practice_reference_answer_follow_up_worker_after_progress_uses_enqueued_context() -> None:
+def test_practice_reference_answer_follow_up_worker_after_progress_uses_enqueued_context() -> (
+    None
+):
     async def run_test() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -730,7 +737,10 @@ def test_practice_reference_answer_follow_up_worker_after_progress_uses_enqueued
                 )
                 assert await build_reference_worker(database, provider).process_one()
                 rendered = provider.calls[0].messages[-1].content
-                assert "I owned the rollout and reduced failures by 20 percent." in rendered
+                assert (
+                    "I owned the rollout and reduced failures by 20 percent."
+                    in rendered
+                )
                 assert q1_prompt in rendered
                 assert q1_focus in rendered
                 assert late_answer not in rendered
@@ -742,16 +752,18 @@ def test_practice_reference_answer_follow_up_worker_after_progress_uses_enqueued
                         user_id=owner.id,
                         question_card_id=question_id,
                         follow_up_question_id=q1_id,
-                        submitted_at=submitted.follow_up_exchanges[0].answer.submitted_at,
+                        submitted_at=submitted.follow_up_exchanges[
+                            0
+                        ].answer.submitted_at,
                     )
                     assert state.status is (
                         PracticeReferenceAnswerLifecycleStatus.REVEALED
                     )
                     assert state.viewed_before_submission is False
                     artifact_count = await session.scalar(
-                        select(func.count()).select_from(
-                            PracticeReferenceAnswerArtifact
-                        ).where(
+                        select(func.count())
+                        .select_from(PracticeReferenceAnswerArtifact)
+                        .where(
                             PracticeReferenceAnswerArtifact.question_card_id
                             == question_id,
                             PracticeReferenceAnswerArtifact.follow_up_question_id
@@ -770,9 +782,12 @@ def test_practice_reference_answer_retry_reuses_main_run_and_artifact() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, question_id = (
-                    await start_answering_session(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    question_id,
+                ) = await start_answering_session(database)
                 await request_main_reference(
                     database,
                     user_id=owner.id,
@@ -894,9 +909,9 @@ def test_practice_reference_answer_retry_reuses_main_run_and_artifact() -> None:
                 runs = await load_reference_runs(database, user_id=owner.id)
                 async with database.sessionmaker() as session:
                     artifact_count = await session.scalar(
-                        select(func.count()).select_from(
-                            PracticeReferenceAnswerArtifact
-                        ).where(
+                        select(func.count())
+                        .select_from(PracticeReferenceAnswerArtifact)
+                        .where(
                             PracticeReferenceAnswerArtifact.question_card_id
                             == question_id,
                             PracticeReferenceAnswerArtifact.target_type

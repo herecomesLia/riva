@@ -105,7 +105,9 @@ def test_agent_uses_fixed_identity_prompt_schema_model_and_parameters() -> None:
     ]
 
 
-def test_agent_uses_matching_prompt_and_stable_utf8_compact_json_without_mutation() -> None:
+def test_agent_uses_matching_prompt_and_stable_utf8_compact_json_without_mutation() -> (
+    None
+):
     provider = FakeLLMProvider([valid_output()])
     agent = MatchingAnalysisAgent(provider, model="test-model")
     input = matching_input()
@@ -132,19 +134,13 @@ def test_agent_uses_matching_prompt_and_stable_utf8_compact_json_without_mutatio
     asyncio.run(agent.run(input))
 
     request = provider.calls[0]
-    assert request.messages[0].content == MATCHING_ANALYSIS_PROMPT.render(
-        values
-    ).system
-    assert request.messages[1].content == MATCHING_ANALYSIS_PROMPT.render(
-        values
-    ).user
+    assert request.messages[0].content == MATCHING_ANALYSIS_PROMPT.render(values).system
+    assert request.messages[1].content == MATCHING_ANALYSIS_PROMPT.render(values).user
     assert input.model_dump(mode="json") == before
 
 
 def test_agent_uses_interaction_language_over_structured_source_languages() -> None:
-    agent = MatchingAnalysisAgent(
-        FakeLLMProvider([valid_output()]), model="test-model"
-    )
+    agent = MatchingAnalysisAgent(FakeLLMProvider([valid_output()]), model="test-model")
     values = agent.prompt_values(matching_input("en"))
     rendered = agent.prompt.render(values)
 
@@ -155,9 +151,7 @@ def test_agent_uses_interaction_language_over_structured_source_languages() -> N
 
 def test_agent_returns_output_and_provider_metadata_and_usage() -> None:
     usage = LLMUsage(input_tokens=321, output_tokens=123)
-    provider = FakeLLMProvider(
-        [valid_output()], provider="fake-matching", usage=usage
-    )
+    provider = FakeLLMProvider([valid_output()], provider="fake-matching", usage=usage)
     agent = MatchingAnalysisAgent(provider, model="test-model")
 
     result = asyncio.run(agent.run(matching_input()))

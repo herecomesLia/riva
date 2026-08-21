@@ -1,6 +1,5 @@
 from copy import deepcopy
-from uuid import UUID
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -288,9 +287,7 @@ def test_matching_career_profile_compresses_every_list_after_deduplication() -> 
         "成果-0",
         *[f"成果-{index}" for index in range(1, 20)],
     ]
-    assert len(result.work_experiences[0].skills) == (
-        MAX_MATCHING_EXPERIENCE_SKILLS
-    )
+    assert len(result.work_experiences[0].skills) == (MAX_MATCHING_EXPERIENCE_SKILLS)
     assert result.work_experiences[0].skills[-1] == "工作技能-99"
     assert len(result.skills) == MAX_MATCHING_PROFILE_SKILLS
     assert result.skills[-1] == "技能-199"
@@ -335,7 +332,9 @@ def test_matching_career_profile_compresses_every_list_after_deduplication() -> 
     }
 
 
-def test_matching_job_context_validates_structured_analysis_and_excludes_raw_text() -> None:
+def test_matching_job_context_validates_structured_analysis_and_excludes_raw_text() -> (
+    None
+):
     role = TargetRole(
         id=uuid4(),
         user_id=uuid4(),

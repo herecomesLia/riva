@@ -1,8 +1,8 @@
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     ForeignKeyConstraint,
     Index,
-    JSON,
     UniqueConstraint,
 )
 
@@ -41,7 +41,9 @@ def test_analysis_is_one_per_role_and_uses_role_owner_foreign_key() -> None:
     assert JobDescriptionAnalysis.role.property.uselist is False
 
 
-def test_analysis_source_run_versions_summary_and_json_columns_are_constrained() -> None:
+def test_analysis_source_run_versions_summary_and_json_columns_are_constrained() -> (
+    None
+):
     table = JobDescriptionAnalysis.__table__
 
     source_foreign_key = next(iter(table.c.source_agent_run_id.foreign_keys))
@@ -86,9 +88,7 @@ def test_analysis_source_run_versions_summary_and_json_columns_are_constrained()
 
 def test_analysis_has_current_role_lookup_index_and_timestamps() -> None:
     table = JobDescriptionAnalysis.__table__
-    indexes = {
-        index.name: index for index in table.indexes if isinstance(index, Index)
-    }
+    indexes = {index.name: index for index in table.indexes if isinstance(index, Index)}
 
     assert [
         column.name

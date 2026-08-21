@@ -1,8 +1,8 @@
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
-import pytest
 
 from riva.core.auth import get_auth_service, require_current_user
 from riva.core.errors import APIError
@@ -116,9 +116,7 @@ class FakeTargetRoleService:
     async def save_job_description(self, user, role_id, payload):
         return await self._result("jd", user, role_id, payload)
 
-    async def update_job_description_analysis_module(
-        self, user, role_id, payload
-    ):
+    async def update_job_description_analysis_module(self, user, role_id, payload):
         return await self._result("analysis", user, role_id, payload)
 
     async def start_job_description_parsing(
@@ -262,9 +260,7 @@ def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
             json={"version": 2, "jobDescriptionVersion": 1},
             headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "en-US"},
         )
-        polled = client.get(
-            f"{path}?version=2&jobDescriptionVersion=1"
-        )
+        polled = client.get(f"{path}?version=2&jobDescriptionVersion=1")
 
     assert started.status_code == 202
     assert service.calls[0][0] == "start-parsing"

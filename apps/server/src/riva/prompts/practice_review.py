@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.practice_review import PracticeReviewOutput
 
-
 PRACTICE_REVIEW_PROMPT = PromptDefinition(
     prompt_id="practice-reviewer",
     version="1",

@@ -35,7 +35,6 @@ from riva.services.training_record_reference_answers import (
     TrainingRecordReferenceAnswerStateError,
 )
 
-
 NOW = datetime(2026, 8, 16, 8, 0, tzinfo=UTC)
 
 
@@ -177,7 +176,9 @@ def service_for(
         session,  # type: ignore[arg-type]
         llm_provider="qwen",
         llm_model="reference-model",
-        reference_answer_generation_service_factory=lambda _session, **_kwargs: generation,  # type: ignore[arg-type]
+        reference_answer_generation_service_factory=lambda _session, **_kwargs: (
+            generation
+        ),  # type: ignore[arg-type]
     )
 
 
@@ -283,8 +284,7 @@ def test_follow_up_request_uses_attempt_scoped_follow_up_and_answer() -> None:
     assert result.reference_answer.status == "generating"
     assert generation.follow_up_enqueue_calls[0]["question_card_id"] == card_id
     assert (
-        generation.follow_up_enqueue_calls[0]["follow_up_question_id"]
-        == follow_up_id
+        generation.follow_up_enqueue_calls[0]["follow_up_question_id"] == follow_up_id
     )
     assert generation.follow_up_calls[0]["submitted_at"] == NOW
 
@@ -468,7 +468,9 @@ def test_missing_llm_configuration_does_not_enqueue_new_generation() -> None:
         session,  # type: ignore[arg-type]
         llm_provider="openai",
         llm_model="model",
-        reference_answer_generation_service_factory=lambda _session, **_kwargs: generation,  # type: ignore[arg-type]
+        reference_answer_generation_service_factory=lambda _session, **_kwargs: (
+            generation
+        ),  # type: ignore[arg-type]
     )
 
     with pytest.raises(TrainingRecordReferenceAnswerStateError) as error:

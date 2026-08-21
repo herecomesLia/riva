@@ -5,8 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db import migrations
 from riva.db.database import Database
@@ -18,7 +18,6 @@ from tests.helpers.interview import (
     create_user,
     seed_interview_prerequisites,
 )
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -73,15 +72,17 @@ async def _run_workflow(url: str) -> None:
             title="Archived Role",
             preparation_status="archived",
         )
-        incomplete_user, incomplete_role, _incomplete_profile = (
-            await seed_interview_prerequisites(
-                database,
-                label="incomplete",
-                include_work_experience=False,
-                include_project_experience=False,
-                include_skill=False,
-                role_title="Incomplete Profile Role",
-            )
+        (
+            incomplete_user,
+            incomplete_role,
+            _incomplete_profile,
+        ) = await seed_interview_prerequisites(
+            database,
+            label="incomplete",
+            include_work_experience=False,
+            include_project_experience=False,
+            include_skill=False,
+            role_title="Incomplete Profile Role",
         )
         missing_jd_user = await _seed_missing_jd_user(database)
         other_user = await _seed_other_user(database)

@@ -5,10 +5,13 @@ from uuid import uuid4
 from riva.agents import InterviewPlanningAgent
 from riva.integrations import MessageRole
 from riva.prompts import INTERVIEW_PLANNING_PROMPT
+from riva.schemas.interview_planning import (
+    InterviewPlanningInput,
+    InterviewPlanningOutput,
+)
 from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
 )
-from riva.schemas.interview_planning import InterviewPlanningInput, InterviewPlanningOutput
 from tests.helpers.llm import FakeLLMProvider
 
 

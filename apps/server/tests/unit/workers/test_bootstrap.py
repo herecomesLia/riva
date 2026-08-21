@@ -1,16 +1,16 @@
 import asyncio
+import signal
 from collections.abc import Callable
 from datetime import timedelta
-import signal
 from typing import Any
 
 import pytest
 
 from riva.agents import (
     InterviewPlanningAgent,
+    InterviewReviewAgent,
     JobDescriptionParsingAgent,
     MatchingAnalysisAgent,
-    InterviewReviewAgent,
     PracticeEvaluationAgent,
     PracticeRecommendationAgent,
     PracticeReferenceAnswerAgent,
@@ -28,18 +28,18 @@ from riva.prompts import (
     QUESTION_GENERATION_PROMPT,
     TRAINING_PLANNING_PROMPT,
 )
-from riva.services.question_generation_prompt_versions import (
-    get_question_generation_prompt,
-)
 from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
+)
+from riva.services.question_generation_prompt_versions import (
+    get_question_generation_prompt,
 )
 from riva.workers import (
     AgentHandlerRegistry,
     DuplicateAgentHandlerError,
-    JobDescriptionParsingHandler,
     InterviewPlanningHandler,
     InterviewReviewHandler,
+    JobDescriptionParsingHandler,
     MatchingAnalysisHandler,
     PracticeEvaluationHandler,
     PracticeRecommendationHandler,
@@ -300,9 +300,7 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert job_description_agent_calls == [
         {"provider": provider, "model": "qwen-test-model"}
     ]
-    assert matching_agent_calls == [
-        {"provider": provider, "model": "qwen-test-model"}
-    ]
+    assert matching_agent_calls == [{"provider": provider, "model": "qwen-test-model"}]
     assert resume_parsing_agent_calls == [
         {"provider": provider, "model": "qwen-test-model"}
     ]
@@ -345,9 +343,8 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert question_generation.agent.prompt is QUESTION_GENERATION_PROMPT
     assert question_generation.legacy_agent is not None
     assert question_generation.legacy_agent.prompt_version == "1"
-    assert (
-        question_generation.legacy_agent.prompt
-        is get_question_generation_prompt("1")
+    assert question_generation.legacy_agent.prompt is get_question_generation_prompt(
+        "1"
     )
     assert question_generation.agents.keys() == {"1", "2", "3"}
     assert question_generation.agents["2"].prompt is get_question_generation_prompt("2")
@@ -358,10 +355,7 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert interview_planning.agent.prompt is INTERVIEW_PLANNING_PROMPT
     assert interview_planning.legacy_agent is not None
     assert interview_planning.legacy_agent.prompt_version == "1"
-    assert (
-        interview_planning.legacy_agent.prompt
-        is get_interview_planning_prompt("1")
-    )
+    assert interview_planning.legacy_agent.prompt is get_interview_planning_prompt("1")
     assert interview_planning.agents.keys() == {"1", "2"}
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
@@ -391,9 +385,7 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert interview_review.legacy_agent is not None
     assert interview_review.legacy_agent.prompt_version == "1"
     assert interview_review.agents.keys() == {"1", "2"}
-    practice_reference_answer = registry.get(
-        "practice-reference-answer-generator"
-    )
+    practice_reference_answer = registry.get("practice-reference-answer-generator")
     assert isinstance(practice_reference_answer, PracticeReferenceAnswerHandler)
     assert isinstance(
         practice_reference_answer.agent,
@@ -459,9 +451,8 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert question_generation.agent.model == "qwen-test-model"
     assert question_generation.legacy_agent is not None
     assert question_generation.legacy_agent.prompt_version == "1"
-    assert (
-        question_generation.legacy_agent.prompt
-        is get_question_generation_prompt("1")
+    assert question_generation.legacy_agent.prompt is get_question_generation_prompt(
+        "1"
     )
     assert question_generation.agents.keys() == {"1", "2", "3"}
     practice_evaluation = registry.get("practice-evaluator")
@@ -490,9 +481,7 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert interview_review.agent.prompt_version == "2"
     assert interview_review.legacy_agent is not None
     assert interview_review.legacy_agent.prompt_version == "1"
-    practice_reference_answer = registry.get(
-        "practice-reference-answer-generator"
-    )
+    practice_reference_answer = registry.get("practice-reference-answer-generator")
     assert isinstance(practice_reference_answer, PracticeReferenceAnswerHandler)
     assert isinstance(
         practice_reference_answer.agent,
@@ -529,12 +518,8 @@ def test_registry_returns_empty_when_injected_provider_factory_returns_none() ->
         job_description_handler_factory=lambda **_options: pytest.fail(
             "handler constructed"
         ),
-        matching_agent_factory=lambda **_options: pytest.fail(
-            "agent constructed"
-        ),
-        matching_handler_factory=lambda **_options: pytest.fail(
-            "handler constructed"
-        ),
+        matching_agent_factory=lambda **_options: pytest.fail("agent constructed"),
+        matching_handler_factory=lambda **_options: pytest.fail("handler constructed"),
     )
 
     assert len(registry) == 0
@@ -685,10 +670,7 @@ def test_run_worker_composes_database_registry_and_runtime() -> None:
             and fields.get("agent_ids") == []
             for _, _, fields in logger.events
         )
-        assert any(
-            fields.get("status") == "stopped"
-            for _, _, fields in logger.events
-        )
+        assert any(fields.get("status") == "stopped" for _, _, fields in logger.events)
         assert any(
             level == "warning"
             and event == "agent.worker.registry"
@@ -714,9 +696,7 @@ def test_run_worker_logs_registered_handler() -> None:
                 events,
             ),
             registry_factory=lambda _settings, _sessions: registry,
-            worker_factory=lambda **_options: FakeWorker(
-                events
-            ),  # type: ignore[arg-type]
+            worker_factory=lambda **_options: FakeWorker(events),  # type: ignore[arg-type]
             signal_registrar=no_signals,
             logger=logger,
         )
@@ -795,9 +775,7 @@ def test_registry_failure_disposes_database_before_worker_starts() -> None:
         assert signal_cleanup_count == 1
         assert not _worker_lifecycle_tasks()
         failure = next(
-            fields
-            for level, _, fields in logger.events
-            if level == "exception"
+            fields for level, _, fields in logger.events if level == "exception"
         )
         assert failure == {
             "worker_id": "registry-host-9",
@@ -839,9 +817,7 @@ def test_run_worker_disposes_database_and_logs_safe_failure() -> None:
 
         assert databases[0].dispose_count == 1
         failure = next(
-            fields
-            for level, _, fields in logger.events
-            if level == "exception"
+            fields for level, _, fields in logger.events if level == "exception"
         )
         assert failure == {
             "worker_id": "test-host-42",

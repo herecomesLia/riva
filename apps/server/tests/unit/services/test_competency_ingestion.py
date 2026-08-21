@@ -1,14 +1,13 @@
 import asyncio
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from uuid import uuid4
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 
 from riva.models import CompetencyEvidence, UserCompetency
 from riva.services.competency_ingestion import CompetencyIngestionService
-
 
 NOW = datetime(2026, 8, 17, 10, tzinfo=UTC)
 
@@ -16,9 +15,7 @@ NOW = datetime(2026, 8, 17, 10, tzinfo=UTC)
 class FakeCompetencyService:
     def __init__(self) -> None:
         self.competencies: dict[tuple[object, str], UserCompetency] = {}
-        self.evidence: dict[
-            tuple[object, object, object, str], CompetencyEvidence
-        ] = {}
+        self.evidence: dict[tuple[object, object, object, str], CompetencyEvidence] = {}
         self.competency_calls: list[tuple[object, str, str]] = []
         self.evidence_calls: list[dict[str, object]] = []
 
@@ -128,7 +125,9 @@ def _evaluation(attempt, *, dimensions=None):
     )
 
 
-def test_practice_evaluation_ingests_answer_and_dimension_scores_without_commit() -> None:
+def test_practice_evaluation_ingests_answer_and_dimension_scores_without_commit() -> (
+    None
+):
     service, competency_service, session = _service()
     user_id, practice_session, attempt = _practice_context()
     evaluation = _evaluation(attempt)
@@ -159,7 +158,9 @@ def test_practice_evaluation_ingests_answer_and_dimension_scores_without_commit(
     session.commit.assert_not_called()
 
 
-def test_practice_review_only_writes_answer_quality_text_and_preserves_raw_items() -> None:
+def test_practice_review_only_writes_answer_quality_text_and_preserves_raw_items() -> (
+    None
+):
     service, competency_service, _session = _service()
     user_id, practice_session, attempt = _practice_context()
     review = SimpleNamespace(
@@ -305,13 +306,16 @@ def test_unavailable_review_has_no_evidence_and_unknown_dimension_fails() -> Non
     )
     interview_session = SimpleNamespace(id=unavailable.session_id, user_id=user_id)
 
-    assert asyncio.run(
-        service.ingest_interview_review(
-            user_id,
-            interview_session,
-            unavailable,  # type: ignore[arg-type]
+    assert (
+        asyncio.run(
+            service.ingest_interview_review(
+                user_id,
+                interview_session,
+                unavailable,  # type: ignore[arg-type]
+            )
         )
-    ) == []
+        == []
+    )
 
     with pytest.raises(ValueError, match="unknown competency dimension"):
         asyncio.run(

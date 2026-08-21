@@ -15,7 +15,6 @@ from riva.services.interview_sessions import (
     InterviewSetupContext,
 )
 
-
 TRUSTED_ORIGIN = "http://localhost:5173"
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 

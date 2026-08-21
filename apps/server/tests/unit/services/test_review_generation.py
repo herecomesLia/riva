@@ -32,9 +32,10 @@ from tests.unit.services.test_evaluation_generation import (
     follow_up_source_runs,
     noop_competency_ingestion_service_factory,
     run_for,
+)
+from tests.unit.services.test_evaluation_generation import (
     valid_output as valid_evaluation_output,
 )
-
 
 NOW = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
 
@@ -76,8 +77,8 @@ def review_context(
     list[AgentRun],
     PracticeEvaluation,
 ]:
-    session, attempt, card, main, questions, follow_answers, decisions = (
-        context_graph(shape)
+    session, attempt, card, main, questions, follow_answers, decisions = context_graph(
+        shape
     )
     evaluation_run = run_for(
         session,
@@ -106,9 +107,9 @@ def review_context(
         dimension_scores=evaluation_output.model_dump(mode="json", by_alias=True)[
             "dimensionScores"
         ],
-        focus_assessments=evaluation_output.model_dump(
-            mode="json", by_alias=True
-        )["focusAssessments"],
+        focus_assessments=evaluation_output.model_dump(mode="json", by_alias=True)[
+            "focusAssessments"
+        ],
         evaluated_at=NOW,
     )
     source_runs = follow_up_source_runs(
@@ -213,7 +214,18 @@ def service_context(
     PracticeEvaluation,
 ]:
     values = review_context(shape)
-    evaluation_run, session, attempt, _card, _main, _questions, _answers, _decisions, source_runs, evaluation = values
+    (
+        evaluation_run,
+        session,
+        attempt,
+        _card,
+        _main,
+        _questions,
+        _answers,
+        _decisions,
+        source_runs,
+        evaluation,
+    ) = values
     db = scripted_review_session(
         values,
         for_update=for_update,
@@ -234,9 +246,7 @@ def service_context(
 
 
 def test_enqueue_in_transaction_freezes_only_attempt_evaluation_and_language() -> None:
-    service, db, run, session, attempt, evaluation = service_context(
-        for_update=True
-    )
+    service, db, run, session, attempt, evaluation = service_context(for_update=True)
     expected_run = AgentRun(
         id=uuid4(),
         user_id=attempt.user_id,
@@ -252,9 +262,7 @@ def test_enqueue_in_transaction_freezes_only_attempt_evaluation_and_language() -
         model="review-test-model",
     )
     fake_run_service = FakeAgentRunService(expected_run)
-    service.agent_run_service_factory = lambda _session: cast(
-        object, fake_run_service
-    )  # type: ignore[assignment]
+    service.agent_run_service_factory = lambda _session: cast(object, fake_run_service)  # type: ignore[assignment]
 
     result = asyncio.run(
         service.enqueue_generation_in_transaction(
@@ -284,9 +292,7 @@ def test_enqueue_in_transaction_freezes_only_attempt_evaluation_and_language() -
 
 
 def test_enqueue_wrapper_commits_and_rejects_noncanonical_key() -> None:
-    service, db, _run, _session, attempt, _evaluation = service_context(
-        for_update=True
-    )
+    service, db, _run, _session, attempt, _evaluation = service_context(for_update=True)
     expected_run = AgentRun(
         id=uuid4(),
         user_id=attempt.user_id,
@@ -302,9 +308,7 @@ def test_enqueue_wrapper_commits_and_rejects_noncanonical_key() -> None:
         model="review-test-model",
     )
     fake_run_service = FakeAgentRunService(expected_run)
-    service.agent_run_service_factory = lambda _session: cast(
-        object, fake_run_service
-    )  # type: ignore[assignment]
+    service.agent_run_service_factory = lambda _session: cast(object, fake_run_service)  # type: ignore[assignment]
 
     asyncio.run(
         service.enqueue_generation(
@@ -318,7 +322,9 @@ def test_enqueue_wrapper_commits_and_rejects_noncanonical_key() -> None:
 
     with pytest.raises(ReviewGenerationStateError) as exc_info:
         asyncio.run(
-            ReviewGenerationService(db, llm_model="review-test-model").enqueue_generation_in_transaction(
+            ReviewGenerationService(
+                db, llm_model="review-test-model"
+            ).enqueue_generation_in_transaction(
                 user_id=attempt.user_id,
                 attempt_id=attempt.id,
                 interaction_language="en",
@@ -328,10 +334,10 @@ def test_enqueue_wrapper_commits_and_rejects_noncanonical_key() -> None:
     assert exc_info.value.code == PRACTICE_REVIEW_CONTEXT_CONFLICT
 
 
-def test_load_reconstructs_review_input_from_evaluation_lineage_without_commit() -> None:
-    service, db, run, _session, attempt, _evaluation = service_context(
-        for_update=False
-    )
+def test_load_reconstructs_review_input_from_evaluation_lineage_without_commit() -> (
+    None
+):
+    service, db, run, _session, attempt, _evaluation = service_context(for_update=False)
 
     result = asyncio.run(service.load_generation_input_in_transaction(run))
 
@@ -345,9 +351,7 @@ def test_load_reconstructs_review_input_from_evaluation_lineage_without_commit()
 
 
 def test_enqueue_requires_owned_attempt_active_session_and_evaluating_status() -> None:
-    service, db, _run, session, attempt, _evaluation = service_context(
-        for_update=True
-    )
+    service, db, _run, session, attempt, _evaluation = service_context(for_update=True)
 
     db.scalar_values = [None]
     with pytest.raises(ReviewGenerationStateError) as missing:
@@ -417,9 +421,7 @@ def test_enqueue_validates_canonical_evaluation_provenance(
     mutation: str,
     expected: str,
 ) -> None:
-    service, db, _run, _session, attempt, evaluation = service_context(
-        for_update=True
-    )
+    service, db, _run, _session, attempt, evaluation = service_context(for_update=True)
     session = cast(object, db.scalar_values[1])
     evaluation_run = cast(AgentRun, db.scalar_values[4])
     if mutation == "missing":
@@ -453,9 +455,7 @@ def test_enqueue_validates_canonical_evaluation_provenance(
 
 
 def test_review_payload_evaluation_id_is_not_replaced_by_attempt_artifact() -> None:
-    service, db, run, _session, attempt, _evaluation = service_context(
-        for_update=False
-    )
+    service, db, run, _session, attempt, _evaluation = service_context(for_update=False)
     payload = ReviewRunPayload.model_validate(run.payload)
     run.payload = {
         **payload.model_dump(mode="json", by_alias=True),
@@ -470,7 +470,9 @@ def test_review_payload_evaluation_id_is_not_replaced_by_attempt_artifact() -> N
     assert db.rollback_count == 1
 
 
-def test_persist_success_creates_exact_canonical_review_without_session_mutation() -> None:
+def test_persist_success_creates_exact_canonical_review_without_session_mutation() -> (
+    None
+):
     service, db, run, session, attempt, evaluation = service_context(
         for_update=True,
         existing_scalars=[None, None],
@@ -494,7 +496,9 @@ def test_persist_success_creates_exact_canonical_review_without_session_mutation
     assert db.commit_count == 1
 
 
-def test_persist_retry_returns_first_source_run_artifact_without_validating_second_output() -> None:
+def test_persist_retry_returns_first_source_run_artifact_without_validating_second_output() -> (
+    None
+):
     service, db, run, _session, attempt, _evaluation = service_context(
         for_update=True,
     )

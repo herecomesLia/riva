@@ -1,7 +1,7 @@
 import asyncio
+import os
 from dataclasses import dataclass, replace
 from datetime import timedelta
-import os
 from uuid import UUID, uuid4
 
 import pytest
@@ -45,7 +45,6 @@ from riva.workers import (
 )
 from tests.helpers.llm import FakeLLMProvider
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -88,16 +87,16 @@ class ParsingSetup:
     worker: AgentWorker
 
 
-def structured_output(summary: str = "Build reliable payment APIs.") -> dict[str, object]:
+def structured_output(
+    summary: str = "Build reliable payment APIs.",
+) -> dict[str, object]:
     return {
         "riva_summary": summary,
         "responsibilities": ["Design APIs"],
         "qualification_requirements": {
             "education": ["Bachelor's degree"],
             "graduation_cohorts": [],
-            "majors": [
-                "Computer Science, Software Engineering, or a related field"
-            ],
+            "majors": ["Computer Science, Software Engineering, or a related field"],
             "experience": ["Three years of backend experience"],
             "languages": ["English"],
             "certifications": [],
@@ -112,9 +111,7 @@ def structured_output(summary: str = "Build reliable payment APIs.") -> dict[str
             "databases_and_middleware": ["PostgreSQL"],
             "other": [],
         },
-        "preferred_qualifications": [
-            "Kubernetes or cloud platform experience"
-        ],
+        "preferred_qualifications": ["Kubernetes or cloud platform experience"],
         "soft_skills": ["Communication"],
         "business_domains": ["Payments"],
     }
@@ -204,9 +201,7 @@ async def setup_parsing(
 
     if registry is None:
         agent_type = (
-            MismatchedResultAgent
-            if mismatched_agent
-            else JobDescriptionParsingAgent
+            MismatchedResultAgent if mismatched_agent else JobDescriptionParsingAgent
         )
         agent = agent_type(provider, model="fake-jd-model")
         handler = JobDescriptionParsingHandler(
@@ -252,9 +247,7 @@ def test_job_description_parsing_worker_success_chain() -> None:
 
                 async with database.sessionmaker() as session:
                     stored_run = await session.get(AgentRun, setup.run.id)
-                    analysis = await session.get(
-                        JobDescriptionAnalysis, setup.role.id
-                    )
+                    analysis = await session.get(JobDescriptionAnalysis, setup.role.id)
                     stored_role = await session.get(TargetRole, setup.role.id)
                     assert stored_run is not None
                     assert stored_run.status is AgentRunStatus.SUCCEEDED
@@ -455,9 +448,10 @@ def test_start_worker_status_end_to_end_with_fake_provider() -> None:
                 assert snapshot.job_description_analysis.riva_summary == (
                     "API-started parsing summary."
                 )
-                assert snapshot.job_description_analysis.required_skills.programming_languages == [
-                    "Python"
-                ]
+                assert (
+                    snapshot.job_description_analysis.required_skills.programming_languages
+                    == ["Python"]
+                )
 
                 async with database.sessionmaker() as session:
                     ready_no_op = await TargetRoleService(
@@ -481,9 +475,7 @@ def test_start_worker_status_end_to_end_with_fake_provider() -> None:
                     assert run.model == "fake-api-model"
                     assert run.input_tokens == 77
                     assert run.output_tokens == 23
-                    analysis = await session.get(
-                        JobDescriptionAnalysis, target.id
-                    )
+                    analysis = await session.get(JobDescriptionAnalysis, target.id)
                     assert analysis is not None
                     await session.delete(analysis)
                     await session.commit()
@@ -507,9 +499,7 @@ def test_start_worker_status_end_to_end_with_fake_provider() -> None:
                     )
 
                 async with database.sessionmaker() as session:
-                    changed = await TargetRoleService(
-                        session
-                    ).save_job_description(
+                    changed = await TargetRoleService(session).save_job_description(
                         role_owner,
                         target.id,
                         SaveJobDescriptionRequest(
@@ -576,9 +566,7 @@ def test_worker_provider_failures_do_not_persist_analysis(
 
                 async with database.sessionmaker() as session:
                     stored_run = await session.get(AgentRun, setup.run.id)
-                    analysis = await session.get(
-                        JobDescriptionAnalysis, setup.role.id
-                    )
+                    analysis = await session.get(JobDescriptionAnalysis, setup.role.id)
                     assert stored_run is not None
                     assert stored_run.status is expected_status
                     assert stored_run.error_code == error_code
@@ -622,9 +610,9 @@ def test_worker_rejects_result_when_jd_changes_during_provider_call() -> None:
                     assert stored_run is not None
                     assert stored_run.status is AgentRunStatus.FAILED
                     assert stored_run.error_code == "job_description_version_stale"
-                    assert await session.get(
-                        JobDescriptionAnalysis, setup.role.id
-                    ) is None
+                    assert (
+                        await session.get(JobDescriptionAnalysis, setup.role.id) is None
+                    )
                     assert stored_role is not None
                     assert stored_role.raw_job_description == (
                         "Build a new generation of data systems."
@@ -676,9 +664,9 @@ def test_worker_rejects_result_when_current_run_is_replaced() -> None:
                     assert stored_role.job_description_parsing_run_id == (
                         replacement_run.id
                     )
-                    assert await session.get(
-                        JobDescriptionAnalysis, setup.role.id
-                    ) is None
+                    assert (
+                        await session.get(JobDescriptionAnalysis, setup.role.id) is None
+                    )
             finally:
                 provider.release.set()
                 await database.reset()
@@ -705,9 +693,9 @@ def test_worker_rejects_mismatched_agent_result_before_persist() -> None:
                     assert stored_run is not None
                     assert stored_run.status is AgentRunStatus.FAILED
                     assert stored_run.error_code == "agent_run_result_mismatch"
-                    assert await session.get(
-                        JobDescriptionAnalysis, setup.role.id
-                    ) is None
+                    assert (
+                        await session.get(JobDescriptionAnalysis, setup.role.id) is None
+                    )
             finally:
                 await database.reset()
 
@@ -735,18 +723,14 @@ def test_repeated_handler_execution_keeps_first_persisted_analysis() -> None:
 
                 await setup.handler.execute(claimed)
                 async with database.sessionmaker() as session:
-                    first = await session.get(
-                        JobDescriptionAnalysis, setup.role.id
-                    )
+                    first = await session.get(JobDescriptionAnalysis, setup.role.id)
                     assert first is not None
                     first_parsed_at = first.parsed_at
 
                 await setup.handler.execute(claimed)
 
                 async with database.sessionmaker() as session:
-                    analysis = await session.get(
-                        JobDescriptionAnalysis, setup.role.id
-                    )
+                    analysis = await session.get(JobDescriptionAnalysis, setup.role.id)
                     stored_role = await session.get(TargetRole, setup.role.id)
                     stored_run = await session.get(AgentRun, setup.run.id)
                     assert analysis is not None

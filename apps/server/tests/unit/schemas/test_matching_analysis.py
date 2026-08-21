@@ -1,8 +1,8 @@
 from copy import deepcopy
 from uuid import uuid4
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from riva.schemas.matching_analysis import (
     MAX_MATCHING_EDUCATION_ITEMS,
@@ -203,9 +203,7 @@ def test_complete_matching_input_uses_names_and_normalizes_profile_text() -> Non
     )
     assert parsed.career_profile.education[0].school == "Tongji University"
     assert parsed.career_profile.work_experiences[0].location == "Shanghai"
-    assert parsed.career_profile.work_experiences[0].responsibilities == [
-        "Build APIs"
-    ]
+    assert parsed.career_profile.work_experiences[0].responsibilities == ["Build APIs"]
     assert parsed.career_profile.work_experiences[0].skills == ["Python"]
     assert parsed.career_profile.project_experiences[0].role is None
     assert parsed.career_profile.project_experiences[0].skills == ["FastAPI"]
@@ -220,9 +218,7 @@ def test_complete_matching_input_uses_names_and_normalizes_profile_text() -> Non
     "mutate",
     [
         lambda payload: payload.update({"profile_id": str(uuid4())}),
-        lambda payload: payload["career_profile"].update(
-            {"source": "userEdited"}
-        ),
+        lambda payload: payload["career_profile"].update({"source": "userEdited"}),
         lambda payload: payload["career_profile"]["education"][0].update(
             {"id": str(uuid4())}
         ),
@@ -376,7 +372,9 @@ def run_payload(**overrides: object) -> dict[str, object]:
     return payload
 
 
-def test_matching_run_payload_accepts_camel_and_snake_names_and_dumps_camel_case() -> None:
+def test_matching_run_payload_accepts_camel_and_snake_names_and_dumps_camel_case() -> (
+    None
+):
     camel_payload = run_payload()
     parsed = MatchingAnalysisRunPayload.model_validate(camel_payload)
 

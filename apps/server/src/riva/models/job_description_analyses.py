@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
-    JSON,
     Text,
     UniqueConstraint,
 )

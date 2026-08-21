@@ -28,20 +28,31 @@ from riva.schemas.training_records import (
     TargetedPracticeQuestionRecordResponse,
     TargetedPracticeSetupResponse,
     TargetedPracticeTrainingRecordDetailResponse,
+    TargetedPracticeTrainingRecordSummaryResponse,
     TrainingRecordEvaluationResponse,
     TrainingRecordFollowUpResponse,
     TrainingRecordKind,
     TrainingRecordKindOverviewResponse,
     TrainingRecordReviewResponse,
+    TrainingRecordsOverviewResponse,
+    TrainingRecordsPageResponse,
     TrainingRecordStatus,
     TrainingRecordSummaryResponse,
     TrainingRecordTargetRoleResponse,
-    TrainingRecordsOverviewResponse,
-    TrainingRecordsPageResponse,
-    TargetedPracticeTrainingRecordSummaryResponse,
 )
 from riva.services.evaluation_generation import (
     practice_evaluation_output_from_artifact,
+)
+from riva.services.interview_training_records import (
+    TRAINING_RECORD_NOT_FOUND,
+    TRAINING_RECORD_STATE_CONFLICT,
+    InterviewTrainingRecordService,
+    TrainingRecordStateError,
+    TrainingRecordStateErrorCode,
+)
+from riva.services.practice_api import (
+    build_practice_follow_up_reference_answer_response,
+    build_practice_main_reference_answer_response,
 )
 from riva.services.practice_sessions import (
     PRACTICE_SESSION_NOT_FOUND,
@@ -58,19 +69,7 @@ from riva.services.reference_answer_generation import (
     ReferenceAnswerGenerationService,
     ReferenceAnswerGenerationStateError,
 )
-from riva.services.practice_api import (
-    build_practice_follow_up_reference_answer_response,
-    build_practice_main_reference_answer_response,
-)
 from riva.services.review_generation import practice_review_output_from_artifact
-from riva.services.interview_training_records import (
-    TRAINING_RECORD_NOT_FOUND,
-    TRAINING_RECORD_STATE_CONFLICT,
-    InterviewTrainingRecordService,
-    TrainingRecordStateError,
-    TrainingRecordStateErrorCode,
-)
-
 
 PracticeSessionServiceFactory = Callable[..., PracticeSessionService]
 ReferenceAnswerGenerationServiceFactory = Callable[
@@ -160,9 +159,7 @@ class TrainingRecordService:
         )
         total_items = len(items)
         items = items[(page - 1) * page_size : page * page_size]
-        total_pages = (
-            (total_items + page_size - 1) // page_size if total_items else 0
-        )
+        total_pages = (total_items + page_size - 1) // page_size if total_items else 0
         return TrainingRecordsPageResponse(
             items=items,
             pagination={
@@ -226,7 +223,9 @@ class TrainingRecordService:
         return TrainingRecordsOverviewResponse(
             total_record_count=len(records),
             completed_record_count=sum(
-                1 for record in records if record.status == TrainingRecordStatus.COMPLETED
+                1
+                for record in records
+                if record.status == TrainingRecordStatus.COMPLETED
             ),
             total_duration_seconds=sum(record.duration_seconds for record in records),
             answered_question_count=sum(
@@ -257,20 +256,22 @@ class TrainingRecordService:
         started_at_from: datetime | None = None,
         started_at_to: datetime | None = None,
     ) -> list[TrainingRecordSummaryResponse]:
-        eligible_records = _build_eligible_training_records_subquery(
-            user_id=user_id
-        )
+        eligible_records = _build_eligible_training_records_subquery(user_id=user_id)
         statement = select(eligible_records)
         if statuses:
             statement = statement.where(
-                eligible_records.c.record_status.in_([status.value for status in statuses])
+                eligible_records.c.record_status.in_(
+                    [status.value for status in statuses]
+                )
             )
         if target_role_id is not None:
             statement = statement.where(
                 eligible_records.c.target_role_id == target_role_id
             )
         if started_at_from is not None:
-            statement = statement.where(eligible_records.c.started_at >= started_at_from)
+            statement = statement.where(
+                eligible_records.c.started_at >= started_at_from
+            )
         if started_at_to is not None:
             statement = statement.where(eligible_records.c.started_at <= started_at_to)
         rows = (
@@ -333,9 +334,7 @@ class TrainingRecordService:
         except PracticeSessionStateError as error:
             if error.code == PRACTICE_SESSION_NOT_FOUND:
                 raise TrainingRecordStateError(TRAINING_RECORD_NOT_FOUND) from None
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
         try:
             if isinstance(context, PracticeCompletedSessionWorkflowContext):
@@ -358,9 +357,7 @@ class TrainingRecordService:
             ValidationError,
             ReferenceAnswerGenerationStateError,
         ):
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
     def _reference_answer_generation_service(
         self,
@@ -375,9 +372,7 @@ class TrainingRecordService:
     ) -> TargetedPracticeTrainingRecordDetailResponse:
         session = context.session
         self._validate_completed_session(session, expected_reason="reviewCompleted")
-        review_contexts = self._ordered_review_contexts(
-            context.attempt_review_contexts
-        )
+        review_contexts = self._ordered_review_contexts(context.attempt_review_contexts)
         if (
             not review_contexts
             or context.final_attempt.id != review_contexts[-1].attempt.id
@@ -596,9 +591,7 @@ class TrainingRecordService:
         question = self._build_question(
             attempt=attempt,
             card=card,
-            reference_answer=_build_main_reference_answer(
-                main_reference_state
-            ),
+            reference_answer=_build_main_reference_answer(main_reference_state),
         )
         follow_ups = await self._build_follow_ups(
             user_id=user_id,
@@ -627,10 +620,8 @@ class TrainingRecordService:
                 reusable_answer_structure=review_output.reusable_answer_structure,
                 exposed_weaknesses=review_output.exposed_weaknesses,
             )
-        except (AttributeError, TypeError, ValueError, ValidationError):
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+        except AttributeError, TypeError, ValueError, ValidationError:
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
         return TargetedPracticeAttemptRecordResponse(
             attempt_id=attempt.id,
             attempt_number=attempt.attempt_number,
@@ -671,9 +662,7 @@ class TrainingRecordService:
             question=self._build_question(
                 attempt=attempt,
                 card=card,
-                reference_answer=_build_main_reference_answer(
-                    main_reference_state
-                ),
+                reference_answer=_build_main_reference_answer(main_reference_state),
             ),
             main_answer=None,
             follow_ups=[],
@@ -736,11 +725,7 @@ class TrainingRecordService:
                     order=question.order,
                     asked_at=question.created_at,
                     answer=_build_answer_response(answer),
-                    reference_answer=(
-                        _build_follow_up_reference_answer(
-                            state
-                        )
-                    ),
+                    reference_answer=(_build_follow_up_reference_answer(state)),
                 )
             )
 
@@ -761,11 +746,7 @@ class TrainingRecordService:
                     order=pending.order,
                     asked_at=pending.created_at,
                     answer=None,
-                    reference_answer=(
-                        _build_follow_up_reference_answer(
-                            state
-                        )
-                    ),
+                    reference_answer=(_build_follow_up_reference_answer(state)),
                 )
             )
         return result

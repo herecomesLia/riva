@@ -1,11 +1,11 @@
 import asyncio
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.models import AgentRun, PracticeAttempt, PracticeEvaluation, User
@@ -15,7 +15,6 @@ from tests.integration.test_practice_next_question_workflow import (
     produce_first_review,
 )
 from tests.integration.test_practice_retry_workflow import _complete_retry_review
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -85,9 +84,7 @@ def test_practice_completion_public_api_replay_and_current_release() -> None:
                     assert current.status_code == 200
                     assert current.json() == {"session": None}
 
-                    fetched = client.get(
-                        f"/api/practice/sessions/{session_id}"
-                    )
+                    fetched = client.get(f"/api/practice/sessions/{session_id}")
                     assert fetched.status_code == 200
                     assert fetched.json() == body
             finally:

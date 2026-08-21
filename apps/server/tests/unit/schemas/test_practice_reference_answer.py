@@ -7,15 +7,14 @@ from pydantic import TypeAdapter, ValidationError
 from riva.schemas.practice_reference_answer import (
     PracticeFollowUpReferenceAnswerInput,
     PracticeFollowUpReferenceAnswerRunPayload,
+    PracticeMainReferenceAnswerInput,
     PracticeMainReferenceAnswerRunPayload,
-    PracticeReferenceAnswerRunPayload,
     PracticeReferenceAnswerInput,
     PracticeReferenceAnswerOutput,
+    PracticeReferenceAnswerRunPayload,
     PracticeReferenceFrozenContext,
     PracticeReferenceQuestionContext,
-    PracticeMainReferenceAnswerInput,
 )
-
 
 MATERIAL_ID = UUID("11111111-1111-4111-8111-111111111111")
 SECOND_MATERIAL_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -110,9 +109,7 @@ def main_payload(
         "targetRole": role_payload(),
         "question": question_payload(question_type=question_type),
         "candidateEvidence": (
-            [work_evidence(), project_evidence()]
-            if evidence is None
-            else evidence
+            [work_evidence(), project_evidence()] if evidence is None else evidence
         ),
     }
 
@@ -132,9 +129,7 @@ def follow_up_payload(
         "targetRole": role_payload(),
         "question": question_payload(question_type=question_type),
         "candidateEvidence": (
-            [work_evidence(), project_evidence()]
-            if evidence is None
-            else evidence
+            [work_evidence(), project_evidence()] if evidence is None else evidence
         ),
         "mainAnswer": {"content": "我负责了服务边界和上线验证。"},
         "previousFollowUps": [] if previous is None else previous,
@@ -274,9 +269,7 @@ def test_candidate_evidence_ids_must_not_repeat() -> None:
 
 
 def test_candidate_evidence_can_be_empty() -> None:
-    parsed = PracticeMainReferenceAnswerInput.model_validate(
-        main_payload(evidence=[])
-    )
+    parsed = PracticeMainReferenceAnswerInput.model_validate(main_payload(evidence=[]))
 
     assert parsed.candidate_evidence == []
 
@@ -312,9 +305,7 @@ def test_work_and_project_evidence_union_is_valid(
 
 
 def test_follow_up_order_one_requires_no_previous_follow_ups() -> None:
-    parsed = PracticeFollowUpReferenceAnswerInput.model_validate(
-        follow_up_payload()
-    )
+    parsed = PracticeFollowUpReferenceAnswerInput.model_validate(follow_up_payload())
 
     assert parsed.current_follow_up.order == 1
     assert parsed.previous_follow_ups == []
@@ -412,14 +403,13 @@ def test_follow_up_output_requires_addressed_gap() -> None:
 
 
 def test_frozen_context_forbids_extra_fields_and_round_trips_aliases() -> None:
-    parsed = PracticeReferenceFrozenContext.model_validate(
-        frozen_context_payload()
-    )
+    parsed = PracticeReferenceFrozenContext.model_validate(frozen_context_payload())
 
     assert parsed.candidate_evidence == []
-    assert parsed.model_dump(mode="json", by_alias=True)["targetRole"][
-        "rivaSummary"
-    ] == role_payload()["rivaSummary"]
+    assert (
+        parsed.model_dump(mode="json", by_alias=True)["targetRole"]["rivaSummary"]
+        == role_payload()["rivaSummary"]
+    )
     with pytest.raises(ValidationError):
         PracticeReferenceFrozenContext.model_validate(
             {**frozen_context_payload(), "untrusted": True}
@@ -444,13 +434,19 @@ def test_main_reference_answer_run_payload_is_discriminated_and_frozen() -> None
     assert parsed.reference_context.target_role.title == "Backend Engineer"
 
 
-@pytest.mark.parametrize("previous", [[], [
-    {
-        "order": 1,
-        "questionId": str(uuid4()),
-        "answerId": str(uuid4()),
-    }
-]])
+@pytest.mark.parametrize(
+    "previous",
+    [
+        [],
+        [
+            {
+                "order": 1,
+                "questionId": str(uuid4()),
+                "answerId": str(uuid4()),
+            }
+        ],
+    ],
+)
 def test_follow_up_reference_answer_run_payload_supports_q1_and_q2_lineage(
     previous: list[dict[str, object]],
 ) -> None:
@@ -473,7 +469,9 @@ def test_follow_up_reference_answer_run_payload_supports_q1_and_q2_lineage(
     ]
 
 
-def test_follow_up_reference_answer_run_payload_rejects_lineage_gaps_and_extras() -> None:
+def test_follow_up_reference_answer_run_payload_rejects_lineage_gaps_and_extras() -> (
+    None
+):
     payload = {
         "targetType": "followUp",
         "questionCardId": str(uuid4()),

@@ -134,7 +134,9 @@ class AuthService:
             )
 
         refreshed = False
-        refresh_after = timedelta(seconds=self.settings.session_refresh_interval_seconds)
+        refresh_after = timedelta(
+            seconds=self.settings.session_refresh_interval_seconds
+        )
         if auth_session.last_seen_at + refresh_after <= now:
             auth_session.last_seen_at = now
             auth_session.expires_at = self._expires_at(now)
@@ -195,14 +197,18 @@ def _normalize_registration_username(username: str) -> str:
     try:
         return normalize_username(username)
     except ValueError as exc:
-        raise APIError(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_username") from exc
+        raise APIError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_username"
+        ) from exc
 
 
 def _validate_registration_password(password: str) -> None:
     try:
         validate_password(password)
     except ValueError as exc:
-        raise APIError(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_password") from exc
+        raise APIError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_password"
+        ) from exc
 
 
 def _invalid_credentials() -> APIError:

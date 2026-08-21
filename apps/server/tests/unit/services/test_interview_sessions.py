@@ -16,7 +16,6 @@ from riva.services.interview_sessions import (
     InterviewSessionStateError,
 )
 
-
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 
 

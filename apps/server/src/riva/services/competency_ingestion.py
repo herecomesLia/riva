@@ -16,8 +16,8 @@ from riva.models import (
     PracticeReview,
     PracticeSession,
 )
-from riva.services.competency_aggregation import CompetencyAggregationService
 from riva.services.competencies import CompetencyService
+from riva.services.competency_aggregation import CompetencyAggregationService
 from riva.services.competency_catalog import (
     competency_key_for_dimension,
     display_name_for_competency_key,
@@ -41,8 +41,8 @@ class CompetencyIngestionService:
     ) -> None:
         self.session = session
         self.competency_service = CompetencyService(session)
-        self.competency_aggregation_service = (
-            competency_aggregation_service_factory(session)
+        self.competency_aggregation_service = competency_aggregation_service_factory(
+            session
         )
 
     async def ingest_practice_evaluation(

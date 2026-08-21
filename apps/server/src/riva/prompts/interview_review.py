@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_review import InterviewReviewOutput
 
-
 INTERVIEW_REVIEW_PROMPT = PromptDefinition(
     prompt_id="interview-review",
     version="2",

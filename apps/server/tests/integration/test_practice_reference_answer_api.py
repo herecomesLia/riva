@@ -33,7 +33,6 @@ from tests.integration.test_question_generation import (
     seed_context,
 )
 
-
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 START = datetime(2026, 8, 14, 9, 30, tzinfo=UTC)
@@ -185,16 +184,21 @@ def test_practice_reference_answer_http_main_lifecycle_and_browser_recovery() ->
 
                     generating = client.get("/api/practice/sessions/current")
                     assert generating.status_code == 200
-                    assert generating.json()["session"]["question"][
-                        "referenceAnswer"
-                    ]["status"] == "generating"
+                    assert (
+                        generating.json()["session"]["question"]["referenceAnswer"][
+                            "status"
+                        ]
+                        == "generating"
+                    )
 
                     provider = FakeLLMProvider(
                         [main_reference_response()],
                         provider="fake-reference-provider",
                         usage=LLMUsage(input_tokens=30, output_tokens=20),
                     )
-                    assert await build_reference_worker(database, provider).process_one()
+                    assert await build_reference_worker(
+                        database, provider
+                    ).process_one()
 
                     refreshed = client.post(
                         f"/api/practice/sessions/{session_id}/questions/reference-answer/refresh",
@@ -214,15 +218,16 @@ def test_practice_reference_answer_http_main_lifecycle_and_browser_recovery() ->
                         "commonMistakes": ["Inventing an unsupported metric."],
                         "generatedAt": reference["content"]["generatedAt"],
                     }
-                    assert reference["content"]["generatedAt"].endswith("+00:00") or reference[
-                        "content"
-                    ]["generatedAt"].endswith("Z")
+                    assert reference["content"]["generatedAt"].endswith(
+                        "+00:00"
+                    ) or reference["content"]["generatedAt"].endswith("Z")
 
                     recovered = client.get("/api/practice/sessions/current")
                     assert recovered.status_code == 200
-                    assert recovered.json()["session"]["question"][
-                        "referenceAnswer"
-                    ] == reference
+                    assert (
+                        recovered.json()["session"]["question"]["referenceAnswer"]
+                        == reference
+                    )
 
                     replay = client.post(
                         f"/api/practice/sessions/{session_id}/questions/reference-answer/refresh",
@@ -234,9 +239,9 @@ def test_practice_reference_answer_http_main_lifecycle_and_browser_recovery() ->
 
                     async with database.sessionmaker() as session:
                         artifact_count = await session.scalar(
-                            select(func.count()).select_from(
-                                PracticeReferenceAnswerArtifact
-                            ).where(
+                            select(func.count())
+                            .select_from(PracticeReferenceAnswerArtifact)
+                            .where(
                                 PracticeReferenceAnswerArtifact.question_card_id
                                 == UUID(question_id),
                                 PracticeReferenceAnswerArtifact.target_type == "main",
@@ -249,7 +254,9 @@ def test_practice_reference_answer_http_main_lifecycle_and_browser_recovery() ->
     asyncio.run(run_test())
 
 
-def test_practice_reference_answer_http_recovers_after_main_submit_before_worker() -> None:
+def test_practice_reference_answer_http_recovers_after_main_submit_before_worker() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
@@ -303,7 +310,9 @@ def test_practice_reference_answer_http_recovers_after_main_submit_before_worker
                         [main_reference_response()],
                         provider="fake-reference-provider",
                     )
-                    assert await build_reference_worker(database, provider).process_one()
+                    assert await build_reference_worker(
+                        database, provider
+                    ).process_one()
 
                     recovered = client.get("/api/practice/sessions/current")
                     assert recovered.status_code == 200
@@ -313,10 +322,16 @@ def test_practice_reference_answer_http_recovers_after_main_submit_before_worker
                     assert recovered_body["question"]["referenceAnswer"]["status"] == (
                         "revealed"
                     )
-                    assert recovered_body["question"]["referenceAnswer"][
-                        "viewedBeforeSubmission"
-                    ] is False
-                    assert "I owned the rollout" not in provider.calls[0].messages[-1].content
+                    assert (
+                        recovered_body["question"]["referenceAnswer"][
+                            "viewedBeforeSubmission"
+                        ]
+                        is False
+                    )
+                    assert (
+                        "I owned the rollout"
+                        not in provider.calls[0].messages[-1].content
+                    )
             finally:
                 await database.reset()
 
@@ -359,9 +374,10 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
                     assert main_revealed.status_code == 200
-                    assert main_revealed.json()["question"]["referenceAnswer"][
-                        "status"
-                    ] == "revealed"
+                    assert (
+                        main_revealed.json()["question"]["referenceAnswer"]["status"]
+                        == "revealed"
+                    )
                     main_submitted = client.post(
                         f"/api/practice/sessions/{session_id}/answers/main",
                         json={
@@ -391,9 +407,12 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     assert q1_ready_body["status"] == "answeringFollowUp"
                     assert q1_ready_body["version"] == 5
                     q1_id = q1_ready_body["currentFollowUp"]["question"]["id"]
-                    assert q1_ready_body["currentFollowUp"]["question"][
-                        "referenceAnswer"
-                    ]["status"] == "notRequested"
+                    assert (
+                        q1_ready_body["currentFollowUp"]["question"]["referenceAnswer"][
+                            "status"
+                        ]
+                        == "notRequested"
+                    )
 
                     q1_requested = client.post(
                         f"/api/practice/sessions/{session_id}/follow-ups/reference-answer",
@@ -406,9 +425,12 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     )
                     assert q1_requested.status_code == 202, q1_requested.json()
                     assert q1_requested.json()["version"] == 6
-                    assert q1_requested.json()["currentFollowUp"]["question"][
-                        "referenceAnswer"
-                    ]["status"] == "generating"
+                    assert (
+                        q1_requested.json()["currentFollowUp"]["question"][
+                            "referenceAnswer"
+                        ]["status"]
+                        == "generating"
+                    )
 
                     assert await build_reference_worker(
                         database,
@@ -448,9 +470,12 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     )
                     assert q1_answered.status_code == 202
                     assert q1_answered.json()["version"] == 7
-                    assert q1_answered.json()["followUpExchanges"][0]["question"][
-                        "referenceAnswer"
-                    ]["status"] == "revealed"
+                    assert (
+                        q1_answered.json()["followUpExchanges"][0]["question"][
+                            "referenceAnswer"
+                        ]["status"]
+                        == "revealed"
+                    )
 
                     assert await build_follow_up_worker(
                         database,
@@ -469,10 +494,15 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
                     assert q2_body["version"] == 8
                     q2_id = q2_body["currentFollowUp"]["question"]["id"]
                     assert q2_id != q1_id
-                    assert q2_body["followUpExchanges"][0]["question"][
+                    assert (
+                        q2_body["followUpExchanges"][0]["question"]["referenceAnswer"][
+                            "status"
+                        ]
+                        == "revealed"
+                    )
+                    assert q2_body["currentFollowUp"]["question"][
                         "referenceAnswer"
-                    ]["status"] == "revealed"
-                    assert q2_body["currentFollowUp"]["question"]["referenceAnswer"] == {
+                    ] == {
                         "status": "notRequested",
                         "content": None,
                         "viewedBeforeSubmission": False,
@@ -480,9 +510,9 @@ def test_practice_reference_answer_http_follow_up_q1_q2_lineage() -> None:
 
                     async with database.sessionmaker() as session:
                         q1_artifacts = await session.scalar(
-                            select(func.count()).select_from(
-                                PracticeReferenceAnswerArtifact
-                            ).where(
+                            select(func.count())
+                            .select_from(PracticeReferenceAnswerArtifact)
+                            .where(
                                 PracticeReferenceAnswerArtifact.question_card_id
                                 == UUID(question_id),
                                 PracticeReferenceAnswerArtifact.follow_up_question_id

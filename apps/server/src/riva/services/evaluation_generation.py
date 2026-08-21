@@ -47,7 +47,6 @@ from riva.services.follow_up_generation import (
 )
 from riva.utils import utc_now
 
-
 EvaluationGenerationStateErrorCode = Literal[
     "invalid_practice_evaluation_run",
     "practice_evaluation_attempt_not_found",
@@ -104,9 +103,7 @@ class _EvaluationContext:
     question_card: QuestionCard
     main_answer: PracticeAnswer
     terminal_decision: PracticeFollowUpDecision
-    follow_up_exchanges: tuple[
-        tuple[PracticeFollowUpQuestion, PracticeAnswer], ...
-    ]
+    follow_up_exchanges: tuple[tuple[PracticeFollowUpQuestion, PracticeAnswer], ...]
     unanswered_follow_up_question: PracticeFollowUpQuestion | None
     input: EvaluationInput
 
@@ -120,9 +117,7 @@ class _ValidatedFollowUpSource:
 @dataclass(frozen=True)
 class _ValidatedEvaluationFollowUpSnapshot:
     terminal_decision: PracticeFollowUpDecision
-    completed_exchanges: tuple[
-        tuple[PracticeFollowUpQuestion, PracticeAnswer], ...
-    ]
+    completed_exchanges: tuple[tuple[PracticeFollowUpQuestion, PracticeAnswer], ...]
     unanswered_question: PracticeFollowUpQuestion | None
     completion_reason: PracticeEvaluationFollowUpCompletionReason
 
@@ -146,10 +141,8 @@ def validate_evaluation_generation_run(
         raise EvaluationGenerationStateError(INVALID_PRACTICE_EVALUATION_RUN)
     try:
         return EvaluationRunPayload.model_validate(run.payload)
-    except (TypeError, ValidationError):
-        raise EvaluationGenerationStateError(
-            INVALID_PRACTICE_EVALUATION_RUN
-        ) from None
+    except TypeError, ValidationError:
+        raise EvaluationGenerationStateError(INVALID_PRACTICE_EVALUATION_RUN) from None
 
 
 def practice_evaluation_output_from_artifact(
@@ -167,7 +160,7 @@ def practice_evaluation_output_from_artifact(
                 "focus_assessments": evaluation.focus_assessments,
             }
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError("persisted practice evaluation is malformed") from None
 
     if scoring_focus_count is not None:
@@ -202,9 +195,7 @@ class EvaluationGenerationService:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.agent_run_service_factory = agent_run_service_factory
-        self.competency_ingestion_service_factory = (
-            competency_ingestion_service_factory
-        )
+        self.competency_ingestion_service_factory = competency_ingestion_service_factory
         self.clock = clock
 
     async def enqueue_generation(
@@ -272,9 +263,7 @@ class EvaluationGenerationService:
         run: AgentRun,
     ) -> EvaluationInput:
         try:
-            evaluation_input = await self.load_generation_input_in_transaction(
-                run
-            )
+            evaluation_input = await self.load_generation_input_in_transaction(run)
             await self.session.commit()
             return evaluation_input
         except Exception:
@@ -335,9 +324,7 @@ class EvaluationGenerationService:
                 try:
                     canonical = practice_evaluation_output_from_artifact(
                         existing,
-                        scoring_focus_count=len(
-                            context.input.question.scoring_focus
-                        ),
+                        scoring_focus_count=len(context.input.question.scoring_focus),
                     )
                 except ValueError:
                     raise EvaluationGenerationStateError(
@@ -404,9 +391,7 @@ class EvaluationGenerationService:
     ) -> _EvaluationContext:
         reason = _completion_reason(follow_up_completion_reason)
         if interaction_language not in INTERACTION_LANGUAGES:
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_CONTEXT_CONFLICT
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_CONTEXT_CONFLICT)
 
         attempt_statement = select(PracticeAttempt).where(
             PracticeAttempt.id == attempt_id,
@@ -414,9 +399,7 @@ class EvaluationGenerationService:
         )
         attempt = await self._scalar(attempt_statement, for_update=False)
         if attempt is None:
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_ATTEMPT_NOT_FOUND
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_ATTEMPT_NOT_FOUND)
 
         session_statement = select(PracticeSession).where(
             PracticeSession.id == attempt.session_id,
@@ -426,17 +409,10 @@ class EvaluationGenerationService:
             session_statement,
             for_update=for_update,
         )
-        if (
-            practice_session is None
-            or practice_session.status != "active"
-        ):
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_SESSION_NOT_ACTIVE
-            )
+        if practice_session is None or practice_session.status != "active":
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_SESSION_NOT_ACTIVE)
         if practice_session.language != interaction_language:
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_CONTEXT_CONFLICT
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_CONTEXT_CONFLICT)
 
         if for_update:
             attempt = await self._scalar(attempt_statement, for_update=True)
@@ -455,9 +431,7 @@ class EvaluationGenerationService:
             else attempt.question_card_id
         )
         if question_card_id is None or attempt.question_card_id != question_card_id:
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_QUESTION_NOT_READY
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_QUESTION_NOT_READY)
         card_statement = select(QuestionCard).where(
             QuestionCard.id == question_card_id,
         )
@@ -467,9 +441,7 @@ class EvaluationGenerationService:
             attempt=attempt,
             practice_session=practice_session,
         ):
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_QUESTION_NOT_READY
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_QUESTION_NOT_READY)
         question_context = _question_context_from_card(question_card)
 
         answers = await self._all_answers(attempt.id, for_update=for_update)
@@ -500,9 +472,7 @@ class EvaluationGenerationService:
 
         terminal_decision = _terminal_decision(
             decisions,
-            payload.terminal_follow_up_decision_id
-            if payload is not None
-            else None,
+            payload.terminal_follow_up_decision_id if payload is not None else None,
         )
         follow_up_snapshot = _validate_completion_graph(
             reason=reason,
@@ -530,7 +500,7 @@ class EvaluationGenerationService:
                 ],
                 follow_up_completion_reason=reason,
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise EvaluationGenerationStateError(
                 PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
             ) from None
@@ -557,9 +527,7 @@ class EvaluationGenerationService:
         decisions: list[PracticeFollowUpDecision],
         for_update: bool,
     ) -> dict[UUID, _ValidatedFollowUpSource]:
-        source_ids = {
-            decision.source_agent_run_id for decision in decisions
-        }
+        source_ids = {decision.source_agent_run_id for decision in decisions}
         source_ids.update(question.source_agent_run_id for question in questions)
         source_statement = select(AgentRun).where(AgentRun.id.in_(source_ids))
         source_runs = await self._scalars(
@@ -699,7 +667,7 @@ def _validate_follow_up_source(
             attempt.id,
             payload.next_follow_up_order,
         )
-    except (FollowUpGenerationStateError, TypeError, ValueError, ValidationError):
+    except FollowUpGenerationStateError, TypeError, ValueError, ValidationError:
         raise EvaluationGenerationStateError(
             PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
         ) from None
@@ -722,7 +690,7 @@ def _completion_reason(
 ) -> PracticeEvaluationFollowUpCompletionReason:
     try:
         return PracticeEvaluationFollowUpCompletionReason(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise EvaluationGenerationStateError(
             PRACTICE_EVALUATION_CONTEXT_CONFLICT
         ) from None
@@ -731,9 +699,7 @@ def _completion_reason(
 def _payload_from_context(context: _EvaluationContext) -> EvaluationRunPayload:
     first = context.follow_up_exchanges[0] if context.follow_up_exchanges else None
     second = (
-        context.follow_up_exchanges[1]
-        if len(context.follow_up_exchanges) > 1
-        else None
+        context.follow_up_exchanges[1] if len(context.follow_up_exchanges) > 1 else None
     )
     return EvaluationRunPayload(
         attempt_id=context.attempt.id,
@@ -764,8 +730,7 @@ def _question_card_matches(
         question_card.user_id == attempt.user_id
         and question_card.target_role_id == practice_session.target_role_id
         and question_card.language == practice_session.language
-        and question_card.question_type
-        == practice_session.initial_question_type
+        and question_card.question_type == practice_session.initial_question_type
         and question_card.difficulty == practice_session.initial_difficulty
         and question_card.question_type == attempt.question_type
         and question_card.difficulty == attempt.difficulty
@@ -785,7 +750,7 @@ def _question_context_from_card(
                 "scoring_focus": question_card.scoring_focus,
             }
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise EvaluationGenerationStateError(
             PRACTICE_EVALUATION_QUESTION_NOT_READY
         ) from None
@@ -804,14 +769,10 @@ def _main_answer_from_answers(
         and answer.follow_up_question_id is None
     ]
     if len(main_answers) != 1:
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_MAIN_ANSWER_NOT_READY
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_MAIN_ANSWER_NOT_READY)
     main_answer = main_answers[0]
     if expected_id is not None and main_answer.id != expected_id:
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_CONTEXT_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_CONTEXT_CONFLICT)
     return main_answer
 
 
@@ -826,7 +787,7 @@ def _answer_content(
             str,
             TypeAdapter(PracticeAnswerContent).validate_python(answer.content),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise EvaluationGenerationStateError(error_code) from None
 
 
@@ -843,9 +804,7 @@ def _terminal_decision(
     for decision in decisions:
         if decision.id == expected_id:
             return decision
-    raise EvaluationGenerationStateError(
-        PRACTICE_EVALUATION_CONTEXT_CONFLICT
-    )
+    raise EvaluationGenerationStateError(PRACTICE_EVALUATION_CONTEXT_CONFLICT)
 
 
 def _validate_completion_graph(
@@ -864,7 +823,8 @@ def _validate_completion_graph(
         if answer.kind == PracticeAnswerKind.FOLLOW_UP.value
     ]
     if any(
-        answer.kind not in {
+        answer.kind
+        not in {
             PracticeAnswerKind.MAIN.value,
             PracticeAnswerKind.FOLLOW_UP.value,
         }
@@ -913,9 +873,7 @@ def _validate_completion_graph(
                 )
             )
         ):
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_CONTEXT_CONFLICT
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_CONTEXT_CONFLICT)
         return _ValidatedEvaluationFollowUpSnapshot(
             terminal_decision=terminal_decision,
             completed_exchanges=(),
@@ -924,16 +882,16 @@ def _validate_completion_graph(
         )
 
     if not ordered_questions or len(ordered_questions) not in (1, 2):
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_COMPLETION_CONFLICT)
 
     answer_by_question: dict[UUID, PracticeAnswer] = {}
     for answer in follow_up_answers:
         if (
             answer.follow_up_question_id is None
             or answer.follow_up_question_id in answer_by_question
-            or answer.order != 1 + _question_order(
+            or answer.order
+            != 1
+            + _question_order(
                 answer.follow_up_question_id,
                 ordered_questions,
             )
@@ -964,7 +922,7 @@ def _validate_completion_graph(
                     focus=question.focus,
                     answer=answer_content,
                 )
-            except (TypeError, ValueError, ValidationError):
+            except TypeError, ValueError, ValidationError:
                 raise EvaluationGenerationStateError(
                     PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID
                 ) from None
@@ -973,9 +931,7 @@ def _validate_completion_graph(
 
     decisions_by_order = {decision.order: decision for decision in decisions}
     if len(decisions_by_order) != len(decisions):
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_COMPLETION_CONFLICT)
 
     first_decision = decisions_by_order.get(1)
     if (
@@ -983,9 +939,7 @@ def _validate_completion_graph(
         or first_decision.action != "askFollowUp"
         or first_decision.follow_up_question_id != ordered_questions[0].id
     ):
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_COMPLETION_CONFLICT)
     _validate_follow_up_decision_payload(
         first_decision,
         follow_up_sources=follow_up_sources,
@@ -1028,8 +982,7 @@ def _validate_completion_graph(
             )
             if (
                 second_decision.action != "askFollowUp"
-                or second_decision.follow_up_question_id
-                != unanswered_question.id
+                or second_decision.follow_up_question_id != unanswered_question.id
             ):
                 raise EvaluationGenerationStateError(
                     PRACTICE_EVALUATION_COMPLETION_CONFLICT
@@ -1040,9 +993,7 @@ def _validate_completion_graph(
                 PRACTICE_EVALUATION_COMPLETION_CONFLICT
             )
         if requested_terminal_decision.id != terminal_decision.id:
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_CONTEXT_CONFLICT
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_CONTEXT_CONFLICT)
         if payload is not None:
             expected_pairs = [
                 (question_id, answer_id)
@@ -1058,12 +1009,9 @@ def _validate_completion_graph(
                 )
                 if question_id is not None
             ]
-            actual_pairs = [
-                (question.id, answer.id) for question, answer in exchanges
-            ]
+            actual_pairs = [(question.id, answer.id) for question, answer in exchanges]
             if (
-                payload.unanswered_follow_up_question_id
-                != unanswered_question.id
+                payload.unanswered_follow_up_question_id != unanswered_question.id
                 or expected_pairs != actual_pairs
             ):
                 raise EvaluationGenerationStateError(
@@ -1077,16 +1025,12 @@ def _validate_completion_graph(
         )
 
     if len(follow_up_answers) != len(ordered_questions) or len(decisions) != 2:
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_COMPLETION_CONFLICT)
     exchanges = build_exchanges(ordered_questions)
     second_decision = decisions_by_order.get(2)
     first_answer = answer_by_question.get(ordered_questions[0].id)
     if second_decision is None or first_answer is None:
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_COMPLETION_CONFLICT)
     _validate_follow_up_decision_payload(
         second_decision,
         follow_up_sources=follow_up_sources,
@@ -1109,9 +1053,7 @@ def _validate_completion_graph(
         or terminal_decision.id != second_decision.id
         or terminal_decision.order != 2
     ):
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_COMPLETION_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_COMPLETION_CONFLICT)
 
     if payload is not None:
         expected_pairs = [
@@ -1133,9 +1075,7 @@ def _validate_completion_graph(
             payload.unanswered_follow_up_question_id is not None
             or expected_pairs != actual_pairs
         ):
-            raise EvaluationGenerationStateError(
-                PRACTICE_EVALUATION_CONTEXT_CONFLICT
-            )
+            raise EvaluationGenerationStateError(PRACTICE_EVALUATION_CONTEXT_CONFLICT)
     return _ValidatedEvaluationFollowUpSnapshot(
         terminal_decision=second_decision,
         completed_exchanges=tuple(exchanges),
@@ -1161,8 +1101,7 @@ def _validate_follow_up_decision_payload(
     if (
         decision.order != expected_order
         or source_payload.next_follow_up_order != expected_order
-        or source_payload.previous_follow_up_question_id
-        != previous_question_id
+        or source_payload.previous_follow_up_question_id != previous_question_id
         or source_payload.previous_follow_up_answer_id != previous_answer_id
     ):
         raise EvaluationGenerationStateError(
@@ -1185,7 +1124,7 @@ def _question_order(
 def _validate_output(output: object) -> PracticeEvaluationOutput:
     try:
         return PracticeEvaluationOutput.model_validate(output)
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise EvaluationGenerationStateError(
             PRACTICE_EVALUATION_ARTIFACT_CONFLICT
         ) from None
@@ -1195,13 +1134,9 @@ def _validate_focus_indices(
     output: PracticeEvaluationOutput,
     scoring_focus_count: int,
 ) -> None:
-    actual_indices = [
-        assessment.focus_index for assessment in output.focus_assessments
-    ]
+    actual_indices = [assessment.focus_index for assessment in output.focus_assessments]
     if actual_indices != list(range(scoring_focus_count)):
-        raise EvaluationGenerationStateError(
-            PRACTICE_EVALUATION_ARTIFACT_CONFLICT
-        )
+        raise EvaluationGenerationStateError(PRACTICE_EVALUATION_ARTIFACT_CONFLICT)
 
 
 def _require_aware_datetime(value: datetime) -> None:

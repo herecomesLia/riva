@@ -1,7 +1,14 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, StrictFloat, StrictInt, StrictStr, field_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    field_validator,
+)
 
 from riva.schemas.base import APIModel
 from riva.schemas.interview import InterviewRound

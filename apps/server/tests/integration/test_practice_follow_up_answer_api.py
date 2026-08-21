@@ -37,19 +37,22 @@ from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_practice_answer_api import (
     TRUSTED_ORIGIN,
     ask_output,
-    build_worker as build_answer_worker,
     evaluation_output,
     settings,
     start_answering,
 )
+from tests.integration.test_practice_answer_api import (
+    build_worker as build_answer_worker,
+)
 from tests.integration.test_practice_review_workflow import (
     build_worker as build_review_worker,
+)
+from tests.integration.test_practice_review_workflow import (
     complete_required_reference_answers,
     recommendation_output,
     review_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 
@@ -230,7 +233,9 @@ async def complete_downstream_pipeline(
     return final.json()
 
 
-def test_follow_up_answer_api_one_exchange_projects_all_answered_and_downstream_review() -> None:
+def test_follow_up_answer_api_one_exchange_projects_all_answered_and_downstream_review() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
@@ -280,9 +285,10 @@ def test_follow_up_answer_api_one_exchange_projects_all_answered_and_downstream_
                     )
                     assert replay.status_code == 202
                     assert replay.json() == a1_body
-                    assert client.get(
-                        "/api/practice/sessions/current"
-                    ).json()["session"] == a1_body
+                    assert (
+                        client.get("/api/practice/sessions/current").json()["session"]
+                        == a1_body
+                    )
                     changed_replay = client.post(
                         f"/api/practice/sessions/{session_id}/answers/follow-up",
                         json={
@@ -442,9 +448,10 @@ def test_follow_up_answer_api_two_exchanges_replays_a2_without_order3() -> None:
                     assert q2["version"] == 6
                     assert len(q2["followUpExchanges"]) == 1
                     q2_id = q2["currentFollowUp"]["question"]["id"]
-                    assert client.get(
-                        "/api/practice/sessions/current"
-                    ).json()["session"] == q2
+                    assert (
+                        client.get("/api/practice/sessions/current").json()["session"]
+                        == q2
+                    )
 
                     a2 = client.post(
                         f"/api/practice/sessions/{session_id}/answers/follow-up",
@@ -493,9 +500,10 @@ def test_follow_up_answer_api_two_exchanges_replays_a2_without_order3() -> None:
                     assert wrong_question_replay.json() == {
                         "error": "practice_session_version_conflict"
                     }
-                    assert client.get(
-                        "/api/practice/sessions/current"
-                    ).json()["session"] == a2_body
+                    assert (
+                        client.get("/api/practice/sessions/current").json()["session"]
+                        == a2_body
+                    )
 
                     graph = await load_graph(
                         database,
@@ -507,7 +515,8 @@ def test_follow_up_answer_api_two_exchanges_replays_a2_without_order3() -> None:
                     assert len(graph["decisions"]) == 2
                     assert len(graph["runs"]) == 2
                     assert {
-                        run.idempotency_key for run in graph["runs"]  # type: ignore[union-attr]
+                        run.idempotency_key
+                        for run in graph["runs"]  # type: ignore[union-attr]
                     } == {
                         practice_follow_up_idempotency_key(
                             graph["attempt"].id,  # type: ignore[union-attr]
@@ -572,7 +581,9 @@ class FailingFollowUpGenerationService:
         raise ValueError("missing follow-up model")
 
 
-def test_follow_up_answer_api_rolls_back_a1_when_order2_enqueue_is_unavailable() -> None:
+def test_follow_up_answer_api_rolls_back_a1_when_order2_enqueue_is_unavailable() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
@@ -590,12 +601,16 @@ def test_follow_up_answer_api_rolls_back_a1_when_order2_enqueue_is_unavailable()
                         llm_provider="qwen",
                         llm_model="fake-practice-model",
                         practice_service_factory=(
-                            lambda service_session, **service_kwargs: PracticeSessionService(
-                                service_session,
-                                follow_up_generation_service_factory=(
-                                    lambda _session, **_kwargs: FailingFollowUpGenerationService()
-                                ),
-                                **service_kwargs,
+                            lambda service_session, **service_kwargs: (
+                                PracticeSessionService(
+                                    service_session,
+                                    follow_up_generation_service_factory=(
+                                        lambda _session, **_kwargs: (
+                                            FailingFollowUpGenerationService()
+                                        )
+                                    ),
+                                    **service_kwargs,
+                                )
                             )
                         ),
                     )
@@ -615,9 +630,9 @@ def test_follow_up_answer_api_rolls_back_a1_when_order2_enqueue_is_unavailable()
                         json={
                             "version": 4,
                             "questionId": q1["question"]["id"],  # type: ignore[index]
-                            "followUpQuestionId": q1["currentFollowUp"][
-                                "question"
-                            ]["id"],  # type: ignore[index]
+                            "followUpQuestionId": q1["currentFollowUp"]["question"][
+                                "id"
+                            ],  # type: ignore[index]
                             "content": "This must roll back.",
                         },
                         headers=headers(),

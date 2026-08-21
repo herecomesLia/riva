@@ -16,7 +16,6 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 
-
 CORE_DIMENSIONS = [
     "relevance",
     "structure",
@@ -143,8 +142,7 @@ def test_output_accepts_score_boundaries(score: int) -> None:
             **output_payload(),
             "overallScore": score,
             "dimensionScores": [
-                dimension_score(dimension, score=score)
-                for dimension in CORE_DIMENSIONS
+                dimension_score(dimension, score=score) for dimension in CORE_DIMENSIONS
             ],
         }
     )
@@ -335,9 +333,7 @@ def evaluation_run_payload(
         "terminalFollowUpDecisionId": "00000000-0000-4000-8000-000000000004",
     }
     if unanswered_question:
-        payload["unansweredFollowUpQuestionId"] = (
-            "00000000-0000-4000-8000-000000000031"
-        )
+        payload["unansweredFollowUpQuestionId"] = "00000000-0000-4000-8000-000000000031"
     if include_first:
         payload.update(
             {
@@ -358,11 +354,14 @@ def evaluation_run_payload(
 def test_evaluation_run_payload_is_camel_case_and_excludes_absent_follow_ups() -> None:
     parsed = EvaluationRunPayload.model_validate(evaluation_run_payload())
 
-    assert parsed.model_dump(
-        mode="json",
-        by_alias=True,
-        exclude_none=True,
-    ) == evaluation_run_payload()
+    assert (
+        parsed.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_none=True,
+        )
+        == evaluation_run_payload()
+    )
 
 
 @pytest.mark.parametrize(

@@ -5,9 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
-from riva.core.app import create_app
 from riva.db.database import Database
 from riva.models import (
     CompetencyEvidence,
@@ -18,7 +18,6 @@ from riva.models import (
 )
 from riva.services.competencies import CompetencyService
 from tests.helpers.integration_database import get_integration_database_url
-
 
 pytestmark = pytest.mark.integration
 
@@ -70,9 +69,7 @@ def test_dashboard_api_is_authenticated_isolated_and_read_only() -> None:
                     )
                     session.add(role)
                     await session.flush()
-                    session.add(
-                        CurrentTargetRole(user_id=owner.id, role_id=role.id)
-                    )
+                    session.add(CurrentTargetRole(user_id=owner.id, role_id=role.id))
                     await session.commit()
 
                     competency = await CompetencyService(
@@ -98,9 +95,7 @@ def test_dashboard_api_is_authenticated_isolated_and_read_only() -> None:
                     await session.commit()
 
                     before = await session.scalar(
-                        select(UserCompetency).where(
-                            UserCompetency.id == competency.id
-                        )
+                        select(UserCompetency).where(UserCompetency.id == competency.id)
                     )
                     assert before is not None
                     before_state = (
@@ -170,9 +165,7 @@ def test_dashboard_api_is_authenticated_isolated_and_read_only() -> None:
 
                 async with database.sessionmaker() as session:
                     after = await session.scalar(
-                        select(UserCompetency).where(
-                            UserCompetency.id == competency.id
-                        )
+                        select(UserCompetency).where(UserCompetency.id == competency.id)
                     )
                     assert after is not None
                     assert (
@@ -181,11 +174,14 @@ def test_dashboard_api_is_authenticated_isolated_and_read_only() -> None:
                         after.evidence_count,
                         after.updated_at,
                     ) == before_state
-                    assert await session.scalar(
-                        select(CompetencyEvidence.id).where(
-                            CompetencyEvidence.competency_id == competency.id
+                    assert (
+                        await session.scalar(
+                            select(CompetencyEvidence.id).where(
+                                CompetencyEvidence.competency_id == competency.id
+                            )
                         )
-                    ) is not None
+                        is not None
+                    )
             finally:
                 await database.reset()
 

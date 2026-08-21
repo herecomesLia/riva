@@ -11,7 +11,6 @@ from riva.models import CompetencyEvidence, User, UserCompetency
 from riva.services.competencies import CompetencyService
 from tests.helpers.integration_database import get_integration_database_url
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -111,9 +110,9 @@ def test_competency_models_persist_with_ownership_and_db_constraints() -> None:
                     assert competency.level is None
                     assert competency.confidence == 0
                     assert competency.trend == "insufficient"
-                    assert len(
-                        await service.list_evidence(owner_id, competency_id)
-                    ) == 2
+                    assert (
+                        len(await service.list_evidence(owner_id, competency_id)) == 2
+                    )
 
                     with pytest.raises(ValueError, match="does not belong"):
                         await service.add_evidence(

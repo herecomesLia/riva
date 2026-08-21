@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.evaluation import PracticeEvaluationOutput
 
-
 PRACTICE_EVALUATION_PROMPT = PromptDefinition(
     prompt_id="practice-evaluator",
     version="1",

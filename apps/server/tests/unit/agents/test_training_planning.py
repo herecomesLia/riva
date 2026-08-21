@@ -162,17 +162,29 @@ def test_unsupported_targeted_question_type_is_invalid_structured_output() -> No
         (
             "round",
             "final",
-            {"rounds": ["technical"], "difficulties": ["basic"], "durationMinutes": [15]},
+            {
+                "rounds": ["technical"],
+                "difficulties": ["basic"],
+                "durationMinutes": [15],
+            },
         ),
         (
             "difficulty",
             "pressure",
-            {"rounds": ["technical"], "difficulties": ["basic"], "durationMinutes": [15]},
+            {
+                "rounds": ["technical"],
+                "difficulties": ["basic"],
+                "durationMinutes": [15],
+            },
         ),
         (
             "durationMinutes",
             30,
-            {"rounds": ["technical"], "difficulties": ["basic"], "durationMinutes": [15]},
+            {
+                "rounds": ["technical"],
+                "difficulties": ["basic"],
+                "durationMinutes": [15],
+            },
         ),
     ],
 )
@@ -225,6 +237,4 @@ def test_unavailable_training_mode_is_rejected_as_invalid_structured_output() ->
         asyncio.run(agent.run(input))
 
     assert raised.value.diagnostics is not None
-    assert raised.value.diagnostics.validation_errors[0].location == (
-        "action"
-    )
+    assert raised.value.diagnostics.validation_errors[0].location == ("action")

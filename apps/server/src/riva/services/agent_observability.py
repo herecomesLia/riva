@@ -85,9 +85,7 @@ class AgentObservabilityService:
             statement = statement.where(AgentRun.agent_id == agent_id)
 
         result = await self.session.execute(statement)
-        observations = [
-            _observation_from_row(row._mapping) for row in result.all()
-        ]
+        observations = [_observation_from_row(row._mapping) for row in result.all()]
         return aggregate_agent_run_observations(
             observations,
             window_from=window_from,
@@ -173,9 +171,7 @@ def _aggregate_scope(runs: list[AgentRunObservation]) -> _ScopeAggregate:
         if _status_value(run.status) == AgentRunStatus.SUCCEEDED.value
     ]
     failed_runs = [
-        run
-        for run in runs
-        if _status_value(run.status) == AgentRunStatus.FAILED.value
+        run for run in runs if _status_value(run.status) == AgentRunStatus.FAILED.value
     ]
     terminal_runs = len(succeeded_runs) + len(failed_runs)
     started_runs = sum(run.attempt_count > 0 for run in runs)
@@ -303,9 +299,7 @@ def _token_summary(runs: list[AgentRunObservation]) -> AgentTokenSummary:
 
 
 def _error_counts(runs: list[AgentRunObservation]) -> list[AgentErrorCount]:
-    counts = Counter(
-        run.error_code for run in runs if run.error_code is not None
-    )
+    counts = Counter(run.error_code for run in runs if run.error_code is not None)
     return [
         AgentErrorCount(error_code=error_code, count=count)
         for error_code, count in sorted(
@@ -353,9 +347,7 @@ def _duration_ms(
     if delta <= timedelta(0):
         return 0
     microseconds = (
-        delta.days * 86_400 * 1_000_000
-        + delta.seconds * 1_000_000
-        + delta.microseconds
+        delta.days * 86_400 * 1_000_000 + delta.seconds * 1_000_000 + delta.microseconds
     )
     return (microseconds + 500) // 1_000
 

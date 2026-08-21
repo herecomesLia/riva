@@ -23,7 +23,6 @@ from riva.integrations.llm import (
     validate_structured_output,
 )
 
-
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 
 
@@ -73,7 +72,7 @@ class QwenProvider:
             data = _response_object(response)
             content = _message_content(data)
             usage = _usage(data)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise ProviderUnavailableError from None
         return LLMResponse(
             content=content,
@@ -100,7 +99,7 @@ class QwenProvider:
 
         try:
             raw_data = response.json()
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             diagnostics = _structured_output_diagnostics(
                 request.output_schema,
                 "json_decode",
@@ -120,7 +119,7 @@ class QwenProvider:
 
         try:
             content = _message_content(data)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             diagnostics = _structured_output_diagnostics(
                 request.output_schema,
                 "provider_response",
@@ -132,7 +131,7 @@ class QwenProvider:
 
         try:
             parsed = json.loads(content)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             diagnostics = _structured_output_diagnostics(
                 request.output_schema,
                 "json_decode",
@@ -144,7 +143,7 @@ class QwenProvider:
 
         try:
             usage = _usage(data)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             diagnostics = _structured_output_diagnostics(
                 request.output_schema,
                 "provider_response",
@@ -232,8 +231,7 @@ def _chat_completions_endpoint(base_url: str) -> str:
 
 def _messages(messages: tuple[LLMMessage, ...]) -> list[dict[str, str]]:
     return [
-        {"role": message.role.value, "content": message.content}
-        for message in messages
+        {"role": message.role.value, "content": message.content} for message in messages
     ]
 
 
@@ -243,10 +241,7 @@ def _structured_messages(
 ) -> list[dict[str, str]]:
     result = _messages(messages)
     insertion_index = 0
-    while (
-        insertion_index < len(result)
-        and result[insertion_index]["role"] == "system"
-    ):
+    while insertion_index < len(result) and result[insertion_index]["role"] == "system":
         insertion_index += 1
     result.insert(
         insertion_index,

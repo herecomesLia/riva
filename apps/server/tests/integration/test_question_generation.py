@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -39,7 +39,6 @@ from riva.services.agent_runs import AgentRunService
 from riva.services.question_generation import QuestionGenerationService
 from riva.workers import AgentHandlerRegistry, AgentWorker, QuestionGenerationHandler
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 10, 9, 30, tzinfo=UTC)
@@ -94,7 +93,9 @@ def succeeded_run(
     )
 
 
-async def seed_context(database: Database) -> tuple[User, TargetRole, CareerProfile, UUID]:
+async def seed_context(
+    database: Database,
+) -> tuple[User, TargetRole, CareerProfile, UUID]:
     user_id = uuid4()
     role_id = uuid4()
     profile_id = uuid4()
@@ -389,12 +390,10 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                         "Payment Platform"
                     )
 
-                    persisted_output = QuestionGenerationOutput.model_validate(
-                        response
+                    persisted_output = QuestionGenerationOutput.model_validate(response)
+                    returned = await QuestionGenerationService(session).persist_success(
+                        stored_run, persisted_output
                     )
-                    returned = await QuestionGenerationService(
-                        session
-                    ).persist_success(stored_run, persisted_output)
                     count = await session.scalar(
                         select(func.count())
                         .select_from(QuestionCard)
@@ -404,8 +403,7 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                         select(func.count())
                         .select_from(PracticeQuestionReferenceContext)
                         .where(
-                            PracticeQuestionReferenceContext.question_card_id
-                            == card.id
+                            PracticeQuestionReferenceContext.question_card_id == card.id
                         )
                     )
                     assert returned.id == card.id
@@ -442,9 +440,9 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                     retry_response_a
                 )
                 async with database.sessionmaker() as session:
-                    await QuestionGenerationService(
-                        session
-                    ).persist_success(claimed, retry_output_a)
+                    await QuestionGenerationService(session).persist_success(
+                        claimed, retry_output_a
+                    )
 
                 async with database.sessionmaker() as session:
                     now = datetime.now(UTC)
@@ -501,8 +499,7 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                         (
                             await session.scalars(
                                 select(QuestionCard).where(
-                                    QuestionCard.source_agent_run_id
-                                    == retry_run.id
+                                    QuestionCard.source_agent_run_id == retry_run.id
                                 )
                             )
                         ).all()
@@ -513,12 +510,12 @@ def test_question_generation_worker_persists_and_retries_idempotently() -> None:
                     assert retry_cards[0].source_agent_run_id == retry_run.id
                     assert retry_cards[0].prompt == retry_response_a["prompt"]
                     assert stored_retry_run.result is not None
-                    assert stored_retry_run.result["prompt"] == retry_response_a[
-                        "prompt"
-                    ]
-                    assert stored_retry_run.result["prompt"] != retry_response_b[
-                        "prompt"
-                    ]
+                    assert (
+                        stored_retry_run.result["prompt"] == retry_response_a["prompt"]
+                    )
+                    assert (
+                        stored_retry_run.result["prompt"] != retry_response_b["prompt"]
+                    )
             finally:
                 await database.reset()
 

@@ -1,7 +1,7 @@
 import asyncio
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
-import os
 from uuid import UUID, uuid4
 
 import pytest
@@ -43,7 +43,6 @@ from riva.services.matching_analyses import (
     MatchingAnalysisStateError,
 )
 from riva.services.profile_completion import career_profile_completed
-
 
 pytestmark = pytest.mark.integration
 GENERATED_AT = datetime(2026, 8, 4, 9, 30, tzinfo=UTC)
@@ -220,7 +219,7 @@ def make_graph(suffix: str) -> tuple[Graph, JobDescriptionAnalysis]:
             skill_id=skill.id,
             position=1,
             skill=skill,
-        )
+        ),
     ]
     second_work = CareerProfileWorkExperience(
         id=uuid4(),
@@ -737,9 +736,7 @@ def test_matching_service_accepts_each_minimal_profile(case: str) -> None:
                     session,
                     clock=lambda: GENERATED_AT,
                 )
-                matching_input = await service.load_matching_input(
-                    graph.matching_run
-                )
+                matching_input = await service.load_matching_input(graph.matching_run)
                 snapshot = matching_input.career_profile
                 assert snapshot.education == []
 
@@ -750,16 +747,14 @@ def test_matching_service_accepts_each_minimal_profile(case: str) -> None:
                 elif case == "work_only":
                     assert snapshot.skills == []
                     assert [
-                        experience.company
-                        for experience in snapshot.work_experiences
+                        experience.company for experience in snapshot.work_experiences
                     ] == ["Riva", "Riva Labs"]
                     assert snapshot.project_experiences == []
                 else:
                     assert snapshot.skills == []
                     assert snapshot.work_experiences == []
                     assert [
-                        experience.name
-                        for experience in snapshot.project_experiences
+                        experience.name for experience in snapshot.project_experiences
                     ] == ["Payment Platform", "Profile Project"]
 
                 persisted = await service.persist_success(
@@ -822,9 +817,7 @@ def test_matching_service_ignores_blank_skill_when_other_evidence_is_valid() -> 
                     session,
                     clock=lambda: GENERATED_AT,
                 )
-                matching_input = await service.load_matching_input(
-                    graph.matching_run
-                )
+                matching_input = await service.load_matching_input(graph.matching_run)
                 snapshot = matching_input.career_profile
                 assert snapshot.skills == []
                 assert "" not in snapshot.skills
@@ -853,7 +846,9 @@ def test_matching_service_ignores_blank_skill_when_other_evidence_is_valid() -> 
     asyncio.run(run())
 
 
-def test_matching_service_loads_detached_input_persists_overwrites_and_is_idempotent() -> None:
+def test_matching_service_loads_detached_input_persists_overwrites_and_is_idempotent() -> (
+    None
+):
     async def run() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -890,9 +885,7 @@ def test_matching_service_loads_detached_input_persists_overwrites_and_is_idempo
                     session,
                     clock=lambda: GENERATED_AT,
                 )
-                matching_input = await service.load_matching_input(
-                    graph.matching_run
-                )
+                matching_input = await service.load_matching_input(graph.matching_run)
                 assert matching_input.career_profile.skills == ["Python", "FastAPI"]
                 assert [
                     item.company
@@ -911,9 +904,10 @@ def test_matching_service_loads_detached_input_persists_overwrites_and_is_idempo
                     "Python",
                 ]
                 assert matching_input.job.role_title == "Backend Engineer"
-                assert matching_input.job.job_description_analysis.required_skills.programming_languages == [
-                    "Python"
-                ]
+                assert (
+                    matching_input.job.job_description_analysis.required_skills.programming_languages
+                    == ["Python"]
+                )
                 input_dump = matching_input.model_dump()
                 assert set(input_dump) == {
                     "career_profile",
@@ -986,7 +980,9 @@ def test_matching_service_loads_detached_input_persists_overwrites_and_is_idempo
                 assert stored.profile_id == graph.profile.profile_id
                 assert stored.profile_version == initial_profile_version
                 assert stored.job_description_version == initial_jd_version
-                assert stored.job_description_analysis_version == initial_analysis_version
+                assert (
+                    stored.job_description_analysis_version == initial_analysis_version
+                )
                 stored_jd_analysis = await session.get(
                     JobDescriptionAnalysis,
                     graph.role.id,
@@ -1075,15 +1071,18 @@ def test_matching_service_loads_detached_input_persists_overwrites_and_is_idempo
                 assert stored.profile_version == 4
                 assert stored.job_description_version == 3
                 assert stored.job_description_analysis_version == 5
-                assert len(
-                    (
-                        await session.scalars(
-                            select(MatchingAnalysis).where(
-                                MatchingAnalysis.role_id == graph.role.id
+                assert (
+                    len(
+                        (
+                            await session.scalars(
+                                select(MatchingAnalysis).where(
+                                    MatchingAnalysis.role_id == graph.role.id
+                                )
                             )
-                        )
-                    ).all()
-                ) == 1
+                        ).all()
+                    )
+                    == 1
+                )
                 stored_jd_analysis = await session.get(
                     JobDescriptionAnalysis,
                     graph.role.id,
@@ -1408,9 +1407,12 @@ def test_matching_service_naive_clock_rolls_back_and_keeps_old_result() -> None:
                 assert role.version == role_version
 
                 # The rollback must leave this transaction usable.
-                assert await session.scalar(
-                    select(TargetRole.id).where(TargetRole.id == graph.role.id)
-                ) == graph.role.id
+                assert (
+                    await session.scalar(
+                        select(TargetRole.id).where(TargetRole.id == graph.role.id)
+                    )
+                    == graph.role.id
+                )
 
     asyncio.run(run())
 

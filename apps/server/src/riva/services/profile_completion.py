@@ -12,9 +12,7 @@ def career_profile_completed(profile: CareerProfile) -> bool:
         for skill in profile.skills
     )
     return bool(
-        has_named_skill
-        or profile.work_experiences
-        or profile.project_experiences
+        has_named_skill or profile.work_experiences or profile.project_experiences
     )
 
 

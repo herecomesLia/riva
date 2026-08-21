@@ -32,7 +32,6 @@ from riva.schemas.question_cards import (
     QuestionCardTextList,
 )
 
-
 MAX_PRACTICE_REFERENCE_ANSWER_LENGTH = 6_000
 MAX_PRACTICE_REFERENCE_ADDRESSED_GAP_LENGTH = 1_000
 MAX_PRACTICE_REFERENCE_ANSWER_ITEM_LENGTH = 1_000
@@ -303,9 +302,7 @@ class _PracticeReferenceAnswerInput(_PracticeReferenceModel):
         evidence_ids = [evidence.id for evidence in self.candidate_evidence]
         if len(evidence_ids) != len(set(evidence_ids)):
             raise ValueError("candidate_evidence ids must be unique")
-        if not set(evidence_ids).issubset(
-            set(self.question.recommended_material_ids)
-        ):
+        if not set(evidence_ids).issubset(set(self.question.recommended_material_ids)):
             raise ValueError(
                 "candidate_evidence ids must reference recommended materials"
             )
@@ -313,8 +310,8 @@ class _PracticeReferenceAnswerInput(_PracticeReferenceModel):
 
 
 class PracticeMainReferenceAnswerInput(_PracticeReferenceAnswerInput):
-    target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = (
-        _discriminator_alias("targetType")
+    target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = _discriminator_alias(
+        "targetType"
     )
     expected_kind: Literal[
         PracticeReferenceAnswerKind.PERSONALIZED_EXAMPLE,
@@ -330,9 +327,7 @@ class PracticeMainReferenceAnswerInput(_PracticeReferenceAnswerInput):
             else PracticeReferenceAnswerKind.PERSONALIZED_EXAMPLE
         )
         if self.expected_kind != expected:
-            raise ValueError(
-                "expected_kind does not match the question type"
-            )
+            raise ValueError("expected_kind does not match the question type")
         return self
 
 
@@ -368,9 +363,7 @@ class PracticeFollowUpReferenceAnswerInput(_PracticeReferenceAnswerInput):
                 "previous_follow_ups must contain completed orders in sequence"
             )
         if self.current_follow_up.order != len(self.previous_follow_ups) + 1:
-            raise ValueError(
-                "current_follow_up.order must follow previous_follow_ups"
-            )
+            raise ValueError("current_follow_up.order must follow previous_follow_ups")
         return self
 
     @model_validator(mode="after")
@@ -382,9 +375,7 @@ class PracticeFollowUpReferenceAnswerInput(_PracticeReferenceAnswerInput):
             else PracticeReferenceAnswerKind.PERSONALIZED_SUPPLEMENT
         )
         if self.expected_kind != expected:
-            raise ValueError(
-                "expected_kind does not match the question type"
-            )
+            raise ValueError("expected_kind does not match the question type")
         return self
 
 
@@ -422,8 +413,8 @@ class PracticeMainReferenceAnswerRunPayload(_PracticeReferenceModel):
         serialize_by_alias=True,
     )
 
-    target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = (
-        _discriminator_alias("targetType")
+    target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = _discriminator_alias(
+        "targetType"
     )
     question_card_id: StandardUUID = _alias(
         "question_card_id",
@@ -467,13 +458,11 @@ class PracticeFollowUpReferenceAnswerRunPayload(_PracticeReferenceModel):
         "follow_up_question_id",
         "followUpQuestionId",
     )
-    previous_follow_ups: list[PracticeReferencePreviousFollowUpRunPayload] = (
-        _alias(
-            "previous_follow_ups",
-            "previousFollowUps",
-            default_factory=list,
-            max_length=MAX_PRACTICE_FOLLOW_UPS,
-        )
+    previous_follow_ups: list[PracticeReferencePreviousFollowUpRunPayload] = _alias(
+        "previous_follow_ups",
+        "previousFollowUps",
+        default_factory=list,
+        max_length=MAX_PRACTICE_FOLLOW_UPS,
     )
     interaction_language: InteractionLanguage = _alias(
         "interaction_language",
@@ -505,15 +494,14 @@ class PracticeFollowUpReferenceAnswerRunPayload(_PracticeReferenceModel):
 
 
 PracticeReferenceAnswerRunPayload = Annotated[
-    PracticeMainReferenceAnswerRunPayload
-    | PracticeFollowUpReferenceAnswerRunPayload,
+    PracticeMainReferenceAnswerRunPayload | PracticeFollowUpReferenceAnswerRunPayload,
     Field(discriminator="target_type"),
 ]
 
 
 class PracticeMainReferenceAnswerOutput(_PracticeReferenceModel):
-    target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = (
-        _discriminator_alias("targetType")
+    target_type: Literal[PracticeReferenceAnswerTargetType.MAIN] = _discriminator_alias(
+        "targetType"
     )
     kind: Literal[
         PracticeReferenceAnswerKind.PERSONALIZED_EXAMPLE,

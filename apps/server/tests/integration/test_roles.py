@@ -2,8 +2,8 @@ import asyncio
 import os
 from uuid import UUID, uuid4
 
-from fastapi import status
 import pytest
+from fastapi import status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -148,17 +148,13 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
 
                 updated_at = updated.updated_at
                 async with database.sessionmaker() as session:
-                    update_no_op_page = await TargetRoleService(
-                        session
-                    ).update_role(
+                    update_no_op_page = await TargetRoleService(session).update_role(
                         owner,
                         first.id,
                         update_request(2, "Platform Engineer"),
                     )
                     update_no_op = next(
-                        role
-                        for role in update_no_op_page.roles
-                        if role.id == first.id
+                        role for role in update_no_op_page.roles if role.id == first.id
                     )
                     assert update_no_op.version == 2
                     assert update_no_op.updated_at == updated_at
@@ -170,14 +166,11 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                             update_request(1, "Platform Engineer"),
                         )
                     assert (
-                        stale_update_no_op.value.error
-                        == "target_role_version_conflict"
+                        stale_update_no_op.value.error == "target_role_version_conflict"
                     )
 
                 async with database.sessionmaker() as session:
-                    current_no_op = await TargetRoleService(
-                        session
-                    ).set_current_role(
+                    current_no_op = await TargetRoleService(session).set_current_role(
                         owner,
                         first.id,
                         SetCurrentTargetRoleRequest(version=2),
@@ -214,9 +207,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     assert paused_page.current_role_id == first.id
 
                 async with database.sessionmaker() as session:
-                    no_op = await TargetRoleService(
-                        session
-                    ).update_preparation_status(
+                    no_op = await TargetRoleService(session).update_preparation_status(
                         owner,
                         first.id,
                         UpdatePreparationStatusRequest(
@@ -224,15 +215,16 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                             preparation_status="paused",
                         ),
                     )
-                    assert next(
-                        role for role in no_op.roles if role.id == first.id
-                    ).version == 3
+                    assert (
+                        next(
+                            role for role in no_op.roles if role.id == first.id
+                        ).version
+                        == 3
+                    )
 
                 async with database.sessionmaker() as session:
                     with pytest.raises(APIError) as stale_no_op:
-                        await TargetRoleService(
-                            session
-                        ).update_preparation_status(
+                        await TargetRoleService(session).update_preparation_status(
                             owner,
                             first.id,
                             UpdatePreparationStatusRequest(
@@ -275,9 +267,12 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                         second.id,
                         ArchiveTargetRoleRequest(version=2),
                     )
-                    assert next(
-                        role for role in archive_no_op.roles if role.id == second.id
-                    ).version == 2
+                    assert (
+                        next(
+                            role for role in archive_no_op.roles if role.id == second.id
+                        ).version
+                        == 2
+                    )
                 async with database.sessionmaker() as session:
                     with pytest.raises(APIError) as stale_archive_no_op:
                         await TargetRoleService(session).archive_role(
@@ -519,14 +514,15 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     concurrent_update("Second Winner"),
                     return_exceptions=True,
                 )
-                assert sum(
-                    not isinstance(result, BaseException)
-                    for result in update_results
-                ) == 1
+                assert (
+                    sum(
+                        not isinstance(result, BaseException)
+                        for result in update_results
+                    )
+                    == 1
+                )
                 conflicts = [
-                    result
-                    for result in update_results
-                    if isinstance(result, APIError)
+                    result for result in update_results if isinstance(result, APIError)
                 ]
                 assert len(conflicts) == 1
                 assert conflicts[0].error == "target_role_version_conflict"
@@ -566,9 +562,9 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                 assert [role.version for role in final_current.roles] == [1, 1]
                 async with database.sessionmaker() as session:
                     mapping_count = await session.scalar(
-                        select(func.count()).select_from(CurrentTargetRole).where(
-                            CurrentTargetRole.user_id == current_owner.id
-                        )
+                        select(func.count())
+                        .select_from(CurrentTargetRole)
+                        .where(CurrentTargetRole.user_id == current_owner.id)
                     )
                     assert mapping_count == 1
 

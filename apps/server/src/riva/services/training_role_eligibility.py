@@ -11,7 +11,6 @@ from sqlalchemy.orm import selectinload
 from riva.models import CareerProfile, CurrentTargetRole, TargetRole
 from riva.services.profile_completion import career_profile_completed
 
-
 TrainingRoleEligibilityBlockedReason = Literal[
     "noTargetRoles",
     "profileIncomplete",
@@ -55,14 +54,20 @@ class TrainingRoleEligibilityService:
             ).all()
             if role.preparation_status != "archived"
         )
-        jd_ready_roles = tuple(role for role in roles if self._job_description_ready(role))
+        jd_ready_roles = tuple(
+            role for role in roles if self._job_description_ready(role)
+        )
         current_target_role_id = await self.session.scalar(
-            select(CurrentTargetRole.role_id).where(CurrentTargetRole.user_id == user_id)
+            select(CurrentTargetRole.role_id).where(
+                CurrentTargetRole.user_id == user_id
+            )
         )
         profile_complete = profile is not None and career_profile_completed(profile)
 
         if not roles:
-            blocked_reason: TrainingRoleEligibilityBlockedReason | None = "noTargetRoles"
+            blocked_reason: TrainingRoleEligibilityBlockedReason | None = (
+                "noTargetRoles"
+            )
         elif not profile_complete:
             blocked_reason = "profileIncomplete"
         elif not jd_ready_roles:

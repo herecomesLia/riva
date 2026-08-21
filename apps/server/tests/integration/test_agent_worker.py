@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -13,7 +13,6 @@ from riva.integrations import LLMUsage
 from riva.models import AgentRun, AgentRunStatus, User
 from riva.services.agent_runs import AgentRunLeaseError, AgentRunService
 from riva.workers import AgentHandlerRegistry, AgentWorker
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 7, 31, 8, tzinfo=UTC)
@@ -140,9 +139,7 @@ def test_agent_worker_leases_and_expired_batch_recovery() -> None:
                     assert succeeded.model == "fake-model"
                     assert succeeded.input_tokens == 11
                     assert succeeded.output_tokens == 4
-                    assert succeeded.result == {
-                        "value": worker_run.payload["roleId"]
-                    }
+                    assert succeeded.result == {"value": worker_run.payload["roleId"]}
 
                 clock = MutableClock(START)
                 renewable = await enqueue(

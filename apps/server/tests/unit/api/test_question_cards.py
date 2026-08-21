@@ -1,20 +1,19 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
-import pytest
 
 from riva.core.auth import get_auth_service, require_current_user
-from riva.core.question_cards import get_question_card_service
 from riva.core.errors import APIError
+from riva.core.question_cards import get_question_card_service
 from riva.models import User
 from riva.schemas.question_cards import (
     QuestionCardResponse,
     QuestionGenerationStatusResponse,
 )
 from riva.services.question_cards import QUESTION_GENERATION_REQUEST_CONFLICT
-
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -99,9 +98,7 @@ class FakeQuestionCardService:
         *,
         interaction_language: str,
     ) -> QuestionGenerationStatusResponse:
-        self.calls.append(
-            ("start", (current_user, payload, interaction_language))
-        )
+        self.calls.append(("start", (current_user, payload, interaction_language)))
         if self.error is not None:
             raise self.error
         return self.start_result
@@ -329,20 +326,20 @@ def test_openapi_exposes_question_card_contract(app) -> None:
     assert generation in paths
     assert card in paths
     assert (
-        paths[start]["post"]["responses"]["202"]["content"][
-            "application/json"
-        ]["schema"]["$ref"]
+        paths[start]["post"]["responses"]["202"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
         == "#/components/schemas/QuestionGenerationStatusResponse"
     )
     assert (
-        paths[generation]["get"]["responses"]["200"]["content"][
-            "application/json"
-        ]["schema"]["$ref"]
+        paths[generation]["get"]["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
         == "#/components/schemas/QuestionGenerationStatusResponse"
     )
     assert (
-        paths[card]["get"]["responses"]["200"]["content"][
-            "application/json"
-        ]["schema"]["$ref"]
+        paths[card]["get"]["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ]
         == "#/components/schemas/QuestionCardResponse"
     )

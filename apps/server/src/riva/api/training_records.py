@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, Path, Query, status
 from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
 from riva.core.errors import APIError
-from riva.core.training_records import get_training_record_service
 from riva.core.training_records import (
     get_training_record_reference_answer_service,
+    get_training_record_service,
 )
 from riva.models import User
 from riva.schemas.training_records import (
@@ -18,9 +18,19 @@ from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordDetailResponse,
     TrainingRecordKind,
     TrainingRecordReferenceAnswerResponse,
-    TrainingRecordStatus,
     TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
+    TrainingRecordStatus,
+)
+from riva.services.training_record_reference_answers import (
+    REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+    TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
+    TRAINING_RECORD_QUESTION_NOT_FOUND,
+    TrainingRecordReferenceAnswerService,
+    TrainingRecordReferenceAnswerStateError,
+)
+from riva.services.training_record_reference_answers import (
+    TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
 )
 from riva.services.training_records import (
     TRAINING_RECORD_NOT_FOUND,
@@ -28,15 +38,6 @@ from riva.services.training_records import (
     TrainingRecordService,
     TrainingRecordStateError,
 )
-from riva.services.training_record_reference_answers import (
-    REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
-    TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
-    TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
-    TRAINING_RECORD_QUESTION_NOT_FOUND,
-    TrainingRecordReferenceAnswerService,
-    TrainingRecordReferenceAnswerStateError,
-)
-
 
 TrainingRecordId = Annotated[UUID, Path(alias="recordId")]
 TrainingRecordPage = Annotated[int, Query(ge=1)]
@@ -183,7 +184,9 @@ async def get_targeted_practice_training_record(
         )
     except TrainingRecordStateError as error:
         if error.code == TRAINING_RECORD_NOT_FOUND:
-            raise APIError(status.HTTP_404_NOT_FOUND, TRAINING_RECORD_NOT_FOUND) from None
+            raise APIError(
+                status.HTTP_404_NOT_FOUND, TRAINING_RECORD_NOT_FOUND
+            ) from None
         if error.code == TRAINING_RECORD_STATE_CONFLICT:
             raise APIError(
                 status.HTTP_409_CONFLICT,
@@ -211,7 +214,9 @@ async def get_mock_interview_training_record(
         )
     except TrainingRecordStateError as error:
         if error.code == TRAINING_RECORD_NOT_FOUND:
-            raise APIError(status.HTTP_404_NOT_FOUND, TRAINING_RECORD_NOT_FOUND) from None
+            raise APIError(
+                status.HTTP_404_NOT_FOUND, TRAINING_RECORD_NOT_FOUND
+            ) from None
         if error.code == TRAINING_RECORD_STATE_CONFLICT:
             raise APIError(
                 status.HTTP_409_CONFLICT,

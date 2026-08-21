@@ -1,8 +1,8 @@
 import asyncio
 from uuid import UUID, uuid4
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from riva.agents import QuestionGenerationAgent
@@ -29,7 +29,6 @@ from tests.integration.test_practice_next_question_workflow import (
     question_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -137,9 +136,7 @@ def test_practice_early_completion_public_api_rejects_generating_follow_up() -> 
                         headers=headers,
                     )
                     assert ended.status_code == 409
-                    assert ended.json() == {
-                        "error": "practice_session_state_conflict"
-                    }
+                    assert ended.json() == {"error": "practice_session_state_conflict"}
 
                     async with database.sessionmaker() as session:
                         persisted_session = await session.get(
@@ -182,9 +179,7 @@ def test_practice_early_completion_public_api_rejects_generating_follow_up() -> 
                         assert persisted_attempt.status == "answering"
                         assert persisted_attempt.completed_at is None
                         assert len(main_answers) == 1
-                        assert main_answers[0].content == (
-                            "A valid submitted answer."
-                        )
+                        assert main_answers[0].content == ("A valid submitted answer.")
                         assert len(follow_up_runs) == 1
                         assert follow_up_runs[0].agent_id == "follow-up-generator"
 
@@ -231,9 +226,7 @@ def test_practice_early_completion_public_api_replay_get_and_current_release() -
                         password_hash="hash",
                         display_name="Other User",
                     )
-                    app.dependency_overrides[require_current_user] = (
-                        lambda: other_user
-                    )
+                    app.dependency_overrides[require_current_user] = lambda: other_user
                     isolated = client.post(
                         path,
                         json=request_body,

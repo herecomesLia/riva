@@ -13,7 +13,6 @@ from riva.services.competency_aggregation import CompetencyAggregationService
 from riva.services.competency_ingestion import CompetencyIngestionService
 from tests.helpers.integration_database import get_integration_database_url
 
-
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 1, 9, tzinfo=UTC)
 
@@ -186,10 +185,12 @@ def test_competency_aggregation_persists_repairs_and_is_session_weighted() -> No
                     assert competency.evidence_count == 3
                     assert (
                         await session.scalar(
-                            select(CompetencyEvidence).where(
+                            select(CompetencyEvidence)
+                            .where(
                                 CompetencyEvidence.competency_id == competency.id,
                                 CompetencyEvidence.source_type == "interview",
-                            ).with_for_update()
+                            )
+                            .with_for_update()
                         )
                         is not None
                     )

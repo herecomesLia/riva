@@ -54,12 +54,14 @@ def test_resume_document_constraints_cover_ownership_source_and_status() -> None
 
     assert "byte_size > 0" in checks["ck_resume_documents_byte_size_positive"]
     assert "length(sha256) = 64" in checks["ck_resume_documents_sha256_length"]
-    assert "source_type IN ('file', 'pastedText')" in checks[
-        "ck_resume_documents_source_type"
-    ]
-    assert "extraction_status IN ('pending', 'succeeded', 'failed')" in checks[
-        "ck_resume_documents_extraction_status"
-    ]
+    assert (
+        "source_type IN ('file', 'pastedText')"
+        in checks["ck_resume_documents_source_type"]
+    )
+    assert (
+        "extraction_status IN ('pending', 'succeeded', 'failed')"
+        in checks["ck_resume_documents_extraction_status"]
+    )
 
     source_check = checks["ck_resume_documents_source_fields"]
     assert "original_filename IS NOT NULL" in source_check
@@ -99,11 +101,7 @@ def test_resume_document_has_owner_storage_constraints_and_indexes() -> None:
     )
     assert [column.name for column in storage_unique.columns] == ["storage_key"]
 
-    indexes = {
-        index.name: index
-        for index in table.indexes
-        if isinstance(index, Index)
-    }
+    indexes = {index.name: index for index in table.indexes if isinstance(index, Index)}
     assert [
         column.name
         for column in indexes["ix_resume_documents_user_uploaded_at"].columns

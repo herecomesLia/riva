@@ -1,6 +1,6 @@
+import json
 from dataclasses import dataclass
 from hashlib import sha256
-import json
 from typing import TYPE_CHECKING
 
 from fastapi import Depends, Request
@@ -122,9 +122,7 @@ def serialize_training_planning_input(input: TrainingPlanningInput) -> str:
 
 
 def training_planning_context_fingerprint(input: TrainingPlanningInput) -> str:
-    return sha256(
-        serialize_training_planning_input(input).encode("utf-8")
-    ).hexdigest()
+    return sha256(serialize_training_planning_input(input).encode("utf-8")).hexdigest()
 
 
 async def get_training_planning_service(

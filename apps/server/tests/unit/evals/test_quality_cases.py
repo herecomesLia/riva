@@ -1,12 +1,11 @@
 import re
 from pathlib import Path
 
-from pydantic import TypeAdapter
 import pytest
+from pydantic import TypeAdapter
 
 from riva.evals.registry import build_default_registry
 from riva.evals.runner import load_eval_cases
-
 
 CASES_DIR = Path(__file__).resolve().parents[3] / "evals" / "cases"
 

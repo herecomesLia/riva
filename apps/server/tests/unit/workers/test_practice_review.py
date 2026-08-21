@@ -20,7 +20,6 @@ from riva.workers import AgentExecutionError, PracticeReviewHandler
 from riva.workers.practice_review import ReviewGenerationServiceFactory
 from riva.workers.runtime import SessionFactory
 
-
 NOW = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
 
 
@@ -316,7 +315,9 @@ def test_handler_requires_the_practice_review_agent_identity() -> None:
         )
 
 
-def test_handler_maps_persistence_state_errors_to_non_retryable_execution_error() -> None:
+def test_handler_maps_persistence_state_errors_to_non_retryable_execution_error() -> (
+    None
+):
     sessions = FakeSessionFactory()
     state = State()
     state.persist_error = ReviewGenerationStateError(

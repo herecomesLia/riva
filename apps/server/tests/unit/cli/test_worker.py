@@ -8,7 +8,6 @@ from riva.core.config import Settings
 from riva.core.logging import LogFormat, LogLevel
 from riva.integrations import LLMProviderConfigurationError
 
-
 WORKER_ENV_KEYS = [
     "RIVA_DATABASE_URL",
     "RIVA_SESSION_DIGEST_KEY",

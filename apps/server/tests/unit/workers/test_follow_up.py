@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
-from pydantic import BaseModel
 import pytest
+from pydantic import BaseModel
 
 from riva.agents import AgentResult, FollowUpAgent
 from riva.integrations import (
@@ -24,7 +24,6 @@ from riva.services.follow_up_generation import FollowUpGenerationStateError
 from riva.workers import AgentExecutionError, FollowUpHandler
 from riva.workers.follow_up import FollowUpGenerationServiceFactory
 from riva.workers.runtime import SessionFactory
-
 
 NOW = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
 
@@ -254,9 +253,7 @@ def test_handler_rejects_invalid_run_before_opening_session(error_field: str) ->
 def test_handler_maps_context_errors_to_non_retryable_execution_error() -> None:
     sessions = FakeSessionFactory()
     state = State()
-    state.load_error = FollowUpGenerationStateError(
-        "follow_up_main_answer_not_ready"
-    )
+    state.load_error = FollowUpGenerationStateError("follow_up_main_answer_not_ready")
     agent = FakeAgent(sessions, result())
 
     with pytest.raises(AgentExecutionError) as exc_info:

@@ -6,7 +6,6 @@ from pydantic import ValidationError
 
 from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
 
-
 NOW = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
 
 

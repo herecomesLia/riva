@@ -131,9 +131,7 @@ class InterviewReviewQuestionSnapshot(InterviewReviewModel):
     follow_up_directions: ReferenceList
     scoring_focus: ReferenceList
     answer: InterviewReviewAnswerSnapshot | None = None
-    follow_ups: list[InterviewReviewFollowUpSnapshot] = Field(
-        default_factory=list
-    )
+    follow_ups: list[InterviewReviewFollowUpSnapshot] = Field(default_factory=list)
     turn_assessments: list[InterviewReviewTurnAssessmentSnapshot] = Field(
         default_factory=list
     )
@@ -147,9 +145,9 @@ class InterviewReviewInput(InterviewReviewModel):
     interaction_language: InteractionLanguage
     planner_context: InterviewPlanningInput
     questions: list[InterviewReviewQuestionSnapshot] = Field(default_factory=list)
-    candidate_question_exchanges: list[
-        InterviewCandidateQuestionExchangeSnapshot
-    ] = Field(default_factory=list)
+    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeSnapshot] = (
+        Field(default_factory=list)
+    )
     training_memory: TrainingMemoryContext = Field(
         alias="trainingMemory",
         default_factory=TrainingMemoryContext,
@@ -175,9 +173,11 @@ class InterviewReviewInput(InterviewReviewModel):
             range(1, len(self.candidate_question_exchanges) + 1)
         ):
             raise ValueError("review candidate exchanges must be contiguous")
-        if self.completion_reason == (
-            InterviewReviewCompletionReason.FORMAL_QUESTIONS_COMPLETED
-        ) and self.review_mode != InterviewReviewMode.COMPLETE:
+        if (
+            self.completion_reason
+            == (InterviewReviewCompletionReason.FORMAL_QUESTIONS_COMPLETED)
+            and self.review_mode != InterviewReviewMode.COMPLETE
+        ):
             raise ValueError("formal completion requires complete review mode")
         return self
 
@@ -289,9 +289,7 @@ class InterviewReviewOutput(InterviewReviewModel):
     communication_suggestions: ReviewList = Field(default_factory=list)
     preparation_suggestions: ReviewList = Field(default_factory=list)
     overall_score: Annotated[int, Field(strict=True, ge=0, le=100)] | None = None
-    dimension_scores: list[InterviewReviewDimensionScore] = Field(
-        default_factory=list
-    )
+    dimension_scores: list[InterviewReviewDimensionScore] = Field(default_factory=list)
     next_training: InterviewReviewTrainingSuggestion | None = None
     reference_answers: list[InterviewReviewReferenceAnswer] = Field(
         default_factory=list

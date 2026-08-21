@@ -22,18 +22,18 @@ from riva.schemas.interview import (
 )
 from riva.schemas.job_description_parsing import Company, RoleTitle
 from riva.schemas.practice_recommendation import PracticeRecommendationOutput
+from riva.schemas.practice_review import (
+    MAX_PRACTICE_REVIEW_ITEMS,
+    ReviewItem,
+    ReviewOverallPerformance,
+    ReviewWeakness,
+)
 from riva.schemas.practice_sessions import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerResponse,
     PracticeFollowUpReferenceAnswerResponse,
     PracticeMainReferenceAnswerResponse,
     PracticeQuestionSource,
-)
-from riva.schemas.practice_review import (
-    MAX_PRACTICE_REVIEW_ITEMS,
-    ReviewItem,
-    ReviewOverallPerformance,
-    ReviewWeakness,
 )
 from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
@@ -189,8 +189,7 @@ TargetedPracticeReferenceAnswerTargetResponse = Annotated[
 class TrainingRecordReferenceAnswerResponse(TrainingRecordAPIModel):
     target: TargetedPracticeReferenceAnswerTargetResponse
     reference_answer: (
-        PracticeMainReferenceAnswerResponse
-        | PracticeFollowUpReferenceAnswerResponse
+        PracticeMainReferenceAnswerResponse | PracticeFollowUpReferenceAnswerResponse
     )
 
 
@@ -232,9 +231,7 @@ class TrainingRecordEvaluationResponse(TrainingRecordAPIModel):
     ]
     evaluated_at: datetime
 
-    _validate_evaluated_at = field_validator("evaluated_at")(
-        _validate_aware_timestamp
-    )
+    _validate_evaluated_at = field_validator("evaluated_at")(_validate_aware_timestamp)
 
 
 class TrainingRecordReviewResponse(TrainingRecordAPIModel):
@@ -274,9 +271,7 @@ class TargetedPracticeAttemptRecordResponse(TrainingRecordAPIModel):
     recommendation: PracticeRecommendationOutput | None
 
     _validate_completed_at = field_validator("completed_at")(
-        lambda value: _validate_aware_timestamp(value)
-        if value is not None
-        else value
+        lambda value: _validate_aware_timestamp(value) if value is not None else value
     )
 
 
@@ -290,9 +285,7 @@ class TargetedPracticeTrainingRecordDetailResponse(TrainingRecordAPIModel):
     duration_seconds: Annotated[int, Field(ge=0)]
     target_role: TrainingRecordTargetRoleResponse
     setup: TargetedPracticeSetupResponse
-    attempts: list[TargetedPracticeAttemptRecordResponse] = Field(
-        min_length=1
-    )
+    attempts: list[TargetedPracticeAttemptRecordResponse] = Field(min_length=1)
     exposed_weaknesses: list[ReviewWeakness] = Field(default_factory=list)
     recommendation: PracticeRecommendationOutput | None
 
@@ -332,8 +325,8 @@ class MockInterviewTrainingRecordDetailResponse(TrainingRecordAPIModel):
         default_factory=list
     )
     review: InterviewSessionReviewResponse
-    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
-        default_factory=list
+    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = (
+        Field(default_factory=list)
     )
 
     _validate_started_at = field_validator("started_at")(_validate_aware_timestamp)

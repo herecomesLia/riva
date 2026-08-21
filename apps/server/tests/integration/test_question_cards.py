@@ -1,6 +1,6 @@
 import asyncio
-from datetime import timedelta
 import os
+from datetime import timedelta
 from uuid import uuid4
 
 import pytest
@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from riva.agents import QuestionGenerationAgent
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMUsage
@@ -17,7 +17,6 @@ from riva.models import AgentRun
 from riva.workers import AgentHandlerRegistry, AgentWorker, QuestionGenerationHandler
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_question_generation import seed_context
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -117,20 +116,21 @@ def test_question_card_http_flow_with_real_worker() -> None:
                     )
                     assert await worker.process_one() is True
 
-                    succeeded = client.get(
-                        f"/api/question-cards/generations/{run_id}"
-                    )
+                    succeeded = client.get(f"/api/question-cards/generations/{run_id}")
                     assert succeeded.status_code == 200
                     succeeded_body = succeeded.json()
                     assert succeeded_body["status"] == "succeeded"
-                    assert succeeded_body["questionCard"]["prompt"] == response_a[
-                        "prompt"
-                    ]
+                    assert (
+                        succeeded_body["questionCard"]["prompt"] == response_a["prompt"]
+                    )
                     card_id = succeeded_body["questionCard"]["id"]
                     assert succeeded_body["questionCard"]["language"] == "en"
-                    assert succeeded_body["questionCard"]["recommendedMaterials"][0][
-                        "label"
-                    ] == "Payment Platform"
+                    assert (
+                        succeeded_body["questionCard"]["recommendedMaterials"][0][
+                            "label"
+                        ]
+                        == "Payment Platform"
+                    )
 
                     card = client.get(f"/api/question-cards/{card_id}")
                     assert card.status_code == 200

@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import json
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,7 +10,6 @@ from riva.db.database import Database
 from riva.models import AgentRun, AgentRunStatus, User
 from riva.services.agent_observability import AgentObservabilityService
 from tests.helpers.integration_database import get_integration_database_url
-
 
 pytestmark = pytest.mark.integration
 
@@ -231,9 +230,7 @@ def test_observability_report_filters_safely_and_is_read_only() -> None:
                         agent_id="agent-a",
                     )
                 assert owner_report.total_runs == 5
-                assert [item.agent_id for item in owner_report.by_agent] == [
-                    "agent-a"
-                ]
+                assert [item.agent_id for item in owner_report.by_agent] == ["agent-a"]
 
                 serialized = json.dumps(
                     report.model_dump(mode="json", by_alias=True),

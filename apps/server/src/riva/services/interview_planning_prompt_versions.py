@@ -2,7 +2,6 @@ from riva.prompts import INTERVIEW_PLANNING_PROMPT
 from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_planning import InterviewPlanningOutput
 
-
 # This is the exact v1 planning prompt. Keep it immutable so queued and replayed
 # v1 runs never receive the v2 training-memory block.
 INTERVIEW_PLANNING_LEGACY_PROMPT = PromptDefinition(

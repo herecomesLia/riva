@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Final
 
-
 COMPETENCY_DISPLAY_NAMES: Final[Mapping[str, str]] = {
     "answer_quality": "Answer Quality",
     "relevance": "Relevance",

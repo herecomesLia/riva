@@ -11,12 +11,11 @@ from riva.models import AgentRun, AgentRunStatus
 from riva.prompts import TRAINING_PLANNING_PROMPT
 from riva.schemas.training_planning import (
     TrainingPlanningInput,
-    TrainingPlanningTargetedPracticeOutput,
     TrainingPlanningRunPayload,
+    TrainingPlanningTargetedPracticeOutput,
 )
 from riva.workers import AgentExecutionError, TrainingPlanningHandler
 from tests.helpers.llm import FakeLLMProvider
-
 
 NOW = datetime(2026, 8, 18, 10, 0, tzinfo=UTC)
 
@@ -77,9 +76,7 @@ def running_run(
         requestId=request_id,
         targetRoleId=input.target_role.id,
         interactionLanguage=input.interaction_language,
-        contextFingerprint=(
-            "0" * 64
-        ),
+        contextFingerprint=("0" * 64),
         trainingPlanningInput=input,
     )
     from riva.core.training_planning import training_planning_context_fingerprint
@@ -93,9 +90,7 @@ def running_run(
         prompt_version=TRAINING_PLANNING_PROMPT.version,
         output_schema_id=TRAINING_PLANNING_PROMPT.output_schema_id,
         status=status,
-        payload=cast(
-            dict[str, object], payload.model_dump(mode="json", by_alias=True)
-        ),
+        payload=cast(dict[str, object], payload.model_dump(mode="json", by_alias=True)),
         idempotency_key=f"training-planning:{request_id}",
         attempt_count=1,
         max_attempts=3,

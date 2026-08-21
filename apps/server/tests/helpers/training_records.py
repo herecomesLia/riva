@@ -15,7 +15,6 @@ from riva.models import (
     User,
 )
 
-
 TRUSTED_ORIGIN = "http://localhost:5173"
 START = datetime(2026, 8, 10, 9, 0, tzinfo=UTC)
 
@@ -301,9 +300,7 @@ async def seed_records(database: Database):
             role_id=role.id,
             started_at=START + timedelta(hours=4),
             reason="reviewCompleted",
-            attempt_specs=[
-                {"number": 1, "status": "completed", "answered": True}
-            ],
+            attempt_specs=[{"number": 1, "status": "completed", "answered": True}],
         )
         ids["archived"] = await add_record(
             session,

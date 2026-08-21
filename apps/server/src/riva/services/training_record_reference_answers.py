@@ -24,6 +24,7 @@ from riva.services.practice_api import (
     build_practice_follow_up_reference_answer_response,
     build_practice_main_reference_answer_response,
 )
+from riva.services.practice_sessions import PracticeSessionStateError
 from riva.services.reference_answer_generation import (
     PracticeReferenceAnswerLifecycleStatus,
     PracticeReferenceAnswerWorkflowState,
@@ -32,8 +33,6 @@ from riva.services.reference_answer_generation import (
     practice_follow_up_reference_answer_idempotency_key,
     practice_main_reference_answer_idempotency_key,
 )
-from riva.services.practice_sessions import PracticeSessionStateError
-
 
 TrainingRecordReferenceAnswerStateErrorCode = Literal[
     "training_record_not_found",
@@ -199,9 +198,7 @@ class TrainingRecordReferenceAnswerService:
             or record.completed_at is None
             or record.completion_reason not in {"reviewCompleted", "userEndedEarly"}
         ):
-            raise TrainingRecordReferenceAnswerStateError(
-                TRAINING_RECORD_NOT_FOUND
-            )
+            raise TrainingRecordReferenceAnswerStateError(TRAINING_RECORD_NOT_FOUND)
 
         attempt = await self.session.scalar(
             select(PracticeAttempt).where(
@@ -339,9 +336,7 @@ def _build_response(
                 question_id=target.attempt.id,
                 subject="mainQuestion",
             )
-            reference_answer = build_practice_main_reference_answer_response(
-                state
-            )
+            reference_answer = build_practice_main_reference_answer_response(state)
         else:
             response_target = TargetedPracticeFollowUpReferenceAnswerTargetResponse(
                 kind="targetedPractice",
@@ -350,16 +345,14 @@ def _build_response(
                 subject="followUp",
                 follow_up_id=target.follow_up_question.id,
             )
-            reference_answer = (
-                build_practice_follow_up_reference_answer_response(state)
-            )
+            reference_answer = build_practice_follow_up_reference_answer_response(state)
         return TrainingRecordReferenceAnswerResponse(
             target=response_target,
             reference_answer=reference_answer,
         )
     except TrainingRecordReferenceAnswerStateError:
         raise
-    except (AttributeError, TypeError, ValueError, PracticeSessionStateError):
+    except AttributeError, TypeError, ValueError, PracticeSessionStateError:
         raise TrainingRecordReferenceAnswerStateError(
             TRAINING_RECORD_STATE_CONFLICT
         ) from None

@@ -9,7 +9,6 @@ from sqlalchemy import select
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMProviderConfigurationError
-from riva.services.agent_runs import AgentRunService
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -24,6 +23,7 @@ from riva.models import (
     InterviewTurnAssessment,
     TargetRole,
 )
+from riva.services.agent_runs import AgentRunService
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_interview_planning_workflow import (
     _app,
@@ -35,11 +35,12 @@ from tests.integration.test_interview_planning_workflow import (
     migrated_database_url,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
-def _turn_output(action: str = "followUp", prompt: str = "What evidence supports that decision?"):
+def _turn_output(
+    action: str = "followUp", prompt: str = "What evidence supports that decision?"
+):
     return {
         "assessment": {
             "score": 82,
@@ -194,11 +195,14 @@ def test_interview_turn_success_persists_follow_up_and_frozen_snapshot(
                     assert turn_snapshot["careerProfile"]["summary"] is None
                     assert turn_snapshot["targetRole"]["company"] is None
                     assert turn_snapshot["targetRole"]["location"] is None
-                    assert turn_snapshot["careerProfile"]["workExperiences"][0][
-                        "location"
-                    ] is None
+                    assert (
+                        turn_snapshot["careerProfile"]["workExperiences"][0]["location"]
+                        is None
+                    )
 
-                    stored_profile = await session.get(CareerProfile, profile.profile_id)
+                    stored_profile = await session.get(
+                        CareerProfile, profile.profile_id
+                    )
                     assert stored_profile is not None
                     stored_profile.summary = "CHANGED_AFTER_ENQUEUE"
                     await session.commit()
@@ -211,8 +215,7 @@ def test_interview_turn_success_persists_follow_up_and_frozen_snapshot(
                     assert stored_run.status is AgentRunStatus.SUCCEEDED
                     assessment = await session.scalar(
                         select(InterviewTurnAssessment).where(
-                            InterviewTurnAssessment.source_agent_run_id
-                            == turn_run.id
+                            InterviewTurnAssessment.source_agent_run_id == turn_run.id
                         )
                     )
                     assert assessment is not None
@@ -251,7 +254,10 @@ def test_interview_turn_success_persists_follow_up_and_frozen_snapshot(
                 )
                 assert body["currentFollowUp"]["status"] == "awaitingAnswer"
                 assert len(provider.calls) == 2
-                assert "CHANGED_AFTER_ENQUEUE" not in provider.calls[-1].messages[1].content
+                assert (
+                    "CHANGED_AFTER_ENQUEUE"
+                    not in provider.calls[-1].messages[1].content
+                )
 
     asyncio.run(run_workflow())
 
@@ -409,18 +415,21 @@ def test_interview_turn_stale_and_duplicate_answer_do_not_enqueue_again(
                             )
                         )
                     ) is not None
-                    assert len(
-                        list(
-                            (
-                                await session.scalars(
-                                    select(AgentRun).where(
-                                        AgentRun.user_id == owner.id,
-                                        AgentRun.agent_id == "interview-turn",
+                    assert (
+                        len(
+                            list(
+                                (
+                                    await session.scalars(
+                                        select(AgentRun).where(
+                                            AgentRun.user_id == owner.id,
+                                            AgentRun.agent_id == "interview-turn",
+                                        )
                                     )
-                                )
-                            ).all()
+                                ).all()
+                            )
                         )
-                    ) == 1
+                        == 1
+                    )
 
     asyncio.run(run_workflow())
 
@@ -458,12 +467,15 @@ def test_interview_turn_pressure_follow_up_limit_is_enforced_and_serialized(
                     )
                     assert main_question is not None
 
-                assert _answer_request(
-                    client,
-                    session_id,
-                    version=3,
-                    question_id=main_question.id,
-                ).status_code == 202
+                assert (
+                    _answer_request(
+                        client,
+                        session_id,
+                        version=3,
+                        question_id=main_question.id,
+                    ).status_code
+                    == 202
+                )
                 await _run_planner(database, settings, provider)
                 first_follow_up_page = client.get(
                     "/api/interview",
@@ -475,13 +487,16 @@ def test_interview_turn_pressure_follow_up_limit_is_enforced_and_serialized(
                 )
                 assert "assessment" not in first_follow_up_page
 
-                assert _follow_up_answer_request(
-                    client,
-                    session_id,
-                    version=5,
-                    question_id=main_question.id,
-                    follow_up_question_id=first_follow_up_id,
-                ).status_code == 202
+                assert (
+                    _follow_up_answer_request(
+                        client,
+                        session_id,
+                        version=5,
+                        question_id=main_question.id,
+                        follow_up_question_id=first_follow_up_id,
+                    ).status_code
+                    == 202
+                )
                 await _run_planner(database, settings, provider)
                 second_follow_up_page = client.get(
                     "/api/interview",
@@ -491,15 +506,21 @@ def test_interview_turn_pressure_follow_up_limit_is_enforced_and_serialized(
                 second_follow_up_id = UUID(
                     second_follow_up_page["currentFollowUp"]["question"]["id"]
                 )
-                assert len(second_follow_up_page["currentQuestion"]["answeredFollowUps"]) == 1
+                assert (
+                    len(second_follow_up_page["currentQuestion"]["answeredFollowUps"])
+                    == 1
+                )
 
-                assert _follow_up_answer_request(
-                    client,
-                    session_id,
-                    version=7,
-                    question_id=main_question.id,
-                    follow_up_question_id=second_follow_up_id,
-                ).status_code == 202
+                assert (
+                    _follow_up_answer_request(
+                        client,
+                        session_id,
+                        version=7,
+                        question_id=main_question.id,
+                        follow_up_question_id=second_follow_up_id,
+                    ).status_code
+                    == 202
+                )
                 await _run_planner(database, settings, provider)
 
                 final_page = client.get("/api/interview", headers=_headers())
@@ -561,7 +582,11 @@ def test_interview_turn_complete_is_atomic_and_materializes_next_or_candidate_st
             settings = _settings(migrated_database_url)
             app = _app(migrated_database_url, owner)
             provider = FakeLLMProvider(
-                [_planner_output(2), _turn_output("complete"), _turn_output("complete")],
+                [
+                    _planner_output(2),
+                    _turn_output("complete"),
+                    _turn_output("complete"),
+                ],
                 provider="fake",
             )
             with TestClient(app) as client:
@@ -579,21 +604,25 @@ def test_interview_turn_complete_is_atomic_and_materializes_next_or_candidate_st
                         )
                     )
                     assert first is not None
-                assert _answer_request(
-                    client,
-                    session_id,
-                    version=3,
-                    question_id=first.id,
-                ).status_code == 202
+                assert (
+                    _answer_request(
+                        client,
+                        session_id,
+                        version=3,
+                        question_id=first.id,
+                    ).status_code
+                    == 202
+                )
                 await _run_planner(database, settings, provider)
                 next_page = client.get("/api/interview", headers=_headers())
                 assert next_page.json()["session"]["status"] == "question"
                 assert next_page.json()["session"]["completedQuestions"][0][
                     "completedAt"
                 ]
-                assert next_page.json()["session"]["progress"][
-                    "completedMainQuestions"
-                ] == 1
+                assert (
+                    next_page.json()["session"]["progress"]["completedMainQuestions"]
+                    == 1
+                )
 
                 async with database.sessionmaker() as session:
                     second = await session.scalar(
@@ -603,12 +632,15 @@ def test_interview_turn_complete_is_atomic_and_materializes_next_or_candidate_st
                         )
                     )
                     assert second is not None
-                assert _answer_request(
-                    client,
-                    session_id,
-                    version=5,
-                    question_id=second.id,
-                ).status_code == 202
+                assert (
+                    _answer_request(
+                        client,
+                        session_id,
+                        version=5,
+                        question_id=second.id,
+                    ).status_code
+                    == 202
+                )
                 await _run_planner(database, settings, provider)
                 final = client.get("/api/interview", headers=_headers())
                 assert final.json()["session"]["status"] == "candidateQuestions"
@@ -639,12 +671,15 @@ def test_interview_turn_persist_failure_rolls_back_assessment_and_follow_up(
                         )
                     )
                     assert question is not None
-                assert _answer_request(
-                    client,
-                    session_id,
-                    version=3,
-                    question_id=question.id,
-                ).status_code == 202
+                assert (
+                    _answer_request(
+                        client,
+                        session_id,
+                        version=3,
+                        question_id=question.id,
+                    ).status_code
+                    == 202
+                )
                 async with database.sessionmaker() as session:
                     question = await session.get(InterviewQuestion, question.id)
                     assert question is not None
@@ -704,8 +739,7 @@ async def _seed(
             stored_role = await session.get(TargetRole, role.id)
             work_experience = await session.scalar(
                 select(CareerProfileWorkExperience).where(
-                    CareerProfileWorkExperience.career_profile_id
-                    == profile.profile_id
+                    CareerProfileWorkExperience.career_profile_id == profile.profile_id
                 )
             )
             assert stored_profile is not None

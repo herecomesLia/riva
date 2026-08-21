@@ -20,7 +20,6 @@ from riva.schemas.resume_parsing import (
 from riva.services.prompt_versions import RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
 from riva.utils import utc_now
 
-
 ResumeParsingStateErrorCode = Literal[
     "invalid_resume_parsing_run",
     "resume_document_not_found",
@@ -30,21 +29,13 @@ ResumeParsingStateErrorCode = Literal[
     "resume_parsing_result_conflict",
 ]
 
-INVALID_RESUME_PARSING_RUN: ResumeParsingStateErrorCode = (
-    "invalid_resume_parsing_run"
-)
-RESUME_DOCUMENT_NOT_FOUND: ResumeParsingStateErrorCode = (
-    "resume_document_not_found"
-)
-RESUME_DOCUMENT_NOT_READY: ResumeParsingStateErrorCode = (
-    "resume_document_not_ready"
-)
+INVALID_RESUME_PARSING_RUN: ResumeParsingStateErrorCode = "invalid_resume_parsing_run"
+RESUME_DOCUMENT_NOT_FOUND: ResumeParsingStateErrorCode = "resume_document_not_found"
+RESUME_DOCUMENT_NOT_READY: ResumeParsingStateErrorCode = "resume_document_not_ready"
 RESUME_DOCUMENT_TEXT_MISSING: ResumeParsingStateErrorCode = (
     "resume_document_text_missing"
 )
-RESUME_PARSING_SUPERSEDED: ResumeParsingStateErrorCode = (
-    "resume_parsing_superseded"
-)
+RESUME_PARSING_SUPERSEDED: ResumeParsingStateErrorCode = "resume_parsing_superseded"
 RESUME_PARSING_RESULT_CONFLICT: ResumeParsingStateErrorCode = (
     "resume_parsing_result_conflict"
 )
@@ -83,10 +74,8 @@ class ResumeParsingService:
                     resume_text=context.document.extracted_text,
                     interaction_language=context.payload.interaction_language,
                 )
-            except (TypeError, ValueError, ValidationError):
-                raise ResumeParsingStateError(
-                    RESUME_DOCUMENT_TEXT_MISSING
-                ) from None
+            except TypeError, ValueError, ValidationError:
+                raise ResumeParsingStateError(RESUME_DOCUMENT_TEXT_MISSING) from None
 
             await self.session.commit()
             return parsing_input
@@ -117,8 +106,7 @@ class ResumeParsingService:
                 select(ResumeParsingResult)
                 .where(
                     ResumeParsingResult.source_agent_run_id == run.id,
-                    ResumeParsingResult.resume_document_id
-                    != context.document.id,
+                    ResumeParsingResult.resume_document_id != context.document.id,
                 )
                 .with_for_update()
             )
@@ -137,16 +125,10 @@ class ResumeParsingService:
                     parsed_at=parsed_at,
                     summary=cast(str | None, values["summary"]),
                     education=_copy_json_list(values["education"]),
-                    work_experiences=_copy_json_list(
-                        values["work_experiences"]
-                    ),
-                    project_experiences=_copy_json_list(
-                        values["project_experiences"]
-                    ),
+                    work_experiences=_copy_json_list(values["work_experiences"]),
+                    project_experiences=_copy_json_list(values["project_experiences"]),
                     skills=_copy_string_list(values["skills"]),
-                    unresolved_items=_copy_string_list(
-                        values["unresolved_items"]
-                    ),
+                    unresolved_items=_copy_string_list(values["unresolved_items"]),
                 )
                 self.session.add(result)
             else:
@@ -157,16 +139,12 @@ class ResumeParsingService:
                 result.parsed_at = parsed_at
                 result.summary = cast(str | None, values["summary"])
                 result.education = _copy_json_list(values["education"])
-                result.work_experiences = _copy_json_list(
-                    values["work_experiences"]
-                )
+                result.work_experiences = _copy_json_list(values["work_experiences"])
                 result.project_experiences = _copy_json_list(
                     values["project_experiences"]
                 )
                 result.skills = _copy_string_list(values["skills"])
-                result.unresolved_items = _copy_string_list(
-                    values["unresolved_items"]
-                )
+                result.unresolved_items = _copy_string_list(values["unresolved_items"])
 
             context.document.parsing_run_id = run.id
             await self.session.commit()
@@ -199,10 +177,7 @@ class ResumeParsingService:
         document = await self.session.scalar(document_statement)
         if document is None:
             raise ResumeParsingStateError(RESUME_DOCUMENT_NOT_FOUND)
-        if (
-            document.id != payload.resume_document_id
-            or document.user_id != run.user_id
-        ):
+        if document.id != payload.resume_document_id or document.user_id != run.user_id:
             raise ResumeParsingStateError(RESUME_DOCUMENT_NOT_FOUND)
         if document.parsing_run_id != run.id:
             raise ResumeParsingStateError(RESUME_PARSING_SUPERSEDED)
@@ -240,7 +215,7 @@ def resume_parsing_output_from_result(
                 "unresolved_items": result.unresolved_items,
             }
         )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise ResumeParsingStateError(INVALID_RESUME_PARSING_RUN) from None
 
 
@@ -256,16 +231,14 @@ def _validate_run(run: AgentRun) -> ResumeParsingRunPayload:
 
     try:
         return ResumeParsingRunPayload.model_validate(run.payload)
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ResumeParsingStateError(INVALID_RESUME_PARSING_RUN) from None
 
 
 def _revalidate_output(output: ResumeParsingOutput) -> ResumeParsingOutput:
     try:
-        return ResumeParsingOutput.model_validate(
-            output.model_dump(mode="json")
-        )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+        return ResumeParsingOutput.model_validate(output.model_dump(mode="json"))
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise ResumeParsingStateError(INVALID_RESUME_PARSING_RUN) from None
 
 

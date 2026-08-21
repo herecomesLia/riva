@@ -8,10 +8,9 @@ from riva.schemas.practice_recommendation import (
     PracticeNextQuestionPlan,
     PracticeRecommendationInput,
     PracticeRecommendationOutput,
-    RecommendationRunPayload,
     PracticeRetryCurrentRecommendation,
+    RecommendationRunPayload,
 )
-
 
 CORE_DIMENSIONS = [
     "relevance",
@@ -259,13 +258,16 @@ def test_next_question_plan_has_no_extra_fields() -> None:
         )
 
 
-@pytest.mark.parametrize("question_type", [
-    "projectDeepDive",
-    "behavioral",
-    "businessUnderstanding",
-    "motivation",
-    "technicalFoundation",
-])
+@pytest.mark.parametrize(
+    "question_type",
+    [
+        "projectDeepDive",
+        "behavioral",
+        "businessUnderstanding",
+        "motivation",
+        "technicalFoundation",
+    ],
+)
 @pytest.mark.parametrize("difficulty", ["basic", "pressure"])
 def test_recommendation_input_accepts_question_contract(
     question_type: str,

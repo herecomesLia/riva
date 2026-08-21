@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, JSON
+from sqlalchemy import JSON, CheckConstraint, ForeignKeyConstraint, Index
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db import Base
@@ -89,9 +89,7 @@ def test_interview_session_checks_cover_future_states_and_configuration() -> Non
         "duration_minutes IN (15, 30, 45)"
     )
     assert checks["ck_interview_sessions_plan_revision"] == "plan_revision >= 0"
-    assert "status = 'completed'" in checks[
-        "ck_interview_sessions_completion_state"
-    ]
+    assert "status = 'completed'" in checks["ck_interview_sessions_completion_state"]
 
 
 def test_only_one_non_completed_interview_session_is_allowed_per_user() -> None:
@@ -154,7 +152,9 @@ def test_interview_question_table_is_independent_from_question_cards() -> None:
     assert table.c.completed_at.type.timezone is True
 
 
-def test_interview_turn_tables_use_single_answer_lineage_and_independent_lifecycle() -> None:
+def test_interview_turn_tables_use_single_answer_lineage_and_independent_lifecycle() -> (
+    None
+):
     load_models()
 
     answer = InterviewAnswer.__table__
@@ -164,21 +164,19 @@ def test_interview_turn_tables_use_single_answer_lineage_and_independent_lifecyc
 
     assert answer.c.content.nullable is False
     assert answer.c.submitted_at.type.timezone is True
-    assert {
-        column.name for column in answer.constraints if column.name
-    } >= {"uq_interview_answers_question"}
+    assert {column.name for column in answer.constraints if column.name} >= {
+        "uq_interview_answers_question"
+    }
     assert {
         column.name for column in follow_up_question.constraints if column.name
     } >= {
         "uq_interview_follow_up_questions_parent_order",
         "uq_interview_follow_up_questions_source_run",
     }
-    assert {
-        column.name for column in follow_up_answer.constraints if column.name
-    } >= {"uq_interview_follow_up_answers_question"}
-    assert {
-        column.name for column in assessment.constraints if column.name
-    } >= {
+    assert {column.name for column in follow_up_answer.constraints if column.name} >= {
+        "uq_interview_follow_up_answers_question"
+    }
+    assert {column.name for column in assessment.constraints if column.name} >= {
         "uq_interview_turn_assessments_source_run",
         "uq_interview_turn_assessments_main_answer",
         "uq_interview_turn_assessments_follow_up_answer",

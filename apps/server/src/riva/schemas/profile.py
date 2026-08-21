@@ -215,9 +215,7 @@ class CareerProfileSkillResponse(CareerProfileSkillInput):
 class CareerProfilePutRequest(StrictAPIModel):
     version: Annotated[int, Field(ge=1)] | None
     summary: Summary
-    education: list[CareerProfileEducationInput] = Field(
-        max_length=MAX_SECTION_ITEMS
-    )
+    education: list[CareerProfileEducationInput] = Field(max_length=MAX_SECTION_ITEMS)
     work_experiences: list[CareerProfileWorkExperienceInput] = Field(
         max_length=MAX_SECTION_ITEMS
     )

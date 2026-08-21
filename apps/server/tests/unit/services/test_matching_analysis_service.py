@@ -26,7 +26,6 @@ from riva.services.matching_analyses import (
 )
 from riva.services.profile_completion import career_profile_completed
 
-
 NOW = datetime(2026, 8, 4, 9, 30, tzinfo=UTC)
 
 
@@ -198,9 +197,7 @@ def test_invalid_run_rolls_back_and_exposes_only_safe_matching_error() -> None:
     session = ScriptedSession()
 
     with pytest.raises(MatchingAnalysisStateError) as exc_info:
-        asyncio.run(
-            MatchingAnalysisService(session).load_matching_input(run)
-        )
+        asyncio.run(MatchingAnalysisService(session).load_matching_input(run))
 
     assert exc_info.value.code == INVALID_MATCHING_ANALYSIS_RUN
     assert str(exc_info.value) == MatchingAnalysisStateError.safe_message
@@ -246,9 +243,7 @@ def invalid_contract_cases() -> list[tuple[str, Callable[[AgentRun], None]]]:
         ),
         (
             "invalid_analysis_version",
-            lambda run: run.payload.update(
-                {"jobDescriptionAnalysisVersion": 0}
-            ),
+            lambda run: run.payload.update({"jobDescriptionAnalysisVersion": 0}),
         ),
     ]
 
@@ -379,9 +374,7 @@ def test_persist_locks_in_required_order_and_saves_initial_result() -> None:
     assert role.version == 11
     assert session.commit_count == 1
     assert session.rollback_count == 0
-    assert all(
-        "FOR UPDATE" in str(statement) for statement in session.statements[:5]
-    )
+    assert all("FOR UPDATE" in str(statement) for statement in session.statements[:5])
     assert "FOR UPDATE" not in str(session.statements[5])
 
 

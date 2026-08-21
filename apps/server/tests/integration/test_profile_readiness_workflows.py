@@ -1,6 +1,6 @@
 import asyncio
-from datetime import timedelta
 import os
+from datetime import timedelta
 from typing import Literal
 from uuid import uuid4
 
@@ -52,7 +52,6 @@ from tests.helpers.interview import (
     create_user,
 )
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 MODEL = "fake-profile-readiness-model"
@@ -267,11 +266,14 @@ def test_minimal_profiles_are_ready_across_core_workflows(
                     question_run = await session.get(AgentRun, question_run_id)
                     assert question_run is not None
                     assert question_run.status is AgentRunStatus.SUCCEEDED
-                    assert await session.scalar(
-                        select(QuestionCard.id).where(
-                            QuestionCard.source_agent_run_id == question_run_id
+                    assert (
+                        await session.scalar(
+                            select(QuestionCard.id).where(
+                                QuestionCard.source_agent_run_id == question_run_id
+                            )
                         )
-                    ) is not None
+                        is not None
+                    )
 
                     interview_service = InterviewSessionService(session)
                     setup = await interview_service.get_setup(user_id=owner.id)

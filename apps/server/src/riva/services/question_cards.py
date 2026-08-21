@@ -1,5 +1,5 @@
-from collections.abc import Callable
 import re
+from collections.abc import Callable
 from uuid import UUID
 
 from fastapi import status
@@ -26,7 +26,6 @@ from riva.services.question_generation import (
     question_generation_output_from_card,
     validate_question_generation_run,
 )
-
 
 QUESTION_GENERATION_FAILURE_REASON = (
     "The question could not be generated right now. Please try again."
@@ -150,13 +149,16 @@ class QuestionCardService:
     ) -> AgentRun | None:
         prompt = QUESTION_GENERATION_PROMPT
         return await self.session.scalar(
-            select(AgentRun).where(
+            select(AgentRun)
+            .where(
                 AgentRun.user_id == user_id,
                 AgentRun.agent_id == "question-generator",
                 AgentRun.prompt_id == prompt.prompt_id,
                 AgentRun.output_schema_id == prompt.output_schema_id,
                 AgentRun.idempotency_key == idempotency_key,
-            ).order_by(AgentRun.created_at.asc(), AgentRun.id.asc()).limit(1)
+            )
+            .order_by(AgentRun.created_at.asc(), AgentRun.id.asc())
+            .limit(1)
         )
 
     async def _load_run(self, *, user_id: UUID, run_id: UUID) -> AgentRun:
@@ -190,7 +192,7 @@ class QuestionCardService:
                 raise _state_conflict()
             try:
                 question_generation_output_from_card(card)
-            except (AttributeError, TypeError, ValueError, ValidationError):
+            except AttributeError, TypeError, ValueError, ValidationError:
                 raise _state_conflict() from None
             question_card = build_question_card_response(card)
         elif run.status == AgentRunStatus.FAILED:
@@ -215,9 +217,7 @@ class QuestionCardService:
                 attempt_count=run.attempt_count,
                 max_attempts=run.max_attempts,
                 error_code=(
-                    run.error_code
-                    if run.status == AgentRunStatus.FAILED
-                    else None
+                    run.error_code if run.status == AgentRunStatus.FAILED else None
                 ),
                 failure_reason=(
                     QUESTION_GENERATION_FAILURE_REASON
@@ -229,7 +229,7 @@ class QuestionCardService:
                 finished_at=run.finished_at,
                 question_card=question_card,
             )
-        except (AttributeError, TypeError, ValueError, ValidationError):
+        except AttributeError, TypeError, ValueError, ValidationError:
             raise _state_conflict() from None
 
     @staticmethod
@@ -248,7 +248,7 @@ class QuestionCardService:
     ) -> QuestionGenerationRunPayload:
         try:
             return validate_question_generation_run(run)
-        except (ValidationError, QuestionGenerationStateError):
+        except ValidationError, QuestionGenerationStateError:
             raise _state_conflict() from None
 
     @staticmethod
@@ -308,7 +308,7 @@ def build_question_card_response(card: QuestionCard) -> QuestionCardResponse:
             created_at=card.created_at,
             updated_at=card.updated_at,
         )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise _state_conflict() from None
 
 

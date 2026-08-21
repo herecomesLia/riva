@@ -29,9 +29,7 @@ class JobDescriptionParsingAgent(
     def agent_id(self) -> str:
         return "job-description-parser"
 
-    def prompt_values(
-        self, input: JobDescriptionParsingInput
-    ) -> Mapping[str, object]:
+    def prompt_values(self, input: JobDescriptionParsingInput) -> Mapping[str, object]:
         return {
             "role_title": input.role_title or "",
             "company": input.company or "",

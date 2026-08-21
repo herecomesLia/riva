@@ -50,9 +50,7 @@ class QualityJudgeRubricMismatchError(ValueError):
         )
 
 
-class AgentEvalQualityJudge(
-    Agent[QualityJudgeInput, QualityJudgeOutput]
-):
+class AgentEvalQualityJudge(Agent[QualityJudgeInput, QualityJudgeOutput]):
     def __init__(self, provider: LLMProvider, model: str) -> None:
         super().__init__(
             provider=provider,

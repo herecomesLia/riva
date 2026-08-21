@@ -1,5 +1,5 @@
-from enum import StrEnum
 import os
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -86,7 +86,9 @@ class Settings(BaseSettings):
             self.session_cookie_samesite == SameSitePolicy.NONE
             and not self.session_cookie_secure
         ):
-            raise ValueError("SameSite=None cookies require RIVA_SESSION_COOKIE_SECURE.")
+            raise ValueError(
+                "SameSite=None cookies require RIVA_SESSION_COOKIE_SECURE."
+            )
         if self.worker_heartbeat_seconds >= self.worker_lease_seconds:
             raise ValueError(
                 "RIVA_WORKER_HEARTBEAT_SECONDS must be less than "
@@ -112,37 +114,25 @@ class Settings(BaseSettings):
         _write_optional_secret_environ("RIVA_LLM_API_KEY", self.llm_api_key)
         _write_optional_environ("RIVA_LLM_BASE_URL", self.llm_base_url)
         os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.llm_timeout_seconds)
-        os.environ["RIVA_LLM_ENABLE_THINKING"] = str(
-            self.llm_enable_thinking
-        ).lower()
+        os.environ["RIVA_LLM_ENABLE_THINKING"] = str(self.llm_enable_thinking).lower()
         _write_optional_environ("RIVA_WORKER_ID", self.worker_id)
         os.environ["RIVA_WORKER_LEASE_SECONDS"] = str(self.worker_lease_seconds)
-        os.environ["RIVA_WORKER_HEARTBEAT_SECONDS"] = str(
-            self.worker_heartbeat_seconds
-        )
+        os.environ["RIVA_WORKER_HEARTBEAT_SECONDS"] = str(self.worker_heartbeat_seconds)
         os.environ["RIVA_WORKER_POLL_SECONDS"] = str(self.worker_poll_seconds)
-        os.environ["RIVA_WORKER_REQUEUE_SECONDS"] = str(
-            self.worker_requeue_seconds
-        )
+        os.environ["RIVA_WORKER_REQUEUE_SECONDS"] = str(self.worker_requeue_seconds)
         os.environ["RIVA_WORKER_RETRY_BASE_SECONDS"] = str(
             self.worker_retry_base_seconds
         )
-        os.environ["RIVA_WORKER_RETRY_MAX_SECONDS"] = str(
-            self.worker_retry_max_seconds
-        )
+        os.environ["RIVA_WORKER_RETRY_MAX_SECONDS"] = str(self.worker_retry_max_seconds)
         os.environ["RIVA_WORKER_REQUEUE_BATCH_SIZE"] = str(
             self.worker_requeue_batch_size
         )
         os.environ["RIVA_RESUME_STORAGE_DIR"] = str(self.resume_storage_dir)
-        os.environ["RIVA_RESUME_MAX_UPLOAD_BYTES"] = str(
-            self.resume_max_upload_bytes
-        )
+        os.environ["RIVA_RESUME_MAX_UPLOAD_BYTES"] = str(self.resume_max_upload_bytes)
         os.environ["RIVA_RESUME_MAX_EXTRACTED_CHARACTERS"] = str(
             self.resume_max_extracted_characters
         )
-        os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(
-            self.cors_allowed_origins
-        )
+        os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(self.cors_allowed_origins)
         os.environ["RIVA_CORS_ALLOW_CREDENTIALS"] = str(
             self.cors_allow_credentials
         ).lower()
@@ -151,9 +141,7 @@ class Settings(BaseSettings):
         os.environ["RIVA_SESSION_COOKIE_SECURE"] = str(
             self.session_cookie_secure
         ).lower()
-        os.environ["RIVA_SESSION_COOKIE_SAMESITE"] = (
-            self.session_cookie_samesite.value
-        )
+        os.environ["RIVA_SESSION_COOKIE_SAMESITE"] = self.session_cookie_samesite.value
         os.environ["RIVA_SESSION_COOKIE_PATH"] = self.session_cookie_path
         os.environ["RIVA_SESSION_IDLE_TIMEOUT_SECONDS"] = str(
             self.session_idle_timeout_seconds

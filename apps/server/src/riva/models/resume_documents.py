@@ -181,8 +181,7 @@ class ResumeDocument(Base):
         "ResumeImportDraft",
         back_populates="document",
         foreign_keys=(
-            "[ResumeImportDraft.user_id, "
-            "ResumeImportDraft.resume_document_id]"
+            "[ResumeImportDraft.user_id, ResumeImportDraft.resume_document_id]"
         ),
         passive_deletes=True,
         uselist=False,

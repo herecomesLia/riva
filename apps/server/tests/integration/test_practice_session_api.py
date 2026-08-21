@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from riva.agents import QuestionGenerationAgent
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMUsage
@@ -20,7 +20,6 @@ from tests.integration.test_question_generation import (
     database_url,
     seed_context,
 )
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -70,9 +69,7 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                 }
 
                 with TestClient(app) as client:
-                    initial_current = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    initial_current = client.get("/api/practice/sessions/current")
                     assert initial_current.status_code == 200
                     assert initial_current.json() == {"session": None}
 
@@ -92,9 +89,7 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                     session_id = started_body["sessionId"]
                     session_uuid = UUID(session_id)
 
-                    current_generating = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    current_generating = client.get("/api/practice/sessions/current")
                     assert current_generating.status_code == 200
                     assert current_generating.json()["session"]["sessionId"] == (
                         session_id
@@ -173,8 +168,7 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                     question_id = refreshed_body["question"]["id"]
                     assert refreshed_body["question"]["answerHints"]["content"] is None
                     assert (
-                        refreshed_body["question"]["answerFramework"]["content"]
-                        is None
+                        refreshed_body["question"]["answerFramework"]["content"] is None
                     )
                     assert "sourceAgentRunId" not in refreshed_body["question"]
                     assert "templateId" not in refreshed_body["question"]
@@ -190,9 +184,7 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                     assert replay.json()["version"] == 2
                     assert replay.json()["question"]["id"] == question_id
 
-                    current_answering = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    current_answering = client.get("/api/practice/sessions/current")
                     assert current_answering.status_code == 200
                     assert current_answering.json()["session"]["status"] == (
                         "answering"
@@ -213,15 +205,11 @@ def test_practice_session_http_workflow_and_lost_response_replay() -> None:
                         password_hash="hash",
                         display_name="Other User",
                     )
-                    app.dependency_overrides[require_current_user] = (
-                        lambda: other_user
-                    )
+                    app.dependency_overrides[require_current_user] = lambda: other_user
                     isolated = client.get(f"/api/practice/sessions/{session_id}")
                     assert isolated.status_code == 404
                     assert isolated.json() == {"error": "practice_session_not_found"}
-                    isolated_current = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    isolated_current = client.get("/api/practice/sessions/current")
                     assert isolated_current.status_code == 200
                     assert isolated_current.json() == {"session": None}
             finally:

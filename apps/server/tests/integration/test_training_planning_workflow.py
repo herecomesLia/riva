@@ -34,7 +34,6 @@ from tests.helpers.interview import (
 )
 from tests.helpers.llm import FakeLLMProvider
 
-
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 MODEL = "fake-training-planner-model"
@@ -369,23 +368,21 @@ def test_training_planning_snapshots_replays_and_enforces_state_conflicts(
                     assert frozen_input["matchingAnalysis"]["missingCapabilities"] == [
                         "Results and evidence"
                     ]
-                    assert frozen_input["trainingMemory"]["focusCompetencies"][0][
-                        "level"
-                    ] == 42
+                    assert (
+                        frozen_input["trainingMemory"]["focusCompetencies"][0]["level"]
+                        == 42
+                    )
                     assert len(frozen_input["recentTraining"]) == 2
                     assert [
                         item["kind"] for item in frozen_input["recentTraining"]
                     ] == ["targetedPractice", "mockInterview"]
-                    initial_fingerprint = queued_run.payload[
-                        "contextFingerprint"
-                    ]
+                    initial_fingerprint = queued_run.payload["contextFingerprint"]
 
                     matching = await session.get(MatchingAnalysis, role.id)
                     competency = await session.scalar(
                         select(UserCompetency).where(
                             UserCompetency.user_id == owner.id,
-                            UserCompetency.competency_key
-                            == "results_and_evidence",
+                            UserCompetency.competency_key == "results_and_evidence",
                         )
                     )
                     assert matching is not None
@@ -418,9 +415,7 @@ def test_training_planning_snapshots_replays_and_enforces_state_conflicts(
                         completed_at=NOW - timedelta(minutes=6),
                         created_at=NOW - timedelta(minutes=25),
                     )
-                    session.add_all(
-                        [new_training_session, new_training_attempt]
-                    )
+                    session.add_all([new_training_session, new_training_attempt])
                     await session.commit()
 
                 provider = FakeLLMProvider(
@@ -475,12 +470,14 @@ def test_training_planning_snapshots_replays_and_enforces_state_conflicts(
                     assert second_run.payload["trainingPlanningInput"][
                         "matchingAnalysis"
                     ]["missingCapabilities"] == ["MUTATED_MATCHING_CONTEXT"]
-                    assert second_run.payload["trainingPlanningInput"][
-                        "trainingMemory"
-                    ]["focusCompetencies"][0]["level"] == 91
                     assert (
-                        second_run.payload["contextFingerprint"]
-                        != initial_fingerprint
+                        second_run.payload["trainingPlanningInput"]["trainingMemory"][
+                            "focusCompetencies"
+                        ][0]["level"]
+                        == 91
+                    )
+                    assert (
+                        second_run.payload["contextFingerprint"] != initial_fingerprint
                     )
                     recent = second_run.payload["trainingPlanningInput"][
                         "recentTraining"
@@ -510,9 +507,7 @@ def test_training_planning_snapshots_replays_and_enforces_state_conflicts(
 
                 missing_run = client.get(f"/api/training-plans/{uuid4()}")
                 assert missing_run.status_code == 404
-                assert missing_run.json() == {
-                    "error": "training_planning_not_found"
-                }
+                assert missing_run.json() == {"error": "training_planning_not_found"}
 
                 other_owner = create_user("training-planning-other")
                 other_run = AgentRun(
@@ -535,13 +530,9 @@ def test_training_planning_snapshots_replays_and_enforces_state_conflicts(
                     session.add_all([other_owner, other_run])
                     await session.commit()
 
-                not_owner = client.get(
-                    f"/api/training-plans/{other_run.id}"
-                )
+                not_owner = client.get(f"/api/training-plans/{other_run.id}")
                 assert not_owner.status_code == 404
-                assert not_owner.json() == {
-                    "error": "training_planning_not_found"
-                }
+                assert not_owner.json() == {"error": "training_planning_not_found"}
 
                 unconfigured_app = app_for(
                     migrated_database_url,

@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.models import CompetencyEvidence, UserCompetency
 
-
 _TREND_INSUFFICIENT = "insufficient"
 _TREND_IMPROVING = "improving"
 _TREND_STABLE = "stable"
@@ -71,10 +70,7 @@ class CompetencyAggregationService:
         if len(competencies) != len(ids):
             raise ValueError("competency does not belong to user")
 
-        return [
-            await self._recompute_locked(competency)
-            for competency in competencies
-        ]
+        return [await self._recompute_locked(competency) for competency in competencies]
 
     async def recompute_user_in_transaction(
         self,
@@ -87,10 +83,7 @@ class CompetencyAggregationService:
             .with_for_update()
         )
         competencies = list(result.all())
-        return [
-            await self._recompute_locked(competency)
-            for competency in competencies
-        ]
+        return [await self._recompute_locked(competency) for competency in competencies]
 
     async def _recompute_locked(
         self,
@@ -111,8 +104,8 @@ class CompetencyAggregationService:
         evidence = list(result.all())
 
         competency.evidence_count = len(evidence)
-        competency.last_evidence_at = (
-            max((item.occurred_at for item in evidence), default=None)
+        competency.last_evidence_at = max(
+            (item.occurred_at for item in evidence), default=None
         )
 
         scored_sessions = self._scored_sessions(evidence)
@@ -125,9 +118,7 @@ class CompetencyAggregationService:
     def _scored_sessions(
         evidence: list[CompetencyEvidence],
     ) -> list[tuple[str, UUID, datetime, Fraction]]:
-        grouped: dict[tuple[str, UUID], list[CompetencyEvidence]] = defaultdict(
-            list
-        )
+        grouped: dict[tuple[str, UUID], list[CompetencyEvidence]] = defaultdict(list)
         for item in evidence:
             if item.signal_type == "score" and item.score is not None:
                 grouped[(item.source_type, item.source_session_id)].append(item)
@@ -195,9 +186,7 @@ class CompetencyAggregationService:
     def _round_half_up(value: Fraction) -> int:
         # All scores are non-negative.  This is exact integer arithmetic and
         # does not inherit Python's bankers-rounding behavior.
-        return (value.numerator * 2 + value.denominator) // (
-            2 * value.denominator
-        )
+        return (value.numerator * 2 + value.denominator) // (2 * value.denominator)
 
 
 __all__ = ["CompetencyAggregationService"]

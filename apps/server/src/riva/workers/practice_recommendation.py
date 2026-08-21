@@ -13,16 +13,15 @@ from riva.schemas.practice_recommendation import (
     PracticeRecommendationInput,
     PracticeRetryCurrentRecommendation,
 )
+from riva.services.practice_recommendation_prompt_versions import (
+    get_practice_recommendation_prompt,
+)
 from riva.services.recommendation_generation import (
     RecommendationGenerationService,
     RecommendationGenerationStateError,
 )
-from riva.services.practice_recommendation_prompt_versions import (
-    get_practice_recommendation_prompt,
-)
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
-
 
 RecommendationGenerationServiceFactory = Callable[
     [AsyncSession], RecommendationGenerationService
@@ -64,9 +63,7 @@ class PracticeRecommendationHandler:
             if legacy_agent is not None:
                 resolved_agents.setdefault(legacy_agent.prompt_version, legacy_agent)
         if not resolved_agents:
-            raise ValueError(
-                "at least one practice recommendation agent is required"
-            )
+            raise ValueError("at least one practice recommendation agent is required")
         for version, current_agent in resolved_agents.items():
             if not hasattr(current_agent, "prompt_version"):
                 raise ValueError(
@@ -89,9 +86,9 @@ class PracticeRecommendationHandler:
                 )
         self._agents = resolved_agents
         self.agents = dict(resolved_agents)
-        self.agent = self._agents.get(
-            PRACTICE_RECOMMENDATION_PROMPT.version
-        ) or next(iter(self._agents.values()))
+        self.agent = self._agents.get(PRACTICE_RECOMMENDATION_PROMPT.version) or next(
+            iter(self._agents.values())
+        )
         self.legacy_agent = self._agents.get("1")
         self.generation_service_factory = generation_service_factory
 

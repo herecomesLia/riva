@@ -11,7 +11,6 @@ from riva.services.practice_weaknesses import (
     PracticeWeaknessService,
 )
 
-
 NOW = datetime(2026, 8, 12, 9, 0, tzinfo=UTC)
 
 
@@ -111,12 +110,12 @@ def test_completed_attempt_in_an_active_session_is_eligible() -> None:
         target_role_id=role_id,
     )
 
-    assert [item.weakness for item in focus.evidence] == [
-        "active-session weakness"
-    ]
+    assert [item.weakness for item in focus.evidence] == ["active-session weakness"]
 
 
-def test_eligibility_query_requires_completed_attempt_review_and_non_archived_role() -> None:
+def test_eligibility_query_requires_completed_attempt_review_and_non_archived_role() -> (
+    None
+):
     focus, scripted = get_focus([], target_role_id=uuid4())
 
     assert focus.evidence == ()

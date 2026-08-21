@@ -27,7 +27,6 @@ from tests.integration.test_practice_next_question_workflow import (
 )
 from tests.integration.test_question_generation import database_url
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -107,12 +106,14 @@ def test_targeted_practice_training_record_replays_completed_durable_data() -> N
                 assert record.attempts[0].question.reference_answer.content.answer == (
                     reference_artifact.answer
                 )
-                assert record.target_role.title == frozen.frozen_context["targetRole"][
-                    "title"
-                ]
-                assert record.target_role.company == frozen.frozen_context[
-                    "targetRole"
-                ]["company"]
+                assert (
+                    record.target_role.title
+                    == frozen.frozen_context["targetRole"]["title"]
+                )
+                assert (
+                    record.target_role.company
+                    == frozen.frozen_context["targetRole"]["company"]
+                )
                 assert record.duration_seconds >= 0
             finally:
                 await database.reset()

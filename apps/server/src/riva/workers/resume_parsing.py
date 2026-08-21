@@ -23,7 +23,6 @@ from riva.services.resume_parsing import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 ParsingServiceFactory = Callable[[AsyncSession], ResumeParsingService]
 DraftServiceFactory = Callable[[AsyncSession], ResumeImportDraftService]
 
@@ -62,9 +61,9 @@ class ResumeParsingWorkerHandler:
 
         try:
             async with self.session_factory() as session:
-                parsing_input = await self.parsing_service_factory(
-                    session
-                ).load_input(run)
+                parsing_input = await self.parsing_service_factory(session).load_input(
+                    run
+                )
         except ResumeParsingStateError as error:
             raise AgentExecutionError(error.code, retryable=False) from None
 
@@ -88,9 +87,7 @@ class ResumeParsingWorkerHandler:
                     run,
                     result.output,
                 )
-            authoritative_output = resume_parsing_output_from_result(
-                persisted_result
-            )
+            authoritative_output = resume_parsing_output_from_result(persisted_result)
         except ResumeParsingStateError as error:
             raise AgentExecutionError(error.code, retryable=False) from None
 
@@ -117,10 +114,8 @@ class ResumeParsingWorkerHandler:
 
 def _resume_document_id(run: AgentRun) -> UUID:
     try:
-        return ResumeParsingRunPayload.model_validate(
-            run.payload
-        ).resume_document_id
-    except (TypeError, ValueError, ValidationError):
+        return ResumeParsingRunPayload.model_validate(run.payload).resume_document_id
+    except TypeError, ValueError, ValidationError:
         raise AgentExecutionError(
             INVALID_RESUME_PARSING_RUN,
             retryable=False,

@@ -52,7 +52,6 @@ from riva.services.profile_completion import career_profile_completed
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
-
 InterviewPlanningStateErrorCode = Literal[
     "interview_session_not_found",
     "interview_session_version_conflict",
@@ -143,30 +142,22 @@ class InterviewPlanningService:
                 .with_for_update()
             )
             if interview_session is None:
-                raise InterviewPlanningStateError(
-                    INTERVIEW_PLANNING_SESSION_NOT_FOUND
-                )
+                raise InterviewPlanningStateError(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
             if interview_session.version != version:
-                raise InterviewPlanningStateError(
-                    INTERVIEW_PLANNING_VERSION_CONFLICT
-                )
+                raise InterviewPlanningStateError(INTERVIEW_PLANNING_VERSION_CONFLICT)
 
             planning_run = None
             retry_memory: TrainingMemoryContext | None = None
             if interview_session.status == "generatingQuestion":
                 if interview_session.planning_run_id is None:
-                    raise InterviewPlanningStateError(
-                        INTERVIEW_PLANNING_STATE_INVALID
-                    )
+                    raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID)
                 planning_run = await self.session.scalar(
                     select(AgentRun)
                     .where(AgentRun.id == interview_session.planning_run_id)
                     .with_for_update()
                 )
                 if planning_run is None:
-                    raise InterviewPlanningStateError(
-                        INTERVIEW_PLANNING_STATE_INVALID
-                    )
+                    raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID)
                 if _status_value(planning_run.status) in {
                     AgentRunStatus.QUEUED.value,
                     AgentRunStatus.RUNNING.value,
@@ -174,9 +165,7 @@ class InterviewPlanningService:
                     await self.session.commit()
                     return interview_session
                 if _status_value(planning_run.status) != AgentRunStatus.FAILED.value:
-                    raise InterviewPlanningStateError(
-                        INTERVIEW_PLANNING_STATE_INVALID
-                    )
+                    raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID)
                 if planning_run.payload:
                     retry_memory = self._validate_run_payload(
                         planning_run
@@ -260,9 +249,7 @@ class InterviewPlanningService:
 
             await self._lock_user(run.user_id)
             persisted_run = await self.session.scalar(
-                select(AgentRun)
-                .where(AgentRun.id == run.id)
-                .with_for_update()
+                select(AgentRun).where(AgentRun.id == run.id).with_for_update()
             )
             if persisted_run is None or _status_value(persisted_run.status) != (
                 AgentRunStatus.RUNNING.value
@@ -273,8 +260,7 @@ class InterviewPlanningService:
                 or persisted_run.agent_id != prompt.prompt_id
                 or persisted_run.prompt_id != prompt.prompt_id
                 or persisted_run.prompt_version != prompt.version
-                or persisted_run.output_schema_id
-                != prompt.output_schema_id
+                or persisted_run.output_schema_id != prompt.output_schema_id
             ):
                 raise InterviewPlanningStateError(INTERVIEW_PLANNING_RUN_INVALID)
 
@@ -287,9 +273,7 @@ class InterviewPlanningService:
                 .with_for_update()
             )
             if interview_session is None:
-                raise InterviewPlanningStateError(
-                    INTERVIEW_PLANNING_SESSION_NOT_FOUND
-                )
+                raise InterviewPlanningStateError(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
             if (
                 interview_session.planning_run_id != run.id
                 or interview_session.status != "generatingQuestion"
@@ -316,9 +300,7 @@ class InterviewPlanningService:
             )
             if existing_plan is not None:
                 if existing_plan.source_agent_run_id != run.id:
-                    raise InterviewPlanningStateError(
-                        INTERVIEW_PLANNING_RUN_INVALID
-                    )
+                    raise InterviewPlanningStateError(INTERVIEW_PLANNING_RUN_INVALID)
                 existing_question = await self.session.scalar(
                     select(InterviewQuestion).where(
                         InterviewQuestion.session_id == interview_session.id,
@@ -326,9 +308,7 @@ class InterviewPlanningService:
                     )
                 )
                 if existing_question is None:
-                    raise InterviewPlanningStateError(
-                        INTERVIEW_PLANNING_STATE_INVALID
-                    )
+                    raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID)
                 await self.session.commit()
                 return existing_plan
 
@@ -362,9 +342,7 @@ class InterviewPlanningService:
                     order=first_question.order,
                     prompt=first_question.prompt,
                     question_type=first_question.question_type.value,
-                    assessed_capabilities=list(
-                        first_question.assessed_capabilities
-                    ),
+                    assessed_capabilities=list(first_question.assessed_capabilities),
                     created_at=now,
                 )
             )
@@ -377,7 +355,7 @@ class InterviewPlanningService:
         except InterviewPlanningStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
             raise InterviewPlanningStateError(
                 INTERVIEW_PLANNING_SNAPSHOT_INVALID
@@ -403,9 +381,7 @@ class InterviewPlanningService:
         if profile is None:
             raise InterviewPlanningStateError(INTERVIEW_PLANNING_PROFILE_NOT_FOUND)
         if not career_profile_completed(profile):
-            raise InterviewPlanningStateError(
-                INTERVIEW_PLANNING_PROFILE_INCOMPLETE
-            )
+            raise InterviewPlanningStateError(INTERVIEW_PLANNING_PROFILE_INCOMPLETE)
 
         role = await self.session.scalar(
             select(TargetRole)
@@ -420,9 +396,7 @@ class InterviewPlanningService:
             )
         )
         if role is None or role.preparation_status == "archived":
-            raise InterviewPlanningStateError(
-                INTERVIEW_PLANNING_TARGET_ROLE_NOT_FOUND
-            )
+            raise InterviewPlanningStateError(INTERVIEW_PLANNING_TARGET_ROLE_NOT_FOUND)
         analysis = role.job_description_analysis
         if not (
             role.job_description_status == "saved"
@@ -488,7 +462,7 @@ class InterviewPlanningService:
                 training_memory=training_memory,
             )
             return planning_input
-        except (AttributeError, TypeError, ValueError, ValidationError):
+        except AttributeError, TypeError, ValueError, ValidationError:
             raise InterviewPlanningStateError(
                 INTERVIEW_PLANNING_SNAPSHOT_INVALID
             ) from None
@@ -515,7 +489,7 @@ class InterviewPlanningService:
                 interaction_language=planning_input.interaction_language,
                 interview_planning_input=planning_input,
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise InterviewPlanningStateError(
                 INTERVIEW_PLANNING_SNAPSHOT_INVALID
             ) from None
@@ -525,7 +499,7 @@ class InterviewPlanningService:
         InterviewPlanningService._prompt_for_run(run)
         try:
             return InterviewPlanningRunPayload.model_validate(run.payload)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise InterviewPlanningStateError(
                 INTERVIEW_PLANNING_SNAPSHOT_INVALID
             ) from None
@@ -551,9 +525,7 @@ class InterviewPlanningService:
             select(User.id).where(User.id == user_id).with_for_update()
         )
         if exists is None:
-            raise InterviewPlanningStateError(
-                INTERVIEW_PLANNING_SESSION_NOT_FOUND
-            )
+            raise InterviewPlanningStateError(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
 
 
 def _session_configuration(session: InterviewSession) -> InterviewConfiguration:
@@ -564,7 +536,7 @@ def _session_configuration(session: InterviewSession) -> InterviewConfiguration:
             difficulty=InterviewDifficulty(session.difficulty),
             duration_minutes=InterviewDurationMinutes(session.duration_minutes),
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID) from None
 
 
@@ -613,7 +585,7 @@ def _matching_snapshot(
             ),
             **result.model_dump(mode="python"),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         return None
 
 

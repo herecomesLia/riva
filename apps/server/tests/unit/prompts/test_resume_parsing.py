@@ -26,12 +26,9 @@ def test_resume_prompt_defines_skill_consistency() -> None:
     assert "canonical top-level set" in rendered.system
     assert (
         "Any skill placed in a work experience or project experience `skills` "
-        "list MUST also appear in the top-level `skills` list."
-        in rendered.system
+        "list MUST also appear in the top-level `skills` list." in rendered.system
     )
-    assert "explicit evidence tying the skill to that experience" in (
-        rendered.system
-    )
+    assert "explicit evidence tying the skill to that experience" in (rendered.system)
     assert '"skills": ["Python", "FastAPI", "Docker"]' in rendered.system
     assert '"skills": ["Python", "FastAPI"]' in rendered.system
     assert '"skills": ["Python", "Docker"]' in rendered.system

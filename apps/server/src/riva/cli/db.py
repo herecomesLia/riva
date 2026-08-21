@@ -7,7 +7,6 @@ from rich import print as rprint
 from riva.core.config import Settings
 from riva.db import migrations
 
-
 app = typer.Typer(
     invoke_without_command=True,
     context_settings={"help_option_names": ["-h", "--help"]},

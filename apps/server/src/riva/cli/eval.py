@@ -14,7 +14,6 @@ from riva.evals.registry import build_default_registry
 from riva.evals.runner import AgentEvalRunner, load_eval_cases
 from riva.integrations import build_llm_provider
 
-
 app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Run offline Agent evaluations.",

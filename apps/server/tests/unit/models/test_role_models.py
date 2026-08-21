@@ -92,7 +92,9 @@ def test_current_target_role_is_one_per_user_and_uses_composite_foreign_key() ->
     assert CurrentTargetRole.role.property.uselist is False
 
 
-def test_role_models_have_internal_timestamps_without_denormalized_current_flag() -> None:
+def test_role_models_have_internal_timestamps_without_denormalized_current_flag() -> (
+    None
+):
     for model in (TargetRole, CurrentTargetRole):
         assert "created_at" in model.__table__.c
         assert "updated_at" in model.__table__.c

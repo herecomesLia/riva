@@ -1,13 +1,13 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
-import pytest
 
 from riva.core.auth import get_auth_service, require_current_user
-from riva.core.training_planning import get_training_planning_service
 from riva.core.errors import APIError
+from riva.core.training_planning import get_training_planning_service
 from riva.models import User
 from riva.schemas.training_planning import (
     EnsureCurrentTrainingPlanningRequest,
@@ -20,7 +20,6 @@ from riva.services.training_planning import (
     TRAINING_PLANNING_STATE_CONFLICT,
     TrainingPlanningStateError,
 )
-
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -85,9 +84,7 @@ class FakeTrainingPlanningService:
         *,
         interaction_language: str,
     ) -> TrainingPlanningStatusResponse:
-        self.calls.append(
-            ("start", (current_user, payload, interaction_language))
-        )
+        self.calls.append(("start", (current_user, payload, interaction_language)))
         if isinstance(self.error, TrainingPlanningStateError):
             raise self.error
         if isinstance(self.error, APIError):
@@ -114,9 +111,7 @@ class FakeTrainingPlanningService:
         *,
         interaction_language: str,
     ) -> TrainingPlanningStatusResponse:
-        self.calls.append(
-            ("current", (current_user, payload, interaction_language))
-        )
+        self.calls.append(("current", (current_user, payload, interaction_language)))
         if isinstance(self.error, TrainingPlanningStateError):
             raise self.error
         if isinstance(self.error, APIError):
@@ -315,8 +310,8 @@ def test_openapi_exposes_training_planning_contract(app) -> None:
     assert "/api/training-plans/current" in paths
     assert "/api/training-plans/{runId}" in paths
     assert (
-        paths["/api/training-plans"]["post"]["responses"]["202"][
-            "content"
-        ]["application/json"]["schema"]["$ref"]
+        paths["/api/training-plans"]["post"]["responses"]["202"]["content"][
+            "application/json"
+        ]["schema"]["$ref"]
         == "#/components/schemas/TrainingPlanningStatusResponse"
     )

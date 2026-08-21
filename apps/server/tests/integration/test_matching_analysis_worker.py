@@ -1,12 +1,13 @@
 import asyncio
-from dataclasses import dataclass, replace
-from datetime import UTC, datetime, timedelta
 import json
 import os
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
+
 from riva.agents import MatchingAnalysisAgent
 from riva.core.config import Settings
 from riva.core.errors import APIError
@@ -42,7 +43,6 @@ from riva.workers import (
     build_agent_handler_registry,
 )
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 4, 9, 30, tzinfo=UTC)
@@ -577,9 +577,7 @@ def test_matching_current_result_with_invalid_run_is_noop(
                         "underrepresented_capabilities": list(
                             stored_analysis.underrepresented_capabilities
                         ),
-                        "resume_highlights": list(
-                            stored_analysis.resume_highlights
-                        ),
+                        "resume_highlights": list(stored_analysis.resume_highlights),
                         "resume_gaps": list(stored_analysis.resume_gaps),
                         "high_risk_questions": list(
                             stored_analysis.high_risk_questions
@@ -606,9 +604,7 @@ def test_matching_current_result_with_invalid_run_is_noop(
                         StartMatchingAnalysisRequest(version=before_version),
                     )
                     projected = next(
-                        role
-                        for role in snapshot.roles
-                        if role.id == setup.role.id
+                        role for role in snapshot.roles if role.id == setup.role.id
                     )
                     assert projected.version == before_version
                     assert projected.matching_analysis is not None
@@ -651,9 +647,7 @@ def test_matching_current_result_with_invalid_run_is_noop(
                         "underrepresented_capabilities": list(
                             stored_analysis.underrepresented_capabilities
                         ),
-                        "resume_highlights": list(
-                            stored_analysis.resume_highlights
-                        ),
+                        "resume_highlights": list(stored_analysis.resume_highlights),
                         "resume_gaps": list(stored_analysis.resume_gaps),
                         "high_risk_questions": list(
                             stored_analysis.high_risk_questions
@@ -700,11 +694,7 @@ def test_matching_start_concurrent_same_version_creates_one_run() -> None:
                     for result in results
                     if not isinstance(result, BaseException)
                 ]
-                errors = [
-                    result
-                    for result in results
-                    if isinstance(result, APIError)
-                ]
+                errors = [result for result in results if isinstance(result, APIError)]
                 assert len(successes) == 1
                 assert len(errors) == 1
                 assert errors[0].error == "target_role_version_conflict"
@@ -757,9 +747,7 @@ def test_matching_failed_run_retry_replaces_pointer_and_preserves_audit() -> Non
                         StartMatchingAnalysisRequest(version=1),
                     )
                     started_role = next(
-                        role
-                        for role in started.roles
-                        if role.id == setup.role.id
+                        role for role in started.roles if role.id == setup.role.id
                     )
                     assert started_role.version == 2
                     stored_role = await session.get(TargetRole, setup.role.id)
@@ -789,9 +777,7 @@ def test_matching_failed_run_retry_replaces_pointer_and_preserves_audit() -> Non
                         StartMatchingAnalysisRequest(version=2),
                     )
                     retried_role = next(
-                        role
-                        for role in retried.roles
-                        if role.id == setup.role.id
+                        role for role in retried.roles if role.id == setup.role.id
                     )
                     assert retried_role.version == 3
                     assert retried_role.matching_analysis is not None
@@ -849,11 +835,7 @@ def test_matching_failed_projection_hides_internal_error_details() -> None:
                         MatchingAnalysisStatusQuery(version=1),
                     )
                     for response in (
-                        next(
-                            role
-                            for role in page.roles
-                            if role.id == setup.role.id
-                        ),
+                        next(role for role in page.roles if role.id == setup.role.id),
                         snapshot,
                     ):
                         projected = response.matching_analysis
@@ -906,9 +888,7 @@ def test_matching_enqueue_is_invisible_until_role_binding_commits() -> None:
                     )
                     assert stored_role is not None
                     prompt = MATCHING_ANALYSIS_PROMPT
-                    run = await AgentRunService(
-                        enqueue_session
-                    ).enqueue_in_transaction(
+                    run = await AgentRunService(enqueue_session).enqueue_in_transaction(
                         user_id=setup.owner.id,
                         agent_id="matching-analyzer",
                         prompt_id=prompt.prompt_id,
@@ -927,9 +907,7 @@ def test_matching_enqueue_is_invisible_until_role_binding_commits() -> None:
                     await enqueue_session.flush()
 
                     async with database.sessionmaker() as worker_session:
-                        invisible = await AgentRunService(
-                            worker_session
-                        ).claim_next(
+                        invisible = await AgentRunService(worker_session).claim_next(
                             lease_owner="matching-atomic-worker",
                             lease_duration=timedelta(minutes=5),
                         )
@@ -1001,8 +979,7 @@ def test_production_registry_runs_matching_worker_chain() -> None:
                     assert stored_run.provider == "fake-production-provider"
                     assert stored_run.model == "fake-matching-model"
                     assert (
-                        await session.get(MatchingAnalysis, setup.role.id)
-                        is not None
+                        await session.get(MatchingAnalysis, setup.role.id) is not None
                     )
                 assert provider_calls == [current]
                 assert len(provider.calls) == 1
@@ -1118,8 +1095,7 @@ def test_matching_worker_retries_provider_unavailable_then_succeeds() -> None:
                     assert stored_run.error_code is None
                     assert stored_run.provider == "fake-retry-provider"
                     assert (
-                        await session.get(MatchingAnalysis, setup.role.id)
-                        is not None
+                        await session.get(MatchingAnalysis, setup.role.id) is not None
                     )
                     assert stored_role is not None
                     assert stored_role.version == 2

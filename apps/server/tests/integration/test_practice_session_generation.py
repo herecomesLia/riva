@@ -33,7 +33,6 @@ from tests.integration.test_question_generation import (
     seed_context,
 )
 
-
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 10, 9, 30, tzinfo=UTC)
 
@@ -148,9 +147,7 @@ def test_practice_session_generation_workflow() -> None:
                     assert refreshed.attempt.status == "answering"
                     assert refreshed.attempt.question_card_id is not None
                     assert refreshed.question_card is not None
-                    assert (
-                        refreshed.question_card.source_agent_run_id == run_id
-                    )
+                    assert refreshed.question_card.source_agent_run_id == run_id
 
                     card = await session.scalar(
                         select(QuestionCard).where(
@@ -202,8 +199,7 @@ def test_practice_session_start_rolls_back_on_stale_matching_analysis() -> None:
                         )
 
                 assert (
-                    error.value.code
-                    == PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED
+                    error.value.code == PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED
                 )
 
                 async with database.sessionmaker() as session:

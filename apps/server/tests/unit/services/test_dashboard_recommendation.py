@@ -4,7 +4,6 @@ from uuid import uuid4
 
 from riva.services.dashboard_recommendation import DashboardRecommendationService
 
-
 NOW = datetime(2026, 8, 17, 12, tzinfo=UTC)
 
 
@@ -134,7 +133,7 @@ def test_latest_weakness_text_has_priority_and_maps_targeted_practice() -> None:
         "reason": "Quantify the outcome.",
         "question_type": "projectDeepDive",
         "difficulty": "basic",
-            "focus_areas": ["Results and Evidence"],
+        "focus_areas": ["Results and Evidence"],
     }
 
 
@@ -175,7 +174,9 @@ def test_score_explanation_and_fallback_are_used_deterministically() -> None:
         current_role=role,
     )
 
-    assert first.weaknesses[0].description == "Connect the example to the business goal."
+    assert (
+        first.weaknesses[0].description == "Connect the example to the business goal."
+    )
     assert first.weaknesses[1].description == "Specificity"
     assert first.recommendation is not None
     assert first.recommendation.recommendation.action == "targetedPractice"
@@ -184,7 +185,9 @@ def test_score_explanation_and_fallback_are_used_deterministically() -> None:
     assert first.recommendation.model_dump() == second.recommendation.model_dump()
 
 
-def test_risk_control_uses_pressure_mock_interview_and_prerequisites_gate_only_action() -> None:
+def test_risk_control_uses_pressure_mock_interview_and_prerequisites_gate_only_action() -> (
+    None
+):
     user_id = uuid4()
     candidate = competency("risk_control", 35, 80, display_name="Risk Control")
     score = evidence(

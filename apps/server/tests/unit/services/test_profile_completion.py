@@ -91,9 +91,7 @@ def test_career_profile_ready_with_any_career_evidence(
     work: bool,
     project: bool,
 ) -> None:
-    assert career_profile_completed(
-        _profile(skills=skills, work=work, project=project)
-    )
+    assert career_profile_completed(_profile(skills=skills, work=work, project=project))
 
 
 @pytest.mark.parametrize(
@@ -142,6 +140,4 @@ def test_education_does_not_change_existing_readiness(
 
 @pytest.mark.parametrize("evidence", ["work", "project"])
 def test_blank_skill_does_not_override_valid_experience(evidence: str) -> None:
-    assert career_profile_completed(
-        _profile(blank_skill=True, **{evidence: True})
-    )
+    assert career_profile_completed(_profile(blank_skill=True, **{evidence: True}))

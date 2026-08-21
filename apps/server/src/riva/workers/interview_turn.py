@@ -13,7 +13,6 @@ from riva.services.interview_turn import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 TurnServiceFactory = Callable[[AsyncSession], InterviewTurnService]
 
 
@@ -49,9 +48,9 @@ class InterviewTurnHandler:
 
         try:
             async with self.session_factory() as session:
-                turn_input = await self.turn_service_factory(
-                    session
-                ).load_turn_input(run)
+                turn_input = await self.turn_service_factory(session).load_turn_input(
+                    run
+                )
         except InterviewTurnStateError as error:
             raise AgentExecutionError(error.code, retryable=False) from None
 

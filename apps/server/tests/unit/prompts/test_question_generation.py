@@ -17,15 +17,14 @@ def test_question_generation_prompt_has_current_identity_and_output_contract() -
     assert prompt.version == "3"
     assert prompt.output_schema_id == "question-generation-v1"
     assert prompt.output_schema is QuestionGenerationOutput
-    assert (
-        get_question_generation_prompt("1")
-        is QUESTION_GENERATION_LEGACY_PROMPT
-    )
+    assert get_question_generation_prompt("1") is QUESTION_GENERATION_LEGACY_PROMPT
     assert get_question_generation_prompt("2") is QUESTION_GENERATION_V2_PROMPT
     assert get_question_generation_prompt("3") is prompt
 
 
-def test_question_generation_prompt_defines_task_evidence_and_injection_boundaries() -> None:
+def test_question_generation_prompt_defines_task_evidence_and_injection_boundaries() -> (
+    None
+):
     system = QUESTION_GENERATION_PROMPT.system_template
 
     assert "one personalized interview practice main-question card" in system
@@ -54,7 +53,9 @@ def test_question_generation_prompt_defines_each_question_type(
     assert question_type in QUESTION_GENERATION_PROMPT.system_template
 
 
-def test_question_generation_prompt_defines_difficulty_language_and_internal_fields() -> None:
+def test_question_generation_prompt_defines_difficulty_language_and_internal_fields() -> (
+    None
+):
     system = QUESTION_GENERATION_PROMPT.system_template
 
     assert "basic is direct and clear" in system

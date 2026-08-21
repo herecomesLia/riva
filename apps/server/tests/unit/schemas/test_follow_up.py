@@ -1,7 +1,8 @@
 from copy import deepcopy
+from uuid import uuid4
 
-from pydantic import TypeAdapter, ValidationError
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
@@ -11,7 +12,6 @@ from riva.schemas.follow_up import (
     FollowUpRunPayload,
 )
 from riva.schemas.question_cards import QuestionCardQuestionType
-from uuid import uuid4
 
 
 def question_context() -> dict[str, object]:
@@ -47,7 +47,10 @@ def test_follow_up_input_requires_language_and_accepts_first_exchange() -> None:
     parsed = FollowUpInput.model_validate(follow_up_input())
 
     assert parsed.interaction_language == "zh-CN"
-    assert parsed.main_answer.content == "I owned the service boundary and reduced failures."
+    assert (
+        parsed.main_answer.content
+        == "I owned the service boundary and reduced failures."
+    )
     assert parsed.question.prompt == "Explain how you designed the payment boundary."
     assert parsed.question.assessed_capabilities == ["Personal contribution"]
     assert parsed.previous_follow_ups == []
@@ -120,14 +123,20 @@ def test_follow_up_input_rejects_unknown_fields_and_invalid_main_order() -> None
         FollowUpInput.model_validate(invalid_main)
 
 
-@pytest.mark.parametrize("question_type", [item.value for item in QuestionCardQuestionType])
+@pytest.mark.parametrize(
+    "question_type", [item.value for item in QuestionCardQuestionType]
+)
 @pytest.mark.parametrize("difficulty", ["basic", "pressure"])
 def test_follow_up_input_covers_all_question_types_and_difficulties(
     question_type: str,
     difficulty: str,
 ) -> None:
     payload = follow_up_input()
-    payload["question"] = {**question_context(), "question_type": question_type, "difficulty": difficulty}
+    payload["question"] = {
+        **question_context(),
+        "question_type": question_type,
+        "difficulty": difficulty,
+    }
 
     parsed = FollowUpInput.model_validate(payload)
 

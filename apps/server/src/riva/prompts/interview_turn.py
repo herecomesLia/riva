@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_turn import InterviewTurnOutput
 
-
 INTERVIEW_TURN_PROMPT = PromptDefinition(
     prompt_id="interview-turn",
     version="1",

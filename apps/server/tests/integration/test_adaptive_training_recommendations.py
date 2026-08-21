@@ -36,7 +36,6 @@ from tests.integration.test_recommendation_generation import (
     recommendation_response,
 )
 
-
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 18, 10, 0, tzinfo=UTC)
 
@@ -96,7 +95,9 @@ def test_practice_recommendation_uses_the_enqueue_memory_snapshot() -> None:
                     [recommendation_response("nextQuestion")],
                     usage=None,
                 )
-                assert await build_recommendation_worker(database, provider).process_one()
+                assert await build_recommendation_worker(
+                    database, provider
+                ).process_one()
 
                 request = provider.calls[0]
                 assert isinstance(request, StructuredGenerationRequest)
@@ -179,9 +180,9 @@ def test_interview_review_freezes_memory_for_the_initial_review_enqueue(
                     )
                     assert review_run is not None
                     assert review_run.prompt_version == "2"
-                    frozen_memory = review_run.payload[
-                        "interviewReviewInput"
-                    ]["trainingMemory"]
+                    frozen_memory = review_run.payload["interviewReviewInput"][
+                        "trainingMemory"
+                    ]
                     assert frozen_memory["focusCompetencies"][0]["level"] == 49
                     competency = await session.scalar(
                         select(UserCompetency).where(
@@ -204,7 +205,9 @@ def test_interview_review_freezes_memory_for_the_initial_review_enqueue(
                         ).all()
                     )
 
-                provider.responses.append(_review_output([item.id for item in questions]))
+                provider.responses.append(
+                    _review_output([item.id for item in questions])
+                )
                 await _process_worker(database, settings, provider)
 
                 request = provider.calls[-1]

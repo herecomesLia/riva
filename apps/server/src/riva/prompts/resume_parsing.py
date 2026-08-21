@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.resume_parsing import ResumeParsingOutput
 
-
 RESUME_PARSING_PROMPT = PromptDefinition(
     prompt_id="resume-parser",
     version="4",

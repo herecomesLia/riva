@@ -11,7 +11,6 @@ from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
 from riva.prompts import RESUME_PARSING_PROMPT
 from riva.utils import utc_now
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -231,10 +230,7 @@ def test_resume_parsing_result_constraints_and_cascades() -> None:
                     delete(ResumeDocument).where(ResumeDocument.id == first_document.id)
                 )
                 await session.commit()
-                assert (
-                    await session.get(ResumeParsingResult, first_document.id)
-                    is None
-                )
+                assert await session.get(ResumeParsingResult, first_document.id) is None
 
             async with database.sessionmaker() as session:
                 await session.execute(delete(User).where(User.id == first_user_id))

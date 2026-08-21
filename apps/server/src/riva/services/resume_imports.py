@@ -38,12 +38,11 @@ from riva.schemas.resume_imports import (
     ResumeImportDraftData,
     ResumeImportProtectedItem,
     ResumeImportSection,
-    ResumeImportSkipReason,
     ResumeImportSkippedItem,
+    ResumeImportSkipReason,
 )
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.utils import utc_now
-
 
 ResumeImportStateErrorCode = Literal[
     "resume_document_not_found",
@@ -60,9 +59,7 @@ ResumeImportStateErrorCode = Literal[
     "resume_import_apply_conflict",
 ]
 
-RESUME_DOCUMENT_NOT_FOUND: ResumeImportStateErrorCode = (
-    "resume_document_not_found"
-)
+RESUME_DOCUMENT_NOT_FOUND: ResumeImportStateErrorCode = "resume_document_not_found"
 RESUME_PARSING_RESULT_NOT_FOUND: ResumeImportStateErrorCode = (
     "resume_parsing_result_not_found"
 )
@@ -87,9 +84,7 @@ RESUME_IMPORT_DRAFT_NOT_READY: ResumeImportStateErrorCode = (
 RESUME_IMPORT_DRAFT_VERSION_CONFLICT: ResumeImportStateErrorCode = (
     "resume_import_draft_version_conflict"
 )
-RESUME_IMPORT_DRAFT_INVALID: ResumeImportStateErrorCode = (
-    "resume_import_draft_invalid"
-)
+RESUME_IMPORT_DRAFT_INVALID: ResumeImportStateErrorCode = "resume_import_draft_invalid"
 RESUME_IMPORT_PROFILE_VERSION_CONFLICT: ResumeImportStateErrorCode = (
     "resume_import_profile_version_conflict"
 )
@@ -140,7 +135,7 @@ def resume_import_draft_data_from_model(
                 "change_summary": draft.change_summary,
             }
         )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID) from None
 
 
@@ -201,7 +196,7 @@ def build_resume_import_draft_data(
         )
         try:
             skill = CareerProfileSkillInput(id=skill_id, name=skill_name)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise ResumeImportStateError(RESUME_PARSING_RESULT_INVALID) from None
         skill_ids_by_name[skill_key] = skill_id
         skills.append(skill)
@@ -225,9 +220,7 @@ def build_resume_import_draft_data(
         )
         reasons = _education_work_date_reasons(item)
         if reasons:
-            skipped_items.append(
-                _skipped_item("education", source_index, reasons)
-            )
+            skipped_items.append(_skipped_item("education", source_index, reasons))
             continue
 
         try:
@@ -242,7 +235,7 @@ def build_resume_import_draft_data(
                     is_current=cast(bool, item.is_current),
                 )
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             skipped_items.append(
                 _skipped_item(
                     "education",
@@ -270,9 +263,7 @@ def build_resume_import_draft_data(
         if item.employment_type is None:
             reasons = _append_reason(reasons, "employment_type_unknown")
         if reasons:
-            skipped_items.append(
-                _skipped_item("workExperience", source_index, reasons)
-            )
+            skipped_items.append(_skipped_item("workExperience", source_index, reasons))
             continue
 
         try:
@@ -296,7 +287,7 @@ def build_resume_import_draft_data(
             )
         except ResumeImportStateError:
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             skipped_items.append(
                 _skipped_item(
                     "workExperience",
@@ -346,7 +337,7 @@ def build_resume_import_draft_data(
             )
         except ResumeImportStateError:
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             skipped_items.append(
                 _skipped_item(
                     "projectExperience",
@@ -458,20 +449,12 @@ class ResumeImportDraftService:
                     summary=cast(str | None, values["summary"]),
                     summary_action=cast(str, values["summary_action"]),
                     education=_copy_json_list(values["education"]),
-                    work_experiences=_copy_json_list(
-                        values["work_experiences"]
-                    ),
-                    project_experiences=_copy_json_list(
-                        values["project_experiences"]
-                    ),
+                    work_experiences=_copy_json_list(values["work_experiences"]),
+                    project_experiences=_copy_json_list(values["project_experiences"]),
                     skills=_copy_json_list(values["skills"]),
-                    unresolved_items=_copy_string_list(
-                        values["unresolved_items"]
-                    ),
+                    unresolved_items=_copy_string_list(values["unresolved_items"]),
                     skipped_items=_copy_json_list(values["skipped_items"]),
-                    protected_items=_copy_json_list(
-                        values["protected_items"]
-                    ),
+                    protected_items=_copy_json_list(values["protected_items"]),
                     change_summary=_copy_json_dict(values["change_summary"]),
                     applied_profile_version=None,
                     applied_at=None,
@@ -498,20 +481,14 @@ class ResumeImportDraftService:
                 draft.summary = cast(str | None, values["summary"])
                 draft.summary_action = cast(str, values["summary_action"])
                 draft.education = _copy_json_list(values["education"])
-                draft.work_experiences = _copy_json_list(
-                    values["work_experiences"]
-                )
+                draft.work_experiences = _copy_json_list(values["work_experiences"])
                 draft.project_experiences = _copy_json_list(
                     values["project_experiences"]
                 )
                 draft.skills = _copy_json_list(values["skills"])
-                draft.unresolved_items = _copy_string_list(
-                    values["unresolved_items"]
-                )
+                draft.unresolved_items = _copy_string_list(values["unresolved_items"])
                 draft.skipped_items = _copy_json_list(values["skipped_items"])
-                draft.protected_items = _copy_json_list(
-                    values["protected_items"]
-                )
+                draft.protected_items = _copy_json_list(values["protected_items"])
                 draft.change_summary = _copy_json_dict(values["change_summary"])
                 draft.applied_profile_version = None
                 draft.applied_at = None
@@ -615,9 +592,11 @@ class ResumeImportDraftService:
 
 
 def _parse_persisted_result(result: ResumeParsingResult) -> ResumeParsingOutput:
-    if not isinstance(result.result_version, int) or isinstance(
-        result.result_version, bool
-    ) or result.result_version < 1:
+    if (
+        not isinstance(result.result_version, int)
+        or isinstance(result.result_version, bool)
+        or result.result_version < 1
+    ):
         raise ResumeImportStateError(RESUME_PARSING_RESULT_INVALID)
 
     try:
@@ -631,7 +610,7 @@ def _parse_persisted_result(result: ResumeParsingResult) -> ResumeParsingOutput:
                 "unresolved_items": result.unresolved_items,
             }
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ResumeImportStateError(RESUME_PARSING_RESULT_INVALID) from None
 
 
@@ -885,8 +864,7 @@ def _validate_profile(profile: CareerProfile | None) -> None:
                 _profile_source(item.source)
 
         skill_names = [
-            canonicalize_resume_import_identity(skill.name)
-            for skill in profile.skills
+            canonicalize_resume_import_identity(skill.name) for skill in profile.skills
         ]
         if len(skill_names) != len(set(skill_names)):
             raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
@@ -898,7 +876,7 @@ def _validate_profile(profile: CareerProfile | None) -> None:
                 raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
     except ResumeImportStateError:
         raise
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
 
 
@@ -926,19 +904,14 @@ def _protected_items(
     protected: list[ResumeImportProtectedItem] = []
     current_by_id = {
         "education": {item.id: item for item in profile.education},
-        "workExperience": {
-            item.id: item for item in profile.work_experiences
-        },
-        "projectExperience": {
-            item.id: item for item in profile.project_experiences
-        },
+        "workExperience": {item.id: item for item in profile.work_experiences},
+        "projectExperience": {item.id: item for item in profile.project_experiences},
     }
     draft_skill_names = {
         canonicalize_resume_import_identity(item.name) for item in skills
     }
     draft_skill_names_by_id = {
-        item.id: canonicalize_resume_import_identity(item.name)
-        for item in skills
+        item.id: canonicalize_resume_import_identity(item.name) for item in skills
     }
     for section, candidates in (
         ("education", education),
@@ -960,8 +933,7 @@ def _protected_items(
                 )
 
     current_by_skill_name = {
-        canonicalize_resume_import_identity(item.name): item
-        for item in profile.skills
+        canonicalize_resume_import_identity(item.name): item for item in profile.skills
     }
     for candidate in skills:
         current = current_by_skill_name.get(
@@ -1009,19 +981,14 @@ def _change_summary(
 
     current_by_id = {
         "education": {item.id: item for item in profile.education},
-        "workExperience": {
-            item.id: item for item in profile.work_experiences
-        },
-        "projectExperience": {
-            item.id: item for item in profile.project_experiences
-        },
+        "workExperience": {item.id: item for item in profile.work_experiences},
+        "projectExperience": {item.id: item for item in profile.project_experiences},
     }
     draft_skill_names = {
         canonicalize_resume_import_identity(item.name) for item in skills
     }
     draft_skill_names_by_id = {
-        item.id: canonicalize_resume_import_identity(item.name)
-        for item in skills
+        item.id: canonicalize_resume_import_identity(item.name) for item in skills
     }
     for section, candidates in (
         ("education", education),
@@ -1032,7 +999,9 @@ def _change_summary(
             current = current_by_id[section].get(candidate.id)
             if current is None:
                 new_items += 1
-            elif _profile_source(current.source) == ProfileSource.RESUME_EXTRACTED.value:
+            elif (
+                _profile_source(current.source) == ProfileSource.RESUME_EXTRACTED.value
+            ):
                 if _candidate_changed(
                     section,
                     current,
@@ -1043,8 +1012,7 @@ def _change_summary(
                     changed_items += 1
 
     current_by_skill_name = {
-        canonicalize_resume_import_identity(item.name): item
-        for item in profile.skills
+        canonicalize_resume_import_identity(item.name): item for item in profile.skills
     }
     for candidate in skills:
         current = current_by_skill_name.get(
@@ -1073,16 +1041,14 @@ def _change_summary(
         missing_items += sum(
             1
             for item in current_items
-            if _profile_source(item.source)
-            == ProfileSource.RESUME_EXTRACTED.value
+            if _profile_source(item.source) == ProfileSource.RESUME_EXTRACTED.value
             and item.id not in candidate_ids
         )
     missing_items += sum(
         1
         for item in profile.skills
         if _profile_source(item.source) == ProfileSource.RESUME_EXTRACTED.value
-        and canonicalize_resume_import_identity(item.name)
-        not in draft_skill_names
+        and canonicalize_resume_import_identity(item.name) not in draft_skill_names
     )
 
     return ResumeImportChangeSummary(

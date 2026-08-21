@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import pytest
+
 from riva.core.auth import get_auth_service, require_current_user
 from riva.core.practice import get_practice_api_service
 from riva.models import User
@@ -19,16 +20,15 @@ from riva.schemas.practice_sessions import (
     PracticeFollowUpQuestionResponse,
     PracticeGeneratingFollowUpResponse,
     PracticeGeneratingQuestionResponse,
+    PracticeSessionSelection,
     RefreshPracticeEvaluationRequest,
+    RetryPracticeQuestionRequest,
     RevealPracticeFollowUpGuidanceRequest,
     RevealPracticeQuestionGuidanceRequest,
-    RetryPracticeQuestionRequest,
-    SkipPracticeQuestionRequest,
-    PracticeSessionSelection,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
+    SkipPracticeQuestionRequest,
 )
-
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 SESSION_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -364,9 +364,7 @@ def test_complete_returns_completed_summary_and_forwards_only_version(app) -> No
     assert service.calls[0][1]["user_id"] == current_user.id
     assert service.calls[0][1]["session_id"] == SESSION_ID
     assert isinstance(service.calls[0][1]["payload"], CompletePracticeSessionRequest)
-    assert service.calls[0][1]["payload"].model_dump(mode="json") == {
-        "version": 5
-    }
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == {"version": 5}
 
 
 def test_end_returns_completed_summary_and_forwards_only_public_early_body(app) -> None:
@@ -404,7 +402,9 @@ def test_completed_get_uses_public_session_union(app) -> None:
     assert result.json()["completionReason"] == "reviewCompleted"
 
 
-def test_continue_to_next_question_returns_202_and_forwards_only_public_body(app) -> None:
+def test_continue_to_next_question_returns_202_and_forwards_only_public_body(
+    app,
+) -> None:
     service = FakePracticeAPIService()
     current_user = user()
     install_service(app, service, current_user)
@@ -430,7 +430,9 @@ def test_continue_to_next_question_returns_202_and_forwards_only_public_body(app
     assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
 
 
-def test_continue_to_next_question_requires_csrf_and_forbids_internal_fields(app) -> None:
+def test_continue_to_next_question_requires_csrf_and_forbids_internal_fields(
+    app,
+) -> None:
     service = FakePracticeAPIService()
     install_service(app, service, user())
     payload = {
@@ -782,7 +784,9 @@ def test_guidance_reveal_routes_require_csrf_and_forbid_internal_fields(
     assert service.calls == []
 
 
-def test_guidance_reveal_routes_publish_200_active_response_models_in_openapi(app) -> None:
+def test_guidance_reveal_routes_publish_200_active_response_models_in_openapi(
+    app,
+) -> None:
     paths = app.openapi()["paths"]
     for path in (
         "/api/practice/sessions/{sessionId}/questions/hint",
@@ -793,10 +797,7 @@ def test_guidance_reveal_routes_publish_200_active_response_models_in_openapi(ap
         response_schema = paths[path]["post"]["responses"]["200"]["content"][
             "application/json"
         ]["schema"]
-        assert {
-            item["$ref"].split("/")[-1]
-            for item in response_schema["oneOf"]
-        } == {
+        assert {item["$ref"].split("/")[-1] for item in response_schema["oneOf"]} == {
             "PracticeGeneratingQuestionResponse",
             "PracticeAnsweringResponse",
             "PracticeGeneratingFollowUpResponse",
@@ -945,9 +946,7 @@ def test_end_follow_ups_returns_202_and_forwards_exact_public_body(app) -> None:
     assert service.calls[0][0] == "end_follow_ups"
     assert service.calls[0][1]["user_id"] == current_user.id
     assert service.calls[0][1]["session_id"] == SESSION_ID
-    assert isinstance(
-        service.calls[0][1]["payload"], EndPracticeFollowUpsRequest
-    )
+    assert isinstance(service.calls[0][1]["payload"], EndPracticeFollowUpsRequest)
     assert service.calls[0][1]["payload"].model_dump(mode="json") == payload
 
 
@@ -999,9 +998,7 @@ def test_refresh_follow_up_generation_returns_200_and_forwards_version(app) -> N
     assert service.calls[0][0] == "refresh_follow_up"
     assert service.calls[0][1]["user_id"] == current_user.id
     assert service.calls[0][1]["session_id"] == SESSION_ID
-    assert service.calls[0][1]["payload"].model_dump(mode="json") == {
-        "version": 3
-    }
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == {"version": 3}
 
 
 @pytest.mark.parametrize(
@@ -1150,12 +1147,8 @@ def test_refresh_evaluation_returns_200_and_forwards_version(app) -> None:
     assert service.calls[0][0] == "refresh_evaluation"
     assert service.calls[0][1]["user_id"] == current_user.id
     assert service.calls[0][1]["session_id"] == SESSION_ID
-    assert isinstance(
-        service.calls[0][1]["payload"], RefreshPracticeEvaluationRequest
-    )
-    assert service.calls[0][1]["payload"].model_dump(mode="json") == {
-        "version": 4
-    }
+    assert isinstance(service.calls[0][1]["payload"], RefreshPracticeEvaluationRequest)
+    assert service.calls[0][1]["payload"].model_dump(mode="json") == {"version": 4}
 
 
 def test_refresh_evaluation_requires_csrf_and_forbids_extra_fields(app) -> None:
@@ -1395,23 +1388,16 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
     assert "/api/practice/sessions" in paths
     assert "/api/practice/sessions/{sessionId}" in paths
     assert "/api/practice/sessions/current" in paths
-    assert (
-        "/api/practice/sessions/{sessionId}/question-generation/refresh"
-        in paths
-    )
+    assert "/api/practice/sessions/{sessionId}/question-generation/refresh" in paths
     assert "/api/practice/sessions/{sessionId}/answers/main" in paths
     assert "/api/practice/sessions/{sessionId}/answers/follow-up" in paths
     assert "/api/practice/sessions/{sessionId}/follow-ups/end" in paths
-    assert (
-        "/api/practice/sessions/{sessionId}/follow-up-generation/refresh"
-        in paths
-    )
+    assert "/api/practice/sessions/{sessionId}/follow-up-generation/refresh" in paths
     assert "/api/practice/sessions/{sessionId}/evaluation/refresh" in paths
     assert "/api/practice/sessions/{sessionId}/end" in paths
     assert "/api/practice/sessions/{sessionId}/questions/reference-answer" in paths
     assert (
-        "/api/practice/sessions/{sessionId}/questions/reference-answer/refresh"
-        in paths
+        "/api/practice/sessions/{sessionId}/questions/reference-answer/refresh" in paths
     )
     assert "/api/practice/sessions/{sessionId}/follow-ups/reference-answer" in paths
     assert (
@@ -1424,21 +1410,21 @@ def test_openapi_exposes_practice_union_contract(app) -> None:
         "content"
     ]["application/json"]["schema"]
     assert response_schema["discriminator"]["propertyName"] == "status"
-    submit_schema = paths[
-        "/api/practice/sessions/{sessionId}/answers/main"
-    ]["post"]["responses"]["202"]["content"]["application/json"]["schema"]
+    submit_schema = paths["/api/practice/sessions/{sessionId}/answers/main"]["post"][
+        "responses"
+    ]["202"]["content"]["application/json"]["schema"]
     assert submit_schema["discriminator"]["propertyName"] == "status"
     follow_up_submit_schema = paths[
         "/api/practice/sessions/{sessionId}/answers/follow-up"
     ]["post"]["responses"]["202"]["content"]["application/json"]["schema"]
     assert follow_up_submit_schema["discriminator"]["propertyName"] == "status"
-    end_follow_ups_schema = paths[
-        "/api/practice/sessions/{sessionId}/follow-ups/end"
-    ]["post"]["responses"]["202"]["content"]["application/json"]["schema"]
+    end_follow_ups_schema = paths["/api/practice/sessions/{sessionId}/follow-ups/end"][
+        "post"
+    ]["responses"]["202"]["content"]["application/json"]["schema"]
     assert end_follow_ups_schema["discriminator"]["propertyName"] == "status"
-    current_schema = paths["/api/practice/sessions/current"]["get"]["responses"][
-        "200"
-    ]["content"]["application/json"]["schema"]
+    current_schema = paths["/api/practice/sessions/current"]["get"]["responses"]["200"][
+        "content"
+    ]["application/json"]["schema"]
     assert current_schema["$ref"] == (
         "#/components/schemas/CurrentPracticeSessionResponse"
     )

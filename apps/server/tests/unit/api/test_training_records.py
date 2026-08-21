@@ -19,17 +19,20 @@ from riva.schemas.training_records import (
 from riva.services.training_record_reference_answers import (
     REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
     TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
-    TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
     TRAINING_RECORD_QUESTION_NOT_FOUND,
-    TRAINING_RECORD_STATE_CONFLICT as REFERENCE_ANSWER_STATE_CONFLICT,
     TrainingRecordReferenceAnswerStateError,
+)
+from riva.services.training_record_reference_answers import (
+    TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
+)
+from riva.services.training_record_reference_answers import (
+    TRAINING_RECORD_STATE_CONFLICT as REFERENCE_ANSWER_STATE_CONFLICT,
 )
 from riva.services.training_records import (
     TRAINING_RECORD_NOT_FOUND,
     TRAINING_RECORD_STATE_CONFLICT,
     TrainingRecordStateError,
 )
-
 
 RECORD_ID = UUID("11111111-1111-4111-8111-111111111111")
 ATTEMPT_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -231,9 +234,9 @@ def reference_answer_client_for(
 ) -> tuple[TestClient, User]:
     user = current_user()
     app.dependency_overrides[require_current_user] = lambda: user
-    app.dependency_overrides[
-        get_training_record_reference_answer_service
-    ] = lambda: service
+    app.dependency_overrides[get_training_record_reference_answer_service] = lambda: (
+        service
+    )
     return TestClient(app), user
 
 
@@ -303,7 +306,9 @@ def test_get_targeted_practice_record_openapi_declares_response_model(app) -> No
     ].endswith("TargetedPracticeTrainingRecordDetailResponse")
 
 
-def test_list_training_records_forwards_repeated_filters_and_camel_case_queries(app) -> None:
+def test_list_training_records_forwards_repeated_filters_and_camel_case_queries(
+    app,
+) -> None:
     service = FakeTrainingRecordService()
     client, user = client_for(app, service)
 

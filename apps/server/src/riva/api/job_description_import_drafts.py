@@ -18,7 +18,6 @@ from riva.services.job_description_import_drafts import (
     JobDescriptionImportDraftService,
 )
 
-
 DraftId = Annotated[UUID, Path(alias="id")]
 
 router = APIRouter(

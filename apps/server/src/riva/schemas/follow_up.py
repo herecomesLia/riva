@@ -16,13 +16,13 @@ from riva.schemas.practice_interactions import (
     PracticeAnswerContent,
     PracticeAnswerSnapshot,
 )
+from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardPrompt,
     QuestionCardQuestionType,
     QuestionCardTextList,
 )
-from riva.schemas.profile import StandardUUID
 
 
 class _FollowUpModel(BaseModel):
@@ -37,15 +37,11 @@ class FollowUpQuestionContext(_FollowUpModel):
     )
     difficulty: QuestionCardDifficulty
     assessed_capabilities: QuestionCardTextList = Field(
-        validation_alias=AliasChoices(
-            "assessed_capabilities", "assessedCapabilities"
-        ),
+        validation_alias=AliasChoices("assessed_capabilities", "assessedCapabilities"),
         serialization_alias="assessedCapabilities",
     )
     follow_up_directions: QuestionCardTextList = Field(
-        validation_alias=AliasChoices(
-            "follow_up_directions", "followUpDirections"
-        ),
+        validation_alias=AliasChoices("follow_up_directions", "followUpDirections"),
         serialization_alias="followUpDirections",
     )
     scoring_focus: QuestionCardTextList = Field(
@@ -65,9 +61,7 @@ class FollowUpPreviousExchange(_FollowUpModel):
 
 class FollowUpInput(_FollowUpModel):
     interaction_language: InteractionLanguage = Field(
-        validation_alias=AliasChoices(
-            "interaction_language", "interactionLanguage"
-        ),
+        validation_alias=AliasChoices("interaction_language", "interactionLanguage"),
         serialization_alias="interactionLanguage",
     )
     question: FollowUpQuestionContext
@@ -78,18 +72,14 @@ class FollowUpInput(_FollowUpModel):
     previous_follow_ups: list[FollowUpPreviousExchange] = Field(
         default_factory=list,
         max_length=MAX_PRACTICE_FOLLOW_UPS,
-        validation_alias=AliasChoices(
-            "previous_follow_ups", "previousFollowUps"
-        ),
+        validation_alias=AliasChoices("previous_follow_ups", "previousFollowUps"),
         serialization_alias="previousFollowUps",
     )
     next_follow_up_order: Annotated[
         int,
         Field(ge=1, le=MAX_PRACTICE_FOLLOW_UPS),
     ] = Field(
-        validation_alias=AliasChoices(
-            "next_follow_up_order", "nextFollowUpOrder"
-        ),
+        validation_alias=AliasChoices("next_follow_up_order", "nextFollowUpOrder"),
         serialization_alias="nextFollowUpOrder",
     )
 
@@ -118,9 +108,7 @@ class FollowUpRunPayload(_FollowUpModel):
     attempt_id: StandardUUID = Field(alias="attemptId")
     question_card_id: StandardUUID = Field(alias="questionCardId")
     main_answer_id: StandardUUID = Field(alias="mainAnswerId")
-    interaction_language: InteractionLanguage = Field(
-        alias="interactionLanguage"
-    )
+    interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
     next_follow_up_order: Annotated[
         int,
         Field(
@@ -144,17 +132,11 @@ class FollowUpRunPayload(_FollowUpModel):
         answer_id = self.previous_follow_up_answer_id
         if self.next_follow_up_order == 1:
             if question_id is not None or answer_id is not None:
-                raise ValueError(
-                    "order one must not include previous follow-up IDs"
-                )
+                raise ValueError("order one must not include previous follow-up IDs")
         elif (question_id is None) != (answer_id is None):
-            raise ValueError(
-                "order two requires both previous follow-up IDs"
-            )
+            raise ValueError("order two requires both previous follow-up IDs")
         elif question_id is None or answer_id is None:
-            raise ValueError(
-                "order two requires both previous follow-up IDs"
-            )
+            raise ValueError("order two requires both previous follow-up IDs")
         return self
 
 

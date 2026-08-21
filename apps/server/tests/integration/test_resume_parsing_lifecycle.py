@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -27,7 +27,6 @@ from riva.utils import utc_now
 from riva.workers import AgentWorker
 from riva.workers.bootstrap import build_agent_handler_registry
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 
@@ -348,8 +347,7 @@ def test_failed_retry_preserves_old_artifacts_and_advances_versions() -> None:
                     [parsing_output("Second durable result")]
                 )
                 assert (
-                    await make_worker(database, second_provider).process_one()
-                    is True
+                    await make_worker(database, second_provider).process_one() is True
                 )
 
                 succeeded = await status(database, user_id, document_id)
@@ -380,10 +378,13 @@ def test_retry_can_continue_after_retry_run_fails_before_persisting_artifacts() 
                 user_id, document_id = await seed_document(database)
                 run_a_response = await start(database, user_id, document_id)
 
-                assert await make_worker(
-                    database,
-                    FakeLLMProvider([parsing_output("Result A")]),
-                ).process_one() is True
+                assert (
+                    await make_worker(
+                        database,
+                        FakeLLMProvider([parsing_output("Result A")]),
+                    ).process_one()
+                    is True
+                )
 
                 async with database.sessionmaker() as session:
                     run_a = await session.get(AgentRun, run_a_response.run_id)
@@ -472,10 +473,13 @@ def test_retry_can_continue_after_retry_run_fails_before_persisting_artifacts() 
                     assert stored_draft.draft_version == draft_version_before_b
                     assert stored_draft.summary == draft_summary_before_b
 
-                assert await make_worker(
-                    database,
-                    FakeLLMProvider([parsing_output("Result C")]),
-                ).process_one() is True
+                assert (
+                    await make_worker(
+                        database,
+                        FakeLLMProvider([parsing_output("Result C")]),
+                    ).process_one()
+                    is True
+                )
 
                 final = await status(database, user_id, document_id)
                 assert final.status == "succeeded"
@@ -503,16 +507,13 @@ def test_retry_can_continue_after_retry_run_fails_before_persisting_artifacts() 
                     assert draft_c.draft_version == 2
                     assert run_count == 3
                     assert (
-                        await session.get(AgentRun, run_a_response.run_id)
-                        is not None
+                        await session.get(AgentRun, run_a_response.run_id) is not None
                     )
                     assert (
-                        await session.get(AgentRun, run_b_response.run_id)
-                        is not None
+                        await session.get(AgentRun, run_b_response.run_id) is not None
                     )
                     assert (
-                        await session.get(AgentRun, run_c_response.run_id)
-                        is not None
+                        await session.get(AgentRun, run_c_response.run_id) is not None
                     )
             finally:
                 await database.reset()

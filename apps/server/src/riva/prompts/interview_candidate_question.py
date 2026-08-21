@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_candidate_question import InterviewCandidateQuestionOutput
 
-
 INTERVIEW_CANDIDATE_QUESTION_PROMPT = PromptDefinition(
     prompt_id="interview-candidate-question",
     version="1",

@@ -106,9 +106,7 @@ def test_minimal_and_complete_draft_data_are_valid() -> None:
     )
 
     parsed = ResumeImportDraftData.model_validate(complete)
-    assert parsed.skipped_items[0].reasons == [
-        "start_date_precision_insufficient"
-    ]
+    assert parsed.skipped_items[0].reasons == ["start_date_precision_insufficient"]
     assert parsed.work_experiences[0].skill_ids == [skill_id]
 
 
@@ -224,4 +222,3 @@ def test_draft_schema_is_strict_and_rejects_invalid_references() -> None:
                 "summaryAction": "none",
             }
         )
-

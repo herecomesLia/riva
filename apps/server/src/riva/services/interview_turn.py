@@ -32,6 +32,8 @@ from riva.schemas.interview_planning import (
     InterviewPlanningRunPayload,
 )
 from riva.schemas.interview_turn import (
+    MAX_INTERVIEW_FOLLOW_UPS_BASIC,
+    MAX_INTERVIEW_FOLLOW_UPS_PRESSURE,
     InterviewTurnAnswerSnapshot,
     InterviewTurnAssessmentOutput,
     InterviewTurnCompleteQuestionAction,
@@ -43,13 +45,10 @@ from riva.schemas.interview_turn import (
     InterviewTurnQuestionContext,
     InterviewTurnRunPayload,
     InterviewTurnSessionSnapshot,
-    MAX_INTERVIEW_FOLLOW_UPS_BASIC,
-    MAX_INTERVIEW_FOLLOW_UPS_PRESSURE,
 )
 from riva.services.agent_runs import AgentRunService
 from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.utils import utc_now
-
 
 InterviewTurnStateErrorCode = Literal[
     "interview_turn_session_not_found",
@@ -81,9 +80,7 @@ INTERVIEW_TURN_FOLLOW_UP_MISMATCH: InterviewTurnStateErrorCode = (
 INTERVIEW_TURN_ANSWER_INVALID: InterviewTurnStateErrorCode = (
     "interview_turn_answer_invalid"
 )
-INTERVIEW_TURN_RUN_INVALID: InterviewTurnStateErrorCode = (
-    "interview_turn_run_invalid"
-)
+INTERVIEW_TURN_RUN_INVALID: InterviewTurnStateErrorCode = "interview_turn_run_invalid"
 INTERVIEW_TURN_SNAPSHOT_INVALID: InterviewTurnStateErrorCode = (
     "interview_turn_snapshot_invalid"
 )
@@ -117,9 +114,7 @@ class InterviewTurnService:
         self.session = session
         self.llm_model = llm_model
         self.clock = clock
-        self.competency_ingestion_service_factory = (
-            competency_ingestion_service_factory
-        )
+        self.competency_ingestion_service_factory = competency_ingestion_service_factory
 
     async def submit_answer(
         self,
@@ -149,9 +144,7 @@ class InterviewTurnService:
 
             if target == "question":
                 if follow_up_question_id is not None:
-                    raise InterviewTurnStateError(
-                        INTERVIEW_TURN_QUESTION_MISMATCH
-                    )
+                    raise InterviewTurnStateError(INTERVIEW_TURN_QUESTION_MISMATCH)
                 if interview_session.status != "question":
                     raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
                 existing_answer = await self.session.scalar(
@@ -185,9 +178,7 @@ class InterviewTurnService:
                 if interview_session.status != "followUp":
                     raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
                 if follow_up_question_id is None:
-                    raise InterviewTurnStateError(
-                        INTERVIEW_TURN_FOLLOW_UP_MISMATCH
-                    )
+                    raise InterviewTurnStateError(INTERVIEW_TURN_FOLLOW_UP_MISMATCH)
                 follow_up = await self.session.scalar(
                     select(InterviewFollowUpQuestion)
                     .where(
@@ -198,21 +189,16 @@ class InterviewTurnService:
                     .with_for_update()
                 )
                 if follow_up is None:
-                    raise InterviewTurnStateError(
-                        INTERVIEW_TURN_FOLLOW_UP_MISMATCH
-                    )
+                    raise InterviewTurnStateError(INTERVIEW_TURN_FOLLOW_UP_MISMATCH)
                 existing_follow_up_answer = await self.session.scalar(
                     select(InterviewFollowUpAnswer)
                     .where(
-                        InterviewFollowUpAnswer.follow_up_question_id
-                        == follow_up.id
+                        InterviewFollowUpAnswer.follow_up_question_id == follow_up.id
                     )
                     .with_for_update()
                 )
                 if existing_follow_up_answer is not None:
-                    raise InterviewTurnStateError(
-                        INTERVIEW_TURN_STATE_INVALID
-                    )
+                    raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
                 main_answer = await self._main_answer(question.id)
                 if main_answer is None:
                     raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
@@ -261,11 +247,9 @@ class InterviewTurnService:
         except InterviewTurnStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
-            raise InterviewTurnStateError(
-                INTERVIEW_TURN_SNAPSHOT_INVALID
-            ) from None
+            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -311,8 +295,7 @@ class InterviewTurnService:
                 user_id=user_id,
                 payload=retry_payload,
                 idempotency_key=(
-                    f"interview-turn-retry:{interview_session.id}:run:"
-                    f"{failed_run.id}"
+                    f"interview-turn-retry:{interview_session.id}:run:{failed_run.id}"
                 ),
             )
             interview_session.turn_run_id = run.id
@@ -322,11 +305,9 @@ class InterviewTurnService:
         except InterviewTurnStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
-            raise InterviewTurnStateError(
-                INTERVIEW_TURN_SNAPSHOT_INVALID
-            ) from None
+            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -345,9 +326,7 @@ class InterviewTurnService:
             validated_output = _validate_output(output)
             await self._lock_user(run.user_id)
             persisted_run = await self.session.scalar(
-                select(AgentRun)
-                .where(AgentRun.id == run.id)
-                .with_for_update()
+                select(AgentRun).where(AgentRun.id == run.id).with_for_update()
             )
             if persisted_run is None or _status_value(persisted_run.status) != (
                 AgentRunStatus.RUNNING.value
@@ -400,8 +379,7 @@ class InterviewTurnService:
                 return canonical
 
             plan = await self.session.scalar(
-                select(InterviewPlan)
-                .where(
+                select(InterviewPlan).where(
                     InterviewPlan.id == payload.plan_id,
                     InterviewPlan.session_id == interview_session.id,
                     InterviewPlan.revision == payload.plan_revision,
@@ -441,9 +419,7 @@ class InterviewTurnService:
                 question_id=question.id,
                 source_agent_run_id=run.id,
                 main_answer_id=(
-                    payload.main_answer_id
-                    if payload.target_type == "main"
-                    else None
+                    payload.main_answer_id if payload.target_type == "main" else None
                 ),
                 follow_up_answer_id=(
                     payload.follow_up_answer_id
@@ -517,17 +493,13 @@ class InterviewTurnService:
             await self.session.commit()
             if effective_action is validated_output.next_action:
                 return validated_output
-            return validated_output.model_copy(
-                update={"next_action": effective_action}
-            )
+            return validated_output.model_copy(update={"next_action": effective_action})
         except InterviewTurnStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
-            raise InterviewTurnStateError(
-                INTERVIEW_TURN_SNAPSHOT_INVALID
-            ) from None
+            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -630,13 +602,9 @@ class InterviewTurnService:
             turn_question = InterviewTurnQuestionContext(
                 prompt=planned_question.prompt,
                 question_type=planned_question.question_type,
-                assessed_capabilities=list(
-                    planned_question.assessed_capabilities
-                ),
+                assessed_capabilities=list(planned_question.assessed_capabilities),
                 objective=planned_question.objective,
-                follow_up_directions=list(
-                    planned_question.follow_up_directions
-                ),
+                follow_up_directions=list(planned_question.follow_up_directions),
                 scoring_focus=list(planned_question.scoring_focus),
             )
             exchanges = tuple(
@@ -671,18 +639,15 @@ class InterviewTurnService:
                 ),
                 answered_follow_ups=list(exchanges),
                 remaining_follow_up_slots=(
-                    _max_follow_ups(interview_session.difficulty)
-                    - len(exchanges)
+                    _max_follow_ups(interview_session.difficulty) - len(exchanges)
                 ),
                 career_profile=planning_input.career_profile,
                 target_role=planning_input.target_role,
                 job_description_analysis=planning_input.job_description_analysis,
                 matching_analysis=planning_input.matching_analysis,
             )
-        except (TypeError, ValueError, ValidationError, AttributeError):
-            raise InterviewTurnStateError(
-                INTERVIEW_TURN_SNAPSHOT_INVALID
-            ) from None
+        except TypeError, ValueError, ValidationError, AttributeError:
+            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
 
     async def _next_planned_question(
         self,
@@ -695,10 +660,8 @@ class InterviewTurnService:
                 current_order + 1,
                 required=False,
             )
-        except (TypeError, ValueError, ValidationError):
-            raise InterviewTurnStateError(
-                INTERVIEW_TURN_SNAPSHOT_INVALID
-            ) from None
+        except TypeError, ValueError, ValidationError:
+            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
 
     async def _main_answer(self, question_id: UUID) -> InterviewAnswer | None:
         return await self.session.scalar(
@@ -719,9 +682,7 @@ class InterviewTurnService:
                     InterviewFollowUpAnswer.follow_up_question_id
                     == InterviewFollowUpQuestion.id,
                 )
-                .where(
-                    InterviewFollowUpQuestion.parent_question_id == question_id
-                )
+                .where(InterviewFollowUpQuestion.parent_question_id == question_id)
                 .order_by(InterviewFollowUpQuestion.order.asc())
                 .with_for_update()
             )
@@ -801,10 +762,8 @@ class InterviewTurnService:
         cls._validate_run_metadata(run, run.user_id)
         try:
             return InterviewTurnRunPayload.model_validate(run.payload)
-        except (TypeError, ValueError, ValidationError):
-            raise InterviewTurnStateError(
-                INTERVIEW_TURN_SNAPSHOT_INVALID
-            ) from None
+        except TypeError, ValueError, ValidationError:
+            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
 
     async def _follow_up_for_assessment(
         self,
@@ -906,7 +865,7 @@ class InterviewTurnService:
 def _validate_output(output: object) -> InterviewTurnOutput:
     try:
         return InterviewTurnOutput.model_validate(output)
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
 
 
@@ -934,7 +893,7 @@ def _output_from_assessment(
             ),
             next_action=action,
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID) from None
 
 
@@ -984,7 +943,7 @@ def _session_configuration(session: InterviewSession) -> InterviewConfiguration:
             difficulty=InterviewDifficulty(session.difficulty),
             duration_minutes=session.duration_minutes,
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID) from None
 
 

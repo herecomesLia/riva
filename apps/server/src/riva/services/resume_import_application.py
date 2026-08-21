@@ -537,10 +537,7 @@ def _validate_draft_metadata(
 ) -> None:
     if draft.draft_version != draft_version:
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_VERSION_CONFLICT)
-    if (
-        draft.user_id != user_id
-        or draft.resume_document_id != resume_document_id
-    ):
+    if draft.user_id != user_id or draft.resume_document_id != resume_document_id:
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
 
 
@@ -566,7 +563,7 @@ def _validate_recomputed_draft(
         )
     except ResumeImportStateError:
         raise
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID) from None
     if _stable_model_json(expected) != _stable_model_json(persisted):
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
@@ -749,7 +746,7 @@ def reconcile_work_skill_links(
         raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
     try:
         existing_links = list(experience.skill_links)
-    except (AttributeError, TypeError):
+    except AttributeError, TypeError:
         raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
     existing_link_ids: set[UUID] = set()
     for link in existing_links:
@@ -806,7 +803,7 @@ def reconcile_project_skill_links(
         raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
     try:
         existing_links = list(project.skill_links)
-    except (AttributeError, TypeError):
+    except AttributeError, TypeError:
         raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
     existing_link_ids: set[UUID] = set()
     for link in existing_links:

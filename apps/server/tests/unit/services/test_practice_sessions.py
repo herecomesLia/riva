@@ -22,8 +22,8 @@ from riva.prompts import (
     FOLLOW_UP_PROMPT,
     PRACTICE_EVALUATION_PROMPT,
     PRACTICE_RECOMMENDATION_PROMPT,
-    PRACTICE_REVIEW_PROMPT,
     PRACTICE_REFERENCE_ANSWER_PROMPT,
+    PRACTICE_REVIEW_PROMPT,
     QUESTION_GENERATION_PROMPT,
 )
 from riva.schemas.evaluation import (
@@ -32,8 +32,8 @@ from riva.schemas.evaluation import (
 )
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import PracticeAnswerKind
-from riva.schemas.practice_reference_answer import PracticeReferenceAnswerTargetType
 from riva.schemas.practice_recommendation import RecommendationRunPayload
+from riva.schemas.practice_reference_answer import PracticeReferenceAnswerTargetType
 from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
@@ -46,33 +46,38 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import QuestionGenerationRunPayload
+from riva.services.evaluation_generation import (
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+)
+from riva.services.follow_up_generation import FollowUpGenerationStateError
 from riva.services.practice_sessions import (
-    PRACTICE_FOLLOW_UP_GENERATION_FAILED,
-    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
+    PRACTICE_EVALUATION_GENERATION_FAILED,
     PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,
     PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
-    PRACTICE_EVALUATION_GENERATION_FAILED,
-    PRACTICE_RECOMMENDATION_GENERATION_FAILED,
-    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
-    PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
-    PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+    PRACTICE_FOLLOW_UP_GENERATION_FAILED,
+    PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT,
     PRACTICE_QUESTION_GENERATION_FAILED,
     PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED,
     PRACTICE_QUESTION_GENERATION_STATE_CONFLICT,
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
+    PRACTICE_RECOMMENDATION_GENERATION_FAILED,
+    PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT,
+    PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
+    PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
+    PRACTICE_REVIEW_GENERATION_FAILED,
+    PRACTICE_REVIEW_GENERATION_STATE_CONFLICT,
+    PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PRACTICE_SESSION_ALREADY_ACTIVE,
     PRACTICE_SESSION_NOT_FOUND,
     PRACTICE_SESSION_SOURCE_UNAVAILABLE,
     PRACTICE_SESSION_STATE_CONFLICT,
     PRACTICE_SESSION_VERSION_CONFLICT,
-    PRACTICE_REVIEW_GENERATION_FAILED,
-    PRACTICE_REVIEW_GENERATION_STATE_CONFLICT,
-    PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
     PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE,
-    PracticePrimaryAnswerWorkflowContext,
-    PracticeEvaluationWorkflowContext,
     PracticeCompletedSessionWorkflowContext,
     PracticeEndedEarlySessionWorkflowContext,
+    PracticeEvaluationWorkflowContext,
+    PracticePrimaryAnswerWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionService,
     PracticeSessionStateError,
@@ -80,16 +85,10 @@ from riva.services.practice_sessions import (
     practice_follow_up_idempotency_key,
     practice_question_generation_idempotency_key,
 )
-from riva.services.evaluation_generation import (
-    EvaluationGenerationStateError,
-    practice_evaluation_idempotency_key,
-)
-from riva.services.follow_up_generation import FollowUpGenerationStateError
+from riva.services.question_generation import QuestionGenerationStateError
 from riva.services.recommendation_generation import (
     practice_recommendation_idempotency_key,
 )
-from riva.services.review_generation import practice_review_idempotency_key
-from riva.services.question_generation import QuestionGenerationStateError
 from riva.services.reference_answer_generation import (
     PracticeReferenceAnswerLifecycleStatus,
     PracticeReferenceAnswerWorkflowState,
@@ -97,7 +96,7 @@ from riva.services.reference_answer_generation import (
     practice_follow_up_reference_answer_idempotency_key,
     practice_main_reference_answer_idempotency_key,
 )
-
+from riva.services.review_generation import practice_review_idempotency_key
 
 NOW = datetime(2026, 8, 10, 10, 0, tzinfo=UTC)
 
@@ -136,10 +135,7 @@ class ScriptedSession:
             for value in candidates
             if entity is not None
             and isinstance(value, entity)
-            and not (
-                entity is AgentRun
-                and value.agent_id != "follow-up-generator"
-            )
+            and not (entity is AgentRun and value.agent_id != "follow-up-generator")
         ]
 
         class Result:
@@ -302,9 +298,7 @@ class FakeReferenceAnswerGenerationService:
         state: PracticeReferenceAnswerWorkflowState | None = None,
         error: BaseException | None = None,
         state_error: ReferenceAnswerGenerationStateError | None = None,
-        states: dict[
-            tuple[str, UUID | None], PracticeReferenceAnswerWorkflowState
-        ]
+        states: dict[tuple[str, UUID | None], PracticeReferenceAnswerWorkflowState]
         | None = None,
     ) -> None:
         self.run = run
@@ -488,9 +482,7 @@ def generation_run(
         model="test-model",
         input_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
         output_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
-        result={"prompt": "persisted"}
-        if status is AgentRunStatus.SUCCEEDED
-        else None,
+        result={"prompt": "persisted"} if status is AgentRunStatus.SUCCEEDED else None,
         error_code="provider_unavailable" if status is AgentRunStatus.FAILED else None,
     )
 
@@ -642,9 +634,7 @@ def follow_up_run(
         model="test-model",
         input_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
         output_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
-        result={"action": "complete"}
-        if status is AgentRunStatus.SUCCEEDED
-        else None,
+        result={"action": "complete"} if status is AgentRunStatus.SUCCEEDED else None,
         error_code="provider_unavailable" if status is AgentRunStatus.FAILED else None,
     )
 
@@ -778,7 +768,9 @@ def test_reveal_question_allows_empty_frozen_guidance() -> None:
     assert active.version == 5
 
 
-def test_reveal_question_works_for_a_retry_without_creating_generation_records() -> None:
+def test_reveal_question_works_for_a_retry_without_creating_generation_records() -> (
+    None
+):
     records = _retry_review_records("retryCurrent")
     active = records["active"]
     original = records["attempt"]
@@ -1041,7 +1033,9 @@ def test_reveal_question_rejects_a_generating_follow_up_shape() -> None:
     assert scripted.commit_count == 0
 
 
-def test_reveal_question_rejects_completed_session_wrong_version_owner_and_question() -> None:
+def test_reveal_question_rejects_completed_session_wrong_version_owner_and_question() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context(version=4)
     active.status = PracticeSessionStatus.COMPLETED.value
     completed_session = ScriptedSession(active)
@@ -1497,9 +1491,7 @@ def evaluation_run(
         question_card_id=question_card_id,
         main_answer_id=main_answer_id,
         interaction_language="en",
-        follow_up_completion_reason=(
-            follow_up_completion_reason
-        ),
+        follow_up_completion_reason=(follow_up_completion_reason),
         terminal_follow_up_decision_id=decision_id,
         unanswered_follow_up_question_id=unanswered_follow_up_question_id,
         follow_up_question_1_id=follow_up_question_1_id,
@@ -1522,17 +1514,13 @@ def evaluation_run(
         available_at=NOW,
         started_at=None if status is AgentRunStatus.QUEUED else NOW,
         finished_at=(
-            NOW
-            if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
-            else None
+            NOW if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED} else None
         ),
         provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
         model="test-model",
         input_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
         output_tokens=1 if status is AgentRunStatus.SUCCEEDED else None,
-        result={"overallScore": 80}
-        if status is AgentRunStatus.SUCCEEDED
-        else None,
+        result={"overallScore": 80} if status is AgentRunStatus.SUCCEEDED else None,
         error_code="provider_unavailable" if status is AgentRunStatus.FAILED else None,
     )
 
@@ -1594,16 +1582,13 @@ def review_run(
         output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
-        idempotency_key=idempotency_key
-        or practice_review_idempotency_key(attempt_id),
+        idempotency_key=idempotency_key or practice_review_idempotency_key(attempt_id),
         attempt_count=0 if status is AgentRunStatus.QUEUED else 1,
         max_attempts=3,
         available_at=NOW,
         started_at=None if status is AgentRunStatus.QUEUED else NOW,
         finished_at=(
-            NOW
-            if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
-            else None
+            NOW if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED} else None
         ),
         provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
         model="test-model",
@@ -1668,9 +1653,7 @@ def recommendation_run(
         available_at=NOW,
         started_at=None if status is AgentRunStatus.QUEUED else NOW,
         finished_at=(
-            NOW
-            if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
-            else None
+            NOW if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED} else None
         ),
         provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
         model="test-model",
@@ -1734,10 +1717,16 @@ def service(
         llm_model="test-model",
         question_generation_service_factory=lambda _session, **kwargs: fake_generation,  # type: ignore[arg-type]
         follow_up_generation_service_factory=lambda _session, **kwargs: fake_follow_up,  # type: ignore[arg-type]
-        evaluation_generation_service_factory=lambda _session, **kwargs: fake_evaluation,  # type: ignore[arg-type]
+        evaluation_generation_service_factory=lambda _session, **kwargs: (
+            fake_evaluation
+        ),  # type: ignore[arg-type]
         review_generation_service_factory=lambda _session, **kwargs: fake_review,  # type: ignore[arg-type]
-        recommendation_generation_service_factory=lambda _session, **kwargs: fake_recommendation,  # type: ignore[arg-type]
-        reference_answer_generation_service_factory=lambda _session, **kwargs: fake_reference,  # type: ignore[arg-type]
+        recommendation_generation_service_factory=lambda _session, **kwargs: (
+            fake_recommendation
+        ),  # type: ignore[arg-type]
+        reference_answer_generation_service_factory=lambda _session, **kwargs: (
+            fake_reference
+        ),  # type: ignore[arg-type]
         clock=lambda: NOW,
     )
 
@@ -1777,7 +1766,9 @@ def follow_up_reference_request_values(
     ]
 
 
-def test_request_question_reference_answer_enqueues_and_advances_only_session_version() -> None:
+def test_request_question_reference_answer_enqueues_and_advances_only_session_version() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context(version=4)
     original_attempt_updated_at = attempt.updated_at
     reference_run = reference_answer_run(user_id=active.user_id)
@@ -1790,7 +1781,9 @@ def test_request_question_reference_answer_enqueues_and_advances_only_session_ve
     )
 
     result = asyncio.run(
-        service(scripted, fake_reference=fake_reference).request_question_reference_answer(
+        service(
+            scripted, fake_reference=fake_reference
+        ).request_question_reference_answer(
             user_id=active.user_id,
             session_id=active.id,
             expected_version=4,
@@ -1811,16 +1804,16 @@ def test_request_question_reference_answer_enqueues_and_advances_only_session_ve
         {
             "user_id": active.user_id,
             "question_card_id": card.id,
-            "idempotency_key": practice_main_reference_answer_idempotency_key(
-                card.id
-            ),
+            "idempotency_key": practice_main_reference_answer_idempotency_key(card.id),
         }
     ]
     assert scripted.commit_count == 1
     assert scripted.rollback_count == 0
 
 
-def test_request_question_reference_answer_reuses_stable_run_with_latest_version() -> None:
+def test_request_question_reference_answer_reuses_stable_run_with_latest_version() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context(version=4)
     reference_run = reference_answer_run(user_id=active.user_id)
     fake_reference = FakeReferenceAnswerGenerationService(
@@ -1865,7 +1858,9 @@ def test_request_question_reference_answer_reuses_stable_run_with_latest_version
     assert second_session.commit_count == 1
 
 
-def test_request_question_reference_answer_rejects_stale_version_and_unavailable_enqueue_rolls_back() -> None:
+def test_request_question_reference_answer_rejects_stale_version_and_unavailable_enqueue_rolls_back() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context(version=4)
     reference_run = reference_answer_run(user_id=active.user_id)
     fake_reference = FakeReferenceAnswerGenerationService(
@@ -1978,7 +1973,9 @@ def test_request_question_reference_answer_rejects_existing_main_answer() -> Non
     assert active.version == 4
 
 
-def test_request_follow_up_reference_answer_enqueues_only_current_pending_question() -> None:
+def test_request_follow_up_reference_answer_enqueues_only_current_pending_question() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context(
         version=4,
         attempt_status=PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
@@ -2049,7 +2046,9 @@ def test_request_follow_up_reference_answer_enqueues_only_current_pending_questi
     assert scripted.commit_count == 1
 
 
-def test_refresh_follow_up_reference_answer_preserves_version_and_rejects_wrong_question() -> None:
+def test_refresh_follow_up_reference_answer_preserves_version_and_rejects_wrong_question() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context(
         version=4,
         attempt_status=PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
@@ -2138,7 +2137,9 @@ def test_refresh_follow_up_reference_answer_preserves_version_and_rejects_wrong_
     assert error.value.code == PRACTICE_SESSION_STATE_CONFLICT
 
 
-def test_request_question_reference_answer_on_retry_reuses_question_card_target() -> None:
+def test_request_question_reference_answer_on_retry_reuses_question_card_target() -> (
+    None
+):
     records = _retry_review_records("retryCurrent")
     active = records["active"]
     original = records["attempt"]
@@ -2249,8 +2250,7 @@ def evaluation_pipeline(
             attempt_id=attempt.id,
             run_id=evaluation.id,
         )
-        if evaluation_artifact_present
-        and evaluation_status is AgentRunStatus.SUCCEEDED
+        if evaluation_artifact_present and evaluation_status is AgentRunStatus.SUCCEEDED
         else None
     )
     review = None
@@ -2420,9 +2420,7 @@ def evaluation_pipeline_with_two_follow_ups(
         follow_up_answer_1_id=first_answer.id,
         follow_up_question_2_id=second_question.id if second_answer else None,
         follow_up_answer_2_id=second_answer.id if second_answer else None,
-        unanswered_follow_up_question_id=(
-            second_question.id if ended_early else None
-        ),
+        unanswered_follow_up_question_id=(second_question.id if ended_early else None),
     )
     evaluation_value = evaluation_artifact(
         attempt_id=attempt.id,
@@ -2631,8 +2629,7 @@ def test_setup_capabilities_expose_only_currently_supported_sources() -> None:
     assert result.history_question_count == 0
     assert result.can_prioritize_weaknesses is False
     assert [
-        item.model_dump(mode="json")
-        for item in result.question_source_availability
+        item.model_dump(mode="json") for item in result.question_source_availability
     ] == [
         {
             "targetRoleId": str(role_id),
@@ -2644,7 +2641,9 @@ def test_setup_capabilities_expose_only_currently_supported_sources() -> None:
     ]
 
 
-def test_setup_capabilities_enable_weakness_prioritization_for_eligible_review() -> None:
+def test_setup_capabilities_enable_weakness_prioritization_for_eligible_review() -> (
+    None
+):
     user_id = uuid4()
     role_id = uuid4()
     session = ScriptedSession(
@@ -2673,7 +2672,9 @@ def test_setup_capabilities_enable_weakness_prioritization_for_eligible_review()
     assert result.can_prioritize_weaknesses is True
 
 
-def test_start_session_rejects_weakness_prioritization_without_eligible_weakness() -> None:
+def test_start_session_rejects_weakness_prioritization_without_eligible_weakness() -> (
+    None
+):
     user_id = uuid4()
     session = ScriptedSession(user_id, None)
 
@@ -2922,9 +2923,7 @@ def test_refresh_failed_raises_without_changing_session_state() -> None:
     [
         ((None,), PRACTICE_SESSION_NOT_FOUND),
         (
-                (
-                    practice_session(user_id=uuid4(), role_id=uuid4(), version=3),
-                ),
+            (practice_session(user_id=uuid4(), role_id=uuid4(), version=3),),
             PRACTICE_SESSION_VERSION_CONFLICT,
         ),
     ],
@@ -3335,9 +3334,7 @@ def test_get_session_context_maps_missing_or_wrong_owner_to_not_found() -> None:
 def test_get_active_session_context_returns_none_without_active_session() -> None:
     scripted = ScriptedSession(None)
 
-    result = asyncio.run(
-        service(scripted).get_active_session_context(user_id=uuid4())
-    )
+    result = asyncio.run(service(scripted).get_active_session_context(user_id=uuid4()))
 
     assert result is None
     assert scripted.commit_count == 0
@@ -3366,9 +3363,7 @@ def test_get_active_session_context_does_not_reconcile_succeeded_generation() ->
     )
     scripted = ScriptedSession(active, attempt, run, card)
 
-    result = asyncio.run(
-        service(scripted).get_active_session_context(user_id=user_id)
-    )
+    result = asyncio.run(service(scripted).get_active_session_context(user_id=user_id))
 
     assert result is not None
     assert result.attempt is attempt
@@ -3406,9 +3401,7 @@ def test_get_active_session_context_returns_highest_answering_attempt() -> None:
     attempt.attempt_number = 2
     scripted = ScriptedSession(active, attempt, run, card, None)
 
-    result = asyncio.run(
-        service(scripted).get_active_session_context(user_id=user_id)
-    )
+    result = asyncio.run(service(scripted).get_active_session_context(user_id=user_id))
 
     assert result is not None
     assert result.attempt.attempt_number == 2
@@ -3693,9 +3686,7 @@ def test_get_active_session_context_rejects_malformed_generation_run() -> None:
     scripted = ScriptedSession(active, attempt, run)
 
     with pytest.raises(PracticeSessionStateError) as error:
-        asyncio.run(
-            service(scripted).get_active_session_context(user_id=user_id)
-        )
+        asyncio.run(service(scripted).get_active_session_context(user_id=user_id))
 
     assert error.value.code == PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
     assert scripted.rollback_count == 1
@@ -3721,15 +3712,15 @@ def test_get_active_session_context_rejects_invalid_question_card_link() -> None
     scripted = ScriptedSession(active, attempt, run, card)
 
     with pytest.raises(PracticeSessionStateError) as error:
-        asyncio.run(
-            service(scripted).get_active_session_context(user_id=user_id)
-        )
+        asyncio.run(service(scripted).get_active_session_context(user_id=user_id))
 
     assert error.value.code == PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
     assert scripted.rollback_count == 1
 
 
-def test_submit_primary_answer_persists_answer_and_enqueues_follow_up_atomically() -> None:
+def test_submit_primary_answer_persists_answer_and_enqueues_follow_up_atomically() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context()
     follow_up = follow_up_run(
         user_id=active.user_id,
@@ -3781,9 +3772,7 @@ def test_submit_primary_answer_persists_answer_and_enqueues_follow_up_atomically
 
 def test_submit_primary_answer_rolls_back_when_follow_up_enqueue_fails() -> None:
     active, attempt, question_run, card = primary_answer_context()
-    fake_follow_up = FakeFollowUpGenerationService(
-        error=RuntimeError("enqueue failed")
-    )
+    fake_follow_up = FakeFollowUpGenerationService(error=RuntimeError("enqueue failed"))
     scripted = ScriptedSession(active, attempt, question_run, card, None)
 
     with pytest.raises(RuntimeError, match="enqueue failed"):
@@ -3810,9 +3799,7 @@ def test_submit_primary_answer_rolls_back_when_follow_up_enqueue_fails() -> None
 def test_submit_primary_answer_maps_follow_up_state_errors() -> None:
     active, attempt, question_run, card = primary_answer_context()
     fake_follow_up = FakeFollowUpGenerationService(
-        error=FollowUpGenerationStateError(
-            "follow_up_main_answer_not_ready"
-        )
+        error=FollowUpGenerationStateError("follow_up_main_answer_not_ready")
     )
     scripted = ScriptedSession(active, attempt, question_run, card, None)
 
@@ -3867,7 +3854,9 @@ def test_submit_primary_answer_rejects_invalid_content(
     assert scripted.rollback_count == 1
 
 
-def test_submit_primary_answer_rejects_existing_main_answer_without_overwriting() -> None:
+def test_submit_primary_answer_rejects_existing_main_answer_without_overwriting() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context()
     existing = main_answer(attempt_id=attempt.id, content="Original answer")
     scripted = ScriptedSession(active, attempt, question_run, card, existing)
@@ -4458,9 +4447,7 @@ def test_refresh_follow_up_evaluation_state_error_maps_without_leaking_source() 
         action="complete",
     )
     fake_evaluation = FakeEvaluationGenerationService(
-        error=EvaluationGenerationStateError(
-            "practice_evaluation_context_conflict"
-        )
+        error=EvaluationGenerationStateError("practice_evaluation_context_conflict")
     )
     scripted = ScriptedSession(
         active,
@@ -4622,13 +4609,9 @@ def test_get_evaluating_loads_only_a_canonical_succeeded_artifact() -> None:
     [
         lambda run: setattr(run, "agent_id", "wrong-agent"),
         lambda run: setattr(run, "payload", {"invalid": "payload"}),
-        lambda run: run.payload.update(
-            {"terminalFollowUpDecisionId": str(uuid4())}
-        ),
+        lambda run: run.payload.update({"terminalFollowUpDecisionId": str(uuid4())}),
         lambda run: run.payload.update({"interactionLanguage": "zh-CN"}),
-        lambda run: run.payload.update(
-            {"followUpQuestion1Id": str(uuid4())}
-        ),
+        lambda run: run.payload.update({"followUpQuestion1Id": str(uuid4())}),
     ],
 )
 def test_get_evaluating_rejects_corrupt_evaluation_lineage(mutate) -> None:
@@ -5143,12 +5126,16 @@ def test_refresh_evaluation_only_enqueues_missing_reference_target() -> None:
 
     assert isinstance(result, PracticeEvaluationWorkflowContext)
     assert fake_reference.main_calls == []
-    assert [call["follow_up_question_id"] for call in fake_reference.follow_up_calls] == [
+    assert [
+        call["follow_up_question_id"] for call in fake_reference.follow_up_calls
+    ] == [
         records["second_question"].id,  # type: ignore[union-attr]
     ]
 
 
-def test_refresh_evaluation_allows_unavailable_reference_target_to_reach_review() -> None:
+def test_refresh_evaluation_allows_unavailable_reference_target_to_reach_review() -> (
+    None
+):
     records = evaluation_pipeline_with_two_follow_ups()
     reference_run = reference_answer_run(
         user_id=records["active"].user_id,  # type: ignore[union-attr]
@@ -5190,7 +5177,9 @@ def test_refresh_evaluation_allows_unavailable_reference_target_to_reach_review(
     assert fake_reference.follow_up_calls == []
 
 
-def test_refresh_evaluation_uses_evaluation_run_created_at_for_ended_early_pending_target() -> None:
+def test_refresh_evaluation_uses_evaluation_run_created_at_for_ended_early_pending_target() -> (
+    None
+):
     records = evaluation_pipeline_with_two_follow_ups(ended_early=True)
     cutoff = NOW + timedelta(minutes=2)
     records["evaluation"].created_at = cutoff  # type: ignore[union-attr]
@@ -5238,7 +5227,9 @@ def test_refresh_evaluation_uses_evaluation_run_created_at_for_ended_early_pendi
     assert all(call["submitted_at"] == cutoff for call in pending_calls)
 
 
-def test_refresh_evaluation_maps_reference_resolver_corruption_to_state_conflict() -> None:
+def test_refresh_evaluation_maps_reference_resolver_corruption_to_state_conflict() -> (
+    None
+):
     records = evaluation_pipeline(
         review_status=AgentRunStatus.SUCCEEDED,
         recommendation_status=AgentRunStatus.SUCCEEDED,
@@ -5272,7 +5263,9 @@ def test_refresh_evaluation_maps_reference_resolver_corruption_to_state_conflict
     assert scripted.rollback_count == 1
 
 
-def test_refresh_evaluation_maps_reference_configuration_failure_without_advancing() -> None:
+def test_refresh_evaluation_maps_reference_configuration_failure_without_advancing() -> (
+    None
+):
     records = evaluation_pipeline(
         review_status=AgentRunStatus.SUCCEEDED,
         recommendation_status=AgentRunStatus.SUCCEEDED,
@@ -5541,7 +5534,15 @@ def test_get_review_requires_complete_canonical_lineage_without_writes() -> None
 
 
 @pytest.mark.parametrize(
-    "missing", ["evaluation_run", "evaluation_artifact", "review_run", "review_artifact", "recommendation_run", "recommendation_artifact"],
+    "missing",
+    [
+        "evaluation_run",
+        "evaluation_artifact",
+        "review_run",
+        "review_artifact",
+        "recommendation_run",
+        "recommendation_artifact",
+    ],
 )
 def test_final_replay_rejects_incomplete_lineage_as_version_conflict(
     missing: str,
@@ -5694,7 +5695,9 @@ def test_get_active_review_uses_no_write_locks_or_commit() -> None:
         )
     )
 
-    assert isinstance(result, PracticeEvaluationWorkflowContext | PracticeReviewWorkflowContext)
+    assert isinstance(
+        result, PracticeEvaluationWorkflowContext | PracticeReviewWorkflowContext
+    )
     assert result.attempt.status == "review"
     assert result.session.version == 4
     assert scripted.commit_count == 0
@@ -5774,9 +5777,7 @@ def test_submit_follow_up_answer_order1_persists_and_enqueues_order2() -> None:
     assert submitted.order == 2
     assert submitted.follow_up_question_id == question_1.id
     assert submitted.content == "The metric improved."
-    assert result.follow_up_exchanges == (
-        result.follow_up_exchanges[0],
-    )
+    assert result.follow_up_exchanges == (result.follow_up_exchanges[0],)
     assert result.follow_up_exchanges[0].question is question_1
     assert result.follow_up_exchanges[0].answer is submitted
     assert result.follow_up_generation_run is fake_follow_up.run
@@ -6144,7 +6145,9 @@ def test_refresh_follow_up_order2_complete_enqueues_all_answered_evaluation() ->
     assert scripted.commit_count == 1
 
 
-def test_submit_follow_up_answer_order2_persists_a2_without_order3_and_starts_evaluation() -> None:
+def test_submit_follow_up_answer_order2_persists_a2_without_order3_and_starts_evaluation() -> (
+    None
+):
     records = _order2_refresh_records(
         attempt_status="answeringFollowUp",
         order2_status=AgentRunStatus.SUCCEEDED,
@@ -6171,9 +6174,7 @@ def test_submit_follow_up_answer_order2_persists_a2_without_order3_and_starts_ev
             follow_up_answer_2_id=submitted.id,
         )
 
-    fake_evaluation = FakeEvaluationGenerationService(
-        run_factory=build_evaluation
-    )
+    fake_evaluation = FakeEvaluationGenerationService(run_factory=build_evaluation)
     result = asyncio.run(
         service(
             scripted,
@@ -6861,10 +6862,10 @@ def _retry_source_records() -> tuple[
     return active, original, retry_one, retry_two, question_run, card
 
 
-def test_retry_question_source_resolver_reaches_original_source_and_stable_key() -> None:
-    active, original, retry_one, retry_two, question_run, card = (
-        _retry_source_records()
-    )
+def test_retry_question_source_resolver_reaches_original_source_and_stable_key() -> (
+    None
+):
+    active, original, retry_one, retry_two, question_run, card = _retry_source_records()
     scripted = ScriptedSession(retry_one, original, question_run, card)
 
     source = asyncio.run(
@@ -6912,9 +6913,7 @@ def test_retry_question_source_resolver_reaches_original_source_and_stable_key()
 def test_retry_question_source_resolver_rejects_corruption(
     corruption: str,
 ) -> None:
-    active, original, retry_one, retry_two, question_run, card = (
-        _retry_source_records()
-    )
+    active, original, retry_one, retry_two, question_run, card = _retry_source_records()
     scalar_values: list[object]
     if corruption == "parent_missing":
         scalar_values = [None]
@@ -7108,7 +7107,9 @@ def test_get_retry_question_is_a_pure_read_and_returns_canonical_source() -> Non
     )
 
 
-def test_submit_primary_answer_on_retry_uses_retry_attempt_and_new_follow_up_key() -> None:
+def test_submit_primary_answer_on_retry_uses_retry_attempt_and_new_follow_up_key() -> (
+    None
+):
     active, original, _retry_one, retry_attempt, question_run, card = (
         _retry_source_records()
     )
@@ -7232,7 +7233,10 @@ def test_end_session_early_ends_unanswered_question_without_artifacts() -> None:
     assert result.question_context.question_generation_run is question_run
     assert result.completed_attempt_review_contexts == ()
     assert active.status == PracticeSessionStatus.COMPLETED.value
-    assert active.completion_reason == PracticeSessionCompletionReason.USER_ENDED_EARLY.value
+    assert (
+        active.completion_reason
+        == PracticeSessionCompletionReason.USER_ENDED_EARLY.value
+    )
     assert active.completed_at == NOW
     assert active.version == 5
     assert attempt.status == PracticeAttemptStatus.ENDED_EARLY.value
@@ -7248,7 +7252,9 @@ def test_end_session_early_ends_unanswered_question_without_artifacts() -> None:
     assert fake_recommendation.calls == []
 
 
-def test_end_session_early_rejects_db_answering_with_main_answer_and_follow_up_run() -> None:
+def test_end_session_early_rejects_db_answering_with_main_answer_and_follow_up_run() -> (
+    None
+):
     records = evaluation_pipeline(attempt_status=PracticeAttemptStatus.ANSWERING.value)
     active = records["active"]
     attempt = records["attempt"]
@@ -7390,7 +7396,9 @@ def test_end_session_early_replays_without_version_or_timestamp_changes() -> Non
     assert replay_scripted.rollback_count == 0
 
 
-def test_end_session_early_replay_rejects_wrong_question_or_new_response_artifact() -> None:
+def test_end_session_early_replay_rejects_wrong_question_or_new_response_artifact() -> (
+    None
+):
     active, attempt, question_run, card = primary_answer_context(
         version=4,
         attempt_status=PracticeAttemptStatus.ANSWERING.value,
@@ -7471,7 +7479,9 @@ def test_continue_to_next_question_completes_review_and_enqueues_new_attempt(
     assert result.attempt.question_type == "projectDeepDive"
     assert result.attempt.difficulty == "basic"
     assert result.attempt.retry_of_attempt_id is None
-    assert result.attempt.question_generation_run_id == result.question_generation_run.id
+    assert (
+        result.attempt.question_generation_run_id == result.question_generation_run.id
+    )
     assert result.attempt.completed_at is None
     assert result.question_card is None
     assert fake_generation.calls[0] == {
@@ -7550,7 +7560,9 @@ def test_continue_to_next_question_replays_lost_response_without_new_attempt() -
     assert replay_scripted.rollback_count == 0
 
 
-def test_continue_to_next_question_enqueue_failure_rolls_back_review_transition() -> None:
+def test_continue_to_next_question_enqueue_failure_rolls_back_review_transition() -> (
+    None
+):
     records = _continue_review_records("retryCurrent")
     active = records["active"]
     attempt = records["attempt"]
@@ -8086,11 +8098,11 @@ def test_complete_session_after_review_rejects_corrupt_replay(
     assert scripted.rollback_count == 1
 
 
-def test_get_active_session_context_ignores_completed_session_after_completion() -> None:
+def test_get_active_session_context_ignores_completed_session_after_completion() -> (
+    None
+):
     scripted = ScriptedSession(None)
-    result = asyncio.run(
-        service(scripted).get_active_session_context(user_id=uuid4())
-    )
+    result = asyncio.run(service(scripted).get_active_session_context(user_id=uuid4()))
 
     assert result is None
     assert scripted.commit_count == 0
@@ -8140,16 +8152,14 @@ class _RetryFinalCompletionSession(ScriptedSession):
             self.scalar_values.extend(self.completed_loader_scalar_values)
             self.completed_loader_started = True
         result = await super().scalars(statement)
-        if (
-            self.completed_loader_started
-            and statement.column_descriptions[0].get("entity")
-            in {
-                AgentRun,
-                PracticeAnswer,
-                PracticeFollowUpDecision,
-                PracticeFollowUpQuestion,
-            }
-        ):
+        if self.completed_loader_started and statement.column_descriptions[0].get(
+            "entity"
+        ) in {
+            AgentRun,
+            PracticeAnswer,
+            PracticeFollowUpDecision,
+            PracticeFollowUpQuestion,
+        }:
             values = [
                 value
                 for value in result.all()
@@ -8171,7 +8181,9 @@ class _RetryFinalCompletionSession(ScriptedSession):
         return result
 
 
-def test_complete_session_after_review_accepts_retry_final_attempt_without_run_id() -> None:
+def test_complete_session_after_review_accepts_retry_final_attempt_without_run_id() -> (
+    None
+):
     records = _retry_final_review_records()
     active = records["active"]
     original = records["original"]

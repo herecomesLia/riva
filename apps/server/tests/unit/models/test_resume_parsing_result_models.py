@@ -1,4 +1,10 @@
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, JSON, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKeyConstraint,
+    Index,
+    UniqueConstraint,
+)
 from sqlalchemy.sql.sqltypes import Text, Uuid
 
 from riva.db import Base
@@ -84,29 +90,20 @@ def test_resume_parsing_result_has_fields_constraints_indexes_and_timestamps() -
         if isinstance(constraint, UniqueConstraint)
         and constraint.name == "uq_resume_parsing_results_source_run"
     )
-    assert [column.name for column in source_unique.columns] == [
-        "source_agent_run_id"
-    ]
+    assert [column.name for column in source_unique.columns] == ["source_agent_run_id"]
 
     checks = {
         constraint.name: str(constraint.sqltext)
         for constraint in table.constraints
         if isinstance(constraint, CheckConstraint)
     }
-    assert checks["ck_resume_parsing_results_result_version"] == (
-        "result_version >= 1"
-    )
+    assert checks["ck_resume_parsing_results_result_version"] == ("result_version >= 1")
 
-    indexes = {
-        index.name: index
-        for index in table.indexes
-        if isinstance(index, Index)
-    }
+    indexes = {index.name: index for index in table.indexes if isinstance(index, Index)}
     assert [
         column.name
         for column in indexes["ix_resume_parsing_results_user_document"].columns
     ] == ["user_id", "resume_document_id"]
     assert [
-        column.name
-        for column in indexes["ix_resume_parsing_results_parsed_at"].columns
+        column.name for column in indexes["ix_resume_parsing_results_parsed_at"].columns
     ] == ["parsed_at"]

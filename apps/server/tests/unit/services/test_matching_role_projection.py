@@ -21,7 +21,6 @@ from riva.services.roles import (
     TargetRoleService,
 )
 
-
 NOW = datetime(2026, 8, 4, 9, 30, tzinfo=UTC)
 
 
@@ -167,7 +166,10 @@ def test_role_projection_returns_current_result_and_copies_lists() -> None:
     assert response.job_description.status == "ready"
     assert response.job_description_analysis is not None
     assert response.matching_analysis.result.matched_capabilities == ["Python"]
-    assert response.matching_analysis.result.matched_capabilities is not matching.matched_capabilities
+    assert (
+        response.matching_analysis.result.matched_capabilities
+        is not matching.matched_capabilities
+    )
 
 
 def test_generating_and_failed_runs_hide_an_old_result() -> None:

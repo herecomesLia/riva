@@ -19,7 +19,6 @@ from riva.schemas.evaluation import (
 )
 from riva.schemas.profile import StandardUUID
 
-
 MAX_PRACTICE_REVIEW_OVERALL_LENGTH = 4_000
 MAX_PRACTICE_REVIEW_ITEM_LENGTH = 1_500
 MAX_PRACTICE_REVIEW_ITEMS = 10
@@ -62,9 +61,7 @@ class ReviewRunPayload(BaseModel):
 
     attempt_id: StandardUUID = Field(alias="attemptId")
     evaluation_id: StandardUUID = Field(alias="evaluationId")
-    interaction_language: InteractionLanguage = Field(
-        alias="interactionLanguage"
-    )
+    interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
 
 
 def _alias(snake_case: str, camel_case: str, **kwargs: Any) -> Any:
@@ -166,8 +163,7 @@ class PracticeReviewInput(EvaluationInput):
     @model_validator(mode="after")
     def validate_evaluation_focus_indices(self) -> Self:
         actual_indices = [
-            assessment.focus_index
-            for assessment in self.evaluation.focus_assessments
+            assessment.focus_index for assessment in self.evaluation.focus_assessments
         ]
         expected_indices = list(range(len(self.question.scoring_focus)))
         if actual_indices != expected_indices:

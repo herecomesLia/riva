@@ -64,7 +64,9 @@ def valid_dashboard() -> dict[str, object]:
 def test_dashboard_response_accepts_exact_camel_case_wire_contract() -> None:
     response = DashboardResponse.model_validate(valid_dashboard())
     assert response.metrics.role_fit.current_value == 80
-    assert response.performance_trend.targeted_practice[0].occurred_at.tzinfo is not None
+    assert (
+        response.performance_trend.targeted_practice[0].occurred_at.tzinfo is not None
+    )
 
 
 @pytest.mark.parametrize(
@@ -101,7 +103,9 @@ def test_dashboard_response_rejects_extra_fields_and_naive_timestamps() -> None:
         DashboardResponse.model_validate(payload)
 
 
-def test_dashboard_response_can_be_empty_without_current_role_or_recommendation() -> None:
+def test_dashboard_response_can_be_empty_without_current_role_or_recommendation() -> (
+    None
+):
     payload = valid_dashboard()
     payload["currentRole"] = None
     payload["recommendation"] = None

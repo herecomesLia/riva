@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from riva.db.base import Base
 from riva.db.database import load_models
 
-
 config = context.config
 load_models()
 target_metadata = Base.metadata

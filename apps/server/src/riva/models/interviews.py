@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -237,13 +237,13 @@ class InterviewSession(Base):
         passive_deletes=True,
         order_by="InterviewCandidateQuestion.order",
     )
-    candidate_question_exchanges: Mapped[
-        list[InterviewCandidateQuestionExchange]
-    ] = relationship(
-        back_populates="session",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-        order_by="InterviewCandidateQuestionExchange.created_at",
+    candidate_question_exchanges: Mapped[list[InterviewCandidateQuestionExchange]] = (
+        relationship(
+            back_populates="session",
+            cascade="all, delete-orphan",
+            passive_deletes=True,
+            order_by="InterviewCandidateQuestionExchange.created_at",
+        )
     )
     review: Mapped[InterviewReview | None] = relationship(
         back_populates="session",
@@ -325,7 +325,7 @@ class InterviewQuestion(Base):
             name="ck_interview_questions_plan_revision",
         ),
         CheckConstraint(
-            "\"order\" >= 1",
+            '"order" >= 1',
             name="ck_interview_questions_order",
         ),
         CheckConstraint(

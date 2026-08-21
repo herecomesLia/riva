@@ -27,7 +27,6 @@ from riva.services.agent_runs import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.handlers import AgentHandlerRegistry
 
-
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 ServiceFactory = Callable[[AsyncSession], AgentRunService]
 WaitForEvent = Callable[[asyncio.Event, timedelta], Awaitable[bool]]
@@ -300,9 +299,7 @@ class AgentWorker:
         failure: _Failure,
     ) -> AgentRun | None:
         delay = (
-            self.retry_delay(run.attempt_count)
-            if failure.retryable
-            else timedelta(0)
+            self.retry_delay(run.attempt_count) if failure.retryable else timedelta(0)
         )
         try:
             async with self.session_factory() as session:
@@ -457,17 +454,13 @@ def _duration_ms(start: datetime | None, end: datetime | None) -> int | None:
     if delta <= timedelta(0):
         return 0
     microseconds = (
-        delta.days * 86_400 * 1_000_000
-        + delta.seconds * 1_000_000
-        + delta.microseconds
+        delta.days * 86_400 * 1_000_000 + delta.seconds * 1_000_000 + delta.microseconds
     )
     return (microseconds + 500) // 1_000
 
 
 def _timedelta_ms(value: timedelta) -> int:
     microseconds = (
-        value.days * 86_400 * 1_000_000
-        + value.seconds * 1_000_000
-        + value.microseconds
+        value.days * 86_400 * 1_000_000 + value.seconds * 1_000_000 + value.microseconds
     )
     return max(0, microseconds // 1_000)

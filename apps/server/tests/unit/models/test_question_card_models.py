@@ -1,4 +1,10 @@
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, JSON, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKeyConstraint,
+    Index,
+    UniqueConstraint,
+)
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db import Base
@@ -81,7 +87,9 @@ def test_question_card_uses_owner_composite_foreign_keys() -> None:
         ),
     ):
         assert [element.parent.name for element in constraint.elements] == child_columns
-        assert [element.target_fullname for element in constraint.elements] == target_columns
+        assert [
+            element.target_fullname for element in constraint.elements
+        ] == target_columns
         assert constraint.ondelete == "CASCADE"
 
     assert table.c.user_id.references(User.__table__.c.id)
@@ -110,9 +118,7 @@ def test_question_card_has_source_uniqueness_and_database_checks() -> None:
     assert checks["ck_question_cards_difficulty"] == (
         "difficulty IN ('basic', 'pressure')"
     )
-    assert checks["ck_question_cards_prompt_not_blank"] == (
-        "length(trim(prompt)) > 0"
-    )
+    assert checks["ck_question_cards_prompt_not_blank"] == ("length(trim(prompt)) > 0")
     assert checks["ck_question_cards_profile_version"] == "profile_version >= 1"
     assert checks["ck_question_cards_jd_version"] == "job_description_version >= 1"
     assert checks["ck_question_cards_analysis_version"] == (

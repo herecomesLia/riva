@@ -12,16 +12,15 @@ from riva.core.language import InteractionLanguage
 from riva.models import AgentRun, JobDescriptionAnalysis, TargetRole
 from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import (
+    MAX_JOB_DESCRIPTION_SUMMARY_LENGTH,
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
     JobDescriptionParsingRunPayload,
-    MAX_JOB_DESCRIPTION_SUMMARY_LENGTH,
 )
 from riva.services.prompt_versions import (
     JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS,
 )
 from riva.utils import utc_now
-
 
 JobDescriptionParsingStateErrorCode = Literal[
     "invalid_job_description_parse_run",
@@ -36,9 +35,7 @@ INVALID_PARSE_RUN: JobDescriptionParsingStateErrorCode = (
 TARGET_NOT_FOUND: JobDescriptionParsingStateErrorCode = (
     "job_description_target_not_found"
 )
-JOB_DESCRIPTION_MISSING: JobDescriptionParsingStateErrorCode = (
-    "job_description_missing"
-)
+JOB_DESCRIPTION_MISSING: JobDescriptionParsingStateErrorCode = "job_description_missing"
 JOB_DESCRIPTION_VERSION_STALE: JobDescriptionParsingStateErrorCode = (
     "job_description_version_stale"
 )
@@ -75,9 +72,7 @@ def new_job_description_analysis(
             dict[str, list[str]],
             values["required_skills"],
         ),
-        preferred_qualifications=cast(
-            list[str], values["preferred_qualifications"]
-        ),
+        preferred_qualifications=cast(list[str], values["preferred_qualifications"]),
         soft_skills=cast(list[str], values["soft_skills"]),
         business_domains=cast(list[str], values["business_domains"]),
     )
@@ -252,9 +247,7 @@ class JobDescriptionAnalysisService:
                 analysis.source_agent_run_id = run.id
                 analysis.parsed_at = now
                 analysis.riva_summary = output.riva_summary
-                analysis.responsibilities = cast(
-                    list[str], values["responsibilities"]
-                )
+                analysis.responsibilities = cast(list[str], values["responsibilities"])
                 analysis.qualification_requirements = cast(
                     dict[str, list[str]],
                     values["qualification_requirements"],
@@ -266,9 +259,7 @@ class JobDescriptionAnalysisService:
                     list[str], values["preferred_qualifications"]
                 )
                 analysis.soft_skills = cast(list[str], values["soft_skills"])
-                analysis.business_domains = cast(
-                    list[str], values["business_domains"]
-                )
+                analysis.business_domains = cast(list[str], values["business_domains"])
 
             context.role.version += 1
             await self.session.commit()

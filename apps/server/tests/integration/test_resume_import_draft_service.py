@@ -24,7 +24,6 @@ from riva.services.resume_imports import (
 )
 from riva.utils import utc_now
 
-
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
 
@@ -452,7 +451,9 @@ def test_two_sessions_build_one_draft_without_spurious_version_increment() -> No
     asyncio.run(run())
 
 
-def test_service_rejects_isolation_superseded_and_invalid_json_transactionally() -> None:
+def test_service_rejects_isolation_superseded_and_invalid_json_transactionally() -> (
+    None
+):
     async def run() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -491,9 +492,10 @@ def test_service_rejects_isolation_superseded_and_invalid_json_transactionally()
                         resume_document_id=document_id,
                     )
                 assert exc_info.value.code == "resume_parsing_result_invalid"
-                assert await session.scalar(
-                    select(ResumeImportDraft.resume_document_id)
-                ) is None
+                assert (
+                    await session.scalar(select(ResumeImportDraft.resume_document_id))
+                    is None
+                )
 
             async with database.sessionmaker() as session:
                 with pytest.raises(ResumeImportStateError) as exc_info:

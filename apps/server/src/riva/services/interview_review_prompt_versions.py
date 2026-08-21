@@ -2,7 +2,6 @@ from riva.prompts import INTERVIEW_REVIEW_PROMPT
 from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_review import InterviewReviewOutput
 
-
 # Keep the original definition immutable so queued and replayed v1 runs render
 # the exact prompt they were created with.
 INTERVIEW_REVIEW_LEGACY_PROMPT = PromptDefinition(

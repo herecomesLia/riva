@@ -23,6 +23,10 @@ from riva.models import (
     QuestionCard,
 )
 from riva.services.practice_sessions import PracticeSessionService
+from tests.helpers.llm import FakeLLMProvider
+from tests.helpers.practice_reference_answers import (
+    complete_queued_reference_answers,
+)
 from tests.integration.test_practice_next_question_workflow import (
     build_worker,
     evaluation_output,
@@ -31,12 +35,7 @@ from tests.integration.test_practice_next_question_workflow import (
     recommendation_output,
     review_output,
 )
-from tests.helpers.practice_reference_answers import (
-    complete_queued_reference_answers,
-)
 from tests.integration.test_question_generation import database_url
-from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 
@@ -487,7 +486,9 @@ def test_practice_retry_real_workflow_reuses_question_and_replays() -> None:
                     assert next_context.session.version == 15
                     assert next_context.attempt.attempt_number == 4
                     assert next_context.attempt.status == "answering"
-                    assert next_context.attempt.question_generation_run_id == next_run_id
+                    assert (
+                        next_context.attempt.question_generation_run_id == next_run_id
+                    )
                     assert next_context.question_card is not None
                     assert next_context.question_card.id != first_card_id
 

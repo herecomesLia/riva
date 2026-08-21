@@ -10,21 +10,22 @@ from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.interview_planning import InterviewPlanningOutput
 from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services import interview_planning as planning_module
-from riva.services.interview_planning_prompt_versions import (
-    get_interview_planning_prompt,
-)
 from riva.services.interview_planning import (
     INTERVIEW_PLANNING_VERSION_CONFLICT,
     InterviewPlanningService,
     InterviewPlanningStateError,
 )
-
+from riva.services.interview_planning_prompt_versions import (
+    get_interview_planning_prompt,
+)
 
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 
 
 class ScriptedSession:
-    def __init__(self, responses: list[object], *, flush_error: Exception | None = None):
+    def __init__(
+        self, responses: list[object], *, flush_error: Exception | None = None
+    ):
         self.responses = list(responses)
         self.flush_error = flush_error
         self.added: list[object] = []
@@ -294,9 +295,7 @@ def test_begin_enqueues_snapshot_and_moves_opening_to_generating(monkeypatch) ->
             llm_model="test-model",
             training_memory_service_factory=FakeTrainingMemoryService,
             clock=lambda: NOW,
-        ).begin_questions(
-            user_id=user_id, session_id=session.id, version=1
-        )
+        ).begin_questions(user_id=user_id, session_id=session.id, version=1)
     )
 
     assert result is session
@@ -309,9 +308,12 @@ def test_begin_enqueues_snapshot_and_moves_opening_to_generating(monkeypatch) ->
     assert payload["sessionVersion"] == 1
     assert "interviewPlanningInput" in payload
     assert payload["interviewPlanningInput"]["careerProfile"]["version"] == 4
-    assert payload["interviewPlanningInput"]["trainingMemory"][
-        "focusCompetencies"
-    ][0]["competencyKey"] == "results_and_evidence"
+    assert (
+        payload["interviewPlanningInput"]["trainingMemory"]["focusCompetencies"][0][
+            "competencyKey"
+        ]
+        == "results_and_evidence"
+    )
     assert FakeTrainingMemoryService.calls == 1
 
 
@@ -343,7 +345,9 @@ def test_in_progress_begin_does_not_enqueue_a_second_run(
 ) -> None:
     user_id = uuid4()
     run = _run(user_id=user_id, status=run_status, prompt_version="1")
-    session = _session(user_id, uuid4(), status="generatingQuestion", version=2, run_id=run.id)
+    session = _session(
+        user_id, uuid4(), status="generatingQuestion", version=2, run_id=run.id
+    )
     FakeAgentRunService.calls = []
     FakeTrainingMemoryService.calls = 0
     monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
@@ -418,9 +422,7 @@ def test_failed_retry_reuses_memory_snapshot_without_requery(monkeypatch) -> Non
             ScriptedSession([user_id, session, _profile(uuid4()), role]),
             llm_model="test-model",
             training_memory_service_factory=FakeTrainingMemoryService,
-        ).begin_questions(
-            user_id=user_id, session_id=session.id, version=1
-        )
+        ).begin_questions(user_id=user_id, session_id=session.id, version=1)
     )
     original_memory = deepcopy(
         failed_run.payload["interviewPlanningInput"]["trainingMemory"]
@@ -434,19 +436,14 @@ def test_failed_retry_reuses_memory_snapshot_without_requery(monkeypatch) -> Non
     FakeAgentRunService.next_run = retry_run
     asyncio.run(
         InterviewPlanningService(
-            ScriptedSession(
-                [user_id, session, failed_run, _profile(uuid4()), role]
-            ),
+            ScriptedSession([user_id, session, failed_run, _profile(uuid4()), role]),
             llm_model="test-model",
             training_memory_service_factory=ExplodingTrainingMemoryService,
-        ).begin_questions(
-            user_id=user_id, session_id=session.id, version=2
-        )
+        ).begin_questions(user_id=user_id, session_id=session.id, version=2)
     )
 
     assert (
-        retry_run.payload["interviewPlanningInput"]["trainingMemory"]
-        == original_memory
+        retry_run.payload["interviewPlanningInput"]["trainingMemory"] == original_memory
     )
 
 
@@ -466,6 +463,7 @@ def test_v1_snapshot_without_memory_is_accepted_and_unsupported_version_rejected
         ScriptedSession([user_id, session, _profile(uuid4()), role]),
         llm_model="test-model",
     )
+
     # Build a valid immutable snapshot through the same enqueue path used by
     # production, then emulate a persisted v1 payload from before memory.
     async def enqueue() -> None:
@@ -494,7 +492,9 @@ def test_v1_snapshot_without_memory_is_accepted_and_unsupported_version_rejected
     assert error.value.code == "interview_planning_run_invalid"
 
 
-def test_success_persists_plan_and_first_question_in_one_transaction(monkeypatch) -> None:
+def test_success_persists_plan_and_first_question_in_one_transaction(
+    monkeypatch,
+) -> None:
     user_id = uuid4()
     role_id = uuid4()
     session = _session(user_id, role_id)

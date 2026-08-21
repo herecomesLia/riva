@@ -61,7 +61,6 @@ from riva.services.question_generation import (
 )
 from riva.utils import utc_now
 
-
 ReferenceAnswerGenerationStateErrorCode = Literal[
     "invalid_reference_answer_generation_run",
     "reference_answer_question_card_not_ready",
@@ -88,9 +87,7 @@ REFERENCE_ANSWER_FOLLOW_UP_NOT_READY: ReferenceAnswerGenerationStateErrorCode = 
 REFERENCE_ANSWER_MAIN_ANSWER_NOT_READY: ReferenceAnswerGenerationStateErrorCode = (
     "reference_answer_main_answer_not_ready"
 )
-REFERENCE_ANSWER_PREVIOUS_EXCHANGE_NOT_READY: ReferenceAnswerGenerationStateErrorCode = (
-    "reference_answer_previous_exchange_not_ready"
-)
+REFERENCE_ANSWER_PREVIOUS_EXCHANGE_NOT_READY: ReferenceAnswerGenerationStateErrorCode = "reference_answer_previous_exchange_not_ready"
 REFERENCE_ANSWER_ARTIFACT_CONFLICT: ReferenceAnswerGenerationStateErrorCode = (
     "reference_answer_artifact_conflict"
 )
@@ -149,11 +146,9 @@ def validate_reference_answer_generation_run(
     try:
         return cast(
             PracticeReferenceAnswerRunPayload,
-            TypeAdapter(PracticeReferenceAnswerRunPayload).validate_python(
-                run.payload
-            ),
+            TypeAdapter(PracticeReferenceAnswerRunPayload).validate_python(run.payload),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ReferenceAnswerGenerationStateError(
             INVALID_REFERENCE_ANSWER_GENERATION_RUN
         ) from None
@@ -170,10 +165,7 @@ def practice_reference_answer_output_from_artifact(
             ):
                 raise ValueError("main reference artifact target is invalid")
         elif artifact.target_type == PracticeReferenceAnswerTargetType.FOLLOW_UP:
-            if (
-                artifact.follow_up_question_id is None
-                or artifact.addressed_gap is None
-            ):
+            if artifact.follow_up_question_id is None or artifact.addressed_gap is None:
                 raise ValueError("follow-up reference artifact target is invalid")
         values: dict[str, object] = {
             "targetType": artifact.target_type,
@@ -188,7 +180,7 @@ def practice_reference_answer_output_from_artifact(
             PracticeReferenceAnswerOutput,
             TypeAdapter(PracticeReferenceAnswerOutput).validate_python(values),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ReferenceAnswerGenerationStateError(
             REFERENCE_ANSWER_ARTIFACT_CONFLICT
         ) from None
@@ -258,9 +250,7 @@ class ReferenceAnswerGenerationService:
         if idempotency_key != practice_main_reference_answer_idempotency_key(
             question_card_id
         ):
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         context = await self._load_main_context_for_user(
             user_id=user_id,
             question_card_id=question_card_id,
@@ -314,9 +304,7 @@ class ReferenceAnswerGenerationService:
         if idempotency_key != practice_follow_up_reference_answer_idempotency_key(
             follow_up_question_id
         ):
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         context = await self._load_follow_up_context_for_user(
             user_id=user_id,
             question_card_id=question_card_id,
@@ -405,9 +393,7 @@ class ReferenceAnswerGenerationService:
             else PracticeReferenceAnswerTargetType.MAIN
         )
         idempotency_key = (
-            practice_follow_up_reference_answer_idempotency_key(
-                follow_up_question_id
-            )
+            practice_follow_up_reference_answer_idempotency_key(follow_up_question_id)
             if follow_up_question_id is not None
             else practice_main_reference_answer_idempotency_key(question_card_id)
         )
@@ -452,9 +438,7 @@ class ReferenceAnswerGenerationService:
                 and not isinstance(payload, PracticeMainReferenceAnswerRunPayload)
             )
         ):
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
 
         target_artifact = await self._load_reference_artifact(
             question_card_id=question_card_id,
@@ -484,7 +468,10 @@ class ReferenceAnswerGenerationService:
                 raise ReferenceAnswerGenerationStateError(
                     REFERENCE_ANSWER_ARTIFACT_CONFLICT
                 )
-        if target_artifact is not None and target_artifact.source_agent_run_id != run.id:
+        if (
+            target_artifact is not None
+            and target_artifact.source_agent_run_id != run.id
+        ):
             raise ReferenceAnswerGenerationStateError(
                 REFERENCE_ANSWER_ARTIFACT_CONFLICT
             )
@@ -521,9 +508,7 @@ class ReferenceAnswerGenerationService:
             )
 
         try:
-            output = practice_reference_answer_output_from_artifact(
-                target_artifact
-            )
+            output = practice_reference_answer_output_from_artifact(target_artifact)
         except ReferenceAnswerGenerationStateError:
             raise
         if (
@@ -600,9 +585,7 @@ class ReferenceAnswerGenerationService:
             candidate_statement = candidate_statement.with_for_update()
         candidate = await self.session.scalar(candidate_statement)
         if candidate is not None:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         return None
 
     async def _load_reference_artifact(
@@ -641,8 +624,7 @@ class ReferenceAnswerGenerationService:
         for_update: bool,
     ) -> PracticeReferenceAnswerArtifact | None:
         statement = select(PracticeReferenceAnswerArtifact).where(
-            PracticeReferenceAnswerArtifact.source_agent_run_id
-            == source_agent_run_id
+            PracticeReferenceAnswerArtifact.source_agent_run_id == source_agent_run_id
         )
         if for_update:
             statement = statement.with_for_update()
@@ -682,9 +664,7 @@ class ReferenceAnswerGenerationService:
         if run.idempotency_key != practice_follow_up_reference_answer_idempotency_key(
             payload.follow_up_question_id
         ):
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         return (
             await self._load_follow_up_context_for_run(
                 run,
@@ -744,23 +724,23 @@ class ReferenceAnswerGenerationService:
 
             existing_by_source = await self.session.scalar(
                 select(PracticeReferenceAnswerArtifact)
-                .where(
-                    PracticeReferenceAnswerArtifact.source_agent_run_id
-                    == run.id
-                )
+                .where(PracticeReferenceAnswerArtifact.source_agent_run_id == run.id)
                 .with_for_update()
             )
             if existing_by_source is not None:
                 canonical = practice_reference_answer_output_from_artifact(
                     existing_by_source
                 )
-                if not _artifact_matches(
-                    existing_by_source,
-                    canonical,
-                    question_card_id=context.card.id,
-                    follow_up_question_id=target_follow_up_id,
-                    source_agent_run_id=run.id,
-                ) or canonical != validated_output:
+                if (
+                    not _artifact_matches(
+                        existing_by_source,
+                        canonical,
+                        question_card_id=context.card.id,
+                        follow_up_question_id=target_follow_up_id,
+                        source_agent_run_id=run.id,
+                    )
+                    or canonical != validated_output
+                ):
                     raise ReferenceAnswerGenerationStateError(
                         REFERENCE_ANSWER_ARTIFACT_CONFLICT
                     )
@@ -768,8 +748,7 @@ class ReferenceAnswerGenerationService:
                 return canonical
 
             target_statement = select(PracticeReferenceAnswerArtifact).where(
-                PracticeReferenceAnswerArtifact.question_card_id
-                == context.card.id,
+                PracticeReferenceAnswerArtifact.question_card_id == context.card.id,
                 PracticeReferenceAnswerArtifact.target_type
                 == payload.target_type.value,
             )
@@ -854,9 +833,7 @@ class ReferenceAnswerGenerationService:
             for_update=for_update,
         )
         if card.language != payload.interaction_language:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         frozen_context = await self._load_frozen_context(
             question_card_id=card.id,
             expected_context=payload.reference_context,
@@ -864,9 +841,7 @@ class ReferenceAnswerGenerationService:
         )
         context = _main_context_from_card(card, frozen_context)
         if context.input.expected_kind != payload.expected_kind:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         return context
 
     async def _load_follow_up_context_for_user(
@@ -909,9 +884,7 @@ class ReferenceAnswerGenerationService:
             for_update=for_update,
         )
         if card.language != payload.interaction_language:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         frozen_context = await self._load_frozen_context(
             question_card_id=card.id,
             expected_context=payload.reference_context,
@@ -926,9 +899,7 @@ class ReferenceAnswerGenerationService:
             for_update=for_update,
         )
         if context.input.expected_kind != payload.expected_kind:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         return context
 
     async def _load_card_and_question_generation_run(
@@ -956,10 +927,7 @@ class ReferenceAnswerGenerationService:
         if for_update:
             qg_statement = qg_statement.with_for_update()
         qg_run = await self.session.scalar(qg_statement)
-        if (
-            qg_run is None
-            or qg_run.status != AgentRunStatus.SUCCEEDED
-        ):
+        if qg_run is None or qg_run.status != AgentRunStatus.SUCCEEDED:
             raise ReferenceAnswerGenerationStateError(
                 INVALID_REFERENCE_ANSWER_GENERATION_RUN
             )
@@ -985,14 +953,12 @@ class ReferenceAnswerGenerationService:
             statement = statement.with_for_update()
         row = await self.session.scalar(statement)
         if row is None:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         try:
             frozen_context = PracticeReferenceFrozenContext.model_validate(
                 row.frozen_context
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise ReferenceAnswerGenerationStateError(
                 REFERENCE_ANSWER_CONTEXT_CONFLICT
             ) from None
@@ -1000,9 +966,7 @@ class ReferenceAnswerGenerationService:
             frozen_context,
             expected_context,
         ):
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_CONTEXT_CONFLICT
-            )
+            raise ReferenceAnswerGenerationStateError(REFERENCE_ANSWER_CONTEXT_CONFLICT)
         return frozen_context
 
     async def _load_follow_up_context(
@@ -1033,10 +997,7 @@ class ReferenceAnswerGenerationService:
         if for_update:
             attempt_statement = attempt_statement.with_for_update()
         attempt = await self.session.scalar(attempt_statement)
-        if (
-            attempt is None
-            or attempt.question_card_id != card.id
-        ):
+        if attempt is None or attempt.question_card_id != card.id:
             raise ReferenceAnswerGenerationStateError(
                 REFERENCE_ANSWER_FOLLOW_UP_NOT_READY
             )
@@ -1127,9 +1088,7 @@ class ReferenceAnswerGenerationService:
                 previous_question_statement = (
                     previous_question_statement.with_for_update()
                 )
-            previous_question = await self.session.scalar(
-                previous_question_statement
-            )
+            previous_question = await self.session.scalar(previous_question_statement)
             if previous_question is None:
                 raise ReferenceAnswerGenerationStateError(
                     REFERENCE_ANSWER_PREVIOUS_EXCHANGE_NOT_READY
@@ -1159,7 +1118,7 @@ class ReferenceAnswerGenerationService:
                         answer=content,
                     )
                 )
-            except (TypeError, ValueError, ValidationError):
+            except TypeError, ValueError, ValidationError:
                 raise ReferenceAnswerGenerationStateError(
                     REFERENCE_ANSWER_PREVIOUS_EXCHANGE_NOT_READY
                 ) from None
@@ -1209,7 +1168,7 @@ class ReferenceAnswerGenerationService:
                     focus=question.focus,
                 ),
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise ReferenceAnswerGenerationStateError(
                 REFERENCE_ANSWER_FOLLOW_UP_NOT_READY
             ) from None
@@ -1266,6 +1225,7 @@ def _follow_up_payload(
         reference_context=context.frozen_context,
     )
 
+
 def _main_context_from_card(
     card: QuestionCard,
     frozen_context: PracticeReferenceFrozenContext,
@@ -1284,7 +1244,7 @@ def _main_context_from_card(
             question=question,
             candidate_evidence=frozen_context.candidate_evidence,
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ReferenceAnswerGenerationStateError(
             REFERENCE_ANSWER_QUESTION_CARD_NOT_READY
         ) from None
@@ -1309,7 +1269,7 @@ def _question_context_from_card(card: QuestionCard) -> PracticeReferenceQuestion
             scoring_focus=card.scoring_focus,
             recommended_material_ids=[material.id for material in materials],
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ReferenceAnswerGenerationStateError(
             REFERENCE_ANSWER_QUESTION_CARD_NOT_READY
         ) from None
@@ -1332,7 +1292,7 @@ def _validate_output(output: object) -> PracticeReferenceAnswerOutput:
             PracticeReferenceAnswerOutput,
             TypeAdapter(PracticeReferenceAnswerOutput).validate_python(output),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ReferenceAnswerGenerationStateError(
             REFERENCE_ANSWER_OUTPUT_MISMATCH
         ) from None
@@ -1349,7 +1309,7 @@ def _answer_content(
             str,
             TypeAdapter(PracticeAnswerContent).validate_python(answer.content),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ReferenceAnswerGenerationStateError(error_code) from None
 
 
@@ -1393,7 +1353,7 @@ def _viewed_before_submission(
     try:
         _require_aware_datetime(artifact.generated_at)
         _require_aware_datetime(submitted_at)
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         raise ReferenceAnswerGenerationStateError(
             REFERENCE_ANSWER_CONTEXT_CONFLICT
         ) from None

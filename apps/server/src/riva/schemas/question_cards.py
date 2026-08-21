@@ -191,9 +191,7 @@ class QuestionGenerationStatusResponse(APIModel):
     @field_validator("created_at", "started_at", "finished_at")
     @classmethod
     def validate_aware_datetime(cls, value: datetime | None) -> datetime | None:
-        if value is not None and (
-            value.tzinfo is None or value.utcoffset() is None
-        ):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise ValueError("timestamps must be timezone-aware")
         return value
 

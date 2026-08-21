@@ -5,18 +5,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents import AgentResult, InterviewReviewAgent
 from riva.models import AgentRun, AgentRunStatus
+from riva.prompts import INTERVIEW_REVIEW_PROMPT
 from riva.schemas.interview_review import InterviewReviewOutput
 from riva.services.interview_review import (
     InterviewReviewService,
     InterviewReviewStateError,
 )
-from riva.prompts import INTERVIEW_REVIEW_PROMPT
 from riva.services.interview_review_prompt_versions import (
     get_interview_review_prompt,
 )
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
-
 
 ReviewServiceFactory = Callable[[AsyncSession], InterviewReviewService]
 
@@ -72,9 +71,9 @@ class InterviewReviewHandler:
                 )
         self._agents = resolved_agents
         self.agents = dict(resolved_agents)
-        self.agent = self._agents.get(
-            INTERVIEW_REVIEW_PROMPT.version
-        ) or next(iter(self._agents.values()))
+        self.agent = self._agents.get(INTERVIEW_REVIEW_PROMPT.version) or next(
+            iter(self._agents.values())
+        )
         self.legacy_agent = self._agents.get("1")
         self.review_service_factory = review_service_factory
 

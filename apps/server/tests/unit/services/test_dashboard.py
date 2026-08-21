@@ -14,7 +14,6 @@ from riva.schemas.training_records import (
 from riva.services.dashboard import DashboardService
 from riva.services.dashboard_recommendation import DashboardRecommendationResult
 
-
 NOW = datetime(2026, 8, 17, 12, tzinfo=UTC)
 
 
@@ -75,7 +74,9 @@ def test_metrics_use_ended_at_windows_and_round_total_seconds() -> None:
     current_boundary = NOW - timedelta(days=7)
     previous_boundary = NOW - timedelta(days=14)
     records = [
-        record(TrainingRecordKind.TARGETED_PRACTICE, NOW, score=70, duration_seconds=61),
+        record(
+            TrainingRecordKind.TARGETED_PRACTICE, NOW, score=70, duration_seconds=61
+        ),
         record(
             TrainingRecordKind.MOCK_INTERVIEW,
             current_boundary,
@@ -115,7 +116,9 @@ def test_metrics_use_ended_at_windows_and_round_total_seconds() -> None:
     assert metrics.role_fit.model_dump() == {"currentValue": 87, "previousValue": None}
 
 
-def test_score_snapshots_and_trends_are_latest_first_for_snapshots_and_old_to_new_for_trends() -> None:
+def test_score_snapshots_and_trends_are_latest_first_for_snapshots_and_old_to_new_for_trends() -> (
+    None
+):
     records = [
         record(
             TrainingRecordKind.TARGETED_PRACTICE,
@@ -153,7 +156,9 @@ def test_score_snapshots_and_trends_are_latest_first_for_snapshots_and_old_to_ne
     assert snapshot.previous_value == 72
     assert len(trend.targeted_practice) == 10
     assert [item.score for item in trend.targeted_practice] == list(range(59, 49, -1))
-    assert trend.targeted_practice[0].occurred_at < trend.targeted_practice[-1].occurred_at
+    assert (
+        trend.targeted_practice[0].occurred_at < trend.targeted_practice[-1].occurred_at
+    )
 
 
 def test_empty_records_produce_null_metric_values_and_empty_trends() -> None:

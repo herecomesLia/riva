@@ -1,7 +1,17 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Path, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Path,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 
 from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
@@ -26,7 +36,6 @@ from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
 from riva.services.resume_documents import ResumeDocumentService
 from riva.services.resume_import_api import ResumeImportAPIService
 from riva.services.resume_parsing_lifecycle import ResumeParsingLifecycleService
-
 
 ResumeId = Annotated[UUID, Path(alias="resumeId")]
 ResumeLimit = Annotated[int, Query(ge=1, le=100)]
@@ -166,9 +175,7 @@ async def retry_resume_parsing(
 async def get_resume_import_draft(
     resume_document_id: ResumeId,
     current_user: User = Depends(require_current_user),
-    import_api_service: ResumeImportAPIService = Depends(
-        get_resume_import_api_service
-    ),
+    import_api_service: ResumeImportAPIService = Depends(get_resume_import_api_service),
 ) -> ResumeImportDraftResponse:
     return await import_api_service.get_draft(
         user_id=current_user.id,
@@ -184,9 +191,7 @@ async def apply_resume_import_draft(
     payload: ResumeImportApplicationRequest,
     resume_document_id: ResumeId,
     current_user: User = Depends(require_current_user),
-    import_api_service: ResumeImportAPIService = Depends(
-        get_resume_import_api_service
-    ),
+    import_api_service: ResumeImportAPIService = Depends(get_resume_import_api_service),
 ) -> ResumeImportApplicationResponse:
     return await import_api_service.apply_draft(
         user_id=current_user.id,

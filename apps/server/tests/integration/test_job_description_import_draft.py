@@ -2,8 +2,8 @@ import asyncio
 from datetime import timedelta
 from uuid import UUID, uuid4
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from riva.agents import JobDescriptionParsingAgent
@@ -32,7 +32,6 @@ from riva.workers import AgentHandlerRegistry, AgentWorker
 from riva.workers.job_description_parsing import JobDescriptionParsingHandler
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -223,9 +222,7 @@ def test_create_parse_apply_and_repeated_apply_are_authoritative() -> None:
                 assert role.job_description_parsing_run_id == created.agent_run_id
                 assert analysis is not None
                 assert analysis.source_agent_run_id == created.agent_run_id
-                assert analysis.required_skills["programming_languages"] == [
-                    "Python"
-                ]
+                assert analysis.required_skills["programming_languages"] == ["Python"]
                 assert run_count == 1
                 assert role_count == 1
             finally:
@@ -268,8 +265,7 @@ def test_parser_failure_marks_draft_failed_and_nonready_apply_is_rejected() -> N
                 assert persisted_failure is not None
                 assert persisted_failure.status == "failed"
                 assert (
-                    persisted_failure.failure_reason
-                    == "provider_configuration_error"
+                    persisted_failure.failure_reason == "provider_configuration_error"
                 )
 
                 async with database.sessionmaker() as session:
@@ -336,8 +332,7 @@ def test_import_routes_exist_and_manual_target_role_creation_is_unchanged() -> N
             assert imported_body["status"] == "parsing"
 
             fetched = client.get(
-                "/api/job-description-import-drafts/"
-                f"{imported_body['id']}"
+                f"/api/job-description-import-drafts/{imported_body['id']}"
             )
             assert fetched.status_code == 200
             assert fetched.json()["id"] == imported_body["id"]

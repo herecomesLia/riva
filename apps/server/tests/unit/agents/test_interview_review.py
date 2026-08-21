@@ -5,12 +5,11 @@ from pathlib import Path
 from riva.agents import InterviewReviewAgent
 from riva.integrations import MessageRole
 from riva.prompts import INTERVIEW_REVIEW_PROMPT
+from riva.schemas.interview_review import InterviewReviewInput, InterviewReviewOutput
 from riva.services.interview_review_prompt_versions import (
     get_interview_review_prompt,
 )
-from riva.schemas.interview_review import InterviewReviewInput, InterviewReviewOutput
 from tests.helpers.llm import FakeLLMProvider
-
 
 CASE_PATH = (
     Path(__file__).resolve().parents[3]

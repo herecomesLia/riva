@@ -1,11 +1,5 @@
 import pytest
 
-from riva.evals.registry import (
-    AgentEvalRegistration,
-    AgentEvalRegistry,
-    UnknownAgentError,
-    build_default_registry,
-)
 from riva.agents.evaluation import PracticeEvaluationAgent
 from riva.agents.follow_up import FollowUpAgent
 from riva.agents.interview_candidate_question import InterviewCandidateQuestionAgent
@@ -20,6 +14,12 @@ from riva.agents.practice_review import PracticeReviewAgent
 from riva.agents.question_generation import QuestionGenerationAgent
 from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.agents.training_planning import TrainingPlanningAgent
+from riva.evals.registry import (
+    AgentEvalRegistration,
+    AgentEvalRegistry,
+    UnknownAgentError,
+    build_default_registry,
+)
 from riva.prompts import (
     FOLLOW_UP_PROMPT,
     INTERVIEW_CANDIDATE_QUESTION_PROMPT,

@@ -37,8 +37,8 @@ from riva.schemas.roles import (
     CreateTargetRoleRequest,
     CurrentMatchingAnalysisResponse,
     ExistingProfileContext,
-    FailedMatchingAnalysisResponse,
     FailedJobDescriptionResponse,
+    FailedMatchingAnalysisResponse,
     GeneratingMatchingAnalysisResponse,
     JobDescriptionAnalysisResponse,
     JobDescriptionParsingStatusQuery,
@@ -48,8 +48,8 @@ from riva.schemas.roles import (
     ParsingJobDescriptionResponse,
     ReadyJobDescriptionResponse,
     RolesPageResponse,
-    SaveJobDescriptionRequest,
     SavedJobDescriptionResponse,
+    SaveJobDescriptionRequest,
     SetCurrentTargetRoleRequest,
     StaleMatchingAnalysisResponse,
     StartJobDescriptionParsingRequest,
@@ -67,7 +67,6 @@ from riva.services.prompt_versions import (
     JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS,
     MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS,
 )
-
 
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
 PARSING_FAILURE_REASON = (
@@ -87,15 +86,11 @@ def build_matching_analysis_result_response(
         core_requirements_summary=analysis.core_requirements_summary,
         matched_capabilities=list(analysis.matched_capabilities),
         missing_capabilities=list(analysis.missing_capabilities),
-        underrepresented_capabilities=list(
-            analysis.underrepresented_capabilities
-        ),
+        underrepresented_capabilities=list(analysis.underrepresented_capabilities),
         resume_highlights=list(analysis.resume_highlights),
         resume_gaps=list(analysis.resume_gaps),
         high_risk_questions=list(analysis.high_risk_questions),
-        preparation_recommendations=list(
-            analysis.preparation_recommendations
-        ),
+        preparation_recommendations=list(analysis.preparation_recommendations),
     )
 
 
@@ -248,9 +243,7 @@ class TargetRoleService:
 
             current = await self._current_mapping(user.id, for_update=True)
             if current is None:
-                self.session.add(
-                    CurrentTargetRole(user_id=user.id, role_id=role.id)
-                )
+                self.session.add(CurrentTargetRole(user_id=user.id, role_id=role.id))
             elif current.role_id != role.id:
                 current.role_id = role.id
 
@@ -375,8 +368,7 @@ class TargetRoleService:
             analysis = await self._locked_analysis(user.id, role.id)
             if (
                 analysis is None
-                or analysis.job_description_version
-                != role.job_description_version
+                or analysis.job_description_version != role.job_description_version
             ):
                 raise APIError(
                     status.HTTP_409_CONFLICT,
@@ -391,13 +383,9 @@ class TargetRoleService:
             if self._replace_analysis_module(analysis, payload):
                 analysis.riva_summary = build_riva_summary(
                     responsibilities=analysis.responsibilities,
-                    qualification_requirements=(
-                        analysis.qualification_requirements
-                    ),
+                    qualification_requirements=(analysis.qualification_requirements),
                     required_skills=analysis.required_skills,
-                    preferred_qualifications=(
-                        analysis.preferred_qualifications
-                    ),
+                    preferred_qualifications=(analysis.preferred_qualifications),
                     soft_skills=analysis.soft_skills,
                     business_domains=analysis.business_domains,
                 )
@@ -446,9 +434,7 @@ class TargetRoleService:
             prompt = JOB_DESCRIPTION_PARSING_PROMPT
             run_payload = JobDescriptionParsingRunPayload(
                 role_id=role.id,
-                job_description_version=cast(
-                    int, role.job_description_version
-                ),
+                job_description_version=cast(int, role.job_description_version),
                 interaction_language=interaction_language,
             )
             new_run = await self.agent_run_service_factory(
@@ -853,8 +839,7 @@ class TargetRoleService:
             and role.raw_job_description.strip()
             and role.job_description_version is not None
             and analysis is not None
-            and analysis.job_description_version
-            == role.job_description_version
+            and analysis.job_description_version == role.job_description_version
         )
 
     @staticmethod
@@ -913,9 +898,7 @@ class TargetRoleService:
             value = payload.value.model_dump(mode="json", by_alias=False)
             if analysis.qualification_requirements == value:
                 return False
-            analysis.qualification_requirements = cast(
-                dict[str, list[str]], value
-            )
+            analysis.qualification_requirements = cast(dict[str, list[str]], value)
             return True
         if payload.field == "requiredSkills":
             value = payload.value.model_dump(mode="json", by_alias=False)
@@ -930,8 +913,7 @@ class TargetRoleService:
         analysis = role.job_description_analysis
         return (
             analysis is not None
-            and analysis.job_description_version
-            == role.job_description_version
+            and analysis.job_description_version == role.job_description_version
         )
 
     @staticmethod
@@ -954,15 +936,12 @@ class TargetRoleService:
         ):
             return None
         try:
-            payload = JobDescriptionParsingRunPayload.model_validate(
-                run.payload
-            )
+            payload = JobDescriptionParsingRunPayload.model_validate(run.payload)
         except ValidationError:
             return None
         if (
             payload.role_id != role.id
-            or payload.job_description_version
-            != role.job_description_version
+            or payload.job_description_version != role.job_description_version
         ):
             return None
         return run
@@ -987,8 +966,7 @@ class TargetRoleService:
         if (
             run.agent_id != "matching-analyzer"
             or run.prompt_id != prompt.prompt_id
-            or run.prompt_version
-            not in MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
+            or run.prompt_version not in MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != prompt.output_schema_id
         ):
             return None
@@ -1000,8 +978,7 @@ class TargetRoleService:
             payload.role_id != role.id
             or payload.profile_id != profile.profile_id
             or payload.profile_version != profile.version
-            or payload.job_description_version
-            != role.job_description_version
+            or payload.job_description_version != role.job_description_version
             or payload.job_description_analysis_version
             != job_description_analysis.analysis_version
             or not TargetRoleService._matching_job_description_ready(
@@ -1019,10 +996,7 @@ class TargetRoleService:
     ) -> TargetRoleResponse:
         experience_range = (
             None
-            if (
-                role.min_experience_years is None
-                and role.max_experience_years is None
-            )
+            if (role.min_experience_years is None and role.max_experience_years is None)
             else TargetRoleExperienceRange(
                 min_years=role.min_experience_years,
                 max_years=role.max_experience_years,
@@ -1197,13 +1171,9 @@ class TargetRoleService:
                 "parsed_at": analysis.parsed_at,
                 "riva_summary": analysis.riva_summary,
                 "responsibilities": analysis.responsibilities,
-                "qualification_requirements": (
-                    analysis.qualification_requirements
-                ),
+                "qualification_requirements": (analysis.qualification_requirements),
                 "required_skills": analysis.required_skills,
-                "preferred_qualifications": (
-                    analysis.preferred_qualifications
-                ),
+                "preferred_qualifications": (analysis.preferred_qualifications),
                 "soft_skills": analysis.soft_skills,
                 "business_domains": analysis.business_domains,
             }

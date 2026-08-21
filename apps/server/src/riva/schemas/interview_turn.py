@@ -20,7 +20,6 @@ from riva.schemas.interview_planning import (
 )
 from riva.schemas.profile import StandardUUID
 
-
 MAX_INTERVIEW_FOLLOW_UPS_BASIC = 1
 MAX_INTERVIEW_FOLLOW_UPS_PRESSURE = 2
 MAX_INTERVIEW_FOLLOW_UPS = MAX_INTERVIEW_FOLLOW_UPS_PRESSURE
@@ -137,9 +136,7 @@ class InterviewTurnInput(InterviewTurnModel):
             if self.session.configuration.difficulty.value == "pressure"
             else MAX_INTERVIEW_FOLLOW_UPS_BASIC
         )
-        if self.remaining_follow_up_slots != max_slots - len(
-            self.answered_follow_ups
-        ):
+        if self.remaining_follow_up_slots != max_slots - len(self.answered_follow_ups):
             raise ValueError("remaining follow-up slots do not match difficulty")
         matching = self.matching_analysis
         if matching is not None:
@@ -204,7 +201,10 @@ class InterviewTurnRunPayload(InterviewTurnModel):
         if self.target_type == "main":
             if self.submitted_answer_id != self.main_answer_id:
                 raise ValueError("main turn answer lineage is invalid")
-            if self.follow_up_question_id is not None or self.follow_up_answer_id is not None:
+            if (
+                self.follow_up_question_id is not None
+                or self.follow_up_answer_id is not None
+            ):
                 raise ValueError("main turn must not contain follow-up lineage")
         else:
             if self.follow_up_question_id is None or self.follow_up_answer_id is None:
@@ -212,8 +212,7 @@ class InterviewTurnRunPayload(InterviewTurnModel):
             if self.submitted_answer_id != self.follow_up_answer_id:
                 raise ValueError("follow-up turn answer lineage is invalid")
             if not turn_input.answered_follow_ups or (
-                turn_input.answered_follow_ups[-1].answer.id
-                != self.follow_up_answer_id
+                turn_input.answered_follow_ups[-1].answer.id != self.follow_up_answer_id
             ):
                 raise ValueError("turn input does not contain the submitted follow-up")
         return self

@@ -33,9 +33,7 @@ def test_update_account_persists_only_supplied_fields() -> None:
     service = UsersService(session)  # type: ignore[arg-type]
     user = create_user()
 
-    result = asyncio.run(
-        service.update_account(user, {"display_name": "Lia Chen"})
-    )
+    result = asyncio.run(service.update_account(user, {"display_name": "Lia Chen"}))
 
     assert result is user
     assert user.display_name == "Lia Chen"

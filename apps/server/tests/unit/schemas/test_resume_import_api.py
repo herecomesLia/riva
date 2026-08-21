@@ -9,7 +9,6 @@ from riva.schemas.resume_import_api import (
     ResumeImportDraftResponse,
 )
 
-
 NOW = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
 
 
@@ -31,7 +30,7 @@ def draft_payload(**overrides: object) -> dict[str, object]:
         "education": [],
         "workExperiences": [],
         "projectExperiences": [],
-        "skills":[{"id": skill_id, "name": "Python"}],
+        "skills": [{"id": skill_id, "name": "Python"}],
         "unresolvedItems": [],
         "skippedItems": [],
         "protectedItems": [],

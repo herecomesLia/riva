@@ -19,12 +19,13 @@ from tests.integration.test_practice_follow_up_answer_workflow import (
 )
 from tests.integration.test_question_generation import database_url
 
-
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 14, 9, 30, tzinfo=UTC)
 
 
-async def question_generation_runs(database: Database, user_id, run_id) -> list[AgentRun]:
+async def question_generation_runs(
+    database: Database, user_id, run_id
+) -> list[AgentRun]:
     async with database.sessionmaker() as session:
         runs = list(
             (
@@ -50,11 +51,7 @@ async def follow_up_runs(database: Database, attempt_id) -> list[AgentRun]:
                 )
             ).all()
         )
-    return [
-        run
-        for run in runs
-        if run.payload.get("attemptId") == str(attempt_id)
-    ]
+    return [run for run in runs if run.payload.get("attemptId") == str(attempt_id)]
 
 
 def test_practice_main_guidance_reveal_is_durable_and_recovers_without_agents() -> None:
@@ -62,8 +59,8 @@ def test_practice_main_guidance_reveal_is_durable_and_recovers_without_agents() 
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, attempt, card = await seed_answering_session(
+                    database
                 )
                 assert card.answer_hints_revealed is False
                 assert card.answer_framework_revealed is False
@@ -104,7 +101,9 @@ def test_practice_main_guidance_reveal_is_durable_and_recovers_without_agents() 
                 assert revealed_framework.session.version == 4
                 assert revealed_framework.question_card is not None
                 assert revealed_framework.question_card.answer_hints_revealed is True
-                assert revealed_framework.question_card.answer_framework_revealed is True
+                assert (
+                    revealed_framework.question_card.answer_framework_revealed is True
+                )
 
                 async with database.sessionmaker() as session:
                     recovered = await PracticeSessionService(
@@ -141,9 +140,12 @@ def test_practice_follow_up_reveal_is_durable_and_next_question_resets_state() -
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, card_id = (
-                    await prepare_question_and_main_answer(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    card_id,
+                ) = await prepare_question_and_main_answer(database)
                 await run_follow_up_worker(
                     database,
                     follow_up_question_output(1),
@@ -176,7 +178,9 @@ def test_practice_follow_up_reveal_is_durable_and_next_question_resets_state() -
                 assert revealed_hint.session.version == 5
                 assert revealed_hint.follow_up_question is not None
                 assert revealed_hint.follow_up_question.answer_hints_revealed is True
-                assert revealed_hint.follow_up_question.answer_framework_revealed is False
+                assert (
+                    revealed_hint.follow_up_question.answer_framework_revealed is False
+                )
 
                 async with database.sessionmaker() as session:
                     revealed_framework = await PracticeSessionService(
@@ -191,8 +195,13 @@ def test_practice_follow_up_reveal_is_durable_and_next_question_resets_state() -
                     )
                 assert revealed_framework.session.version == 6
                 assert revealed_framework.follow_up_question is not None
-                assert revealed_framework.follow_up_question.answer_hints_revealed is True
-                assert revealed_framework.follow_up_question.answer_framework_revealed is True
+                assert (
+                    revealed_framework.follow_up_question.answer_hints_revealed is True
+                )
+                assert (
+                    revealed_framework.follow_up_question.answer_framework_revealed
+                    is True
+                )
                 after_reveal_runs = await follow_up_runs(database, attempt_id)
                 assert len(after_reveal_runs) == len(before_runs) == 1
 

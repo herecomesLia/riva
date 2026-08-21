@@ -1,54 +1,54 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from pydantic import TypeAdapter, ValidationError
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
 from riva.schemas.practice_sessions import (
     CompletePracticeSessionRequest,
     ContinuePracticeQuestionRequest,
     EndPracticeFollowUpsRequest,
     EndPracticeSessionEarlyRequest,
-    PracticeAttemptStatus,
     PracticeActiveSessionResponse,
-    PracticeCompletedSessionResponse,
-    PracticeAnswerResponse,
+    PracticeAllAnsweredCompletionResponse,
     PracticeAnsweredFollowUpExchangeResponse,
     PracticeAnsweringFollowUpResponse,
     PracticeAnsweringResponse,
+    PracticeAnswerResponse,
+    PracticeAttemptStatus,
+    PracticeCompletedSessionResponse,
+    PracticeEndedEarlyFollowUpCompletionResponse,
     PracticeEvaluatingResponse,
     PracticeEvaluationResponse,
-    PracticeGeneratingFollowUpResponse,
-    PracticeGeneratingQuestionResponse,
-    PracticeAllAnsweredCompletionResponse,
-    PracticeEndedEarlyFollowUpCompletionResponse,
-    PracticeGuidanceNotRequestedResponse,
-    PracticeGuidanceRevealedResponse,
-    PracticeGuidanceUnavailableResponse,
-    PracticeNoFollowUpRequiredCompletionResponse,
-    PracticeQuestionResponse,
-    PracticeReviewResponse,
     PracticeFollowUpQuestionResponse,
     PracticeFollowUpReferenceAnswerRequest,
     PracticeFollowUpReferenceAnswerResponse,
+    PracticeGeneratingFollowUpResponse,
+    PracticeGeneratingQuestionResponse,
+    PracticeGuidanceNotRequestedResponse,
+    PracticeGuidanceRevealedResponse,
+    PracticeGuidanceUnavailableResponse,
     PracticeMainReferenceAnswerResponse,
+    PracticeNoFollowUpRequiredCompletionResponse,
     PracticeQuestionReferenceAnswerRequest,
-    RefreshPracticeFollowUpGenerationRequest,
+    PracticeQuestionResponse,
+    PracticeQuestionSource,
+    PracticeReviewResponse,
+    PracticeSessionCompletionReason,
+    PracticeSessionResponse,
+    PracticeSessionSelection,
+    PracticeSessionStatus,
     RefreshPracticeEvaluationRequest,
+    RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RetryPracticeQuestionRequest,
     RevealPracticeFollowUpGuidanceRequest,
     RevealPracticeQuestionGuidanceRequest,
-    RetryPracticeQuestionRequest,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
     StartPracticeSessionRequest,
     SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
-    PracticeQuestionSource,
-    PracticeSessionCompletionReason,
-    PracticeSessionSelection,
-    PracticeSessionResponse,
-    PracticeSessionStatus,
 )
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -132,7 +132,9 @@ def test_reference_answer_request_contract_is_strict() -> None:
                 request_type.model_validate(invalid)
 
 
-def test_reference_answer_public_unions_cover_four_states_and_content_variants() -> None:
+def test_reference_answer_public_unions_cover_four_states_and_content_variants() -> (
+    None
+):
     main_adapter = TypeAdapter(PracticeMainReferenceAnswerResponse)
     follow_up_adapter = TypeAdapter(PracticeFollowUpReferenceAnswerResponse)
     common = {
@@ -232,7 +234,11 @@ def test_reference_answer_public_unions_cover_four_states_and_content_variants()
         main_adapter.validate_python(
             {
                 "status": "revealed",
-                "content": {**common, "kind": "personalizedExample", "generatedAt": "2026-08-14T09:30:00"},
+                "content": {
+                    **common,
+                    "kind": "personalizedExample",
+                    "generatedAt": "2026-08-14T09:30:00",
+                },
                 "viewedBeforeSubmission": True,
             }
         )
@@ -241,7 +247,12 @@ def test_reference_answer_public_unions_cover_four_states_and_content_variants()
         for invalid in (
             {"status": "generating", "content": [], "viewedBeforeSubmission": False},
             {"status": "unavailable", "content": None, "viewedBeforeSubmission": True},
-            {"status": "notRequested", "content": None, "viewedBeforeSubmission": False, "runId": str(uuid4())},
+            {
+                "status": "notRequested",
+                "content": None,
+                "viewedBeforeSubmission": False,
+                "runId": str(uuid4()),
+            },
         ):
             with pytest.raises(ValidationError):
                 adapter.validate_python(invalid)
@@ -360,9 +371,12 @@ def test_completed_session_request_and_response_are_strict() -> None:
     )
     assert response.completion_reason == "reviewCompleted"
     assert response.completed_at.tzinfo is not None
-    assert TypeAdapter(PracticeSessionResponse).validate_python(
-        completed_session_payload()
-    ).status == "completed"
+    assert (
+        TypeAdapter(PracticeSessionResponse)
+        .validate_python(completed_session_payload())
+        .status
+        == "completed"
+    )
 
 
 @pytest.mark.parametrize(
@@ -478,9 +492,7 @@ def test_practice_session_selection_rejects_invalid_uuid_and_unknown_fields() ->
         )
 
     with pytest.raises(ValidationError):
-        PracticeSessionSelection.model_validate(
-            selection_payload(unexpectedField=True)
-        )
+        PracticeSessionSelection.model_validate(selection_payload(unexpectedField=True))
 
 
 @pytest.mark.parametrize(
@@ -504,9 +516,7 @@ def test_practice_session_selection_round_trips_through_json() -> None:
     serialized = selection.model_dump(mode="json")
     restored = PracticeSessionSelection.model_validate(serialized)
 
-    assert serialized == selection_payload(
-        targetRoleId=str(selection.target_role_id)
-    )
+    assert serialized == selection_payload(targetRoleId=str(selection.target_role_id))
     assert restored == selection
     assert isinstance(restored.target_role_id, UUID)
 
@@ -515,19 +525,19 @@ def test_start_request_has_explicit_name_and_rejects_language() -> None:
     payload = selection_payload()
     request = StartPracticeSessionRequest.model_validate(payload)
 
-    assert request.model_dump() == PracticeSessionSelection.model_validate(
-        payload
-    ).model_dump()
+    assert (
+        request.model_dump()
+        == PracticeSessionSelection.model_validate(payload).model_dump()
+    )
     with pytest.raises(ValidationError):
-        StartPracticeSessionRequest.model_validate(
-            {**payload, "language": "en"}
-        )
+        StartPracticeSessionRequest.model_validate({**payload, "language": "en"})
 
 
 def test_refresh_request_requires_positive_version_and_rejects_run_id() -> None:
-    assert RefreshPracticeQuestionGenerationRequest.model_validate(
-        {"version": 1}
-    ).version == 1
+    assert (
+        RefreshPracticeQuestionGenerationRequest.model_validate({"version": 1}).version
+        == 1
+    )
     with pytest.raises(ValidationError):
         RefreshPracticeQuestionGenerationRequest.model_validate({"version": 0})
     with pytest.raises(ValidationError):
@@ -555,8 +565,16 @@ def test_continue_question_request_uses_only_public_provenance() -> None:
         {"version": 5, "questionId": "not-a-uuid"},
         {"version": 5, "questionId": str(question_id), "attemptId": str(uuid4())},
         {"version": 5, "questionId": str(question_id), "runId": str(uuid4())},
-        {"version": 5, "questionId": str(question_id), "questionType": "projectDeepDive"},
-        {"version": 5, "questionId": str(question_id), "recommendation": "nextQuestion"},
+        {
+            "version": 5,
+            "questionId": str(question_id),
+            "questionType": "projectDeepDive",
+        },
+        {
+            "version": 5,
+            "questionId": str(question_id),
+            "recommendation": "nextQuestion",
+        },
         {"version": 5, "questionId": str(question_id), "focusAreas": ["evidence"]},
     ):
         with pytest.raises(ValidationError):
@@ -648,7 +666,9 @@ def test_submit_primary_answer_request_rejects_invalid_or_internal_fields(
         SubmitPrimaryAnswerRequest.model_validate(payload)
 
 
-def test_submit_follow_up_answer_request_uses_camel_case_and_normalizes_content() -> None:
+def test_submit_follow_up_answer_request_uses_camel_case_and_normalizes_content() -> (
+    None
+):
     question_id = uuid4()
     follow_up_question_id = uuid4()
     request = SubmitFollowUpAnswerRequest.model_validate(
@@ -736,22 +756,20 @@ def test_submit_follow_up_answer_request_rejects_invalid_or_internal_fields(
 
 
 def test_refresh_follow_up_request_requires_only_positive_version() -> None:
-    request = RefreshPracticeFollowUpGenerationRequest.model_validate(
-        {"version": 3}
-    )
+    request = RefreshPracticeFollowUpGenerationRequest.model_validate({"version": 3})
 
     assert request.model_dump(mode="json") == {"version": 3}
     with pytest.raises(ValidationError):
-        RefreshPracticeFollowUpGenerationRequest.model_validate(
-            {"version": 0}
-        )
+        RefreshPracticeFollowUpGenerationRequest.model_validate({"version": 0})
     with pytest.raises(ValidationError):
         RefreshPracticeFollowUpGenerationRequest.model_validate(
             {"version": 3, "attemptId": str(uuid4())}
         )
 
 
-def test_end_follow_ups_request_uses_only_public_provenance_and_strict_aliases() -> None:
+def test_end_follow_ups_request_uses_only_public_provenance_and_strict_aliases() -> (
+    None
+):
     question_id = uuid4()
     follow_up_question_id = uuid4()
     request = EndPracticeFollowUpsRequest.model_validate(
@@ -797,7 +815,9 @@ def test_end_follow_ups_request_uses_only_public_provenance_and_strict_aliases()
         )
 
 
-def test_refresh_evaluation_request_requires_positive_version_and_forbids_internal_fields() -> None:
+def test_refresh_evaluation_request_requires_positive_version_and_forbids_internal_fields() -> (
+    None
+):
     request = RefreshPracticeEvaluationRequest.model_validate({"version": 4})
     assert request.model_dump(mode="json") == {"version": 4}
     with pytest.raises(ValidationError):
@@ -862,9 +882,7 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
             "question": {
                 "id": str(uuid4()),
                 "prompt": "What metric changed?",
-                "createdAt": datetime(
-                    2026, 8, 11, 12, 2, tzinfo=UTC
-                ).isoformat(),
+                "createdAt": datetime(2026, 8, 11, 12, 2, tzinfo=UTC).isoformat(),
                 "order": 1,
             },
             "answer": None,
@@ -874,9 +892,7 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
             "status": "completed",
             "reason": "noFollowUpRequired",
         }
-        payload["submittedAt"] = datetime(
-            2026, 8, 11, 12, 3, tzinfo=UTC
-        ).isoformat()
+        payload["submittedAt"] = datetime(2026, 8, 11, 12, 3, tzinfo=UTC).isoformat()
     if status == "review":
         payload["followUpCompletion"] = {
             "status": "completed",
@@ -897,9 +913,7 @@ def public_session_payload(status: str = "generatingQuestion") -> dict[str, obje
                     "communication",
                 )
             ],
-            "evaluatedAt": datetime(
-                2026, 8, 11, 12, 3, tzinfo=UTC
-            ).isoformat(),
+            "evaluatedAt": datetime(2026, 8, 11, 12, 3, tzinfo=UTC).isoformat(),
         }
         payload["review"] = {
             "overallPerformance": "Strong answer.",
@@ -952,7 +966,9 @@ def answered_exchange_payload(
     }
 
 
-def test_answered_follow_up_exchange_response_requires_answer_and_exact_status() -> None:
+def test_answered_follow_up_exchange_response_requires_answer_and_exact_status() -> (
+    None
+):
     payload = answered_exchange_payload(question_order=1, answer_order=2)
     exchange = PracticeAnsweredFollowUpExchangeResponse.model_validate(payload)
 
@@ -1029,12 +1045,12 @@ def test_public_ended_early_completion_projects_the_unanswered_question(
     exchange_count: int,
 ) -> None:
     payload = public_session_payload(status)
-    exchanges = [
-        answered_exchange_payload(question_order=1, answer_order=2)
-    ] if exchange_count else []
-    current_follow_up = public_session_payload("answeringFollowUp")[
-        "currentFollowUp"
-    ]
+    exchanges = (
+        [answered_exchange_payload(question_order=1, answer_order=2)]
+        if exchange_count
+        else []
+    )
+    current_follow_up = public_session_payload("answeringFollowUp")["currentFollowUp"]
     assert isinstance(current_follow_up, dict)
     unanswered_question = current_follow_up["question"]
     assert isinstance(unanswered_question, dict)
@@ -1045,9 +1061,7 @@ def test_public_ended_early_completion_projects_the_unanswered_question(
         "unansweredQuestion": unanswered_question,
     }
     if status == "evaluating":
-        payload["submittedAt"] = datetime(
-            2026, 8, 11, 12, 3, tzinfo=UTC
-        ).isoformat()
+        payload["submittedAt"] = datetime(2026, 8, 11, 12, 3, tzinfo=UTC).isoformat()
     else:
         payload.update(
             {
@@ -1092,9 +1106,7 @@ def test_public_ended_early_completion_rejects_invalid_snapshot(
         },
     }
     if status == "evaluating":
-        payload["submittedAt"] = datetime(
-            2026, 8, 11, 12, 3, tzinfo=UTC
-        ).isoformat()
+        payload["submittedAt"] = datetime(2026, 8, 11, 12, 3, tzinfo=UTC).isoformat()
     else:
         review_payload = public_session_payload("review")
         payload["evaluation"] = review_payload["evaluation"]
@@ -1123,9 +1135,9 @@ def test_public_follow_up_exchanges_reject_awaiting_items_and_more_than_two() ->
     payload["followUpExchanges"] = [
         {
             "status": "awaitingAnswer",
-            "question": public_session_payload("answeringFollowUp")[
-                "currentFollowUp"
-            ]["question"],
+            "question": public_session_payload("answeringFollowUp")["currentFollowUp"][
+                "question"
+            ],
             "answer": None,
         }
     ]
@@ -1184,11 +1196,13 @@ def test_active_response_union_exposes_only_supported_states() -> None:
     assert review.review.recommendation.action == "retryCurrent"
 
 
-def test_answer_and_follow_up_question_public_projections_are_strict_and_aware() -> None:
+def test_answer_and_follow_up_question_public_projections_are_strict_and_aware() -> (
+    None
+):
     answer_payload = public_session_payload("generatingFollowUp")["mainAnswer"]
-    question_payload = public_session_payload("answeringFollowUp")[
-        "currentFollowUp"
-    ]["question"]
+    question_payload = public_session_payload("answeringFollowUp")["currentFollowUp"][
+        "question"
+    ]
     assert isinstance(answer_payload, dict)
     assert isinstance(question_payload, dict)
 
@@ -1207,12 +1221,12 @@ def test_answer_and_follow_up_question_public_projections_are_strict_and_aware()
                 {**question_payload, field: "internal"}
             )
     with pytest.raises(ValidationError):
-        PracticeAnswerResponse.model_validate(
-            {**answer_payload, "kind": "main"}
-        )
+        PracticeAnswerResponse.model_validate({**answer_payload, "kind": "main"})
 
 
-def test_follow_up_public_response_rejects_naive_artifact_timestamps_and_history() -> None:
+def test_follow_up_public_response_rejects_naive_artifact_timestamps_and_history() -> (
+    None
+):
     payload = public_session_payload("answeringFollowUp")
     current_follow_up = payload["currentFollowUp"]
     assert isinstance(current_follow_up, dict)
@@ -1231,9 +1245,9 @@ def test_follow_up_public_response_rejects_naive_artifact_timestamps_and_history
     payload["followUpExchanges"] = [
         {
             "status": "awaitingAnswer",
-            "question": public_session_payload("answeringFollowUp")[
-                "currentFollowUp"
-            ]["question"],
+            "question": public_session_payload("answeringFollowUp")["currentFollowUp"][
+                "question"
+            ],
             "answer": None,
         }
     ]
@@ -1271,9 +1285,9 @@ def test_question_projection_hides_internal_fields_and_defaults_guidance() -> No
 
 
 def test_practice_guidance_variants_are_strict_and_nonempty_when_revealed() -> None:
-    assert PracticeGuidanceNotRequestedResponse(
-        status="notRequested"
-    ).model_dump(mode="json") == {
+    assert PracticeGuidanceNotRequestedResponse(status="notRequested").model_dump(
+        mode="json"
+    ) == {
         "status": "notRequested",
         "content": None,
     }
@@ -1284,9 +1298,9 @@ def test_practice_guidance_variants_are_strict_and_nonempty_when_revealed() -> N
         "status": "revealed",
         "content": ["Context", "Action"],
     }
-    assert PracticeGuidanceUnavailableResponse(
-        status="unavailable"
-    ).model_dump(mode="json") == {
+    assert PracticeGuidanceUnavailableResponse(status="unavailable").model_dump(
+        mode="json"
+    ) == {
         "status": "unavailable",
         "content": None,
     }
@@ -1326,9 +1340,9 @@ def test_question_and_follow_up_responses_accept_all_guidance_states() -> None:
     assert question.answer_hints.status == "revealed"
     assert question.answer_framework.status == "unavailable"
 
-    follow_up_payload = public_session_payload("answeringFollowUp")[
-        "currentFollowUp"
-    ]["question"]
+    follow_up_payload = public_session_payload("answeringFollowUp")["currentFollowUp"][
+        "question"
+    ]
     assert isinstance(follow_up_payload, dict)
     follow_up_payload["answerHints"] = {
         "status": "revealed",
@@ -1367,7 +1381,10 @@ def test_reveal_guidance_requests_use_only_public_provenance() -> None:
     }
 
     for request_type, payload in (
-        (RevealPracticeQuestionGuidanceRequest, {"version": 0, "questionId": str(question_id)}),
+        (
+            RevealPracticeQuestionGuidanceRequest,
+            {"version": 0, "questionId": str(question_id)},
+        ),
         (
             RevealPracticeFollowUpGuidanceRequest,
             {
@@ -1394,7 +1411,9 @@ def test_active_response_rejects_naive_timestamp_and_unknown_fields() -> None:
         TypeAdapter(PracticeActiveSessionResponse).validate_python(payload)
 
 
-def test_public_evaluation_response_is_strict_aware_and_hides_focus_assessments() -> None:
+def test_public_evaluation_response_is_strict_aware_and_hides_focus_assessments() -> (
+    None
+):
     payload = public_session_payload("review")["evaluation"]
     assert isinstance(payload, dict)
     evaluation = PracticeEvaluationResponse.model_validate(payload)
@@ -1403,9 +1422,7 @@ def test_public_evaluation_response_is_strict_aware_and_hides_focus_assessments(
     assert len(evaluation.dimension_scores) == 4
     assert evaluation.evaluated_at.tzinfo is not None
     with pytest.raises(ValidationError):
-        PracticeEvaluationResponse.model_validate(
-            {**payload, "overallScore": "82"}
-        )
+        PracticeEvaluationResponse.model_validate({**payload, "overallScore": "82"})
     with pytest.raises(ValidationError):
         PracticeEvaluationResponse.model_validate(
             {**payload, "dimensionScores": [{"score": 82}] * 4}
@@ -1415,9 +1432,7 @@ def test_public_evaluation_response_is_strict_aware_and_hides_focus_assessments(
             {**payload, "evaluatedAt": "2026-08-11T12:03:00"}
         )
     with pytest.raises(ValidationError):
-        PracticeEvaluationResponse.model_validate(
-            {**payload, "focusAssessments": []}
-        )
+        PracticeEvaluationResponse.model_validate({**payload, "focusAssessments": []})
 
 
 @pytest.mark.parametrize("action", ["retryCurrent", "nextQuestion"])
@@ -1449,12 +1464,17 @@ def test_public_review_response_validates_both_recommendation_branches(
             "Attribution evidence"
         ]
     else:
-        assert "nextQuestion" not in parsed.model_dump(mode="json", by_alias=True)[
-            "review"
-        ]["recommendation"]
+        assert (
+            "nextQuestion"
+            not in parsed.model_dump(mode="json", by_alias=True)["review"][
+                "recommendation"
+            ]
+        )
 
 
-def test_public_review_response_rejects_mixed_recommendation_union_and_missing_sections() -> None:
+def test_public_review_response_rejects_mixed_recommendation_union_and_missing_sections() -> (
+    None
+):
     payload = public_session_payload("review")
     review = payload["review"]
     assert isinstance(review, dict)

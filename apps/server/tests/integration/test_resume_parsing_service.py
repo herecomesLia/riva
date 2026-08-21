@@ -20,7 +20,6 @@ from riva.services.resume_parsing import (
 )
 from riva.utils import utc_now
 
-
 pytestmark = pytest.mark.integration
 GENERATED_AT = datetime(2026, 8, 5, 11, 0, tzinfo=UTC)
 
@@ -221,11 +220,7 @@ def test_same_run_is_idempotent_and_new_run_overwrites_version() -> None:
 
             async with database.sessionmaker() as session:
                 results = list(
-                    (
-                        await session.scalars(
-                            select(ResumeParsingResult)
-                        )
-                    ).all()
+                    (await session.scalars(select(ResumeParsingResult))).all()
                 )
                 assert len(results) == 1
 

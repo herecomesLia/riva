@@ -16,6 +16,11 @@ from riva.models import (
     QuestionCard,
 )
 from riva.schemas.practice_reference_answer import PracticeReferenceFrozenContext
+from riva.schemas.training_records import (
+    MockInterviewTrainingRecordSummaryResponse,
+    TrainingRecordKind,
+    TrainingRecordStatus,
+)
 from riva.services.practice_sessions import (
     PRACTICE_SESSION_NOT_FOUND,
     PracticeAnsweredFollowUpExchangeContext,
@@ -34,12 +39,6 @@ from riva.services.training_records import (
     TrainingRecordService,
     TrainingRecordStateError,
 )
-from riva.schemas.training_records import (
-    MockInterviewTrainingRecordSummaryResponse,
-    TrainingRecordKind,
-    TrainingRecordStatus,
-)
-
 
 NOW = datetime(2026, 8, 15, 9, 0, tzinfo=UTC)
 
@@ -279,9 +278,7 @@ class FakeReferenceAnswerService:
 def service(context, reference: FakeReferenceAnswerService):
     return TrainingRecordService(
         object(),
-        practice_service_factory=lambda _session: FakePracticeSessionService(
-            context
-        ),
+        practice_service_factory=lambda _session: FakePracticeSessionService(context),
         reference_answer_generation_service_factory=lambda _session: reference,
     )
 
@@ -376,7 +373,9 @@ def test_list_training_records_projects_summary_and_rounds_average_score() -> No
     result = asyncio.run(
         TrainingRecordService(
             fake_session,
-            interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(),
+            interview_training_record_service_factory=lambda _session: (
+                FakeInterviewTrainingRecordService()
+            ),
         ).list_training_records(
             user_id=uuid4(),
             page=1,
@@ -404,7 +403,9 @@ def test_list_training_records_mock_only_filter_is_an_empty_page() -> None:
     result = asyncio.run(
         TrainingRecordService(
             fake_session,
-            interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(),
+            interview_training_record_service_factory=lambda _session: (
+                FakeInterviewTrainingRecordService()
+            ),
         ).list_training_records(
             user_id=uuid4(),
             kinds=[TrainingRecordKind.MOCK_INTERVIEW],
@@ -418,7 +419,9 @@ def test_list_training_records_mock_only_filter_is_an_empty_page() -> None:
     assert fake_session.execute_calls == []
 
 
-def test_list_training_records_merges_interview_records_before_global_pagination() -> None:
+def test_list_training_records_merges_interview_records_before_global_pagination() -> (
+    None
+):
     practice_id = uuid4()
     interview_id = uuid4()
     fake_session = FakeListSession(
@@ -445,8 +448,8 @@ def test_list_training_records_merges_interview_records_before_global_pagination
     interview = interview_summary(record_id=interview_id)
     service = TrainingRecordService(
         fake_session,
-        interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(
-            [interview]
+        interview_training_record_service_factory=lambda _session: (
+            FakeInterviewTrainingRecordService([interview])
         ),
     )
 
@@ -501,8 +504,8 @@ def test_list_all_summaries_merges_both_kinds_without_pagination() -> None:
     interview = interview_summary(record_id=interview_id)
     service = TrainingRecordService(
         fake_session,
-        interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(
-            [interview]
+        interview_training_record_service_factory=lambda _session: (
+            FakeInterviewTrainingRecordService([interview])
         ),
     )
 
@@ -576,7 +579,9 @@ def test_get_training_records_overview_aggregates_record_scores_and_roles() -> N
     result = asyncio.run(
         TrainingRecordService(
             fake_session,
-            interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(),
+            interview_training_record_service_factory=lambda _session: (
+                FakeInterviewTrainingRecordService()
+            ),
         ).get_training_records_overview(
             user_id=uuid4(),
         )
@@ -625,8 +630,8 @@ def test_get_training_records_overview_includes_interview_projection() -> None:
     )
     service = TrainingRecordService(
         fake_session,
-        interview_training_record_service_factory=lambda _session: FakeInterviewTrainingRecordService(
-            [interview]
+        interview_training_record_service_factory=lambda _session: (
+            FakeInterviewTrainingRecordService([interview])
         ),
     )
 
@@ -758,9 +763,7 @@ def test_ended_early_pending_follow_up_uses_evaluation_run_cutoff() -> None:
         attempt,
         question,
         follow_up_completion_reason="endedEarly",
-        follow_up_exchanges=(
-            PracticeAnsweredFollowUpExchangeContext(q1, q1_answer),
-        ),
+        follow_up_exchanges=(PracticeAnsweredFollowUpExchangeContext(q1, q1_answer),),
         follow_up_question=q2,
         evaluation_created_at=NOW + timedelta(seconds=10),
     )

@@ -22,9 +22,7 @@ def _stable_json(value: BaseModel) -> str:
     )
 
 
-class MatchingAnalysisAgent(
-    Agent[MatchingAnalysisInput, MatchingAnalysisOutput]
-):
+class MatchingAnalysisAgent(Agent[MatchingAnalysisInput, MatchingAnalysisOutput]):
     def __init__(
         self,
         provider: LLMProvider,
@@ -42,9 +40,7 @@ class MatchingAnalysisAgent(
     def agent_id(self) -> str:
         return "matching-analyzer"
 
-    def prompt_values(
-        self, input: MatchingAnalysisInput
-    ) -> Mapping[str, object]:
+    def prompt_values(self, input: MatchingAnalysisInput) -> Mapping[str, object]:
         return {
             "career_profile": _stable_json(input.career_profile),
             "job": _stable_json(input.job),

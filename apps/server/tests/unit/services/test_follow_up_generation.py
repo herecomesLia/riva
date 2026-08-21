@@ -27,7 +27,6 @@ from riva.services.follow_up_generation import (
     FollowUpGenerationStateError,
 )
 
-
 NOW = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
 
 
@@ -284,9 +283,7 @@ def test_load_input_rebuilds_only_frozen_interaction_context() -> None:
     db = ScriptedSession(attempt, session, card, main_answer, None)
 
     result = asyncio.run(
-        FollowUpGenerationService(db, llm_model="test-model").load_generation_input(
-            run
-        )
+        FollowUpGenerationService(db, llm_model="test-model").load_generation_input(run)
     )
 
     assert result.question.prompt == card.prompt
@@ -296,7 +293,9 @@ def test_load_input_rebuilds_only_frozen_interaction_context() -> None:
     assert all("career_profiles" not in str(statement) for statement in db.statements)
 
 
-def test_persist_success_recovers_first_artifact_without_comparing_retry_output() -> None:
+def test_persist_success_recovers_first_artifact_without_comparing_retry_output() -> (
+    None
+):
     session, attempt, card, main_answer, _, _ = context_graph()
     run = run_for(session, attempt, card, main_answer)
     first = FollowUpQuestionOutput(

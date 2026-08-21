@@ -10,7 +10,6 @@ from riva.schemas.practice_review import (
     ReviewRunPayload,
 )
 
-
 CORE_DIMENSIONS = [
     "relevance",
     "structure",
@@ -32,18 +31,12 @@ def review_output_payload(
         "highlights": [] if highlights is None else highlights,
         "mainIssues": [] if main_issues is None else main_issues,
         "improvementSuggestions": (
-            []
-            if improvement_suggestions is None
-            else improvement_suggestions
+            [] if improvement_suggestions is None else improvement_suggestions
         ),
         "reusableAnswerStructure": (
-            []
-            if reusable_answer_structure is None
-            else reusable_answer_structure
+            [] if reusable_answer_structure is None else reusable_answer_structure
         ),
-        "exposedWeaknesses": (
-            [] if exposed_weaknesses is None else exposed_weaknesses
-        ),
+        "exposedWeaknesses": ([] if exposed_weaknesses is None else exposed_weaknesses),
     }
 
 
@@ -114,9 +107,7 @@ def test_review_output_normalizes_lists_and_accepts_empty_lists() -> None:
         )
     )
 
-    assert parsed.overall_performance == (
-        "The answer was relevant and mostly clear."
-    )
+    assert parsed.overall_performance == ("The answer was relevant and mostly clear.")
     assert parsed.highlights == ["Clear ownership", "Evidence"]
     assert parsed.main_issues == []
     assert parsed.improvement_suggestions == ["Add a baseline"]
@@ -198,7 +189,9 @@ def test_review_input_accepts_continuous_all_answered_chain(
     parsed = PracticeReviewInput.model_validate(
         review_input_payload(
             scoring_focus=["result evidence"],
-            exchanges=[follow_up_exchange(index) for index in range(1, exchange_count + 1)],
+            exchanges=[
+                follow_up_exchange(index) for index in range(1, exchange_count + 1)
+            ],
             completion_reason="allAnswered",
             evaluation=evaluation_payload(focus_count=1),
         )
@@ -239,9 +232,7 @@ def test_review_input_accepts_continuous_all_answered_chain(
                 ]
             }
         ),
-        lambda payload: payload["question"].update(
-            {"scoringFocus": ["one", "two"]}
-        ),
+        lambda payload: payload["question"].update({"scoringFocus": ["one", "two"]}),
     ],
 )
 def test_review_input_rejects_focus_index_mismatch(mutate) -> None:

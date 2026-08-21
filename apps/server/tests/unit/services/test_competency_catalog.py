@@ -4,9 +4,9 @@ from riva.services.competency_catalog import (
     CANONICAL_COMPETENCY_KEYS,
     COMPETENCY_DISPLAY_NAMES,
     DIMENSION_TO_COMPETENCY_KEY,
+    canonical_competency_sort_key,
     competency_key_for_dimension,
     display_name_for_competency_key,
-    canonical_competency_sort_key,
 )
 
 

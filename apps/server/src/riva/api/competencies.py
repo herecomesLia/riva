@@ -7,7 +7,6 @@ from riva.schemas.competencies import CompetencyListResponse
 from riva.services.competencies import CompetencyService
 from riva.services.competency_catalog import canonical_competency_sort_key
 
-
 router = APIRouter(prefix="/competencies", tags=["competencies"])
 
 
@@ -22,9 +21,7 @@ async def list_competencies(
 ) -> CompetencyListResponse:
     competencies = await competency_service.list_competencies(current_user.id)
     competencies.sort(
-        key=lambda competency: canonical_competency_sort_key(
-            competency.competency_key
-        )
+        key=lambda competency: canonical_competency_sort_key(competency.competency_key)
     )
     return CompetencyListResponse(items=competencies)
 

@@ -25,7 +25,6 @@ from riva.services.practice_sessions import (
 from tests.integration.test_practice_answer_api import start_answering
 from tests.integration.test_question_generation import database_url, seed_context
 
-
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 
@@ -80,8 +79,7 @@ async def question_state(
         cards = list(
             (
                 await session.scalars(
-                    select(QuestionCard)
-                    .where(QuestionCard.user_id == user_id)
+                    select(QuestionCard).where(QuestionCard.user_id == user_id)
                 )
             ).all()
         )

@@ -4,7 +4,6 @@ from riva.prompts import (
     RESUME_PARSING_PROMPT,
 )
 
-
 RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS = frozenset(
     {"1", "2", "3", RESUME_PARSING_PROMPT.version}
 )

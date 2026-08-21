@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
 
-
 MATCHING_ANALYSIS_PROMPT = PromptDefinition(
     prompt_id="matching-analyzer",
     version="2",

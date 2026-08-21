@@ -11,9 +11,10 @@ from riva.schemas.profile import (
     CareerProfileSkillInput,
     CareerProfileWorkExperienceInput,
     StandardUUID,
+)
+from riva.schemas.profile import (
     Summary as ProfileSummary,
 )
-
 
 ResumeImportSection = Literal[
     "education",
@@ -72,9 +73,7 @@ class ResumeImportChangeSummary(_ResumeImportModel):
 class ResumeImportDraftData(_ResumeImportModel):
     summary: ProfileSummary
     summary_action: ResumeImportSummaryAction
-    education: list[CareerProfileEducationInput] = Field(
-        max_length=MAX_SECTION_ITEMS
-    )
+    education: list[CareerProfileEducationInput] = Field(max_length=MAX_SECTION_ITEMS)
     work_experiences: list[CareerProfileWorkExperienceInput] = Field(
         max_length=MAX_SECTION_ITEMS
     )
@@ -112,9 +111,7 @@ class ResumeImportDraftData(_ResumeImportModel):
         if len(skill_names) != len(set(skill_names)):
             raise ValueError("draft skill names must be unique")
 
-        protected_keys = [
-            (item.section, item.item_id) for item in self.protected_items
-        ]
+        protected_keys = [(item.section, item.item_id) for item in self.protected_items]
         if len(protected_keys) != len(set(protected_keys)):
             raise ValueError("draft protected items must be unique")
 

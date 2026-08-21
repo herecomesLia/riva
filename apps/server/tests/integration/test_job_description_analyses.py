@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime
 import os
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,7 +21,6 @@ from riva.services.job_description_analyses import (
     JobDescriptionParsingStateError,
 )
 from riva.services.roles import TargetRoleService
-
 
 pytestmark = pytest.mark.integration
 PARSED_AT_1 = datetime(2026, 7, 31, 8, tzinfo=UTC)
@@ -108,9 +107,7 @@ def output(summary: str) -> JobDescriptionParsingOutput:
                 "databases_and_middleware": ["PostgreSQL"],
                 "other": [],
             },
-            "preferred_qualifications": [
-                "Kubernetes or cloud platform experience"
-            ],
+            "preferred_qualifications": ["Kubernetes or cloud platform experience"],
             "soft_skills": ["Communication"],
             "business_domains": ["Payments"],
         }
@@ -236,9 +233,7 @@ def test_job_description_analysis_lifecycle_guards_and_invalidation() -> None:
                 assert analysis.qualification_requirements["education"] == [
                     "Bachelor's degree"
                 ]
-                assert analysis.required_skills["programming_languages"] == [
-                    "Python"
-                ]
+                assert analysis.required_skills["programming_languages"] == ["Python"]
                 assert analysis.qualification_requirements["majors"] == [
                     "Computer Science, Software Engineering, or a related field"
                 ]
@@ -269,9 +264,7 @@ def test_job_description_analysis_lifecycle_guards_and_invalidation() -> None:
                     assert persisted_role.version == 2
 
                 async with database.sessionmaker() as session:
-                    no_op_page = await TargetRoleService(
-                        session
-                    ).save_job_description(
+                    no_op_page = await TargetRoleService(session).save_job_description(
                         owner,
                         target.id,
                         SaveJobDescriptionRequest(
@@ -404,7 +397,9 @@ def test_job_description_analysis_lifecycle_guards_and_invalidation() -> None:
                     persisted_role = await session.get(TargetRole, target.id)
                     assert persisted_role is not None
                     assert persisted_role.job_description_parsing_run_id is None
-                    assert await session.get(JobDescriptionAnalysis, target.id) is not None
+                    assert (
+                        await session.get(JobDescriptionAnalysis, target.id) is not None
+                    )
 
                 async with database.sessionmaker() as session:
                     persisted_role = await session.get(TargetRole, target.id)

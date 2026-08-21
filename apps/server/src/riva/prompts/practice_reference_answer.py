@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.practice_reference_answer import PracticeReferenceAnswerOutput
 
-
 PRACTICE_REFERENCE_ANSWER_PROMPT = PromptDefinition(
     prompt_id="practice-reference-answer-generator",
     version="1",

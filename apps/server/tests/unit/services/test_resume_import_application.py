@@ -35,7 +35,6 @@ from riva.services.resume_imports import (
     build_resume_import_draft_data,
 )
 
-
 NOW = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
 USER_ID = UUID("11111111-1111-4111-8111-111111111111")
 DOCUMENT_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -945,12 +944,8 @@ def test_apply_creates_profile_with_deterministic_ids_and_applies_draft() -> Non
             *application.profile.skills,
         )
     )
-    assert [item.id for item in application.profile.education] == [
-        data.education[0].id
-    ]
-    assert application.profile.work_experiences[0].skill_ids == [
-        data.skills[0].id
-    ]
+    assert [item.id for item in application.profile.education] == [data.education[0].id]
+    assert application.profile.work_experiences[0].skill_ids == [data.skills[0].id]
 
 
 def test_existing_profile_change_flushes_refreshes_then_commits() -> None:
@@ -1107,9 +1102,7 @@ def test_flush_failure_rolls_back_before_refresh_or_commit() -> None:
 
 
 def test_commit_failure_rolls_back_without_post_commit_database_operations() -> None:
-    session = ready_application_session(
-        commit_error=RuntimeError("commit failed")
-    )
+    session = ready_application_session(commit_error=RuntimeError("commit failed"))
 
     with pytest.raises(RuntimeError, match="commit failed"):
         asyncio.run(

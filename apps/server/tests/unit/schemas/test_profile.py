@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from riva.schemas.profile import (
     CareerProfileGetResponse,
@@ -185,9 +185,7 @@ def test_project_has_no_is_current_and_validates_date_order() -> None:
         lambda payload: payload["education"][0].update(
             {"startDate": "2021-01", "endDate": "2020-12"}
         ),
-        lambda payload: payload["skills"].append(
-            {"id": SKILL_ID, "name": "FastAPI"}
-        ),
+        lambda payload: payload["skills"].append({"id": SKILL_ID, "name": "FastAPI"}),
         lambda payload: payload["skills"].append(
             {
                 "id": "77777777-7777-4777-8777-777777777777",
@@ -218,9 +216,7 @@ def test_profile_response_contains_source_and_excludes_created_at() -> None:
     response = CareerProfileResponse.model_validate(response_profile_payload())
     serialized = response.model_dump()
 
-    assert serialized["profileId"] == UUID(
-        "55555555-5555-4555-8555-555555555555"
-    )
+    assert serialized["profileId"] == UUID("55555555-5555-4555-8555-555555555555")
     assert serialized["education"][0]["source"] == "userAdded"
     assert "createdAt" not in serialized
 

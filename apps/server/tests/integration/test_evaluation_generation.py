@@ -25,9 +25,9 @@ from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.services.agent_runs import AgentRunService
 from riva.services.evaluation_generation import (
+    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
     EvaluationGenerationService,
     EvaluationGenerationStateError,
-    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
     practice_evaluation_idempotency_key,
 )
 from riva.services.follow_up_generation import practice_follow_up_idempotency_key
@@ -39,7 +39,6 @@ from tests.integration.test_follow_up_generation import (
     seed_context,
     succeeded_seed_run,
 )
-
 
 pytestmark = pytest.mark.integration
 
@@ -383,8 +382,7 @@ def test_evaluation_worker_persists_no_follow_and_all_answered_graphs(
                 assert "MUTATED_PROFILE_MUST_NOT_BE_LOADED" not in user_message
                 assert "MUTATED_JOB_DESCRIPTION_MUST_NOT_BE_LOADED" not in user_message
                 assert (
-                    "MUTATED_MATCHING_ANALYSIS_MUST_NOT_BE_LOADED"
-                    not in user_message
+                    "MUTATED_MATCHING_ANALYSIS_MUST_NOT_BE_LOADED" not in user_message
                 )
                 if shape != "none":
                     assert "Failure rate fell by 20%." in user_message
@@ -431,10 +429,13 @@ def test_evaluation_retry_preserves_first_canonical_artifact() -> None:
                     assert running is not None
                     running.lease_expires_at = now - timedelta(seconds=1)
                     await session.commit()
-                    assert await AgentRunService(
-                        session,
-                        clock=lambda: now,
-                    ).requeue_expired() == 1
+                    assert (
+                        await AgentRunService(
+                            session,
+                            clock=lambda: now,
+                        ).requeue_expired()
+                        == 1
+                    )
 
                 retry_provider = FakeLLMProvider([evaluation_response(91)])
                 assert await build_worker(database, retry_provider).process_one()

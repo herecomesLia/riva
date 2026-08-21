@@ -25,7 +25,6 @@ from riva.services.training_planning import (
     TrainingPlanningStateError,
 )
 
-
 TrainingPlanningRunId = Annotated[UUID, Path(alias="runId")]
 
 router = APIRouter(

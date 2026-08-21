@@ -29,9 +29,7 @@ def _stable_json(value: BaseModel | Sequence[BaseModel] | None) -> str:
     elif isinstance(value, BaseModel):
         serializable = value.model_dump(mode="json", by_alias=True)
     else:
-        serializable = [
-            item.model_dump(mode="json", by_alias=True) for item in value
-        ]
+        serializable = [item.model_dump(mode="json", by_alias=True) for item in value]
     return json.dumps(
         serializable,
         ensure_ascii=False,
@@ -54,9 +52,7 @@ def _invalid_output(
     return InvalidStructuredOutputError(diagnostics)
 
 
-class TrainingPlanningAgent(
-    Agent[TrainingPlanningInput, TrainingPlanningOutput]
-):
+class TrainingPlanningAgent(Agent[TrainingPlanningInput, TrainingPlanningOutput]):
     def __init__(
         self,
         provider: LLMProvider,

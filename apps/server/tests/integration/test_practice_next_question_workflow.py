@@ -47,7 +47,6 @@ from tests.helpers.practice_reference_answers import (
 )
 from tests.integration.test_question_generation import database_url, seed_context
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -461,7 +460,10 @@ def test_practice_next_question_real_workflow_replay_and_rollback() -> None:
                     assert continued.attempt.retry_of_attempt_id is None
                     assert continued.attempt.question_card_id is None
                     assert continued.attempt.completed_at is None
-                    assert continued.question_generation_run.status is AgentRunStatus.QUEUED
+                    assert (
+                        continued.question_generation_run.status
+                        is AgentRunStatus.QUEUED
+                    )
                     assert continued.question_generation_run.id is not None
                     assert continued.question_generation_run.idempotency_key == (
                         practice_question_generation_idempotency_key(
@@ -491,17 +493,20 @@ def test_practice_next_question_real_workflow_replay_and_rollback() -> None:
                     assert second_attempt.question_generation_run_id == second_run_id
                     assert first_session.status == "active"
                     assert first_session.version == 6
-                    assert len(
-                        list(
-                            (
-                                await session.scalars(
-                                    select(PracticeAttempt).where(
-                                        PracticeAttempt.session_id == session_id
+                    assert (
+                        len(
+                            list(
+                                (
+                                    await session.scalars(
+                                        select(PracticeAttempt).where(
+                                            PracticeAttempt.session_id == session_id
+                                        )
                                     )
-                                )
-                            ).all()
+                                ).all()
+                            )
                         )
-                    ) == 2
+                        == 2
+                    )
 
                 async with database.sessionmaker() as session:
                     replay = await PracticeSessionService(

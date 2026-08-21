@@ -37,15 +37,14 @@ from riva.services.practice_recommendation_prompt_versions import (
     get_practice_recommendation_prompt,
 )
 from riva.services.review_generation import (
-    ReviewGenerationStateError,
     ReviewGenerationService,
+    ReviewGenerationStateError,
     practice_review_idempotency_key,
     practice_review_output_from_artifact,
     validate_review_generation_run,
 )
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
-
 
 RecommendationGenerationStateErrorCode = Literal[
     "invalid_practice_recommendation_run",
@@ -69,9 +68,7 @@ PRACTICE_RECOMMENDATION_SESSION_NOT_ACTIVE: RecommendationGenerationStateErrorCo
 PRACTICE_RECOMMENDATION_REVIEW_NOT_READY: RecommendationGenerationStateErrorCode = (
     "practice_recommendation_review_not_ready"
 )
-PRACTICE_RECOMMENDATION_REVIEW_CONTEXT_INVALID: RecommendationGenerationStateErrorCode = (
-    "practice_recommendation_review_context_invalid"
-)
+PRACTICE_RECOMMENDATION_REVIEW_CONTEXT_INVALID: RecommendationGenerationStateErrorCode = "practice_recommendation_review_context_invalid"
 PRACTICE_RECOMMENDATION_CONTEXT_CONFLICT: RecommendationGenerationStateErrorCode = (
     "practice_recommendation_context_conflict"
 )
@@ -121,12 +118,10 @@ def validate_recommendation_generation_run(
         or run.prompt_version != prompt.version
         or run.output_schema_id != prompt.output_schema_id
     ):
-        raise RecommendationGenerationStateError(
-            INVALID_PRACTICE_RECOMMENDATION_RUN
-        )
+        raise RecommendationGenerationStateError(INVALID_PRACTICE_RECOMMENDATION_RUN)
     try:
         return RecommendationRunPayload.model_validate(run.payload)
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise RecommendationGenerationStateError(
             INVALID_PRACTICE_RECOMMENDATION_RUN
         ) from None
@@ -161,7 +156,7 @@ def practice_recommendation_output_from_artifact(
 
     try:
         return TypeAdapter(PracticeRecommendationOutput).validate_python(payload)
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError("persisted practice recommendation is malformed") from None
 
 
@@ -256,9 +251,7 @@ class RecommendationGenerationService:
         run: AgentRun,
     ) -> PracticeRecommendationInput:
         try:
-            recommendation_input = await self.load_generation_input_in_transaction(
-                run
-            )
+            recommendation_input = await self.load_generation_input_in_transaction(run)
             await self.session.commit()
             return recommendation_input
         except Exception:
@@ -314,9 +307,7 @@ class RecommendationGenerationService:
             if existing is None:
                 existing = await self.session.scalar(
                     select(PracticeRecommendation)
-                    .where(
-                        PracticeRecommendation.attempt_id == payload.attempt_id
-                    )
+                    .where(PracticeRecommendation.attempt_id == payload.attempt_id)
                     .with_for_update()
                 )
             if existing is not None:
@@ -407,10 +398,7 @@ class RecommendationGenerationService:
             session_statement,
             for_update=for_update,
         )
-        if (
-            practice_session is None
-            or practice_session.status != "active"
-        ):
+        if practice_session is None or practice_session.status != "active":
             raise RecommendationGenerationStateError(
                 PRACTICE_RECOMMENDATION_SESSION_NOT_ACTIVE
             )
@@ -456,10 +444,7 @@ class RecommendationGenerationService:
             select(AgentRun).where(AgentRun.id == review.source_agent_run_id),
             for_update=for_update,
         )
-        if (
-            review_run is None
-            or review_run.status is not AgentRunStatus.SUCCEEDED
-        ):
+        if review_run is None or review_run.status is not AgentRunStatus.SUCCEEDED:
             raise RecommendationGenerationStateError(
                 PRACTICE_RECOMMENDATION_REVIEW_NOT_READY
             )
@@ -473,8 +458,7 @@ class RecommendationGenerationService:
 
         if (
             review_run.user_id != user_id
-            or review_run.idempotency_key
-            != practice_review_idempotency_key(attempt.id)
+            or review_run.idempotency_key != practice_review_idempotency_key(attempt.id)
             or review_payload.attempt_id != attempt.id
             or review_payload.interaction_language != practice_session.language
             or review.source_agent_run_id != review_run.id
@@ -529,9 +513,7 @@ class RecommendationGenerationService:
                 question=PracticeRecommendationQuestionContext.model_validate(
                     review_input.question.model_dump()
                 ),
-                follow_up_completion_reason=(
-                    review_input.follow_up_completion_reason
-                ),
+                follow_up_completion_reason=(review_input.follow_up_completion_reason),
                 evaluation=review_input.evaluation,
                 review=canonical_review,
                 training_memory=(
@@ -540,7 +522,7 @@ class RecommendationGenerationService:
                     else TrainingMemoryContext()
                 ),
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise RecommendationGenerationStateError(
                 PRACTICE_RECOMMENDATION_REVIEW_CONTEXT_INVALID
             ) from None
@@ -566,9 +548,7 @@ class RecommendationGenerationService:
         input: PracticeRecommendationInput,
     ) -> PracticeRecommendationOutput:
         try:
-            canonical = practice_recommendation_output_from_artifact(
-                recommendation
-            )
+            canonical = practice_recommendation_output_from_artifact(recommendation)
         except ValueError:
             raise RecommendationGenerationStateError(
                 PRACTICE_RECOMMENDATION_ARTIFACT_CONFLICT
@@ -581,14 +561,12 @@ class RecommendationGenerationService:
             raise ValueError("llm_model must not be empty")
 
 
-def _validate_output(output: object) -> (
-    PracticeRetryCurrentRecommendation | PracticeNextQuestionRecommendation
-):
+def _validate_output(
+    output: object,
+) -> PracticeRetryCurrentRecommendation | PracticeNextQuestionRecommendation:
     try:
-        validated = TypeAdapter(PracticeRecommendationOutput).validate_python(
-            output
-        )
-    except (TypeError, ValueError, ValidationError):
+        validated = TypeAdapter(PracticeRecommendationOutput).validate_python(output)
+    except TypeError, ValueError, ValidationError:
         raise RecommendationGenerationStateError(
             PRACTICE_RECOMMENDATION_ARTIFACT_CONFLICT
         ) from None
@@ -619,9 +597,7 @@ def validate_recommendation_v1_contract(
     if (
         plan.question_type != input.question.question_type
         or plan.difficulty != input.question.difficulty
-        or not set(plan.focus_areas).issubset(
-            set(input.review.exposed_weaknesses)
-        )
+        or not set(plan.focus_areas).issubset(set(input.review.exposed_weaknesses))
     ):
         raise RecommendationGenerationStateError(
             PRACTICE_RECOMMENDATION_ARTIFACT_CONFLICT

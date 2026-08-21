@@ -12,7 +12,6 @@ from riva.integrations import (
     validate_structured_output,
 )
 
-
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 LLMCall = TextGenerationRequest | StructuredGenerationRequest[BaseModel]
 

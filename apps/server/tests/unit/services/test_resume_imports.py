@@ -22,7 +22,6 @@ from riva.services.resume_imports import (
     canonicalize_resume_import_identity,
 )
 
-
 USER_ID = UUID("11111111-1111-4111-8111-111111111111")
 OTHER_USER_ID = UUID("22222222-2222-4222-8222-222222222222")
 NOW = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
@@ -250,7 +249,9 @@ def test_conversion_filters_lossy_sections_without_filling_values() -> None:
         data.skills[0].id,
         data.skills[1].id,
     ]
-    assert [(item.section, item.source_index, item.reasons) for item in data.skipped_items] == [
+    assert [
+        (item.section, item.source_index, item.reasons) for item in data.skipped_items
+    ] == [
         (
             "education",
             1,

@@ -13,7 +13,6 @@ from riva.schemas.resume_import_api import (
     ResumeImportDraftResponse,
 )
 
-
 TRUSTED_ORIGIN = "http://localhost:5173"
 RESUME_ID = UUID("11111111-1111-4111-8111-111111111111")
 NOW = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
@@ -122,9 +121,7 @@ def test_draft_routes_forward_path_user_body_and_use_contracts(app) -> None:
     client, current_user = create_client(app, service)
 
     with client:
-        get_response = client.get(
-            f"/api/profile/resumes/{RESUME_ID}/import-draft"
-        )
+        get_response = client.get(f"/api/profile/resumes/{RESUME_ID}/import-draft")
         apply_response = client.post(
             f"/api/profile/resumes/{RESUME_ID}/import-draft/apply",
             json={"draftVersion": 1},
@@ -165,9 +162,7 @@ def test_draft_routes_require_authentication(app) -> None:
     app.dependency_overrides[get_auth_service] = lambda: object()
 
     with TestClient(app) as client:
-        response = client.get(
-            f"/api/profile/resumes/{RESUME_ID}/import-draft"
-        )
+        response = client.get(f"/api/profile/resumes/{RESUME_ID}/import-draft")
 
     assert response.status_code == 401
     assert service.get_calls == []
@@ -180,9 +175,7 @@ def test_facade_api_errors_are_returned_without_internal_details(app) -> None:
     client, _user = create_client(app, service)
 
     with client:
-        response = client.get(
-            f"/api/profile/resumes/{RESUME_ID}/import-draft"
-        )
+        response = client.get(f"/api/profile/resumes/{RESUME_ID}/import-draft")
 
     assert response.status_code == 409
     assert response.json() == {"error": "resume_import_draft_not_ready"}
@@ -194,17 +187,17 @@ def test_openapi_exposes_draft_paths_body_and_alias(app) -> None:
     get_path = "/api/profile/resumes/{resumeId}/import-draft"
     apply_path = f"{get_path}/apply"
 
-    assert paths[get_path]["get"]["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]["$ref"] == "#/components/schemas/ResumeImportDraftResponse"
-    assert paths[apply_path]["post"]["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]["$ref"] == (
-        "#/components/schemas/ResumeImportApplicationResponse"
+    assert (
+        paths[get_path]["get"]["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
+        == "#/components/schemas/ResumeImportDraftResponse"
     )
+    assert paths[apply_path]["post"]["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"] == ("#/components/schemas/ResumeImportApplicationResponse")
     assert any(
-        parameter["name"] == "resumeId"
-        and parameter["in"] == "path"
+        parameter["name"] == "resumeId" and parameter["in"] == "path"
         for parameter in paths[apply_path]["post"]["parameters"]
     )
     body_schema = paths[apply_path]["post"]["requestBody"]["content"][

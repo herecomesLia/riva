@@ -15,7 +15,6 @@ from riva.services.evaluation_generation import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 EvaluationGenerationServiceFactory = Callable[
     [AsyncSession], EvaluationGenerationService
 ]

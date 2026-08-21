@@ -12,7 +12,6 @@ from riva.schemas.resume_documents import (
     SucceededResumeDocumentResponse,
 )
 
-
 NOW = datetime(2026, 8, 5, tzinfo=UTC)
 
 
@@ -73,11 +72,7 @@ def test_invalid_status_specific_shapes_are_rejected(payload) -> None:
 
 def test_response_is_camel_case_and_forbids_sensitive_or_extra_fields() -> None:
     response = ResumeDocumentsResponse.model_validate(
-        {
-            "documents": [
-                common_payload(extractionStatus="succeeded", extractedAt=NOW)
-            ]
-        }
+        {"documents": [common_payload(extractionStatus="succeeded", extractedAt=NOW)]}
     )
     serialized = response.model_dump_json(by_alias=True)
 
@@ -98,11 +93,7 @@ def test_response_is_camel_case_and_forbids_sensitive_or_extra_fields() -> None:
 
     with pytest.raises(ValidationError):
         ResumeDocumentsResponse.model_validate(
-            {
-                "documents": [
-                    common_payload(extractionStatus="pending", extraField="no")
-                ]
-            }
+            {"documents": [common_payload(extractionStatus="pending", extraField="no")]}
         )
 
 

@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from io import BytesIO
 import math
-from pathlib import PurePosixPath, PureWindowsPath
 import re
-from typing import Protocol
 import unicodedata
 import xml.etree.ElementTree as ElementTree
 import zipfile
+from dataclasses import dataclass
+from io import BytesIO
+from pathlib import PurePosixPath, PureWindowsPath
+from typing import Protocol
 
 from pypdf import PdfReader
-
 
 TEXT_PLAIN = "text/plain"
 APPLICATION_PDF = "application/pdf"
@@ -35,9 +34,7 @@ RESUME_DOCX_UNSAFE = "resume_docx_unsafe"
 RESUME_DOCX_ARCHIVE_TOO_LARGE = "resume_docx_archive_too_large"
 RESUME_DOCX_EXTRACTION_FAILED = "resume_docx_extraction_failed"
 
-_SUPPORTED_MEDIA_TYPES = frozenset(
-    {TEXT_PLAIN, APPLICATION_PDF, APPLICATION_DOCX}
-)
+_SUPPORTED_MEDIA_TYPES = frozenset({TEXT_PLAIN, APPLICATION_PDF, APPLICATION_DOCX})
 _ERROR_CODES = frozenset(
     {
         RESUME_MEDIA_TYPE_UNSUPPORTED,
@@ -112,8 +109,7 @@ class ResumeTextExtractor(Protocol):
         *,
         declared_media_type: str | None,
         max_characters: int,
-    ) -> ExtractedResumeText:
-        ...
+    ) -> ExtractedResumeText: ...
 
 
 def normalize_resume_text(
@@ -259,9 +255,7 @@ class DefaultResumeTextExtractor:
                 except ResumeExtractionError:
                     raise
                 except Exception:
-                    raise ResumeExtractionError(
-                        RESUME_PDF_EXTRACTION_FAILED
-                    ) from None
+                    raise ResumeExtractionError(RESUME_PDF_EXTRACTION_FAILED) from None
                 if page_text is None:
                     page_text = ""
                 if not isinstance(page_text, str):
@@ -296,9 +290,7 @@ class DefaultResumeTextExtractor:
             xml_names = ["word/document.xml"]
             xml_names.extend(
                 sorted(
-                    name
-                    for name in members
-                    if _is_additional_word_text_member(name)
+                    name for name in members if _is_additional_word_text_member(name)
                 )
             )
             xml_data = {
@@ -324,9 +316,7 @@ class DefaultResumeTextExtractor:
                 except ResumeExtractionError:
                     raise
                 except Exception:
-                    raise ResumeExtractionError(
-                        RESUME_DOCX_EXTRACTION_FAILED
-                    ) from None
+                    raise ResumeExtractionError(RESUME_DOCX_EXTRACTION_FAILED) from None
 
             return normalize_resume_text(
                 accumulator.value,
@@ -397,9 +387,7 @@ class DefaultResumeTextExtractor:
                         break
                     total_bytes += len(chunk)
                     if total_bytes > self.max_xml_member_bytes:
-                        raise ResumeExtractionError(
-                            RESUME_DOCX_ARCHIVE_TOO_LARGE
-                        )
+                        raise ResumeExtractionError(RESUME_DOCX_ARCHIVE_TOO_LARGE)
                     chunks.append(chunk)
         except ResumeExtractionError:
             raise
@@ -419,8 +407,7 @@ class DefaultResumeTextExtractor:
                 element.tag.rsplit("}", 1)[-1] == "Override"
                 and element.attrib.get("PartName", "").casefold()
                 == "/word/document.xml"
-                and content_type
-                == _WORDPROCESSINGML_DOCUMENT_CONTENT_TYPE
+                and content_type == _WORDPROCESSINGML_DOCUMENT_CONTENT_TYPE
             ):
                 has_standard_main_document = True
         if not has_standard_main_document:
@@ -510,8 +497,7 @@ def _decode_text(data: bytes) -> str:
 
 def _contains_binary_control_character(value: str) -> bool:
     return any(
-        unicodedata.category(character) == "Cc"
-        and character not in {"\t", "\n", "\r"}
+        unicodedata.category(character) == "Cc" and character not in {"\t", "\n", "\r"}
         for character in value
     )
 
@@ -533,10 +519,10 @@ def _validate_zip_member_name(name: str) -> None:
 
 def _is_additional_word_text_member(name: str) -> bool:
     return (
-        name.startswith("word/header") and name.endswith(".xml")
-    ) or (
-        name.startswith("word/footer") and name.endswith(".xml")
-    ) or name in {"word/footnotes.xml", "word/endnotes.xml"}
+        (name.startswith("word/header") and name.endswith(".xml"))
+        or (name.startswith("word/footer") and name.endswith(".xml"))
+        or name in {"word/footnotes.xml", "word/endnotes.xml"}
+    )
 
 
 def _parse_xml(data: bytes) -> ElementTree.Element:

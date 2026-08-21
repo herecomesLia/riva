@@ -55,9 +55,7 @@ class PracticeReferenceAnswerAgent(
         input: PracticeReferenceAnswerInput,
     ) -> Mapping[str, object]:
         follow_up_input = (
-            input
-            if isinstance(input, PracticeFollowUpReferenceAnswerInput)
-            else None
+            input if isinstance(input, PracticeFollowUpReferenceAnswerInput) else None
         )
         return {
             "interaction_language": input.interaction_language,

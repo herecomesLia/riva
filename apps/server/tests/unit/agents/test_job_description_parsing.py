@@ -49,7 +49,9 @@ def valid_output() -> dict[str, object]:
     }
 
 
-def malicious_input(language: InteractionLanguage = "zh-CN") -> JobDescriptionParsingInput:
+def malicious_input(
+    language: InteractionLanguage = "zh-CN",
+) -> JobDescriptionParsingInput:
     return JobDescriptionParsingInput(
         role_title="后端工程师",
         company="示例科技",

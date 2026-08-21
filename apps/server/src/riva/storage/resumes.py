@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import errno
-from hashlib import sha256
 import os
-from pathlib import Path, PurePosixPath, PureWindowsPath
 import tempfile
+from dataclasses import dataclass
+from hashlib import sha256
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import BinaryIO, Protocol
 from uuid import UUID
-
 
 INVALID_STORAGE_KEY = "invalid_storage_key"
 RESUME_FILE_EMPTY = "resume_file_empty"
@@ -38,14 +37,11 @@ class ResumeObjectStorage(Protocol):
         key: str,
         file_obj: BinaryIO,
         max_bytes: int,
-    ) -> StoredResumeObject:
-        ...
+    ) -> StoredResumeObject: ...
 
-    async def read_bytes(self, key: str) -> bytes:
-        ...
+    async def read_bytes(self, key: str) -> bytes: ...
 
-    async def delete(self, key: str) -> None:
-        ...
+    async def delete(self, key: str) -> None: ...
 
 
 def build_resume_storage_key(
@@ -54,10 +50,7 @@ def build_resume_storage_key(
 ) -> str:
     if not isinstance(user_id, UUID) or not isinstance(resume_document_id, UUID):
         raise TypeError("user_id and resume_document_id must be UUID instances")
-    return (
-        f"users/{user_id.hex}/resumes/"
-        f"{resume_document_id.hex}/source"
-    )
+    return f"users/{user_id.hex}/resumes/{resume_document_id.hex}/source"
 
 
 class LocalResumeObjectStorage:
@@ -208,7 +201,7 @@ class LocalResumeObjectStorage:
             resolved.relative_to(self._root)
         except ValueError:
             raise ResumeStorageError(INVALID_STORAGE_KEY) from None
-        except (OSError, RuntimeError):
+        except OSError, RuntimeError:
             raise ResumeStorageError(RESUME_STORAGE_UNAVAILABLE) from None
         return candidate
 

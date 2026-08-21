@@ -58,7 +58,9 @@ def test_agent_uses_fixed_identity_prompt_schema_and_parameters() -> None:
     ]
 
 
-def test_agent_renders_selected_controls_and_stable_utf8_context_without_mutation() -> None:
+def test_agent_renders_selected_controls_and_stable_utf8_context_without_mutation() -> (
+    None
+):
     input = valid_question_generation_input()
     before = input.model_dump(mode="json")
     agent = QuestionGenerationAgent(
@@ -189,7 +191,9 @@ def test_agent_returns_output_and_canonicalizes_material_label() -> None:
     )
 
 
-def test_agent_accepts_valid_work_material_and_canonicalizes_company_title_label() -> None:
+def test_agent_accepts_valid_work_material_and_canonicalizes_company_title_label() -> (
+    None
+):
     input = valid_question_generation_input()
     payload = valid_question_generation_output(input)
     payload["recommended_materials"][0] = {

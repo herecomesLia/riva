@@ -1,15 +1,14 @@
 import asyncio
 
+import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-import pytest
 from sqlalchemy import inspect, text
 
 from riva.db import migrations
 from riva.db.base import Base
 from riva.db.database import Database, load_models
 from tests.helpers.integration_database import get_integration_database_url
-
 
 pytestmark = pytest.mark.integration
 
@@ -28,15 +27,14 @@ async def _clear_database(database_url: str) -> None:
 async def _schema_details(database_url: str) -> dict[str, object]:
     async with Database(database_url) as database:
         async with database.engine.connect() as connection:
+
             def inspect_schema(sync_connection):
                 inspector = inspect(sync_connection)
                 return {
                     "tables": set(inspector.get_table_names()),
                     "checks": {
                         item["name"]
-                        for item in inspector.get_check_constraints(
-                            "user_competencies"
-                        )
+                        for item in inspector.get_check_constraints("user_competencies")
                     }
                     | {
                         item["name"]
@@ -84,6 +82,7 @@ async def _competency_orm_differences(database_url: str) -> list[object]:
 
     async with Database(database_url) as database:
         async with database.engine.connect() as connection:
+
             def compare_competency_schema(sync_connection):
                 context = MigrationContext.configure(
                     sync_connection,
@@ -127,9 +126,7 @@ def test_competency_migration_upgrades_downgrades_and_matches_orm() -> None:
             "uq_user_competencies_user_id_id",
             "uq_competency_evidence_source_entity_signal",
         } <= details["uniques"]
-        assert "fk_competency_evidence_competency_owner" in details[
-            "foreign_keys"
-        ]
+        assert "fk_competency_evidence_competency_owner" in details["foreign_keys"]
         assert {
             "ix_user_competencies_user_id",
             "ix_competency_evidence_user_id",

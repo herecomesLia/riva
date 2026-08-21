@@ -36,7 +36,6 @@ from riva.workers import AgentExecutionError, ResumeParsingWorkerHandler
 from riva.workers.resume_parsing import DraftServiceFactory, ParsingServiceFactory
 from riva.workers.runtime import SessionFactory
 
-
 NOW = datetime(2026, 8, 6, 10, tzinfo=UTC)
 USER_ID = UUID("11111111-1111-4111-8111-111111111111")
 DOCUMENT_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -378,8 +377,16 @@ def test_handler_rejects_invalid_run_before_opening_session(
 @pytest.mark.parametrize(
     ("phase", "error", "code"),
     [
-        ("load", ResumeParsingStateError(RESUME_DOCUMENT_NOT_READY), RESUME_DOCUMENT_NOT_READY),
-        ("persist", ResumeParsingStateError(RESUME_PARSING_SUPERSEDED), RESUME_PARSING_SUPERSEDED),
+        (
+            "load",
+            ResumeParsingStateError(RESUME_DOCUMENT_NOT_READY),
+            RESUME_DOCUMENT_NOT_READY,
+        ),
+        (
+            "persist",
+            ResumeParsingStateError(RESUME_PARSING_SUPERSEDED),
+            RESUME_PARSING_SUPERSEDED,
+        ),
     ],
 )
 def test_handler_maps_resume_state_errors_as_non_retryable(

@@ -7,14 +7,14 @@ from sqlalchemy import func, select
 
 from riva.db.database import Database
 from riva.models import AgentRun, InterviewFollowUpQuestion, InterviewQuestion
-from tests.helpers.llm import FakeLLMProvider
 from tests.helpers.interview import seed_interview_prerequisites
+from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_interview_completion_workflow import (
     _app,
     _candidate_output,
     _headers,
-    _planner_output,
     _partial_review_output,
+    _planner_output,
     _prepare_profile_snapshot,
     _process_worker,
     _reach_candidate_questions,
@@ -25,7 +25,6 @@ from tests.integration.test_interview_completion_workflow import (
 )
 from tests.integration.test_interview_planning_workflow import _start_and_begin
 from tests.integration.test_interview_turn_workflow import _answer_request, _turn_output
-
 
 pytestmark = pytest.mark.integration
 
@@ -88,7 +87,9 @@ def test_mock_interview_training_record_detail_is_a_read_only_projection(
                             )
                         ).all()
                     )
-                provider.responses.append(_review_output([item.id for item in questions]))
+                provider.responses.append(
+                    _review_output([item.id for item in questions])
+                )
                 finish_page = client.get("/api/interview", headers=_headers())
                 assert finish_page.status_code == 200
                 finish_version = finish_page.json()["session"]["version"]
@@ -142,11 +143,13 @@ def test_mock_interview_training_record_detail_is_a_read_only_projection(
                     )
                 assert after_read == before_read
 
-            other_owner, _other_role, _other_profile = (
-                await seed_interview_prerequisites(
-                    database,
-                    label="training-record-other-user",
-                )
+            (
+                other_owner,
+                _other_role,
+                _other_profile,
+            ) = await seed_interview_prerequisites(
+                database,
+                label="training-record-other-user",
             )
             with TestClient(_app(migrated_database_url, other_owner)) as other_client:
                 isolated = other_client.get(
@@ -217,8 +220,7 @@ def test_mock_interview_training_record_preserves_unanswered_question_on_early_e
                 assert body["questionDetails"][0]["record"]["status"] == "unanswered"
                 assert body["questionDetails"][0]["record"]["answer"] is None
                 assert (
-                    body["questionDetails"][0]["referenceAnswer"]["status"]
-                    == "ready"
+                    body["questionDetails"][0]["referenceAnswer"]["status"] == "ready"
                 )
 
     asyncio.run(run_workflow())

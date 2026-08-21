@@ -11,7 +11,7 @@ from pydantic import (
     model_validator,
 )
 
-from riva.schemas.base import APIModel, MAX_RAW_JOB_DESCRIPTION_LENGTH
+from riva.schemas.base import MAX_RAW_JOB_DESCRIPTION_LENGTH, APIModel
 from riva.schemas.job_description_parsing import (
     AnalysisItemList,
     Summary,
@@ -251,9 +251,7 @@ class TargetRoleResponse(RoleAPIModel):
                     "ready job description and analysis versions must match"
                 )
         elif self.job_description_analysis is not None:
-            raise ValueError(
-                "non-ready job description cannot include analysis"
-            )
+            raise ValueError("non-ready job description cannot include analysis")
         matching = self.matching_analysis
         if matching is not None and matching.status == "current":
             if self.job_description.status != "ready":
@@ -264,10 +262,7 @@ class TargetRoleResponse(RoleAPIModel):
                 raise ValueError(
                     "current matching analysis requires job description analysis"
                 )
-            if (
-                matching.job_description_version
-                != self.job_description.version
-            ):
+            if matching.job_description_version != self.job_description.version:
                 raise ValueError(
                     "current matching analysis and job description versions must match"
                 )
@@ -296,9 +291,7 @@ class RolesPageResponse(RoleAPIModel):
             if current_role is None:
                 raise ValueError("current_role_id must reference a role in roles")
             if current_role.preparation_status is TargetRolePreparationStatus.ARCHIVED:
-                raise ValueError(
-                    "current_role_id cannot reference an archived role"
-                )
+                raise ValueError("current_role_id cannot reference an archived role")
 
         for role in self.roles:
             matching = role.matching_analysis
@@ -380,9 +373,7 @@ class UpdateJobDescriptionAnalysisListModuleRequest(RoleAPIModel):
     value: AnalysisItemList
 
 
-class UpdateJobDescriptionAnalysisQualificationRequirementsRequest(
-    RoleAPIModel
-):
+class UpdateJobDescriptionAnalysisQualificationRequirementsRequest(RoleAPIModel):
     version: TargetRoleVersion
     job_description_version: TargetRoleVersion
     analysis_version: TargetRoleVersion

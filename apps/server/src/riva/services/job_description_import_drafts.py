@@ -42,7 +42,6 @@ from riva.services.prompt_versions import (
 from riva.services.roles import TargetRoleService
 from riva.utils import utc_now
 
-
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
 Clock = Callable[[], datetime]
 
@@ -158,9 +157,7 @@ class JobDescriptionImportDraftService:
                     IMPORT_DRAFT_NOT_READY,
                 )
             try:
-                output = JobDescriptionParsingOutput.model_validate(
-                    draft.parsed_result
-                )
+                output = JobDescriptionParsingOutput.model_validate(draft.parsed_result)
             except ValidationError:
                 raise APIError(
                     status.HTTP_409_CONFLICT,
@@ -181,9 +178,7 @@ class JobDescriptionImportDraftService:
                     recruitment_type=None,
                     location=draft.parsed_location,
                     experience_range=None,
-                    preparation_status=(
-                        ActiveTargetRolePreparationStatus.PREPARING
-                    ),
+                    preparation_status=(ActiveTargetRolePreparationStatus.PREPARING),
                 ),
             )
             await role_service.save_job_description_in_transaction(
@@ -214,16 +209,12 @@ class JobDescriptionImportDraftService:
         try:
             draft = await self._draft_for_run(run, for_update=False)
             if draft.status != JobDescriptionImportDraftStatus.PARSING.value:
-                raise JobDescriptionImportDraftStateError(
-                    IMPORT_DRAFT_SUPERSEDED
-                )
+                raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_SUPERSEDED)
             parsing_input = JobDescriptionParsingInput(
                 role_title=None,
                 company=None,
                 raw_job_description=draft.raw_text,
-                interaction_language=self._run_payload(
-                    run
-                ).interaction_language,
+                interaction_language=self._run_payload(run).interaction_language,
             )
             await self.session.commit()
             return parsing_input
@@ -242,20 +233,14 @@ class JobDescriptionImportDraftService:
                 await self.session.commit()
                 return draft
             if draft.status != JobDescriptionImportDraftStatus.PARSING.value:
-                raise JobDescriptionImportDraftStateError(
-                    IMPORT_DRAFT_SUPERSEDED
-                )
+                raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_SUPERSEDED)
             if output.parsed_title is None:
-                raise JobDescriptionImportDraftStateError(
-                    IMPORT_DRAFT_TITLE_MISSING
-                )
+                raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_TITLE_MISSING)
 
             draft.parsed_company = output.parsed_company
             draft.parsed_title = output.parsed_title
             draft.parsed_location = output.parsed_location
-            draft.parsed_description = (
-                output.parsed_description or draft.raw_text
-            )
+            draft.parsed_description = output.parsed_description or draft.raw_text
             draft.parsed_result = output.model_dump(mode="json")
             draft.status = JobDescriptionImportDraftStatus.READY.value
             draft.failure_reason = None
@@ -312,9 +297,7 @@ class JobDescriptionImportDraftService:
         payload = self._run_payload(run)
         draft_id = payload.job_description_import_draft_id
         if draft_id is None:
-            raise JobDescriptionImportDraftStateError(
-                IMPORT_DRAFT_INVALID_RUN
-            )
+            raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_INVALID_RUN)
         statement = select(JobDescriptionImportDraft).where(
             JobDescriptionImportDraft.id == draft_id,
             JobDescriptionImportDraft.user_id == run.user_id,
@@ -323,13 +306,9 @@ class JobDescriptionImportDraftService:
             statement = statement.with_for_update()
         draft = await self.session.scalar(statement)
         if draft is None:
-            raise JobDescriptionImportDraftStateError(
-                IMPORT_DRAFT_INVALID_RUN
-            )
+            raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_INVALID_RUN)
         if draft.agent_run_id != run.id:
-            raise JobDescriptionImportDraftStateError(
-                IMPORT_DRAFT_SUPERSEDED
-            )
+            raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_SUPERSEDED)
         return draft
 
     @staticmethod
@@ -342,9 +321,7 @@ class JobDescriptionImportDraftService:
             not in JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != prompt.output_schema_id
         ):
-            raise JobDescriptionImportDraftStateError(
-                IMPORT_DRAFT_INVALID_RUN
-            )
+            raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_INVALID_RUN)
         try:
             return JobDescriptionParsingRunPayload.model_validate(run.payload)
         except ValidationError:

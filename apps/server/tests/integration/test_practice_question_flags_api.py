@@ -13,13 +13,13 @@ from riva.db.database import Database
 from riva.models import PracticeAttempt, QuestionCard
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider
+from tests.integration.test_practice_answer_api import start_answering
 from tests.integration.test_practice_answer_workflow import (
     build_evaluation_worker,
     build_follow_up_worker,
     evaluation_response,
     seed_answering_session,
 )
-from tests.integration.test_practice_answer_api import start_answering
 from tests.integration.test_practice_review_workflow import (
     build_worker,
     complete_required_reference_answers,
@@ -27,7 +27,6 @@ from tests.integration.test_practice_review_workflow import (
     review_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -48,9 +47,7 @@ async def prepare_review_session(
     database: Database,
     url: str,
 ) -> tuple[object, UUID, UUID, object]:
-    owner, practice_session, _attempt, card = await seed_answering_session(
-        database
-    )
+    owner, practice_session, _attempt, card = await seed_answering_session(database)
     async with database.sessionmaker() as session:
         submitted = await PracticeSessionService(
             session,
@@ -357,9 +354,9 @@ def test_practice_question_flags_follow_retry_without_cloning_the_card() -> None
                     )
                     assert len(after_cards) == len(before_cards)
                     assert len(attempts) == 2
-                    assert {
-                        attempt.question_card_id for attempt in attempts
-                    } == {question_id}
+                    assert {attempt.question_card_id for attempt in attempts} == {
+                        question_id
+                    }
                     assert after_cards[0].is_saved is True
             finally:
                 await database.reset()

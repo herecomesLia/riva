@@ -17,7 +17,6 @@ from riva.services.interview_planning_prompt_versions import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 PlanningServiceFactory = Callable[[AsyncSession], InterviewPlanningService]
 
 

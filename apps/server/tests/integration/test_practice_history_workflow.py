@@ -35,12 +35,11 @@ from tests.helpers.practice_reference_answers import complete_queued_reference_a
 from tests.integration.test_practice_next_question_workflow import (
     build_worker,
     evaluation_output,
-    recommendation_output,
     question_output,
+    recommendation_output,
     review_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -491,9 +490,12 @@ def test_history_setup_distinct_count_filters_and_starts_without_llm() -> None:
                     completed_at=START + timedelta(minutes=13),
                 )
 
-                other_owner, other_role, _other_profile, other_project = await seed_context(
-                    database
-                )
+                (
+                    other_owner,
+                    other_role,
+                    _other_profile,
+                    other_project,
+                ) = await seed_context(database)
                 other_card, _ = await generate_history_card(
                     database,
                     user_id=other_owner.id,
@@ -543,7 +545,9 @@ def test_history_setup_distinct_count_filters_and_starts_without_llm() -> None:
                     }
                     assert await session_count(database, owner.id) == before
 
-                    run_ids_before = await question_generator_run_ids(database, owner.id)
+                    run_ids_before = await question_generator_run_ids(
+                        database, owner.id
+                    )
                     started = client.post(
                         "/api/practice/sessions",
                         json={
@@ -568,12 +572,19 @@ def test_history_setup_distinct_count_filters_and_starts_without_llm() -> None:
                         assert attempt is not None
                         assert attempt.question_card_id == valid_card.id
                         assert attempt.question_generation_run_id is None
-                    assert await question_generator_run_ids(database, owner.id) == run_ids_before
+                    assert (
+                        await question_generator_run_ids(database, owner.id)
+                        == run_ids_before
+                    )
 
-                    current = client.get("/api/practice/sessions/current", headers=headers)
+                    current = client.get(
+                        "/api/practice/sessions/current", headers=headers
+                    )
                     assert current.status_code == 200
                     assert current.json()["session"]["status"] == "answering"
-                    assert current.json()["session"]["question"]["id"] == str(valid_card.id)
+                    assert current.json()["session"]["question"]["id"] == str(
+                        valid_card.id
+                    )
                     assert session_id == UUID(current.json()["session"]["sessionId"])
             finally:
                 await database.reset()
@@ -670,7 +681,9 @@ def test_history_source_full_lifecycle_reuses_card_provenance() -> None:
                 assert len(record_body["attempts"]) == 1
                 record_attempt = record_body["attempts"][0]
                 assert record_attempt["attemptId"] == str(attempt_id)
-                assert record_attempt["question"]["questionCardId"] == str(history_card.id)
+                assert record_attempt["question"]["questionCardId"] == str(
+                    history_card.id
+                )
                 assert record_attempt["question"]["prompt"] == history_card.prompt
                 assert record_attempt["mainAnswer"]["content"] == (
                     "I owned the rollout and reduced failures."
@@ -681,7 +694,10 @@ def test_history_source_full_lifecycle_reuses_card_provenance() -> None:
                 )
                 assert record_attempt["recommendation"]["action"] == "nextQuestion"
 
-                assert await question_generator_run_ids(database, owner.id) == original_run_ids
+                assert (
+                    await question_generator_run_ids(database, owner.id)
+                    == original_run_ids
+                )
                 assert original_question_run.id in original_run_ids
                 async with database.sessionmaker() as session:
                     persisted_card = await session.get(QuestionCard, history_card.id)
@@ -714,7 +730,9 @@ def test_history_source_full_lifecycle_reuses_card_provenance() -> None:
     asyncio.run(run_test())
 
 
-def test_history_next_skip_retry_reuse_cards_and_skip_rolls_back_without_replacement() -> None:
+def test_history_next_skip_retry_reuse_cards_and_skip_rolls_back_without_replacement() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
@@ -783,14 +801,18 @@ def test_history_next_skip_retry_reuse_cards_and_skip_rolls_back_without_replace
                         headers=headers,
                     )
                     assert stale.status_code == 409
-                    assert stale.json() == {"error": "practice_session_version_conflict"}
+                    assert stale.json() == {
+                        "error": "practice_session_version_conflict"
+                    }
                     wrong_question = client.post(
                         f"/api/practice/sessions/{session_id}/questions/skip",
                         json={"version": 1, "questionId": str(uuid4())},
                         headers=headers,
                     )
                     assert wrong_question.status_code == 409
-                    assert wrong_question.json() == {"error": "practice_session_state_conflict"}
+                    assert wrong_question.json() == {
+                        "error": "practice_session_state_conflict"
+                    }
 
                     first_review = await advance_history_to_review(
                         database,
@@ -853,7 +875,10 @@ def test_history_next_skip_retry_reuse_cards_and_skip_rolls_back_without_replace
                     assert retried_body["attemptNumber"] == 3
                     assert retried_body["question"]["id"] == str(second_card.id)
 
-                    assert await question_generator_run_ids(database, owner.id) == original_run_ids
+                    assert (
+                        await question_generator_run_ids(database, owner.id)
+                        == original_run_ids
+                    )
                     async with database.sessionmaker() as session:
                         original_attempt = await session.get(
                             PracticeAttempt,

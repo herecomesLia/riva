@@ -15,10 +15,7 @@ from riva.services.review_generation import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
-ReviewGenerationServiceFactory = Callable[
-    [AsyncSession], ReviewGenerationService
-]
+ReviewGenerationServiceFactory = Callable[[AsyncSession], ReviewGenerationService]
 
 
 class PracticeReviewHandler:

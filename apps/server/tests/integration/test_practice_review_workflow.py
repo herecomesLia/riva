@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import json
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -30,9 +30,9 @@ from riva.models import (
     QuestionCard,
 )
 from riva.services.practice_sessions import (
+    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
     PRACTICE_REVIEW_GENERATION_UNAVAILABLE,
-    PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PracticeSessionService,
     PracticeSessionStateError,
     practice_question_generation_idempotency_key,
@@ -57,7 +57,6 @@ from tests.integration.test_practice_answer_workflow import (
     seed_answering_session,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -307,8 +306,7 @@ async def runs_for(
                     select(AgentRun).where(
                         AgentRun.user_id == user_id,
                         AgentRun.agent_id == agent_id,
-                        AgentRun.payload["attemptId"].as_string()
-                        == str(attempt_id),
+                        AgentRun.payload["attemptId"].as_string() == str(attempt_id),
                     )
                 )
             ).all()
@@ -513,13 +511,9 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                         )
                         assert stored_evaluation is not None
 
-                    evaluation_get = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    evaluation_get = client.get("/api/practice/sessions/current")
                     assert evaluation_get.status_code == 200
-                    assert evaluation_get.json()["session"]["status"] == (
-                        "evaluating"
-                    )
+                    assert evaluation_get.json()["session"]["status"] == ("evaluating")
                     assert evaluation_get.json()["session"]["version"] == 4
                     review_before_refresh = await runs_for(
                         database,
@@ -656,9 +650,7 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                         assert stored_recommendation is not None
                         assert stored_recommendation.action == action
 
-                    still_evaluating = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    still_evaluating = client.get("/api/practice/sessions/current")
                     assert still_evaluating.status_code == 200
                     assert still_evaluating.json()["session"]["status"] == (
                         "evaluating"
@@ -716,41 +708,50 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                         assert persisted_attempt.completed_at == completed_at
                         assert persisted_session.version == 5
                         assert persisted_attempt.status == "review"
-                        assert len(
-                            list(
-                                (
-                                    await session.scalars(
-                                        select(PracticeEvaluation).where(
-                                            PracticeEvaluation.attempt_id
-                                            == attempt_id
+                        assert (
+                            len(
+                                list(
+                                    (
+                                        await session.scalars(
+                                            select(PracticeEvaluation).where(
+                                                PracticeEvaluation.attempt_id
+                                                == attempt_id
+                                            )
                                         )
-                                    )
-                                ).all()
+                                    ).all()
+                                )
                             )
-                        ) == 1
-                        assert len(
-                            list(
-                                (
-                                    await session.scalars(
-                                        select(PracticeReview).where(
-                                            PracticeReview.attempt_id == attempt_id
+                            == 1
+                        )
+                        assert (
+                            len(
+                                list(
+                                    (
+                                        await session.scalars(
+                                            select(PracticeReview).where(
+                                                PracticeReview.attempt_id == attempt_id
+                                            )
                                         )
-                                    )
-                                ).all()
+                                    ).all()
+                                )
                             )
-                        ) == 1
-                        assert len(
-                            list(
-                                (
-                                    await session.scalars(
-                                        select(PracticeRecommendation).where(
-                                            PracticeRecommendation.attempt_id
-                                            == attempt_id
+                            == 1
+                        )
+                        assert (
+                            len(
+                                list(
+                                    (
+                                        await session.scalars(
+                                            select(PracticeRecommendation).where(
+                                                PracticeRecommendation.attempt_id
+                                                == attempt_id
+                                            )
                                         )
-                                    )
-                                ).all()
+                                    ).all()
+                                )
                             )
-                        ) == 1
+                            == 1
+                        )
 
                     old_question_id = UUID(final_body["question"]["id"])
                     async with database.sessionmaker() as session:
@@ -776,8 +777,7 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                             (
                                 await session.scalars(
                                     select(PracticeAttempt).where(
-                                        PracticeAttempt.session_id
-                                        == UUID(session_id)
+                                        PracticeAttempt.session_id == UUID(session_id)
                                     )
                                 )
                             ).all()
@@ -825,7 +825,10 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                         assert continued.attempt.retry_of_attempt_id is None
                         assert continued.attempt.question_card_id is None
                         assert continued.attempt.completed_at is None
-                        assert continued.question_generation_run.status is AgentRunStatus.QUEUED
+                        assert (
+                            continued.question_generation_run.status
+                            is AgentRunStatus.QUEUED
+                        )
                         assert continued.question_generation_run.id is not None
                         assert continued.question_generation_run.idempotency_key == (
                             practice_question_generation_idempotency_key(
@@ -854,18 +857,21 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                         assert next_attempt.status == "generatingQuestion"
                         assert next_attempt.completed_at is None
                         assert persisted_session.version == 6
-                        assert len(
-                            list(
-                                (
-                                    await session.scalars(
-                                        select(PracticeAttempt).where(
-                                            PracticeAttempt.session_id
-                                            == UUID(session_id)
+                        assert (
+                            len(
+                                list(
+                                    (
+                                        await session.scalars(
+                                            select(PracticeAttempt).where(
+                                                PracticeAttempt.session_id
+                                                == UUID(session_id)
+                                            )
                                         )
-                                    )
-                                ).all()
+                                    ).all()
+                                )
                             )
-                        ) == 2
+                            == 2
+                        )
 
                     async with database.sessionmaker() as session:
                         replay = await PracticeSessionService(
@@ -881,9 +887,7 @@ def test_practice_review_workflow_is_atomic_idempotent_and_publicly_final(
                     assert replay.attempt.id == next_attempt_id
                     assert replay.question_generation_run.id == next_run_id
 
-                    current_generating = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    current_generating = client.get("/api/practice/sessions/current")
                     assert current_generating.status_code == 200
                     assert current_generating.json()["session"]["status"] == (
                         "generatingQuestion"
@@ -946,9 +950,11 @@ def test_review_enqueue_failure_rolls_back_real_db_without_losing_evaluation() -
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt = (
-                    await prepare_evaluation_ready_attempt(database)
-                )
+                (
+                    owner,
+                    practice_session,
+                    attempt,
+                ) = await prepare_evaluation_ready_attempt(database)
 
                 async with database.sessionmaker() as session:
                     with pytest.raises(PracticeSessionStateError) as error:
@@ -963,9 +969,7 @@ def test_review_enqueue_failure_rolls_back_real_db_without_losing_evaluation() -
                             session_id=practice_session.id,
                             expected_version=4,
                         )
-                    assert error.value.code == (
-                        PRACTICE_REVIEW_GENERATION_UNAVAILABLE
-                    )
+                    assert error.value.code == (PRACTICE_REVIEW_GENERATION_UNAVAILABLE)
 
                 async with database.sessionmaker() as session:
                     stored_session = await session.get(
@@ -1002,14 +1006,16 @@ def test_review_enqueue_failure_rolls_back_real_db_without_losing_evaluation() -
     asyncio.run(run_test())
 
 
-def test_recommendation_enqueue_failure_rolls_back_real_db_with_prior_artifacts() -> None:
+def test_recommendation_enqueue_failure_rolls_back_real_db_with_prior_artifacts() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt = (
-                    await prepare_review_ready_attempt(database)
+                owner, practice_session, attempt = await prepare_review_ready_attempt(
+                    database
                 )
 
                 async with database.sessionmaker() as session:

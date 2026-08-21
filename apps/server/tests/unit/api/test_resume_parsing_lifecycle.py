@@ -1,15 +1,14 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from riva.core.auth import get_auth_service, require_current_user
 from riva.core.errors import APIError
 from riva.core.resumes import get_resume_parsing_lifecycle_service
 from riva.models import User
 from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
-
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 RESUME_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -204,21 +203,21 @@ def test_openapi_exposes_resume_parsing_lifecycle_contract(app) -> None:
     assert "200" in paths[base]["get"]["responses"]
     assert "202" in paths[retry]["post"]["responses"]
     assert (
-        paths[base]["post"]["responses"]["202"]["content"][
-            "application/json"
-        ]["schema"]["$ref"]
+        paths[base]["post"]["responses"]["202"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
         == "#/components/schemas/ResumeParsingStatusResponse"
     )
     assert (
-        paths[base]["get"]["responses"]["200"]["content"][
-            "application/json"
-        ]["schema"]["$ref"]
+        paths[base]["get"]["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ]
         == "#/components/schemas/ResumeParsingStatusResponse"
     )
     assert (
-        paths[retry]["post"]["responses"]["202"]["content"][
-            "application/json"
-        ]["schema"]["$ref"]
+        paths[retry]["post"]["responses"]["202"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
         == "#/components/schemas/ResumeParsingStatusResponse"
     )
     for operation in (
@@ -227,7 +226,6 @@ def test_openapi_exposes_resume_parsing_lifecycle_contract(app) -> None:
         paths[retry]["post"],
     ):
         assert any(
-            parameter["name"] == "resumeId"
-            and parameter["in"] == "path"
+            parameter["name"] == "resumeId" and parameter["in"] == "path"
             for parameter in operation["parameters"]
         )

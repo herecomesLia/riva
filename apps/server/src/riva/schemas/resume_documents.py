@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import ConfigDict, Field, StringConstraints
 
 from riva.schemas.base import APIModel
-from riva.schemas.profile import StandardUUID, RequiredText
+from riva.schemas.profile import RequiredText, StandardUUID
 
 
 class StrictAPIModel(APIModel):

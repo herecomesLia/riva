@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BeforeValidator, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from riva.core.language import InteractionLanguage
 from riva.schemas.job_description_parsing import (
@@ -80,9 +80,7 @@ class QuestionGenerationWeaknessEvidence(_QuestionGenerationModel):
     weakness: RequiredText
     source_attempt_id: StandardUUID = Field(alias="sourceAttemptId")
     source_target_role_id: StandardUUID = Field(alias="sourceTargetRoleId")
-    source_question_type: QuestionCardQuestionType = Field(
-        alias="sourceQuestionType"
-    )
+    source_question_type: QuestionCardQuestionType = Field(alias="sourceQuestionType")
     reviewed_at: datetime = Field(alias="reviewedAt")
 
 
@@ -188,9 +186,7 @@ class QuestionGenerationRunPayload(BaseModel):
         alias="jobDescriptionAnalysisVersion",
         ge=1,
     )
-    matching_analysis_run_id: StandardUUID = Field(
-        alias="matchingAnalysisRunId"
-    )
+    matching_analysis_run_id: StandardUUID = Field(alias="matchingAnalysisRunId")
     interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
     question_type: QuestionCardQuestionType = Field(alias="questionType")
     difficulty: QuestionCardDifficulty

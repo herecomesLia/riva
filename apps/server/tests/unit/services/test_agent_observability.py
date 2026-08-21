@@ -11,7 +11,6 @@ from riva.services.agent_observability import (
     aggregate_agent_run_observations,
 )
 
-
 START = datetime(2026, 8, 17, 0, tzinfo=UTC)
 END = START + timedelta(days=2)
 
@@ -33,9 +32,7 @@ def _run(
 ) -> AgentRunObservation:
     created_at = START + timedelta(milliseconds=offset_ms)
     started_at = (
-        created_at + timedelta(milliseconds=queue_ms)
-        if queue_ms is not None
-        else None
+        created_at + timedelta(milliseconds=queue_ms) if queue_ms is not None else None
     )
     finished_at = (
         created_at + timedelta(milliseconds=terminal_ms)
@@ -86,13 +83,52 @@ def _report(runs: list[AgentRunObservation]):
 
 def test_status_retry_and_terminal_aggregation() -> None:
     runs = [
-        _run(0, status=AgentRunStatus.QUEUED, attempt_count=0, queue_ms=None, terminal_ms=None, processing_ms=None),
-        _run(1, status=AgentRunStatus.QUEUED, attempt_count=1, queue_ms=20, terminal_ms=None, processing_ms=None),
-        _run(2, status=AgentRunStatus.RUNNING, attempt_count=2, queue_ms=20, terminal_ms=None, processing_ms=None),
+        _run(
+            0,
+            status=AgentRunStatus.QUEUED,
+            attempt_count=0,
+            queue_ms=None,
+            terminal_ms=None,
+            processing_ms=None,
+        ),
+        _run(
+            1,
+            status=AgentRunStatus.QUEUED,
+            attempt_count=1,
+            queue_ms=20,
+            terminal_ms=None,
+            processing_ms=None,
+        ),
+        _run(
+            2,
+            status=AgentRunStatus.RUNNING,
+            attempt_count=2,
+            queue_ms=20,
+            terminal_ms=None,
+            processing_ms=None,
+        ),
         _run(3, status=AgentRunStatus.SUCCEEDED),
-        _run(4, status=AgentRunStatus.FAILED, attempt_count=1, max_attempts=3, error_code="z_error"),
-        _run(5, status=AgentRunStatus.FAILED, attempt_count=3, max_attempts=3, error_code="a_error"),
-        _run(6, status=AgentRunStatus.FAILED, attempt_count=1, max_attempts=3, error_code="z_error"),
+        _run(
+            4,
+            status=AgentRunStatus.FAILED,
+            attempt_count=1,
+            max_attempts=3,
+            error_code="z_error",
+        ),
+        _run(
+            5,
+            status=AgentRunStatus.FAILED,
+            attempt_count=3,
+            max_attempts=3,
+            error_code="a_error",
+        ),
+        _run(
+            6,
+            status=AgentRunStatus.FAILED,
+            attempt_count=1,
+            max_attempts=3,
+            error_code="z_error",
+        ),
     ]
 
     report = _report(runs)
@@ -127,8 +163,21 @@ def test_empty_and_no_terminal_reports_use_null_rates() -> None:
 
     no_terminal = _report(
         [
-            _run(0, status=AgentRunStatus.QUEUED, attempt_count=0, queue_ms=None, terminal_ms=None, processing_ms=None),
-            _run(1, status=AgentRunStatus.RUNNING, queue_ms=10, terminal_ms=None, processing_ms=None),
+            _run(
+                0,
+                status=AgentRunStatus.QUEUED,
+                attempt_count=0,
+                queue_ms=None,
+                terminal_ms=None,
+                processing_ms=None,
+            ),
+            _run(
+                1,
+                status=AgentRunStatus.RUNNING,
+                queue_ms=10,
+                terminal_ms=None,
+                processing_ms=None,
+            ),
         ]
     )
     assert no_terminal.terminal_success_rate is None

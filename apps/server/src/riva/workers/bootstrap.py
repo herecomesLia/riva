@@ -1,9 +1,9 @@
 import asyncio
-from collections.abc import Callable
-from datetime import timedelta
 import os
 import signal
 import socket
+from collections.abc import Callable
+from datetime import timedelta
 from typing import Any
 
 import structlog
@@ -31,9 +31,6 @@ from riva.integrations import (
     LLMProviderConfigurationError,
     build_llm_provider,
 )
-from riva.services.question_generation_prompt_versions import (
-    get_question_generation_prompt,
-)
 from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
 )
@@ -43,27 +40,29 @@ from riva.services.interview_review_prompt_versions import (
 from riva.services.practice_recommendation_prompt_versions import (
     get_practice_recommendation_prompt,
 )
-from riva.workers.handlers import AgentHandlerRegistry
+from riva.services.question_generation_prompt_versions import (
+    get_question_generation_prompt,
+)
 from riva.workers.follow_up import FollowUpHandler
-from riva.workers.interview_planning import InterviewPlanningHandler
-from riva.workers.interview_turn import InterviewTurnHandler
+from riva.workers.handlers import AgentHandlerRegistry
 from riva.workers.interview_candidate_question import (
     InterviewCandidateQuestionHandler,
 )
+from riva.workers.interview_planning import InterviewPlanningHandler
 from riva.workers.interview_review import InterviewReviewHandler
+from riva.workers.interview_turn import InterviewTurnHandler
 from riva.workers.job_description_parsing import (
     JobDescriptionParsingHandler,
 )
 from riva.workers.matching_analysis import MatchingAnalysisHandler
 from riva.workers.practice_evaluation import PracticeEvaluationHandler
 from riva.workers.practice_recommendation import PracticeRecommendationHandler
-from riva.workers.practice_review import PracticeReviewHandler
 from riva.workers.practice_reference_answer import PracticeReferenceAnswerHandler
+from riva.workers.practice_review import PracticeReviewHandler
 from riva.workers.question_generation import QuestionGenerationHandler
 from riva.workers.resume_parsing import ResumeParsingWorkerHandler
-from riva.workers.training_planning import TrainingPlanningHandler
 from riva.workers.runtime import AgentWorker, SessionFactory
-
+from riva.workers.training_planning import TrainingPlanningHandler
 
 DatabaseFactory = Callable[[str], Database]
 ProviderFactory = Callable[[Settings], LLMProvider | None]
@@ -79,9 +78,7 @@ InterviewPlanningAgentFactory = Callable[..., InterviewPlanningAgent]
 InterviewPlanningHandlerFactory = Callable[..., InterviewPlanningHandler]
 InterviewTurnAgentFactory = Callable[..., InterviewTurnAgent]
 InterviewTurnHandlerFactory = Callable[..., InterviewTurnHandler]
-InterviewCandidateQuestionAgentFactory = Callable[
-    ..., InterviewCandidateQuestionAgent
-]
+InterviewCandidateQuestionAgentFactory = Callable[..., InterviewCandidateQuestionAgent]
 InterviewCandidateQuestionHandlerFactory = Callable[
     ..., InterviewCandidateQuestionHandler
 ]
@@ -326,11 +323,9 @@ def build_agent_handler_registry(
         provider=provider,
         model=model,
     )
-    practice_reference_answer_handler = (
-        practice_reference_answer_handler_factory(
-            session_factory=session_factory,
-            agent=practice_reference_answer_agent,
-        )
+    practice_reference_answer_handler = practice_reference_answer_handler_factory(
+        session_factory=session_factory,
+        agent=practice_reference_answer_agent,
     )
     resume_parsing_agent = resume_parsing_agent_factory(
         provider=provider,
@@ -393,17 +388,11 @@ def build_agent_worker(
         session_factory=database.sessionmaker,
         registry=registry,
         lease_duration=timedelta(seconds=settings.worker_lease_seconds),
-        heartbeat_interval=timedelta(
-            seconds=settings.worker_heartbeat_seconds
-        ),
+        heartbeat_interval=timedelta(seconds=settings.worker_heartbeat_seconds),
         poll_interval=timedelta(seconds=settings.worker_poll_seconds),
         requeue_interval=timedelta(seconds=settings.worker_requeue_seconds),
-        retry_base_delay=timedelta(
-            seconds=settings.worker_retry_base_seconds
-        ),
-        retry_max_delay=timedelta(
-            seconds=settings.worker_retry_max_seconds
-        ),
+        retry_base_delay=timedelta(seconds=settings.worker_retry_base_seconds),
+        retry_max_delay=timedelta(seconds=settings.worker_retry_max_seconds),
         requeue_batch_size=settings.worker_requeue_batch_size,
         logger=logger,
     )
@@ -439,9 +428,9 @@ async def run_worker(
     signal_log_task: asyncio.Task[None] | None = None
 
     try:
-        remove_signal_handlers = (
-            signal_registrar or install_signal_handlers
-        )(request_stop)
+        remove_signal_handlers = (signal_registrar or install_signal_handlers)(
+            request_stop
+        )
         async with database_factory(settings.database_url) as database:
             await database.ping()
             registry = registry_factory(settings, database.sessionmaker)
@@ -551,11 +540,11 @@ def _install_synchronous_signal_handlers(
                 current,
                 lambda signum, _frame: callback(signal.Signals(signum)),
             )
-    except (OSError, RuntimeError, ValueError):
+    except OSError, RuntimeError, ValueError:
         for current, handler in previous.items():
             try:
                 signal.signal(current, handler)
-            except (OSError, RuntimeError, ValueError):
+            except OSError, RuntimeError, ValueError:
                 pass
         return lambda: None
 
@@ -563,7 +552,7 @@ def _install_synchronous_signal_handlers(
         for current, handler in previous.items():
             try:
                 signal.signal(current, handler)
-            except (OSError, RuntimeError, ValueError):
+            except OSError, RuntimeError, ValueError:
                 pass
 
     return remove

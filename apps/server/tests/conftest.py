@@ -8,7 +8,6 @@ from riva.core.logging import LogFormat, LogLevel
 from tests.helpers.app import create_test_app
 from tests.helpers.fakes import FakeDatabase
 
-
 TEST_DATABASE_URL = "postgresql+asyncpg://riva_test:riva_test@localhost:5432/riva_test"
 TESTS_ROOT = Path(__file__).parent.resolve()
 SLOW_TEST_PATHS = frozenset(

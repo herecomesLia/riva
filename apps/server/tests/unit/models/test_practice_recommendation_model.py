@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, JSON, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Text, UniqueConstraint
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db.base import Base
@@ -62,28 +62,18 @@ def test_practice_recommendation_table_constraints_and_relationships() -> None:
     assert "action = 'nextQuestion'" in action_plan
     assert "next_question_type IS NOT NULL" in action_plan
     assert "next_difficulty IS NOT NULL" in action_plan
-    assert "projectDeepDive" in checks[
-        "ck_practice_recommendations_question_type"
-    ]
-    assert "technicalFoundation" in checks[
-        "ck_practice_recommendations_question_type"
-    ]
+    assert "projectDeepDive" in checks["ck_practice_recommendations_question_type"]
+    assert "technicalFoundation" in checks["ck_practice_recommendations_question_type"]
     assert "basic" in checks["ck_practice_recommendations_difficulty"]
     assert "pressure" in checks["ck_practice_recommendations_difficulty"]
-    assert "length(trim(reason)) > 0" in checks[
-        "ck_practice_recommendations_reason"
-    ]
-    assert "length(reason) <= 2000" in checks[
-        "ck_practice_recommendations_reason"
-    ]
+    assert "length(trim(reason)) > 0" in checks["ck_practice_recommendations_reason"]
+    assert "length(reason) <= 2000" in checks["ck_practice_recommendations_reason"]
 
     unique_columns = {
         tuple(column.name for column in constraint.columns): constraint.name
         for constraint in constraints_by_type(table, UniqueConstraint)
     }
-    assert unique_columns[("attempt_id",)] == (
-        "uq_practice_recommendations_attempt"
-    )
+    assert unique_columns[("attempt_id",)] == ("uq_practice_recommendations_attempt")
     assert unique_columns[("source_agent_run_id",)] == (
         "uq_practice_recommendations_source_run"
     )

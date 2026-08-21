@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -13,7 +13,6 @@ from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import AgentRun, AgentRunStatus, User
 from riva.services.agent_runs import AgentRunLeaseError, AgentRunService
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 7, 30, 8, tzinfo=UTC)
@@ -290,9 +289,7 @@ def test_agent_run_queue_state_machine_and_constraints() -> None:
                     )
                     assert duplicate_count == 1
                     duplicate_run = await session.scalar(
-                        select(AgentRun).where(
-                            AgentRun.id == enqueue_results[0].id
-                        )
+                        select(AgentRun).where(AgentRun.id == enqueue_results[0].id)
                     )
                     assert duplicate_run is not None
                     duplicate_run.available_at = clock.now + timedelta(days=2)

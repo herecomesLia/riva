@@ -2,8 +2,8 @@ from typing import Annotated, Self
 from uuid import UUID
 
 from pydantic import (
-    BeforeValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StrictInt,
@@ -29,9 +29,10 @@ from riva.schemas.profile import (
     OptionalText,
     RequiredText,
     StandardUUID,
+)
+from riva.schemas.profile import (
     Summary as ProfileSummary,
 )
-
 
 MAX_MATCHING_EDUCATION_ITEMS = 20
 MAX_MATCHING_WORK_EXPERIENCE_ITEMS = 20

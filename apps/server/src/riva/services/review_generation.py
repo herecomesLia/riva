@@ -37,7 +37,6 @@ from riva.services.evaluation_generation import (
 )
 from riva.utils import utc_now
 
-
 ReviewGenerationStateErrorCode = Literal[
     "invalid_practice_review_run",
     "practice_review_attempt_not_found",
@@ -108,7 +107,7 @@ def validate_review_generation_run(
         raise ReviewGenerationStateError(INVALID_PRACTICE_REVIEW_RUN)
     try:
         return ReviewRunPayload.model_validate(run.payload)
-    except (TypeError, ValidationError):
+    except TypeError, ValidationError:
         raise ReviewGenerationStateError(INVALID_PRACTICE_REVIEW_RUN) from None
 
 
@@ -128,7 +127,7 @@ def practice_review_output_from_artifact(
                 "exposed_weaknesses": review.exposed_weaknesses,
             }
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError("persisted practice review is malformed") from None
 
 
@@ -149,9 +148,7 @@ class ReviewGenerationService:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.agent_run_service_factory = agent_run_service_factory
-        self.competency_ingestion_service_factory = (
-            competency_ingestion_service_factory
-        )
+        self.competency_ingestion_service_factory = competency_ingestion_service_factory
         self.clock = clock
 
     async def enqueue_generation(
@@ -230,9 +227,7 @@ class ReviewGenerationService:
         run: AgentRun,
     ) -> PracticeReviewInput:
         payload = validate_review_generation_run(run)
-        if run.idempotency_key != practice_review_idempotency_key(
-            payload.attempt_id
-        ):
+        if run.idempotency_key != practice_review_idempotency_key(payload.attempt_id):
             raise ReviewGenerationStateError(PRACTICE_REVIEW_CONTEXT_CONFLICT)
         context = await self._load_context(
             user_id=run.user_id,
@@ -253,9 +248,7 @@ class ReviewGenerationService:
             if run.idempotency_key != practice_review_idempotency_key(
                 payload.attempt_id
             ):
-                raise ReviewGenerationStateError(
-                    PRACTICE_REVIEW_CONTEXT_CONFLICT
-                )
+                raise ReviewGenerationStateError(PRACTICE_REVIEW_CONTEXT_CONFLICT)
             context = await self._load_context(
                 user_id=run.user_id,
                 attempt_id=payload.attempt_id,
@@ -280,9 +273,7 @@ class ReviewGenerationService:
                     existing.attempt_id != payload.attempt_id
                     or existing.source_agent_run_id != run.id
                 ):
-                    raise ReviewGenerationStateError(
-                        PRACTICE_REVIEW_ARTIFACT_CONFLICT
-                    )
+                    raise ReviewGenerationStateError(PRACTICE_REVIEW_ARTIFACT_CONFLICT)
                 try:
                     canonical = practice_review_output_from_artifact(existing)
                 except ValueError:
@@ -310,9 +301,7 @@ class ReviewGenerationService:
                 overall_performance=validated_output.overall_performance,
                 highlights=list(validated_output.highlights),
                 main_issues=list(validated_output.main_issues),
-                improvement_suggestions=list(
-                    validated_output.improvement_suggestions
-                ),
+                improvement_suggestions=list(validated_output.improvement_suggestions),
                 reusable_answer_structure=list(
                     validated_output.reusable_answer_structure
                 ),
@@ -350,9 +339,7 @@ class ReviewGenerationService:
         for_update: bool,
     ) -> _ReviewContext:
         if interaction_language not in INTERACTION_LANGUAGES:
-            raise ReviewGenerationStateError(
-                PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID
-            )
+            raise ReviewGenerationStateError(PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID)
         if payload is not None and payload.attempt_id != attempt_id:
             raise ReviewGenerationStateError(PRACTICE_REVIEW_CONTEXT_CONFLICT)
 
@@ -372,22 +359,15 @@ class ReviewGenerationService:
             session_statement,
             for_update=for_update,
         )
-        if (
-            practice_session is None
-            or practice_session.status != "active"
-        ):
+        if practice_session is None or practice_session.status != "active":
             raise ReviewGenerationStateError(PRACTICE_REVIEW_SESSION_NOT_ACTIVE)
         if practice_session.language != interaction_language:
-            raise ReviewGenerationStateError(
-                PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID
-            )
+            raise ReviewGenerationStateError(PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID)
 
         if for_update:
             attempt = await self._scalar(attempt_statement, for_update=True)
             if attempt is None:
-                raise ReviewGenerationStateError(
-                    PRACTICE_REVIEW_ATTEMPT_NOT_FOUND
-                )
+                raise ReviewGenerationStateError(PRACTICE_REVIEW_ATTEMPT_NOT_FOUND)
         if attempt.status != "evaluating":
             raise ReviewGenerationStateError(PRACTICE_REVIEW_CONTEXT_CONFLICT)
 
@@ -405,9 +385,7 @@ class ReviewGenerationService:
         )
         if evaluation is None:
             if payload is None:
-                raise ReviewGenerationStateError(
-                    PRACTICE_REVIEW_EVALUATION_NOT_READY
-                )
+                raise ReviewGenerationStateError(PRACTICE_REVIEW_EVALUATION_NOT_READY)
             raise ReviewGenerationStateError(PRACTICE_REVIEW_CONTEXT_CONFLICT)
         if evaluation.attempt_id != attempt.id:
             raise ReviewGenerationStateError(PRACTICE_REVIEW_CONTEXT_CONFLICT)
@@ -423,14 +401,10 @@ class ReviewGenerationService:
             evaluation_run is None
             or evaluation_run.status is not AgentRunStatus.SUCCEEDED
         ):
-            raise ReviewGenerationStateError(
-                PRACTICE_REVIEW_EVALUATION_NOT_READY
-            )
+            raise ReviewGenerationStateError(PRACTICE_REVIEW_EVALUATION_NOT_READY)
 
         try:
-            evaluation_payload = validate_evaluation_generation_run(
-                evaluation_run
-            )
+            evaluation_payload = validate_evaluation_generation_run(evaluation_run)
         except EvaluationGenerationStateError:
             raise ReviewGenerationStateError(
                 PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID
@@ -444,9 +418,7 @@ class ReviewGenerationService:
             or evaluation_payload.interaction_language != practice_session.language
             or evaluation.source_agent_run_id != evaluation_run.id
         ):
-            raise ReviewGenerationStateError(
-                PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID
-            )
+            raise ReviewGenerationStateError(PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID)
 
         try:
             evaluation_input = await EvaluationGenerationService(
@@ -463,9 +435,7 @@ class ReviewGenerationService:
             ) from None
 
         if evaluation_input.interaction_language != practice_session.language:
-            raise ReviewGenerationStateError(
-                PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID
-            )
+            raise ReviewGenerationStateError(PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID)
 
         try:
             canonical_evaluation = practice_evaluation_output_from_artifact(
@@ -482,7 +452,7 @@ class ReviewGenerationService:
                 ),
                 evaluation=canonical_evaluation,
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise ReviewGenerationStateError(
                 PRACTICE_REVIEW_EVALUATION_CONTEXT_INVALID
             ) from None
@@ -509,10 +479,8 @@ class ReviewGenerationService:
 def _validate_output(output: object) -> PracticeReviewOutput:
     try:
         return PracticeReviewOutput.model_validate(output)
-    except (TypeError, ValueError, ValidationError):
-        raise ReviewGenerationStateError(
-            PRACTICE_REVIEW_ARTIFACT_CONFLICT
-        ) from None
+    except TypeError, ValueError, ValidationError:
+        raise ReviewGenerationStateError(PRACTICE_REVIEW_ARTIFACT_CONFLICT) from None
 
 
 def _require_aware_datetime(value: datetime) -> None:

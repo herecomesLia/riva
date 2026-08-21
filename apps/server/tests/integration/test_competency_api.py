@@ -14,7 +14,6 @@ from riva.models import User, UserCompetency
 from riva.services.competencies import CompetencyService
 from tests.helpers.integration_database import get_integration_database_url
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -68,9 +67,7 @@ def test_competency_read_api_is_scoped_ordered_and_read_only() -> None:
                     created[0].confidence = 80
                     created[0].evidence_count = 3
                     created[0].trend = "stable"
-                    created[0].last_evidence_at = datetime(
-                        2026, 8, 17, 10, tzinfo=UTC
-                    )
+                    created[0].last_evidence_at = datetime(2026, 8, 17, 10, tzinfo=UTC)
                     await session.commit()
                     before = {
                         item.id: (

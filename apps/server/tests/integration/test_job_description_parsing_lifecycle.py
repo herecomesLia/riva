@@ -1,10 +1,10 @@
 import asyncio
-from datetime import timedelta
 import os
+from datetime import timedelta
 from uuid import UUID, uuid4
 
-from fastapi import status
 import pytest
+from fastapi import status
 from sqlalchemy import func, select
 
 from riva.core.errors import APIError
@@ -17,7 +17,6 @@ from riva.schemas.roles import (
 )
 from riva.services.agent_runs import AgentRunService
 from riva.services.roles import TargetRoleService
-
 
 pytestmark = pytest.mark.integration
 
@@ -164,9 +163,7 @@ def test_start_retry_status_conflicts_and_concurrency() -> None:
                         retry_delay=timedelta(0),
                     )
                 async with database.sessionmaker() as session:
-                    failed = await service(
-                        session
-                    ).get_job_description_parsing_status(
+                    failed = await service(session).get_job_description_parsing_status(
                         user,
                         target.id,
                         JobDescriptionParsingStatusQuery(
@@ -216,9 +213,7 @@ def test_start_retry_status_conflicts_and_concurrency() -> None:
 
                 async with database.sessionmaker() as session:
                     with pytest.raises(APIError) as isolated:
-                        await service(
-                            session
-                        ).get_job_description_parsing_status(
+                        await service(session).get_job_description_parsing_status(
                             other,
                             target.id,
                             JobDescriptionParsingStatusQuery(
@@ -230,9 +225,7 @@ def test_start_retry_status_conflicts_and_concurrency() -> None:
 
                 async def concurrent_start():
                     async with database.sessionmaker() as session:
-                        return await service(
-                            session
-                        ).start_job_description_parsing(
+                        return await service(session).start_job_description_parsing(
                             user, concurrent.id, request()
                         )
 
@@ -240,9 +233,7 @@ def test_start_retry_status_conflicts_and_concurrency() -> None:
                     concurrent_start(), concurrent_start(), return_exceptions=True
                 )
                 assert sum(not isinstance(item, Exception) for item in results) == 1
-                conflict = next(
-                    item for item in results if isinstance(item, APIError)
-                )
+                conflict = next(item for item in results if isinstance(item, APIError))
                 assert conflict.error == "target_role_version_conflict"
                 async with database.sessionmaker() as session:
                     stored = await session.get(TargetRole, concurrent.id)
@@ -273,9 +264,7 @@ def test_transactional_enqueue_is_invisible_until_role_binding_commits() -> None
                     )
                     assert locked is not None
                     prompt = JOB_DESCRIPTION_PARSING_PROMPT
-                    run = await AgentRunService(
-                        enqueue_session
-                    ).enqueue_in_transaction(
+                    run = await AgentRunService(enqueue_session).enqueue_in_transaction(
                         user_id=user.id,
                         agent_id="job-description-parser",
                         prompt_id=prompt.prompt_id,
@@ -294,9 +283,7 @@ def test_transactional_enqueue_is_invisible_until_role_binding_commits() -> None
                     await enqueue_session.flush()
 
                     async with database.sessionmaker() as worker_session:
-                        invisible = await AgentRunService(
-                            worker_session
-                        ).claim_next(
+                        invisible = await AgentRunService(worker_session).claim_next(
                             lease_owner="atomic-worker",
                             lease_duration=timedelta(minutes=5),
                         )

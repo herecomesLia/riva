@@ -10,7 +10,7 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.core.language import InteractionLanguage, INTERACTION_LANGUAGES
+from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
     PracticeAnswer,
@@ -23,8 +23,8 @@ from riva.models import (
 from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
-    FollowUpInput,
     FollowUpGenerationOutput,
+    FollowUpInput,
     FollowUpPreviousExchange,
     FollowUpQuestionContext,
     FollowUpQuestionOutput,
@@ -38,7 +38,6 @@ from riva.schemas.practice_interactions import (
 )
 from riva.services.agent_runs import AgentRunService
 from riva.utils import utc_now
-
 
 FollowUpGenerationStateErrorCode = Literal[
     "invalid_follow_up_generation_run",
@@ -124,10 +123,8 @@ def validate_follow_up_generation_run(
         raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN)
     try:
         return FollowUpRunPayload.model_validate(run.payload)
-    except (TypeError, ValidationError):
-        raise FollowUpGenerationStateError(
-            INVALID_FOLLOW_UP_GENERATION_RUN
-        ) from None
+    except TypeError, ValidationError:
+        raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN) from None
 
 
 def follow_up_output_from_persistence(
@@ -288,7 +285,7 @@ class FollowUpGenerationService:
                         decision,
                         question,
                     )
-                except (TypeError, ValueError, ValidationError):
+                except TypeError, ValueError, ValidationError:
                     raise FollowUpGenerationStateError(
                         INVALID_FOLLOW_UP_GENERATION_RUN
                     ) from None
@@ -311,7 +308,7 @@ class FollowUpGenerationService:
                 await self.session.commit()
                 try:
                     return follow_up_output_from_persistence(decision)
-                except (TypeError, ValueError, ValidationError):
+                except TypeError, ValueError, ValidationError:
                     raise FollowUpGenerationStateError(
                         INVALID_FOLLOW_UP_GENERATION_RUN
                     ) from None
@@ -343,7 +340,7 @@ class FollowUpGenerationService:
             await self.session.commit()
             try:
                 return follow_up_output_from_persistence(decision, question)
-            except (TypeError, ValueError, ValidationError):
+            except TypeError, ValueError, ValidationError:
                 raise FollowUpGenerationStateError(
                     INVALID_FOLLOW_UP_GENERATION_RUN
                 ) from None
@@ -365,13 +362,9 @@ class FollowUpGenerationService:
             or not isinstance(next_follow_up_order, int)
             or not 1 <= next_follow_up_order <= MAX_PRACTICE_FOLLOW_UPS
         ):
-            raise FollowUpGenerationStateError(
-                FOLLOW_UP_GENERATION_ORDER_CONFLICT
-            )
+            raise FollowUpGenerationStateError(FOLLOW_UP_GENERATION_ORDER_CONFLICT)
         if interaction_language not in INTERACTION_LANGUAGES:
-            raise FollowUpGenerationStateError(
-                FOLLOW_UP_GENERATION_CONTEXT_CONFLICT
-            )
+            raise FollowUpGenerationStateError(FOLLOW_UP_GENERATION_CONTEXT_CONFLICT)
 
         attempt_statement = select(PracticeAttempt).where(
             PracticeAttempt.id == attempt_id,
@@ -391,9 +384,7 @@ class FollowUpGenerationService:
         if practice_session is None or practice_session.status != "active":
             raise FollowUpGenerationStateError(FOLLOW_UP_SESSION_NOT_ACTIVE)
         if practice_session.language != interaction_language:
-            raise FollowUpGenerationStateError(
-                FOLLOW_UP_GENERATION_CONTEXT_CONFLICT
-            )
+            raise FollowUpGenerationStateError(FOLLOW_UP_GENERATION_CONTEXT_CONFLICT)
 
         if for_update:
             attempt_statement = (
@@ -409,9 +400,7 @@ class FollowUpGenerationService:
                 raise FollowUpGenerationStateError(FOLLOW_UP_ATTEMPT_NOT_FOUND)
 
         if attempt.question_card_id is None:
-            raise FollowUpGenerationStateError(
-                FOLLOW_UP_QUESTION_CARD_NOT_READY
-            )
+            raise FollowUpGenerationStateError(FOLLOW_UP_QUESTION_CARD_NOT_READY)
         card_statement = select(QuestionCard).where(
             QuestionCard.id == attempt.question_card_id,
         )
@@ -423,9 +412,7 @@ class FollowUpGenerationService:
             attempt=attempt,
             practice_session=practice_session,
         ):
-            raise FollowUpGenerationStateError(
-                FOLLOW_UP_QUESTION_CARD_NOT_READY
-            )
+            raise FollowUpGenerationStateError(FOLLOW_UP_QUESTION_CARD_NOT_READY)
         question_context = _question_context_from_card(question_card)
 
         main_answer_statement = select(PracticeAnswer).where(
@@ -453,9 +440,7 @@ class FollowUpGenerationService:
                 previous_question_statement = (
                     previous_question_statement.with_for_update()
                 )
-            previous_question = await self.session.scalar(
-                previous_question_statement
-            )
+            previous_question = await self.session.scalar(previous_question_statement)
             if previous_question is not None:
                 answer_statement = select(PracticeAnswer).where(
                     PracticeAnswer.follow_up_question_id == previous_question.id
@@ -477,9 +462,7 @@ class FollowUpGenerationService:
                 previous_question_statement = (
                     previous_question_statement.with_for_update()
                 )
-            previous_question = await self.session.scalar(
-                previous_question_statement
-            )
+            previous_question = await self.session.scalar(previous_question_statement)
             if previous_question is None:
                 raise FollowUpGenerationStateError(
                     FOLLOW_UP_PREVIOUS_EXCHANGE_NOT_READY
@@ -509,7 +492,7 @@ class FollowUpGenerationService:
                         answer=previous_content,
                     )
                 )
-            except (TypeError, ValueError, ValidationError):
+            except TypeError, ValueError, ValidationError:
                 raise FollowUpGenerationStateError(
                     FOLLOW_UP_PREVIOUS_EXCHANGE_NOT_READY
                 ) from None
@@ -522,7 +505,7 @@ class FollowUpGenerationService:
                 previous_follow_ups=previous_exchanges,
                 next_follow_up_order=next_follow_up_order,
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise FollowUpGenerationStateError(
                 FOLLOW_UP_GENERATION_CONTEXT_CONFLICT
             ) from None
@@ -548,22 +531,16 @@ class FollowUpGenerationService:
             or decision.order != payload.next_follow_up_order
             or decision.source_agent_run_id != run.id
         ):
-            raise FollowUpGenerationStateError(
-                INVALID_FOLLOW_UP_GENERATION_RUN
-            )
+            raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN)
         if decision.action == "complete":
             if decision.follow_up_question_id is not None:
-                raise FollowUpGenerationStateError(
-                    INVALID_FOLLOW_UP_GENERATION_RUN
-                )
+                raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN)
             return None
         if decision.action != "askFollowUp" or decision.follow_up_question_id is None:
             raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN)
         question = await self.session.scalar(
             select(PracticeFollowUpQuestion)
-            .where(
-                PracticeFollowUpQuestion.id == decision.follow_up_question_id
-            )
+            .where(PracticeFollowUpQuestion.id == decision.follow_up_question_id)
             .with_for_update()
         )
         if question is None or not (
@@ -571,9 +548,7 @@ class FollowUpGenerationService:
             and question.source_agent_run_id == run.id
             and question.order == payload.next_follow_up_order
         ):
-            raise FollowUpGenerationStateError(
-                INVALID_FOLLOW_UP_GENERATION_RUN
-            )
+            raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN)
         return question
 
     def _require_configuration(self) -> None:
@@ -594,9 +569,7 @@ def _payload_from_context(context: _FollowUpContext) -> FollowUpRunPayload:
             else None
         ),
         previous_follow_up_answer_id=(
-            context.previous_answer.id
-            if context.previous_answer is not None
-            else None
+            context.previous_answer.id if context.previous_answer is not None else None
         ),
     )
 
@@ -606,32 +579,22 @@ def _validate_frozen_context(
     payload: FollowUpRunPayload,
 ) -> None:
     if context.attempt.id != payload.attempt_id:
-        raise FollowUpGenerationStateError(
-            FOLLOW_UP_GENERATION_CONTEXT_CONFLICT
-        )
+        raise FollowUpGenerationStateError(FOLLOW_UP_GENERATION_CONTEXT_CONFLICT)
     if context.question_card.id != payload.question_card_id:
-        raise FollowUpGenerationStateError(
-            FOLLOW_UP_QUESTION_CARD_NOT_READY
-        )
+        raise FollowUpGenerationStateError(FOLLOW_UP_QUESTION_CARD_NOT_READY)
     if context.main_answer.id != payload.main_answer_id:
         raise FollowUpGenerationStateError(FOLLOW_UP_MAIN_ANSWER_NOT_READY)
     actual_question_id = (
-        context.previous_question.id
-        if context.previous_question is not None
-        else None
+        context.previous_question.id if context.previous_question is not None else None
     )
     actual_answer_id = (
-        context.previous_answer.id
-        if context.previous_answer is not None
-        else None
+        context.previous_answer.id if context.previous_answer is not None else None
     )
     if (
         actual_question_id != payload.previous_follow_up_question_id
         or actual_answer_id != payload.previous_follow_up_answer_id
     ):
-        raise FollowUpGenerationStateError(
-            FOLLOW_UP_PREVIOUS_EXCHANGE_NOT_READY
-        )
+        raise FollowUpGenerationStateError(FOLLOW_UP_PREVIOUS_EXCHANGE_NOT_READY)
 
 
 def _question_card_matches(
@@ -663,20 +626,16 @@ def _question_context_from_card(
                 "scoring_focus": question_card.scoring_focus,
             }
         )
-    except (TypeError, ValueError, ValidationError):
-        raise FollowUpGenerationStateError(
-            FOLLOW_UP_QUESTION_CARD_NOT_READY
-        ) from None
+    except TypeError, ValueError, ValidationError:
+        raise FollowUpGenerationStateError(FOLLOW_UP_QUESTION_CARD_NOT_READY) from None
 
 
 def _main_answer_snapshot(answer: PracticeAnswer) -> PracticeAnswerSnapshot:
     content = _answer_content(answer, FOLLOW_UP_MAIN_ANSWER_NOT_READY)
     try:
         return PracticeAnswerSnapshot(content=content, order=1)
-    except (TypeError, ValueError, ValidationError):
-        raise FollowUpGenerationStateError(
-            FOLLOW_UP_MAIN_ANSWER_NOT_READY
-        ) from None
+    except TypeError, ValueError, ValidationError:
+        raise FollowUpGenerationStateError(FOLLOW_UP_MAIN_ANSWER_NOT_READY) from None
 
 
 def _answer_content(
@@ -688,7 +647,7 @@ def _answer_content(
             str,
             TypeAdapter(PracticeAnswerContent).validate_python(answer.content),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise FollowUpGenerationStateError(error_code) from None
 
 
@@ -697,10 +656,8 @@ def _validate_output(
 ) -> FollowUpCompleteOutput | FollowUpQuestionOutput:
     try:
         validated = TypeAdapter(FollowUpGenerationOutput).validate_python(output)
-    except (TypeError, ValueError, ValidationError):
-        raise FollowUpGenerationStateError(
-            INVALID_FOLLOW_UP_GENERATION_RUN
-        ) from None
+    except TypeError, ValueError, ValidationError:
+        raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN) from None
     if isinstance(validated, (FollowUpCompleteOutput, FollowUpQuestionOutput)):
         return validated
     raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN)

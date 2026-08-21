@@ -10,7 +10,6 @@ from riva.db.database import Database
 from riva.models import ResumeDocument, User
 from riva.utils import utc_now
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -210,9 +209,7 @@ def test_resume_document_constraints_cascade_and_rollback() -> None:
                 )
 
                 async with database.sessionmaker() as session:
-                    await session.execute(
-                        delete(User).where(User.id == first_user_id)
-                    )
+                    await session.execute(delete(User).where(User.id == first_user_id))
                     await session.commit()
 
                 async with database.sessionmaker() as session:

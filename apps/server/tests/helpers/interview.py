@@ -16,7 +16,6 @@ from riva.models import (
 )
 from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 
-
 START = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 
 

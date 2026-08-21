@@ -108,9 +108,7 @@ def test_rubric_result_and_average_are_strict_and_bounded() -> None:
     assert result.rubric_results[0].rubric_id == "grounding"
 
     with pytest.raises(ValidationError):
-        AgentEvalRubric.model_validate(
-            {"id": "", "criteria": "criterion"}
-        )
+        AgentEvalRubric.model_validate({"id": "", "criteria": "criterion"})
     with pytest.raises(ValidationError):
         AgentEvalCaseResult.model_validate(
             {
@@ -134,11 +132,7 @@ def test_assertion_path_must_be_a_simple_json_pointer(path: str) -> None:
 def test_unknown_operator_and_extra_fields_are_rejected() -> None:
     with pytest.raises(ValidationError):
         AgentEvalCase.model_validate(
-            _case(
-                assertions=[
-                    {"operator": "python", "path": "/value", "expected": 3}
-                ]
-            )
+            _case(assertions=[{"operator": "python", "path": "/value", "expected": 3}])
         )
 
     with pytest.raises(ValidationError):

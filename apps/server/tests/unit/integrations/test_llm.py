@@ -73,9 +73,7 @@ def test_fake_provider_returns_validated_structured_output() -> None:
 
 
 def test_fake_provider_rejects_invalid_structured_output() -> None:
-    provider = FakeLLMProvider(
-        [{"name": "private resume content", "score": "invalid"}]
-    )
+    provider = FakeLLMProvider([{"name": "private resume content", "score": "invalid"}])
 
     with pytest.raises(InvalidStructuredOutputError) as exc_info:
         asyncio.run(provider.generate_structured(structured_request()))
@@ -107,11 +105,7 @@ def test_schema_validation_diagnostics_preserve_nested_error_path() -> None:
     with pytest.raises(InvalidStructuredOutputError) as exc_info:
         validate_structured_output(
             NestedOutput,
-            {
-                "work_experiences": [
-                    {"is_current": "PRIVATE_RESUME_CONTENT"}
-                ]
-            },
+            {"work_experiences": [{"is_current": "PRIVATE_RESUME_CONTENT"}]},
         )
 
     diagnostics = exc_info.value.diagnostics

@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.eval_quality_judge import QualityJudgeOutput
 
-
 EVAL_QUALITY_JUDGE_PROMPT = PromptDefinition(
     prompt_id="eval-quality-judge",
     version="1",

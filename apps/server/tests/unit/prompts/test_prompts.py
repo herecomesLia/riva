@@ -25,9 +25,7 @@ def example_prompt() -> PromptDefinition[ExampleOutput]:
 
 
 def test_prompt_renders_system_and_user_templates() -> None:
-    rendered = example_prompt().render(
-        {"role": "reviewer", "subject": "candidate"}
-    )
+    rendered = example_prompt().render({"role": "reviewer", "subject": "candidate"})
 
     assert rendered.system == "You are a reviewer."
     assert rendered.user == "Review candidate."

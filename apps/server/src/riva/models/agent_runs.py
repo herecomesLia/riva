@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
     Index,
-    JSON,
     String,
     UniqueConstraint,
     text,

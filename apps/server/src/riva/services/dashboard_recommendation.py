@@ -22,7 +22,6 @@ from riva.services.competency_catalog import (
     canonical_competency_sort_key,
 )
 
-
 _WEAKNESS_CATEGORIES = {
     "results_and_evidence": "quantifiedResults",
     "risk_control": "pressureResponse",
@@ -78,9 +77,8 @@ class DashboardRecommendationService:
         competencies: Sequence[UserCompetency],
         current_role: TargetRoleResponse | None,
         profile_completed: bool,
-        evidence_by_competency: Mapping[
-            UUID, Sequence[CompetencyEvidence]
-        ] | None = None,
+        evidence_by_competency: Mapping[UUID, Sequence[CompetencyEvidence]]
+        | None = None,
     ) -> DashboardRecommendationResult:
         eligible = [
             competency
@@ -245,9 +243,7 @@ class DashboardRecommendationService:
                     primary.competency_key,
                     "projectDeepDive",
                 ),
-                difficulty=(
-                    "basic" if primary.level < 60 else "pressure"
-                ),
+                difficulty=("basic" if primary.level < 60 else "pressure"),
                 focus_areas=focus_areas,
             )
             estimated_minutes = 15
@@ -320,8 +316,7 @@ class DashboardRecommendationService:
             items,
             key=lambda item: (
                 item.occurred_at,
-                item.created_at
-                or datetime.min.replace(tzinfo=UTC),
+                item.created_at or datetime.min.replace(tzinfo=UTC),
                 str(item.id),
             ),
         )

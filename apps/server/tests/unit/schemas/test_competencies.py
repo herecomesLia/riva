@@ -24,9 +24,7 @@ def _summary(**overrides: object) -> dict[str, object]:
 
 
 def test_competency_response_serializes_wire_contract() -> None:
-    response = CompetencyListResponse.model_validate(
-        {"items": [_summary()]}
-    )
+    response = CompetencyListResponse.model_validate({"items": [_summary()]})
 
     assert response.model_dump(mode="json", by_alias=True) == {
         "items": [

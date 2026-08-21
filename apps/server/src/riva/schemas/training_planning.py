@@ -164,9 +164,7 @@ class TrainingPlanningInput(TrainingPlanningModel):
     def validate_recent_training_order(self) -> Self:
         for newer, older in zip(self.recent_training, self.recent_training[1:]):
             if newer.ended_at < older.ended_at:
-                raise ValueError(
-                    "recentTraining must be ordered from newest to oldest"
-                )
+                raise ValueError("recentTraining must be ordered from newest to oldest")
         return self
 
 
@@ -194,9 +192,7 @@ class TrainingPlanningRunPayload(TrainingPlanningModel):
             self.interaction_language
             != self.training_planning_input.interaction_language
         ):
-            raise ValueError(
-                "interactionLanguage does not match trainingPlanningInput"
-            )
+            raise ValueError("interactionLanguage does not match trainingPlanningInput")
         return self
 
 
@@ -249,9 +245,7 @@ class TrainingPlanningStatusResponse(TrainingPlanningModel):
     @field_validator("created_at", "started_at", "finished_at")
     @classmethod
     def validate_aware_timestamp(cls, value: datetime | None) -> datetime | None:
-        if value is not None and (
-            value.tzinfo is None or value.utcoffset() is None
-        ):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise ValueError("timestamps must be timezone-aware")
         return value
 

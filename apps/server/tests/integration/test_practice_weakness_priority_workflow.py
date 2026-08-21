@@ -20,8 +20,8 @@ from riva.models import (
     QuestionCard,
     User,
 )
-from riva.schemas.question_generation import QuestionGenerationWeaknessEvidence
 from riva.schemas.question_cards import QuestionCardQuestionType
+from riva.schemas.question_generation import QuestionGenerationWeaknessEvidence
 from riva.services.practice_sessions import (
     PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
     PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE,
@@ -43,7 +43,6 @@ from tests.integration.test_practice_next_question_workflow import (
 )
 from tests.integration.test_practice_saved_workflow import generate_saved_card
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -390,7 +389,9 @@ def test_priority_without_eligible_weakness_does_not_create_session() -> None:
     asyncio.run(run_test())
 
 
-def test_saved_and_history_priority_reuse_cards_without_llm_or_new_question_run() -> None:
+def test_saved_and_history_priority_reuse_cards_without_llm_or_new_question_run() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
@@ -453,14 +454,18 @@ def test_saved_and_history_priority_reuse_cards_without_llm_or_new_question_run(
                         )
                         assert attempt is not None
                         assert attempt.question_generation_run_id is None
-                    assert await session_count_question_runs(database, owner_id) == before
+                    assert (
+                        await session_count_question_runs(database, owner_id) == before
+                    )
             finally:
                 await database.reset()
 
     asyncio.run(run_test())
 
 
-def test_personalized_priority_continue_completes_current_attempt_before_snapshot() -> None:
+def test_personalized_priority_continue_completes_current_attempt_before_snapshot() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
@@ -655,7 +660,9 @@ def test_personalized_priority_continue_rolls_back_on_enqueue_failure() -> None:
                             session,
                             llm_model="fake-practice-model",
                             question_generation_service_factory=(
-                                lambda *_args, **_kwargs: FailingQuestionGenerationService()
+                                lambda *_args, **_kwargs: (
+                                    FailingQuestionGenerationService()
+                                )
                             ),
                         ).continue_to_next_question(
                             user_id=owner.id,
@@ -958,9 +965,7 @@ def test_reused_priority_falls_back_when_weakness_card_is_not_a_candidate() -> N
                         "Accept-Language": "en-US",
                     }
                     question_type = (
-                        "projectDeepDive"
-                        if source == "saved"
-                        else "behavioral"
+                        "projectDeepDive" if source == "saved" else "behavioral"
                     )
                     with TestClient(app) as client:
                         started = client.post(

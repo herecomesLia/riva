@@ -162,7 +162,9 @@ def test_cli_writes_stable_json_output(monkeypatch, tmp_path) -> None:
     assert payload["cases"][0]["caseId"] == "cli.question"
 
 
-def test_cli_uses_optional_judge_model_and_prints_quality(monkeypatch, tmp_path) -> None:
+def test_cli_uses_optional_judge_model_and_prints_quality(
+    monkeypatch, tmp_path
+) -> None:
     _configure_env(monkeypatch)
     input_model = _write_case(tmp_path / "case.json", with_rubric=True)
     provider = _provider(input_model, include_judge=True)

@@ -30,7 +30,6 @@ from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_question_generation import seed_context
 
-
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 17, 10, tzinfo=UTC)
 
@@ -126,8 +125,7 @@ def test_question_generation_snapshots_memory_and_routes_all_prompt_versions() -
                     competency = await session.scalar(
                         select(UserCompetency).where(
                             UserCompetency.user_id == owner.id,
-                            UserCompetency.competency_key
-                            == "results_and_evidence",
+                            UserCompetency.competency_key == "results_and_evidence",
                         )
                     )
                     assert competency is not None
@@ -141,9 +139,12 @@ def test_question_generation_snapshots_memory_and_routes_all_prompt_versions() -
                         session,
                         llm_model="memory-test-model",
                     ).load_generation_input(v3_run)
-                    assert loaded.training_memory.model_dump(
-                        mode="json", by_alias=True
-                    )["focusCompetencies"][0]["level"] == 55
+                    assert (
+                        loaded.training_memory.model_dump(mode="json", by_alias=True)[
+                            "focusCompetencies"
+                        ][0]["level"]
+                        == 55
+                    )
 
                 async with database.sessionmaker() as session:
                     claimed = await AgentRunService(session).claim_next(
@@ -192,12 +193,18 @@ def test_question_generation_snapshots_memory_and_routes_all_prompt_versions() -
                     for key, value in v2_payload.items()
                     if key != "weaknessFocus"
                 }
-                assert QuestionGenerationRunPayload.model_validate(
-                    v1_payload
-                ).training_memory == TrainingMemoryContext()
-                assert QuestionGenerationRunPayload.model_validate(
-                    v2_payload
-                ).training_memory == TrainingMemoryContext()
+                assert (
+                    QuestionGenerationRunPayload.model_validate(
+                        v1_payload
+                    ).training_memory
+                    == TrainingMemoryContext()
+                )
+                assert (
+                    QuestionGenerationRunPayload.model_validate(
+                        v2_payload
+                    ).training_memory
+                    == TrainingMemoryContext()
+                )
 
                 v1_run = await enqueue_versioned_run(
                     database,
@@ -283,7 +290,8 @@ def test_question_generation_snapshots_memory_and_routes_all_prompt_versions() -
                     for request in provider.calls
                 )
                 assert any(
-                    "<BEGIN_UNTRUSTED_WEAKNESS_FOCUS>" not in request.messages[1].content
+                    "<BEGIN_UNTRUSTED_WEAKNESS_FOCUS>"
+                    not in request.messages[1].content
                     and "<BEGIN_UNTRUSTED_TRAINING_MEMORY>"
                     not in request.messages[1].content
                     for request in provider.calls

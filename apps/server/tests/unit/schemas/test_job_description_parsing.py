@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from riva.schemas.job_description_parsing import (
     MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH,
@@ -93,9 +93,7 @@ def test_semantic_list_items_are_preserved_as_complete_or_atomic_values() -> Non
         "计算机科学、软件工程或相关专业",
         "人工智能、机器学习相关方向",
     ]
-    payload["qualification_requirements"]["languages"] = [
-        "英语 CET-6 或同等水平"
-    ]
+    payload["qualification_requirements"]["languages"] = ["英语 CET-6 或同等水平"]
     payload["required_skills"]["programming_languages"] = ["Python", "Go"]
     payload["preferred_qualifications"] = ["有 Kubernetes 或云平台使用经验"]
 

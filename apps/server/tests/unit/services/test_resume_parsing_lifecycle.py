@@ -27,7 +27,6 @@ from riva.services.resume_parsing_lifecycle import (
     ResumeParsingLifecycleService,
 )
 
-
 NOW = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
 USER_ID = UUID("11111111-1111-4111-8111-111111111111")
 DOCUMENT_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -126,9 +125,7 @@ def run(
 ) -> AgentRun:
     started_at = None if attempt_count == 0 else NOW
     finished_at = (
-        NOW
-        if status in (AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED)
-        else None
+        NOW if status in (AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED) else None
     )
     return AgentRun(
         id=run_id or uuid4(),
@@ -225,11 +222,7 @@ def service(
 ) -> ResumeParsingLifecycleService:
     calls = calls if calls is not None else []
     sessions = sessions if sessions is not None else []
-    factory = (
-        make_factory(next_run, calls, sessions)
-        if next_run is not None
-        else None
-    )
+    factory = make_factory(next_run, calls, sessions) if next_run is not None else None
     kwargs: dict[str, object] = {
         "llm_provider": provider,
         "llm_model": model,
@@ -396,8 +389,7 @@ def test_retry_creates_new_run_and_supersedes_failed_ready_draft() -> None:
     assert old_draft.source_agent_run_id == failed.id
     assert calls[0]["prompt_version"] == RESUME_PARSING_PROMPT.version
     assert calls[0]["idempotency_key"] == (
-        f"resume-parsing:{DOCUMENT_ID}:retry:{failed.id}"
-        ":zh-CN"
+        f"resume-parsing:{DOCUMENT_ID}:retry:{failed.id}:zh-CN"
     )
     assert session.commit_count == 1
 

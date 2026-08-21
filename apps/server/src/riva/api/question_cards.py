@@ -15,7 +15,6 @@ from riva.schemas.question_cards import (
 )
 from riva.services.question_cards import QuestionCardService
 
-
 GenerationRunId = Annotated[UUID, Path(alias="runId")]
 QuestionCardId = Annotated[UUID, Path(alias="questionCardId")]
 
@@ -35,9 +34,7 @@ async def start_question_generation(
     payload: StartQuestionGenerationRequest,
     request: Request,
     current_user: User = Depends(require_current_user),
-    question_card_service: QuestionCardService = Depends(
-        get_question_card_service
-    ),
+    question_card_service: QuestionCardService = Depends(get_question_card_service),
 ) -> QuestionGenerationStatusResponse:
     return await question_card_service.start_generation(
         current_user,
@@ -55,9 +52,7 @@ async def start_question_generation(
 async def get_question_generation_status(
     run_id: GenerationRunId,
     current_user: User = Depends(require_current_user),
-    question_card_service: QuestionCardService = Depends(
-        get_question_card_service
-    ),
+    question_card_service: QuestionCardService = Depends(get_question_card_service),
 ) -> QuestionGenerationStatusResponse:
     return await question_card_service.get_generation_status(
         user_id=current_user.id,
@@ -72,9 +67,7 @@ async def get_question_generation_status(
 async def get_question_card(
     question_card_id: QuestionCardId,
     current_user: User = Depends(require_current_user),
-    question_card_service: QuestionCardService = Depends(
-        get_question_card_service
-    ),
+    question_card_service: QuestionCardService = Depends(get_question_card_service),
 ) -> QuestionCardResponse:
     return await question_card_service.get_question_card(
         user_id=current_user.id,

@@ -1,6 +1,6 @@
+import re
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
-import re
 from typing import TypeVar, cast
 from uuid import UUID, uuid4
 
@@ -13,18 +13,24 @@ from riva.agents import AgentResult
 from riva.core.language import INTERACTION_LANGUAGES
 from riva.models import AgentRun, AgentRunStatus
 from riva.models.agent_runs import AgentRunPayload, AgentRunResult, JSONValue
-from riva.schemas.question_cards import (
-    QuestionCardDifficulty,
-    QuestionCardQuestionType,
-)
-from riva.schemas.practice_interactions import MAX_PRACTICE_FOLLOW_UPS
 from riva.schemas.evaluation import (
     PracticeEvaluationFollowUpCompletionReason,
     PracticeEvaluationOutput,
 )
+from riva.schemas.interview_candidate_question import (
+    InterviewCandidateQuestionInput,
+)
+from riva.schemas.interview_planning import InterviewPlanningInput
+from riva.schemas.interview_review import InterviewReviewInput
+from riva.schemas.interview_turn import InterviewTurnInput
+from riva.schemas.practice_interactions import MAX_PRACTICE_FOLLOW_UPS
 from riva.schemas.practice_reference_answer import (
     PracticeReferenceFrozenContext,
     PracticeReferencePreviousFollowUpRunPayload,
+)
+from riva.schemas.question_cards import (
+    QuestionCardDifficulty,
+    QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import (
     MAX_QUESTION_GENERATION_WEAKNESS_FOCUS_ITEMS,
@@ -35,14 +41,7 @@ from riva.schemas.training_planning import (
     TrainingPlanningContextFingerprint,
     TrainingPlanningInput,
 )
-from riva.schemas.interview_planning import InterviewPlanningInput
-from riva.schemas.interview_turn import InterviewTurnInput
-from riva.schemas.interview_candidate_question import (
-    InterviewCandidateQuestionInput,
-)
-from riva.schemas.interview_review import InterviewReviewInput
 from riva.utils import utc_now
-
 
 AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
 PayloadValue = UUID | JSONValue
@@ -130,13 +129,9 @@ class AgentRunService:
         agent_id = _required_text("agent_id", agent_id, 128)
         prompt_id = _required_text("prompt_id", prompt_id, 128)
         prompt_version = _required_text("prompt_version", prompt_version, 64)
-        output_schema_id = _required_text(
-            "output_schema_id", output_schema_id, 128
-        )
+        output_schema_id = _required_text("output_schema_id", output_schema_id, 128)
         model = _required_text("model", model, 255)
-        idempotency_key = _required_text(
-            "idempotency_key", idempotency_key, 255
-        )
+        idempotency_key = _required_text("idempotency_key", idempotency_key, 255)
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
         serialized_payload = _serialize_payload(payload)
@@ -423,9 +418,7 @@ def _serialize_payload(
             serialized[key] = value
         elif key == "difficulty":
             if not isinstance(value, str) or value not in _DIFFICULTIES:
-                raise ValueError(
-                    "payload.difficulty must be a supported difficulty"
-                )
+                raise ValueError("payload.difficulty must be a supported difficulty")
             serialized[key] = value
         elif key == "followUpCompletionReason":
             if (
@@ -439,9 +432,7 @@ def _serialize_payload(
             serialized[key] = value
         elif key == "targetType":
             if not isinstance(value, str) or value not in {"main", "followUp"}:
-                raise ValueError(
-                    "payload.targetType must be a supported target type"
-                )
+                raise ValueError("payload.targetType must be a supported target type")
             serialized[key] = value
         elif key == "completionReason":
             if not isinstance(value, str) or value not in {
@@ -495,19 +486,13 @@ def _serialize_payload(
                 serialized[key] = TypeAdapter(
                     TrainingPlanningContextFingerprint
                 ).validate_python(value)
-            except (TypeError, ValueError, ValidationError):
+            except TypeError, ValueError, ValidationError:
                 raise ValueError(
                     "payload.contextFingerprint must be a SHA-256 hex digest"
                 ) from None
         elif key == "planRevision":
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or value < 1
-            ):
-                raise ValueError(
-                    "payload.planRevision must be a positive integer"
-                )
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError("payload.planRevision must be a positive integer")
             serialized[key] = value
         elif key == "remainingFollowUpSlots":
             if (
@@ -585,7 +570,7 @@ def _serialize_reference_context(value: object) -> dict[str, JSONValue]:
             dict[str, JSONValue],
             context.model_dump(mode="json", by_alias=True),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.referenceContext must be a valid frozen reference context"
         ) from None
@@ -598,7 +583,7 @@ def _serialize_interview_planning_input(value: object) -> dict[str, JSONValue]:
             dict[str, JSONValue],
             planning_input.model_dump(mode="json", by_alias=True),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.interviewPlanningInput must be a valid planning snapshot"
         ) from None
@@ -611,7 +596,7 @@ def _serialize_interview_turn_input(value: object) -> dict[str, JSONValue]:
             dict[str, JSONValue],
             turn_input.model_dump(mode="json", by_alias=True),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.interviewTurnInput must be a valid frozen turn snapshot"
         ) from None
@@ -621,14 +606,12 @@ def _serialize_interview_candidate_question_input(
     value: object,
 ) -> dict[str, JSONValue]:
     try:
-        candidate_question_input = InterviewCandidateQuestionInput.model_validate(
-            value
-        )
+        candidate_question_input = InterviewCandidateQuestionInput.model_validate(value)
         return cast(
             dict[str, JSONValue],
             candidate_question_input.model_dump(mode="json", by_alias=True),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.interviewCandidateQuestionInput must be a valid frozen candidate-question snapshot"
         ) from None
@@ -641,7 +624,7 @@ def _serialize_interview_review_input(value: object) -> dict[str, JSONValue]:
             dict[str, JSONValue],
             review_input.model_dump(mode="json", by_alias=True),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.interviewReviewInput must be a valid frozen review snapshot"
         ) from None
@@ -654,7 +637,7 @@ def _serialize_training_planning_input(value: object) -> dict[str, JSONValue]:
             dict[str, JSONValue],
             planning_input.model_dump(mode="json", by_alias=True),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.trainingPlanningInput must be a valid planning snapshot"
         ) from None
@@ -669,7 +652,7 @@ def _serialize_previous_follow_ups(value: object) -> list[JSONValue]:
             list[JSONValue],
             [item.model_dump(mode="json", by_alias=True) for item in previous],
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.previousFollowUps must contain valid follow-up lineage"
         ) from None
@@ -686,7 +669,7 @@ def _serialize_weakness_focus(value: object) -> list[JSONValue]:
             list[JSONValue],
             [item.model_dump(mode="json", by_alias=True) for item in evidence],
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.weaknessFocus must contain valid weakness evidence"
         ) from None
@@ -699,7 +682,7 @@ def _serialize_training_memory(value: object) -> dict[str, JSONValue]:
             dict[str, JSONValue],
             context.model_dump(mode="json", by_alias=True),
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError(
             "payload.trainingMemory must contain a valid training memory snapshot"
         ) from None

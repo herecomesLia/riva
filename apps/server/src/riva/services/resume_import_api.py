@@ -69,7 +69,8 @@ class ResumeImportAPIService:
         *,
         parsing_lifecycle_service_factory: Callable[
             [AsyncSession], ResumeParsingLifecycleService
-        ] | None = None,
+        ]
+        | None = None,
         draft_service_factory: Callable[
             [AsyncSession], ResumeImportDraftService
         ] = ResumeImportDraftService,
@@ -84,9 +85,7 @@ class ResumeImportAPIService:
             )
 
             parsing_lifecycle_service_factory = ResumeParsingLifecycleService
-        self.parsing_lifecycle_service_factory = (
-            parsing_lifecycle_service_factory
-        )
+        self.parsing_lifecycle_service_factory = parsing_lifecycle_service_factory
         self.draft_service_factory = draft_service_factory
         self.application_service_factory = application_service_factory
 
@@ -121,9 +120,7 @@ class ResumeImportAPIService:
                 user_id=user_id,
                 resume_document_id=resume_document_id,
             )
-            result = await self.application_service_factory(
-                self.session
-            ).apply_draft(
+            result = await self.application_service_factory(self.session).apply_draft(
                 user_id=user_id,
                 resume_document_id=resume_document_id,
                 draft_version=draft_version,
@@ -177,7 +174,7 @@ def build_resume_import_draft_response(
         )
     except ResumeImportStateError:
         raise
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID) from None
 
 
@@ -198,7 +195,7 @@ def build_resume_import_application_response(
         )
     except ResumeImportStateError:
         raise
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
 
 

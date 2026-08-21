@@ -27,9 +27,7 @@ def evaluation_input(
                 "difficulty": "basic",
                 "assessedCapabilities": ["服务设计"],
                 "scoringFocus": (
-                    ["个人贡献", "结果证据"]
-                    if scoring_focus is None
-                    else scoring_focus
+                    ["个人贡献", "结果证据"] if scoring_focus is None else scoring_focus
                 ),
             },
             "mainAnswer": {"content": main_answer},
@@ -204,9 +202,7 @@ def test_agent_rejects_duplicate_or_missing_dimensions(
         }
         for dimension in dimensions
     ]
-    agent = PracticeEvaluationAgent(
-        FakeLLMProvider([payload]), model="test-model"
-    )
+    agent = PracticeEvaluationAgent(FakeLLMProvider([payload]), model="test-model")
 
     with pytest.raises(InvalidStructuredOutputError):
         asyncio.run(agent.run(evaluation_input()))
@@ -258,9 +254,7 @@ def test_agent_rejects_focus_assessment_mismatch(
 ) -> None:
     payload = valid_output()
     payload["focusAssessments"] = focus_assessments
-    agent = PracticeEvaluationAgent(
-        FakeLLMProvider([payload]), model="test-model"
-    )
+    agent = PracticeEvaluationAgent(FakeLLMProvider([payload]), model="test-model")
 
     with pytest.raises(InvalidStructuredOutputError) as error:
         asyncio.run(agent.run(evaluation_input()))

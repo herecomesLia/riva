@@ -17,7 +17,6 @@ from riva.services.resume_imports import (
     ResumeImportStateError,
 )
 
-
 NOW = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
 
 

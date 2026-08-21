@@ -31,7 +31,6 @@ from tests.integration.test_practice_next_question_workflow import (
     produce_first_review,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -56,9 +55,7 @@ async def _load_review_snapshot(
         )
     )
     evaluation = await session.scalar(
-        select(PracticeEvaluation).where(
-            PracticeEvaluation.attempt_id == attempt_id
-        )
+        select(PracticeEvaluation).where(PracticeEvaluation.attempt_id == attempt_id)
     )
     review = await session.scalar(
         select(PracticeReview).where(PracticeReview.attempt_id == attempt_id)

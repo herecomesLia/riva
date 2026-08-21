@@ -2,8 +2,8 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_LIST_ITEM_LENGTH,
@@ -57,7 +57,9 @@ def test_question_generation_input_covers_all_question_types_and_difficulties() 
         assert QuestionGenerationInput.model_validate(payload).difficulty == difficulty
 
 
-def test_question_generation_input_is_curated_and_excludes_internal_profile_fields() -> None:
+def test_question_generation_input_is_curated_and_excludes_internal_profile_fields() -> (
+    None
+):
     payload = valid_question_generation_input().model_dump(mode="json")
     payload["career_profile"]["profile_id"] = str(uuid4())
     payload["career_profile"]["work_experiences"][0]["source"] = "userEdited"
@@ -67,7 +69,9 @@ def test_question_generation_input_is_curated_and_excludes_internal_profile_fiel
         QuestionGenerationInput.model_validate(payload)
 
 
-def test_question_generation_input_preserves_real_experience_ids_and_context_shape() -> None:
+def test_question_generation_input_preserves_real_experience_ids_and_context_shape() -> (
+    None
+):
     input = valid_question_generation_input()
     work = input.career_profile.work_experiences[0]
     project = input.career_profile.project_experiences[0]
@@ -125,18 +129,14 @@ def test_question_generation_output_uses_bounded_question_card_contract() -> Non
         QuestionGenerationOutput.model_validate(
             {
                 **payload,
-                "scoring_focus": [
-                    "x" * (MAX_QUESTION_CARD_LIST_ITEM_LENGTH + 1)
-                ],
+                "scoring_focus": ["x" * (MAX_QUESTION_CARD_LIST_ITEM_LENGTH + 1)],
             }
         )
     with pytest.raises(ValidationError):
         QuestionGenerationOutput.model_validate(
             {
                 **payload,
-                "recommended_materials": [
-                    *payload["recommended_materials"]
-                ]
+                "recommended_materials": [*payload["recommended_materials"]]
                 * (MAX_QUESTION_CARD_RECOMMENDED_MATERIALS + 1),
             }
         )
@@ -152,7 +152,9 @@ def test_question_generation_input_profile_skill_count_is_bounded() -> None:
         QuestionGenerationInput.model_validate(payload)
 
 
-def test_question_generation_run_payload_snapshots_weakness_focus_with_aliases() -> None:
+def test_question_generation_run_payload_snapshots_weakness_focus_with_aliases() -> (
+    None
+):
     evidence = QuestionGenerationWeaknessEvidence(
         weakness="Ownership evidence",
         source_attempt_id=uuid4(),
@@ -180,7 +182,9 @@ def test_question_generation_run_payload_snapshots_weakness_focus_with_aliases()
     ]
 
 
-def test_question_generation_run_payload_v1_without_weakness_focus_defaults_empty() -> None:
+def test_question_generation_run_payload_v1_without_weakness_focus_defaults_empty() -> (
+    None
+):
     payload = QuestionGenerationRunPayload(
         role_id=uuid4(),
         profile_id=uuid4(),

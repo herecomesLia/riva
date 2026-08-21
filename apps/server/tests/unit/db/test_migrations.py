@@ -8,7 +8,6 @@ from alembic.runtime.environment import EnvironmentContext
 
 from riva.db import migrations
 
-
 DATABASE_URL = "postgresql+asyncpg://user:password@localhost:5432/riva"
 
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from datetime import datetime
-import re
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,10 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.models import CompetencyEvidence, UserCompetency
 
-
-_MACHINE_KEY_PATTERN = re.compile(
-    r"^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$"
-)
+_MACHINE_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$")
 _SOURCE_ENTITY_TYPES = {
     "practice": {"practiceAttempt"},
     "interview": {"interviewTurn", "interviewReview"},
@@ -30,9 +27,7 @@ def normalize_competency_key(value: str) -> str:
 
     key = value.strip().lower()
     if len(key) > 128 or _MACHINE_KEY_PATTERN.fullmatch(key) is None:
-        raise ValueError(
-            "competency_key must match ^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$"
-        )
+        raise ValueError("competency_key must match ^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$")
     return key
 
 
@@ -317,9 +312,7 @@ class CompetencyService:
             raise ValueError("signal_type is invalid")
         if not isinstance(occurred_at, datetime):
             raise ValueError("occurred_at must be a datetime")
-        if score is not None and (
-            not isinstance(score, int) or not 0 <= score <= 100
-        ):
+        if score is not None and (not isinstance(score, int) or not 0 <= score <= 100):
             raise ValueError("score must be between 0 and 100")
         if signal_type == "score" and score is None:
             raise ValueError("score signal requires score")

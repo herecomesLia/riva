@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
-from pydantic import BaseModel
 import pytest
+from pydantic import BaseModel
 
 from riva.agents import AgentResult, PracticeEvaluationAgent
 from riva.integrations import (
@@ -22,7 +22,6 @@ from riva.services.evaluation_generation import EvaluationGenerationStateError
 from riva.workers import AgentExecutionError, PracticeEvaluationHandler
 from riva.workers.practice_evaluation import EvaluationGenerationServiceFactory
 from riva.workers.runtime import SessionFactory
-
 
 NOW = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
 
@@ -315,8 +314,9 @@ def test_handler_requires_the_practice_evaluation_agent_identity() -> None:
         )
 
 
-def test_handler_maps_persistence_state_errors_to_non_retryable_execution_error(
-) -> None:
+def test_handler_maps_persistence_state_errors_to_non_retryable_execution_error() -> (
+    None
+):
     sessions = FakeSessionFactory()
     state = State()
     state.persist_error = EvaluationGenerationStateError(

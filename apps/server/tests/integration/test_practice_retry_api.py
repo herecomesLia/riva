@@ -9,12 +9,18 @@ from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
-from riva.models import AgentRun, PracticeAnswer, PracticeAttempt, PracticeSession, QuestionCard, User
+from riva.models import (
+    AgentRun,
+    PracticeAnswer,
+    PracticeAttempt,
+    PracticeSession,
+    QuestionCard,
+    User,
+)
 from tests.integration.test_practice_next_question_workflow import (
     database_url,
     produce_first_review,
 )
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -132,8 +138,12 @@ def test_practice_retry_http_workflow_replay_get_and_submit() -> None:
                     assert len(cards) == 1
                     second_attempt_id = UUID(retried_body["attemptId"])
                     async with database.sessionmaker() as session:
-                        first_attempt = await session.get(PracticeAttempt, first_attempt_id)
-                        second_attempt = await session.get(PracticeAttempt, second_attempt_id)
+                        first_attempt = await session.get(
+                            PracticeAttempt, first_attempt_id
+                        )
+                        second_attempt = await session.get(
+                            PracticeAttempt, second_attempt_id
+                        )
                         assert first_attempt is not None
                         assert second_attempt is not None
                         assert first_attempt.status == "completed"
@@ -228,9 +238,14 @@ def test_practice_retry_http_workflow_replay_get_and_submit() -> None:
                                 )
                             ).all()
                         )
-                        practice_session = await session.get(PracticeSession, session_id)
+                        practice_session = await session.get(
+                            PracticeSession, session_id
+                        )
                         assert retry_answer is not None
-                        assert retry_answer.content == "The retry answer contains new evidence."
+                        assert (
+                            retry_answer.content
+                            == "The retry answer contains new evidence."
+                        )
                         assert retry_answer.attempt_id == second_attempt_id
                         assert len(attempts) == 2
                         assert practice_session is not None

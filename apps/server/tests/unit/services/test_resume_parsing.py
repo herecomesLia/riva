@@ -19,7 +19,6 @@ from riva.services.resume_parsing import (
     ResumeParsingStateError,
 )
 
-
 NOW = datetime(2026, 8, 5, 10, 30, tzinfo=UTC)
 
 
@@ -174,7 +173,9 @@ def test_load_input_restores_language_from_run_payload() -> None:
     _, document, run = graph(extracted_text="English resume: built APIs.")
     run.payload["interactionLanguage"] = "en"
 
-    loaded = asyncio.run(ResumeParsingService(ScriptedSession(document)).load_input(run))
+    loaded = asyncio.run(
+        ResumeParsingService(ScriptedSession(document)).load_input(run)
+    )
 
     assert loaded.interaction_language == "en"
 
@@ -243,7 +244,9 @@ def test_document_state_is_revalidated(
 ) -> None:
     _, document, run = graph()
     setattr(document, attribute, value)
-    session_values = (document,) if operation == "load" else (run.user_id, document, None, None)
+    session_values = (
+        (document,) if operation == "load" else (run.user_id, document, None, None)
+    )
     session = ScriptedSession(*session_values)
     service = ResumeParsingService(session, clock=lambda: NOW)
 

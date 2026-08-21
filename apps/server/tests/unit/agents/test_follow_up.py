@@ -1,8 +1,8 @@
 import asyncio
 import json
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from riva.agents import FollowUpAgent
 from riva.integrations import InvalidStructuredOutputError, MessageRole

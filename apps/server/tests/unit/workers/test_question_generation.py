@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel
 import pytest
+from pydantic import BaseModel
 
 from riva.agents import AgentResult, QuestionGenerationAgent
 from riva.integrations import (
@@ -107,9 +107,7 @@ def question_card_for(
         target_role_id=UUID(cast(str, payload["roleId"])),
         profile_id=UUID(cast(str, payload["profileId"])),
         source_agent_run_id=run.id,
-        matching_analysis_run_id=UUID(
-            cast(str, payload["matchingAnalysisRunId"])
-        ),
+        matching_analysis_run_id=UUID(cast(str, payload["matchingAnalysisRunId"])),
         language=cast(str, payload["interactionLanguage"]),
         question_type=cast(str, values["question_type"]),
         difficulty=cast(str, values["difficulty"]),
@@ -375,9 +373,7 @@ def test_handler_returns_existing_card_output_and_keeps_retry_metadata() -> None
         run = running_agent_run()
         output_a = output()
         output_b = output().model_copy(
-            update={
-                "prompt": "Describe a completely different retry question."
-            }
+            update={"prompt": "Describe a completely different retry question."}
         )
         state.persisted_card = question_card_for(run, output_a)
         retry_result = agent_result(

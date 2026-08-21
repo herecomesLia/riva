@@ -71,7 +71,9 @@ def test_injection_like_data_stays_in_untrusted_user_region() -> None:
     )
 
 
-def test_matching_prompt_template_has_no_raw_jd_ids_provider_or_api_key_fields() -> None:
+def test_matching_prompt_template_has_no_raw_jd_ids_provider_or_api_key_fields() -> (
+    None
+):
     template = (
         MATCHING_ANALYSIS_PROMPT.system_template
         + MATCHING_ANALYSIS_PROMPT.user_template

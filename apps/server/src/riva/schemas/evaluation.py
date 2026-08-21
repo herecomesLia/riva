@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Any, Annotated, Self
+from typing import Annotated, Any, Self
 from uuid import UUID
 
 from pydantic import (
@@ -18,14 +18,13 @@ from riva.schemas.practice_interactions import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerContent,
 )
+from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardPrompt,
     QuestionCardQuestionType,
     QuestionCardTextList,
 )
-from riva.schemas.profile import StandardUUID
-
 
 MAX_PRACTICE_EVALUATION_DIMENSIONS = 8
 MAX_PRACTICE_EVALUATION_EXPLANATION_LENGTH = 2_000
@@ -99,16 +98,12 @@ class _EvaluationModel(BaseModel):
 
 class EvaluationQuestionContext(_EvaluationModel):
     prompt: QuestionCardPrompt
-    question_type: QuestionCardQuestionType = _alias(
-        "question_type", "questionType"
-    )
+    question_type: QuestionCardQuestionType = _alias("question_type", "questionType")
     difficulty: QuestionCardDifficulty
     assessed_capabilities: QuestionCardTextList = _alias(
         "assessed_capabilities", "assessedCapabilities"
     )
-    scoring_focus: QuestionCardTextList = _alias(
-        "scoring_focus", "scoringFocus"
-    )
+    scoring_focus: QuestionCardTextList = _alias("scoring_focus", "scoringFocus")
 
 
 class EvaluationRunPayload(_EvaluationModel):
@@ -122,9 +117,7 @@ class EvaluationRunPayload(_EvaluationModel):
     attempt_id: StandardUUID = Field(alias="attemptId")
     question_card_id: StandardUUID = Field(alias="questionCardId")
     main_answer_id: StandardUUID = Field(alias="mainAnswerId")
-    interaction_language: InteractionLanguage = Field(
-        alias="interactionLanguage"
-    )
+    interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
     follow_up_completion_reason: PracticeEvaluationFollowUpCompletionReason = Field(
         alias="followUpCompletionReason"
     )
@@ -176,21 +169,15 @@ class EvaluationRunPayload(_EvaluationModel):
                     "noFollowUpRequired must not include an unanswered question"
                 )
             if any(value is not None for value in (*first_pair, *second_pair)):
-                raise ValueError(
-                    "noFollowUpRequired must not include follow-up IDs"
-                )
+                raise ValueError("noFollowUpRequired must not include follow-up IDs")
         elif reason == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED:
             if self.unanswered_follow_up_question_id is not None:
-                raise ValueError(
-                    "allAnswered must not include an unanswered question"
-                )
+                raise ValueError("allAnswered must not include an unanswered question")
             if first_pair[0] is None:
                 raise ValueError("allAnswered requires the first follow-up pair")
         elif reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
             if self.unanswered_follow_up_question_id is None:
-                raise ValueError(
-                    "endedEarly requires an unanswered follow-up question"
-                )
+                raise ValueError("endedEarly requires an unanswered follow-up question")
             if second_pair[0] is not None:
                 raise ValueError(
                     "endedEarly permits at most one completed follow-up pair"
@@ -229,9 +216,7 @@ class PracticeFocusAssessment(_EvaluationModel):
 
 
 class PracticeEvaluationOutput(_EvaluationModel):
-    overall_score: PracticeEvaluationScore = _alias(
-        "overall_score", "overallScore"
-    )
+    overall_score: PracticeEvaluationScore = _alias("overall_score", "overallScore")
     dimension_scores: Annotated[
         list[PracticeDimensionScore],
         Field(
@@ -256,9 +241,7 @@ class PracticeEvaluationOutput(_EvaluationModel):
             PracticeEvaluationDimension.COMMUNICATION,
         }
         if not required.issubset(dimensions):
-            raise ValueError(
-                "dimension_scores must contain all core dimensions"
-            )
+            raise ValueError("dimension_scores must contain all core dimensions")
         return self
 
 
@@ -293,9 +276,7 @@ class EvaluationInput(_EvaluationModel):
             == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
             and self.follow_up_exchanges
         ):
-            raise ValueError(
-                "noFollowUpRequired requires no follow_up_exchanges"
-            )
+            raise ValueError("noFollowUpRequired requires no follow_up_exchanges")
         if (
             self.follow_up_completion_reason
             == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED

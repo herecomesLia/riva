@@ -62,7 +62,6 @@ from riva.services.interview_review_prompt_versions import (
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
-
 InterviewReviewStateErrorCode = Literal[
     "interview_session_not_found",
     "interview_review_version_conflict",
@@ -124,9 +123,7 @@ class InterviewReviewService:
         self.session = session
         self.llm_model = (llm_model or "").strip()
         self.clock = clock
-        self.competency_ingestion_service_factory = (
-            competency_ingestion_service_factory
-        )
+        self.competency_ingestion_service_factory = competency_ingestion_service_factory
         self.training_memory_service_factory = training_memory_service_factory
 
     async def enqueue_review_in_transaction(
@@ -269,9 +266,9 @@ class InterviewReviewService:
                         select(InterviewQuestion)
                         .options(
                             selectinload(InterviewQuestion.answer),
-                            selectinload(InterviewQuestion.follow_up_questions).selectinload(
-                                InterviewFollowUpQuestion.answer
-                            ),
+                            selectinload(
+                                InterviewQuestion.follow_up_questions
+                            ).selectinload(InterviewFollowUpQuestion.answer),
                             selectinload(InterviewQuestion.turn_assessments),
                         )
                         .where(
@@ -285,7 +282,9 @@ class InterviewReviewService:
                 (
                     await self.session.scalars(
                         select(InterviewCandidateQuestionExchange)
-                        .options(selectinload(InterviewCandidateQuestionExchange.question))
+                        .options(
+                            selectinload(InterviewCandidateQuestionExchange.question)
+                        )
                         .where(
                             InterviewCandidateQuestionExchange.session_id
                             == interview_session.id,
@@ -318,10 +317,8 @@ class InterviewReviewService:
             )
         except InterviewReviewStateError:
             raise
-        except (TypeError, ValueError, ValidationError):
-            raise InterviewReviewStateError(
-                INTERVIEW_REVIEW_SNAPSHOT_INVALID
-            ) from None
+        except TypeError, ValueError, ValidationError:
+            raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
 
     async def load_review_input(self, run: AgentRun) -> InterviewReviewInput:
         payload = self._validate_run_payload(run)
@@ -356,9 +353,7 @@ class InterviewReviewService:
             validated_output = _validate_output(output, payload.review_mode)
             await self._lock_user(run.user_id)
             persisted_run = await self.session.scalar(
-                select(AgentRun)
-                .where(AgentRun.id == run.id)
-                .with_for_update()
+                select(AgentRun).where(AgentRun.id == run.id).with_for_update()
             )
             if persisted_run is None or _status_value(persisted_run.status) != (
                 AgentRunStatus.RUNNING.value
@@ -383,9 +378,7 @@ class InterviewReviewService:
             )
             if existing is not None:
                 if existing.source_agent_run_id != run.id:
-                    raise InterviewReviewStateError(
-                        INTERVIEW_REVIEW_ARTIFACT_CONFLICT
-                    )
+                    raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
                 await self.competency_ingestion_service_factory(
                     self.session
                 ).ingest_interview_review(
@@ -430,11 +423,9 @@ class InterviewReviewService:
         except InterviewReviewStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
-            raise InterviewReviewStateError(
-                INTERVIEW_REVIEW_SNAPSHOT_INVALID
-            ) from None
+            raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -495,9 +486,9 @@ class InterviewReviewService:
                     select(InterviewQuestion)
                     .options(
                         selectinload(InterviewQuestion.answer),
-                        selectinload(InterviewQuestion.follow_up_questions).selectinload(
-                            InterviewFollowUpQuestion.answer
-                        ),
+                        selectinload(
+                            InterviewQuestion.follow_up_questions
+                        ).selectinload(InterviewFollowUpQuestion.answer),
                         selectinload(InterviewQuestion.turn_assessments),
                     )
                     .where(
@@ -511,19 +502,14 @@ class InterviewReviewService:
             str(item.question_id): item for item in output.question_reviews
         }
         follow_up_reviews = {
-            str(item.follow_up_question_id): item
-            for item in output.follow_up_reviews
+            str(item.follow_up_question_id): item for item in output.follow_up_reviews
         }
-        references = {
-            _reference_key(item): item for item in output.reference_answers
-        }
+        references = {_reference_key(item): item for item in output.reference_answers}
         details: list[dict[str, object]] = []
         for question in questions:
             main_reference = references.get(f"main:{question.id}")
             if main_reference is None:
-                raise InterviewReviewStateError(
-                    INTERVIEW_REVIEW_ARTIFACT_CONFLICT
-                )
+                raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
             answer = question.answer
             follow_up_records: list[dict[str, object]] = []
             follow_up_details: list[dict[str, object]] = []
@@ -533,9 +519,7 @@ class InterviewReviewService:
             ):
                 follow_up_reference = references.get(f"followUp:{follow_up.id}")
                 if follow_up_reference is None:
-                    raise InterviewReviewStateError(
-                        INTERVIEW_REVIEW_ARTIFACT_CONFLICT
-                    )
+                    raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
                 follow_up_answer = follow_up.answer
                 follow_up_record = {
                     "status": "answered"
@@ -653,10 +637,8 @@ class InterviewReviewService:
         cls._validate_run_metadata(run, run.user_id)
         try:
             return InterviewReviewRunPayload.model_validate(run.payload)
-        except (TypeError, ValueError, ValidationError):
-            raise InterviewReviewStateError(
-                INTERVIEW_REVIEW_SNAPSHOT_INVALID
-            ) from None
+        except TypeError, ValueError, ValidationError:
+            raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
 
 
 def _review_question_snapshot(
@@ -721,7 +703,7 @@ def _review_question_snapshot(
                 )
             ],
         )
-    except (StopIteration, TypeError, ValueError, ValidationError, AttributeError):
+    except StopIteration, TypeError, ValueError, ValidationError, AttributeError:
         raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
 
 
@@ -757,7 +739,7 @@ def _validate_output(
 ) -> InterviewReviewOutput:
     try:
         validated = InterviewReviewOutput.model_validate(output)
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
     if mode == InterviewReviewMode.COMPLETE:
         if (
@@ -765,9 +747,7 @@ def _validate_output(
             or validated.overall_score is None
             or validated.next_training is None
             or len(validated.dimension_scores) != 8
-            or {
-                item.dimension for item in validated.dimension_scores
-            }
+            or {item.dimension for item in validated.dimension_scores}
             != set(InterviewReviewDimension)
         ):
             raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
@@ -940,8 +920,7 @@ def _assessment_from_turn(
                         (
                             item.id
                             for item in question.follow_up_questions
-                            if item.answer is not None
-                            and item.answer.id == answer_id
+                            if item.answer is not None and item.answer.id == answer_id
                         ),
                         answer_id,
                     )

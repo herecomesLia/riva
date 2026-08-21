@@ -66,18 +66,14 @@ class TrainingMemoryService:
 
         return TrainingMemoryContext(
             focus_competencies=[self._snapshot(item) for item in focus],
-            established_competencies=[
-                self._snapshot(item) for item in established
-            ],
+            established_competencies=[self._snapshot(item) for item in established],
         )
 
     @staticmethod
     def _snapshot(competency: UserCompetency) -> TrainingMemoryCompetency:
         return TrainingMemoryCompetency(
             competency_key=competency.competency_key,
-            display_name=display_name_for_competency_key(
-                competency.competency_key
-            ),
+            display_name=display_name_for_competency_key(competency.competency_key),
             level=competency.level,
             confidence=competency.confidence,
             trend=competency.trend,

@@ -224,9 +224,7 @@ def test_handler_preserves_provider_errors() -> None:
     agent = FakeAgent(sessions, ProviderUnavailableError())
 
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
-            make_handler(sessions, State(), agent).execute(run)
-        )
+        asyncio.run(make_handler(sessions, State(), agent).execute(run))
 
 
 @pytest.mark.parametrize(

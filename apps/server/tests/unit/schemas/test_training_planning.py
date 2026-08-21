@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
-from pydantic import TypeAdapter, ValidationError
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
 from riva.core.training_planning import training_planning_context_fingerprint
 from riva.schemas.training_planning import (
@@ -194,8 +194,7 @@ def test_constraints_allow_one_unavailable_training_mode_but_not_both() -> None:
         "mockInterview": None,
     }
     assert (
-        TrainingPlanningInput.model_validate(targeted_only)
-        .constraints.mock_interview
+        TrainingPlanningInput.model_validate(targeted_only).constraints.mock_interview
         is None
     )
 
@@ -205,8 +204,7 @@ def test_constraints_allow_one_unavailable_training_mode_but_not_both() -> None:
         "mockInterview": input_payload()["constraints"]["mockInterview"],  # type: ignore[index]
     }
     assert (
-        TrainingPlanningInput.model_validate(mock_only)
-        .constraints.targeted_practice
+        TrainingPlanningInput.model_validate(mock_only).constraints.targeted_practice
         is None
     )
 
@@ -242,9 +240,7 @@ def test_lifecycle_request_and_payload_preserve_lineage_and_fingerprint() -> Non
             "requestId": request.request_id,
             "targetRoleId": request.target_role_id,
             "interactionLanguage": planning_input.interaction_language,
-            "contextFingerprint": training_planning_context_fingerprint(
-                planning_input
-            ),
+            "contextFingerprint": training_planning_context_fingerprint(planning_input),
             "trainingPlanningInput": planning_input,
         }
     )

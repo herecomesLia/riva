@@ -5,9 +5,9 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from riva.schemas.practice_sessions import (
-    PracticeReferenceAnswerNotRequestedResponse,
     PracticeFollowUpReferenceAnswerResponse,
     PracticeMainReferenceAnswerResponse,
+    PracticeReferenceAnswerNotRequestedResponse,
 )
 from riva.schemas.training_records import (
     TargetedPracticeAttemptRecordResponse,
@@ -20,9 +20,9 @@ from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordSummaryResponse,
     TrainingRecordKind,
     TrainingRecordReferenceAnswerResponse,
-    TrainingRecordStatus,
     TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
+    TrainingRecordStatus,
     TrainingRecordTargetRoleResponse,
 )
 
@@ -93,9 +93,10 @@ def test_training_record_enums_and_wire_aliases_are_exact() -> None:
         "endedEarly",
         "partiallyCompleted",
     }
-    assert detail([attempt(1)]).model_dump(mode="json", by_alias=True)[
-        "durationSeconds"
-    ] == 60
+    assert (
+        detail([attempt(1)]).model_dump(mode="json", by_alias=True)["durationSeconds"]
+        == 60
+    )
 
 
 def test_training_record_timestamps_and_duration_are_validated() -> None:
@@ -130,9 +131,9 @@ def test_reference_answer_fields_use_the_real_discriminated_unions() -> None:
     main = TypeAdapter(PracticeMainReferenceAnswerResponse).validate_python(
         {"status": "unavailable"}
     )
-    follow_up = TypeAdapter(
-        PracticeFollowUpReferenceAnswerResponse
-    ).validate_python({"status": "notRequested"})
+    follow_up = TypeAdapter(PracticeFollowUpReferenceAnswerResponse).validate_python(
+        {"status": "notRequested"}
+    )
     assert main.status == "unavailable"
     assert follow_up.status == "notRequested"
 
@@ -237,7 +238,9 @@ def test_training_record_overview_uses_wire_aliases() -> None:
     }
 
 
-def test_training_record_reference_answer_request_is_discriminated_and_camel_case() -> None:
+def test_training_record_reference_answer_request_is_discriminated_and_camel_case() -> (
+    None
+):
     attempt_id = uuid4()
     follow_up_id = uuid4()
 

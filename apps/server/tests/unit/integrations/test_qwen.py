@@ -3,8 +3,8 @@ import json
 from collections.abc import Callable
 
 import httpx
-from pydantic import BaseModel, ConfigDict, ValidationError
 import pytest
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from riva.core.config import Settings
 from riva.integrations import (
@@ -25,7 +25,6 @@ from riva.schemas.follow_up import (
     FollowUpGenerationOutput,
     FollowUpQuestionOutput,
 )
-
 
 TEST_API_KEY = "test-qwen-key"
 BASE_URL = "https://dashscope.example/compatible-mode/v1/"
@@ -212,9 +211,7 @@ def test_base_url_does_not_duplicate_chat_completions_path() -> None:
 
     qwen = QwenProvider(
         api_key=TEST_API_KEY,
-        base_url=(
-            "https://dashscope.example/compatible-mode/v1/chat/completions/"
-        ),
+        base_url=("https://dashscope.example/compatible-mode/v1/chat/completions/"),
         transport=httpx.MockTransport(handle),
     )
 

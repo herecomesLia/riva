@@ -24,14 +24,16 @@ from riva.schemas.evaluation import PracticeEvaluationOutput
 from riva.schemas.interview_review import InterviewReviewOutput
 from riva.schemas.interview_turn import InterviewTurnOutput
 from riva.services.agent_runs import AgentRunService
-from riva.services.evaluation_generation import EvaluationGenerationService
 from riva.services.competency_ingestion import CompetencyIngestionService
+from riva.services.evaluation_generation import EvaluationGenerationService
 from riva.services.interview_review import InterviewReviewService
 from riva.services.interview_turn import InterviewTurnService
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_evaluation_generation import (
     enqueue as enqueue_evaluation,
+)
+from tests.integration.test_evaluation_generation import (
     evaluation_response,
     prepare_context,
 )
@@ -41,18 +43,27 @@ from tests.integration.test_interview_completion_workflow import (
 )
 from tests.integration.test_interview_planning_workflow import (
     _app as interview_app,
+)
+from tests.integration.test_interview_planning_workflow import (
     _headers as interview_headers,
+)
+from tests.integration.test_interview_planning_workflow import (
     _planner_output,
-    _settings as interview_settings,
     _start_and_begin,
+)
+from tests.integration.test_interview_planning_workflow import (
+    _settings as interview_settings,
+)
+from tests.integration.test_interview_planning_workflow import (
     _worker as interview_worker,
 )
 from tests.integration.test_interview_turn_workflow import (
     _answer_request,
-    _seed as seed_interview_context,
     _turn_output,
 )
-
+from tests.integration.test_interview_turn_workflow import (
+    _seed as seed_interview_context,
+)
 
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 17, 10, tzinfo=UTC)
@@ -328,22 +339,27 @@ def test_practice_and_interview_ingestion_is_idempotent_and_atomic() -> None:
                 )
                 async with database.sessionmaker() as session:
                     ingestion = CompetencyIngestionService(session)
-                    assert await ingestion.ingest_interview_review(
-                        owner_id,
-                        interview_session,  # type: ignore[arg-type]
-                        unavailable_review,  # type: ignore[arg-type]
-                    ) == []
+                    assert (
+                        await ingestion.ingest_interview_review(
+                            owner_id,
+                            interview_session,  # type: ignore[arg-type]
+                            unavailable_review,  # type: ignore[arg-type]
+                        )
+                        == []
+                    )
                     await session.commit()
 
                 async with database.sessionmaker() as session:
                     ingestion = CompetencyIngestionService(session)
-                    with pytest.raises(ValueError, match="unknown competency dimension"):
+                    with pytest.raises(
+                        ValueError, match="unknown competency dimension"
+                    ):
                         await ingestion.ingest_practice_evaluation(
                             owner_id,
                             practice_session,  # type: ignore[arg-type]
                             attempt,  # type: ignore[arg-type]
                             _practice_evaluation(attempt, unknown=True),  # type: ignore[arg-type]
-                    )
+                        )
                     await session.rollback()
                     count = await session.scalar(
                         select(func.count())
@@ -410,7 +426,9 @@ def test_practice_and_interview_ingestion_is_idempotent_and_atomic() -> None:
     asyncio.run(run())
 
 
-def test_practice_evaluation_source_transaction_rolls_back_artifact_and_evidence() -> None:
+def test_practice_evaluation_source_transaction_rolls_back_artifact_and_evidence() -> (
+    None
+):
     async def run() -> None:
         database_url = get_integration_database_url()
         async with Database(database_url) as database:
@@ -617,18 +635,14 @@ def test_interview_review_source_transaction_rolls_back_completion_state() -> No
                         headers=interview_headers(),
                     )
                     assert finish.status_code == 202
-                    assert finish.json()["session"]["status"] == (
-                        "generatingReview"
-                    )
+                    assert finish.json()["session"]["status"] == ("generatingReview")
 
                 async with database.sessionmaker() as session:
                     questions = list(
                         (
                             await session.scalars(
                                 select(InterviewQuestion)
-                                .where(
-                                    InterviewQuestion.session_id == session_id
-                                )
+                                .where(InterviewQuestion.session_id == session_id)
                                 .order_by(InterviewQuestion.order.asc())
                             )
                         ).all()

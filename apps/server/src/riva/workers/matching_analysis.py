@@ -14,7 +14,6 @@ from riva.services.matching_analyses import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 AnalysisServiceFactory = Callable[[AsyncSession], MatchingAnalysisService]
 
 
@@ -26,9 +25,7 @@ class MatchingAnalysisHandler:
         *,
         session_factory: SessionFactory,
         agent: MatchingAnalysisAgent,
-        analysis_service_factory: AnalysisServiceFactory = (
-            MatchingAnalysisService
-        ),
+        analysis_service_factory: AnalysisServiceFactory = (MatchingAnalysisService),
     ) -> None:
         if agent.agent_id != self.agent_id:
             raise ValueError("agent must be the matching analysis agent")

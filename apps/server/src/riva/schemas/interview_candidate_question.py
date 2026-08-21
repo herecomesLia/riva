@@ -83,17 +83,11 @@ class InterviewCandidateQuestionExchangeSnapshot(InterviewCandidateQuestionModel
     interviewer_answer: CandidateQuestionText
     feedback_summary: CandidateQuestionFeedbackText
     strengths: CandidateQuestionFeedbackList = Field(default_factory=list)
-    improvement_suggestions: CandidateQuestionFeedbackList = Field(
-        default_factory=list
-    )
-    suggested_alternatives: CandidateQuestionFeedbackList = Field(
-        default_factory=list
-    )
+    improvement_suggestions: CandidateQuestionFeedbackList = Field(default_factory=list)
+    suggested_alternatives: CandidateQuestionFeedbackList = Field(default_factory=list)
 
 
-class InterviewCandidateCompletedFollowUpSnapshot(
-    InterviewCandidateQuestionModel
-):
+class InterviewCandidateCompletedFollowUpSnapshot(InterviewCandidateQuestionModel):
     id: StandardUUID
     parent_question_id: StandardUUID
     prompt: CandidateQuestionText
@@ -173,12 +167,8 @@ class InterviewCandidateQuestionRunPayload(InterviewCandidateQuestionModel):
 class InterviewCandidateQuestionFeedback(InterviewCandidateQuestionModel):
     summary: CandidateQuestionFeedbackText
     strengths: CandidateQuestionFeedbackList = Field(default_factory=list)
-    improvement_suggestions: CandidateQuestionFeedbackList = Field(
-        default_factory=list
-    )
-    suggested_alternatives: CandidateQuestionFeedbackList = Field(
-        default_factory=list
-    )
+    improvement_suggestions: CandidateQuestionFeedbackList = Field(default_factory=list)
+    suggested_alternatives: CandidateQuestionFeedbackList = Field(default_factory=list)
 
 
 class InterviewCandidateQuestionOutput(InterviewCandidateQuestionModel):

@@ -87,12 +87,8 @@ def test_practice_session_checks_cover_selection_and_completion_state() -> None:
     assert checks["ck_practice_sessions_status"] == (
         "status IN ('active', 'completed')"
     )
-    assert "projectDeepDive" in checks[
-        "ck_practice_sessions_initial_question_type"
-    ]
-    assert "technicalFoundation" in checks[
-        "ck_practice_sessions_initial_question_type"
-    ]
+    assert "projectDeepDive" in checks["ck_practice_sessions_initial_question_type"]
+    assert "technicalFoundation" in checks["ck_practice_sessions_initial_question_type"]
     assert checks["ck_practice_sessions_initial_difficulty"] == (
         "initial_difficulty IN ('basic', 'pressure')"
     )
@@ -148,7 +144,9 @@ def test_practice_attempt_table_and_columns_are_registered() -> None:
     assert table.c.question_card_id.references(QuestionCard.__table__.c.id)
 
 
-def test_practice_attempt_uses_session_ownership_and_attempt_number_uniqueness() -> None:
+def test_practice_attempt_uses_session_ownership_and_attempt_number_uniqueness() -> (
+    None
+):
     table = PracticeAttempt.__table__
     composite = next(
         constraint
@@ -174,9 +172,7 @@ def test_practice_attempt_uses_session_ownership_and_attempt_number_uniqueness()
         and [column.name for column in constraint.columns]
         == ["session_id", "attempt_number"]
     )
-    assert attempt_number_unique.name == (
-        "uq_practice_attempts_session_attempt_number"
-    )
+    assert attempt_number_unique.name == ("uq_practice_attempts_session_attempt_number")
 
 
 def test_practice_attempt_checks_cover_selection_and_status() -> None:
@@ -214,8 +210,7 @@ def test_practice_attempt_links_are_nullable_and_generation_run_is_unique() -> N
     assert unique.name == "uq_practice_attempts_question_generation_run"
 
     retry_foreign_key = next(
-        foreign_key
-        for foreign_key in table.c.retry_of_attempt_id.foreign_keys
+        foreign_key for foreign_key in table.c.retry_of_attempt_id.foreign_keys
     )
     assert retry_foreign_key.target_fullname == "practice_attempts.id"
     assert retry_foreign_key.ondelete == "SET NULL"

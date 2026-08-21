@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from riva.core.training_planning import training_planning_context_fingerprint
 from riva.models import AgentRun, AgentRunStatus, User
 from riva.prompts import TRAINING_PLANNING_PROMPT
 from riva.schemas.training_planning import (
@@ -23,8 +24,6 @@ from riva.services.training_planning import (
     TrainingPlanningStateError,
     validate_training_planning_run,
 )
-from riva.core.training_planning import training_planning_context_fingerprint
-
 
 NOW = datetime(2026, 8, 18, 10, 0, tzinfo=UTC)
 
@@ -171,9 +170,7 @@ def run_for(
         available_at=NOW,
         started_at=None if status is AgentRunStatus.QUEUED else NOW,
         finished_at=(
-            NOW
-            if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
-            else None
+            NOW if status in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED} else None
         ),
         provider="fake" if status is AgentRunStatus.SUCCEEDED else None,
         model="test-model",
@@ -334,7 +331,9 @@ def test_current_planning_replays_matching_fingerprint_without_llm_configuration
     assert response.status == "queued"
 
 
-def test_current_planning_uses_stable_request_id_for_a_new_fingerprint(monkeypatch) -> None:
+def test_current_planning_uses_stable_request_id_for_a_new_fingerprint(
+    monkeypatch,
+) -> None:
     current_user = owner()
     input = planning_input()
     run = run_for(current_user.id, input, request_id=uuid4())
@@ -383,6 +382,7 @@ def test_current_planning_uses_stable_request_id_for_a_new_fingerprint(monkeypat
 
     assert second.run_id == CurrentFakeAgentRunService.next_run.id
     assert CurrentFakeAgentRunService.calls[1]["idempotency_key"] == first_request_key
+
 
 def test_new_request_without_llm_configuration_is_unavailable() -> None:
     current_user = owner()
@@ -464,9 +464,7 @@ def test_corrupted_fingerprint_or_result_is_state_conflict() -> None:
         ScriptedSession(run),  # type: ignore[arg-type]
     )
     with pytest.raises(TrainingPlanningStateError) as raised:
-        asyncio.run(
-            service.get_planning_status(user_id=current_user.id, run_id=run.id)
-        )
+        asyncio.run(service.get_planning_status(user_id=current_user.id, run_id=run.id))
     assert raised.value.code == TRAINING_PLANNING_STATE_CONFLICT
 
 

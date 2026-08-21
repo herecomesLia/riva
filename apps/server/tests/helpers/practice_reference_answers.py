@@ -84,8 +84,7 @@ async def complete_queued_reference_answers(
                 await session.scalars(
                     select(AgentRun)
                     .where(
-                        AgentRun.agent_id
-                        == "practice-reference-answer-generator",
+                        AgentRun.agent_id == "practice-reference-answer-generator",
                         AgentRun.status == AgentRunStatus.QUEUED,
                     )
                     .order_by(

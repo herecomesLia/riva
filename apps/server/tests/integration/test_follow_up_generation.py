@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -30,7 +30,6 @@ from riva.services.follow_up_generation import (
 )
 from riva.workers import AgentHandlerRegistry, AgentWorker, FollowUpHandler
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
@@ -383,10 +382,13 @@ def test_follow_up_retry_preserves_first_ask_and_complete_decisions() -> None:
                     assert running is not None
                     running.lease_expires_at = now - timedelta(seconds=1)
                     await session.commit()
-                    assert await AgentRunService(
-                        session,
-                        clock=lambda: now,
-                    ).requeue_expired() == 1
+                    assert (
+                        await AgentRunService(
+                            session,
+                            clock=lambda: now,
+                        ).requeue_expired()
+                        == 1
+                    )
 
                 retry_provider = FakeLLMProvider([retry_response])
                 retry_worker = build_worker(database, retry_provider)

@@ -13,9 +13,9 @@ from riva.integrations import (
 )
 from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import (
+    FollowUpGenerationOutput,
     FollowUpInput,
     FollowUpQuestionOutput,
-    FollowUpGenerationOutput,
 )
 
 
@@ -77,9 +77,7 @@ class FollowUpAgent(Agent[FollowUpInput, FollowUpGenerationOutput]):
             "next_follow_up_order": input.next_follow_up_order,
         }
 
-    async def run(
-        self, input: FollowUpInput
-    ) -> AgentResult[FollowUpGenerationOutput]:
+    async def run(self, input: FollowUpInput) -> AgentResult[FollowUpGenerationOutput]:
         result = await super().run(input)
         output = result.output
         if isinstance(output, FollowUpQuestionOutput):

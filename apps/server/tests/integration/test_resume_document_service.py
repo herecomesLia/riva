@@ -1,6 +1,6 @@
 import asyncio
-from io import BytesIO
 import os
+from io import BytesIO
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -14,7 +14,6 @@ from riva.resumes import DefaultResumeTextExtractor
 from riva.services.resume_documents import ResumeDocumentService
 from riva.storage import LocalResumeObjectStorage, build_resume_storage_key
 from tests.unit.resumes.test_extraction import make_docx, make_pdf
-
 
 pytestmark = pytest.mark.integration
 
@@ -158,22 +157,31 @@ def test_resume_document_service_with_postgres_and_local_storage(
                     assert second_user_list.documents == []
 
                     stored_rows = (
-                        await session.execute(
-                            select(ResumeDocument).where(
-                                ResumeDocument.user_id == user.id
+                        (
+                            await session.execute(
+                                select(ResumeDocument).where(
+                                    ResumeDocument.user_id == user.id
+                                )
                             )
                         )
-                    ).scalars().all()
+                        .scalars()
+                        .all()
+                    )
                     assert len(stored_rows) == 8
-                    assert sum(row.extraction_status == "failed" for row in stored_rows) == 2
+                    assert (
+                        sum(row.extraction_status == "failed" for row in stored_rows)
+                        == 2
+                    )
                     rows_by_id = {row.id: row for row in stored_rows}
                     assert rows_by_id[pasted.id].storage_key is None
-                    assert rows_by_id[duplicate_one.id].sha256 == rows_by_id[
-                        duplicate_two.id
-                    ].sha256
-                    assert rows_by_id[duplicate_one.id].storage_key != rows_by_id[
-                        duplicate_two.id
-                    ].storage_key
+                    assert (
+                        rows_by_id[duplicate_one.id].sha256
+                        == rows_by_id[duplicate_two.id].sha256
+                    )
+                    assert (
+                        rows_by_id[duplicate_one.id].storage_key
+                        != rows_by_id[duplicate_two.id].storage_key
+                    )
             finally:
                 await database.drop_tables()
 

@@ -14,7 +14,6 @@ from riva.services.resume_imports import (
     ResumeImportStateError,
 )
 
-
 NOW = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
 USER_ID = UUID("11111111-1111-4111-8111-111111111111")
 DOCUMENT_ID = UUID("22222222-2222-4222-8222-222222222222")

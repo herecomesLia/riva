@@ -24,9 +24,7 @@ class ResumeParsingAgent(Agent[ResumeParsingInput, ResumeParsingOutput]):
     def agent_id(self) -> str:
         return "resume-parser"
 
-    def prompt_values(
-        self, input: ResumeParsingInput
-    ) -> Mapping[str, object]:
+    def prompt_values(self, input: ResumeParsingInput) -> Mapping[str, object]:
         return {
             "resume_text": input.resume_text,
             "interaction_language": input.interaction_language,

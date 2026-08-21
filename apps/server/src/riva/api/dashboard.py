@@ -6,7 +6,6 @@ from riva.models import User
 from riva.schemas.dashboard import DashboardResponse
 from riva.services.dashboard import DashboardService
 
-
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 

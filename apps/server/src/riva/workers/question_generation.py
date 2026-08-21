@@ -19,10 +19,7 @@ from riva.services.question_generation_prompt_versions import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
-QuestionGenerationServiceFactory = Callable[
-    [AsyncSession], QuestionGenerationService
-]
+QuestionGenerationServiceFactory = Callable[[AsyncSession], QuestionGenerationService]
 
 
 class QuestionGenerationHandler:
@@ -116,9 +113,7 @@ class QuestionGenerationHandler:
 
         try:
             async with self.session_factory() as session:
-                card = await self.generation_service_factory(
-                    session
-                ).persist_success(
+                card = await self.generation_service_factory(session).persist_success(
                     run,
                     result.output,
                 )

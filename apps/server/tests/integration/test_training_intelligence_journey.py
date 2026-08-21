@@ -46,20 +46,27 @@ from tests.helpers.practice_reference_answers import (
 )
 from tests.integration.test_interview_planning_workflow import (
     _app as interview_app,
+)
+from tests.integration.test_interview_planning_workflow import (
     _planner_output,
-    _settings as interview_settings,
     _start_and_begin,
+)
+from tests.integration.test_interview_planning_workflow import (
+    _settings as interview_settings,
+)
+from tests.integration.test_interview_planning_workflow import (
     _worker as interview_worker,
 )
 from tests.integration.test_practice_next_question_workflow import (
     build_worker as practice_worker,
+)
+from tests.integration.test_practice_next_question_workflow import (
     evaluation_output,
     question_output,
     recommendation_output,
     review_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 
@@ -259,30 +266,30 @@ def test_training_intelligence_cross_module_journey() -> None:
                 profile_id = profile.profile_id
 
                 async with database.sessionmaker() as session:
-                    session.add(
-                        CurrentTargetRole(user_id=owner_id, role_id=role_id)
-                    )
+                    session.add(CurrentTargetRole(user_id=owner_id, role_id=role_id))
                     await session.commit()
 
-                first_session_id, first_attempt_id = (
-                    await _complete_personalized_practice(
-                        database,
-                        user_id=owner_id,
-                        role_id=role_id,
-                        project_id=project_id,
-                        label="first",
-                        score=82,
-                    )
+                (
+                    first_session_id,
+                    first_attempt_id,
+                ) = await _complete_personalized_practice(
+                    database,
+                    user_id=owner_id,
+                    role_id=role_id,
+                    project_id=project_id,
+                    label="first",
+                    score=82,
                 )
-                second_session_id, second_attempt_id = (
-                    await _complete_personalized_practice(
-                        database,
-                        user_id=owner_id,
-                        role_id=role_id,
-                        project_id=project_id,
-                        label="second",
-                        score=50,
-                    )
+                (
+                    second_session_id,
+                    second_attempt_id,
+                ) = await _complete_personalized_practice(
+                    database,
+                    user_id=owner_id,
+                    role_id=role_id,
+                    project_id=project_id,
+                    label="second",
+                    score=50,
                 )
 
                 async with database.sessionmaker() as session:
@@ -371,9 +378,10 @@ def test_training_intelligence_cross_module_journey() -> None:
                         and item.score is not None
                         for item in score_evidence
                     )
-                    assert {
-                        item.source_session_id for item in score_evidence
-                    } == {first_session_id, second_session_id}
+                    assert {item.source_session_id for item in score_evidence} == {
+                        first_session_id,
+                        second_session_id,
+                    }
 
                 async with database.sessionmaker() as session:
                     await CompetencyAggregationService(
@@ -393,8 +401,7 @@ def test_training_intelligence_cross_module_journey() -> None:
                         (
                             await session.scalars(
                                 select(CompetencyEvidence).where(
-                                    CompetencyEvidence.competency_id
-                                    == competency_id
+                                    CompetencyEvidence.competency_id == competency_id
                                 )
                             )
                         ).all()
@@ -414,15 +421,12 @@ def test_training_intelligence_cross_module_journey() -> None:
                     assert competency.last_evidence_at is not None
                     assert competency.last_evidence_at.tzinfo is not None
 
-                    memory = await TrainingMemoryService(session).get_context(
-                        owner_id
-                    )
+                    memory = await TrainingMemoryService(session).get_context(owner_id)
                     memory_snapshot = memory.model_dump(mode="json", by_alias=True)
                     memory_keys = {
                         item.competency_key
                         for item in (
-                            memory.focus_competencies
-                            + memory.established_competencies
+                            memory.focus_competencies + memory.established_competencies
                         )
                     }
                     assert "answer_quality" in memory_keys
@@ -453,8 +457,7 @@ def test_training_intelligence_cross_module_journey() -> None:
                         question_output(
                             project_id,
                             prompt=(
-                                "Explain the next evidence-based reliability "
-                                "decision."
+                                "Explain the next evidence-based reliability decision."
                             ),
                         )
                     ],
@@ -468,8 +471,7 @@ def test_training_intelligence_cross_module_journey() -> None:
                     ),
                 ).process_one()
                 question_messages = "\n".join(
-                    message.content
-                    for message in question_provider.calls[0].messages
+                    message.content for message in question_provider.calls[0].messages
                 )
                 serialized_memory = json.dumps(
                     generated_memory,
@@ -562,8 +564,7 @@ def test_training_intelligence_cross_module_journey() -> None:
                     latest_score = await session.scalar(
                         select(CompetencyEvidence)
                         .where(
-                            CompetencyEvidence.competency_id
-                            == answer_quality.id,
+                            CompetencyEvidence.competency_id == answer_quality.id,
                             CompetencyEvidence.signal_type == "score",
                         )
                         .order_by(
@@ -578,9 +579,7 @@ def test_training_intelligence_cross_module_journey() -> None:
                         dashboard.recommendation.source_record_id
                         == latest_score.source_session_id
                     )
-                    assert (
-                        dashboard.recommendation.target_role_id == role_id
-                    )
+                    assert dashboard.recommendation.target_role_id == role_id
 
                     records = await TrainingRecordService(
                         session
@@ -593,14 +592,8 @@ def test_training_intelligence_cross_module_journey() -> None:
                         for item in records.items
                         if item.record_id == second_session_id
                     )
-                    assert (
-                        practice_record.kind
-                        is TrainingRecordKind.TARGETED_PRACTICE
-                    )
-                    assert (
-                        practice_record.status
-                        is TrainingRecordStatus.COMPLETED
-                    )
+                    assert practice_record.kind is TrainingRecordKind.TARGETED_PRACTICE
+                    assert practice_record.status is TrainingRecordStatus.COMPLETED
 
                     overview = await TrainingRecordService(
                         session

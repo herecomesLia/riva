@@ -21,20 +21,23 @@ from riva.models import (
 )
 from riva.services.agent_runs import AgentRunService
 from riva.services.review_generation import (
-    ReviewGenerationStateError,
     ReviewGenerationService,
+    ReviewGenerationStateError,
     practice_review_idempotency_key,
 )
 from riva.workers import AgentHandlerRegistry, AgentWorker, PracticeReviewHandler
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_evaluation_generation import (
     build_worker as build_evaluation_worker,
+)
+from tests.integration.test_evaluation_generation import (
     database_url,
-    enqueue as enqueue_evaluation,
     evaluation_response,
     prepare_context,
 )
-
+from tests.integration.test_evaluation_generation import (
+    enqueue as enqueue_evaluation,
+)
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
@@ -147,9 +150,7 @@ def test_real_evaluation_to_review_worker_uses_frozen_canonical_lineage(
                         user_id=owner.id,
                         attempt_id=attempt.id,
                         interaction_language="en",
-                        idempotency_key=practice_review_idempotency_key(
-                            attempt.id
-                        ),
+                        idempotency_key=practice_review_idempotency_key(attempt.id),
                     )
                     assert review_run.status is AgentRunStatus.QUEUED
                     assert review_run.max_attempts == 3
@@ -267,10 +268,13 @@ def test_real_review_retry_keeps_first_persisted_review_and_agent_result() -> No
                     assert running is not None
                     running.lease_expires_at = now - timedelta(seconds=1)
                     await session.commit()
-                    assert await AgentRunService(
-                        session,
-                        clock=lambda: now,
-                    ).requeue_expired() == 1
+                    assert (
+                        await AgentRunService(
+                            session,
+                            clock=lambda: now,
+                        ).requeue_expired()
+                        == 1
+                    )
 
                 retry_provider = FakeLLMProvider([review_response("SECOND")])
                 assert await build_review_worker(database, retry_provider).process_one()
@@ -307,7 +311,9 @@ def test_real_review_retry_keeps_first_persisted_review_and_agent_result() -> No
     asyncio.run(run_test())
 
 
-def test_review_enqueue_rejects_evaluation_artifact_before_source_run_succeeds() -> None:
+def test_review_enqueue_rejects_evaluation_artifact_before_source_run_succeeds() -> (
+    None
+):
     async def run_test() -> None:
         async with Database(database_url()) as database:
             await database.reset()

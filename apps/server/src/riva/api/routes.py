@@ -8,13 +8,13 @@ from riva.api.interview import router as interview_router
 from riva.api.job_description_import_drafts import (
     router as job_description_import_drafts_router,
 )
-from riva.api.profile import router as profile_router
 from riva.api.practice import router as practice_router
+from riva.api.profile import router as profile_router
 from riva.api.question_cards import router as question_cards_router
 from riva.api.resumes import router as resume_router
 from riva.api.roles import router as roles_router
-from riva.api.training_records import router as training_records_router
 from riva.api.training_planning import router as training_planning_router
+from riva.api.training_records import router as training_records_router
 from riva.api.users import router as users_router
 
 router = APIRouter()

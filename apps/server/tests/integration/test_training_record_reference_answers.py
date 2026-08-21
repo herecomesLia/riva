@@ -42,7 +42,6 @@ from tests.integration.test_practice_review_workflow import (
     review_output,
 )
 
-
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 START = datetime(2026, 8, 16, 9, 30, tzinfo=UTC)
@@ -83,9 +82,7 @@ async def clear_reference_answer_lineage(
                     PracticeReferenceAnswerArtifact.source_agent_run_id.in_(run_ids)
                 )
             )
-            await session.execute(
-                delete(AgentRun).where(AgentRun.id.in_(run_ids))
-            )
+            await session.execute(delete(AgentRun).where(AgentRun.id.in_(run_ids)))
         await session.commit()
 
 
@@ -105,9 +102,13 @@ async def reference_run_count(database: Database, *, user_id: UUID) -> int:
 async def complete_follow_up_record(
     database: Database,
 ) -> tuple[UUID, UUID, UUID, UUID]:
-    owner, session_id, attempt_id, question_id, first_follow_up_id = (
-        await prepare_follow_up_question(database)
-    )
+    (
+        owner,
+        session_id,
+        attempt_id,
+        question_id,
+        first_follow_up_id,
+    ) = await prepare_follow_up_question(database)
 
     async with database.sessionmaker() as session:
         submitted = await PracticeSessionService(
@@ -252,9 +253,14 @@ def test_training_record_reference_answer_main_lifecycle() -> None:
         async with Database(url) as database:
             await database.reset()
             try:
-                user_id, session_id, attempt_id, card_id, first_run_id, _project_id = (
-                    await produce_first_review(database)
-                )
+                (
+                    user_id,
+                    session_id,
+                    attempt_id,
+                    card_id,
+                    first_run_id,
+                    _project_id,
+                ) = await produce_first_review(database)
                 async with database.sessionmaker() as session:
                     completed = await PracticeSessionService(
                         session,
@@ -330,9 +336,7 @@ def test_training_record_reference_answer_main_lifecycle() -> None:
                         },
                         headers={"Origin": TRUSTED_ORIGIN},
                     )
-                    detail = client.get(
-                        f"/api/training-records/practice/{session_id}"
-                    )
+                    detail = client.get(f"/api/training-records/practice/{session_id}")
                 assert refreshed.status_code == 200
                 assert refreshed.json()["referenceAnswer"]["status"] == "revealed"
                 assert await reference_run_count(database, user_id=user_id) == 1
@@ -340,8 +344,9 @@ def test_training_record_reference_answer_main_lifecycle() -> None:
                 body = detail.json()
                 assert body["status"] == "completed"
                 assert body["attempts"][0]["attemptId"] == str(attempt_id)
-                assert body["attempts"][0]["question"]["referenceAnswer"] == (
-                    refreshed.json()["referenceAnswer"]
+                assert (
+                    body["attempts"][0]["question"]["referenceAnswer"]
+                    == (refreshed.json()["referenceAnswer"])
                 )
 
                 async with database.sessionmaker() as session:
@@ -354,8 +359,7 @@ def test_training_record_reference_answer_main_lifecycle() -> None:
                             await session.scalars(
                                 select(AgentRun).where(
                                     AgentRun.user_id == user_id,
-                                    AgentRun.agent_id
-                                    == "question-generator",
+                                    AgentRun.agent_id == "question-generator",
                                 )
                             )
                         ).all()
@@ -393,9 +397,12 @@ def test_training_record_reference_answer_follow_up_lifecycle() -> None:
         async with Database(url) as database:
             await database.reset()
             try:
-                user_id, session_id, attempt_id, follow_up_id = (
-                    await complete_follow_up_record(database)
-                )
+                (
+                    user_id,
+                    session_id,
+                    attempt_id,
+                    follow_up_id,
+                ) = await complete_follow_up_record(database)
                 assert await reference_run_count(database, user_id=user_id) == 0
                 app = create_app(settings(url))
                 async with database.sessionmaker() as session:

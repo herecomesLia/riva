@@ -2,7 +2,6 @@ from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT
 from riva.prompts.base import PromptDefinition
 from riva.schemas.practice_recommendation import PracticeRecommendationOutput
 
-
 # Keep the original definition immutable so queued and replayed v1 runs render
 # the exact prompt they were created with.
 PRACTICE_RECOMMENDATION_LEGACY_PROMPT = PromptDefinition(

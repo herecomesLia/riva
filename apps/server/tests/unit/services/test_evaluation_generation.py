@@ -223,9 +223,7 @@ def context_graph(
                 source_agent_run_id=uuid4(),
                 order=2,
                 action="complete" if shape == "one" else "askFollowUp",
-                follow_up_question_id=(
-                    None if shape == "one" else questions[1].id
-                ),
+                follow_up_question_id=(None if shape == "one" else questions[1].id),
                 created_at=NOW,
             )
         )
@@ -254,15 +252,9 @@ def run_for(
     reason: str,
     unanswered_question_id: UUID | None = None,
 ) -> AgentRun:
-    first = (
-        (questions[0], follow_up_answers[0])
-        if follow_up_answers
-        else None
-    )
+    first = (questions[0], follow_up_answers[0]) if follow_up_answers else None
     second = (
-        (questions[1], follow_up_answers[1])
-        if len(follow_up_answers) > 1
-        else None
+        (questions[1], follow_up_answers[1]) if len(follow_up_answers) > 1 else None
     )
     payload = EvaluationRunPayload(
         attempt_id=attempt.id,
@@ -422,8 +414,8 @@ def valid_output(*, score: int = 80) -> PracticeEvaluationOutput:
 
 
 def load_context_values(shape: str) -> tuple[AgentRun, tuple[object, ...]]:
-    session, attempt, card, main, questions, follow_answers, decisions = (
-        context_graph(shape)
+    session, attempt, card, main, questions, follow_answers, decisions = context_graph(
+        shape
     )
     reason = "noFollowUpRequired" if shape == "none" else "allAnswered"
     run = run_for(
@@ -452,8 +444,8 @@ def ended_context_values(
     completed_first_follow_up: bool,
 ) -> tuple[AgentRun, tuple[object, ...]]:
     shape = "two" if completed_first_follow_up else "one"
-    session, attempt, card, main, questions, follow_answers, decisions = (
-        context_graph(shape)
+    session, attempt, card, main, questions, follow_answers, decisions = context_graph(
+        shape
     )
     if completed_first_follow_up:
         follow_answers = follow_answers[:1]
@@ -785,9 +777,7 @@ def test_ended_early_rejects_wrong_frozen_lineage(field: str) -> None:
         asyncio.run(
             EvaluationGenerationService(
                 db  # type: ignore[arg-type]
-            ).load_generation_input(
-                run
-            )
+            ).load_generation_input(run)
         )
     assert error.value.code == PRACTICE_EVALUATION_CONTEXT_CONFLICT
 
@@ -826,8 +816,9 @@ def test_ended_early_rejects_an_answer_added_to_the_pending_question() -> None:
     assert db.added == []
 
 
-def test_persist_success_writes_one_canonical_artifact_without_status_mutation(
-) -> None:
+def test_persist_success_writes_one_canonical_artifact_without_status_mutation() -> (
+    None
+):
     run, values = load_context_values("none")
     session, attempt, card, main, questions, follow_answers, decisions = values
     db = session_for_context(
@@ -1013,8 +1004,9 @@ def test_malformed_persisted_artifact_is_not_replaced_on_retry() -> None:
 def test_follow_up_decision_source_run_must_exist() -> None:
     assert_follow_up_provenance_rejected(
         "none",
-        lambda _run, _session, _attempt, _card, _main, _questions, _answers,
-        _decisions, source_runs: source_runs.clear(),
+        lambda _run, _session, _attempt, _card, _main, _questions, _answers, _decisions, source_runs: (
+            source_runs.clear()
+        ),
     )
 
 

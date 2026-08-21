@@ -32,10 +32,10 @@ from riva.schemas.interview_candidate_question import (
     InterviewCandidateQuestionAnswerSnapshot,
     InterviewCandidateQuestionExchangeSnapshot,
     InterviewCandidateQuestionInput,
+    InterviewCandidateQuestionOutput,
     InterviewCandidateQuestionRunPayload,
     InterviewCandidateQuestionSessionSnapshot,
     InterviewCandidateQuestionSnapshot,
-    InterviewCandidateQuestionOutput,
 )
 from riva.schemas.interview_planning import InterviewPlanningRunPayload
 from riva.services.agent_runs import AgentRunService
@@ -43,7 +43,6 @@ from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
 )
 from riva.utils import utc_now
-
 
 InterviewCandidateQuestionStateErrorCode = Literal[
     "interview_session_not_found",
@@ -55,27 +54,17 @@ InterviewCandidateQuestionStateErrorCode = Literal[
     "interview_candidate_question_content_invalid",
 ]
 
-INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND: InterviewCandidateQuestionStateErrorCode = (
-    "interview_session_not_found"
-)
-INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT: InterviewCandidateQuestionStateErrorCode = (
-    "interview_candidate_question_version_conflict"
-)
+INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND: InterviewCandidateQuestionStateErrorCode = "interview_session_not_found"
+INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_version_conflict"
 INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID: InterviewCandidateQuestionStateErrorCode = (
     "interview_candidate_question_state_invalid"
 )
 INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID: InterviewCandidateQuestionStateErrorCode = (
     "interview_candidate_question_run_invalid"
 )
-INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID: InterviewCandidateQuestionStateErrorCode = (
-    "interview_candidate_question_snapshot_invalid"
-)
-INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED: InterviewCandidateQuestionStateErrorCode = (
-    "interview_candidate_question_model_not_configured"
-)
-INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID: InterviewCandidateQuestionStateErrorCode = (
-    "interview_candidate_question_content_invalid"
-)
+INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_snapshot_invalid"
+INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_model_not_configured"
+INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_content_invalid"
 
 
 class InterviewCandidateQuestionStateError(RuntimeError):
@@ -119,17 +108,20 @@ class InterviewCandidateQuestionService:
                 )
             normalized_content = _normalized_content(content)
             now = self._now()
-            order = int(
-                await self.session.scalar(
-                    select(InterviewCandidateQuestion.order)
-                    .where(
-                        InterviewCandidateQuestion.session_id == session_id,
+            order = (
+                int(
+                    await self.session.scalar(
+                        select(InterviewCandidateQuestion.order)
+                        .where(
+                            InterviewCandidateQuestion.session_id == session_id,
+                        )
+                        .order_by(InterviewCandidateQuestion.order.desc())
+                        .limit(1)
                     )
-                    .order_by(InterviewCandidateQuestion.order.desc())
-                    .limit(1)
+                    or 0
                 )
-                or 0
-            ) + 1
+                + 1
+            )
             question = InterviewCandidateQuestion(
                 id=uuid4(),
                 session_id=session_id,
@@ -161,7 +153,7 @@ class InterviewCandidateQuestionService:
         except InterviewCandidateQuestionStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
@@ -229,7 +221,7 @@ class InterviewCandidateQuestionService:
         except InterviewCandidateQuestionStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
@@ -255,9 +247,7 @@ class InterviewCandidateQuestionService:
             validated_output = _validate_output(output)
             await self._lock_user(run.user_id)
             persisted_run = await self.session.scalar(
-                select(AgentRun)
-                .where(AgentRun.id == run.id)
-                .with_for_update()
+                select(AgentRun).where(AgentRun.id == run.id).with_for_update()
             )
             if persisted_run is None or _status_value(persisted_run.status) != (
                 AgentRunStatus.RUNNING.value
@@ -321,9 +311,7 @@ class InterviewCandidateQuestionService:
                     interviewer_answer=validated_output.interviewer_answer,
                     feedback_summary=feedback.summary,
                     strengths=list(feedback.strengths),
-                    improvement_suggestions=list(
-                        feedback.improvement_suggestions
-                    ),
+                    improvement_suggestions=list(feedback.improvement_suggestions),
                     suggested_alternatives=list(feedback.suggested_alternatives),
                     created_at=self._now(),
                 )
@@ -336,7 +324,7 @@ class InterviewCandidateQuestionService:
         except InterviewCandidateQuestionStateError:
             await self.session.rollback()
             raise
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             await self.session.rollback()
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
@@ -366,9 +354,7 @@ class InterviewCandidateQuestionService:
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             )
         try:
-            planning_prompt = get_interview_planning_prompt(
-                planning_run.prompt_version
-            )
+            planning_prompt = get_interview_planning_prompt(planning_run.prompt_version)
         except ValueError:
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
@@ -397,9 +383,9 @@ class InterviewCandidateQuestionService:
                         select(InterviewQuestion)
                         .options(
                             selectinload(InterviewQuestion.answer),
-                            selectinload(InterviewQuestion.follow_up_questions).selectinload(
-                                InterviewFollowUpQuestion.answer
-                            ),
+                            selectinload(
+                                InterviewQuestion.follow_up_questions
+                            ).selectinload(InterviewFollowUpQuestion.answer),
                         )
                         .where(
                             InterviewQuestion.session_id == interview_session.id,
@@ -412,7 +398,9 @@ class InterviewCandidateQuestionService:
                 (
                     await self.session.scalars(
                         select(InterviewCandidateQuestionExchange)
-                        .options(selectinload(InterviewCandidateQuestionExchange.question))
+                        .options(
+                            selectinload(InterviewCandidateQuestionExchange.question)
+                        )
                         .where(
                             InterviewCandidateQuestionExchange.session_id
                             == interview_session.id,
@@ -451,7 +439,7 @@ class InterviewCandidateQuestionService:
             )
         except InterviewCandidateQuestionStateError:
             raise
-        except (TypeError, ValueError, ValidationError, AttributeError):
+        except TypeError, ValueError, ValidationError, AttributeError:
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             ) from None
@@ -571,7 +559,7 @@ class InterviewCandidateQuestionService:
         cls._validate_run_metadata(run, run.user_id)
         try:
             return InterviewCandidateQuestionRunPayload.model_validate(run.payload)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             ) from None
@@ -655,7 +643,7 @@ def _output_from_exchange(
 def _validate_output(output: object) -> InterviewCandidateQuestionOutput:
     try:
         return InterviewCandidateQuestionOutput.model_validate(output)
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise InterviewCandidateQuestionStateError(
             INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
         ) from None

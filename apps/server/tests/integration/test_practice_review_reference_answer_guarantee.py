@@ -44,7 +44,6 @@ from tests.integration.test_practice_review_workflow import (
 )
 from tests.integration.test_question_generation import database_url
 
-
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 15, 9, 30, tzinfo=UTC)
 
@@ -254,7 +253,9 @@ def test_review_reference_answers_are_guaranteed_without_user_requests() -> None
                         second_question_id
                     ),
                 ]
-                assert all(run.status is AgentRunStatus.QUEUED for run in reference_runs)
+                assert all(
+                    run.status is AgentRunStatus.QUEUED for run in reference_runs
+                )
 
                 reference_worker = build_reference_worker(
                     database,
@@ -297,7 +298,9 @@ def test_review_reference_answers_are_guaranteed_without_user_requests() -> None
                 assert response.status == "review"
                 assert response.version == 8
                 assert response.question.reference_answer.status == "revealed"
-                assert response.question.reference_answer.viewed_before_submission is False
+                assert (
+                    response.question.reference_answer.viewed_before_submission is False
+                )
                 assert all(
                     exchange.question.reference_answer.status == "revealed"
                     for exchange in response.follow_up_exchanges

@@ -13,7 +13,6 @@ from riva.models import PracticeAttempt, PracticeReview, PracticeSession, Target
 from riva.schemas.practice_sessions import PracticeAttemptStatus
 from riva.schemas.question_cards import QuestionCardQuestionType
 
-
 MAX_PRACTICE_WEAKNESS_FOCUS_ITEMS = 8
 
 
@@ -74,9 +73,7 @@ class PracticeWeaknessService:
         evidence: list[PracticeWeaknessEvidence] = []
         seen: set[str] = set()
         for candidate in candidates:
-            for weakness in self._normalized_weaknesses(
-                candidate.exposed_weaknesses
-            ):
+            for weakness in self._normalized_weaknesses(candidate.exposed_weaknesses):
                 normalized = " ".join(weakness.split()).casefold()
                 if normalized in seen:
                     continue
@@ -195,11 +192,7 @@ class PracticeWeaknessService:
             key=lambda candidate: (
                 2
                 if candidate.target_role_id != target_role_id
-                else (
-                    0
-                    if candidate.question_type == question_type
-                    else 1
-                )
+                else (0 if candidate.question_type == question_type else 1)
             )
         )
         return candidates

@@ -23,8 +23,9 @@ from riva.schemas.interview import (
     InterviewCandidateQuestionExchangeResponse,
     InterviewCandidateQuestionFeedbackResponse,
     InterviewCandidateQuestionResponse,
-    InterviewCompletionReason,
     InterviewCompleteReviewResponse,
+    InterviewCompleteReviewStateResponse,
+    InterviewCompletionReason,
     InterviewDifficulty,
     InterviewFollowUpLearningDetailResponse,
     InterviewFollowUpQuestionResponse,
@@ -38,7 +39,6 @@ from riva.schemas.interview import (
     InterviewRound,
     InterviewSessionReviewResponse,
     InterviewUnavailableReviewResponse,
-    InterviewCompleteReviewStateResponse,
 )
 from riva.schemas.training_records import (
     MockInterviewTrainingRecordDetailResponse,
@@ -48,14 +48,11 @@ from riva.schemas.training_records import (
     TrainingRecordTargetRoleResponse,
 )
 
-
 TrainingRecordStateErrorCode = Literal[
     "training_record_not_found",
     "training_record_state_conflict",
 ]
-TRAINING_RECORD_NOT_FOUND: TrainingRecordStateErrorCode = (
-    "training_record_not_found"
-)
+TRAINING_RECORD_NOT_FOUND: TrainingRecordStateErrorCode = "training_record_not_found"
 TRAINING_RECORD_STATE_CONFLICT: TrainingRecordStateErrorCode = (
     "training_record_state_conflict"
 )
@@ -150,9 +147,7 @@ class InterviewTrainingRecordService:
                 InterviewSession.target_role_id == target_role_id
             )
         if started_at_from is not None:
-            statement = statement.where(
-                InterviewSession.started_at >= started_at_from
-            )
+            statement = statement.where(InterviewSession.started_at >= started_at_from)
         if started_at_to is not None:
             statement = statement.where(InterviewSession.started_at <= started_at_to)
         return list((await self.session.scalars(statement)).all())
@@ -255,7 +250,8 @@ class InterviewTrainingRecordService:
             role is None
             or review is None
             or completed_at is None
-            or record.completion_reason not in {
+            or record.completion_reason
+            not in {
                 "formalQuestionsCompleted",
                 "userEndedEarly",
             }
@@ -321,19 +317,16 @@ class InterviewTrainingRecordService:
                 InterviewQuestionLearningDetailResponse.model_validate(item)
                 for item in review.question_details
             ]
-        except (TypeError, ValueError, ValidationError):
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+        except TypeError, ValueError, ValidationError:
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
         snapshot_by_question_id = {
             detail.record.question.id: detail for detail in snapshots
         }
         questions = sorted(record.questions, key=lambda item: item.order)
-        if (
-            len(snapshot_by_question_id) != len(snapshots)
-            or set(snapshot_by_question_id) != {question.id for question in questions}
-        ):
+        if len(snapshot_by_question_id) != len(snapshots) or set(
+            snapshot_by_question_id
+        ) != {question.id for question in questions}:
             raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
 
         result: list[InterviewQuestionLearningDetailResponse] = []
@@ -364,18 +357,15 @@ class InterviewTrainingRecordService:
                 continue
 
             snapshot_follow_ups = {
-                detail.record.question.id: detail
-                for detail in snapshot.follow_ups
+                detail.record.question.id: detail for detail in snapshot.follow_ups
             }
             follow_up_questions = sorted(
                 question.follow_up_questions,
                 key=lambda item: item.order,
             )
-            if (
-                len(snapshot_follow_ups) != len(snapshot.follow_ups)
-                or set(snapshot_follow_ups)
-                != {follow_up.id for follow_up in follow_up_questions}
-            ):
+            if len(snapshot_follow_ups) != len(snapshot.follow_ups) or set(
+                snapshot_follow_ups
+            ) != {follow_up.id for follow_up in follow_up_questions}:
                 raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
 
             follow_up_records: list[InterviewFollowUpRecordResponse] = []
@@ -384,7 +374,10 @@ class InterviewTrainingRecordService:
                 follow_up_snapshot = snapshot_follow_ups[follow_up.id]
                 cls._require_ready_reference(follow_up_snapshot.reference_answer)
                 follow_up_answer = follow_up.answer
-                if follow_up_answer is None and follow_up_snapshot.performance is not None:
+                if (
+                    follow_up_answer is None
+                    and follow_up_snapshot.performance is not None
+                ):
                     raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
                 follow_up_record = InterviewFollowUpRecordResponse(
                     status="answered" if follow_up_answer is not None else "unanswered",
@@ -447,9 +440,11 @@ class InterviewTrainingRecordService:
             if review.status == "complete":
                 return InterviewCompleteReviewStateResponse(
                     status="complete",
-                    review=InterviewCompleteReviewResponse.model_validate(review.review),
+                    review=InterviewCompleteReviewResponse.model_validate(
+                        review.review
+                    ),
                 )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             pass
         raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
 
@@ -488,20 +483,14 @@ class InterviewTrainingRecordService:
                     feedback=InterviewCandidateQuestionFeedbackResponse(
                         summary=exchange.feedback_summary,
                         strengths=list(exchange.strengths),
-                        improvement_suggestions=list(
-                            exchange.improvement_suggestions
-                        ),
-                        suggested_alternatives=list(
-                            exchange.suggested_alternatives
-                        ),
+                        improvement_suggestions=list(exchange.improvement_suggestions),
+                        suggested_alternatives=list(exchange.suggested_alternatives),
                     ),
                 )
                 for exchange in exchanges
             ]
-        except (AttributeError, TypeError, ValueError):
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+        except AttributeError, TypeError, ValueError:
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _question_response(question: InterviewQuestion) -> InterviewQuestionResponse:
@@ -513,10 +502,8 @@ class InterviewTrainingRecordService:
                 assessed_capabilities=list(question.assessed_capabilities),
                 order=question.order,
             )
-        except (AttributeError, TypeError, ValueError):
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+        except AttributeError, TypeError, ValueError:
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _answer_response(answer: InterviewAnswer) -> InterviewAnswerResponse:
@@ -526,10 +513,8 @@ class InterviewTrainingRecordService:
                 content=answer.content,
                 submitted_at=answer.submitted_at,
             )
-        except (AttributeError, TypeError, ValueError):
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+        except AttributeError, TypeError, ValueError:
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _follow_up_question_response(
@@ -543,10 +528,8 @@ class InterviewTrainingRecordService:
                 order=question.order,
                 created_at=question.created_at,
             )
-        except (AttributeError, TypeError, ValueError):
-            raise TrainingRecordStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+        except AttributeError, TypeError, ValueError:
+            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _require_ready_reference(reference_answer: object) -> None:

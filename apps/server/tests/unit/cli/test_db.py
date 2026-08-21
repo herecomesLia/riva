@@ -5,7 +5,6 @@ from typer.testing import CliRunner
 import riva.cli.db as db_module
 from riva.cli.main import app
 
-
 DATABASE_URL = "postgresql+asyncpg://cli_user:cli_pass@localhost/cli_db"
 
 

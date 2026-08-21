@@ -17,27 +17,27 @@ from riva.models import (
     AgentRunStatus,
     PracticeAnswer,
     PracticeAttempt,
+    PracticeEvaluation,
     PracticeFollowUpDecision,
     PracticeFollowUpQuestion,
-    PracticeEvaluation,
     PracticeSession,
     QuestionCard,
     User,
 )
+from riva.prompts import PRACTICE_EVALUATION_PROMPT
+from riva.schemas.evaluation import EvaluationRunPayload
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
-from riva.schemas.evaluation import EvaluationRunPayload
-from riva.prompts import PRACTICE_EVALUATION_PROMPT
+from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PracticeSessionService,
     PracticeSessionStateError,
-    practice_question_generation_idempotency_key,
     practice_follow_up_idempotency_key,
+    practice_question_generation_idempotency_key,
 )
-from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.services.question_generation import QuestionGenerationService
 from riva.workers import (
     AgentHandlerRegistry,
@@ -52,7 +52,6 @@ from tests.integration.test_question_generation import (
     database_url,
     seed_context,
 )
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)
@@ -297,8 +296,8 @@ def test_practice_primary_answer_submit_is_atomic_and_idempotent() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, attempt, card = await seed_answering_session(
+                    database
                 )
                 submitted_session, submitted_attempt, run = await submit_answer(
                     database,
@@ -379,8 +378,8 @@ def test_practice_follow_up_refresh_reconciles_canonical_result(
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, _, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, _, card = await seed_answering_session(
+                    database
                 )
                 _, _, run = await submit_answer(
                     database,
@@ -406,14 +405,12 @@ def test_practice_follow_up_refresh_reconciles_canonical_result(
                     assert refreshed.session.version == 4
                     decision = await session.scalar(
                         select(PracticeFollowUpDecision).where(
-                            PracticeFollowUpDecision.source_agent_run_id
-                            == run.id
+                            PracticeFollowUpDecision.source_agent_run_id == run.id
                         )
                     )
                     question = await session.scalar(
                         select(PracticeFollowUpQuestion).where(
-                            PracticeFollowUpQuestion.source_agent_run_id
-                            == run.id
+                            PracticeFollowUpQuestion.source_agent_run_id == run.id
                         )
                     )
                     assert decision is not None
@@ -453,9 +450,7 @@ def test_practice_follow_up_refresh_reconciles_canonical_result(
                         )
                         assert EvaluationRunPayload.model_validate(
                             evaluation_run.payload
-                        ).follow_up_completion_reason.value == (
-                            "noFollowUpRequired"
-                        )
+                        ).follow_up_completion_reason.value == ("noFollowUpRequired")
             finally:
                 await database.reset()
 
@@ -467,8 +462,8 @@ def test_practice_complete_refresh_runs_evaluation_and_get_stays_evaluating() ->
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, _, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, _, card = await seed_answering_session(
+                    database
                 )
                 _, _, follow_up_run = await submit_answer(
                     database,
@@ -493,9 +488,7 @@ def test_practice_complete_refresh_runs_evaluation_and_get_stays_evaluating() ->
                     )
                     assert refreshed.attempt.status == "evaluating"
                     assert refreshed.session.version == 4
-                    evaluation_run_id = (
-                        refreshed.evaluation_generation_run.id
-                    )  # type: ignore[attr-defined]
+                    evaluation_run_id = refreshed.evaluation_generation_run.id  # type: ignore[attr-defined]
 
                 async with database.sessionmaker() as session:
                     current = await PracticeSessionService(
@@ -517,8 +510,7 @@ def test_practice_complete_refresh_runs_evaluation_and_get_stays_evaluating() ->
                 async with database.sessionmaker() as session:
                     evaluation = await session.scalar(
                         select(PracticeEvaluation).where(
-                            PracticeEvaluation.attempt_id
-                            == refreshed.attempt.id
+                            PracticeEvaluation.attempt_id == refreshed.attempt.id
                         )
                     )
                     stored_run = await session.get(
@@ -552,8 +544,8 @@ def test_practice_follow_up_refresh_replays_without_second_version_increment() -
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, _, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, _, card = await seed_answering_session(
+                    database
                 )
                 _, _, run = await submit_answer(
                     database,
@@ -603,12 +595,18 @@ def test_practice_follow_up_refresh_replays_without_second_version_increment() -
                     assert replay.attempt.status == "answeringFollowUp"
                     assert replay.follow_up_question is not None
                     assert replay.follow_up_question.id == first_question_id
-                    assert await session.scalar(
-                        select(func.count()).select_from(PracticeFollowUpDecision)
-                    ) == 1
-                    assert await session.scalar(
-                        select(func.count()).select_from(PracticeFollowUpQuestion)
-                    ) == 1
+                    assert (
+                        await session.scalar(
+                            select(func.count()).select_from(PracticeFollowUpDecision)
+                        )
+                        == 1
+                    )
+                    assert (
+                        await session.scalar(
+                            select(func.count()).select_from(PracticeFollowUpQuestion)
+                        )
+                        == 1
+                    )
                     stored_run = await session.get(AgentRun, run.id)
                     assert stored_run is not None
                     assert stored_run.status is AgentRunStatus.SUCCEEDED
@@ -623,8 +621,8 @@ def test_practice_primary_answer_rolls_back_against_real_database() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, attempt, card = await seed_answering_session(
+                    database
                 )
 
                 class FailingFollowUpService:
@@ -639,7 +637,9 @@ def test_practice_primary_answer_rolls_back_against_real_database() -> None:
                         await PracticeSessionService(
                             session,
                             llm_model="fake-follow-up-model",
-                            follow_up_generation_service_factory=lambda _session, **kwargs: FailingFollowUpService(),  # type: ignore[arg-type]
+                            follow_up_generation_service_factory=lambda _session, **kwargs: (
+                                FailingFollowUpService()
+                            ),  # type: ignore[arg-type]
                             clock=lambda: START,
                         ).submit_primary_answer(
                             user_id=owner.id,
@@ -650,11 +650,14 @@ def test_practice_primary_answer_rolls_back_against_real_database() -> None:
                         )
 
                 async with database.sessionmaker() as session:
-                    assert await session.scalar(
-                        select(func.count())
-                        .select_from(PracticeAnswer)
-                        .where(PracticeAnswer.attempt_id == attempt.id)
-                    ) == 0
+                    assert (
+                        await session.scalar(
+                            select(func.count())
+                            .select_from(PracticeAnswer)
+                            .where(PracticeAnswer.attempt_id == attempt.id)
+                        )
+                        == 0
+                    )
                     stored_session = await session.get(
                         PracticeSession,
                         practice_session.id,
@@ -667,14 +670,17 @@ def test_practice_primary_answer_rolls_back_against_real_database() -> None:
                     assert stored_session.version == 2
                     assert stored_attempt is not None
                     assert stored_attempt.status == "answering"
-                    assert await session.scalar(
-                        select(func.count())
-                        .select_from(AgentRun)
-                        .where(
-                            AgentRun.user_id == owner.id,
-                            AgentRun.agent_id == "follow-up-generator",
+                    assert (
+                        await session.scalar(
+                            select(func.count())
+                            .select_from(AgentRun)
+                            .where(
+                                AgentRun.user_id == owner.id,
+                                AgentRun.agent_id == "follow-up-generator",
+                            )
                         )
-                    ) == 0
+                        == 0
+                    )
             finally:
                 await database.reset()
 
@@ -686,8 +692,8 @@ def test_practice_evaluation_enqueue_rolls_back_without_removing_follow_up() -> 
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, attempt, card = await seed_answering_session(
+                    database
                 )
                 _, _, follow_up_run = await submit_answer(
                     database,
@@ -712,7 +718,9 @@ def test_practice_evaluation_enqueue_rolls_back_without_removing_follow_up() -> 
                         await PracticeSessionService(
                             session,
                             llm_model="fake-evaluation-model",
-                            evaluation_generation_service_factory=lambda _session, **kwargs: FailingEvaluationService(),  # type: ignore[arg-type]
+                            evaluation_generation_service_factory=lambda _session, **kwargs: (
+                                FailingEvaluationService()
+                            ),  # type: ignore[arg-type]
                             clock=lambda: START,
                         ).refresh_follow_up_generation(
                             user_id=owner.id,
@@ -733,22 +741,28 @@ def test_practice_evaluation_enqueue_rolls_back_without_removing_follow_up() -> 
                     assert stored_session.version == 3
                     assert stored_attempt is not None
                     assert stored_attempt.status == "answering"
-                    assert await session.scalar(
-                        select(func.count())
-                        .select_from(PracticeFollowUpDecision)
-                        .where(
-                            PracticeFollowUpDecision.source_agent_run_id
-                            == follow_up_run.id
+                    assert (
+                        await session.scalar(
+                            select(func.count())
+                            .select_from(PracticeFollowUpDecision)
+                            .where(
+                                PracticeFollowUpDecision.source_agent_run_id
+                                == follow_up_run.id
+                            )
                         )
-                    ) == 1
-                    assert await session.scalar(
-                        select(func.count())
-                        .select_from(AgentRun)
-                        .where(
-                            AgentRun.user_id == owner.id,
-                            AgentRun.agent_id == "practice-evaluator",
+                        == 1
+                    )
+                    assert (
+                        await session.scalar(
+                            select(func.count())
+                            .select_from(AgentRun)
+                            .where(
+                                AgentRun.user_id == owner.id,
+                                AgentRun.agent_id == "practice-evaluator",
+                            )
                         )
-                    ) == 0
+                        == 0
+                    )
             finally:
                 await database.reset()
 
@@ -760,8 +774,8 @@ def test_practice_follow_up_failed_refresh_does_not_change_session() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, attempt, card = await seed_answering_session(
+                    database
                 )
                 _, _, run = await submit_answer(
                     database,

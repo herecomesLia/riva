@@ -29,9 +29,7 @@ class TrainingMemoryCompetency(_TrainingMemoryModel):
         cls,
         value: datetime | None,
     ) -> datetime | None:
-        if value is not None and (
-            value.tzinfo is None or value.utcoffset() is None
-        ):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise ValueError("lastEvidenceAt must be timezone-aware")
         return value
 

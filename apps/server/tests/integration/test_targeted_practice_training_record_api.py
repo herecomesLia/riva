@@ -1,19 +1,18 @@
 import asyncio
 from uuid import UUID
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.models import AgentRun, PracticeReferenceAnswerArtifact, PracticeSession, User
 from riva.services.practice_sessions import PracticeSessionService
 from tests.integration.test_practice_next_question_workflow import produce_first_review
 from tests.integration.test_question_generation import database_url
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -41,9 +40,7 @@ def test_targeted_practice_training_record_api_is_read_only_and_scoped() -> None
                 app.dependency_overrides[require_current_user] = lambda: owner
 
                 with TestClient(app) as client:
-                    active = client.get(
-                        f"/api/training-records/practice/{session_id}"
-                    )
+                    active = client.get(f"/api/training-records/practice/{session_id}")
                 assert active.status_code == 404
                 assert active.json() == {"error": "training_record_not_found"}
 
@@ -86,7 +83,9 @@ def test_targeted_practice_training_record_api_is_read_only_and_scoped() -> None
                         "agentRuns": list(
                             (
                                 await session.scalars(
-                                    select(AgentRun.id).where(AgentRun.user_id == user_id)
+                                    select(AgentRun.id).where(
+                                        AgentRun.user_id == user_id
+                                    )
                                 )
                             ).all()
                         ),
@@ -137,7 +136,9 @@ def test_targeted_practice_training_record_api_is_read_only_and_scoped() -> None
                         "agentRuns": list(
                             (
                                 await session.scalars(
-                                    select(AgentRun.id).where(AgentRun.user_id == user_id)
+                                    select(AgentRun.id).where(
+                                        AgentRun.user_id == user_id
+                                    )
                                 )
                             ).all()
                         ),

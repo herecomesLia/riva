@@ -80,7 +80,9 @@ def test_practice_answer_table_columns_constraints_and_relationships() -> None:
     assert PracticeAnswer.follow_up_question.property.cascade.delete_orphan is False
 
 
-def test_practice_follow_up_question_table_columns_constraints_and_relationships() -> None:
+def test_practice_follow_up_question_table_columns_constraints_and_relationships() -> (
+    None
+):
     load_models()
 
     assert "practice_follow_up_questions" in Base.metadata.tables
@@ -119,12 +121,10 @@ def test_practice_follow_up_question_table_columns_constraints_and_relationships
         for constraint in constraints_by_type(table, CheckConstraint)
     }
     assert checks["ck_practice_follow_up_questions_order"] == '"order" >= 1'
-    assert "length(trim(prompt)) > 0" in checks[
-        "ck_practice_follow_up_questions_prompt"
-    ]
-    assert "length(trim(focus)) > 0" in checks[
-        "ck_practice_follow_up_questions_focus"
-    ]
+    assert (
+        "length(trim(prompt)) > 0" in checks["ck_practice_follow_up_questions_prompt"]
+    )
+    assert "length(trim(focus)) > 0" in checks["ck_practice_follow_up_questions_focus"]
 
     unique_columns = {
         tuple(column.name for column in constraint.columns): constraint.name
@@ -196,9 +196,10 @@ def test_practice_follow_up_decision_table_constraints_and_relationships() -> No
     }
     assert '"order" >= 1' in checks["ck_practice_follow_up_decisions_order"]
     assert '"order" <= 2' in checks["ck_practice_follow_up_decisions_order"]
-    assert "action IN ('askFollowUp', 'complete')" in checks[
-        "ck_practice_follow_up_decisions_action"
-    ]
+    assert (
+        "action IN ('askFollowUp', 'complete')"
+        in checks["ck_practice_follow_up_decisions_action"]
+    )
     invariant = checks["ck_practice_follow_up_decisions_action_question"]
     assert "action = 'askFollowUp'" in invariant
     assert "follow_up_question_id IS NOT NULL" in invariant
@@ -224,7 +225,10 @@ def test_practice_follow_up_decision_table_constraints_and_relationships() -> No
     assert PracticeFollowUpDecision.attempt.property.uselist is False
     assert PracticeFollowUpDecision.source_agent_run.property.uselist is False
     assert PracticeFollowUpDecision.follow_up_question.property.uselist is False
-    assert PracticeFollowUpDecision.follow_up_question.property.cascade.delete_orphan is False
+    assert (
+        PracticeFollowUpDecision.follow_up_question.property.cascade.delete_orphan
+        is False
+    )
     assert PracticeFollowUpQuestion.decision.property.uselist is False
     assert PracticeFollowUpQuestion.decision.property.cascade.delete_orphan is False
 

@@ -21,8 +21,8 @@ from riva.utils import utc_now
 
 if TYPE_CHECKING:
     from riva.models.agent_runs import AgentRun
-    from riva.models.job_description_analyses import JobDescriptionAnalysis
     from riva.models.interviews import InterviewSession
+    from riva.models.job_description_analyses import JobDescriptionAnalysis
     from riva.models.matching_analyses import MatchingAnalysis
     from riva.models.practice_sessions import PracticeSession
     from riva.models.question_cards import QuestionCard
@@ -33,20 +33,14 @@ class TargetRole(Base):
     __tablename__ = "target_roles"
     __table_args__ = (
         CheckConstraint("recruitment_type IN ('campus', 'experienced')"),
-        CheckConstraint(
-            "preparation_status IN ('preparing', 'paused', 'archived')"
-        ),
+        CheckConstraint("preparation_status IN ('preparing', 'paused', 'archived')"),
         CheckConstraint("job_description_status IN ('missing', 'saved')"),
         CheckConstraint("version >= 1"),
         CheckConstraint(
             "job_description_version IS NULL OR job_description_version >= 1"
         ),
-        CheckConstraint(
-            "min_experience_years IS NULL OR min_experience_years >= 0"
-        ),
-        CheckConstraint(
-            "max_experience_years IS NULL OR max_experience_years >= 0"
-        ),
+        CheckConstraint("min_experience_years IS NULL OR min_experience_years >= 0"),
+        CheckConstraint("max_experience_years IS NULL OR max_experience_years >= 0"),
         CheckConstraint(
             "min_experience_years IS NULL "
             "OR max_experience_years IS NULL "

@@ -23,7 +23,6 @@ from riva.services.agent_runs import (
 )
 from riva.workers import AgentExecutionError, AgentHandlerRegistry, AgentWorker
 
-
 NOW = datetime(2026, 7, 31, 8, tzinfo=UTC)
 
 
@@ -312,9 +311,10 @@ def test_success_log_uses_canonical_run_metadata_and_safe_timing_fields() -> Non
     registry = AgentHandlerRegistry()
     registry.register(FakeHandler(result(run), sessions))
 
-    assert asyncio.run(
-        worker(service, sessions, registry, logger=logger).process_one()
-    ) is True
+    assert (
+        asyncio.run(worker(service, sessions, registry, logger=logger).process_one())
+        is True
+    )
 
     running_event = next(
         fields
@@ -344,12 +344,15 @@ def test_success_log_uses_canonical_run_metadata_and_safe_timing_fields() -> Non
     assert success_event["processing_span_ms"] == 0
     assert success_event["attempt_count"] == 1
     assert success_event["max_attempts"] == 3
-    assert not {
-        "payload",
-        "result",
-        "user_id",
-        "idempotency_key",
-    } & success_event.keys()
+    assert (
+        not {
+            "payload",
+            "result",
+            "user_id",
+            "idempotency_key",
+        }
+        & success_event.keys()
+    )
 
 
 def test_retry_failure_log_contains_retry_metadata_and_next_available_at() -> None:
@@ -360,9 +363,10 @@ def test_retry_failure_log_contains_retry_metadata_and_next_available_at() -> No
     registry = AgentHandlerRegistry()
     registry.register(FakeHandler(ProviderUnavailableError(), sessions))
 
-    assert asyncio.run(
-        worker(service, sessions, registry, logger=logger).process_one()
-    ) is True
+    assert (
+        asyncio.run(worker(service, sessions, registry, logger=logger).process_one())
+        is True
+    )
 
     failure_event = next(
         fields
@@ -375,12 +379,15 @@ def test_retry_failure_log_contains_retry_metadata_and_next_available_at() -> No
     assert failure_event["next_available_at"] == NOW + timedelta(seconds=10)
     assert failure_event["attempt_count"] == 1
     assert failure_event["max_attempts"] == 3
-    assert not {
-        "payload",
-        "result",
-        "user_id",
-        "idempotency_key",
-    } & failure_event.keys()
+    assert (
+        not {
+            "payload",
+            "result",
+            "user_id",
+            "idempotency_key",
+        }
+        & failure_event.keys()
+    )
 
 
 def test_terminal_failure_log_is_safe_and_marks_retryable_exhaustion() -> None:
@@ -391,9 +398,10 @@ def test_terminal_failure_log_is_safe_and_marks_retryable_exhaustion() -> None:
     registry = AgentHandlerRegistry()
     registry.register(FakeHandler(RuntimeError("PRIVATE_EXCEPTION_MESSAGE"), sessions))
 
-    assert asyncio.run(
-        worker(service, sessions, registry, logger=logger).process_one()
-    ) is True
+    assert (
+        asyncio.run(worker(service, sessions, registry, logger=logger).process_one())
+        is True
+    )
 
     failure_event = next(
         fields
@@ -405,12 +413,15 @@ def test_terminal_failure_log_is_safe_and_marks_retryable_exhaustion() -> None:
     assert failure_event["retry_delay_ms"] == 10_000
     assert "next_available_at" not in failure_event
     assert "PRIVATE_EXCEPTION_MESSAGE" not in repr(logger.events)
-    assert not {
-        "payload",
-        "result",
-        "user_id",
-        "idempotency_key",
-    } & failure_event.keys()
+    assert (
+        not {
+            "payload",
+            "result",
+            "user_id",
+            "idempotency_key",
+        }
+        & failure_event.keys()
+    )
 
 
 def test_missing_handler_marks_run_as_permanent_failure() -> None:
@@ -522,9 +533,7 @@ def test_invalid_structured_output_retries_and_logs_safe_diagnostics() -> None:
     assert final_failure_event["agent_id"] == runs[-1].agent_id
     assert final_failure_event["attempt_count"] == 3
     assert final_failure_event["error_code"] == "invalid_structured_output"
-    assert final_failure_event["structured_output_stage"] == (
-        "schema_validation"
-    )
+    assert final_failure_event["structured_output_stage"] == ("schema_validation")
     assert final_failure_event["output_schema"] == "ResumeParsingOutput"
     assert final_failure_event["validation_error_count"] == 1
     assert final_failure_event["validation_errors"] == [
@@ -642,12 +651,15 @@ def test_heartbeat_failure_cancels_handler_without_submitting_result() -> None:
         assert abandoned_event["prompt_id"] == "example-prompt"
         assert abandoned_event["prompt_version"] == "1"
         assert abandoned_event["model"] == "queued-model"
-        assert not {
-            "payload",
-            "result",
-            "user_id",
-            "idempotency_key",
-        } & abandoned_event.keys()
+        assert (
+            not {
+                "payload",
+                "result",
+                "user_id",
+                "idempotency_key",
+            }
+            & abandoned_event.keys()
+        )
         assert not _worker_tasks()
 
     asyncio.run(run_test())

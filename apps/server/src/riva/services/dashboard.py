@@ -30,7 +30,6 @@ from riva.services.roles import TargetRoleService
 from riva.services.training_records import TrainingRecordService
 from riva.utils import utc_now
 
-
 Clock = Callable[[], datetime]
 TargetRoleServiceFactory = Callable[[AsyncSession], TargetRoleService]
 TrainingRecordServiceFactory = Callable[[AsyncSession], TrainingRecordService]
@@ -160,9 +159,7 @@ class DashboardService:
         current_start = now - timedelta(days=7)
         previous_start = now - timedelta(days=14)
         current_records = [
-            record
-            for record in records
-            if current_start <= record.ended_at <= now
+            record for record in records if current_start <= record.ended_at <= now
         ]
         previous_records = [
             record

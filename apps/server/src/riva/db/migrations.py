@@ -1,7 +1,6 @@
 from alembic import command
 from alembic.config import Config
 
-
 MIGRATION_SCRIPT_LOCATION = "riva:migrations"
 
 

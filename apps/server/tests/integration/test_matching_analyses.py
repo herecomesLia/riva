@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime
 import os
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -16,7 +16,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-
 
 pytestmark = pytest.mark.integration
 GENERATED_AT = datetime(2026, 8, 4, 9, 30, tzinfo=UTC)
@@ -143,7 +142,9 @@ async def expect_integrity_error(database: Database, entity: object) -> None:
         await session.rollback()
 
 
-def test_matching_analysis_persists_result_dependencies_and_role_run_reference() -> None:
+def test_matching_analysis_persists_result_dependencies_and_role_run_reference() -> (
+    None
+):
     async def run() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -189,12 +190,8 @@ def test_matching_analysis_persists_result_dependencies_and_role_run_reference()
                     )
                     assert persisted.matched_capabilities == ["Python", "FastAPI"]
                     assert persisted.missing_capabilities == ["Kubernetes"]
-                    assert persisted.underrepresented_capabilities == [
-                        "System design"
-                    ]
-                    assert persisted.resume_highlights == [
-                        "Improved API reliability"
-                    ]
+                    assert persisted.underrepresented_capabilities == ["System design"]
+                    assert persisted.resume_highlights == ["Improved API reliability"]
                     assert persisted.resume_gaps == ["Scale is not stated"]
                     assert persisted.high_risk_questions == [
                         "How did you improve reliability?"
@@ -218,7 +215,9 @@ def test_matching_analysis_persists_result_dependencies_and_role_run_reference()
                     assert persisted_role.matching_analysis_run is not None
                     assert persisted_role.matching_analysis_run.id == current_run.id
                     assert persisted_role.job_description_parsing_run is not None
-                    assert persisted_role.job_description_parsing_run.id == parsing_run.id
+                    assert (
+                        persisted_role.job_description_parsing_run.id == parsing_run.id
+                    )
             finally:
                 await database.reset()
 
@@ -372,7 +371,9 @@ def test_matching_analysis_delete_and_current_run_semantics() -> None:
                     )
                     assert persisted_role is not None
                     assert persisted_role.matching_analysis_run_id is None
-                    assert persisted_role.job_description_parsing_run_id == parsing_run.id
+                    assert (
+                        persisted_role.job_description_parsing_run_id == parsing_run.id
+                    )
                     assert await session.get(MatchingAnalysis, target.id) is not None
 
                 async with database.sessionmaker() as session:
@@ -405,7 +406,9 @@ def test_matching_analysis_delete_and_current_run_semantics() -> None:
                     )
                     await session.commit()
                     assert await session.get(MatchingAnalysis, target.id) is None
-                    assert await session.get(AgentRun, replacement_source.id) is not None
+                    assert (
+                        await session.get(AgentRun, replacement_source.id) is not None
+                    )
 
                 cascade_graph = await seed_owner_graph(database, "user-delete")
                 cascade_owner = cascade_graph["owner"]
@@ -462,7 +465,9 @@ def test_database_reset_creates_matching_analysis_table() -> None:
             try:
                 async with database.engine.connect() as connection:
                     table_names = await connection.run_sync(
-                        lambda sync_connection: inspect(sync_connection).get_table_names()
+                        lambda sync_connection: inspect(
+                            sync_connection
+                        ).get_table_names()
                     )
                 assert "matching_analyses" in table_names
             finally:

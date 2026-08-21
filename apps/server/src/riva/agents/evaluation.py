@@ -42,9 +42,7 @@ def _focus_assessment_mismatch() -> InvalidStructuredOutputError:
     return InvalidStructuredOutputError(diagnostics)
 
 
-class PracticeEvaluationAgent(
-    Agent[EvaluationInput, PracticeEvaluationOutput]
-):
+class PracticeEvaluationAgent(Agent[EvaluationInput, PracticeEvaluationOutput]):
     def __init__(
         self,
         provider: LLMProvider,

@@ -13,7 +13,6 @@ from riva.schemas.agent_observability import AgentObservabilityReport
 from riva.services.agent_observability import AgentObservabilityService
 from riva.utils import utc_now
 
-
 app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Inspect runtime AgentRun observability.",
@@ -115,10 +114,7 @@ def _print_report(report: AgentObservabilityReport) -> None:
         f"queued={status.queued}, running={status.running}, "
         f"succeeded={status.succeeded}, failed={status.failed}"
     )
-    typer.echo(
-        "Terminal success rate: "
-        f"{_format_rate(report.terminal_success_rate)}"
-    )
+    typer.echo(f"Terminal success rate: {_format_rate(report.terminal_success_rate)}")
     typer.echo(f"Retry rate: {_format_rate(report.retry_rate)}")
     typer.echo(
         "Latency: "

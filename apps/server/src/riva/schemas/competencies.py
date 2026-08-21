@@ -11,9 +11,7 @@ class _StrictAPIModel(APIModel):
 
 
 def _validate_aware_timestamp(value: datetime | None) -> datetime | None:
-    if value is not None and (
-        value.tzinfo is None or value.utcoffset() is None
-    ):
+    if value is not None and (value.tzinfo is None or value.utcoffset() is None):
         raise ValueError("last_evidence_at must be timezone-aware")
     return value
 

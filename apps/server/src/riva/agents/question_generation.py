@@ -57,9 +57,7 @@ def _work_experience_label(company: str, title: str) -> str:
     return title
 
 
-class QuestionGenerationAgent(
-    Agent[QuestionGenerationInput, QuestionGenerationOutput]
-):
+class QuestionGenerationAgent(Agent[QuestionGenerationInput, QuestionGenerationOutput]):
     def __init__(
         self,
         provider: LLMProvider,
@@ -81,18 +79,14 @@ class QuestionGenerationAgent(
     def agent_id(self) -> str:
         return "question-generator"
 
-    def prompt_values(
-        self, input: QuestionGenerationInput
-    ) -> Mapping[str, object]:
+    def prompt_values(self, input: QuestionGenerationInput) -> Mapping[str, object]:
         values: dict[str, object] = {
             "interaction_language": input.interaction_language,
             "question_type": input.question_type.value,
             "difficulty": input.difficulty.value,
             "target_role": _stable_json(input.target_role),
             "career_profile": _stable_json(input.career_profile),
-            "job_description_analysis": _stable_json(
-                input.job_description_analysis
-            ),
+            "job_description_analysis": _stable_json(input.job_description_analysis),
             "matching_analysis": _stable_json(input.matching_analysis),
         }
         resolved_prompt = get_question_generation_prompt(self.prompt.version)
@@ -123,9 +117,7 @@ class QuestionGenerationAgent(
             errors.append(("difficulty", "difficulty_mismatch"))
 
         work_labels = {
-            experience.id: _work_experience_label(
-                experience.company, experience.title
-            )
+            experience.id: _work_experience_label(experience.company, experience.title)
             for experience in input.career_profile.work_experiences
         }
         project_labels = {

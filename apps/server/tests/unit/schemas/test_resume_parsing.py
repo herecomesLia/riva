@@ -144,9 +144,7 @@ def test_complete_output_reuses_text_constraints_and_normalizes_lists() -> None:
         lambda payload: payload.update({"id": str(uuid4())}),
         lambda payload: payload.update({"source": "resumeExtracted"}),
         lambda payload: payload.update({"version": 1}),
-        lambda payload: payload["education"][0].update(
-            {"source": "resumeExtracted"}
-        ),
+        lambda payload: payload["education"][0].update({"source": "resumeExtracted"}),
         lambda payload: payload["work_experiences"][0].update(
             {"profileId": str(uuid4())}
         ),
@@ -466,9 +464,7 @@ def test_experience_lists_accept_boundary_and_reject_overflow(
 
 def test_run_payload_accepts_both_names_and_serializes_camel_case() -> None:
     document_id = str(uuid4())
-    parsed = ResumeParsingRunPayload.model_validate(
-        {"resumeDocumentId": document_id}
-    )
+    parsed = ResumeParsingRunPayload.model_validate({"resumeDocumentId": document_id})
 
     assert str(parsed.resume_document_id) == document_id
     assert parsed.model_dump(mode="json") == {

@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.job_description_parsing import JobDescriptionParsingOutput
 
-
 JOB_DESCRIPTION_PARSING_PROMPT = PromptDefinition(
     prompt_id="job-description-parser",
     version="3",

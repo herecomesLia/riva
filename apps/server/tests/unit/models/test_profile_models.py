@@ -70,9 +70,10 @@ def test_profile_children_use_uuid_ids_positions_and_cascading_foreign_keys() ->
         assert table.c.id.primary_key is True
         assert isinstance(table.c.id.type, Uuid)
         assert table.c.career_profile_id.nullable is False
-        assert foreign_key(
-            table.c.career_profile_id
-        ).target_fullname == "career_profiles.id"
+        assert (
+            foreign_key(table.c.career_profile_id).target_fullname
+            == "career_profiles.id"
+        )
         assert foreign_key(table.c.career_profile_id).ondelete == "CASCADE"
         assert table.c.position.nullable is False
         position_owner = (
@@ -96,18 +97,21 @@ def test_profile_skill_associations_reference_experiences_and_skills() -> None:
     work_links = Base.metadata.tables["career_profile_work_skills"]
     project_links = Base.metadata.tables["career_profile_project_skills"]
 
-    assert foreign_key(
-        work_links.c.work_experience_id
-    ).target_fullname == "career_profile_work_experiences.id"
-    assert foreign_key(
-        work_links.c.skill_id
-    ).target_fullname == "career_profile_skills.id"
-    assert foreign_key(
-        project_links.c.project_experience_id
-    ).target_fullname == "career_profile_project_experiences.id"
-    assert foreign_key(
-        project_links.c.skill_id
-    ).target_fullname == "career_profile_skills.id"
+    assert (
+        foreign_key(work_links.c.work_experience_id).target_fullname
+        == "career_profile_work_experiences.id"
+    )
+    assert (
+        foreign_key(work_links.c.skill_id).target_fullname == "career_profile_skills.id"
+    )
+    assert (
+        foreign_key(project_links.c.project_experience_id).target_fullname
+        == "career_profile_project_experiences.id"
+    )
+    assert (
+        foreign_key(project_links.c.skill_id).target_fullname
+        == "career_profile_skills.id"
+    )
     assert all(
         foreign_key(column).ondelete == "CASCADE"
         for column in (

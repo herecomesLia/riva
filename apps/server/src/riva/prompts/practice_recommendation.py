@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.practice_recommendation import PracticeRecommendationOutput
 
-
 PRACTICE_RECOMMENDATION_PROMPT = PromptDefinition(
     prompt_id="practice-recommender",
     version="2",

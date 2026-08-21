@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import BinaryIO
-import unicodedata
 from uuid import UUID, uuid4
 
 from fastapi import status
@@ -40,7 +40,6 @@ from riva.storage import (
 )
 from riva.utils import utc_now
 
-
 RESUME_SOURCE_REQUIRED = "resume_source_required"
 RESUME_SOURCE_AMBIGUOUS = "resume_source_ambiguous"
 RESUME_FILENAME_INVALID = "resume_filename_invalid"
@@ -52,9 +51,7 @@ RESUME_EXTRACTION_FAILURE_REASON = (
     "Please upload a supported TXT, PDF, or DOCX file with a readable text layer."
 )
 
-_SUPPORTED_MEDIA_TYPES = frozenset(
-    {TEXT_PLAIN, APPLICATION_PDF, APPLICATION_DOCX}
-)
+_SUPPORTED_MEDIA_TYPES = frozenset({TEXT_PLAIN, APPLICATION_PDF, APPLICATION_DOCX})
 _RESUME_DOCUMENT_STATE_CODES = frozenset(
     {
         "resume_document_not_found",
@@ -148,9 +145,7 @@ class ResumeDocumentService:
         if max_upload_bytes <= 0:
             raise ValueError("max_upload_bytes must be greater than zero")
         if max_extracted_characters <= 0:
-            raise ValueError(
-                "max_extracted_characters must be greater than zero"
-            )
+            raise ValueError("max_extracted_characters must be greater than zero")
         self.session = session
         self.storage = storage
         self.extractor = extractor
@@ -168,7 +163,7 @@ class ResumeDocumentService:
     ) -> ResumeDocumentResponse:
         try:
             filename = normalize_resume_filename(original_filename)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise APIError(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 RESUME_FILENAME_INVALID,
@@ -297,7 +292,7 @@ class ResumeDocumentService:
             raise
         except ResumeExtractionError as error:
             raise _pasted_text_api_error(error.code) from None
-        except (UnicodeError, AttributeError, TypeError):
+        except UnicodeError, AttributeError, TypeError:
             raise APIError(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 RESUME_TEXT_INVALID,

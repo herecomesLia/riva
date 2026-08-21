@@ -39,10 +39,13 @@ from riva.services.reference_answer_generation import (
 from tests.unit.services.test_question_generation import (
     ScriptedSession,
     graph,
+)
+from tests.unit.services.test_question_generation import (
     payload as question_generation_payload,
+)
+from tests.unit.services.test_question_generation import (
     run_for as question_generation_run,
 )
-
 
 NOW = datetime(2026, 8, 14, 9, 30, tzinfo=UTC)
 
@@ -341,7 +344,8 @@ def test_reference_answer_generation_state_rejects_corrupt_lifecycle(
 
     assert error.value.code == (
         REFERENCE_ANSWER_CONTEXT_CONFLICT
-        if case in {
+        if case
+        in {
             "payload_target_mismatch",
             "wrong_stable_key",
             "malformed_frozen_context",
@@ -357,7 +361,9 @@ def test_reference_answer_generation_state_rejects_malformed_payload() -> None:
 
     with pytest.raises(ReferenceAnswerGenerationStateError) as error:
         asyncio.run(
-            ReferenceAnswerGenerationService(ScriptedSession(run)).get_main_generation_state(
+            ReferenceAnswerGenerationService(
+                ScriptedSession(run)
+            ).get_main_generation_state(
                 user_id=owner.id,
                 question_card_id=card.id,
                 submitted_at=None,
@@ -376,9 +382,7 @@ def test_main_enqueue_freezes_card_context_and_uses_stable_key() -> None:
         session,  # type: ignore[arg-type]
         llm_model="reference-test-model",
     )
-    service.agent_run_service_factory = lambda _session: cast(
-        object, fake_runs
-    )  # type: ignore[assignment]
+    service.agent_run_service_factory = lambda _session: cast(object, fake_runs)  # type: ignore[assignment]
 
     result = asyncio.run(
         service.enqueue_main_generation_in_transaction(

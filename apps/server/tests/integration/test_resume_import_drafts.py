@@ -18,7 +18,6 @@ from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.utils import utc_now
 
-
 pytestmark = pytest.mark.integration
 
 

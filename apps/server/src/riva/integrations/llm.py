@@ -5,7 +5,6 @@ from typing import Generic, Literal, Protocol, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from typing_extensions import TypeForm
 
-
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 ResponseT = TypeVar("ResponseT")
 type StructuredOutputSchema[T] = TypeForm[T] | TypeAdapter[T]

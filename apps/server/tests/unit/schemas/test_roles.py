@@ -1,17 +1,21 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import TypeAdapter, ValidationError
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
+from riva.schemas.job_description_parsing import (
+    MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH,
+    MAX_JOB_DESCRIPTION_ANALYSIS_LIST_ITEMS,
+)
 from riva.schemas.roles import (
     MAX_RAW_JOB_DESCRIPTION_LENGTH,
     ArchiveTargetRoleRequest,
     CreateTargetRoleRequest,
     DeleteTargetRoleVersion,
-    JobDescriptionResponse,
     JobDescriptionAnalysisResponse,
     JobDescriptionParsingStatusQuery,
+    JobDescriptionResponse,
     RolesPageResponse,
     SaveJobDescriptionRequest,
     SetCurrentTargetRoleRequest,
@@ -20,10 +24,6 @@ from riva.schemas.roles import (
     UpdateJobDescriptionAnalysisModuleRequest,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
-)
-from riva.schemas.job_description_parsing import (
-    MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH,
-    MAX_JOB_DESCRIPTION_ANALYSIS_LIST_ITEMS,
 )
 
 ROLE_ID = "11111111-1111-4111-8111-111111111111"
@@ -248,7 +248,10 @@ def test_analysis_module_list_request_reuses_normalization_and_limits() -> None:
     invalid_values = [
         "Design APIs",
         ["x" * (MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH + 1)],
-        [f"item-{index}" for index in range(MAX_JOB_DESCRIPTION_ANALYSIS_LIST_ITEMS + 1)],
+        [
+            f"item-{index}"
+            for index in range(MAX_JOB_DESCRIPTION_ANALYSIS_LIST_ITEMS + 1)
+        ],
     ]
     for value in invalid_values:
         with pytest.raises(ValidationError):
@@ -309,20 +312,18 @@ def test_analysis_module_request_rejects_unknown_and_forbidden_fields(
     payload.update(payload_update)
 
     with pytest.raises(ValidationError):
-        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
-            payload
-        )
+        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(payload)
 
 
-@pytest.mark.parametrize("field", ["version", "jobDescriptionVersion", "analysisVersion"])
+@pytest.mark.parametrize(
+    "field", ["version", "jobDescriptionVersion", "analysisVersion"]
+)
 def test_analysis_module_request_requires_positive_versions(field: str) -> None:
     payload = analysis_module_payload("responsibilities", [])
     payload[field] = 0
 
     with pytest.raises(ValidationError):
-        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(
-            payload
-        )
+        TypeAdapter(UpdateJobDescriptionAnalysisModuleRequest).validate_python(payload)
 
 
 @pytest.mark.parametrize(
@@ -445,12 +446,8 @@ def valid_analysis_response(job_description_version: int = 1):
 
 
 def test_analysis_response_is_camel_case_strict_and_bounded() -> None:
-    analysis = JobDescriptionAnalysisResponse.model_validate(
-        valid_analysis_response()
-    )
-    assert analysis.model_dump()["requiredSkills"]["programmingLanguages"] == [
-        "Python"
-    ]
+    analysis = JobDescriptionAnalysisResponse.model_validate(valid_analysis_response())
+    assert analysis.model_dump()["requiredSkills"]["programmingLanguages"] == ["Python"]
 
     invalid = valid_analysis_response()
     invalid["sourceAgentRunId"] = ROLE_ID
@@ -473,9 +470,7 @@ def test_target_role_response_enforces_analysis_state_consistency(
         "parsingFailureReason": None,
     }
     payload["jobDescriptionAnalysis"] = (
-        None
-        if analysis_version is None
-        else valid_analysis_response(analysis_version)
+        None if analysis_version is None else valid_analysis_response(analysis_version)
     )
     with pytest.raises(ValidationError):
         TargetRoleResponse.model_validate(payload)

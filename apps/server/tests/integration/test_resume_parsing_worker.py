@@ -1,8 +1,8 @@
 import asyncio
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 import json
 import os
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -40,7 +40,6 @@ from riva.workers import AgentWorker, ResumeParsingWorkerHandler
 from riva.workers.bootstrap import build_agent_handler_registry
 from riva.workers.runtime import SessionFactory
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 
@@ -305,9 +304,7 @@ def make_worker(
         "provider_factory": lambda _settings: provider,
     }
     if resume_handler_factory is not None:
-        registry_options["resume_parsing_handler_factory"] = (
-            resume_handler_factory
-        )
+        registry_options["resume_parsing_handler_factory"] = resume_handler_factory
     registry = build_agent_handler_registry(
         make_settings(str(database.engine.url)),
         database.sessionmaker,
@@ -375,9 +372,7 @@ def test_resume_parsing_worker_success_persists_result_and_ready_draft() -> None
                     assert stored_run.model == MODEL
                     assert stored_run.input_tokens == 321
                     assert stored_run.output_tokens == 123
-                    assert stored_run.result == parsing_output().model_dump(
-                        mode="json"
-                    )
+                    assert stored_run.result == parsing_output().model_dump(mode="json")
                     assert (
                         ResumeParsingOutput.model_validate(stored_run.result)
                         == parsing_output()
@@ -487,16 +482,14 @@ def test_resume_parsing_worker_success_persists_result_and_ready_draft() -> None
                         select(func.count())
                         .select_from(ResumeParsingResult)
                         .where(
-                            ResumeParsingResult.resume_document_id
-                            == setup.document_id
+                            ResumeParsingResult.resume_document_id == setup.document_id
                         )
                     )
                     draft_count = await session.scalar(
                         select(func.count())
                         .select_from(ResumeImportDraft)
                         .where(
-                            ResumeImportDraft.resume_document_id
-                            == setup.document_id
+                            ResumeImportDraft.resume_document_id == setup.document_id
                         )
                     )
                     assert result_count == 1
@@ -533,14 +526,20 @@ def test_resume_parsing_worker_retries_temporary_provider_failure() -> None:
                     assert first is not None
                     assert first.status is AgentRunStatus.QUEUED
                     assert first.error_code == "provider_unavailable"
-                    assert await session.get(
-                        ResumeParsingResult,
-                        setup.document_id,
-                    ) is None
-                    assert await session.get(
-                        ResumeImportDraft,
-                        setup.document_id,
-                    ) is None
+                    assert (
+                        await session.get(
+                            ResumeParsingResult,
+                            setup.document_id,
+                        )
+                        is None
+                    )
+                    assert (
+                        await session.get(
+                            ResumeImportDraft,
+                            setup.document_id,
+                        )
+                        is None
+                    )
 
                 await make_available_now(database, setup.run_id)
                 assert await worker.process_one() is True
@@ -634,10 +633,13 @@ def test_resume_parsing_worker_retries_after_result_persisted_before_draft() -> 
                     assert first_run is not None
                     assert first_run.status is AgentRunStatus.QUEUED
                     assert first_run.error_code == "provider_unavailable"
-                    assert await session.get(
-                        ResumeImportDraft,
-                        setup.document_id,
-                    ) is None
+                    assert (
+                        await session.get(
+                            ResumeImportDraft,
+                            setup.document_id,
+                        )
+                        is None
+                    )
 
                 await make_available_now(database, setup.run_id)
                 assert await worker.process_one() is True
@@ -712,14 +714,20 @@ def test_resume_parsing_worker_rejects_deterministic_state_failures(
                     assert run is not None
                     assert run.status is AgentRunStatus.FAILED
                     assert run.error_code == expected_code
-                    assert await session.get(
-                        ResumeParsingResult,
-                        setup.document_id,
-                    ) is None
-                    assert await session.get(
-                        ResumeImportDraft,
-                        setup.document_id,
-                    ) is None
+                    assert (
+                        await session.get(
+                            ResumeParsingResult,
+                            setup.document_id,
+                        )
+                        is None
+                    )
+                    assert (
+                        await session.get(
+                            ResumeImportDraft,
+                            setup.document_id,
+                        )
+                        is None
+                    )
                 assert provider.calls == []
             finally:
                 await database.reset()
@@ -769,10 +777,13 @@ def test_resume_parsing_worker_rejects_superseded_pointer() -> None:
                     assert old_run.error_code == "resume_parsing_superseded"
                     assert new_run is not None
                     assert new_run.status is AgentRunStatus.QUEUED
-                    assert await session.get(
-                        ResumeParsingResult,
-                        setup.document_id,
-                    ) is None
+                    assert (
+                        await session.get(
+                            ResumeParsingResult,
+                            setup.document_id,
+                        )
+                        is None
+                    )
                 assert provider.calls == []
             finally:
                 await database.reset()
@@ -801,10 +812,13 @@ def test_resume_worker_registry_keeps_unknown_agent_failure_semantics() -> None:
                     assert run is not None
                     assert run.status is AgentRunStatus.FAILED
                     assert run.error_code == "agent_handler_not_found"
-                    assert await session.get(
-                        ResumeParsingResult,
-                        setup.document_id,
-                    ) is None
+                    assert (
+                        await session.get(
+                            ResumeParsingResult,
+                            setup.document_id,
+                        )
+                        is None
+                    )
                 assert provider.calls == []
             finally:
                 await database.reset()
@@ -812,7 +826,9 @@ def test_resume_worker_registry_keeps_unknown_agent_failure_semantics() -> None:
     asyncio.run(run_test())
 
 
-def test_resume_parsing_worker_invalid_structured_output_is_final_at_max_attempts() -> None:
+def test_resume_parsing_worker_invalid_structured_output_is_final_at_max_attempts() -> (
+    None
+):
     async def run_test() -> None:
         provider = FakeLLMProvider(
             [{"summary": "missing required fields"}],
@@ -830,14 +846,20 @@ def test_resume_parsing_worker_invalid_structured_output_is_final_at_max_attempt
                     assert run is not None
                     assert run.status is AgentRunStatus.FAILED
                     assert run.error_code == "invalid_structured_output"
-                    assert await session.get(
-                        ResumeParsingResult,
-                        setup.document_id,
-                    ) is None
-                    assert await session.get(
-                        ResumeImportDraft,
-                        setup.document_id,
-                    ) is None
+                    assert (
+                        await session.get(
+                            ResumeParsingResult,
+                            setup.document_id,
+                        )
+                        is None
+                    )
+                    assert (
+                        await session.get(
+                            ResumeImportDraft,
+                            setup.document_id,
+                        )
+                        is None
+                    )
             finally:
                 await database.reset()
 

@@ -12,6 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.core.errors import APIError
+from riva.core.language import (
+    DEFAULT_INTERACTION_LANGUAGE,
+    InteractionLanguage,
+)
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -20,10 +24,6 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.core.language import (
-    DEFAULT_INTERACTION_LANGUAGE,
-    InteractionLanguage,
-)
 from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import (
     ResumeParsingOutput,
@@ -31,17 +31,16 @@ from riva.schemas.resume_parsing import (
 )
 from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
 from riva.services.agent_runs import AgentRunService
-from riva.services.resume_parsing import (
-    ResumeParsingStateError,
-    resume_parsing_output_from_result,
-)
 from riva.services.prompt_versions import RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
 from riva.services.resume_imports import (
     RESUME_IMPORT_DRAFT_INVALID,
     ResumeImportStateError,
     resume_import_draft_data_from_model,
 )
-
+from riva.services.resume_parsing import (
+    ResumeParsingStateError,
+    resume_parsing_output_from_result,
+)
 
 RESUME_PARSING_FAILURE_REASON = (
     "Resume parsing failed. Your uploaded resume is preserved; please try again."
@@ -70,9 +69,7 @@ class ResumeParsingLifecycleService:
         *,
         llm_provider: str | None = None,
         llm_model: str | None = None,
-        agent_run_service_factory: Callable[..., AgentRunService] = (
-            AgentRunService
-        ),
+        agent_run_service_factory: Callable[..., AgentRunService] = (AgentRunService),
     ) -> None:
         self.session = session
         self.llm_provider = (llm_provider or "").strip().lower()
@@ -300,10 +297,7 @@ class ResumeParsingLifecycleService:
         document: ResumeDocument,
         run: AgentRun,
     ) -> tuple[AgentRun, ResumeParsingRunPayload] | None:
-        if (
-            document.parsing_run_id != run.id
-            or run.user_id != document.user_id
-        ):
+        if document.parsing_run_id != run.id or run.user_id != document.user_id:
             return None
         active_prompt = RESUME_PARSING_PROMPT
         if (
@@ -315,7 +309,7 @@ class ResumeParsingLifecycleService:
             return None
         try:
             payload = ResumeParsingRunPayload.model_validate(run.payload)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             return None
         if payload.resume_document_id != document.id:
             return None
@@ -409,10 +403,7 @@ class ResumeParsingLifecycleService:
             raise _state_conflict()
         if draft is None:
             return
-        if (
-            draft.user_id != document.user_id
-            or draft.resume_document_id != document.id
-        ):
+        if draft.user_id != document.user_id or draft.resume_document_id != document.id:
             raise _state_conflict()
         if draft.status == READY:
             if draft.source_agent_run_id != failed_run.id:
@@ -611,7 +602,7 @@ class ResumeParsingLifecycleService:
                 draft_version=draft_version,
                 draft_status=draft_status,
             )
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise _state_conflict() from None
 
 

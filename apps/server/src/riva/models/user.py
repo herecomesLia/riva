@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     from riva.models.auth import AuthSession
     from riva.models.competencies import UserCompetency
     from riva.models.interviews import InterviewSession
-    from riva.models.profile import CareerProfile
     from riva.models.practice_sessions import PracticeSession
+    from riva.models.profile import CareerProfile
     from riva.models.question_cards import QuestionCard
     from riva.models.resume_documents import ResumeDocument
     from riva.models.roles import CurrentTargetRole, TargetRole

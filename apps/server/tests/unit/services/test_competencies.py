@@ -58,7 +58,7 @@ def test_competency_key_is_trimmed_lowercased_and_validated() -> None:
     assert normalize_competency_key("  System_Design ") == "system_design"
     assert normalize_competency_key("Backend-API2") == "backend-api2"
 
-    for value in ("", "has spaces", "_leading", "trailing_", "a__b", "a." ):
+    for value in ("", "has spaces", "_leading", "trailing_", "a__b", "a."):
         with pytest.raises(ValueError):
             normalize_competency_key(value)
 

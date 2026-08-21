@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.interview_planning import InterviewPlanningOutput
 
-
 INTERVIEW_PLANNING_PROMPT = PromptDefinition(
     prompt_id="interview-planner",
     version="2",

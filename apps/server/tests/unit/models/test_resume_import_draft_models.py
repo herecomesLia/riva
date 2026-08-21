@@ -1,4 +1,10 @@
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, JSON, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKeyConstraint,
+    Index,
+    UniqueConstraint,
+)
 from sqlalchemy.sql.sqltypes import DateTime, Text, Uuid
 
 from riva.db import Base
@@ -101,4 +107,3 @@ def test_resume_import_draft_fields_constraints_relationships_and_indexes() -> N
     assert ResumeDocument.import_draft.property.uselist is False
     assert ResumeImportDraft.document.property.uselist is False
     assert ResumeImportDraft.parsing_result.property.uselist is False
-

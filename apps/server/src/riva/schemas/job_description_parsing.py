@@ -2,8 +2,8 @@ from typing import Annotated
 from uuid import UUID
 
 from pydantic import (
-    BeforeValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -15,7 +15,6 @@ from riva.core.language import (
     InteractionLanguage,
 )
 from riva.schemas.base import MAX_RAW_JOB_DESCRIPTION_LENGTH
-
 
 MAX_JOB_DESCRIPTION_ANALYSIS_ITEM_LENGTH = 1_000
 MAX_JOB_DESCRIPTION_ANALYSIS_LIST_ITEMS = 100

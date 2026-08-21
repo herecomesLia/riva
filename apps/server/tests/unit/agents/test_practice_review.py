@@ -9,7 +9,6 @@ from riva.prompts import PRACTICE_REVIEW_PROMPT
 from riva.schemas.practice_review import PracticeReviewInput, PracticeReviewOutput
 from tests.helpers.llm import FakeLLMProvider
 
-
 CORE_DIMENSIONS = [
     "relevance",
     "structure",

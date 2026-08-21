@@ -27,25 +27,19 @@ def _stable_json(value: BaseModel | None) -> str:
     )
 
 
-class InterviewPlanningAgent(
-    Agent[InterviewPlanningInput, InterviewPlanningOutput]
-):
+class InterviewPlanningAgent(Agent[InterviewPlanningInput, InterviewPlanningOutput]):
     def __init__(
         self,
         provider: LLMProvider,
         model: str,
         parameters: GenerationParameters | None = None,
         *,
-        prompt: PromptDefinition[InterviewPlanningOutput] = (
-            INTERVIEW_PLANNING_PROMPT
-        ),
+        prompt: PromptDefinition[InterviewPlanningOutput] = (INTERVIEW_PLANNING_PROMPT),
     ) -> None:
         try:
             resolved_prompt = get_interview_planning_prompt(prompt.version)
         except ValueError:
-            raise ValueError(
-                "unsupported interview planning prompt version"
-            ) from None
+            raise ValueError("unsupported interview planning prompt version") from None
         if resolved_prompt is not prompt:
             raise ValueError(
                 "interview planning prompt must be the canonical version definition"
@@ -71,9 +65,7 @@ class InterviewPlanningAgent(
             "session": _stable_json(input.session),
             "career_profile": _stable_json(input.career_profile),
             "target_role": _stable_json(input.target_role),
-            "job_description_analysis": _stable_json(
-                input.job_description_analysis
-            ),
+            "job_description_analysis": _stable_json(input.job_description_analysis),
             "matching_analysis": _stable_json(input.matching_analysis),
         }
         if get_interview_planning_prompt(self.prompt.version).version == "2":

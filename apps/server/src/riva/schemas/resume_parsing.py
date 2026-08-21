@@ -2,8 +2,8 @@ from typing import Annotated, Self
 from uuid import UUID
 
 from pydantic import (
-    BeforeValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -22,9 +22,10 @@ from riva.schemas.profile import (
     OptionalText,
     RequiredText,
     StandardUUID,
+)
+from riva.schemas.profile import (
     Summary as ProfileSummary,
 )
-
 
 MAX_RESUME_TEXT_LENGTH = 100_000
 MAX_RESUME_EDUCATION_ITEMS = 100
@@ -236,10 +237,7 @@ class ResumeParsingOutput(_ResumeParsingModel):
 
     @model_validator(mode="after")
     def normalize_and_validate_skill_references(self) -> Self:
-        canonical_skills = {
-            skill.casefold(): skill
-            for skill in self.skills
-        }
+        canonical_skills = {skill.casefold(): skill for skill in self.skills}
 
         for experience in (
             *self.work_experiences,

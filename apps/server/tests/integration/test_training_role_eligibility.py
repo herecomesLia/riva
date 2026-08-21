@@ -24,7 +24,6 @@ from tests.helpers.interview import (
 )
 from tests.integration.test_question_generation import database_url
 
-
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 21, 10, 0, tzinfo=UTC)
 
@@ -201,7 +200,9 @@ def test_target_role_with_pending_jd_blocks_both_setups() -> None:
     run_database_test(test)
 
 
-def test_incomplete_profile_preserves_interview_context_but_blocks_both_setups() -> None:
+def test_incomplete_profile_preserves_interview_context_but_blocks_both_setups() -> (
+    None
+):
     async def test(database: Database) -> None:
         user_id, role_id = await seed_ready_user(
             database,

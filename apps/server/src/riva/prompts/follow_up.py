@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.follow_up import FollowUpGenerationOutput
 
-
 FOLLOW_UP_PROMPT = PromptDefinition(
     prompt_id="follow-up-generator",
     version="1",

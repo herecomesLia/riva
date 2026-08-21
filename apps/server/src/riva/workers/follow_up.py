@@ -18,10 +18,7 @@ from riva.services.follow_up_generation import (
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
-FollowUpGenerationServiceFactory = Callable[
-    [AsyncSession], FollowUpGenerationService
-]
+FollowUpGenerationServiceFactory = Callable[[AsyncSession], FollowUpGenerationService]
 
 
 class FollowUpHandler:

@@ -6,8 +6,8 @@ from pydantic import ConfigDict, Field, StringConstraints, field_validator
 
 from riva.core.language import InteractionLanguage
 from riva.schemas.base import APIModel
-from riva.schemas.profile import RequiredText, StandardUUID
 from riva.schemas.job_description_parsing import Company, RoleTitle
+from riva.schemas.profile import RequiredText, StandardUUID
 
 
 class InterviewAPIModel(APIModel):
@@ -182,9 +182,7 @@ class InterviewAnsweredFollowUpResponse(InterviewAPIModel):
 class InterviewCompletedQuestionResponse(InterviewAPIModel):
     question: InterviewQuestionResponse
     answer: InterviewAnswerResponse
-    follow_ups: list[InterviewAnsweredFollowUpResponse] = Field(
-        default_factory=list
-    )
+    follow_ups: list[InterviewAnsweredFollowUpResponse] = Field(default_factory=list)
     completed_at: datetime
 
     @field_validator("completed_at")
@@ -497,9 +495,7 @@ class InterviewQuestionRecordResponse(InterviewAPIModel):
     status: Literal["answered", "unanswered"]
     question: InterviewQuestionResponse
     answer: InterviewAnswerResponse | None
-    follow_ups: list["InterviewFollowUpRecordResponse"] = Field(
-        default_factory=list
-    )
+    follow_ups: list["InterviewFollowUpRecordResponse"] = Field(default_factory=list)
 
 
 class InterviewFollowUpRecordResponse(InterviewAPIModel):
@@ -546,8 +542,7 @@ class InterviewTrainingMockInterviewResponse(InterviewAPIModel):
 
 
 InterviewTrainingSuggestionResponse = Annotated[
-    InterviewTrainingTargetedPracticeResponse
-    | InterviewTrainingMockInterviewResponse,
+    InterviewTrainingTargetedPracticeResponse | InterviewTrainingMockInterviewResponse,
     Field(discriminator="action"),
 ]
 
@@ -617,8 +612,8 @@ class InterviewGeneratingReviewSessionResponse(InterviewAPIModel):
     )
     generation_status: InterviewGenerationStatus
     completion_reason: InterviewCompletionReason
-    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
-        default_factory=list
+    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = (
+        Field(default_factory=list)
     )
 
     @field_validator("started_at")
@@ -642,8 +637,8 @@ class InterviewCompletedSessionResponse(InterviewAPIModel):
     )
     completion_reason: InterviewCompletionReason
     completed_at: datetime
-    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
-        default_factory=list
+    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = (
+        Field(default_factory=list)
     )
     review: InterviewSessionReviewResponse
     question_details: list[InterviewQuestionLearningDetailResponse] = Field(

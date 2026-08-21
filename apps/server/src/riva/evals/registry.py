@@ -22,10 +22,10 @@ from riva.agents.training_planning import TrainingPlanningAgent
 from riva.integrations import LLMProvider
 from riva.prompts import (
     FOLLOW_UP_PROMPT,
+    INTERVIEW_CANDIDATE_QUESTION_PROMPT,
     INTERVIEW_PLANNING_PROMPT,
     INTERVIEW_REVIEW_PROMPT,
     INTERVIEW_TURN_PROMPT,
-    INTERVIEW_CANDIDATE_QUESTION_PROMPT,
     JOB_DESCRIPTION_PARSING_PROMPT,
     MATCHING_ANALYSIS_PROMPT,
     PRACTICE_EVALUATION_PROMPT,
@@ -50,7 +50,6 @@ from riva.schemas.practice_review import PracticeReviewInput
 from riva.schemas.question_generation import QuestionGenerationInput
 from riva.schemas.resume_parsing import ResumeParsingInput
 from riva.schemas.training_planning import TrainingPlanningInput
-
 
 AgentFactory = Callable[[LLMProvider, str], Agent[Any, Any]]
 
@@ -110,9 +109,7 @@ class AgentEvalRegistry:
         try:
             return self._registrations[agent_id]
         except KeyError:
-            raise UnknownAgentError(
-                f"Unknown eval agent: {agent_id}"
-            ) from None
+            raise UnknownAgentError(f"Unknown eval agent: {agent_id}") from None
 
     def __contains__(self, agent_id: str) -> bool:
         return agent_id in self._registrations

@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import status
 import pytest
+from fastapi import status
 
 from riva.core.errors import APIError
 from riva.models import AgentRun, AgentRunStatus, QuestionCard, User
@@ -26,7 +26,6 @@ from riva.services.question_generation import QuestionGenerationStateError
 from riva.services.question_generation_prompt_versions import (
     QUESTION_GENERATION_LEGACY_PROMPT,
 )
-
 
 NOW = datetime(2026, 8, 10, 10, 0, tzinfo=UTC)
 
@@ -111,7 +110,9 @@ def run_for(
         available_at=NOW,
         created_at=NOW,
         started_at=None if state is AgentRunStatus.QUEUED else NOW,
-        finished_at=NOW if state in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED} else None,
+        finished_at=NOW
+        if state in {AgentRunStatus.SUCCEEDED, AgentRunStatus.FAILED}
+        else None,
         provider="fake" if state is AgentRunStatus.SUCCEEDED else None,
         model="test-model",
         input_tokens=1 if state is AgentRunStatus.SUCCEEDED else None,
@@ -205,7 +206,9 @@ def test_start_generation_uses_frozen_language_and_request_idempotency_key() -> 
     assert session.rollback_count == 0
 
 
-def test_duplicate_request_id_returns_existing_state_before_configuration_check() -> None:
+def test_duplicate_request_id_returns_existing_state_before_configuration_check() -> (
+    None
+):
     owner = user()
     run_payload = payload()
     request_id = uuid4()

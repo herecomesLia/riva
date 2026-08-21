@@ -47,7 +47,6 @@ from tests.integration.test_practice_review_workflow import (
 )
 from tests.integration.test_question_generation import database_url
 
-
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
 
@@ -71,9 +70,7 @@ class FailingFollowUpEnqueueService:
 
 
 async def prepare_question_and_main_answer(database):
-    owner, practice_session, attempt, card = await seed_answering_session(
-        database
-    )
+    owner, practice_session, attempt, card = await seed_answering_session(database)
     async with database.sessionmaker() as session:
         main_context = await PracticeSessionService(
             session,
@@ -178,7 +175,9 @@ async def load_follow_up_graph(database, attempt_id: UUID) -> dict[str, list[obj
         }
 
 
-async def load_follow_up_runs(database, user_id: UUID, attempt_id: UUID) -> list[AgentRun]:
+async def load_follow_up_runs(
+    database, user_id: UUID, attempt_id: UUID
+) -> list[AgentRun]:
     async with database.sessionmaker() as session:
         runs = list(
             (
@@ -207,16 +206,21 @@ async def evaluation_run_for(database, user_id: UUID, attempt_id: UUID) -> Agent
         return run
 
 
-def test_practice_follow_up_one_exchange_reaches_real_evaluation_review_recommendation() -> None:
+def test_practice_follow_up_one_exchange_reaches_real_evaluation_review_recommendation() -> (
+    None
+):
     async def run_test() -> None:
         from riva.db.database import Database
 
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, card_id = (
-                    await prepare_question_and_main_answer(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    card_id,
+                ) = await prepare_question_and_main_answer(database)
                 await run_follow_up_worker(
                     database,
                     follow_up_question_output(1),
@@ -264,10 +268,7 @@ def test_practice_follow_up_one_exchange_reaches_real_evaluation_review_recommen
                 assert len(graph["decisions"]) == 2
                 runs = await load_follow_up_runs(database, owner.id, attempt_id)
                 assert len(runs) == 2
-                assert {
-                    run.idempotency_key
-                    for run in runs
-                } == {
+                assert {run.idempotency_key for run in runs} == {
                     practice_follow_up_idempotency_key(attempt_id, 1),
                     practice_follow_up_idempotency_key(attempt_id, 2),
                 }
@@ -396,9 +397,12 @@ def test_practice_follow_up_two_exchanges_freezes_q1_a1_q2_a2_without_order3() -
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, card_id = (
-                    await prepare_question_and_main_answer(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    card_id,
+                ) = await prepare_question_and_main_answer(database)
                 await run_follow_up_worker(database, follow_up_question_output(1))
                 first = await follow_up_refresh(
                     database,
@@ -448,12 +452,16 @@ def test_practice_follow_up_two_exchanges_freezes_q1_a1_q2_a2_without_order3() -
                 assert len(graph["decisions"]) == 2
                 runs = await load_follow_up_runs(database, owner.id, attempt_id)
                 assert len(runs) == 2
-                evaluation_run = await evaluation_run_for(database, owner.id, attempt_id)
+                evaluation_run = await evaluation_run_for(
+                    database, owner.id, attempt_id
+                )
                 payload = EvaluationRunPayload.model_validate(evaluation_run.payload)
                 assert payload.follow_up_completion_reason == (
                     PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED
                 )
-                assert payload.terminal_follow_up_decision_id == graph["decisions"][1].id  # type: ignore[union-attr]
+                assert (
+                    payload.terminal_follow_up_decision_id == graph["decisions"][1].id
+                )  # type: ignore[union-attr]
                 assert payload.follow_up_question_1_id == graph["questions"][0].id  # type: ignore[union-attr]
                 assert payload.follow_up_answer_1_id == graph["answers"][1].id  # type: ignore[union-attr]
                 assert payload.follow_up_question_2_id == graph["questions"][1].id  # type: ignore[union-attr]
@@ -467,25 +475,28 @@ def test_practice_follow_up_two_exchanges_freezes_q1_a1_q2_a2_without_order3() -
                 async with database.sessionmaker() as session:
                     stored = await session.get(AgentRun, evaluation_run.id)
                     assert stored is not None
-                    assert stored.status is AgentRunStatus.SUCCEEDED, (
-                        stored.error_code
-                    )
+                    assert stored.status is AgentRunStatus.SUCCEEDED, stored.error_code
             finally:
                 await database.reset()
 
     asyncio.run(run_test())
 
 
-def test_practice_follow_up_answer_rolls_back_when_order2_enqueue_is_unavailable() -> None:
+def test_practice_follow_up_answer_rolls_back_when_order2_enqueue_is_unavailable() -> (
+    None
+):
     async def run_test() -> None:
         from riva.db.database import Database
 
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, card_id = (
-                    await prepare_question_and_main_answer(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    card_id,
+                ) = await prepare_question_and_main_answer(database)
                 await run_follow_up_worker(database, follow_up_question_output(1))
                 first = await follow_up_refresh(
                     database,
@@ -512,9 +523,7 @@ def test_practice_follow_up_answer_rolls_back_when_order2_enqueue_is_unavailable
 
                 async with database.sessionmaker() as session:
                     attempt = await session.scalar(
-                        select(PracticeSession).where(
-                            PracticeSession.id == session_id
-                        )
+                        select(PracticeSession).where(PracticeSession.id == session_id)
                     )
                     assert attempt is not None
                     assert attempt.version == 4

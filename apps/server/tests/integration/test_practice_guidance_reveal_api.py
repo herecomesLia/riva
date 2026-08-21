@@ -35,7 +35,6 @@ from tests.integration.test_practice_review_workflow import (
 )
 from tests.integration.test_question_generation import database_url
 
-
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 
@@ -78,8 +77,8 @@ def test_main_guidance_reveal_is_private_durable_and_versioned_over_http() -> No
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, practice_session, _attempt, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, _attempt, card = await seed_answering_session(
+                    database
                 )
                 assert card.answer_hints
                 assert card.answer_framework
@@ -143,7 +142,9 @@ def test_main_guidance_reveal_is_private_durable_and_versioned_over_http() -> No
                     assert framed.status_code == 200
                     framed_body = framed.json()
                     assert framed_body["version"] == hinted_body["version"] + 1
-                    assert framed_body["question"]["answerHints"]["status"] == "revealed"
+                    assert (
+                        framed_body["question"]["answerHints"]["status"] == "revealed"
+                    )
                     assert framed_body["question"]["answerFramework"] == {
                         "status": "revealed",
                         "content": list(card.answer_framework),
@@ -209,15 +210,20 @@ def test_main_guidance_reveal_is_private_durable_and_versioned_over_http() -> No
     asyncio.run(run_test())
 
 
-def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http() -> None:
+def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http() -> (
+    None
+):
     async def run_test() -> None:
         url = database_url()
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, card_id = (
-                    await prepare_question_and_main_answer(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    card_id,
+                ) = await prepare_question_and_main_answer(database)
                 await run_follow_up_worker(database, follow_up_question_output(1))
                 await follow_up_refresh(
                     database,
@@ -237,7 +243,9 @@ def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http
                     initial_body = initial.json()["session"]
                     assert initial_body["status"] == "answeringFollowUp"
                     question_1_id = initial_body["currentFollowUp"]["question"]["id"]
-                    assert initial_body["currentFollowUp"]["question"]["answerHints"] == {
+                    assert initial_body["currentFollowUp"]["question"][
+                        "answerHints"
+                    ] == {
                         "status": "notRequested",
                         "content": None,
                     }
@@ -254,9 +262,12 @@ def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http
                     assert hinted.status_code == 200
                     hinted_body = hinted.json()
                     assert hinted_body["version"] == initial_body["version"] + 1
-                    assert hinted_body["currentFollowUp"]["question"]["answerHints"][
-                        "status"
-                    ] == "revealed"
+                    assert (
+                        hinted_body["currentFollowUp"]["question"]["answerHints"][
+                            "status"
+                        ]
+                        == "revealed"
+                    )
 
                     framed = client.post(
                         f"{path}/follow-ups/framework",
@@ -270,9 +281,12 @@ def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http
                     assert framed.status_code == 200
                     framed_body = framed.json()
                     assert framed_body["version"] == hinted_body["version"] + 1
-                    assert framed_body["currentFollowUp"]["question"][
-                        "answerFramework"
-                    ]["status"] == "revealed"
+                    assert (
+                        framed_body["currentFollowUp"]["question"]["answerFramework"][
+                            "status"
+                        ]
+                        == "revealed"
+                    )
 
                     submitted = client.post(
                         f"{path}/answers/follow-up",
@@ -288,12 +302,18 @@ def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http
                     submitted_body = submitted.json()
                     assert submitted_body["status"] == "generatingFollowUp"
                     assert submitted_body["version"] == framed_body["version"] + 1
-                    assert submitted_body["followUpExchanges"][0]["question"][
-                        "answerHints"
-                    ]["status"] == "revealed"
-                    assert submitted_body["followUpExchanges"][0]["question"][
-                        "answerFramework"
-                    ]["status"] == "revealed"
+                    assert (
+                        submitted_body["followUpExchanges"][0]["question"][
+                            "answerHints"
+                        ]["status"]
+                        == "revealed"
+                    )
+                    assert (
+                        submitted_body["followUpExchanges"][0]["question"][
+                            "answerFramework"
+                        ]["status"]
+                        == "revealed"
+                    )
 
                     await run_follow_up_worker(database, follow_up_question_output(2))
                     next_question = client.post(
@@ -305,18 +325,28 @@ def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http
                     next_body = next_question.json()
                     assert next_body["status"] == "answeringFollowUp"
                     assert next_body["version"] == submitted_body["version"] + 1
-                    assert next_body["followUpExchanges"][0]["question"][
-                        "answerHints"
-                    ]["status"] == "revealed"
-                    assert next_body["followUpExchanges"][0]["question"][
-                        "answerFramework"
-                    ]["status"] == "revealed"
-                    assert next_body["currentFollowUp"]["question"]["id"] != question_1_id
+                    assert (
+                        next_body["followUpExchanges"][0]["question"]["answerHints"][
+                            "status"
+                        ]
+                        == "revealed"
+                    )
+                    assert (
+                        next_body["followUpExchanges"][0]["question"][
+                            "answerFramework"
+                        ]["status"]
+                        == "revealed"
+                    )
+                    assert (
+                        next_body["currentFollowUp"]["question"]["id"] != question_1_id
+                    )
                     assert next_body["currentFollowUp"]["question"]["answerHints"] == {
                         "status": "notRequested",
                         "content": None,
                     }
-                    assert next_body["currentFollowUp"]["question"]["answerFramework"] == {
+                    assert next_body["currentFollowUp"]["question"][
+                        "answerFramework"
+                    ] == {
                         "status": "notRequested",
                         "content": None,
                     }
@@ -330,7 +360,9 @@ def test_follow_up_guidance_reveal_survives_answering_q1_and_resets_q2_over_http
                         (
                             await session.scalars(
                                 select(PracticeFollowUpQuestion)
-                                .where(PracticeFollowUpQuestion.attempt_id == attempt_id)
+                                .where(
+                                    PracticeFollowUpQuestion.attempt_id == attempt_id
+                                )
                                 .order_by(PracticeFollowUpQuestion.order)
                             )
                         ).all()
@@ -352,8 +384,8 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, practice_session, _attempt, card = (
-                    await seed_answering_session(database)
+                owner, practice_session, _attempt, card = await seed_answering_session(
+                    database
                 )
                 async with database.sessionmaker() as session:
                     cards_before = list(
@@ -416,7 +448,9 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
                             session_id=practice_session.id,
                             expected_version=submitted.session.version,
                         )
-                    assert follow_up_ready.session.version == submitted.session.version + 1
+                    assert (
+                        follow_up_ready.session.version == submitted.session.version + 1
+                    )
 
                     assert await build_worker(
                         database,
@@ -438,7 +472,10 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
                             session_id=practice_session.id,
                             expected_version=follow_up_ready.session.version,
                         )
-                    assert evaluation_ready.session.version == follow_up_ready.session.version
+                    assert (
+                        evaluation_ready.session.version
+                        == follow_up_ready.session.version
+                    )
 
                     assert await build_worker(
                         database,
@@ -534,9 +571,10 @@ def test_main_guidance_reveal_survives_review_and_retry_over_http() -> None:
                     assert retried_body["status"] == "answering"
                     assert retried_body["version"] == review.session.version + 1
                     assert retried_body["question"]["id"] == str(card.id)
-                    assert retried_body["question"]["answerHints"] == revealed_body[
-                        "question"
-                    ]["answerHints"]
+                    assert (
+                        retried_body["question"]["answerHints"]
+                        == revealed_body["question"]["answerHints"]
+                    )
                     assert retried_body["question"]["answerFramework"] == {
                         "status": "notRequested",
                         "content": None,

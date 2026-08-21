@@ -23,8 +23,8 @@ from riva.models import (
 from riva.prompts import PRACTICE_REVIEW_PROMPT
 from riva.services.agent_runs import AgentRunService
 from riva.services.recommendation_generation import (
-    RecommendationGenerationStateError,
     RecommendationGenerationService,
+    RecommendationGenerationStateError,
     practice_recommendation_idempotency_key,
 )
 from riva.workers import (
@@ -40,7 +40,6 @@ from tests.integration.test_review_generation import (
     produce_evaluation,
     review_response,
 )
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
@@ -133,8 +132,8 @@ def test_real_evaluation_review_recommendation_uses_canonical_frozen_context() -
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, _review_run = (
-                    await produce_review(database)
+                owner, practice_session, attempt, _review_run = await produce_review(
+                    database
                 )
 
                 async with database.sessionmaker() as session:
@@ -172,9 +171,9 @@ def test_real_evaluation_review_recommendation_uses_canonical_frozen_context() -
                 )
                 assert recommendation_run.prompt_version == "2"
                 assert recommendation_run.payload["trainingMemory"]["version"] == "1"
-                assert "focusCompetencies" in recommendation_run.payload[
-                    "trainingMemory"
-                ]
+                assert (
+                    "focusCompetencies" in recommendation_run.payload["trainingMemory"]
+                )
                 provider = FakeLLMProvider(
                     [recommendation_response("nextQuestion")],
                     usage=LLMUsage(input_tokens=20, output_tokens=10),
@@ -233,8 +232,8 @@ def test_recommendation_retry_keeps_first_persisted_union_branch() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, practice_session, attempt, _review_run = (
-                    await produce_review(database)
+                owner, practice_session, attempt, _review_run = await produce_review(
+                    database
                 )
                 recommendation_run = await enqueue_recommendation(
                     database,
@@ -266,10 +265,13 @@ def test_recommendation_retry_keeps_first_persisted_union_branch() -> None:
                     assert running is not None
                     running.lease_expires_at = now - timedelta(seconds=1)
                     await session.commit()
-                    assert await AgentRunService(
-                        session,
-                        clock=lambda: now,
-                    ).requeue_expired() == 1
+                    assert (
+                        await AgentRunService(
+                            session,
+                            clock=lambda: now,
+                        ).requeue_expired()
+                        == 1
+                    )
 
                 retry_provider = FakeLLMProvider(
                     [recommendation_response("nextQuestion")]

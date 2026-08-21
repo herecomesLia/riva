@@ -16,7 +16,6 @@ from riva.schemas import (
 )
 from riva.schemas.interview import InterviewSetupAvailabilityResponse
 
-
 ROLE_ID = uuid4()
 
 

@@ -1,8 +1,6 @@
 from riva.models.agent_runs import AgentRun, AgentRunStatus
 from riva.models.auth import AuthSession
 from riva.models.competencies import CompetencyEvidence, UserCompetency
-from riva.models.job_description_analyses import JobDescriptionAnalysis
-from riva.models.job_description_import_drafts import JobDescriptionImportDraft
 from riva.models.interviews import (
     InterviewAnswer,
     InterviewCandidateQuestion,
@@ -15,16 +13,9 @@ from riva.models.interviews import (
     InterviewSession,
     InterviewTurnAssessment,
 )
+from riva.models.job_description_analyses import JobDescriptionAnalysis
+from riva.models.job_description_import_drafts import JobDescriptionImportDraft
 from riva.models.matching_analyses import MatchingAnalysis
-from riva.models.profile import (
-    CareerProfile,
-    CareerProfileEducation,
-    CareerProfileProjectExperience,
-    CareerProfileProjectSkill,
-    CareerProfileSkill,
-    CareerProfileWorkExperience,
-    CareerProfileWorkSkill,
-)
 from riva.models.practice_interactions import (
     PracticeAnswer,
     PracticeEvaluation,
@@ -38,6 +29,15 @@ from riva.models.practice_reference_answers import (
     PracticeReferenceAnswerArtifact,
 )
 from riva.models.practice_sessions import PracticeAttempt, PracticeSession
+from riva.models.profile import (
+    CareerProfile,
+    CareerProfileEducation,
+    CareerProfileProjectExperience,
+    CareerProfileProjectSkill,
+    CareerProfileSkill,
+    CareerProfileWorkExperience,
+    CareerProfileWorkSkill,
+)
 from riva.models.question_cards import QuestionCard
 from riva.models.resume_documents import ResumeDocument
 from riva.models.resume_import_drafts import ResumeImportDraft

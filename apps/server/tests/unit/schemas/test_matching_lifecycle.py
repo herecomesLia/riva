@@ -1,11 +1,14 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from pydantic import TypeAdapter, ValidationError
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
-from riva.schemas.roles import MatchingAnalysisResponse, RolesPageResponse, TargetRoleResponse
-
+from riva.schemas.roles import (
+    MatchingAnalysisResponse,
+    RolesPageResponse,
+    TargetRoleResponse,
+)
 
 GENERATED_AT = "2026-08-04T09:30:00Z"
 ROLE_ID = str(uuid4())
@@ -64,9 +67,7 @@ def matching_state(status: str) -> dict[str, object]:
         "jobDescriptionAnalysisVersion": 4,
     }
     if status == "generating":
-        base.update(
-            {"generatedAt": None, "failureReason": None, "result": None}
-        )
+        base.update({"generatedAt": None, "failureReason": None, "result": None})
     elif status == "failed":
         base.update(
             {

@@ -14,13 +14,13 @@ from riva.integrations import (
 )
 from riva.models import AgentRun, AgentRunStatus
 from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT
-from riva.services.practice_recommendation_prompt_versions import (
-    get_practice_recommendation_prompt,
-)
 from riva.schemas.practice_recommendation import (
     PracticeNextQuestionRecommendation,
     PracticeRecommendationInput,
     PracticeRetryCurrentRecommendation,
+)
+from riva.services.practice_recommendation_prompt_versions import (
+    get_practice_recommendation_prompt,
 )
 from riva.services.recommendation_generation import (
     RecommendationGenerationStateError,
@@ -31,7 +31,6 @@ from riva.workers.practice_recommendation import (
     RecommendationOutput,
 )
 from riva.workers.runtime import SessionFactory
-
 
 NOW = datetime(2026, 8, 12, 9, 30, tzinfo=UTC)
 
@@ -247,9 +246,7 @@ def test_handler_persists_and_returns_canonical_recommendation() -> None:
     agent_result = result(output_value=retry_output("SECOND"))
     agent = FakeAgent(sessions, agent_result)
 
-    returned = asyncio.run(
-        make_handler(sessions, state, agent).execute(running_run())
-    )
+    returned = asyncio.run(make_handler(sessions, state, agent).execute(running_run()))
 
     assert returned.output == state.canonical
     assert returned.provider == "fake"
@@ -365,7 +362,9 @@ def test_handler_requires_the_practice_recommendation_agent_identity() -> None:
         )
 
 
-def test_handler_maps_persistence_state_errors_to_non_retryable_execution_error() -> None:
+def test_handler_maps_persistence_state_errors_to_non_retryable_execution_error() -> (
+    None
+):
     sessions = FakeSessionFactory()
     state = State()
     state.persist_error = RecommendationGenerationStateError(

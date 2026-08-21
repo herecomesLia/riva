@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -20,14 +20,10 @@ from riva.models import (
     JobDescriptionAnalysis,
     PracticeAnswer,
     PracticeAttempt,
-    PracticeSession,
     PracticeQuestionReferenceContext,
     PracticeReferenceAnswerArtifact,
+    PracticeSession,
     QuestionCard,
-)
-from riva.schemas.question_cards import (
-    QuestionCardDifficulty,
-    QuestionCardQuestionType,
 )
 from riva.schemas.practice_reference_answer import (
     PracticeFollowUpReferenceAnswerOutput,
@@ -35,13 +31,17 @@ from riva.schemas.practice_reference_answer import (
     PracticeReferenceAnswerKind,
     PracticeReferenceAnswerTargetType,
 )
+from riva.schemas.question_cards import (
+    QuestionCardDifficulty,
+    QuestionCardQuestionType,
+)
+from riva.services.practice_sessions import PracticeSessionService
 from riva.services.question_generation import QuestionGenerationService
 from riva.services.reference_answer_generation import (
     ReferenceAnswerGenerationService,
     practice_follow_up_reference_answer_idempotency_key,
     practice_main_reference_answer_idempotency_key,
 )
-from riva.services.practice_sessions import PracticeSessionService
 from riva.workers import (
     AgentHandlerRegistry,
     AgentWorker,
@@ -54,7 +54,6 @@ from tests.integration.test_question_generation import (
     SilentLogger,
     seed_context,
 )
-
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 8, 14, 9, 30, tzinfo=UTC)
@@ -337,9 +336,7 @@ def test_reference_answer_worker_persists_artifact_from_frozen_context() -> None
                         card.id,
                     )
                     assert context is not None
-                    old_summary = context.frozen_context["targetRole"][
-                        "rivaSummary"
-                    ]
+                    old_summary = context.frozen_context["targetRole"]["rivaSummary"]
                     old_evidence = context.frozen_context["candidateEvidence"]
                     frozen_project = next(
                         evidence
@@ -415,14 +412,8 @@ def test_reference_answer_worker_persists_artifact_from_frozen_context() -> None
                 assert frozen_project["responsibilities"][0] in rendered
                 assert frozen_project["achievements"][0] in rendered
                 assert frozen_project["skills"][0] in rendered
-                assert (
-                    "CURRENT PROJECT RESPONSIBILITY MUST NOT BE USED"
-                    not in rendered
-                )
-                assert (
-                    "CURRENT PROJECT ACHIEVEMENT MUST NOT BE USED"
-                    not in rendered
-                )
+                assert "CURRENT PROJECT RESPONSIBILITY MUST NOT BE USED" not in rendered
+                assert "CURRENT PROJECT ACHIEVEMENT MUST NOT BE USED" not in rendered
                 assert "CURRENT PROJECT ROLE MUST NOT BE USED" not in rendered
 
                 async with database.sessionmaker() as session:
@@ -444,9 +435,9 @@ def test_reference_answer_worker_persists_artifact_from_frozen_context() -> None
                     assert artifact.question_card_id == card.id
                     assert artifact.answer == reference_response["answer"]
                     assert artifact.key_points == reference_response["keyPoints"]
-                    assert artifact.common_mistakes == reference_response[
-                        "commonMistakes"
-                    ]
+                    assert (
+                        artifact.common_mistakes == reference_response["commonMistakes"]
+                    )
                     assert stored_reference_run.result is not None
                     assert stored_reference_run.result["answer"] == artifact.answer
             finally:
@@ -480,9 +471,7 @@ def assert_follow_up_reference_payload(
     )
     assert run.payload["referenceContext"] == frozen_context
 
-    payload = PracticeFollowUpReferenceAnswerRunPayload.model_validate(
-        run.payload
-    )
+    payload = PracticeFollowUpReferenceAnswerRunPayload.model_validate(run.payload)
     assert payload.target_type == PracticeReferenceAnswerTargetType.FOLLOW_UP
     assert payload.question_card_id == question_card_id
     assert payload.attempt_id == attempt_id
@@ -543,9 +532,7 @@ def test_reference_answer_follow_up_q1_q2_lifecycle_and_lineage() -> None:
                         question_card_id=card_id,
                         follow_up_question_id=q1_id,
                         idempotency_key=(
-                            practice_follow_up_reference_answer_idempotency_key(
-                                q1_id
-                            )
+                            practice_follow_up_reference_answer_idempotency_key(q1_id)
                         ),
                     )
                     assert_follow_up_reference_payload(
@@ -606,8 +593,7 @@ def test_reference_answer_follow_up_q1_q2_lifecycle_and_lineage() -> None:
                         select(func.count())
                         .select_from(PracticeReferenceAnswerArtifact)
                         .where(
-                            PracticeReferenceAnswerArtifact.question_card_id
-                            == card_id,
+                            PracticeReferenceAnswerArtifact.question_card_id == card_id,
                             PracticeReferenceAnswerArtifact.follow_up_question_id
                             == q1_id,
                         )
@@ -690,9 +676,7 @@ def test_reference_answer_follow_up_q1_q2_lifecycle_and_lineage() -> None:
                         question_card_id=card_id,
                         follow_up_question_id=q2_id,
                         idempotency_key=(
-                            practice_follow_up_reference_answer_idempotency_key(
-                                q2_id
-                            )
+                            practice_follow_up_reference_answer_idempotency_key(q2_id)
                         ),
                     )
                     assert_follow_up_reference_payload(
@@ -815,9 +799,7 @@ def test_reference_answer_worker_uses_enqueued_q1_context_after_progress() -> No
                         question_card_id=card_id,
                         follow_up_question_id=q1_id,
                         idempotency_key=(
-                            practice_follow_up_reference_answer_idempotency_key(
-                                q1_id
-                            )
+                            practice_follow_up_reference_answer_idempotency_key(q1_id)
                         ),
                     )
                     assert_follow_up_reference_payload(
@@ -890,7 +872,9 @@ def test_reference_answer_worker_uses_enqueued_q1_context_after_progress() -> No
                 ).process_one()
                 assert reference_provider.calls
                 rendered = reference_provider.calls[0].messages[-1].content
-                assert "I led the rollout and reduced failures by 20 percent." in rendered
+                assert (
+                    "I led the rollout and reduced failures by 20 percent." in rendered
+                )
                 assert "What evidence supports follow-up 1?" in rendered
                 assert "Attribution evidence" in rendered
                 assert submitted_answer.content not in rendered
@@ -919,8 +903,7 @@ def test_reference_answer_worker_uses_enqueued_q1_context_after_progress() -> No
                         select(func.count())
                         .select_from(PracticeReferenceAnswerArtifact)
                         .where(
-                            PracticeReferenceAnswerArtifact.question_card_id
-                            == card_id,
+                            PracticeReferenceAnswerArtifact.question_card_id == card_id,
                             PracticeReferenceAnswerArtifact.target_type
                             == PracticeReferenceAnswerTargetType.FOLLOW_UP,
                         )

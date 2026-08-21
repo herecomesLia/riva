@@ -1,6 +1,5 @@
 import re
 
-
 _ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 

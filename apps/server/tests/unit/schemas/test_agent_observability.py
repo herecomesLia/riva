@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from riva.schemas.agent_observability import AgentObservabilityReport
 
-
 WINDOW_FROM = datetime(2026, 8, 17, 0, tzinfo=UTC)
 WINDOW_TO = WINDOW_FROM + timedelta(hours=1)
 
@@ -70,9 +69,7 @@ def test_observability_schema_is_strict_and_aliases_are_stable() -> None:
     )
 
     with pytest.raises(ValidationError):
-        AgentObservabilityReport.model_validate(
-            _report(unexpected="not allowed")
-        )
+        AgentObservabilityReport.model_validate(_report(unexpected="not allowed"))
 
 
 @pytest.mark.parametrize(

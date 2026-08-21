@@ -7,8 +7,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db import migrations
 from riva.db.database import Database
@@ -26,7 +26,6 @@ from riva.workers import build_agent_handler_registry, build_agent_worker
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.interview import seed_interview_prerequisites
 from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 
@@ -222,12 +221,15 @@ def test_interview_planning_success_workflow(migrated_database_url: str) -> None
                     assert planning_input["targetRole"]["id"] == str(role.id)
                     assert planning_input["targetRole"]["version"] == role.version
                     assert planning_input["targetRole"]["jobDescriptionVersion"] == 1
-                    assert planning_input["jobDescriptionAnalysis"][
-                        "jobDescriptionVersion"
-                    ] == 1
-                    assert planning_input["jobDescriptionAnalysis"][
-                        "analysisVersion"
-                    ] == 1
+                    assert (
+                        planning_input["jobDescriptionAnalysis"][
+                            "jobDescriptionVersion"
+                        ]
+                        == 1
+                    )
+                    assert (
+                        planning_input["jobDescriptionAnalysis"]["analysisVersion"] == 1
+                    )
 
                 provider = FakeLLMProvider(
                     [_planner_output()],
@@ -272,10 +274,13 @@ def test_interview_planning_success_workflow(migrated_database_url: str) -> None
                     expected_plan = InterviewPlanningOutput.model_validate(
                         _planner_output()
                     )
-                    assert plan.questions == expected_plan.model_dump(
-                        mode="json",
-                        by_alias=True,
-                    )["questions"]
+                    assert (
+                        plan.questions
+                        == expected_plan.model_dump(
+                            mode="json",
+                            by_alias=True,
+                        )["questions"]
+                    )
                     assert len(questions) == 1
                     first_question = questions[0]
                     assert first_question.source_plan_id == plan.id
@@ -393,9 +398,7 @@ def test_interview_planning_begin_rejects_stale_version(
                     headers=_headers(),
                 )
                 assert stale.status_code == 409
-                assert stale.json() == {
-                    "error": "interview_session_version_conflict"
-                }
+                assert stale.json() == {"error": "interview_session_version_conflict"}
 
                 async with database.sessionmaker() as session:
                     runs = list(
@@ -467,8 +470,7 @@ def test_interview_planning_failed_run_can_retry_without_overwriting_history(
                     runs = list(
                         (
                             await session.scalars(
-                                select(AgentRun)
-                                .where(
+                                select(AgentRun).where(
                                     AgentRun.user_id == owner.id,
                                     AgentRun.agent_id == "interview-planner",
                                 )

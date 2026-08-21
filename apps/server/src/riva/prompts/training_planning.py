@@ -1,7 +1,6 @@
 from riva.prompts.base import PromptDefinition
 from riva.schemas.training_planning import TrainingPlanningOutput
 
-
 TRAINING_PLANNING_PROMPT = PromptDefinition(
     prompt_id="training-planner",
     version="1",

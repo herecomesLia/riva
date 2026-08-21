@@ -18,7 +18,6 @@ from riva.models import (
 from riva.services.practice_sessions import PracticeSessionService
 from tests.integration.test_question_generation import database_url
 
-
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 20, 9, 0, tzinfo=UTC)
 
@@ -163,14 +162,10 @@ def test_setup_availability_is_selection_aware_and_scoped() -> None:
             await database.reset()
             try:
                 owner = create_user()
-                profile = CareerProfile(
-                    profile_id=uuid4(), user_id=owner.id, version=1
-                )
+                profile = CareerProfile(profile_id=uuid4(), user_id=owner.id, version=1)
                 role_a = create_role(owner.id, "Role A")
                 role_b = create_role(owner.id, "Role B")
-                archived_role = create_role(
-                    owner.id, "Archived Role", archived=True
-                )
+                archived_role = create_role(owner.id, "Archived Role", archived=True)
 
                 other_owner = create_user()
                 other_profile = CareerProfile(
@@ -303,9 +298,7 @@ def test_setup_availability_is_selection_aware_and_scoped() -> None:
                         card=card,
                         offset=index + 1,
                     )
-                    for index, (card, user_id, role_id) in enumerate(
-                        history_specs
-                    )
+                    for index, (card, user_id, role_id) in enumerate(history_specs)
                 ]
 
                 async with database.sessionmaker() as session:

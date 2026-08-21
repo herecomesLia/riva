@@ -6,15 +6,14 @@ import pytest
 from riva.agents import PracticeRecommendationAgent
 from riva.integrations import InvalidStructuredOutputError, MessageRole
 from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT
-from riva.services.practice_recommendation_prompt_versions import (
-    get_practice_recommendation_prompt,
-)
 from riva.schemas.practice_recommendation import (
     PracticeRecommendationInput,
     PracticeRecommendationOutput,
 )
+from riva.services.practice_recommendation_prompt_versions import (
+    get_practice_recommendation_prompt,
+)
 from tests.helpers.llm import FakeLLMProvider
-
 
 CORE_DIMENSIONS = [
     "relevance",
@@ -224,9 +223,7 @@ def test_prompt_values_have_only_canonical_structured_inputs() -> None:
     }
     assert values["interaction_language"] == "en"
     assert values["follow_up_completion_reason"] == "noFollowUpRequired"
-    assert json.loads(str(values["question"]))["question_type"] == (
-        "projectDeepDive"
-    )
+    assert json.loads(str(values["question"]))["question_type"] == ("projectDeepDive")
     assert "main_answer" not in values
     assert "follow_up_exchanges" not in values
     assert json.loads(str(values["training_memory"]))["focusCompetencies"] == []

@@ -9,17 +9,16 @@ import pytest
 from riva.agents import AgentResult, InterviewReviewAgent
 from riva.integrations import LLMUsage
 from riva.models import AgentRun, AgentRunStatus
-from riva.services.interview_review_prompt_versions import (
-    get_interview_review_prompt,
-)
 from riva.schemas.interview_review import (
     InterviewReviewInput,
     InterviewReviewOutput,
     InterviewReviewRunPayload,
 )
+from riva.services.interview_review_prompt_versions import (
+    get_interview_review_prompt,
+)
 from riva.workers import AgentExecutionError, InterviewReviewHandler
 from riva.workers.runtime import SessionFactory
-
 
 CASE_PATH = (
     Path(__file__).resolve().parents[3]
@@ -140,7 +139,10 @@ def test_handler_selects_the_agent_from_the_run_prompt_version(
         session_factory=cast(SessionFactory, sessions),
         agent=cast(InterviewReviewAgent, current),
         legacy_agent=cast(InterviewReviewAgent, legacy),
-        agents={"1": cast(InterviewReviewAgent, legacy), "2": cast(InterviewReviewAgent, current)},
+        agents={
+            "1": cast(InterviewReviewAgent, legacy),
+            "2": cast(InterviewReviewAgent, current),
+        },
         review_service_factory=lambda _session: cast(object, service),  # type: ignore[arg-type]
     )
 

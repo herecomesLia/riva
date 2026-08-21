@@ -319,9 +319,7 @@ class PracticeMainReferenceAnswerContentResponse(PracticeAPIModel):
     common_mistakes: PracticeReferenceAnswerCommonMistakes
     generated_at: datetime
 
-    _validate_generated_at = field_validator("generated_at")(
-        _validate_aware_timestamp
-    )
+    _validate_generated_at = field_validator("generated_at")(_validate_aware_timestamp)
 
 
 class PracticeFollowUpReferenceAnswerContentResponse(PracticeAPIModel):
@@ -335,9 +333,7 @@ class PracticeFollowUpReferenceAnswerContentResponse(PracticeAPIModel):
     common_mistakes: PracticeReferenceAnswerCommonMistakes
     generated_at: datetime
 
-    _validate_generated_at = field_validator("generated_at")(
-        _validate_aware_timestamp
-    )
+    _validate_generated_at = field_validator("generated_at")(_validate_aware_timestamp)
 
 
 class PracticeMainReferenceAnswerRevealedResponse(PracticeAPIModel):
@@ -484,11 +480,12 @@ class PracticeAnsweredFollowUpExchangeResponse(PracticeAPIModel):
 def _validate_answered_exchange_orders(
     exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
 ) -> None:
-    if [exchange.question.order for exchange in exchanges] != list(
-        range(1, len(exchanges) + 1)
-    ) or len({exchange.question.id for exchange in exchanges}) != len(
-        exchanges
-    ) or len({exchange.answer.id for exchange in exchanges}) != len(exchanges):
+    if (
+        [exchange.question.order for exchange in exchanges]
+        != list(range(1, len(exchanges) + 1))
+        or len({exchange.question.id for exchange in exchanges}) != len(exchanges)
+        or len({exchange.answer.id for exchange in exchanges}) != len(exchanges)
+    ):
         raise ValueError("follow-up exchanges must be ordered and contiguous")
 
 
@@ -509,9 +506,7 @@ class PracticeGeneratingFollowUpResponse(PracticeActiveSessionBase):
     ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
         _validate_answered_exchange_orders(exchanges)
         if len(exchanges) > 1:
-            raise ValueError(
-                "generating follow-up may only contain the first exchange"
-            )
+            raise ValueError("generating follow-up may only contain the first exchange")
         return exchanges
 
 
@@ -533,9 +528,7 @@ class PracticeAnsweringFollowUpResponse(PracticeActiveSessionBase):
     ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
         _validate_answered_exchange_orders(exchanges)
         if len(exchanges) > 1:
-            raise ValueError(
-                "answering follow-up may only contain the first exchange"
-            )
+            raise ValueError("answering follow-up may only contain the first exchange")
         return exchanges
 
     @field_validator("current_follow_up")
@@ -590,9 +583,7 @@ class PracticeEvaluatingResponse(PracticeActiveSessionBase):
     follow_up_completion: PracticeFollowUpCompletionResponse
     submitted_at: datetime
 
-    _validate_submitted_at = field_validator("submitted_at")(
-        _validate_aware_timestamp
-    )
+    _validate_submitted_at = field_validator("submitted_at")(_validate_aware_timestamp)
 
     @field_validator("follow_up_exchanges")
     @classmethod
@@ -621,9 +612,7 @@ class PracticeEvaluatingResponse(PracticeActiveSessionBase):
             if completion.unanswered_question.id in {
                 exchange.question.id for exchange in exchanges
             }:
-                raise ValueError(
-                    "unanswered follow-up question must not be answered"
-                )
+                raise ValueError("unanswered follow-up question must not be answered")
             return completion
         if completion.reason == "noFollowUpRequired" and exchanges:
             raise ValueError("no-follow-up completion must have no exchanges")
@@ -640,9 +629,7 @@ class PracticeEvaluationResponse(PracticeAPIModel):
     ]
     evaluated_at: datetime
 
-    _validate_evaluated_at = field_validator("evaluated_at")(
-        _validate_aware_timestamp
-    )
+    _validate_evaluated_at = field_validator("evaluated_at")(_validate_aware_timestamp)
 
 
 class PracticeReviewContentResponse(PracticeAPIModel):
@@ -709,9 +696,7 @@ class PracticeReviewResponse(PracticeActiveSessionBase):
             if completion.unanswered_question.id in {
                 exchange.question.id for exchange in exchanges
             }:
-                raise ValueError(
-                    "unanswered follow-up question must not be answered"
-                )
+                raise ValueError("unanswered follow-up question must not be answered")
             return completion
         if completion.reason == "noFollowUpRequired" and exchanges:
             raise ValueError("no-follow-up completion must have no exchanges")
@@ -769,9 +754,7 @@ class PracticeCompletedSessionResponse(PracticeAPIModel):
         if self.saved_question_count > self.questions_completed:
             raise ValueError("saved question count exceeds completed questions")
         if self.marked_weak_question_count > self.questions_completed:
-            raise ValueError(
-                "marked-weak question count exceeds completed questions"
-            )
+            raise ValueError("marked-weak question count exceeds completed questions")
         if self.completion_reason == "reviewCompleted":
             if self.questions_completed < 1:
                 raise ValueError(

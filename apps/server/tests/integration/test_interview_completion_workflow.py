@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.db.database import Database
 from riva.integrations import LLMProviderConfigurationError
 from riva.models import (
@@ -38,7 +38,6 @@ from tests.integration.test_interview_turn_workflow import (
     _turn_output,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -49,7 +48,9 @@ def _candidate_output() -> dict[str, object]:
             "summary": "The question is specific and connected to the role.",
             "strengths": ["Specific scope"],
             "improvementSuggestions": ["Ask about the decision-making process."],
-            "suggestedAlternatives": ["How does the team define success in the first quarter?"],
+            "suggestedAlternatives": [
+                "How does the team define success in the first quarter?"
+            ],
         },
     }
 
@@ -256,9 +257,7 @@ async def _reach_candidate_questions(
         session_state = page.json()["session"]
         assert session_state["status"] == "question"
         session_version = session_state["version"]
-        question_id = UUID(
-            session_state["currentQuestion"]["question"]["id"]
-        )
+        question_id = UUID(session_state["currentQuestion"]["question"]["id"])
         submitted = _answer_request(
             client,
             session_id,
@@ -361,7 +360,10 @@ def test_interview_candidate_question_and_review_success_workflow(
                     headers=_headers(),
                 )
                 assert candidate_page.status_code == 202
-                assert "interview_candidate_question_snapshot_invalid" not in candidate_page.text
+                assert (
+                    "interview_candidate_question_snapshot_invalid"
+                    not in candidate_page.text
+                )
                 assert candidate_page.json()["session"]["status"] == (
                     "generatingCandidateAnswer"
                 )
@@ -376,11 +378,9 @@ def test_interview_candidate_question_and_review_success_workflow(
                     candidate_runs = list(
                         (
                             await session.scalars(
-                                select(AgentRun)
-                                .where(
+                                select(AgentRun).where(
                                     AgentRun.user_id == owner.id,
-                                    AgentRun.agent_id
-                                    == "interview-candidate-question",
+                                    AgentRun.agent_id == "interview-candidate-question",
                                 )
                             )
                         ).all()
@@ -418,7 +418,10 @@ def test_interview_candidate_question_and_review_success_workflow(
 
                 await _process_worker(database, settings, provider)
                 assert '"summary":null' in provider.calls[-1].messages[1].content
-                assert "CHANGED_AFTER_CANDIDATE_ENQUEUE" not in provider.calls[-1].messages[1].content
+                assert (
+                    "CHANGED_AFTER_CANDIDATE_ENQUEUE"
+                    not in provider.calls[-1].messages[1].content
+                )
 
                 async with database.sessionmaker() as session:
                     candidate_run = await session.get(AgentRun, candidate_run.id)
@@ -426,8 +429,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     assert candidate_run.status is AgentRunStatus.SUCCEEDED
                     exchange = await session.scalar(
                         select(InterviewCandidateQuestionExchange).where(
-                            InterviewCandidateQuestionExchange.session_id
-                            == session_id
+                            InterviewCandidateQuestionExchange.session_id == session_id
                         )
                     )
                     assert exchange is not None
@@ -471,8 +473,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                             await session.scalars(
                                 select(InterviewCandidateQuestion)
                                 .where(
-                                    InterviewCandidateQuestion.session_id
-                                    == session_id
+                                    InterviewCandidateQuestion.session_id == session_id
                                 )
                                 .order_by(InterviewCandidateQuestion.order)
                             )
@@ -482,8 +483,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     exchanges = list(
                         (
                             await session.scalars(
-                                select(InterviewCandidateQuestionExchange)
-                                .where(
+                                select(InterviewCandidateQuestionExchange).where(
                                     InterviewCandidateQuestionExchange.session_id
                                     == session_id
                                 )
@@ -536,8 +536,7 @@ def test_interview_candidate_question_and_review_success_workflow(
                     review_runs = list(
                         (
                             await session.scalars(
-                                select(AgentRun)
-                                .where(
+                                select(AgentRun).where(
                                     AgentRun.user_id == owner.id,
                                     AgentRun.agent_id == "interview-review",
                                 )
@@ -593,11 +592,13 @@ def test_interview_candidate_question_and_review_success_workflow(
                 )
                 assert immutable_finish.status_code == 409
 
-            other_owner, _other_role, _other_profile = (
-                await seed_interview_prerequisites(
-                    database,
-                    label="completion-success-other-user",
-                )
+            (
+                other_owner,
+                _other_role,
+                _other_profile,
+            ) = await seed_interview_prerequisites(
+                database,
+                label="completion-success-other-user",
             )
             other_app = _app(migrated_database_url, other_owner)
             with TestClient(other_app) as other_client:
@@ -657,7 +658,7 @@ def test_interview_candidate_answer_failure_is_retryable_without_duplicate_run(
                     headers=_headers(),
                 )
                 assert submitted.status_code == 202
-                assert (await _worker(database, settings, provider).process_one())
+                assert await _worker(database, settings, provider).process_one()
 
                 failed = client.get("/api/interview", headers=_headers())
                 assert failed.status_code == 200
@@ -688,8 +689,7 @@ def test_interview_candidate_answer_failure_is_retryable_without_duplicate_run(
                                 select(AgentRun)
                                 .where(
                                     AgentRun.user_id == owner.id,
-                                    AgentRun.agent_id
-                                    == "interview-candidate-question",
+                                    AgentRun.agent_id == "interview-candidate-question",
                                 )
                                 .order_by(AgentRun.created_at)
                             )
@@ -902,11 +902,10 @@ def test_interview_review_failure_is_retryable_and_old_run_is_retained(
                     assert runs[1].status is AgentRunStatus.QUEUED
                     assert runs[0].id != runs[1].id
                     assert runs[1].payload["retryOfRunId"] == str(runs[0].id)
-                    assert runs[1].payload["interviewReviewInput"][
-                        "trainingMemory"
-                    ] == runs[0].payload["interviewReviewInput"][
-                        "trainingMemory"
-                    ]
+                    assert (
+                        runs[1].payload["interviewReviewInput"]["trainingMemory"]
+                        == runs[0].payload["interviewReviewInput"]["trainingMemory"]
+                    )
 
                 await _process_worker(database, settings, provider)
                 completed = client.get("/api/interview", headers=_headers())
@@ -1094,9 +1093,9 @@ def test_interview_end_during_follow_up_keeps_answered_main_and_unanswered_follo
                 assert submitted.status_code == 202
                 await _process_worker(database, settings, provider)
 
-                follow_up_page = client.get("/api/interview", headers=_headers()).json()[
-                    "session"
-                ]
+                follow_up_page = client.get(
+                    "/api/interview", headers=_headers()
+                ).json()["session"]
                 assert follow_up_page["status"] == "followUp"
                 follow_up_id = UUID(follow_up_page["currentFollowUp"]["question"]["id"])
                 provider.responses.append(
@@ -1120,9 +1119,9 @@ def test_interview_end_during_follow_up_keeps_answered_main_and_unanswered_follo
                 assert "dimensionScores" not in completed["review"]["review"]
                 assert "nextTraining" not in completed["review"]["review"]
                 assert len(completed["completedQuestions"]) == 1
-                assert completed["completedQuestions"][0]["answer"]["content"].startswith(
-                    "I made the decision"
-                )
+                assert completed["completedQuestions"][0]["answer"][
+                    "content"
+                ].startswith("I made the decision")
                 detail = completed["questionDetails"][0]
                 assert detail["record"]["status"] == "answered"
                 assert detail["record"]["answer"]["content"].startswith(

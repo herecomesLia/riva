@@ -30,9 +30,7 @@ class TrainingPlanningHandler:
             or agent.prompt_id != TRAINING_PLANNING_PROMPT.prompt_id
             or agent.prompt_version != TRAINING_PLANNING_PROMPT.version
         ):
-            raise ValueError(
-                "agent must be the canonical training planning agent"
-            )
+            raise ValueError("agent must be the canonical training planning agent")
         self.session_factory = session_factory
         self.agent = agent
 
@@ -46,9 +44,7 @@ class TrainingPlanningHandler:
                 retryable=False,
             )
         try:
-            planning_input = validate_training_planning_run(
-                run
-            ).training_planning_input
+            planning_input = validate_training_planning_run(run).training_planning_input
         except TrainingPlanningStateError as error:
             raise AgentExecutionError(error.code, retryable=False) from None
 

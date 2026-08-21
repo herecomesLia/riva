@@ -8,8 +8,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from riva.core.auth import require_current_user
 from riva.core.app import create_app
+from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db import migrations
 from riva.db.database import Database
@@ -17,7 +17,6 @@ from riva.models import AgentRun, AgentRunStatus, CareerProfile, TargetRole
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.interview import seed_interview_prerequisites
 from tests.integration.test_training_planning_workflow import clear_database
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -51,10 +50,15 @@ def set_run_status(run: AgentRun, status: AgentRunStatus) -> None:
     run.status = status
     run.attempt_count = 1
     run.started_at = now
-    run.finished_at = now if status in {
-        AgentRunStatus.SUCCEEDED,
-        AgentRunStatus.FAILED,
-    } else None
+    run.finished_at = (
+        now
+        if status
+        in {
+            AgentRunStatus.SUCCEEDED,
+            AgentRunStatus.FAILED,
+        }
+        else None
+    )
     run.lease_owner = None
     run.lease_token = None
     run.lease_expires_at = None
@@ -136,12 +140,18 @@ def test_current_planning_replays_and_refreshes_by_context(
             async with database.sessionmaker() as session:
                 stored_run = await session.get(AgentRun, UUID(first_run_id))
                 assert stored_run is not None
-                assert stored_run.payload["trainingPlanningInput"][
-                    "constraints"
-                ]["targetedPractice"] is not None
-                assert stored_run.payload["trainingPlanningInput"][
-                    "constraints"
-                ]["mockInterview"] is not None
+                assert (
+                    stored_run.payload["trainingPlanningInput"]["constraints"][
+                        "targetedPractice"
+                    ]
+                    is not None
+                )
+                assert (
+                    stored_run.payload["trainingPlanningInput"]["constraints"][
+                        "mockInterview"
+                    ]
+                    is not None
+                )
 
                 for status in (
                     AgentRunStatus.RUNNING,
@@ -160,7 +170,9 @@ def test_current_planning_replays_and_refreshes_by_context(
                     assert existing_status.json()["runId"] == first_run_id
                     assert existing_status.json()["status"] == status.value
 
-                with TestClient(app_for(migrated_database_url, owner, provider=None)) as client:
+                with TestClient(
+                    app_for(migrated_database_url, owner, provider=None)
+                ) as client:
                     unconfigured_replay = client.post(
                         "/api/training-plans/current",
                         json={"targetRoleId": str(role.id)},

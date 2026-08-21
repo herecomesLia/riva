@@ -43,24 +43,31 @@ from riva.schemas.practice_interactions import (
     PracticeAnswerContent,
     PracticeAnswerKind,
 )
+from riva.schemas.practice_recommendation import (
+    PracticeRecommendationInput,
+    PracticeRecommendationQuestionContext,
+)
 from riva.schemas.practice_reference_answer import PracticeReferenceAnswerTargetType
 from riva.schemas.practice_sessions import (
     PracticeAttemptStatus,
     PracticeQuestionSourceAvailability,
     PracticeSessionCompletionReason,
     PracticeSessionSelection,
-    PracticeSetupCapabilitiesResponse,
     PracticeSessionStatus,
-)
-from riva.schemas.practice_recommendation import (
-    PracticeRecommendationInput,
-    PracticeRecommendationQuestionContext,
+    PracticeSetupCapabilitiesResponse,
 )
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import QuestionGenerationRunPayload
+from riva.services.evaluation_generation import (
+    EvaluationGenerationService,
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+    practice_evaluation_output_from_artifact,
+    validate_evaluation_generation_run,
+)
 from riva.services.follow_up_generation import (
     FollowUpGenerationService,
     FollowUpGenerationStateError,
@@ -68,12 +75,14 @@ from riva.services.follow_up_generation import (
     practice_follow_up_idempotency_key,
     validate_follow_up_generation_run,
 )
-from riva.services.evaluation_generation import (
-    EvaluationGenerationService,
-    EvaluationGenerationStateError,
-    practice_evaluation_idempotency_key,
-    practice_evaluation_output_from_artifact,
-    validate_evaluation_generation_run,
+from riva.services.practice_weaknesses import (
+    PracticeWeaknessFocus,
+    PracticeWeaknessService,
+)
+from riva.services.question_generation import (
+    QuestionGenerationService,
+    QuestionGenerationStateError,
+    validate_question_generation_run,
 )
 from riva.services.recommendation_generation import (
     RecommendationGenerationService,
@@ -83,22 +92,6 @@ from riva.services.recommendation_generation import (
     validate_recommendation_generation_run,
     validate_recommendation_v1_contract,
 )
-from riva.services.review_generation import (
-    ReviewGenerationService,
-    ReviewGenerationStateError,
-    practice_review_idempotency_key,
-    practice_review_output_from_artifact,
-    validate_review_generation_run,
-)
-from riva.services.question_generation import (
-    QuestionGenerationService,
-    QuestionGenerationStateError,
-    validate_question_generation_run,
-)
-from riva.services.practice_weaknesses import (
-    PracticeWeaknessFocus,
-    PracticeWeaknessService,
-)
 from riva.services.reference_answer_generation import (
     PracticeReferenceAnswerLifecycleStatus,
     PracticeReferenceAnswerWorkflowState,
@@ -107,8 +100,14 @@ from riva.services.reference_answer_generation import (
     practice_follow_up_reference_answer_idempotency_key,
     practice_main_reference_answer_idempotency_key,
 )
+from riva.services.review_generation import (
+    ReviewGenerationService,
+    ReviewGenerationStateError,
+    practice_review_idempotency_key,
+    practice_review_output_from_artifact,
+    validate_review_generation_run,
+)
 from riva.utils import utc_now
-
 
 PracticeSessionStateErrorCode = Literal[
     "practice_session_not_found",
@@ -136,9 +135,7 @@ PracticeSessionStateErrorCode = Literal[
     "practice_reference_answer_generation_unavailable",
 ]
 
-PRACTICE_SESSION_NOT_FOUND: PracticeSessionStateErrorCode = (
-    "practice_session_not_found"
-)
+PRACTICE_SESSION_NOT_FOUND: PracticeSessionStateErrorCode = "practice_session_not_found"
 PRACTICE_SESSION_VERSION_CONFLICT: PracticeSessionStateErrorCode = (
     "practice_session_version_conflict"
 )
@@ -250,9 +247,9 @@ class PracticePrimaryAnswerWorkflowContext:
         default_factory=tuple,
         kw_only=True,
     )
-    follow_up_completion_reason: (
-        PracticeEvaluationFollowUpCompletionReason | None
-    ) = field(default=None, kw_only=True)
+    follow_up_completion_reason: PracticeEvaluationFollowUpCompletionReason | None = (
+        field(default=None, kw_only=True)
+    )
 
 
 @dataclass(frozen=True)
@@ -301,9 +298,9 @@ class PracticeEndedEarlySessionWorkflowContext:
     session: PracticeSession
     unfinished_attempt: PracticeAttempt
     question_context: PracticeSessionWorkflowContext
-    completed_attempt_review_contexts: tuple[
-        PracticeReviewWorkflowContext, ...
-    ] = field(default_factory=tuple, kw_only=True)
+    completed_attempt_review_contexts: tuple[PracticeReviewWorkflowContext, ...] = (
+        field(default_factory=tuple, kw_only=True)
+    )
 
 
 @dataclass(frozen=True)
@@ -356,10 +353,9 @@ def practice_question_generation_idempotency_key(
     session_id: UUID,
     attempt_id: UUID,
 ) -> str:
-    return (
-        f"practice-session:{session_id}:"
-        f"attempt:{attempt_id}:question-generation"
-    )
+    return f"practice-session:{session_id}:attempt:{attempt_id}:question-generation"
+
+
 FollowUpGenerationServiceFactory = Callable[
     ...,
     FollowUpGenerationService,
@@ -410,18 +406,12 @@ class PracticeSessionService:
     ) -> None:
         self.session = session
         self.llm_model = (llm_model or "").strip()
-        self.question_generation_service_factory = (
-            question_generation_service_factory
-        )
-        self.follow_up_generation_service_factory = (
-            follow_up_generation_service_factory
-        )
+        self.question_generation_service_factory = question_generation_service_factory
+        self.follow_up_generation_service_factory = follow_up_generation_service_factory
         self.evaluation_generation_service_factory = (
             evaluation_generation_service_factory
         )
-        self.review_generation_service_factory = (
-            review_generation_service_factory
-        )
+        self.review_generation_service_factory = review_generation_service_factory
         self.recommendation_generation_service_factory = (
             recommendation_generation_service_factory
         )
@@ -478,8 +468,7 @@ class PracticeSessionService:
                 and_(
                     PracticeAttempt.question_card_id == QuestionCard.id,
                     PracticeAttempt.user_id == user_id,
-                    PracticeAttempt.status
-                    == PracticeAttemptStatus.COMPLETED.value,
+                    PracticeAttempt.status == PracticeAttemptStatus.COMPLETED.value,
                     PracticeAttempt.completed_at.is_not(None),
                 ),
             )
@@ -493,9 +482,10 @@ class PracticeSessionService:
         history_rows = (await self.session.execute(history_statement)).all()
         availability_counts: dict[tuple[UUID, str, str], dict[str, int]] = {}
         for target_role_id, question_type, difficulty, count in saved_rows:
-            availability_counts[
-                (target_role_id, question_type, difficulty)
-            ] = {"saved": int(count), "history": 0}
+            availability_counts[(target_role_id, question_type, difficulty)] = {
+                "saved": int(count),
+                "history": 0,
+            }
         for target_role_id, question_type, difficulty, count in history_rows:
             counts = availability_counts.setdefault(
                 (target_role_id, question_type, difficulty),
@@ -523,12 +513,10 @@ class PracticeSessionService:
         )
         return PracticeSetupCapabilitiesResponse(
             saved_question_count=sum(
-                item.saved_question_count
-                for item in question_source_availability
+                item.saved_question_count for item in question_source_availability
             ),
             history_question_count=sum(
-                item.history_question_count
-                for item in question_source_availability
+                item.history_question_count for item in question_source_availability
             ),
             question_source_availability=question_source_availability,
             can_prioritize_weaknesses=can_prioritize_weaknesses,
@@ -554,9 +542,7 @@ class PracticeSessionService:
                     selection=selection,
                     interaction_language=interaction_language,
                 ):
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_ALREADY_ACTIVE
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_ALREADY_ACTIVE)
                 context = await self._load_active_context(active_session)
                 await self.session.commit()
                 return context
@@ -600,9 +586,7 @@ class PracticeSessionService:
                     preferred_question_card_ids=preferred_question_card_ids,
                 )
                 if reused_question_card is None:
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_SOURCE_UNAVAILABLE
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -637,7 +621,9 @@ class PracticeSessionService:
                 ),
                 question_generation_run_id=None,
                 question_card_id=(
-                    reused_question_card.id if reused_question_card is not None else None
+                    reused_question_card.id
+                    if reused_question_card is not None
+                    else None
                 ),
                 retry_of_attempt_id=None,
                 created_at=now,
@@ -661,17 +647,19 @@ class PracticeSessionService:
                 generation_kwargs: dict[str, object] = {}
                 if selection.prioritize_weaknesses:
                     generation_kwargs["weakness_focus"] = weakness_focus
-                run = await self._generation_service().enqueue_generation_in_transaction(
-                    user_id=user_id,
-                    target_role_id=practice_session.target_role_id,
-                    question_type=selection.question_type,
-                    difficulty=selection.difficulty,
-                    interaction_language=practice_session.language,
-                    idempotency_key=practice_question_generation_idempotency_key(
-                        practice_session.id,
-                        attempt.id,
-                    ),
-                    **generation_kwargs,
+                run = (
+                    await self._generation_service().enqueue_generation_in_transaction(
+                        user_id=user_id,
+                        target_role_id=practice_session.target_role_id,
+                        question_type=selection.question_type,
+                        difficulty=selection.difficulty,
+                        interaction_language=practice_session.language,
+                        idempotency_key=practice_question_generation_idempotency_key(
+                            practice_session.id,
+                            attempt.id,
+                        ),
+                        **generation_kwargs,
+                    )
                 )
             except QuestionGenerationStateError as error:
                 raise PracticeSessionStateError(
@@ -714,9 +702,7 @@ class PracticeSessionService:
         previous_session_updated_at: datetime | None = None
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -754,9 +740,7 @@ class PracticeSessionService:
                 return context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if current_attempt.status != PracticeAttemptStatus.REVIEW.value:
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if current_attempt.question_card_id != question_id:
@@ -816,9 +800,7 @@ class PracticeSessionService:
                     preferred_question_card_ids=preferred_question_card_ids,
                 )
                 if reused_question_card is None:
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_SOURCE_UNAVAILABLE
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
 
                 next_attempt = PracticeAttempt(
                     id=uuid4(),
@@ -938,9 +920,7 @@ class PracticeSessionService:
 
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -961,9 +941,7 @@ class PracticeSessionService:
             ):
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if (
                 current_attempt.status != PracticeAttemptStatus.ANSWERING.value
                 or current_attempt.question_card_id != question_id
@@ -1031,9 +1009,7 @@ class PracticeSessionService:
                     preferred_question_card_ids=preferred_question_card_ids,
                 )
                 if replacement_card is None:
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_SOURCE_UNAVAILABLE
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
 
                 now = self.clock()
                 _require_aware_datetime(now)
@@ -1166,9 +1142,7 @@ class PracticeSessionService:
         previous_session_completion_reason: str | None = None
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -1204,9 +1178,7 @@ class PracticeSessionService:
                 return context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if (
                 current_attempt.status != PracticeAttemptStatus.REVIEW.value
                 or current_attempt.question_card_id != question_id
@@ -1239,9 +1211,7 @@ class PracticeSessionService:
             previous_version = practice_session.version
             previous_session_updated_at = practice_session.updated_at
             previous_session_completed_at = practice_session.completed_at
-            previous_session_completion_reason = (
-                practice_session.completion_reason
-            )
+            previous_session_completion_reason = practice_session.completion_reason
 
             retry_attempt = PracticeAttempt(
                 id=uuid4(),
@@ -1285,9 +1255,7 @@ class PracticeSessionService:
                 if previous_session_updated_at is not None:
                     practice_session.updated_at = previous_session_updated_at
                 practice_session.completed_at = previous_session_completed_at
-                practice_session.completion_reason = (
-                    previous_session_completion_reason
-                )
+                practice_session.completion_reason = previous_session_completion_reason
             await self.session.rollback()
             raise
 
@@ -1304,9 +1272,7 @@ class PracticeSessionService:
         previous_updated_at: datetime | None = None
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -1333,9 +1299,7 @@ class PracticeSessionService:
                 or attempt.question_card_id != question_id
                 or attempt.completed_at is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             source = await self._load_question_source(
                 practice_session,
@@ -1344,13 +1308,9 @@ class PracticeSessionService:
                 require_succeeded=True,
             )
             if source.question_card.id != question_id:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if await self._load_main_answer(attempt, for_update=True) is not None:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             await self._ensure_attempt_has_no_response_artifacts(
                 practice_session,
                 attempt,
@@ -1387,9 +1347,7 @@ class PracticeSessionService:
                 or generation_state.generation_run is None
                 or generation_state.generation_run.id != run.id
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -1425,9 +1383,7 @@ class PracticeSessionService:
         previous_updated_at: datetime | None = None
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -1450,14 +1406,11 @@ class PracticeSessionService:
                 attempt is None
                 or attempt.user_id != user_id
                 or attempt.session_id != practice_session.id
-                or attempt.status
-                != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+                or attempt.status != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
                 or attempt.question_card_id != question_id
                 or attempt.completed_at is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             chain = await self._load_follow_up_chain(
                 practice_session,
@@ -1467,17 +1420,14 @@ class PracticeSessionService:
             pending_question = chain.follow_up_question
             if (
                 chain.card.id != question_id
-                or chain.follow_up_generation_run.status
-                != AgentRunStatus.SUCCEEDED
+                or chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
                 or chain.follow_up_decision is None
                 or chain.follow_up_decision.action != "askFollowUp"
                 or pending_question is None
                 or pending_question.id != follow_up_question_id
                 or chain.completion_reason is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             try:
                 generation_service = self._reference_answer_generation_service()
@@ -1489,12 +1439,14 @@ class PracticeSessionService:
                         pending_question.id
                     ),
                 )
-                generation_state = await generation_service.get_follow_up_generation_state(
-                    user_id=user_id,
-                    question_card_id=chain.card.id,
-                    follow_up_question_id=pending_question.id,
-                    submitted_at=None,
-                    for_update=True,
+                generation_state = (
+                    await generation_service.get_follow_up_generation_state(
+                        user_id=user_id,
+                        question_card_id=chain.card.id,
+                        follow_up_question_id=pending_question.id,
+                        submitted_at=None,
+                        for_update=True,
+                    )
                 )
             except ReferenceAnswerGenerationStateError as error:
                 raise PracticeSessionStateError(
@@ -1512,9 +1464,7 @@ class PracticeSessionService:
                 or generation_state.generation_run is None
                 or generation_state.generation_run.id != run.id
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -1546,9 +1496,7 @@ class PracticeSessionService:
     ) -> PracticeReferenceAnswerRequestContext:
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             practice_session = await self._load_session(
                 user_id=user_id,
                 session_id=session_id,
@@ -1571,9 +1519,7 @@ class PracticeSessionService:
                 or attempt.question_card_id != question_id
                 or attempt.completed_at is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             source = await self._load_question_source(
                 practice_session,
                 attempt,
@@ -1581,13 +1527,9 @@ class PracticeSessionService:
                 require_succeeded=True,
             )
             if source.question_card.id != question_id:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if await self._load_main_answer(attempt, for_update=False) is not None:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             await self._ensure_attempt_has_no_response_artifacts(
                 practice_session,
                 attempt,
@@ -1622,9 +1564,7 @@ class PracticeSessionService:
     ) -> PracticeReferenceAnswerRequestContext:
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             practice_session = await self._load_session(
                 user_id=user_id,
                 session_id=session_id,
@@ -1643,14 +1583,11 @@ class PracticeSessionService:
                 attempt is None
                 or attempt.user_id != user_id
                 or attempt.session_id != practice_session.id
-                or attempt.status
-                != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+                or attempt.status != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
                 or attempt.question_card_id != question_id
                 or attempt.completed_at is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             chain = await self._load_follow_up_chain(
                 practice_session,
                 attempt,
@@ -1659,17 +1596,14 @@ class PracticeSessionService:
             pending_question = chain.follow_up_question
             if (
                 chain.card.id != question_id
-                or chain.follow_up_generation_run.status
-                != AgentRunStatus.SUCCEEDED
+                or chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
                 or chain.follow_up_decision is None
                 or chain.follow_up_decision.action != "askFollowUp"
                 or pending_question is None
                 or pending_question.id != follow_up_question_id
                 or chain.completion_reason is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             generation_state = await self._reference_answer_generation_service().get_follow_up_generation_state(
                 user_id=user_id,
                 question_card_id=chain.card.id,
@@ -1757,9 +1691,7 @@ class PracticeSessionService:
                 or attempt.question_card_id != question_id
                 or attempt.completed_at is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             question_generation_run, _ = await self._load_generation_run(
                 practice_session,
@@ -1767,26 +1699,17 @@ class PracticeSessionService:
                 for_update=True,
             )
             if question_generation_run.status != AgentRunStatus.SUCCEEDED:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             question_card = await self._load_card_by_id(
                 practice_session,
                 attempt,
                 question_generation_run,
                 for_update=True,
             )
-            if (
-                question_card.id != question_id
-                or question_card.user_id != user_id
-            ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+            if question_card.id != question_id or question_card.user_id != user_id:
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if await self._load_main_answer(attempt, for_update=True) is not None:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -1877,14 +1800,11 @@ class PracticeSessionService:
                 attempt is None
                 or attempt.user_id != user_id
                 or attempt.session_id != practice_session.id
-                or attempt.status
-                != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
+                or attempt.status != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
                 or attempt.question_card_id != question_id
                 or attempt.completed_at is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             chain = await self._load_follow_up_chain(
                 practice_session,
@@ -1894,17 +1814,14 @@ class PracticeSessionService:
             pending_question = chain.follow_up_question
             if (
                 chain.card.id != question_id
-                or chain.follow_up_generation_run.status
-                != AgentRunStatus.SUCCEEDED
+                or chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
                 or chain.follow_up_decision is None
                 or chain.follow_up_decision.action != "askFollowUp"
                 or pending_question is None
                 or pending_question.id != follow_up_question_id
                 or chain.completion_reason is not None
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -1979,9 +1896,7 @@ class PracticeSessionService:
             if not isinstance(value, bool):
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if (
                 practice_session.status != PracticeSessionStatus.ACTIVE.value
                 or practice_session.completed_at is not None
@@ -1989,9 +1904,7 @@ class PracticeSessionService:
             ):
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             current_attempt = await self._load_current_attempt(
                 user_id=user_id,
@@ -2011,14 +1924,10 @@ class PracticeSessionService:
             )
             if context.attempt.status == PracticeAttemptStatus.ANSWERING.value:
                 if not isinstance(context, PracticeSessionWorkflowContext):
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_STATE_CONFLICT
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             elif context.attempt.status == PracticeAttemptStatus.REVIEW.value:
                 if not isinstance(context, PracticeReviewWorkflowContext):
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_STATE_CONFLICT
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             else:
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
@@ -2083,9 +1992,7 @@ class PracticeSessionService:
         previous_session_completion_reason: str | None = None
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             # Lock the session before looking up the latest attempt so this
             # transition serializes with the other review actions.
@@ -2104,30 +2011,22 @@ class PracticeSessionService:
                 or current_attempt.session_id != practice_session.id
             ):
                 if practice_session.version != expected_version:
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_VERSION_CONFLICT
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             if practice_session.version == expected_version + 1:
                 if (
-                    practice_session.status
-                    != PracticeSessionStatus.COMPLETED.value
+                    practice_session.status != PracticeSessionStatus.COMPLETED.value
                     or practice_session.completion_reason
                     != PracticeSessionCompletionReason.REVIEW_COMPLETED.value
                     or practice_session.completed_at is None
                 ):
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_VERSION_CONFLICT
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
                 if (
-                    current_attempt.status
-                    != PracticeAttemptStatus.COMPLETED.value
+                    current_attempt.status != PracticeAttemptStatus.COMPLETED.value
                     or current_attempt.completed_at is None
                 ):
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_VERSION_CONFLICT
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
                 try:
                     final_review_context = await self._load_review_replay_context(
                         practice_session,
@@ -2154,9 +2053,7 @@ class PracticeSessionService:
                 return completed_context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if (
                 practice_session.status != PracticeSessionStatus.ACTIVE.value
                 or practice_session.completed_at is not None
@@ -2210,9 +2107,7 @@ class PracticeSessionService:
                 if previous_session_updated_at is not None:
                     practice_session.updated_at = previous_session_updated_at
                 practice_session.completed_at = previous_session_completed_at
-                practice_session.completion_reason = (
-                    previous_session_completion_reason
-                )
+                practice_session.completion_reason = previous_session_completion_reason
             await self.session.rollback()
             raise
 
@@ -2227,9 +2122,7 @@ class PracticeSessionService:
     ) -> PracticePrimaryAnswerWorkflowContext:
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -2237,18 +2130,14 @@ class PracticeSessionService:
                 for_update=True,
             )
             if practice_session.status != "active":
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             attempt = await self._load_current_attempt(
                 user_id=user_id,
                 session_id=practice_session.id,
                 for_update=True,
             )
             if attempt is None:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             if practice_session.version == expected_version + 1:
                 normalized_content = _normalize_answer_content(content)
@@ -2267,17 +2156,11 @@ class PracticeSessionService:
                 return context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if attempt.status != PracticeAttemptStatus.ANSWERING.value:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if attempt.question_card_id != question_id:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             normalized_content = _normalize_answer_content(content)
             question_generation_run, _ = await self._load_generation_run(
@@ -2286,9 +2169,7 @@ class PracticeSessionService:
                 for_update=True,
             )
             if question_generation_run.status != AgentRunStatus.SUCCEEDED:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             card = await self._load_card_by_id(
                 practice_session,
                 attempt,
@@ -2300,9 +2181,7 @@ class PracticeSessionService:
                 for_update=True,
             )
             if existing_main_answer is not None:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             now = self.clock()
             _require_aware_datetime(now)
@@ -2357,9 +2236,7 @@ class PracticeSessionService:
     ) -> PracticePrimaryAnswerWorkflowContext:
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -2367,18 +2244,14 @@ class PracticeSessionService:
                 for_update=True,
             )
             if practice_session.status != "active":
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             attempt = await self._load_current_attempt(
                 user_id=user_id,
                 session_id=practice_session.id,
                 for_update=True,
             )
             if attempt is None:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             normalized_content = _normalize_answer_content(content)
             if practice_session.version == expected_version + 1:
@@ -2398,17 +2271,11 @@ class PracticeSessionService:
                 return replay
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if attempt.status != PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             if attempt.question_card_id != question_id:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             chain = await self._load_follow_up_chain(
                 practice_session,
@@ -2420,13 +2287,10 @@ class PracticeSessionService:
                 or chain.follow_up_decision.action != "askFollowUp"
                 or chain.follow_up_question is None
                 or chain.follow_up_question.id != follow_up_question_id
-                or chain.follow_up_question.id in {
-                    exchange.question.id for exchange in chain.follow_up_exchanges
-                }
+                or chain.follow_up_question.id
+                in {exchange.question.id for exchange in chain.follow_up_exchanges}
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             question = chain.follow_up_question
             now = self.clock()
@@ -2472,9 +2336,7 @@ class PracticeSessionService:
                         )
                     )
                 except BaseException:
-                    attempt.status = (
-                        PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
-                    )
+                    attempt.status = PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value
                     raise
 
                 practice_session.version += 1
@@ -2548,9 +2410,7 @@ class PracticeSessionService:
 
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -2589,9 +2449,7 @@ class PracticeSessionService:
                 return context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if (
                 practice_session.completed_at is not None
                 or practice_session.completion_reason is not None
@@ -2612,8 +2470,7 @@ class PracticeSessionService:
             )
             pending_question = chain.follow_up_question
             if (
-                chain.follow_up_generation_run.status
-                != AgentRunStatus.SUCCEEDED
+                chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
                 or chain.follow_up_decision is None
                 or chain.follow_up_decision.action != "askFollowUp"
                 or pending_question is None
@@ -2683,9 +2540,7 @@ class PracticeSessionService:
     ) -> PracticePrimaryAnswerWorkflowContext:
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -2693,18 +2548,14 @@ class PracticeSessionService:
                 for_update=True,
             )
             if practice_session.status != "active":
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             attempt = await self._load_current_attempt(
                 user_id=user_id,
                 session_id=practice_session.id,
                 for_update=True,
             )
             if attempt is None:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             if practice_session.version == expected_version + 1:
                 try:
@@ -2720,13 +2571,9 @@ class PracticeSessionService:
                 return context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if attempt.status != PracticeAttemptStatus.ANSWERING.value:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_STATE_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             chain = await self._load_follow_up_chain(
                 practice_session,
@@ -2797,17 +2644,15 @@ class PracticeSessionService:
             attempt.updated_at = now
             try:
                 await self.session.flush()
-                evaluation_generation_run = (
-                    await self._enqueue_evaluation_generation(
-                        user_id=user_id,
-                        practice_session=practice_session,
-                        attempt=attempt,
-                        question_card=chain.card,
-                        main_answer=chain.main_answer,
-                        complete_decision=decision,
-                        follow_up_completion_reason=chain.completion_reason,
-                        follow_up_exchanges=chain.follow_up_exchanges,
-                    )
+                evaluation_generation_run = await self._enqueue_evaluation_generation(
+                    user_id=user_id,
+                    practice_session=practice_session,
+                    attempt=attempt,
+                    question_card=chain.card,
+                    main_answer=chain.main_answer,
+                    complete_decision=decision,
+                    follow_up_completion_reason=chain.completion_reason,
+                    follow_up_exchanges=chain.follow_up_exchanges,
                 )
             except BaseException:
                 attempt.status = previous_attempt_status
@@ -2851,9 +2696,7 @@ class PracticeSessionService:
 
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -2889,13 +2732,9 @@ class PracticeSessionService:
                 return context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if attempt.status != PracticeAttemptStatus.EVALUATING.value:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             chain = await self._load_follow_up_chain(
                 practice_session,
@@ -3045,9 +2884,7 @@ class PracticeSessionService:
                     evaluation=evaluation,
                     review=review,
                 )
-                evaluation_context["recommendation_generation_run"] = (
-                    recommendation_run
-                )
+                evaluation_context["recommendation_generation_run"] = recommendation_run
                 await self.session.commit()
                 return PracticeEvaluationWorkflowContext(**evaluation_context)
 
@@ -3160,9 +2997,7 @@ class PracticeSessionService:
                 await self.session.commit()
                 return context
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             attempt = await self._load_current_attempt(
                 user_id=user_id,
@@ -3272,9 +3107,7 @@ class PracticeSessionService:
                         for_update=False,
                     )
                     if current_attempt is None:
-                        raise PracticeSessionStateError(
-                            PRACTICE_SESSION_STATE_CONFLICT
-                        )
+                        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
                     return await self._load_ended_early_replay_context(
                         practice_session=practice_session,
                         attempt=current_attempt,
@@ -3327,9 +3160,7 @@ class PracticeSessionService:
                     for_update=False,
                 )
                 if current_attempt is None:
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_STATE_CONFLICT
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
                 return await self._load_ended_early_replay_context(
                     practice_session=practice_session,
                     attempt=current_attempt,
@@ -3356,10 +3187,8 @@ class PracticeSessionService:
             )
         except PracticeSessionStateError:
             raise
-        except (AttributeError, TypeError, ValueError, ValidationError):
-            raise PracticeSessionStateError(
-                PRACTICE_SESSION_STATE_CONFLICT
-            ) from None
+        except AttributeError, TypeError, ValueError, ValidationError:
+            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
 
     async def _load_completed_session_context_unchecked(
         self,
@@ -3592,9 +3421,7 @@ class PracticeSessionService:
                 evaluation_generation_run=evaluation_generation_run,
                 evaluation=evaluation,
             )
-        raise PracticeSessionStateError(
-            PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
-        )
+        raise PracticeSessionStateError(PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT)
 
     async def _load_ended_follow_up_replay_context(
         self,
@@ -3721,10 +3548,7 @@ class PracticeSessionService:
             )
         if attempt.status != PracticeAttemptStatus.EVALUATING.value:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-        if (
-            chain.completion_reason is None
-            or chain.follow_up_decision is None
-        ):
+        if chain.completion_reason is None or chain.follow_up_decision is None:
             raise PracticeSessionStateError(
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
             )
@@ -3984,9 +3808,7 @@ class PracticeSessionService:
         previous_session_completion_reason: str | None = None
         try:
             if not _valid_expected_version(expected_version):
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
 
             practice_session = await self._load_session(
                 user_id=user_id,
@@ -4003,9 +3825,7 @@ class PracticeSessionService:
                 or current_attempt.session_id != practice_session.id
             ):
                 if practice_session.version == expected_version + 1:
-                    raise PracticeSessionStateError(
-                        PRACTICE_SESSION_VERSION_CONFLICT
-                    )
+                    raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
             if practice_session.version == expected_version + 1:
@@ -4030,9 +3850,7 @@ class PracticeSessionService:
                 return context
 
             if practice_session.version != expected_version:
-                raise PracticeSessionStateError(
-                    PRACTICE_SESSION_VERSION_CONFLICT
-                )
+                raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
             if (
                 practice_session.status != PracticeSessionStatus.ACTIVE.value
                 or practice_session.completed_at is not None
@@ -4047,8 +3865,7 @@ class PracticeSessionService:
             if (
                 not attempts
                 or attempts[-1].id != current_attempt.id
-                or current_attempt.status
-                != PracticeAttemptStatus.ANSWERING.value
+                or current_attempt.status != PracticeAttemptStatus.ANSWERING.value
                 or current_attempt.question_card_id != question_id
                 or current_attempt.completed_at is not None
             ):
@@ -4092,9 +3909,7 @@ class PracticeSessionService:
                 session=practice_session,
                 unfinished_attempt=current_attempt,
                 question_context=question_context,
-                completed_attempt_review_contexts=tuple(
-                    completed_review_contexts
-                ),
+                completed_attempt_review_contexts=tuple(completed_review_contexts),
             )
         except BaseException:
             if current_attempt is not None and previous_attempt_status is not None:
@@ -4108,9 +3923,7 @@ class PracticeSessionService:
                 if previous_session_updated_at is not None:
                     practice_session.updated_at = previous_session_updated_at
                 practice_session.completed_at = previous_session_completed_at
-                practice_session.completion_reason = (
-                    previous_session_completion_reason
-                )
+                practice_session.completion_reason = previous_session_completion_reason
             await self.session.rollback()
             raise
 
@@ -4123,8 +3936,7 @@ class PracticeSessionService:
         for_update: bool,
     ) -> PracticeEndedEarlySessionWorkflowContext:
         if (
-            practice_session.status
-            != PracticeSessionStatus.COMPLETED.value
+            practice_session.status != PracticeSessionStatus.COMPLETED.value
             or practice_session.completion_reason
             != PracticeSessionCompletionReason.USER_ENDED_EARLY.value
             or practice_session.completed_at is None
@@ -4149,13 +3961,11 @@ class PracticeSessionService:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
         _require_aware_datetime(attempt.completed_at)
 
-        completed_review_contexts = (
-            await self._load_early_end_previous_review_contexts(
-                practice_session,
-                attempts,
-                allow_user_ended_early_session=True,
-                for_update=for_update,
-            )
+        completed_review_contexts = await self._load_early_end_previous_review_contexts(
+            practice_session,
+            attempts,
+            allow_user_ended_early_session=True,
+            for_update=for_update,
         )
         question_context = await self._load_early_end_question_context(
             practice_session=practice_session,
@@ -4227,9 +4037,7 @@ class PracticeSessionService:
             require_succeeded=True,
         )
         if source.question_card.id != question_id:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         if await self._load_main_answer(attempt, for_update=for_update) is not None:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
         await self._ensure_attempt_has_no_response_artifacts(
@@ -4310,17 +4118,13 @@ class PracticeSessionService:
                 practice_recommendation_idempotency_key(attempt.id),
             ),
         ):
-            statement = (
-                select(AgentRun.id)
-                .where(
-                    AgentRun.user_id == practice_session.user_id,
-                    AgentRun.agent_id == agent_id,
-                    or_(
-                        AgentRun.idempotency_key == idempotency_key,
-                        AgentRun.payload["attemptId"].as_string()
-                        == str(attempt.id),
-                    ),
-                )
+            statement = select(AgentRun.id).where(
+                AgentRun.user_id == practice_session.user_id,
+                AgentRun.agent_id == agent_id,
+                or_(
+                    AgentRun.idempotency_key == idempotency_key,
+                    AgentRun.payload["attemptId"].as_string() == str(attempt.id),
+                ),
             )
             if for_update:
                 statement = statement.with_for_update()
@@ -4337,12 +4141,15 @@ class PracticeSessionService:
         allow_unmaterialized_success: bool = False,
     ) -> _PracticeFollowUpChain:
         if primary_records is None:
-            card, main_answer, first_run, _ = (
-                await self._load_primary_follow_up_records(
-                    practice_session,
-                    attempt,
-                    for_update=for_update,
-                )
+            (
+                card,
+                main_answer,
+                first_run,
+                _,
+            ) = await self._load_primary_follow_up_records(
+                practice_session,
+                attempt,
+                for_update=for_update,
             )
         else:
             card, main_answer, first_run = primary_records
@@ -4415,13 +4222,11 @@ class PracticeSessionService:
                 completion_reason=None,
             )
 
-        first_decision, first_question = (
-            await self._load_canonical_follow_up_artifact(
-                first_run,
-                attempt=attempt,
-                expected_order=1,
-                for_update=for_update,
-            )
+        first_decision, first_question = await self._load_canonical_follow_up_artifact(
+            first_run,
+            attempt=attempt,
+            expected_order=1,
+            for_update=for_update,
         )
         questions_by_order = {question.order: question for question in questions}
         answers_by_question = {
@@ -4530,13 +4335,14 @@ class PracticeSessionService:
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
             )
 
-        second_decision, second_question = (
-            await self._load_canonical_follow_up_artifact(
-                second_run,
-                attempt=attempt,
-                expected_order=2,
-                for_update=for_update,
-            )
+        (
+            second_decision,
+            second_question,
+        ) = await self._load_canonical_follow_up_artifact(
+            second_run,
+            attempt=attempt,
+            expected_order=2,
+            for_update=for_update,
         )
         if (
             len(decisions) != 2
@@ -4595,9 +4401,7 @@ class PracticeSessionService:
                     answer=second_answer,
                 ),
             ),
-            completion_reason=(
-                PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED
-            ),
+            completion_reason=(PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED),
         )
 
     async def _load_follow_up_rows(
@@ -4610,20 +4414,26 @@ class PracticeSessionService:
         list[PracticeAnswer],
         list[PracticeFollowUpDecision],
     ]:
-        question_statement = select(PracticeFollowUpQuestion).where(
-            PracticeFollowUpQuestion.attempt_id == attempt.id
-        ).order_by(
-            PracticeFollowUpQuestion.order,
-            PracticeFollowUpQuestion.id,
+        question_statement = (
+            select(PracticeFollowUpQuestion)
+            .where(PracticeFollowUpQuestion.attempt_id == attempt.id)
+            .order_by(
+                PracticeFollowUpQuestion.order,
+                PracticeFollowUpQuestion.id,
+            )
         )
-        answer_statement = select(PracticeAnswer).where(
-            PracticeAnswer.attempt_id == attempt.id
-        ).order_by(PracticeAnswer.order, PracticeAnswer.id)
-        decision_statement = select(PracticeFollowUpDecision).where(
-            PracticeFollowUpDecision.attempt_id == attempt.id
-        ).order_by(
-            PracticeFollowUpDecision.order,
-            PracticeFollowUpDecision.id,
+        answer_statement = (
+            select(PracticeAnswer)
+            .where(PracticeAnswer.attempt_id == attempt.id)
+            .order_by(PracticeAnswer.order, PracticeAnswer.id)
+        )
+        decision_statement = (
+            select(PracticeFollowUpDecision)
+            .where(PracticeFollowUpDecision.attempt_id == attempt.id)
+            .order_by(
+                PracticeFollowUpDecision.order,
+                PracticeFollowUpDecision.id,
+            )
         )
         if for_update:
             question_statement = question_statement.with_for_update()
@@ -4641,11 +4451,15 @@ class PracticeSessionService:
         *,
         for_update: bool,
     ) -> list[AgentRun]:
-        statement = select(AgentRun).where(
-            AgentRun.user_id == practice_session.user_id,
-            AgentRun.agent_id == "follow-up-generator",
-            AgentRun.payload["attemptId"].as_string() == str(attempt.id),
-        ).order_by(AgentRun.created_at, AgentRun.id)
+        statement = (
+            select(AgentRun)
+            .where(
+                AgentRun.user_id == practice_session.user_id,
+                AgentRun.agent_id == "follow-up-generator",
+                AgentRun.payload["attemptId"].as_string() == str(attempt.id),
+            )
+            .order_by(AgentRun.created_at, AgentRun.id)
+        )
         if for_update:
             statement = statement.with_for_update()
         return list((await self.session.scalars(statement)).all())
@@ -4853,7 +4667,7 @@ class PracticeSessionService:
                 )
             try:
                 follow_up_output_from_persistence(decision)
-            except (TypeError, ValueError, ValidationError):
+            except TypeError, ValueError, ValidationError:
                 raise PracticeSessionStateError(
                     PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
                 ) from None
@@ -4877,7 +4691,7 @@ class PracticeSessionService:
             )
         try:
             follow_up_output_from_persistence(decision, question)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise PracticeSessionStateError(
                 PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT
             ) from None
@@ -4912,7 +4726,8 @@ class PracticeSessionService:
             AgentRun.agent_id == "follow-up-generator",
             AgentRun.prompt_id == FOLLOW_UP_PROMPT.prompt_id,
             AgentRun.prompt_version == FOLLOW_UP_PROMPT.version,
-            AgentRun.idempotency_key == practice_follow_up_idempotency_key(
+            AgentRun.idempotency_key
+            == practice_follow_up_idempotency_key(
                 attempt_id,
                 order,
             ),
@@ -4938,9 +4753,7 @@ class PracticeSessionService:
             AgentRun.agent_id == "practice-evaluator",
             AgentRun.prompt_id == PRACTICE_EVALUATION_PROMPT.prompt_id,
             AgentRun.prompt_version == PRACTICE_EVALUATION_PROMPT.version,
-            AgentRun.idempotency_key == practice_evaluation_idempotency_key(
-                attempt_id
-            ),
+            AgentRun.idempotency_key == practice_evaluation_idempotency_key(attempt_id),
         )
         if for_update:
             statement = statement.with_for_update()
@@ -4978,17 +4791,12 @@ class PracticeSessionService:
         if for_update:
             statement = statement.with_for_update()
         run = await self.session.scalar(statement)
-        if (
-            run is not None
-            and run.idempotency_key != practice_review_idempotency_key(attempt_id)
+        if run is not None and run.idempotency_key != practice_review_idempotency_key(
+            attempt_id
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
         if run is None and required:
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
         return run
 
     async def _load_stable_recommendation_run(
@@ -5006,10 +4814,8 @@ class PracticeSessionService:
             or_(
                 and_(
                     AgentRun.user_id == user_id,
-                    AgentRun.prompt_id
-                    == PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
-                    AgentRun.prompt_version
-                    == PRACTICE_RECOMMENDATION_PROMPT.version,
+                    AgentRun.prompt_id == PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
+                    AgentRun.prompt_version == PRACTICE_RECOMMENDATION_PROMPT.version,
                     AgentRun.idempotency_key
                     == practice_recommendation_idempotency_key(attempt_id),
                 ),
@@ -5075,9 +4881,7 @@ class PracticeSessionService:
         follow_up_completion_reason: PracticeEvaluationFollowUpCompletionReason = (
             PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
         ),
-        follow_up_exchanges: tuple[
-            PracticeAnsweredFollowUpExchangeContext, ...
-        ] = (),
+        follow_up_exchanges: tuple[PracticeAnsweredFollowUpExchangeContext, ...] = (),
         unanswered_follow_up_question: PracticeFollowUpQuestion | None = None,
     ) -> AgentRun:
         try:
@@ -5086,9 +4890,7 @@ class PracticeSessionService:
                 attempt_id=attempt.id,
                 interaction_language=practice_session.language,
                 follow_up_completion_reason=follow_up_completion_reason,
-                idempotency_key=practice_evaluation_idempotency_key(
-                    attempt.id
-                ),
+                idempotency_key=practice_evaluation_idempotency_key(attempt.id),
             )
         except EvaluationGenerationStateError as error:
             raise PracticeSessionStateError(
@@ -5160,9 +4962,7 @@ class PracticeSessionService:
                 user_id=user_id,
                 attempt_id=attempt.id,
                 interaction_language=practice_session.language,
-                idempotency_key=practice_recommendation_idempotency_key(
-                    attempt.id
-                ),
+                idempotency_key=practice_recommendation_idempotency_key(attempt.id),
             )
         except RecommendationGenerationStateError as error:
             raise PracticeSessionStateError(
@@ -5232,9 +5032,7 @@ class PracticeSessionService:
         follow_up_completion_reason: PracticeEvaluationFollowUpCompletionReason = (
             PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED
         ),
-        follow_up_exchanges: tuple[
-            PracticeAnsweredFollowUpExchangeContext, ...
-        ] = (),
+        follow_up_exchanges: tuple[PracticeAnsweredFollowUpExchangeContext, ...] = (),
         unanswered_follow_up_question: PracticeFollowUpQuestion | None = None,
     ) -> EvaluationRunPayload:
         try:
@@ -5304,11 +5102,9 @@ class PracticeSessionService:
                 unanswered_follow_up_question is not None
                 and len(follow_up_exchanges) in (0, 1)
                 and unanswered_follow_up_question.attempt_id == attempt.id
-                and unanswered_follow_up_question.order
-                == len(follow_up_exchanges) + 1
+                and unanswered_follow_up_question.order == len(follow_up_exchanges) + 1
                 and complete_decision.attempt_id == attempt.id
-                and complete_decision.order
-                == len(follow_up_exchanges) + 1
+                and complete_decision.order == len(follow_up_exchanges) + 1
                 and complete_decision.action == "askFollowUp"
                 and complete_decision.follow_up_question_id
                 == unanswered_follow_up_question.id
@@ -5316,9 +5112,7 @@ class PracticeSessionService:
         if (
             run.id is None
             or run.user_id != practice_session.user_id
-            or run.idempotency_key != practice_evaluation_idempotency_key(
-                attempt.id
-            )
+            or run.idempotency_key != practice_evaluation_idempotency_key(attempt.id)
             or payload.attempt_id != attempt.id
             or payload.question_card_id != question_card.id
             or payload.main_answer_id != main_answer.id
@@ -5369,9 +5163,7 @@ class PracticeSessionService:
             or payload.evaluation_id != evaluation.id
             or payload.interaction_language != practice_session.language
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
 
     def _validate_recommendation_run_lineage(
         self,
@@ -5436,7 +5228,7 @@ class PracticeSessionService:
                 evaluation,
                 scoring_focus_count=len(question_card.scoring_focus),
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise PracticeSessionStateError(
                 PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
             ) from None
@@ -5457,9 +5249,7 @@ class PracticeSessionService:
         }:
             return None
         if run.status != AgentRunStatus.SUCCEEDED or run.id is None:
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
         statement = select(PracticeReview).where(
             PracticeReview.source_agent_run_id == run.id
         )
@@ -5471,19 +5261,15 @@ class PracticeSessionService:
             or review.attempt_id != attempt.id
             or review.source_agent_run_id != run.id
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
         try:
             practice_review_output_from_artifact(review)
-        except (TypeError, ValueError, ValidationError):
+        except TypeError, ValueError, ValidationError:
             raise PracticeSessionStateError(
                 PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
             ) from None
         if evaluation.attempt_id != attempt.id:
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
         return review
 
     async def _load_recommendation_artifact(
@@ -5564,9 +5350,7 @@ class PracticeSessionService:
                 "prompt": question_card.prompt,
                 "question_type": question_card.question_type,
                 "difficulty": question_card.difficulty,
-                "assessed_capabilities": list(
-                    question_card.assessed_capabilities
-                ),
+                "assessed_capabilities": list(question_card.assessed_capabilities),
                 "scoring_focus": list(question_card.scoring_focus),
             }
         )
@@ -5644,7 +5428,7 @@ class PracticeSessionService:
                 raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
             try:
                 _require_aware_datetime(evaluation_generation_run.created_at)
-            except (AttributeError, TypeError, ValueError):
+            except AttributeError, TypeError, ValueError:
                 raise PracticeSessionStateError(
                     PRACTICE_SESSION_STATE_CONFLICT
                 ) from None
@@ -5759,9 +5543,7 @@ class PracticeSessionService:
         user_id: UUID,
         focus: PracticeWeaknessFocus,
     ) -> frozenset[UUID]:
-        source_attempt_ids = {
-            evidence.source_attempt_id for evidence in focus.evidence
-        }
+        source_attempt_ids = {evidence.source_attempt_id for evidence in focus.evidence}
         if not source_attempt_ids:
             return frozenset()
         question_card_ids = await self.session.scalars(
@@ -5846,17 +5628,14 @@ class PracticeSessionService:
                 QuestionCard.created_at.asc(), QuestionCard.id.asc()
             )
         elif source == "history":
-            statement = (
-                statement.join(
-                    PracticeAttempt,
-                    and_(
-                        PracticeAttempt.question_card_id == QuestionCard.id,
-                        PracticeAttempt.user_id == user_id,
-                        PracticeAttempt.status
-                        == PracticeAttemptStatus.COMPLETED.value,
-                        PracticeAttempt.completed_at.is_not(None),
-                    ),
-                )
+            statement = statement.join(
+                PracticeAttempt,
+                and_(
+                    PracticeAttempt.question_card_id == QuestionCard.id,
+                    PracticeAttempt.user_id == user_id,
+                    PracticeAttempt.status == PracticeAttemptStatus.COMPLETED.value,
+                    PracticeAttempt.completed_at.is_not(None),
+                ),
             )
             if priority_order is not None:
                 statement = statement.order_by(priority_order)
@@ -6006,9 +5785,7 @@ class PracticeSessionService:
                 raise PracticeSessionStateError(
                     PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT
                 )
-            completion_reason = (
-                PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
-            )
+            completion_reason = PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY
             unanswered_question = chain.follow_up_question
         else:
             if chain.follow_up_question is not None:
@@ -6064,12 +5841,8 @@ class PracticeSessionService:
             PracticeAttemptStatus.REVIEW.value,
         }:
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-        if (
-            attempt.status == PracticeAttemptStatus.REVIEW.value
-            and (
-                attempt.question_card_id is None
-                or attempt.completed_at is None
-            )
+        if attempt.status == PracticeAttemptStatus.REVIEW.value and (
+            attempt.question_card_id is None or attempt.completed_at is None
         ):
             raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
 
@@ -6135,8 +5908,7 @@ class PracticeSessionService:
             )
         if attempt.status == PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value:
             if (
-                chain.follow_up_generation_run.status
-                != AgentRunStatus.SUCCEEDED
+                chain.follow_up_generation_run.status != AgentRunStatus.SUCCEEDED
                 or chain.follow_up_decision is None
                 or chain.follow_up_decision.action != "askFollowUp"
                 or chain.follow_up_question is None
@@ -6331,8 +6103,7 @@ class PracticeSessionService:
                     PracticeSessionCompletionReason.USER_ENDED_EARLY.value
                 )
             session_state_valid = (
-                practice_session.status
-                == PracticeSessionStatus.COMPLETED.value
+                practice_session.status == PracticeSessionStatus.COMPLETED.value
                 and practice_session.completed_at is not None
                 and practice_session.completion_reason in allowed_completion_reasons
             )
@@ -6405,9 +6176,7 @@ class PracticeSessionService:
             evaluation=evaluation,
         )
         if review_run.status != AgentRunStatus.SUCCEEDED:
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
         review = await self._load_review_artifact(
             review_run,
             attempt=attempt,
@@ -6415,9 +6184,7 @@ class PracticeSessionService:
             for_update=for_update,
         )
         if review is None:
-            raise PracticeSessionStateError(
-                PRACTICE_REVIEW_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_REVIEW_GENERATION_STATE_CONFLICT)
 
         recommendation_run = await self._load_stable_recommendation_run(
             user_id=practice_session.user_id,
@@ -6487,9 +6254,7 @@ class PracticeSessionService:
             for_update=True,
         )
         if run.status != AgentRunStatus.SUCCEEDED:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         card = await self._load_card_by_id(
             practice_session,
             attempt,
@@ -6529,9 +6294,7 @@ class PracticeSessionService:
             or payload.question_type.value != attempt.question_type
             or payload.difficulty.value != attempt.difficulty
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         return payload
 
     async def _resolve_question_source_attempt(
@@ -6627,9 +6390,7 @@ class PracticeSessionService:
             or source_attempt.question_card_id is None
             or attempt.question_card_id != source_attempt.question_card_id
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
 
         statement = select(AgentRun).where(
             AgentRun.id == source_attempt.question_generation_run_id,
@@ -6640,9 +6401,7 @@ class PracticeSessionService:
             statement = statement.with_for_update()
         run = await self.session.scalar(statement)
         if run is None:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         payload = self._validate_question_generation_run_lineage(
             run,
             practice_session=practice_session,
@@ -6653,9 +6412,7 @@ class PracticeSessionService:
             ),
         )
         if require_succeeded and run.status != AgentRunStatus.SUCCEEDED:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         card = await self._load_card_by_id(
             practice_session,
             attempt,
@@ -6678,9 +6435,7 @@ class PracticeSessionService:
         require_succeeded: bool,
     ) -> _PracticeQuestionSource:
         if attempt.question_generation_run_id is not None:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         source_attempt = await self._resolve_question_source_attempt(
             practice_session=practice_session,
             attempt=attempt,
@@ -6690,9 +6445,7 @@ class PracticeSessionService:
             source_attempt.question_card_id is None
             or attempt.question_card_id != source_attempt.question_card_id
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
 
         card = await self._load_question_card_identity(
             practice_session,
@@ -6708,18 +6461,14 @@ class PracticeSessionService:
             statement = statement.with_for_update()
         run = await self.session.scalar(statement)
         if run is None:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         payload = self._validate_reused_question_generation_run(
             run,
             practice_session=practice_session,
             attempt=source_attempt,
         )
         if require_succeeded and run.status != AgentRunStatus.SUCCEEDED:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         self._validate_question_card(practice_session, attempt, run, card)
         return _PracticeQuestionSource(
             attempt=source_attempt,
@@ -6754,9 +6503,7 @@ class PracticeSessionService:
             return source.generation_run, source.generation_payload
 
         if attempt.question_generation_run_id is None:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         statement = select(AgentRun).where(
             AgentRun.id == attempt.question_generation_run_id
         )
@@ -6764,9 +6511,7 @@ class PracticeSessionService:
             statement = statement.with_for_update()
         run = await self.session.scalar(statement)
         if run is None or run.user_id != practice_session.user_id:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         try:
             payload = validate_question_generation_run(run)
         except QuestionGenerationStateError as error:
@@ -6780,9 +6525,7 @@ class PracticeSessionService:
             or payload.question_type.value != attempt.question_type
             or payload.difficulty.value != attempt.difficulty
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         return run, payload
 
     @staticmethod
@@ -6809,9 +6552,7 @@ class PracticeSessionService:
             or payload.question_type.value != attempt.question_type
             or payload.difficulty.value != attempt.difficulty
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         return payload
 
     async def _load_card_for_run(
@@ -6830,9 +6571,7 @@ class PracticeSessionService:
             statement = statement.with_for_update()
         card = await self.session.scalar(statement)
         if card is None:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
         self._validate_question_card(practice_session, attempt, run, card)
         return card
 
@@ -6885,9 +6624,7 @@ class PracticeSessionService:
             card,
         )
         if card.source_agent_run_id != run.id:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
 
     @staticmethod
     def _validate_question_card_identity(
@@ -6902,9 +6639,7 @@ class PracticeSessionService:
             or card.question_type != attempt.question_type
             or card.difficulty != attempt.difficulty
         ):
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_STATE_CONFLICT
-            )
+            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_STATE_CONFLICT)
 
     @staticmethod
     def _same_intent(
@@ -6915,8 +6650,7 @@ class PracticeSessionService:
     ) -> bool:
         return (
             practice_session.target_role_id == selection.target_role_id
-            and practice_session.initial_question_type
-            == selection.question_type.value
+            and practice_session.initial_question_type == selection.question_type.value
             and practice_session.initial_difficulty == selection.difficulty.value
             and practice_session.source == selection.source.value
             and practice_session.prioritize_weaknesses
@@ -6932,9 +6666,7 @@ class PracticeSessionService:
             "personalized",
             *REUSED_QUESTION_SOURCES,
         }:
-            raise PracticeSessionStateError(
-                PRACTICE_SESSION_SOURCE_UNAVAILABLE
-            )
+            raise PracticeSessionStateError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
 
 
 def _require_aware_datetime(value: datetime) -> None:
@@ -6943,20 +6675,14 @@ def _require_aware_datetime(value: datetime) -> None:
 
 
 def _valid_expected_version(value: object) -> bool:
-    return (
-        not isinstance(value, bool)
-        and isinstance(value, int)
-        and value >= 1
-    )
+    return not isinstance(value, bool) and isinstance(value, int) and value >= 1
 
 
 def _normalize_answer_content(value: object) -> str:
     try:
         return TypeAdapter(PracticeAnswerContent).validate_python(value)
-    except (TypeError, ValueError, ValidationError):
-        raise PracticeSessionStateError(
-            PRACTICE_SESSION_STATE_CONFLICT
-        ) from None
+    except TypeError, ValueError, ValidationError:
+        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 __all__ = [

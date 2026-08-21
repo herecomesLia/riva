@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, JSON, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Text, UniqueConstraint
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db.base import Base

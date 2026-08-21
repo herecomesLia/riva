@@ -34,7 +34,6 @@ from riva.services.resume_imports import (
     build_resume_import_draft_data,
 )
 
-
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
 
@@ -265,9 +264,7 @@ def test_first_import_creates_profile_and_applies_draft() -> None:
                 assert [item.position for item in profile.work_experiences] == [0]
                 assert [item.position for item in profile.project_experiences] == [0]
                 assert [item.position for item in profile.skills] == [0, 1]
-                assert profile.work_experiences[0].skill_ids == [
-                    profile.skills[0].id
-                ]
+                assert profile.work_experiences[0].skill_ids == [profile.skills[0].id]
 
     asyncio.run(run())
 
@@ -437,9 +434,9 @@ def test_existing_profile_merge_preserves_manual_and_missing_items() -> None:
                 assert profile.project_experiences[0].name == "Manual project"
                 assert profile.work_experiences[0].title == "Engineer"
                 assert profile.work_experiences[0].skill_ids == [manual_skill_id]
-                assert [link.id for link in profile.work_experiences[0].skill_links] == [
-                    existing_work_skill_id
-                ]
+                assert [
+                    link.id for link in profile.work_experiences[0].skill_links
+                ] == [existing_work_skill_id]
                 assert profile.work_experiences[0].skill_links[0].skill.id == (
                     manual_skill_id
                 )
@@ -967,12 +964,14 @@ def test_concurrent_application_of_same_draft_changes_profile_once() -> None:
                     )
 
             first, second = await asyncio.gather(apply_once(), apply_once())
-            assert sorted(
-                (first.profile_changed, second.profile_changed)
-            ) == [False, True]
-            assert sorted(
-                (first.profile_created, second.profile_created)
-            ) == [False, True]
+            assert sorted((first.profile_changed, second.profile_changed)) == [
+                False,
+                True,
+            ]
+            assert sorted((first.profile_created, second.profile_created)) == [
+                False,
+                True,
+            ]
 
             async with database.sessionmaker() as session:
                 profile = await load_profile(session, user_id)

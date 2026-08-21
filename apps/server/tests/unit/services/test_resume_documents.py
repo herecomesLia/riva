@@ -1,9 +1,9 @@
 import asyncio
+import io
+import threading
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-import io
 from pathlib import Path
-import threading
 from uuid import UUID, uuid4
 
 import pytest
@@ -11,9 +11,9 @@ import pytest
 from riva.core.errors import APIError
 from riva.models import ResumeDocument, User
 from riva.resumes import (
+    TEXT_PLAIN,
     ExtractedResumeText,
     ResumeExtractionError,
-    TEXT_PLAIN,
 )
 from riva.services.resume_documents import (
     RESUME_EXTRACTION_FAILURE_REASON,
@@ -23,11 +23,11 @@ from riva.services.resume_documents import (
     normalize_resume_filename,
 )
 from riva.storage import (
-    LocalResumeObjectStorage,
     RESUME_FILE_EMPTY,
     RESUME_FILE_TOO_LARGE,
     RESUME_STORAGE_COLLISION,
     RESUME_STORAGE_UNAVAILABLE,
+    LocalResumeObjectStorage,
     ResumeStorageError,
     StoredResumeObject,
     build_resume_storage_key,
@@ -231,14 +231,16 @@ def create_service(
         extractor,  # type: ignore[arg-type]
         max_upload_bytes=100,
         max_extracted_characters=50,
-        document_id_factory=lambda: document_id or UUID(
-            "22222222-2222-4222-8222-222222222222"
+        document_id_factory=lambda: (
+            document_id or UUID("22222222-2222-4222-8222-222222222222")
         ),
     )
     return service, session, storage, extractor
 
 
-def assert_api_error(error: pytest.ExceptionInfo[APIError], status_code: int, code: str) -> None:
+def assert_api_error(
+    error: pytest.ExceptionInfo[APIError], status_code: int, code: str
+) -> None:
     assert error.value.status_code == status_code
     assert error.value.error == code
 
@@ -328,8 +330,16 @@ def test_file_extraction_failure_is_persisted_and_source_is_retained() -> None:
     [
         (ResumeStorageError(RESUME_FILE_EMPTY), 422, RESUME_FILE_EMPTY),
         (ResumeStorageError(RESUME_FILE_TOO_LARGE), 413, RESUME_FILE_TOO_LARGE),
-        (ResumeStorageError(RESUME_STORAGE_COLLISION), 503, "resume_storage_unavailable"),
-        (ResumeStorageError(RESUME_STORAGE_UNAVAILABLE), 503, "resume_storage_unavailable"),
+        (
+            ResumeStorageError(RESUME_STORAGE_COLLISION),
+            503,
+            "resume_storage_unavailable",
+        ),
+        (
+            ResumeStorageError(RESUME_STORAGE_UNAVAILABLE),
+            503,
+            "resume_storage_unavailable",
+        ),
     ],
 )
 def test_storage_errors_do_not_create_documents(
@@ -396,9 +406,7 @@ def test_read_failure_and_unexpected_extractor_failure_compensate_storage() -> N
 
 @pytest.mark.parametrize("failure", ["flush", "commit"])
 def test_database_failure_rolls_back_and_compensates_storage(failure: str) -> None:
-    session = FakeSession(
-        **{f"{failure}_error": RuntimeError("database detail")}
-    )
+    session = FakeSession(**{f"{failure}_error": RuntimeError("database detail")})
     storage = FakeStorage(delete_error=RuntimeError("delete detail"))
     service, session, storage, _extractor = create_service(
         session=session,
@@ -662,7 +670,9 @@ def test_pasted_text_errors_do_not_create_documents(
 ) -> None:
     session = FakeSession()
     storage = FakeStorage()
-    extractor = FakeExtractor(error=extractor_error) if extractor_error else FakeExtractor()
+    extractor = (
+        FakeExtractor(error=extractor_error) if extractor_error else FakeExtractor()
+    )
     service = ResumeDocumentService(
         session,  # type: ignore[arg-type]
         storage,  # type: ignore[arg-type]
@@ -764,9 +774,7 @@ def test_load_extracted_text_state_errors(
         status=status,
         extracted_text=extracted_text,
     )
-    service, _, _, _ = create_service(
-        session=FakeSession(document=document)
-    )
+    service, _, _, _ = create_service(session=FakeSession(document=document))
 
     with pytest.raises(ResumeDocumentStateError) as error:
         asyncio.run(

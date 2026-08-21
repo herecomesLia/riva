@@ -23,17 +23,16 @@ from tests.integration.test_practice_answer_workflow import (
     build_evaluation_worker,
     evaluation_response,
 )
+from tests.integration.test_practice_follow_up_stop_workflow import (
+    prepare_answering_follow_up,
+)
 from tests.integration.test_practice_review_workflow import (
     build_worker,
     complete_required_reference_answers,
     recommendation_output,
     review_output,
 )
-from tests.integration.test_practice_follow_up_stop_workflow import (
-    prepare_answering_follow_up,
-)
 from tests.integration.test_question_generation import database_url
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -238,9 +237,10 @@ def test_practice_follow_up_stop_public_api_replay_poll_and_normal_completion() 
                     )
                     assert pending.status_code == 200
                     assert pending.json()["status"] == "evaluating"
-                    assert pending.json()["followUpCompletion"] == stopped_body[
-                        "followUpCompletion"
-                    ]
+                    assert (
+                        pending.json()["followUpCompletion"]
+                        == stopped_body["followUpCompletion"]
+                    )
 
                     assert await build_worker(
                         database,

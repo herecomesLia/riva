@@ -40,7 +40,6 @@ from tests.integration.test_question_generation import (
     seed_context,
 )
 
-
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
 
@@ -240,9 +239,7 @@ def test_practice_answer_api_recovers_and_replays_ask_flow() -> None:
 
                     pending = client.get("/api/practice/sessions/current")
                     assert pending.status_code == 200
-                    assert pending.json()["session"]["status"] == (
-                        "generatingFollowUp"
-                    )
+                    assert pending.json()["session"]["status"] == ("generatingFollowUp")
                     assert pending.json()["session"]["version"] == 3
 
                     follow_up_provider = FakeLLMProvider(
@@ -258,9 +255,7 @@ def test_practice_answer_api_recovers_and_replays_ask_flow() -> None:
                         ),
                     ).process_one()
 
-                    before_refresh = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    before_refresh = client.get("/api/practice/sessions/current")
                     assert before_refresh.status_code == 200
                     assert before_refresh.json()["session"]["status"] == (
                         "generatingFollowUp"
@@ -283,12 +278,13 @@ def test_practice_answer_api_recovers_and_replays_ask_flow() -> None:
                         "awaitingAnswer"
                     )
                     assert follow_up_body["currentFollowUp"]["answer"] is None
-                    assert follow_up_body["currentFollowUp"]["question"][
-                        "answerHints"
-                    ]["content"] is None
-                    assert "focus" not in follow_up_body["currentFollowUp"][
-                        "question"
-                    ]
+                    assert (
+                        follow_up_body["currentFollowUp"]["question"]["answerHints"][
+                            "content"
+                        ]
+                        is None
+                    )
+                    assert "focus" not in follow_up_body["currentFollowUp"]["question"]
 
                     replay = client.post(
                         f"/api/practice/sessions/{session_id}/"
@@ -320,9 +316,7 @@ def test_practice_answer_api_recovers_and_replays_ask_flow() -> None:
                         password_hash="hash",
                         display_name="Other User",
                     )
-                    app.dependency_overrides[require_current_user] = (
-                        lambda: other_user
-                    )
+                    app.dependency_overrides[require_current_user] = lambda: other_user
                     for method, path, body in (
                         (
                             "get",
@@ -497,8 +491,7 @@ def test_practice_answer_api_exposes_evaluating_completion_and_replay() -> None:
                     async with database.sessionmaker() as session:
                         stored_evaluation = await session.scalar(
                             select(PracticeEvaluation).where(
-                                PracticeEvaluation.attempt_id
-                                == persisted_attempt.id
+                                PracticeEvaluation.attempt_id == persisted_attempt.id
                             )
                         )
                         stored_run = await session.get(
@@ -509,13 +502,9 @@ def test_practice_answer_api_exposes_evaluating_completion_and_replay() -> None:
                         assert stored_run is not None
                         assert stored_run.status is AgentRunStatus.SUCCEEDED
 
-                    after_worker = client.get(
-                        "/api/practice/sessions/current"
-                    )
+                    after_worker = client.get("/api/practice/sessions/current")
                     assert after_worker.status_code == 200
-                    assert after_worker.json()["session"]["status"] == (
-                        "evaluating"
-                    )
+                    assert after_worker.json()["session"]["status"] == ("evaluating")
                     assert after_worker.json()["session"]["version"] == 4
             finally:
                 await database.reset()

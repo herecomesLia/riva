@@ -1,5 +1,5 @@
-from pydantic import TypeAdapter, ValidationError
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
 from riva.schemas.practice_interactions import (
     MAX_PRACTICE_ANSWER_LENGTH,

@@ -8,7 +8,6 @@ from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.interview_turn import InterviewTurnOutput
 from riva.workers import InterviewTurnHandler
 
-
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 
 

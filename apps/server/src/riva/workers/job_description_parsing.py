@@ -9,22 +9,19 @@ from riva.schemas.job_description_parsing import (
     JobDescriptionParsingOutput,
     JobDescriptionParsingRunPayload,
 )
-from riva.services.job_description_import_drafts import (
-    JobDescriptionImportDraftService,
-    JobDescriptionImportDraftStateError,
-)
 from riva.services.job_description_analyses import (
     JobDescriptionAnalysisService,
     JobDescriptionParsingStateError,
 )
+from riva.services.job_description_import_drafts import (
+    JobDescriptionImportDraftService,
+    JobDescriptionImportDraftStateError,
+)
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 
-
 AnalysisServiceFactory = Callable[[AsyncSession], JobDescriptionAnalysisService]
-ImportDraftServiceFactory = Callable[
-    [AsyncSession], JobDescriptionImportDraftService
-]
+ImportDraftServiceFactory = Callable[[AsyncSession], JobDescriptionImportDraftService]
 
 
 class JobDescriptionParsingHandler:
@@ -94,13 +91,13 @@ class JobDescriptionParsingHandler:
         try:
             async with self.session_factory() as session:
                 if _is_import_draft_run(run):
-                    await self.import_draft_service_factory(
-                        session
-                    ).persist_success(run, result.output)
+                    await self.import_draft_service_factory(session).persist_success(
+                        run, result.output
+                    )
                 else:
-                    await self.analysis_service_factory(
-                        session
-                    ).persist_success(run, result.output)
+                    await self.analysis_service_factory(session).persist_success(
+                        run, result.output
+                    )
         except (
             JobDescriptionImportDraftStateError,
             JobDescriptionParsingStateError,

@@ -17,19 +17,18 @@ from riva.models import (
 )
 from riva.services.agent_runs import AgentRunService
 from riva.services.interview_planning import InterviewPlanningService
-from tests.helpers.interview import seed_interview_prerequisites
 from tests.helpers.integration_database import get_integration_database_url
+from tests.helpers.interview import seed_interview_prerequisites
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_interview_planning_workflow import (
     _app,
     _clear_database,
+    _headers,
     _planner_output,
     _settings,
     _start_and_begin,
-    _headers,
     _worker,
 )
-
 
 pytestmark = pytest.mark.integration
 
@@ -86,9 +85,7 @@ def test_v2_planning_snapshots_memory_and_retries_without_requery(
             app = _app(migrated_database_url, owner)
 
             with TestClient(app) as client:
-                session_id, _opening, generating = _start_and_begin(
-                    client, role.id
-                )
+                session_id, _opening, generating = _start_and_begin(client, role.id)
                 async with database.sessionmaker() as session:
                     run = await session.scalar(
                         select(AgentRun).where(
@@ -141,9 +138,7 @@ def test_v2_planning_snapshots_memory_and_retries_without_requery(
                         retry_delay=timedelta(0),
                     )
 
-                    interview_session = await session.get(
-                        InterviewSession, session_id
-                    )
+                    interview_session = await session.get(InterviewSession, session_id)
                     assert interview_session is not None
                     assert interview_session.status == "generatingQuestion"
 
@@ -212,9 +207,7 @@ def test_v1_snapshot_executes_and_persists_plan_lineage(
             app = _app(migrated_database_url, owner)
 
             with TestClient(app) as client:
-                session_id, _opening, _generating = _start_and_begin(
-                    client, role.id
-                )
+                session_id, _opening, _generating = _start_and_begin(client, role.id)
                 async with database.sessionmaker() as session:
                     run = await session.scalar(
                         select(AgentRun).where(
@@ -225,9 +218,7 @@ def test_v1_snapshot_executes_and_persists_plan_lineage(
                     assert run is not None
                     run.prompt_version = "1"
                     legacy_payload = deepcopy(run.payload)
-                    legacy_payload["interviewPlanningInput"].pop(
-                        "trainingMemory", None
-                    )
+                    legacy_payload["interviewPlanningInput"].pop("trainingMemory", None)
                     run.payload = legacy_payload
                     await session.commit()
 

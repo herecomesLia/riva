@@ -2,7 +2,6 @@ import ast
 import re
 from pathlib import Path
 
-
 PROMPT_MODULES = Path(__file__).resolve().parents[3] / "src" / "riva" / "prompts"
 VERSIONED_PROMPT_NAME = re.compile(r".*_PROMPT_V[0-9]+$")
 

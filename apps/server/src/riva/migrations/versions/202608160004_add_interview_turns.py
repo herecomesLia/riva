@@ -2,9 +2,8 @@
 
 from typing import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "202608160004"
 down_revision: str | None = "202608160003"

@@ -10,7 +10,6 @@ from riva.services.interview_api import (
 )
 from riva.services.interview_sessions import InterviewSetupContext
 
-
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 
 
@@ -50,22 +49,20 @@ def session(
         started_at=NOW,
         total_main_questions=(
             3
-            if status in {"question", "generatingTurn", "followUp", "candidateQuestions"}
+            if status
+            in {"question", "generatingTurn", "followUp", "candidateQuestions"}
             else None
         ),
         plan_revision=(
             1
-            if status in {"question", "generatingTurn", "followUp", "candidateQuestions"}
+            if status
+            in {"question", "generatingTurn", "followUp", "candidateQuestions"}
             else 0
         ),
         planning_run=(
-            None
-            if planning_status is None
-            else SimpleNamespace(status=planning_status)
+            None if planning_status is None else SimpleNamespace(status=planning_status)
         ),
-        turn_run=(
-            None if turn_status is None else SimpleNamespace(status=turn_status)
-        ),
+        turn_run=(None if turn_status is None else SimpleNamespace(status=turn_status)),
         questions=questions or [],
     )
 
@@ -221,7 +218,9 @@ def test_get_page_serializes_follow_up_and_candidate_question_history() -> None:
     )
     assert follow_up_response.session is not None
     assert follow_up_response.session.status == "followUp"
-    assert follow_up_response.session.current_follow_up.question.id == pending_follow_up.id
+    assert (
+        follow_up_response.session.current_follow_up.question.id == pending_follow_up.id
+    )
     assert len(follow_up_response.session.current_question.answered_follow_ups) == 1
 
     completed_question = SimpleNamespace(
@@ -238,7 +237,7 @@ def test_get_page_serializes_follow_up_and_candidate_question_history() -> None:
     assert candidate_response.session is not None
     assert candidate_response.session.status == "candidateQuestions"
     assert len(candidate_response.session.completed_questions) == 1
-    assert candidate_response.session.completed_questions[0].follow_ups[0].answer.content == (
-        "The error rate remained stable."
-    )
+    assert candidate_response.session.completed_questions[0].follow_ups[
+        0
+    ].answer.content == ("The error rate remained stable.")
     assert candidate_response.session.exchanges == []

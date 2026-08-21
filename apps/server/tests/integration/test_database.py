@@ -5,7 +5,6 @@ import pytest
 
 from riva.db.database import Database
 
-
 pytestmark = pytest.mark.integration
 
 

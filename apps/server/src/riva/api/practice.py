@@ -23,18 +23,17 @@ from riva.schemas.practice_sessions import (
     RefreshPracticeEvaluationRequest,
     RefreshPracticeFollowUpGenerationRequest,
     RefreshPracticeQuestionGenerationRequest,
+    RetryPracticeQuestionRequest,
     RevealPracticeFollowUpGuidanceRequest,
     RevealPracticeQuestionGuidanceRequest,
-    RetryPracticeQuestionRequest,
-    SkipPracticeQuestionRequest,
     SetPracticeQuestionSavedRequest,
     SetPracticeQuestionWeakRequest,
-    SubmitFollowUpAnswerRequest,
+    SkipPracticeQuestionRequest,
     StartPracticeSessionRequest,
+    SubmitFollowUpAnswerRequest,
     SubmitPrimaryAnswerRequest,
 )
 from riva.services.practice_api import PracticeAPIService
-
 
 PracticeSessionId = Annotated[UUID, Path(alias="sessionId")]
 
@@ -52,9 +51,7 @@ router = APIRouter(
 async def get_practice_setup_capabilities(
     request: Request,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeSetupResponse:
     return await practice_api_service.get_setup_capabilities(
         user_id=current_user.id,
@@ -73,9 +70,7 @@ async def start_practice_session(
     payload: StartPracticeSessionRequest,
     request: Request,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.start_session(
         user_id=current_user.id,
@@ -95,9 +90,7 @@ async def continue_to_next_practice_question(
     session_id: PracticeSessionId,
     payload: ContinuePracticeQuestionRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.continue_to_next_question(
         user_id=current_user.id,
@@ -115,9 +108,7 @@ async def retry_current_practice_question(
     session_id: PracticeSessionId,
     payload: RetryPracticeQuestionRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.retry_current_question(
         user_id=current_user.id,
@@ -135,9 +126,7 @@ async def skip_current_practice_question(
     session_id: PracticeSessionId,
     payload: SkipPracticeQuestionRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.skip_current_question(
         user_id=current_user.id,
@@ -155,9 +144,7 @@ async def set_practice_question_saved(
     session_id: PracticeSessionId,
     payload: SetPracticeQuestionSavedRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.set_question_saved(
         user_id=current_user.id,
@@ -175,9 +162,7 @@ async def set_practice_question_weak(
     session_id: PracticeSessionId,
     payload: SetPracticeQuestionWeakRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.set_question_weak(
         user_id=current_user.id,
@@ -195,9 +180,7 @@ async def reveal_practice_question_hint(
     session_id: PracticeSessionId,
     payload: RevealPracticeQuestionGuidanceRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.reveal_question_hint(
         user_id=current_user.id,
@@ -215,9 +198,7 @@ async def reveal_practice_question_framework(
     session_id: PracticeSessionId,
     payload: RevealPracticeQuestionGuidanceRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.reveal_question_framework(
         user_id=current_user.id,
@@ -235,9 +216,7 @@ async def request_practice_question_reference_answer(
     session_id: PracticeSessionId,
     payload: PracticeQuestionReferenceAnswerRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.request_question_reference_answer(
         user_id=current_user.id,
@@ -254,9 +233,7 @@ async def refresh_practice_question_reference_answer(
     session_id: PracticeSessionId,
     payload: PracticeQuestionReferenceAnswerRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_question_reference_answer(
         user_id=current_user.id,
@@ -273,9 +250,7 @@ async def refresh_practice_question_generation(
     session_id: PracticeSessionId,
     payload: RefreshPracticeQuestionGenerationRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_question_generation(
         user_id=current_user.id,
@@ -293,9 +268,7 @@ async def submit_practice_primary_answer(
     session_id: PracticeSessionId,
     payload: SubmitPrimaryAnswerRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.submit_primary_answer(
         user_id=current_user.id,
@@ -313,9 +286,7 @@ async def submit_practice_follow_up_answer(
     session_id: PracticeSessionId,
     payload: SubmitFollowUpAnswerRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.submit_follow_up_answer(
         user_id=current_user.id,
@@ -333,9 +304,7 @@ async def end_practice_follow_ups(
     session_id: PracticeSessionId,
     payload: EndPracticeFollowUpsRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.end_follow_ups(
         user_id=current_user.id,
@@ -352,9 +321,7 @@ async def refresh_practice_follow_up_generation(
     session_id: PracticeSessionId,
     payload: RefreshPracticeFollowUpGenerationRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_follow_up_generation(
         user_id=current_user.id,
@@ -372,9 +339,7 @@ async def reveal_practice_follow_up_hint(
     session_id: PracticeSessionId,
     payload: RevealPracticeFollowUpGuidanceRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.reveal_follow_up_hint(
         user_id=current_user.id,
@@ -392,9 +357,7 @@ async def reveal_practice_follow_up_framework(
     session_id: PracticeSessionId,
     payload: RevealPracticeFollowUpGuidanceRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.reveal_follow_up_framework(
         user_id=current_user.id,
@@ -412,9 +375,7 @@ async def request_practice_follow_up_reference_answer(
     session_id: PracticeSessionId,
     payload: PracticeFollowUpReferenceAnswerRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.request_follow_up_reference_answer(
         user_id=current_user.id,
@@ -431,9 +392,7 @@ async def refresh_practice_follow_up_reference_answer(
     session_id: PracticeSessionId,
     payload: PracticeFollowUpReferenceAnswerRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_follow_up_reference_answer(
         user_id=current_user.id,
@@ -450,9 +409,7 @@ async def refresh_practice_evaluation_generation(
     session_id: PracticeSessionId,
     payload: RefreshPracticeEvaluationRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.refresh_evaluation(
         user_id=current_user.id,
@@ -467,9 +424,7 @@ async def refresh_practice_evaluation_generation(
 )
 async def get_current_practice_session(
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> CurrentPracticeSessionResponse:
     return await practice_api_service.get_current_session(
         user_id=current_user.id,
@@ -483,9 +438,7 @@ async def get_current_practice_session(
 async def get_practice_session(
     session_id: PracticeSessionId,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeSessionResponse:
     return await practice_api_service.get_session(
         user_id=current_user.id,
@@ -502,9 +455,7 @@ async def complete_practice_session(
     session_id: PracticeSessionId,
     payload: CompletePracticeSessionRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeCompletedSessionResponse:
     return await practice_api_service.complete_session(
         user_id=current_user.id,
@@ -522,9 +473,7 @@ async def end_practice_session_early(
     session_id: PracticeSessionId,
     payload: EndPracticeSessionEarlyRequest,
     current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(
-        get_practice_api_service
-    ),
+    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeCompletedSessionResponse:
     return await practice_api_service.end_session_early(
         user_id=current_user.id,

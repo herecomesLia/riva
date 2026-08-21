@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.core.language import InteractionLanguage
 from riva.models import (
     InterviewCandidateQuestion,
     InterviewCandidateQuestionExchange,
@@ -23,14 +24,12 @@ from riva.schemas.interview import (
     InterviewDurationMinutes,
     InterviewRound,
 )
-from riva.core.language import InteractionLanguage
 from riva.services.training_role_eligibility import (
     TrainingRoleEligibilityBlockedReason,
     TrainingRoleEligibilityContext,
     TrainingRoleEligibilityService,
 )
 from riva.utils import utc_now
-
 
 InterviewSessionStateErrorCode = Literal[
     "interview_session_not_found",
@@ -177,9 +176,7 @@ class InterviewSessionService:
                 None,
             )
             if target_role is None:
-                raise InterviewSessionStateError(
-                    INTERVIEW_TARGET_ROLE_UNAVAILABLE
-                )
+                raise InterviewSessionStateError(INTERVIEW_TARGET_ROLE_UNAVAILABLE)
             self._validate_configuration(configuration, interaction_language)
 
             now = self.clock()
@@ -235,30 +232,20 @@ class InterviewSessionService:
         interaction_language: InteractionLanguage,
     ) -> None:
         if configuration.round not in tuple(InterviewRound):
-            raise InterviewSessionStateError(
-                INTERVIEW_SESSION_CONFIGURATION_INVALID
-            )
+            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
         if configuration.difficulty not in tuple(InterviewDifficulty):
-            raise InterviewSessionStateError(
-                INTERVIEW_SESSION_CONFIGURATION_INVALID
-            )
+            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
         if configuration.duration_minutes not in tuple(InterviewDurationMinutes):
-            raise InterviewSessionStateError(
-                INTERVIEW_SESSION_CONFIGURATION_INVALID
-            )
+            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
         if interaction_language not in ("zh-CN", "en"):
-            raise InterviewSessionStateError(
-                INTERVIEW_SESSION_CONFIGURATION_INVALID
-            )
+            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
 
     @staticmethod
     def _require_setup_available(setup: InterviewSetupContext) -> None:
         if setup.blocked_reason == "profileIncomplete":
             raise InterviewSessionStateError(INTERVIEW_SETUP_PROFILE_INCOMPLETE)
         if setup.blocked_reason == "jobDescriptionMissing":
-            raise InterviewSessionStateError(
-                INTERVIEW_SETUP_JOB_DESCRIPTION_MISSING
-            )
+            raise InterviewSessionStateError(INTERVIEW_SETUP_JOB_DESCRIPTION_MISSING)
 
 
 __all__ = [

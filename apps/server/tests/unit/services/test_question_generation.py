@@ -22,6 +22,7 @@ from riva.models import (
     User,
 )
 from riva.prompts import QUESTION_GENERATION_PROMPT
+from riva.schemas.practice_reference_answer import PracticeReferenceFrozenContext
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardMaterialReference,
@@ -33,13 +34,9 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
 )
 from riva.schemas.training_memory import TrainingMemoryContext
-from riva.schemas.practice_reference_answer import PracticeReferenceFrozenContext
 from riva.services.practice_weaknesses import (
     PracticeWeaknessEvidence,
     PracticeWeaknessFocus,
-)
-from riva.services.question_generation_prompt_versions import (
-    QUESTION_GENERATION_LEGACY_PROMPT,
 )
 from riva.services.question_generation import (
     INVALID_QUESTION_GENERATION_RUN,
@@ -58,7 +55,9 @@ from riva.services.question_generation import (
     question_generation_output_from_card,
     validate_question_generation_run,
 )
-
+from riva.services.question_generation_prompt_versions import (
+    QUESTION_GENERATION_LEGACY_PROMPT,
+)
 
 NOW = datetime(2026, 8, 10, 9, 30, tzinfo=UTC)
 
@@ -589,7 +588,9 @@ def test_enqueue_generation_snapshots_injected_training_memory() -> None:
             session,  # type: ignore[arg-type]
             llm_model="test-model",
             agent_run_service_factory=lambda _session: fake_agent_runs,  # type: ignore[arg-type]
-            training_memory_service_factory=lambda _session: FakeTrainingMemoryService(),  # type: ignore[arg-type]
+            training_memory_service_factory=lambda _session: (
+                FakeTrainingMemoryService()
+            ),  # type: ignore[arg-type]
         ).enqueue_generation(
             user_id=owner.id,
             target_role_id=role.id,
@@ -612,7 +613,9 @@ def test_enqueue_generation_snapshots_injected_training_memory() -> None:
     }
 
 
-def test_v1_run_without_weakness_focus_keeps_empty_backward_compatible_snapshot() -> None:
+def test_v1_run_without_weakness_focus_keeps_empty_backward_compatible_snapshot() -> (
+    None
+):
     owner, role, profile, analysis, matching = graph()
     run_payload = payload(role, profile, analysis, matching)
     run = run_for(owner, run_payload)
@@ -684,9 +687,20 @@ def test_enqueue_generation_rolls_back_when_in_transaction_enqueue_fails() -> No
 @pytest.mark.parametrize(
     ("mutate", "expected"),
     [
-        (lambda role, profile, matching: setattr(role, "preparation_status", "archived"), QUESTION_GENERATION_TARGET_ARCHIVED),
-        (lambda role, profile, matching: setattr(profile, "version", 4), QUESTION_GENERATION_PROFILE_VERSION_STALE),
-        (lambda role, profile, matching: setattr(matching, "profile_version", 4), QUESTION_GENERATION_MATCHING_ANALYSIS_STALE),
+        (
+            lambda role, profile, matching: setattr(
+                role, "preparation_status", "archived"
+            ),
+            QUESTION_GENERATION_TARGET_ARCHIVED,
+        ),
+        (
+            lambda role, profile, matching: setattr(profile, "version", 4),
+            QUESTION_GENERATION_PROFILE_VERSION_STALE,
+        ),
+        (
+            lambda role, profile, matching: setattr(matching, "profile_version", 4),
+            QUESTION_GENERATION_MATCHING_ANALYSIS_STALE,
+        ),
     ],
 )
 def test_load_generation_input_rejects_stale_or_archived_context(
@@ -710,7 +724,13 @@ def test_load_generation_input_rejects_stale_or_archived_context(
     ("values", "expected"),
     [
         ((None,), QUESTION_GENERATION_TARGET_NOT_FOUND),
-        (("profile", None, ), QUESTION_GENERATION_PROFILE_NOT_FOUND),
+        (
+            (
+                "profile",
+                None,
+            ),
+            QUESTION_GENERATION_PROFILE_NOT_FOUND,
+        ),
         (("matching",), QUESTION_GENERATION_MATCHING_ANALYSIS_NOT_READY),
     ],
 )
@@ -817,7 +837,9 @@ def test_persist_success_creates_question_card_with_lineage(
     assert session.commit_count == 1
 
 
-def test_persist_success_freezes_reference_role_and_recommended_evidence_order() -> None:
+def test_persist_success_freezes_reference_role_and_recommended_evidence_order() -> (
+    None
+):
     owner, role, profile, analysis, matching = graph()
     run_payload = payload(role, profile, analysis, matching)
     run = run_for(owner, run_payload)
@@ -856,9 +878,7 @@ def test_persist_success_freezes_reference_role_and_recommended_evidence_order()
         for value in session.added
         if isinstance(value, PracticeQuestionReferenceContext)
     )
-    frozen = PracticeReferenceFrozenContext.model_validate(
-        context.frozen_context
-    )
+    frozen = PracticeReferenceFrozenContext.model_validate(context.frozen_context)
     assert frozen.target_role.title == role.title
     assert [item.id for item in frozen.candidate_evidence] == [
         profile.work_experiences[0].id,
@@ -1026,9 +1046,7 @@ def test_persist_success_rejects_mismatched_existing_lineage() -> None:
     )
 
     with pytest.raises(QuestionGenerationStateError) as error:
-        asyncio.run(
-            service_for(session).persist_success(run, output_for(run_payload))
-        )
+        asyncio.run(service_for(session).persist_success(run, output_for(run_payload)))
 
     assert error.value.code == INVALID_QUESTION_GENERATION_RUN
     assert session.added == []
@@ -1066,9 +1084,7 @@ def test_persist_success_rejects_profile_snapshot_change_without_writing_card() 
     session = ScriptedSession(owner.id, None, role, profile, analysis, matching)
 
     with pytest.raises(QuestionGenerationStateError) as error:
-        asyncio.run(
-            service_for(session).persist_success(run, output_for(run_payload))
-        )
+        asyncio.run(service_for(session).persist_success(run, output_for(run_payload)))
 
     assert error.value.code == QUESTION_GENERATION_PROFILE_VERSION_STALE
     assert session.added == []

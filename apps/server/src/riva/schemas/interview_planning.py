@@ -71,9 +71,7 @@ class InterviewPlanningOutput(InterviewPlanningModel):
     @model_validator(mode="after")
     def validate_question_sequence(self) -> Self:
         if self.total_main_questions != len(self.questions):
-            raise ValueError(
-                "totalMainQuestions must equal the number of questions"
-            )
+            raise ValueError("totalMainQuestions must equal the number of questions")
         expected_orders = list(range(1, len(self.questions) + 1))
         if [question.order for question in self.questions] != expected_orders:
             raise ValueError("questions must have continuous order starting at 1")
@@ -237,9 +235,7 @@ def validate_interview_plan_for_duration(
     except KeyError:
         raise ValueError("duration_minutes must be one of 15, 30, or 45") from None
     if not minimum <= output.total_main_questions <= maximum:
-        raise ValueError(
-            "totalMainQuestions does not match the interview duration"
-        )
+        raise ValueError("totalMainQuestions does not match the interview duration")
     return output
 
 

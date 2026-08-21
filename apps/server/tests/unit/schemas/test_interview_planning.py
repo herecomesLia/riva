@@ -32,7 +32,12 @@ def output(count: int) -> InterviewPlanningOutput:
 )
 def test_duration_question_count_ranges(duration: int, counts: tuple[int, int]) -> None:
     for count in range(counts[0], counts[1] + 1):
-        assert validate_interview_plan_for_duration(output(count), duration).total_main_questions == count
+        assert (
+            validate_interview_plan_for_duration(
+                output(count), duration
+            ).total_main_questions
+            == count
+        )
 
 
 @pytest.mark.parametrize(

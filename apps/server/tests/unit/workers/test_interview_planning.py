@@ -11,9 +11,8 @@ from riva.schemas.interview_planning import InterviewPlanningOutput
 from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
 )
-from riva.workers.errors import AgentExecutionError
 from riva.workers import InterviewPlanningHandler
-
+from riva.workers.errors import AgentExecutionError
 
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 

@@ -12,7 +12,6 @@ from riva.services.training_records import TrainingRecordService
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.training_records import START, TRUSTED_ORIGIN, seed_records, settings
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -22,9 +21,14 @@ def test_training_record_list_filters_aggregates_and_paginates() -> None:
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, role, second_role, archived_role, _other_owner, ids = (
-                    await seed_records(database)
-                )
+                (
+                    owner,
+                    role,
+                    second_role,
+                    archived_role,
+                    _other_owner,
+                    ids,
+                ) = await seed_records(database)
                 async with database.sessionmaker() as session:
                     service = TrainingRecordService(session)
                     page = await service.list_training_records(
@@ -45,7 +49,9 @@ def test_training_record_list_filters_aggregates_and_paginates() -> None:
                     assert page.pagination.total_pages == 1
 
                     completed = next(
-                        item for item in page.items if item.record_id == ids["completed"]
+                        item
+                        for item in page.items
+                        if item.record_id == ids["completed"]
                     )
                     assert completed.status == TrainingRecordStatus.COMPLETED
                     assert completed.answered_question_count == 2
@@ -152,9 +158,14 @@ def test_training_record_list_api_projects_targeted_practice_page() -> None:
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, _role, _second_role, _archived_role, _other, ids = (
-                    await seed_records(database)
-                )
+                (
+                    owner,
+                    _role,
+                    _second_role,
+                    _archived_role,
+                    _other,
+                    ids,
+                ) = await seed_records(database)
                 app = create_app(settings(url))
                 app.dependency_overrides[require_current_user] = lambda: owner
                 with TestClient(app) as client:

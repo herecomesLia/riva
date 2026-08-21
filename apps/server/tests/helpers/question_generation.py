@@ -90,7 +90,9 @@ def valid_question_generation_input(language: str = "zh-CN") -> QuestionGenerati
     )
 
 
-def valid_question_generation_output(input: QuestionGenerationInput) -> dict[str, object]:
+def valid_question_generation_output(
+    input: QuestionGenerationInput,
+) -> dict[str, object]:
     project_id = input.career_profile.project_experiences[0].id
     return {
         "prompt": "Explain how you designed the payment service boundary.",

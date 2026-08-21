@@ -1,9 +1,10 @@
 import asyncio
-from datetime import UTC, datetime
 import os
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
+
 from riva.core.errors import APIError
 from riva.db import Database
 from riva.models import (
@@ -16,7 +17,6 @@ from riva.models import (
 from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.roles import UpdateJobDescriptionAnalysisModuleRequest
 from riva.services.roles import TargetRoleService
-
 
 pytestmark = pytest.mark.integration
 PARSED_AT = datetime(2026, 8, 1, 8, tzinfo=UTC)
@@ -93,9 +93,7 @@ def analysis(
         role_id=target.id,
         user_id=target.user_id,
         job_description_version=(
-            target.job_description_version
-            if jd_version is None
-            else jd_version
+            target.job_description_version if jd_version is None else jd_version
         ),
         analysis_version=1,
         source_agent_run_id=run.id,
@@ -255,10 +253,7 @@ def test_editing_each_analysis_module_and_noop() -> None:
                     assert updated.job_description.status == "ready"
                     assert updated.job_description.version == 1
                     assert updated.job_description_analysis is not None
-                    assert (
-                        updated.job_description_analysis.job_description_version
-                        == 1
-                    )
+                    assert updated.job_description_analysis.job_description_version == 1
                     assert (
                         updated.job_description_analysis.analysis_version
                         == current_analysis_version + 1
@@ -341,9 +336,7 @@ def test_editing_each_analysis_module_and_noop() -> None:
                 )
 
                 nested_no_op_value = (
-                    final_analysis.qualification_requirements.model_dump(
-                        mode="json"
-                    )
+                    final_analysis.qualification_requirements.model_dump(mode="json")
                 )
                 async with database.sessionmaker() as session:
                     nested_no_op_page = await TargetRoleService(
@@ -561,7 +554,9 @@ def test_editing_guards_and_same_version_concurrency() -> None:
                     concurrent_edit("First edit"),
                     concurrent_edit("Second edit"),
                 )
-                successes = [item for item in results if not isinstance(item, Exception)]
+                successes = [
+                    item for item in results if not isinstance(item, Exception)
+                ]
                 errors = [item for item in results if isinstance(item, APIError)]
                 assert len(successes) == 1
                 assert len(errors) == 1

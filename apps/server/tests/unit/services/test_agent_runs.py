@@ -14,11 +14,22 @@ from riva.schemas.interview_candidate_question import (
     InterviewCandidateQuestionSessionSnapshot,
     InterviewCandidateQuestionSnapshot,
 )
+from riva.schemas.interview_review import (
+    InterviewReviewFollowUpSnapshot,
+    InterviewReviewInput,
+    InterviewReviewRunPayload,
+    InterviewReviewTurnAssessmentSnapshot,
+)
+from riva.schemas.interview_turn import InterviewTurnInput, InterviewTurnRunPayload
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
 from riva.schemas.matching_analysis import (
     MatchingAnalysisRunPayload,
     MatchingProfileWorkExperience,
 )
+from riva.schemas.practice_reference_answer import (
+    PracticeMainReferenceAnswerRunPayload,
+)
+from riva.schemas.practice_review import ReviewRunPayload
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
@@ -28,17 +39,6 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
 )
 from riva.schemas.resume_parsing import ResumeParsingRunPayload
-from riva.schemas.interview_review import (
-    InterviewReviewFollowUpSnapshot,
-    InterviewReviewInput,
-    InterviewReviewRunPayload,
-    InterviewReviewTurnAssessmentSnapshot,
-)
-from riva.schemas.interview_turn import InterviewTurnInput, InterviewTurnRunPayload
-from riva.schemas.practice_review import ReviewRunPayload
-from riva.schemas.practice_reference_answer import (
-    PracticeMainReferenceAnswerRunPayload,
-)
 from riva.services.agent_runs import AgentRunService, _serialize_payload
 from tests.unit.agents.test_interview_review import review_input
 from tests.unit.agents.test_interview_turn import turn_input
@@ -120,18 +120,16 @@ def test_serialize_payload_accepts_question_generation_weakness_focus() -> None:
 
     assert _serialize_payload(
         {"weaknessFocus": [evidence.model_dump(mode="json", by_alias=True)]}
-    ) == {
-        "weaknessFocus": [evidence.model_dump(mode="json", by_alias=True)]
-    }
+    ) == {"weaknessFocus": [evidence.model_dump(mode="json", by_alias=True)]}
 
 
 @pytest.mark.parametrize("reason", ["noFollowUpRequired", "allAnswered"])
 def test_serialize_payload_accepts_only_evaluation_completion_reason(
     reason: str,
 ) -> None:
-    assert _serialize_payload(
-        {"followUpCompletionReason": reason}
-    ) == {"followUpCompletionReason": reason}
+    assert _serialize_payload({"followUpCompletionReason": reason}) == {
+        "followUpCompletionReason": reason
+    }
 
 
 @pytest.mark.parametrize(
@@ -155,17 +153,20 @@ def test_serialize_payload_rejects_unapproved_evaluation_metadata(
 
 @pytest.mark.parametrize("order", [1, 2])
 def test_serialize_payload_accepts_follow_up_order_metadata(order: int) -> None:
-    assert _serialize_payload(
-        {
-            "attemptId": uuid4(),
-            "questionCardId": uuid4(),
-            "mainAnswerId": uuid4(),
-            "interactionLanguage": "en",
-            "nextFollowUpOrder": order,
-            "previousFollowUpQuestionId": None,
-            "previousFollowUpAnswerId": None,
-        }
-    )["nextFollowUpOrder"] == order
+    assert (
+        _serialize_payload(
+            {
+                "attemptId": uuid4(),
+                "questionCardId": uuid4(),
+                "mainAnswerId": uuid4(),
+                "interactionLanguage": "en",
+                "nextFollowUpOrder": order,
+                "previousFollowUpQuestionId": None,
+                "previousFollowUpAnswerId": None,
+            }
+        )["nextFollowUpOrder"]
+        == order
+    )
 
 
 @pytest.mark.parametrize("order", [0, 3, True, "1"])
@@ -280,7 +281,9 @@ def test_interview_turn_run_payload_is_accepted_after_alias_serialization() -> N
     assert reparsed.interview_turn_input.career_profile.summary is None
 
 
-def test_interview_candidate_question_run_payload_preserves_nullable_snapshot_fields() -> None:
+def test_interview_candidate_question_run_payload_preserves_nullable_snapshot_fields() -> (
+    None
+):
     review = review_input()
     review.planner_context.career_profile.summary = None
     review.planner_context.target_role.company = None
@@ -363,7 +366,10 @@ def test_interview_candidate_question_run_payload_preserves_nullable_snapshot_fi
         reparsed.interview_candidate_question_input.planner_context.target_role.location
         is None
     )
-    assert reparsed.interview_candidate_question_input.completed_questions[0].answer is None
+    assert (
+        reparsed.interview_candidate_question_input.completed_questions[0].answer
+        is None
+    )
     assert (
         reparsed.interview_candidate_question_input.completed_questions[0]
         .follow_ups[0]
@@ -428,14 +434,11 @@ def test_interview_review_run_payload_preserves_nullable_snapshot_fields() -> No
     assert snapshot["plannerContext"]["targetRole"]["location"] is None
     assert snapshot["questions"][0]["answer"] is None
     assert snapshot["questions"][0]["followUps"][0]["answer"] is None
-    assert snapshot["questions"][0]["turnAssessments"][0][
-        "followUpAnswerId"
-    ] is None
+    assert snapshot["questions"][0]["turnAssessments"][0]["followUpAnswerId"] is None
 
     reparsed = InterviewReviewRunPayload.model_validate(serialized)
     assert (
-        reparsed.interview_review_input.planner_context.career_profile.summary
-        is None
+        reparsed.interview_review_input.planner_context.career_profile.summary is None
     )
     assert reparsed.interview_review_input.questions[0].answer is None
 

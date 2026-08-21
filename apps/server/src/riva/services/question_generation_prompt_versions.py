@@ -2,7 +2,6 @@ from riva.prompts import QUESTION_GENERATION_PROMPT
 from riva.prompts.base import PromptDefinition
 from riva.schemas.question_generation import QuestionGenerationOutput
 
-
 QUESTION_GENERATION_LEGACY_PROMPT = PromptDefinition(
     prompt_id="question-generator",
     version="1",

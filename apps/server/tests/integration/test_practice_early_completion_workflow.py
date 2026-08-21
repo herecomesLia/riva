@@ -27,14 +27,13 @@ from riva.services.practice_sessions import (
     PracticeEndedEarlySessionWorkflowContext,
     PracticeSessionService,
 )
+from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_practice_next_question_workflow import (
     build_worker,
     produce_first_review,
     question_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-from tests.helpers.llm import FakeLLMProvider
-
 
 pytestmark = pytest.mark.integration
 
@@ -119,7 +118,9 @@ async def _attempt_artifact_counts(database: Database, attempt_id) -> dict[str, 
         return counts
 
 
-def test_practice_early_completion_first_question_replays_and_releases_active_session() -> None:
+def test_practice_early_completion_first_question_replays_and_releases_active_session() -> (
+    None
+):
     async def run_test() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -208,7 +209,10 @@ def test_practice_early_completion_first_question_replays_and_releases_active_se
                         first_attempt_completed_at
                     )
 
-                assert await _attempt_artifact_counts(database, attempt_id) == before_counts
+                assert (
+                    await _attempt_artifact_counts(database, attempt_id)
+                    == before_counts
+                )
                 async with database.sessionmaker() as session:
                     active_context = await PracticeSessionService(
                         session,
@@ -238,7 +242,9 @@ def test_practice_early_completion_first_question_replays_and_releases_active_se
     asyncio.run(run_test())
 
 
-def test_practice_early_completion_after_previous_review_keeps_previous_attempt_canonical() -> None:
+def test_practice_early_completion_after_previous_review_keeps_previous_attempt_canonical() -> (
+    None
+):
     async def run_test() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -312,7 +318,9 @@ def test_practice_early_completion_after_previous_review_keeps_previous_attempt_
 
                 async with database.sessionmaker() as session:
                     first_attempt = await session.get(PracticeAttempt, first_attempt_id)
-                    second_attempt = await session.get(PracticeAttempt, second_attempt_id)
+                    second_attempt = await session.get(
+                        PracticeAttempt, second_attempt_id
+                    )
                     first_run = await session.get(AgentRun, first_question_run_id)
                     second_run = await session.get(AgentRun, second_question_run_id)
                     practice_session = await session.get(PracticeSession, session_id)
@@ -333,7 +341,9 @@ def test_practice_early_completion_after_previous_review_keeps_previous_attempt_
     asyncio.run(run_test())
 
 
-def test_practice_retry_attempt_can_end_early_without_new_question_generation_run() -> None:
+def test_practice_retry_attempt_can_end_early_without_new_question_generation_run() -> (
+    None
+):
     async def run_test() -> None:
         async with Database(database_url()) as database:
             await database.reset()
@@ -370,7 +380,9 @@ def test_practice_retry_attempt_can_end_early_without_new_question_generation_ru
                     )
                     assert ended.unfinished_attempt.id == retry_attempt_id
                     assert ended.unfinished_attempt.status == "endedEarly"
-                    assert ended.unfinished_attempt.retry_of_attempt_id == first_attempt_id
+                    assert (
+                        ended.unfinished_attempt.retry_of_attempt_id == first_attempt_id
+                    )
                     assert ended.question_context.question_generation_run.id == (
                         first_question_run_id
                     )
@@ -397,7 +409,10 @@ def test_practice_retry_attempt_can_end_early_without_new_question_generation_ru
                     )
                     assert len(attempts) == 2
                     assert len(question_runs) == 1
-                    assert all(attempt.status in {"completed", "endedEarly"} for attempt in attempts)
+                    assert all(
+                        attempt.status in {"completed", "endedEarly"}
+                        for attempt in attempts
+                    )
             finally:
                 await database.reset()
 

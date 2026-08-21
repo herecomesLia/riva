@@ -1,6 +1,5 @@
 from typing import Literal
 
-
 InteractionLanguage = Literal["zh-CN", "en"]
 INTERACTION_LANGUAGES: tuple[InteractionLanguage, ...] = ("zh-CN", "en")
 DEFAULT_INTERACTION_LANGUAGE: InteractionLanguage = "zh-CN"

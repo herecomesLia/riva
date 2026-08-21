@@ -25,8 +25,7 @@ def test_interview_planner_prompt_marks_all_source_context_as_untrusted() -> Non
             "job_description_analysis": '{"rivaSummary":"Build APIs"}',
             "matching_analysis": "null",
             "training_memory": (
-                '{"version":"1","focusCompetencies":[],'
-                '"establishedCompetencies":[]}'
+                '{"version":"1","focusCompetencies":[],"establishedCompetencies":[]}'
             ),
         }
     ).user

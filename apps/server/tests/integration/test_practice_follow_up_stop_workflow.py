@@ -46,7 +46,6 @@ from tests.integration.test_practice_review_workflow import (
 )
 from tests.integration.test_question_generation import database_url, seed_context
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -60,7 +59,9 @@ def follow_up_question_output(order: int) -> dict[str, object]:
     }
 
 
-async def prepare_answering_follow_up(database: Database) -> tuple[
+async def prepare_answering_follow_up(
+    database: Database,
+) -> tuple[
     User,
     UUID,
     UUID,
@@ -242,9 +243,13 @@ def test_practice_follow_up_stop_replays_and_reaches_review_completed_session() 
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, attempt_id, question_id, follow_up_question_id = (
-                    await prepare_answering_follow_up(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    attempt_id,
+                    question_id,
+                    follow_up_question_id,
+                ) = await prepare_answering_follow_up(database)
                 stopped = await stop_follow_up(
                     database,
                     owner_id=owner.id,
@@ -266,8 +271,7 @@ def test_practice_follow_up_stop_replays_and_reaches_review_completed_session() 
                     graph = list(
                         (
                             await session.scalars(
-                                select(PracticeFollowUpDecision)
-                                .where(
+                                select(PracticeFollowUpDecision).where(
                                     PracticeFollowUpDecision.attempt_id == attempt_id
                                 )
                             )
@@ -276,8 +280,7 @@ def test_practice_follow_up_stop_replays_and_reaches_review_completed_session() 
                     questions = list(
                         (
                             await session.scalars(
-                                select(PracticeFollowUpQuestion)
-                                .where(
+                                select(PracticeFollowUpQuestion).where(
                                     PracticeFollowUpQuestion.attempt_id == attempt_id
                                 )
                             )
@@ -458,9 +461,13 @@ def test_practice_follow_up_stop_review_can_retry_current_question() -> None:
         async with Database(database_url()) as database:
             await database.reset()
             try:
-                owner, session_id, _attempt_id, question_id, follow_up_question_id = (
-                    await prepare_answering_follow_up(database)
-                )
+                (
+                    owner,
+                    session_id,
+                    _attempt_id,
+                    question_id,
+                    follow_up_question_id,
+                ) = await prepare_answering_follow_up(database)
                 await stop_follow_up(
                     database,
                     owner_id=owner.id,

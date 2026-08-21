@@ -39,7 +39,6 @@ from riva.services.resume_imports import (
     build_resume_import_draft_data,
 )
 
-
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -665,12 +664,9 @@ def test_existing_profile_api_response_preserves_manual_items_and_links() -> Non
                     item.id: item for item in applied.profile.work_experiences
                 }
                 project_by_id = {
-                    item.id: item
-                    for item in applied.profile.project_experiences
+                    item.id: item for item in applied.profile.project_experiences
                 }
-                education_by_id = {
-                    item.id: item for item in applied.profile.education
-                }
+                education_by_id = {item.id: item for item in applied.profile.education}
                 skill_by_id = {item.id: item for item in applied.profile.skills}
                 skill_by_name = {item.name: item for item in applied.profile.skills}
                 assert (
@@ -686,12 +682,10 @@ def test_existing_profile_api_response_preserves_manual_items_and_links() -> Non
                 assert work_by_id[existing.manual_work_id].company == "Manual Company"
                 assert work_by_id[existing.manual_work_id].source == "userEdited"
                 assert (
-                    project_by_id[existing.resume_project_id].name
-                    == "Import Project"
+                    project_by_id[existing.resume_project_id].name == "Import Project"
                 )
                 assert (
-                    project_by_id[existing.manual_project_id].name
-                    == "Manual Project"
+                    project_by_id[existing.manual_project_id].name == "Manual Project"
                 )
                 assert skill_by_id[existing.manual_skill_id].name == "Rust"
                 assert skill_by_id[existing.manual_skill_id].source == "userAdded"
@@ -757,17 +751,14 @@ def test_existing_profile_api_response_preserves_manual_items_and_links() -> Non
                         ).all()
                     )
 
-                assert [link.id for link in work_links] == list(
-                    existing.work_link_ids
-                )
+                assert [link.id for link in work_links] == list(existing.work_link_ids)
                 assert [link.skill_id for link in work_links] == [
                     skill_by_name["Python"].id,
                     skill_by_name["Kotlin"].id,
                 ]
                 assert [link.position for link in work_links] == [0, 1]
                 work_combinations = [
-                    (link.work_experience_id, link.skill_id)
-                    for link in all_work_links
+                    (link.work_experience_id, link.skill_id) for link in all_work_links
                 ]
                 assert len(work_combinations) == len(set(work_combinations))
 
@@ -785,10 +776,9 @@ def test_existing_profile_api_response_preserves_manual_items_and_links() -> Non
                 assert len(project_combinations) == len(set(project_combinations))
 
                 fresh = await profile_response(database, seeded.user_id)
-                assert (
-                    applied.profile.model_dump(mode="json", by_alias=True)
-                    == fresh.model_dump(mode="json", by_alias=True)
-                )
+                assert applied.profile.model_dump(
+                    mode="json", by_alias=True
+                ) == fresh.model_dump(mode="json", by_alias=True)
 
                 applied_updated_at = applied.profile.updated_at
                 applied_at = applied.draft.applied_at
@@ -838,9 +828,7 @@ def test_stale_draft_rebuilds_after_profile_version_conflict() -> None:
                             "education": [],
                             "workExperiences": [],
                             "projectExperiences": [],
-                            "skills": [
-                                {"id": manual_skill_id, "name": "Python"}
-                            ],
+                            "skills": [{"id": manual_skill_id, "name": "Python"}],
                         }
                     )
                     await CareerProfileService(session).replace_profile(
@@ -887,8 +875,7 @@ def test_stale_draft_rebuilds_after_profile_version_conflict() -> None:
                 assert rebuilt.draft_version == ready.draft_version + 1
                 assert rebuilt.base_profile_version == 2
                 assert any(
-                    item.item_id == manual_skill_id
-                    and item.source == "userEdited"
+                    item.item_id == manual_skill_id and item.source == "userEdited"
                     for item in rebuilt.protected_items
                 )
 
@@ -931,9 +918,10 @@ def test_concurrent_apply_serializes_to_one_profile_change() -> None:
                         )
 
                 first, second = await asyncio.gather(apply_once(), apply_once())
-                assert sorted(
-                    (first.profile_changed, second.profile_changed)
-                ) == [False, True]
+                assert sorted((first.profile_changed, second.profile_changed)) == [
+                    False,
+                    True,
+                ]
                 assert {first.profile.version, second.profile.version} == {1}
                 assert first.draft.applied_at == second.draft.applied_at
 
@@ -1000,17 +988,13 @@ def test_multiple_resume_drafts_supersede_and_rebuild() -> None:
                         resume_document_id=first.document_id,
                     )
                 async with database.sessionmaker() as session:
-                    second_draft = await ResumeImportAPIService(
-                        session
-                    ).get_draft(
+                    second_draft = await ResumeImportAPIService(session).get_draft(
                         user_id=second.user_id,
                         resume_document_id=second.document_id,
                     )
 
                 async with database.sessionmaker() as session:
-                    applied_first = await ResumeImportAPIService(
-                        session
-                    ).apply_draft(
+                    applied_first = await ResumeImportAPIService(session).apply_draft(
                         user_id=first.user_id,
                         resume_document_id=first.document_id,
                         draft_version=first_draft.draft_version,
@@ -1041,9 +1025,7 @@ def test_multiple_resume_drafts_supersede_and_rebuild() -> None:
                 assert rebuilt.draft_version == second_draft.draft_version + 1
 
                 async with database.sessionmaker() as session:
-                    applied_second = await ResumeImportAPIService(
-                        session
-                    ).apply_draft(
+                    applied_second = await ResumeImportAPIService(session).apply_draft(
                         user_id=second.user_id,
                         resume_document_id=second.document_id,
                         draft_version=rebuilt.draft_version,
@@ -1113,12 +1095,15 @@ def test_import_api_isolates_users_and_rejects_tampered_or_partial_state() -> No
                 async with database.sessionmaker() as session:
                     session.add(tamper_source_run)
                     await session.flush()
-                    assert await session.scalar(
-                        select(ResumeImportDraft).where(
-                            ResumeImportDraft.source_agent_run_id
-                            == tamper_source_run.id
+                    assert (
+                        await session.scalar(
+                            select(ResumeImportDraft).where(
+                                ResumeImportDraft.source_agent_run_id
+                                == tamper_source_run.id
+                            )
                         )
-                    ) is None
+                        is None
+                    )
                     draft = await session.get(ResumeImportDraft, owner.document_id)
                     assert draft is not None
                     draft.source_agent_run_id = tamper_source_run.id
@@ -1129,10 +1114,7 @@ def test_import_api_isolates_users_and_rejects_tampered_or_partial_state() -> No
                         owner.document_id,
                     )
                     assert tampered_draft is not None
-                    assert (
-                        tampered_draft.source_agent_run_id
-                        == tamper_source_run.id
-                    )
+                    assert tampered_draft.source_agent_run_id == tamper_source_run.id
                     tamper_source_drafts = (
                         await session.scalars(
                             select(ResumeImportDraft).where(
@@ -1202,11 +1184,14 @@ def test_import_api_isolates_users_and_rejects_tampered_or_partial_state() -> No
                     code="resume_import_draft_invalid",
                 )
                 async with database.sessionmaker() as session:
-                    assert await session.scalar(
-                        select(CareerProfile).where(
-                            CareerProfile.user_id == owner.user_id
+                    assert (
+                        await session.scalar(
+                            select(CareerProfile).where(
+                                CareerProfile.user_id == owner.user_id
+                            )
                         )
-                    ) is None
+                        is None
+                    )
                     unchanged_draft = await session.get(
                         ResumeImportDraft,
                         owner.document_id,
@@ -1255,9 +1240,7 @@ def test_import_api_isolates_users_and_rejects_tampered_or_partial_state() -> No
                     suffix="missing-profile",
                 )
                 async with database.sessionmaker() as session:
-                    ready_applied = await ResumeImportAPIService(
-                        session
-                    ).get_draft(
+                    ready_applied = await ResumeImportAPIService(session).get_draft(
                         user_id=applied.user_id,
                         resume_document_id=applied.document_id,
                     )
@@ -1357,9 +1340,7 @@ def test_resume_import_api_real_http_flow_with_postgres() -> None:
             )
             assert invalid_version.status_code == 422
 
-            ready = client.get(
-                f"/api/profile/resumes/{first.document_id}/import-draft"
-            )
+            ready = client.get(f"/api/profile/resumes/{first.document_id}/import-draft")
             assert ready.status_code == 200
             ready_body = ready.json()
             assert ready_body["status"] == "ready"
@@ -1429,18 +1410,14 @@ def test_resume_import_api_real_http_flow_with_postgres() -> None:
                 f"/api/profile/resumes/{first.document_id}/import-draft"
             )
             assert other_user_get.status_code == 404
-            assert other_user_get.json() == {
-                "error": "resume_document_not_found"
-            }
+            assert other_user_get.json() == {"error": "resume_document_not_found"}
             other_user_apply = client.post(
                 f"/api/profile/resumes/{first.document_id}/import-draft/apply",
                 json={"draftVersion": rebuilt_body["draftVersion"]},
                 headers={"Origin": TRUSTED_ORIGIN},
             )
             assert other_user_apply.status_code == 404
-            assert other_user_apply.json() == {
-                "error": "resume_document_not_found"
-            }
+            assert other_user_apply.json() == {"error": "resume_document_not_found"}
     finally:
         asyncio.run(_reset_database(url))
 

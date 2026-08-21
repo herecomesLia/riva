@@ -39,10 +39,9 @@ from riva.schemas.matching_analysis import (
     MatchingProfileProjectExperience,
     MatchingProfileWorkExperience,
 )
-from riva.services.prompt_versions import MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
 from riva.services.profile_completion import career_profile_completed
+from riva.services.prompt_versions import MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
 from riva.utils import utc_now
-
 
 MatchingAnalysisStateErrorCode = Literal[
     "invalid_matching_analysis_run",
@@ -60,9 +59,7 @@ MatchingAnalysisStateErrorCode = Literal[
 INVALID_MATCHING_ANALYSIS_RUN: MatchingAnalysisStateErrorCode = (
     "invalid_matching_analysis_run"
 )
-MATCHING_TARGET_NOT_FOUND: MatchingAnalysisStateErrorCode = (
-    "matching_target_not_found"
-)
+MATCHING_TARGET_NOT_FOUND: MatchingAnalysisStateErrorCode = "matching_target_not_found"
 MATCHING_PROFILE_NOT_FOUND: MatchingAnalysisStateErrorCode = (
     "matching_profile_not_found"
 )
@@ -151,10 +148,7 @@ def build_matching_career_profile(
                 limit=MAX_MATCHING_EXPERIENCE_ACHIEVEMENTS,
             ),
             skills=stable_unique_texts(
-                [
-                    link.skill.name
-                    for link in _ordered(item.skill_links, limit=None)
-                ],
+                [link.skill.name for link in _ordered(item.skill_links, limit=None)],
                 limit=MAX_MATCHING_EXPERIENCE_SKILLS,
             ),
         )
@@ -178,10 +172,7 @@ def build_matching_career_profile(
                 limit=MAX_MATCHING_EXPERIENCE_ACHIEVEMENTS,
             ),
             skills=stable_unique_texts(
-                [
-                    link.skill.name
-                    for link in _ordered(item.skill_links, limit=None)
-                ],
+                [link.skill.name for link in _ordered(item.skill_links, limit=None)],
                 limit=MAX_MATCHING_EXPERIENCE_SKILLS,
             ),
         )
@@ -278,9 +269,7 @@ class MatchingAnalysisService:
                     await self.session.commit()
                     return existing
                 if is_same_run:
-                    raise MatchingAnalysisStateError(
-                        INVALID_MATCHING_ANALYSIS_RUN
-                    )
+                    raise MatchingAnalysisStateError(INVALID_MATCHING_ANALYSIS_RUN)
 
             conflicting_source = await self.session.scalar(
                 select(MatchingAnalysis).where(
@@ -300,9 +289,7 @@ class MatchingAnalysisService:
                     user_id=context.role.user_id,
                     profile_id=context.payload.profile_id,
                     profile_version=context.payload.profile_version,
-                    job_description_version=(
-                        context.payload.job_description_version
-                    ),
+                    job_description_version=(context.payload.job_description_version),
                     job_description_analysis_version=(
                         context.payload.job_description_analysis_version
                     ),
@@ -313,12 +300,8 @@ class MatchingAnalysisService:
                         str,
                         values["core_requirements_summary"],
                     ),
-                    matched_capabilities=_copy_list(
-                        values["matched_capabilities"]
-                    ),
-                    missing_capabilities=_copy_list(
-                        values["missing_capabilities"]
-                    ),
+                    matched_capabilities=_copy_list(values["matched_capabilities"]),
+                    missing_capabilities=_copy_list(values["missing_capabilities"]),
                     underrepresented_capabilities=_copy_list(
                         values["underrepresented_capabilities"]
                     ),
@@ -360,13 +343,9 @@ class MatchingAnalysisService:
                 analysis.underrepresented_capabilities = _copy_list(
                     values["underrepresented_capabilities"]
                 )
-                analysis.resume_highlights = _copy_list(
-                    values["resume_highlights"]
-                )
+                analysis.resume_highlights = _copy_list(values["resume_highlights"])
                 analysis.resume_gaps = _copy_list(values["resume_gaps"])
-                analysis.high_risk_questions = _copy_list(
-                    values["high_risk_questions"]
-                )
+                analysis.high_risk_questions = _copy_list(values["high_risk_questions"])
                 analysis.preparation_recommendations = _copy_list(
                     values["preparation_recommendations"]
                 )
@@ -389,8 +368,7 @@ class MatchingAnalysisService:
         if (
             run.agent_id != "matching-analyzer"
             or run.prompt_id != prompt.prompt_id
-            or run.prompt_version
-            not in MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
+            or run.prompt_version not in MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
             or run.output_schema_id != prompt.output_schema_id
         ):
             raise MatchingAnalysisStateError(INVALID_MATCHING_ANALYSIS_RUN)
@@ -501,14 +479,14 @@ def _ordered(items: Iterable[_Item], *, limit: int | None) -> list[_Item]:
 def _build_matching_input(context: _MatchingContext) -> MatchingAnalysisInput:
     try:
         career_profile = build_matching_career_profile(context.profile)
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise MatchingAnalysisStateError(MATCHING_PROFILE_INCOMPLETE) from None
     try:
         job = build_matching_job_context(
             context.role,
             context.job_description_analysis,
         )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise MatchingAnalysisStateError(
             MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY
         ) from None
@@ -518,7 +496,7 @@ def _build_matching_input(context: _MatchingContext) -> MatchingAnalysisInput:
             job=job,
             interaction_language=context.payload.interaction_language,
         )
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise MatchingAnalysisStateError(INVALID_MATCHING_ANALYSIS_RUN) from None
 
 

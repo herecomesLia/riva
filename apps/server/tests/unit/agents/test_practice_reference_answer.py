@@ -70,9 +70,7 @@ def test_agent_parses_main_and_follow_up_outputs(
         if target_type == "followUp"
         else PracticeMainReferenceAnswerInput.model_validate(payload)
     )
-    provider = FakeLLMProvider(
-        [valid_output(target_type=target_type, kind=kind)]
-    )
+    provider = FakeLLMProvider([valid_output(target_type=target_type, kind=kind)])
     agent = PracticeReferenceAnswerAgent(
         provider,
         model="test-reference-answer-model",

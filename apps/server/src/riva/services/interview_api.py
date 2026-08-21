@@ -15,56 +15,56 @@ from riva.models import (
 )
 from riva.schemas.interview import (
     BeginInterviewQuestionsRequest,
-    InterviewAnswerResponse,
-    InterviewAnsweredFollowUpResponse,
-    InterviewAwaitingFollowUpResponse,
     EndInterviewRequest,
     FinishInterviewRequest,
-    InterviewConfiguration,
+    GetInterviewCompleteReviewResponse,
+    GetInterviewPartialReviewResponse,
+    GetInterviewReviewResponse,
+    GetInterviewUnavailableReviewResponse,
+    InterviewAnsweredFollowUpResponse,
+    InterviewAnswerResponse,
+    InterviewAwaitingFollowUpResponse,
+    InterviewAwaitingQuestionResponse,
     InterviewCandidateQuestionExchangeResponse,
     InterviewCandidateQuestionFeedbackResponse,
     InterviewCandidateQuestionResponse,
-    InterviewCompletedSessionResponse,
     InterviewCandidateQuestionsSessionResponse,
+    InterviewCompletedQuestionResponse,
+    InterviewCompletedSessionResponse,
     InterviewCompleteReviewResponse,
     InterviewCompleteReviewStateResponse,
-    InterviewCompletedQuestionResponse,
     InterviewCompletionReason,
+    InterviewConfiguration,
     InterviewDifficulty,
     InterviewDurationMinutes,
-    InterviewAwaitingQuestionResponse,
-    InterviewGeneratingCandidateAnswerSessionResponse,
-    InterviewGeneratingReviewSessionResponse,
-    InterviewGeneratingQuestionSessionResponse,
-    InterviewGeneratingTurnQuestionResponse,
-    InterviewGeneratingTurnSessionResponse,
     InterviewFollowUpQuestionResponse,
     InterviewFollowUpSessionResponse,
+    InterviewGeneratingCandidateAnswerSessionResponse,
+    InterviewGeneratingQuestionSessionResponse,
+    InterviewGeneratingReviewSessionResponse,
+    InterviewGeneratingTurnQuestionResponse,
+    InterviewGeneratingTurnSessionResponse,
     InterviewOpeningSessionResponse,
+    InterviewPageResponse,
     InterviewPartialReviewResponse,
     InterviewPartialReviewStateResponse,
-    InterviewPageResponse,
     InterviewProgressResponse,
     InterviewQuestionResponse,
     InterviewQuestionSessionResponse,
     InterviewQuestionType,
     InterviewRound,
     InterviewSessionReviewResponse,
-    InterviewUnavailableReviewResponse,
-    GetInterviewCompleteReviewResponse,
-    GetInterviewPartialReviewResponse,
-    GetInterviewReviewResponse,
-    GetInterviewUnavailableReviewResponse,
-    RetryInterviewCandidateAnswerRequest,
-    RetryInterviewReviewRequest,
-    RetryInterviewTurnRequest,
-    SubmitCandidateQuestionRequest,
-    SubmitInterviewAnswerRequest,
     InterviewSetupAvailableResponse,
     InterviewSetupBlockedResponse,
     InterviewSetupResponse,
     InterviewTargetRoleResponse,
+    InterviewUnavailableReviewResponse,
+    RetryInterviewCandidateAnswerRequest,
+    RetryInterviewReviewRequest,
+    RetryInterviewTurnRequest,
     StartInterviewRequest,
+    SubmitCandidateQuestionRequest,
+    SubmitInterviewAnswerRequest,
 )
 from riva.schemas.interview_review import InterviewReviewRunPayload
 from riva.services.interview_candidate_questions import (
@@ -79,6 +79,12 @@ from riva.services.interview_completion import (
     InterviewCompletionService,
     InterviewCompletionStateError,
 )
+from riva.services.interview_planning import (
+    INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED,
+    INTERVIEW_PLANNING_SESSION_NOT_FOUND,
+    InterviewPlanningService,
+    InterviewPlanningStateError,
+)
 from riva.services.interview_review import (
     INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED,
     INTERVIEW_REVIEW_SESSION_NOT_FOUND,
@@ -91,19 +97,12 @@ from riva.services.interview_sessions import (
     InterviewSessionStateError,
     InterviewSetupContext,
 )
-from riva.services.interview_planning import (
-    INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED,
-    INTERVIEW_PLANNING_SESSION_NOT_FOUND,
-    InterviewPlanningService,
-    InterviewPlanningStateError,
-)
 from riva.services.interview_turn import (
     INTERVIEW_TURN_MODEL_NOT_CONFIGURED,
     INTERVIEW_TURN_SESSION_NOT_FOUND,
     InterviewTurnService,
     InterviewTurnStateError,
 )
-
 
 InterviewSessionServiceFactory = Callable[[AsyncSession], InterviewSessionService]
 InterviewPlanningServiceFactory = Callable[..., InterviewPlanningService]
@@ -173,16 +172,12 @@ class InterviewAPIService:
     ) -> None:
         self.session = session
         self.interview_service_factory = interview_service_factory
-        self.interview_planning_service_factory = (
-            interview_planning_service_factory
-        )
+        self.interview_planning_service_factory = interview_planning_service_factory
         self.interview_turn_service_factory = interview_turn_service_factory
         self.interview_candidate_question_service_factory = (
             interview_candidate_question_service_factory
         )
-        self.interview_completion_service_factory = (
-            interview_completion_service_factory
-        )
+        self.interview_completion_service_factory = interview_completion_service_factory
         self.interview_review_service_factory = interview_review_service_factory
         self.llm_model = llm_model
 
@@ -235,13 +230,9 @@ class InterviewAPIService:
             )
             interview_service = self._interview_service()
             setup = await interview_service.get_setup(user_id=user_id)
-            active_session = await interview_service.get_active_session(
-                user_id=user_id
-            )
+            active_session = await interview_service.get_active_session(user_id=user_id)
             if active_session is None or active_session.id != session_id:
-                raise InterviewPlanningStateError(
-                    INTERVIEW_PLANNING_SESSION_NOT_FOUND
-                )
+                raise InterviewPlanningStateError(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
             return build_interview_page_response(setup, active_session)
         except InterviewPlanningStateError as error:
             raise interview_planning_state_api_error(error) from None
@@ -398,7 +389,10 @@ class InterviewAPIService:
         session_id: UUID,
     ) -> GetInterviewReviewResponse:
         try:
-            interview_session, review = await self._review_service().get_completed_review(
+            (
+                interview_session,
+                review,
+            ) = await self._review_service().get_completed_review(
                 user_id=user_id,
                 session_id=session_id,
             )
@@ -669,7 +663,9 @@ def build_interview_session_response(
             started_at=session.started_at,
             progress=_session_progress_response(session),
             completed_questions=completed_questions,
-            prompt=CANDIDATE_QUESTIONS_PROMPTS[cast(InteractionLanguage, session.language)],
+            prompt=CANDIDATE_QUESTIONS_PROMPTS[
+                cast(InteractionLanguage, session.language)
+            ],
             exchanges=_candidate_exchange_responses(session),
         )
     if session.status == "generatingCandidateAnswer":
@@ -720,7 +716,11 @@ def build_interview_session_response(
         )
     if session.status == "completed":
         review = getattr(session, "review", None)
-        if review is None or session.completed_at is None or session.completion_reason is None:
+        if (
+            review is None
+            or session.completed_at is None
+            or session.completion_reason is None
+        ):
             raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
         return InterviewCompletedSessionResponse(
             status="completed",
@@ -781,7 +781,7 @@ def _candidate_exchange_responses(
     )
     try:
         return [_candidate_exchange_response(exchange) for exchange in exchanges]
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
 
 
@@ -807,7 +807,7 @@ def _pending_completion_reason(
     try:
         review_payload = InterviewReviewRunPayload.model_validate(payload)
         return cast(InterviewCompletionReason, review_payload.completion_reason.value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -833,7 +833,7 @@ def _review_state_response(
                 status="complete",
                 review=InterviewCompleteReviewResponse.model_validate(review.review),
             )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         pass
     raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
 
@@ -878,7 +878,9 @@ def build_interview_review_response(
     raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
 
 
-def _session_configuration_response(session: InterviewSession) -> InterviewConfiguration:
+def _session_configuration_response(
+    session: InterviewSession,
+) -> InterviewConfiguration:
     return InterviewConfiguration(
         target_role_id=session.target_role_id,
         round=InterviewRound(session.round),
@@ -916,7 +918,7 @@ def _question_response(question: object) -> InterviewQuestionResponse:
             assessed_capabilities=list(question.assessed_capabilities),
             order=question.order,
         )
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
 
 
@@ -927,7 +929,7 @@ def _answer_response(answer: object) -> InterviewAnswerResponse:
             content=answer.content,
             submitted_at=answer.submitted_at,
         )
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
 
 
@@ -942,7 +944,7 @@ def _follow_up_question_response(
             order=follow_up.order,
             created_at=follow_up.created_at,
         )
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
 
 

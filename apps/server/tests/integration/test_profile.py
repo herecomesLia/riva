@@ -2,8 +2,8 @@ import asyncio
 import os
 from uuid import UUID
 
-from fastapi import status
 import pytest
+from fastapi import status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -168,7 +168,9 @@ def test_profile_constraints_concurrency_isolation_and_rollback() -> None:
                 successes = [
                     result for result in results if isinstance(result, CareerProfile)
                 ]
-                conflicts = [result for result in results if isinstance(result, APIError)]
+                conflicts = [
+                    result for result in results if isinstance(result, APIError)
+                ]
                 assert len(successes) == 1
                 assert len(conflicts) == 1
                 assert conflicts[0].status_code == status.HTTP_409_CONFLICT

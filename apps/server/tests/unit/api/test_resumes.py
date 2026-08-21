@@ -1,5 +1,5 @@
-from datetime import UTC, datetime
 import io
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
@@ -13,7 +13,6 @@ from riva.schemas.resume_documents import (
     ResumeDocumentsResponse,
     SucceededResumeDocumentResponse,
 )
-
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 RESUME_ID = "11111111-1111-4111-8111-111111111111"

@@ -40,13 +40,12 @@ from tests.helpers.practice_reference_answers import (
 from tests.integration.test_practice_next_question_workflow import (
     build_worker,
     evaluation_output,
-    recommendation_output,
-    question_output,
     produce_first_review,
+    question_output,
+    recommendation_output,
     review_output,
 )
 from tests.integration.test_question_generation import database_url, seed_context
-
 
 pytestmark = pytest.mark.integration
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -423,9 +422,14 @@ def test_saved_continue_reuses_another_card_without_question_generation() -> Non
         async with Database(url) as database:
             await database.reset()
             try:
-                user_id, session_id, attempt_id, first_card_id, _run_id, project_id = (
-                    await produce_first_review(database)
-                )
+                (
+                    user_id,
+                    session_id,
+                    attempt_id,
+                    first_card_id,
+                    _run_id,
+                    project_id,
+                ) = await produce_first_review(database)
                 async with database.sessionmaker() as session:
                     attempt = await session.get(PracticeAttempt, attempt_id)
                     practice_session = await session.get(PracticeSession, session_id)
@@ -509,9 +513,14 @@ def test_saved_continue_and_retry_reuse_card_provenance_without_generation() -> 
         async with Database(url) as database:
             await database.reset()
             try:
-                user_id, session_id, attempt_id, card_id, run_id, _project_id = (
-                    await produce_first_review(database)
-                )
+                (
+                    user_id,
+                    session_id,
+                    attempt_id,
+                    card_id,
+                    run_id,
+                    _project_id,
+                ) = await produce_first_review(database)
                 async with database.sessionmaker() as session:
                     attempt = await session.get(PracticeAttempt, attempt_id)
                     practice_session = await session.get(PracticeSession, session_id)
@@ -743,9 +752,7 @@ def test_saved_source_full_lifecycle_reuses_question_card_provenance() -> None:
                     assert completed.json()["status"] == "completed"
                     assert completed.json()["version"] == 5
 
-                    record = client.get(
-                        f"/api/training-records/practice/{session_id}"
-                    )
+                    record = client.get(f"/api/training-records/practice/{session_id}")
                     assert record.status_code == 200
                     record_body = record.json()
 
@@ -809,12 +816,8 @@ def test_saved_source_full_lifecycle_reuses_question_card_provenance() -> None:
                         assert len(runs) == 1
 
                     persisted_card = await session.get(QuestionCard, saved_card.id)
-                    persisted_session = await session.get(
-                        PracticeSession, session_id
-                    )
-                    persisted_attempt = await session.get(
-                        PracticeAttempt, attempt_id
-                    )
+                    persisted_session = await session.get(PracticeSession, session_id)
+                    persisted_attempt = await session.get(PracticeAttempt, attempt_id)
                     assert persisted_card is not None
                     assert persisted_card.source_agent_run_id == original_source_run_id
                     assert persisted_card.is_saved is True

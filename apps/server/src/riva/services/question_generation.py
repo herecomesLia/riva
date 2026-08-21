@@ -25,6 +25,12 @@ from riva.models import (
     User,
 )
 from riva.prompts import QUESTION_GENERATION_PROMPT
+from riva.schemas.practice_reference_answer import (
+    PracticeReferenceFrozenContext,
+    PracticeReferenceProjectEvidence,
+    PracticeReferenceRoleContext,
+    PracticeReferenceWorkEvidence,
+)
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_LIST_ITEMS,
     QuestionCardDifficulty,
@@ -34,8 +40,8 @@ from riva.schemas.question_cards import (
 from riva.schemas.question_generation import (
     MAX_QUESTION_GENERATION_EDUCATION_ITEMS,
     MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
-    MAX_QUESTION_GENERATION_PROJECT_EXPERIENCE_ITEMS,
     MAX_QUESTION_GENERATION_PROFILE_SKILLS,
+    MAX_QUESTION_GENERATION_PROJECT_EXPERIENCE_ITEMS,
     MAX_QUESTION_GENERATION_WORK_EXPERIENCE_ITEMS,
     QuestionGenerationEducationContext,
     QuestionGenerationInput,
@@ -49,22 +55,15 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
     QuestionGenerationWorkExperienceContext,
 )
-from riva.schemas.practice_reference_answer import (
-    PracticeReferenceFrozenContext,
-    PracticeReferenceProjectEvidence,
-    PracticeReferenceRoleContext,
-    PracticeReferenceWorkEvidence,
-)
 from riva.services.agent_runs import AgentRunService
-from riva.services.profile_completion import career_profile_completed
 from riva.services.practice_weaknesses import PracticeWeaknessFocus
+from riva.services.profile_completion import career_profile_completed
 from riva.services.question_generation_prompt_versions import (
     QUESTION_GENERATION_ACCEPTED_PROMPT_VERSIONS,
     get_question_generation_prompt,
 )
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
-
 
 QuestionGenerationStateErrorCode = Literal[
     "invalid_question_generation_run",
@@ -105,12 +104,8 @@ QUESTION_GENERATION_JOB_DESCRIPTION_NOT_READY: QuestionGenerationStateErrorCode 
 QUESTION_GENERATION_JOB_DESCRIPTION_VERSION_STALE: QuestionGenerationStateErrorCode = (
     "question_generation_job_description_version_stale"
 )
-QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY: QuestionGenerationStateErrorCode = (
-    "question_generation_job_description_analysis_not_ready"
-)
-QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_VERSION_STALE: QuestionGenerationStateErrorCode = (
-    "question_generation_job_description_analysis_version_stale"
-)
+QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY: QuestionGenerationStateErrorCode = "question_generation_job_description_analysis_not_ready"
+QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_VERSION_STALE: QuestionGenerationStateErrorCode = "question_generation_job_description_analysis_version_stale"
 QUESTION_GENERATION_MATCHING_ANALYSIS_NOT_READY: QuestionGenerationStateErrorCode = (
     "question_generation_matching_analysis_not_ready"
 )
@@ -138,9 +133,7 @@ def validate_question_generation_run(
     try:
         prompt = get_question_generation_prompt(run.prompt_version)
     except ValueError:
-        raise QuestionGenerationStateError(
-            INVALID_QUESTION_GENERATION_RUN
-        ) from None
+        raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN) from None
     if (
         run.agent_id != "question-generator"
         or run.prompt_id != prompt.prompt_id
@@ -151,9 +144,7 @@ def validate_question_generation_run(
     try:
         return QuestionGenerationRunPayload.model_validate(run.payload)
     except ValidationError:
-        raise QuestionGenerationStateError(
-            INVALID_QUESTION_GENERATION_RUN
-        ) from None
+        raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN) from None
 
 
 def validate_question_card_generation_lineage(
@@ -163,7 +154,7 @@ def validate_question_card_generation_lineage(
     payload = validate_question_generation_run(run)
     try:
         matches = _question_card_lineage_matches(card, run, payload)
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         matches = False
     if not matches:
         raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
@@ -221,10 +212,7 @@ def build_question_generation_profile_context(
                 limit=MAX_QUESTION_CARD_LIST_ITEMS,
             ),
             skills=_stable_unique_texts(
-                [
-                    link.skill.name
-                    for link in _ordered(item.skill_links, limit=None)
-                ],
+                [link.skill.name for link in _ordered(item.skill_links, limit=None)],
                 limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
             ),
         )
@@ -247,10 +235,7 @@ def build_question_generation_profile_context(
                 limit=MAX_QUESTION_CARD_LIST_ITEMS,
             ),
             skills=_stable_unique_texts(
-                [
-                    link.skill.name
-                    for link in _ordered(item.skill_links, limit=None)
-                ],
+                [link.skill.name for link in _ordered(item.skill_links, limit=None)],
                 limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
             ),
         )
@@ -323,9 +308,7 @@ def build_question_generation_input(
             role,
             job_description_analysis,
         ),
-        matching_analysis=build_question_generation_matching_context(
-            matching_analysis
-        ),
+        matching_analysis=build_question_generation_matching_context(matching_analysis),
     )
 
 
@@ -432,9 +415,7 @@ class QuestionGenerationService:
             job_description_analysis_version=(
                 context.job_description_analysis.analysis_version
             ),
-            matching_analysis_run_id=(
-                context.matching_analysis.source_agent_run_id
-            ),
+            matching_analysis_run_id=(context.matching_analysis.source_agent_run_id),
             interaction_language=interaction_language,
             question_type=question_type,
             difficulty=difficulty,
@@ -508,20 +489,17 @@ class QuestionGenerationService:
                 reference_context = await self.session.scalar(
                     select(PracticeQuestionReferenceContext)
                     .where(
-                        PracticeQuestionReferenceContext.question_card_id
-                        == existing.id
+                        PracticeQuestionReferenceContext.question_card_id == existing.id
                     )
                     .with_for_update()
                 )
                 if reference_context is None:
-                    raise QuestionGenerationStateError(
-                        INVALID_QUESTION_GENERATION_RUN
-                    )
+                    raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
                 try:
                     PracticeReferenceFrozenContext.model_validate(
                         reference_context.frozen_context
                     )
-                except (TypeError, ValueError, ValidationError):
+                except TypeError, ValueError, ValidationError:
                     raise QuestionGenerationStateError(
                         INVALID_QUESTION_GENERATION_RUN
                     ) from None
@@ -651,13 +629,9 @@ class QuestionGenerationService:
             role_statement = role_statement.with_for_update()
         role = await self.session.scalar(role_statement)
         if role is None:
-            raise QuestionGenerationStateError(
-                QUESTION_GENERATION_TARGET_NOT_FOUND
-            )
+            raise QuestionGenerationStateError(QUESTION_GENERATION_TARGET_NOT_FOUND)
         if role.preparation_status == "archived":
-            raise QuestionGenerationStateError(
-                QUESTION_GENERATION_TARGET_ARCHIVED
-            )
+            raise QuestionGenerationStateError(QUESTION_GENERATION_TARGET_ARCHIVED)
 
         profile_statement = (
             select(CareerProfile)
@@ -672,9 +646,7 @@ class QuestionGenerationService:
             profile_statement = profile_statement.with_for_update()
         profile = await self.session.scalar(profile_statement)
         if profile is None:
-            raise QuestionGenerationStateError(
-                QUESTION_GENERATION_PROFILE_NOT_FOUND
-            )
+            raise QuestionGenerationStateError(QUESTION_GENERATION_PROFILE_NOT_FOUND)
         if profile_version is not None and profile.version != profile_version:
             raise QuestionGenerationStateError(
                 QUESTION_GENERATION_PROFILE_VERSION_STALE
@@ -738,8 +710,7 @@ class QuestionGenerationService:
             or matching.profile_id != profile.profile_id
             or matching.profile_version != profile.version
             or matching.job_description_version != role.job_description_version
-            or matching.job_description_analysis_version
-            != analysis.analysis_version
+            or matching.job_description_analysis_version != analysis.analysis_version
         ):
             raise QuestionGenerationStateError(
                 QUESTION_GENERATION_MATCHING_ANALYSIS_STALE
@@ -769,18 +740,14 @@ def _build_context_input(
     payload: QuestionGenerationRunPayload,
 ) -> QuestionGenerationInput:
     try:
-        target_role = build_question_generation_target_role_context(
-            context.role
-        )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+        target_role = build_question_generation_target_role_context(context.role)
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise QuestionGenerationStateError(
             QUESTION_GENERATION_TARGET_NOT_FOUND
         ) from None
     try:
-        career_profile = build_question_generation_profile_context(
-            context.profile
-        )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+        career_profile = build_question_generation_profile_context(context.profile)
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise QuestionGenerationStateError(
             QUESTION_GENERATION_PROFILE_INCOMPLETE
         ) from None
@@ -789,7 +756,7 @@ def _build_context_input(
             context.role,
             context.job_description_analysis,
         )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise QuestionGenerationStateError(
             QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY
         ) from None
@@ -797,7 +764,7 @@ def _build_context_input(
         matching_analysis = build_question_generation_matching_context(
             context.matching_analysis
         )
-    except (AttributeError, TypeError, ValueError, ValidationError):
+    except AttributeError, TypeError, ValueError, ValidationError:
         raise QuestionGenerationStateError(
             QUESTION_GENERATION_MATCHING_ANALYSIS_NOT_READY
         ) from None
@@ -813,10 +780,8 @@ def _build_context_input(
             job_description_analysis=job_description_analysis,
             matching_analysis=matching_analysis,
         )
-    except (TypeError, ValueError, ValidationError):
-        raise QuestionGenerationStateError(
-            INVALID_QUESTION_GENERATION_RUN
-        ) from None
+    except TypeError, ValueError, ValidationError:
+        raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN) from None
 
 
 def _snapshot_weakness_focus(
@@ -837,7 +802,7 @@ def _snapshot_weakness_focus(
             )
             for value in values
         ]
-    except (TypeError, ValueError, ValidationError):
+    except TypeError, ValueError, ValidationError:
         raise ValueError("weakness focus is invalid") from None
 
 
@@ -878,12 +843,8 @@ def build_practice_reference_frozen_context(
             required_skills=context.job_description_analysis.required_skills,
             business_domains=context.job_description_analysis.business_domains,
         )
-        work_by_id = {
-            item.id: item for item in context.profile.work_experiences
-        }
-        project_by_id = {
-            item.id: item for item in context.profile.project_experiences
-        }
+        work_by_id = {item.id: item for item in context.profile.work_experiences}
+        project_by_id = {item.id: item for item in context.profile.project_experiences}
         evidence = []
         for material in output.recommended_materials:
             if material.type is QuestionCardMaterialType.WORK_EXPERIENCE:
@@ -916,9 +877,7 @@ def build_practice_reference_frozen_context(
             elif material.type is QuestionCardMaterialType.PROJECT_EXPERIENCE:
                 item = project_by_id.get(material.id)
                 if item is None:
-                    raise ValueError(
-                        "recommended project material is not canonical"
-                    )
+                    raise ValueError("recommended project material is not canonical")
                 evidence.append(
                     PracticeReferenceProjectEvidence(
                         type="projectExperience",
@@ -948,10 +907,8 @@ def build_practice_reference_frozen_context(
             target_role=role_context,
             candidate_evidence=evidence,
         )
-    except (AttributeError, KeyError, TypeError, ValueError, ValidationError):
-        raise QuestionGenerationStateError(
-            INVALID_QUESTION_GENERATION_RUN
-        ) from None
+    except AttributeError, KeyError, TypeError, ValueError, ValidationError:
+        raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN) from None
 
 
 def _stable_unique_texts(

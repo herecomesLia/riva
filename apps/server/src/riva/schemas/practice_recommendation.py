@@ -19,14 +19,13 @@ from riva.schemas.evaluation import (
     PracticeEvaluationFollowUpCompletionReason,
     PracticeEvaluationOutput,
 )
-from riva.schemas.profile import StandardUUID
 from riva.schemas.practice_review import PracticeReviewOutput
+from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
 from riva.schemas.training_memory import TrainingMemoryContext
-
 
 MAX_PRACTICE_RECOMMENDATION_REASON_LENGTH = 2_000
 MAX_PRACTICE_RECOMMENDATION_FOCUS_AREAS = 3
@@ -104,9 +103,7 @@ class RecommendationRunPayload(_RecommendationModel):
     attempt_id: StandardUUID = Field(alias="attemptId")
     evaluation_id: StandardUUID = Field(alias="evaluationId")
     review_id: StandardUUID = Field(alias="reviewId")
-    interaction_language: InteractionLanguage = Field(
-        alias="interactionLanguage"
-    )
+    interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
     training_memory: TrainingMemoryContext = _alias(
         "training_memory",
         "trainingMemory",
@@ -172,8 +169,7 @@ class PracticeRecommendationInput(_RecommendationModel):
     @model_validator(mode="after")
     def validate_evaluation_focus_indices(self) -> Self:
         actual_indices = [
-            assessment.focus_index
-            for assessment in self.evaluation.focus_assessments
+            assessment.focus_index for assessment in self.evaluation.focus_assessments
         ]
         expected_indices = list(range(len(self.question.scoring_focus)))
         if actual_indices != expected_indices:

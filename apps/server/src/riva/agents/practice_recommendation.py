@@ -89,9 +89,10 @@ class PracticeRecommendationAgent(
             "evaluation": _stable_json(input.evaluation),
             "review": _stable_json(input.review),
         }
-        if get_practice_recommendation_prompt(
-            self.prompt.version
-        ).version == PRACTICE_RECOMMENDATION_PROMPT.version:
+        if (
+            get_practice_recommendation_prompt(self.prompt.version).version
+            == PRACTICE_RECOMMENDATION_PROMPT.version
+        ):
             values["training_memory"] = _stable_json(input.training_memory)
         return values
 
@@ -115,9 +116,7 @@ class PracticeRecommendationAgent(
                 location="next_question.difficulty",
                 error_type="recommendation_difficulty_mismatch",
             )
-        if not set(plan.focus_areas).issubset(
-            set(input.review.exposed_weaknesses)
-        ):
+        if not set(plan.focus_areas).issubset(set(input.review.exposed_weaknesses)):
             raise _recommendation_contract_error(
                 location="next_question.focus_areas",
                 error_type="recommendation_focus_area_mismatch",

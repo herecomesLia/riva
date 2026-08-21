@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from riva.schemas.training_memory import (
     TrainingMemoryCompetency,
@@ -58,9 +58,7 @@ def test_training_memory_ranges_and_strict_numbers(
     value: object,
 ) -> None:
     with pytest.raises(ValidationError):
-        TrainingMemoryCompetency.model_validate(
-            {**competency_payload(), field: value}
-        )
+        TrainingMemoryCompetency.model_validate({**competency_payload(), field: value})
 
 
 def test_training_memory_requires_timezone_aware_last_evidence_at() -> None:

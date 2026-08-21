@@ -1,16 +1,16 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_LIST_ITEM_LENGTH,
     MAX_QUESTION_CARD_LIST_ITEMS,
-    MAX_QUESTION_CARD_PROMPT_LENGTH,
-    MAX_QUESTION_CARD_RECOMMENDED_MATERIALS,
     MAX_QUESTION_CARD_MATERIAL_LABEL_LENGTH,
     MAX_QUESTION_CARD_MATERIAL_REASON_LENGTH,
+    MAX_QUESTION_CARD_PROMPT_LENGTH,
+    MAX_QUESTION_CARD_RECOMMENDED_MATERIALS,
     QuestionCardDifficulty,
     QuestionCardMaterialReference,
     QuestionCardMaterialType,
@@ -73,7 +73,9 @@ def test_question_card_enums_cover_the_public_contract() -> None:
 
 
 @pytest.mark.parametrize("language", ["zh-CN", "en"])
-@pytest.mark.parametrize("question_type", [item.value for item in QuestionCardQuestionType])
+@pytest.mark.parametrize(
+    "question_type", [item.value for item in QuestionCardQuestionType]
+)
 @pytest.mark.parametrize("difficulty", [item.value for item in QuestionCardDifficulty])
 def test_question_card_response_accepts_all_language_type_and_difficulty_values(
     language: str,
@@ -105,7 +107,9 @@ def test_material_reference_normalizes_text_and_rejects_unknown_type() -> None:
     assert reference.reason == "Demonstrates ownership."
 
     with pytest.raises(ValidationError):
-        QuestionCardMaterialReference.model_validate(material_payload(material_type="resume"))
+        QuestionCardMaterialReference.model_validate(
+            material_payload(material_type="resume")
+        )
 
 
 def test_question_card_response_normalizes_whitespace_and_duplicate_lists() -> None:
@@ -116,7 +120,9 @@ def test_question_card_response_normalizes_whitespace_and_duplicate_lists() -> N
     assert response.answer_hints == ["State the context."]
 
 
-def test_question_card_response_deduplicates_material_references_by_profile_item() -> None:
+def test_question_card_response_deduplicates_material_references_by_profile_item() -> (
+    None
+):
     material_id = str(uuid4())
     response = QuestionCardResponse.model_validate(
         valid_payload(
@@ -138,7 +144,14 @@ def test_question_card_response_deduplicates_material_references_by_profile_item
 def test_question_card_text_lists_are_bounded(field: str) -> None:
     with pytest.raises(ValidationError):
         QuestionCardResponse.model_validate(
-            valid_payload(**{field: [f"Item {index}" for index in range(MAX_QUESTION_CARD_LIST_ITEMS + 1)]})
+            valid_payload(
+                **{
+                    field: [
+                        f"Item {index}"
+                        for index in range(MAX_QUESTION_CARD_LIST_ITEMS + 1)
+                    ]
+                }
+            )
         )
 
 
@@ -147,7 +160,8 @@ def test_question_card_material_list_is_bounded() -> None:
         QuestionCardResponse.model_validate(
             valid_payload(
                 recommendedMaterials=[
-                    material_payload() for _ in range(MAX_QUESTION_CARD_RECOMMENDED_MATERIALS + 1)
+                    material_payload()
+                    for _ in range(MAX_QUESTION_CARD_RECOMMENDED_MATERIALS + 1)
                 ]
             )
         )
@@ -161,7 +175,9 @@ def test_question_card_prompt_and_text_items_are_bounded() -> None:
 
     with pytest.raises(ValidationError):
         QuestionCardResponse.model_validate(
-            valid_payload(assessedCapabilities=["x" * (MAX_QUESTION_CARD_LIST_ITEM_LENGTH + 1)])
+            valid_payload(
+                assessedCapabilities=["x" * (MAX_QUESTION_CARD_LIST_ITEM_LENGTH + 1)]
+            )
         )
 
 
@@ -173,7 +189,9 @@ def test_question_card_material_label_and_reason_are_bounded() -> None:
 
     with pytest.raises(ValidationError):
         QuestionCardMaterialReference.model_validate(
-            material_payload(reason="x" * (MAX_QUESTION_CARD_MATERIAL_REASON_LENGTH + 1))
+            material_payload(
+                reason="x" * (MAX_QUESTION_CARD_MATERIAL_REASON_LENGTH + 1)
+            )
         )
 
 
@@ -188,7 +206,9 @@ def test_question_card_response_rejects_blank_prompt_and_unknown_values() -> Non
         QuestionCardResponse.model_validate(valid_payload(difficulty="advanced"))
 
 
-def test_question_card_response_serializes_camel_case_and_hides_internal_fields() -> None:
+def test_question_card_response_serializes_camel_case_and_hides_internal_fields() -> (
+    None
+):
     response = QuestionCardResponse.model_validate(valid_payload())
     dumped = response.model_dump(mode="json")
 

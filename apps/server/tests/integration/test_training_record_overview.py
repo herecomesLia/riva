@@ -30,7 +30,6 @@ from tests.helpers.training_records import (
     succeeded_run,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -113,9 +112,14 @@ def test_training_record_overview_aggregates_eligible_records_and_is_scoped() ->
         async with Database(url) as database:
             await database.reset()
             try:
-                owner, role, second_role, archived_role, _other_owner, ids = (
-                    await seed_records(database)
-                )
+                (
+                    owner,
+                    role,
+                    second_role,
+                    archived_role,
+                    _other_owner,
+                    ids,
+                ) = await seed_records(database)
                 unused_role = TargetRole(
                     id=uuid4(),
                     user_id=owner.id,
@@ -167,23 +171,34 @@ def test_training_record_overview_aggregates_eligible_records_and_is_scoped() ->
                 assert unused_role.id not in {
                     target_role.id for target_role in overview.target_roles
                 }
-                assert overview.by_kind[TrainingRecordKind.TARGETED_PRACTICE].record_count == 7
                 assert (
-                    overview.by_kind[TrainingRecordKind.TARGETED_PRACTICE]
-                    .completed_record_count
+                    overview.by_kind[TrainingRecordKind.TARGETED_PRACTICE].record_count
+                    == 7
+                )
+                assert (
+                    overview.by_kind[
+                        TrainingRecordKind.TARGETED_PRACTICE
+                    ].completed_record_count
                     == 5
                 )
                 assert (
                     overview.by_kind[TrainingRecordKind.TARGETED_PRACTICE].average_score
                     == 77.5
                 )
-                assert overview.by_kind[TrainingRecordKind.MOCK_INTERVIEW].record_count == 0
                 assert (
-                    overview.by_kind[TrainingRecordKind.MOCK_INTERVIEW]
-                    .completed_record_count
+                    overview.by_kind[TrainingRecordKind.MOCK_INTERVIEW].record_count
                     == 0
                 )
-                assert overview.by_kind[TrainingRecordKind.MOCK_INTERVIEW].average_score is None
+                assert (
+                    overview.by_kind[
+                        TrainingRecordKind.MOCK_INTERVIEW
+                    ].completed_record_count
+                    == 0
+                )
+                assert (
+                    overview.by_kind[TrainingRecordKind.MOCK_INTERVIEW].average_score
+                    is None
+                )
 
                 app = create_app(settings(url))
                 app.dependency_overrides[require_current_user] = lambda: owner
@@ -236,7 +251,9 @@ def test_training_record_overview_aggregates_eligible_records_and_is_scoped() ->
     asyncio.run(run_test())
 
 
-def test_training_record_overview_averages_records_and_ignores_unscored_records() -> None:
+def test_training_record_overview_averages_records_and_ignores_unscored_records() -> (
+    None
+):
     async def run_test() -> None:
         url = get_integration_database_url()
         async with Database(url) as database:
@@ -332,7 +349,9 @@ def test_training_record_overview_with_only_unscored_record_has_null_average() -
     asyncio.run(run_test())
 
 
-def test_training_record_overview_duration_matches_list_for_fractional_seconds() -> None:
+def test_training_record_overview_duration_matches_list_for_fractional_seconds() -> (
+    None
+):
     async def run_test() -> None:
         url = get_integration_database_url()
         async with Database(url) as database:

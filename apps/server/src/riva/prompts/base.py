@@ -6,7 +6,6 @@ from typing import Generic, TypeVar
 from pydantic import BaseModel
 from typing_extensions import TypeForm
 
-
 PromptOutputT = TypeVar("PromptOutputT", bound=BaseModel)
 PromptKey = tuple[str, str]
 

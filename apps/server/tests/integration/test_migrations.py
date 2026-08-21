@@ -7,7 +7,6 @@ from riva.db import migrations
 from riva.db.database import Database
 from tests.helpers.integration_database import get_integration_database_url
 
-
 pytestmark = pytest.mark.integration
 
 HEAD_REVISION = "202608200007"
@@ -28,7 +27,9 @@ async def _create_legacy_database(database_url: str) -> None:
 async def _current_revision(database_url: str) -> str | None:
     async with Database(database_url) as database:
         async with database.engine.connect() as connection:
-            result = await connection.execute(text("SELECT version_num FROM alembic_version"))
+            result = await connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            )
             return result.scalar_one_or_none()
 
 
