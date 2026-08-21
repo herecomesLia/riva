@@ -171,8 +171,8 @@ describe("RolesPage", () => {
     vi.mocked(createTargetRole).mockResolvedValue(created)
     const { queryClient } = renderRolesPage()
 
-    await screen.findByTestId("roles-empty-state")
-    await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.add") }))
+    const emptyState = await screen.findByTestId("roles-empty-state")
+    await user.click(within(emptyState).getByRole("button", { name: i18n.t("roles.empty.action") }))
     const chooser = await screen.findByRole("dialog", {
       name: i18n.t("roles.creationMethod.title"),
     })
@@ -194,6 +194,31 @@ describe("RolesPage", () => {
       await screen.findByRole("button", { name: new RegExp(`^${created.roles[0]!.title}`) }),
     ).toBeInTheDocument()
     expect(queryClient.getQueryData(["roles"])).toEqual(created)
+  })
+
+  it("opens the shared creation chooser from the page action when roles already exist", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getRolesPage).mockResolvedValue(
+      createRolesMockResponse("singleRoleWithoutJobDescription"),
+    )
+    renderRolesPage()
+
+    await screen.findByTestId("role-details-card")
+    await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.add") }))
+
+    const chooser = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creationMethod.title"),
+    })
+    expect(
+      within(chooser).getByRole("button", {
+        name: i18n.t("roles.creationMethod.manual.action"),
+      }),
+    ).toBeInTheDocument()
+    expect(
+      within(chooser).getByRole("button", {
+        name: i18n.t("roles.creationMethod.import.action"),
+      }),
+    ).toBeInTheDocument()
   })
 
   it("creates no role before import confirmation, then opens the applied role details", async () => {
@@ -227,7 +252,7 @@ describe("RolesPage", () => {
       canApply: false,
       status: "applied",
     })
-    renderRolesPage()
+    const { queryClient } = renderRolesPage()
 
     await screen.findByTestId("roles-empty-state")
     await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.add") }))
@@ -263,6 +288,7 @@ describe("RolesPage", () => {
     )
 
     expect(await screen.findByRole("heading", { name: importedRole.title })).toBeInTheDocument()
+    expect(queryClient.getQueryData(["roles"])).toEqual(imported)
     expect(getRolesPage).toHaveBeenCalledTimes(2)
     expect(vi.mocked(applyJobDescriptionImportDraft).mock.calls[0]?.[0]).toBe(draftId)
   })

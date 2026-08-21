@@ -400,6 +400,7 @@ export const roles = {
   empty: {
     title: "No target roles yet",
     description: "Add your first target role to continue with JD parsing and match analysis.",
+    action: "Add your first target role",
   },
   noSelection: {
     title: "Select a role",

@@ -108,11 +108,13 @@ describe("JobDescriptionImportDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it("shows the parsing failure reason and allows re-entry", async () => {
+  it("preserves the JD after parsing fails and allows it to be submitted again", async () => {
     const parsing = createJobDescriptionImportDraftFixture("parsing")
     const failed = createJobDescriptionImportDraftFixture("failed")
+    const ready = createJobDescriptionImportDraftFixture("ready")
+    const createDraft = vi.fn(async () => ready).mockResolvedValueOnce(parsing)
     renderDialog({
-      createDraft: vi.fn(async () => parsing),
+      createDraft,
       getDraft: vi.fn(async () => failed),
     })
     const { user } = await submitJobDescription(parsing.rawText)
@@ -120,5 +122,50 @@ describe("JobDescriptionImportDialog", () => {
     expect(await screen.findByText(failed.failureReason!)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: i18n.t("roles.import.actions.reenter") }))
     expect(screen.getByLabelText(i18n.t("roles.import.input.label"))).toHaveValue(parsing.rawText)
+    await user.click(screen.getByRole("button", { name: i18n.t("roles.import.actions.start") }))
+
+    expect(await screen.findByText(i18n.t("roles.import.ready.title"))).toBeInTheDocument()
+    expect(createDraft).toHaveBeenCalledTimes(2)
+    expect(createDraft).toHaveBeenLastCalledWith({ rawText: parsing.rawText })
+  })
+
+  it("keeps the ready draft after apply fails and allows confirmation to be retried", async () => {
+    const ready = createJobDescriptionImportDraftFixture("ready")
+    const applied = {
+      ...ready,
+      appliedRoleId,
+      canApply: false,
+      status: "applied" as const,
+    }
+    const applyDraft = vi
+      .fn(async () => applied)
+      .mockRejectedValueOnce(new Error("apply unavailable"))
+    const onApplied = vi.fn(async () => undefined)
+    const onOpenChange = vi.fn()
+    renderDialog({
+      applyDraft,
+      createDraft: vi.fn(async () => ready),
+      onApplied,
+      onOpenChange,
+    })
+    const { user } = await submitJobDescription(ready.rawText)
+
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("roles.import.actions.apply") }),
+    )
+
+    expect(await screen.findByText(i18n.t("roles.import.applyFailed.title"))).toBeInTheDocument()
+    expect(screen.getByText(i18n.t("roles.import.ready.title"))).toBeInTheDocument()
+    expect(screen.getByText(ready.parsedTitle!)).toBeInTheDocument()
+    const retryButton = screen.getByRole("button", {
+      name: i18n.t("roles.import.actions.apply"),
+    })
+    expect(retryButton).toBeEnabled()
+
+    await user.click(retryButton)
+
+    await waitFor(() => expect(onApplied).toHaveBeenCalledWith(appliedRoleId))
+    expect(applyDraft).toHaveBeenCalledTimes(2)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 })

@@ -102,12 +102,17 @@ describe("RolesView", () => {
   })
 
   it("renders the no-roles empty state", async () => {
+    const user = userEvent.setup()
     renderReadyView(createRolesMockResponse("noRoles"))
 
-    expect(await screen.findByTestId("roles-empty-state")).toHaveTextContent(
-      i18n.t("roles.empty.title"),
-    )
+    const emptyState = await screen.findByTestId("roles-empty-state")
+    expect(emptyState).toHaveTextContent(i18n.t("roles.empty.title"))
     expect(screen.queryByTestId("roles-list-card")).not.toBeInTheDocument()
+
+    await user.click(within(emptyState).getByRole("button", { name: i18n.t("roles.empty.action") }))
+    expect(
+      await screen.findByRole("dialog", { name: i18n.t("roles.creationMethod.title") }),
+    ).toBeInTheDocument()
   })
 
   it("renders multiple saved roles and their preparation states", async () => {

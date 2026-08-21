@@ -1,4 +1,4 @@
-import { AlertCircleIcon, BriefcaseBusinessIcon } from "lucide-react"
+import { AlertCircleIcon, BriefcaseBusinessIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function RolesLoadingState() {
@@ -87,7 +94,7 @@ export function RolesErrorState({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-export function RolesEmptyState() {
+export function RolesEmptyState({ onAdd }: { onAdd?: () => void }) {
   const { t } = useTranslation()
 
   return (
@@ -101,6 +108,14 @@ export function RolesEmptyState() {
             <EmptyTitle>{t("roles.empty.title")}</EmptyTitle>
             <EmptyDescription>{t("roles.empty.description")}</EmptyDescription>
           </EmptyHeader>
+          {onAdd && (
+            <EmptyContent>
+              <Button onClick={onAdd}>
+                <PlusIcon data-icon="inline-start" />
+                {t("roles.empty.action")}
+              </Button>
+            </EmptyContent>
+          )}
         </Empty>
       </CardContent>
     </Card>

@@ -228,14 +228,24 @@ function RolesReadyView({
     setSelectedRoleId(nextRoles[0]?.id ?? null)
   }
 
+  function openCreationMethodDialog() {
+    setIsCreationMethodDialogOpen(true)
+  }
+
+  function openRoleDetails(roleId: string) {
+    setRoleCategory("saved")
+    setSelectedRoleId(roleId)
+    setActiveTab("overview")
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <RolesHeader
         disabled={pendingAction}
-        onAdd={actions ? () => setIsCreationMethodDialogOpen(true) : undefined}
+        onAdd={actions ? openCreationMethodDialog : undefined}
       />
       {data.roles.length === 0 ? (
-        <RolesEmptyState />
+        <RolesEmptyState onAdd={actions ? openCreationMethodDialog : undefined} />
       ) : (
         <>
           {data.currentRoleId === null && (
@@ -453,9 +463,7 @@ function RolesReadyView({
             getDraft={actions.jobDescriptionImport.getDraft}
             onApplied={async (roleId) => {
               await actions.jobDescriptionImport.refreshRoles(roleId)
-              setRoleCategory("saved")
-              setSelectedRoleId(roleId)
-              setActiveTab("overview")
+              openRoleDetails(roleId)
               closeEditor()
             }}
             onDirtyChange={handleDirtyChange}

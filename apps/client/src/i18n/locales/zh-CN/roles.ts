@@ -384,6 +384,7 @@ export const roles = {
   empty: {
     title: "还没有目标岗位",
     description: "添加第一个目标岗位后，可继续补充 JD 并生成匹配分析。",
+    action: "添加第一个目标岗位",
   },
   noSelection: {
     title: "请选择一个岗位",

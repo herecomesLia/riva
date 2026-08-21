@@ -15,16 +15,18 @@ const meta = preview.meta({
 })
 
 function DialogHarness({
+  applyDraft = fn(() => new Promise<JobDescriptionImportDraft>(() => undefined)),
   createResult,
   getDraft = fn(() => new Promise<JobDescriptionImportDraft>(() => undefined)),
 }: {
+  applyDraft?: (draftId: string) => Promise<JobDescriptionImportDraft>
   createResult?: JobDescriptionImportDraft
   getDraft?: (draftId: string) => Promise<JobDescriptionImportDraft>
 }) {
   const [open, setOpen] = useState(true)
   return (
     <JobDescriptionImportDialog
-      applyDraft={fn()}
+      applyDraft={applyDraft}
       createDraft={
         createResult
           ? fn(async () => createResult)
@@ -82,5 +84,16 @@ export const Failed = meta.story({
   play: async ({ userEvent }) => {
     await submitStoryJd(userEvent)
     await expect(screen.findByText(/JD 解析失败|JD parsing failed/i)).resolves.toBeVisible()
+  },
+})
+
+export const Applying = meta.story({
+  render: () => <DialogHarness createResult={createJobDescriptionImportDraftFixture("ready")} />,
+  play: async ({ userEvent }) => {
+    await submitStoryJd(userEvent)
+    await userEvent.click(
+      await screen.findByRole("button", { name: /确认创建岗位|confirm and create role/i }),
+    )
+    await expect(screen.getByRole("button", { name: /正在创建岗位|creating role/i })).toBeDisabled()
   },
 })
