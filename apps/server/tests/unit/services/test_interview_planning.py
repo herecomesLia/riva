@@ -6,10 +6,10 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.interview import planning as planning_workflow_module
 from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.interview_planning import InterviewPlanningOutput
 from riva.schemas.training_memory import TrainingMemoryContext
-from riva.services import interview_planning as planning_module
 from riva.services.interview_planning import (
     INTERVIEW_PLANNING_VERSION_CONFLICT,
     InterviewPlanningService,
@@ -286,7 +286,9 @@ def test_begin_enqueues_snapshot_and_moves_opening_to_generating(monkeypatch) ->
     FakeAgentRunService.calls = []
     FakeAgentRunService.next_run = run
     FakeTrainingMemoryService.calls = 0
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
     db = ScriptedSession([user_id, session, _profile(uuid4()), role])
 
     result = asyncio.run(
@@ -321,7 +323,9 @@ def test_begin_rejects_version_conflict_without_enqueue(monkeypatch) -> None:
     user_id = uuid4()
     session = _session(user_id, uuid4(), version=2)
     FakeAgentRunService.calls = []
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
     db = ScriptedSession([user_id, session])
 
     with pytest.raises(InterviewPlanningStateError) as error:
@@ -350,7 +354,9 @@ def test_in_progress_begin_does_not_enqueue_a_second_run(
     )
     FakeAgentRunService.calls = []
     FakeTrainingMemoryService.calls = 0
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
     db = ScriptedSession([user_id, session, run])
 
     result = asyncio.run(
@@ -387,7 +393,9 @@ def test_failed_planner_can_retry_with_a_new_idempotent_run(monkeypatch) -> None
     retry_run = _run(user_id=user_id)
     FakeAgentRunService.calls = []
     FakeAgentRunService.next_run = retry_run
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
     db = ScriptedSession([user_id, session, failed_run, _profile(uuid4()), role])
 
     asyncio.run(
@@ -415,7 +423,9 @@ def test_failed_retry_reuses_memory_snapshot_without_requery(monkeypatch) -> Non
     FakeAgentRunService.calls = []
     FakeAgentRunService.next_run = failed_run
     FakeTrainingMemoryService.calls = 0
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
 
     asyncio.run(
         InterviewPlanningService(
@@ -458,7 +468,9 @@ def test_v1_snapshot_without_memory_is_accepted_and_unsupported_version_rejected
     run = _run(user_id=user_id)
     FakeAgentRunService.calls = []
     FakeAgentRunService.next_run = run
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
     original_service = InterviewPlanningService(
         ScriptedSession([user_id, session, _profile(uuid4()), role]),
         llm_model="test-model",
@@ -503,7 +515,9 @@ def test_success_persists_plan_and_first_question_in_one_transaction(
     run = _run(user_id=user_id)
     FakeAgentRunService.calls = []
     FakeAgentRunService.next_run = run
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
     enqueue_db = ScriptedSession([user_id, session, _profile(uuid4()), role])
     asyncio.run(
         InterviewPlanningService(enqueue_db, llm_model="test-model").begin_questions(
@@ -546,7 +560,9 @@ def test_persist_failure_rolls_back_before_a_question_is_committed(monkeypatch) 
     run = _run(user_id=user_id)
     FakeAgentRunService.calls = []
     FakeAgentRunService.next_run = run
-    monkeypatch.setattr(planning_module, "AgentRunService", FakeAgentRunService)
+    monkeypatch.setattr(
+        planning_workflow_module, "AgentRunService", FakeAgentRunService
+    )
     enqueue_db = ScriptedSession([user_id, session, _profile(uuid4()), role])
     asyncio.run(
         InterviewPlanningService(enqueue_db, llm_model="test-model").begin_questions(

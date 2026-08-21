@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import MatchingAnalysisAgent, QuestionGenerationAgent
+from riva.agents.interview import InterviewPlanningWorkflow
 from riva.core.errors import APIError
 from riva.db.database import Database
 from riva.models import (
@@ -297,7 +298,10 @@ def test_minimal_profiles_are_ready_across_core_workflows(
 
                 async with database.sessionmaker() as session:
                     planner = InterviewPlanningService(session, llm_model=MODEL)
-                    planning_input = await planner._build_planning_input(
+                    planning_input = await InterviewPlanningWorkflow(
+                        session,
+                        llm_model=MODEL,
+                    ).build_planning_input(
                         interview,
                         user_id=owner.id,
                     )
