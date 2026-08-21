@@ -99,7 +99,7 @@ describe("DashboardView", () => {
       screen.getByText(dashboardResponseMock.recommendation!.recommendation.reason),
     ).toBeInTheDocument()
     expect(screen.getByText("76%")).toBeInTheDocument()
-    expect(screen.getAllByText("8.6 / 10").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("86/100").length).toBeGreaterThan(0)
     expect(screen.getByText(dashboardResponseMock.weaknesses[0].description)).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.weaknesses.description"))).toBeInTheDocument()
     const recommendationLink = screen.getByRole("link", {

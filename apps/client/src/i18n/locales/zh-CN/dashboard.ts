@@ -74,7 +74,7 @@ export const dashboard = {
       percentage: "{{value}}%",
       duration: "{{value}} 分钟",
       durationUnit: "分钟",
-      score: "{{value}} / 10",
+      score: "{{value}}/100",
     },
   },
   performanceTrend: {
@@ -89,7 +89,7 @@ export const dashboard = {
     daysUnit: "天",
     highestScore: "最高分",
     averageScore: "平均分",
-    score: "{{score}} / 10",
+    score: "{{score}}/100",
     session: "{{type}} 第{{count}}次",
     chartLabel: "最近 10 次{{type}}评分表现",
     empty: "暂无{{type}}记录。",

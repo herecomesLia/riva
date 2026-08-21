@@ -15,7 +15,7 @@ export const history = {
       records: "{{count}} sessions",
       minutes: "{{count}} min",
       hours: "{{count}} hr",
-      score: "{{score}} pts",
+      score: "{{score}}/100",
       noScore: "No score yet",
     },
   },

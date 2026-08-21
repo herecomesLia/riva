@@ -75,7 +75,7 @@ export const dashboard = {
       percentage: "{{value}}%",
       duration: "{{value}} min",
       durationUnit: "min",
-      score: "{{value}} / 10",
+      score: "{{value}}/100",
     },
   },
   performanceTrend: {
@@ -90,7 +90,7 @@ export const dashboard = {
     daysUnit: "days",
     highestScore: "Highest score",
     averageScore: "Average score",
-    score: "{{score}} / 10",
+    score: "{{score}}/100",
     session: "{{type}} · Session {{count}}",
     chartLabel: "10 most recent {{type}} scores",
     empty: "No {{type}} records yet.",

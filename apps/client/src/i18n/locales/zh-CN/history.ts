@@ -14,7 +14,7 @@ export const history = {
       records: "{{count}} 次",
       minutes: "{{count}} 分钟",
       hours: "{{count}} 小时",
-      score: "{{score}} 分",
+      score: "{{score}}/100",
       noScore: "暂无得分",
     },
   },

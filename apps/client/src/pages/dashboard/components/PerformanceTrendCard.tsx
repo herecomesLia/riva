@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
 import type { DashboardPerformanceRecord, DashboardResponse } from "@/models/dashboard"
 import type { Loadable } from "@/types"
 
-import { toDashboardScoreOutOfTen } from "../dashboard-display"
+import { formatDashboardScore } from "../dashboard-display"
 
 const performanceChart = {
   height: 184,
@@ -72,10 +72,7 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
         practicedDays: new Set(points.map((point) => point.occurredAt.slice(0, 10))).size,
       }
     : null
-  const formatScore = (score: number) =>
-    new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(
-      toDashboardScoreOutOfTen(score),
-    )
+  const formatScore = (score: number) => formatDashboardScore(score, i18n.language)
   const formatDate = (occurredAt: string) =>
     new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short" }).format(
       new Date(occurredAt),
@@ -286,13 +283,13 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
                     />
                   </linearGradient>
                 </defs>
-                {[0, 5, 10].map((score) => {
+                {[0, 50, 100].map((score) => {
                   const y =
                     performanceChart.padding.top +
                     (performanceChart.height -
                       performanceChart.padding.top -
                       performanceChart.padding.bottom) *
-                      (1 - score / 10)
+                      (1 - score / 100)
 
                   return (
                     <g key={score}>

@@ -1,3 +1,3 @@
-export function toDashboardScoreOutOfTen(scoreOutOfOneHundred: number): number {
-  return scoreOutOfOneHundred / 10
+export function formatDashboardScore(scoreOutOfOneHundred: number, language: string): string {
+  return new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(scoreOutOfOneHundred)
 }
