@@ -7,6 +7,7 @@ import pytest
 from fastapi import status
 from sqlalchemy import func, select
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.errors import APIError
 from riva.db import Database
 from riva.models import AgentRun, AgentRunStatus, TargetRole, User
@@ -15,7 +16,6 @@ from riva.schemas.roles import (
     JobDescriptionParsingStatusQuery,
     StartJobDescriptionParsingRequest,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.roles import TargetRoleService
 
 pytestmark = pytest.mark.integration

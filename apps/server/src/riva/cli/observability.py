@@ -7,10 +7,10 @@ from typing import Annotated, NoReturn
 import typer
 from pydantic import ValidationError
 
+from riva.agents.runtime.observability import AgentObservabilityService
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.schemas.agent_observability import AgentObservabilityReport
-from riva.services.agent_observability import AgentObservabilityService
 from riva.utils import utc_now
 
 app = typer.Typer(

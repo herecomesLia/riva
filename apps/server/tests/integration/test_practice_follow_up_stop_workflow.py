@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import PracticeRecommendationAgent, PracticeReviewAgent
+from riva.agents.evaluation import practice_evaluation_idempotency_key
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -24,7 +25,6 @@ from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
-from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.services.practice_sessions import (
     PracticeEvaluationWorkflowContext,
     PracticeReviewWorkflowContext,

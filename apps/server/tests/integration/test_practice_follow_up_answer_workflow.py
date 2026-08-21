@@ -9,6 +9,8 @@ from riva.agents import (
     PracticeRecommendationAgent,
     PracticeReviewAgent,
 )
+from riva.agents.evaluation import practice_evaluation_idempotency_key
+from riva.agents.follow_up import practice_follow_up_idempotency_key
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -21,8 +23,6 @@ from riva.schemas.evaluation import (
     EvaluationRunPayload,
     PracticeEvaluationFollowUpCompletionReason,
 )
-from riva.services.evaluation_generation import practice_evaluation_idempotency_key
-from riva.services.follow_up_generation import practice_follow_up_idempotency_key
 from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
     PracticeEvaluationWorkflowContext,

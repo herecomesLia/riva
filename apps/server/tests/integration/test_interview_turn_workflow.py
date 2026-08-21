@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import LLMProviderConfigurationError
@@ -23,7 +24,6 @@ from riva.models import (
     InterviewTurnAssessment,
     TargetRole,
 )
-from riva.services.agent_runs import AgentRunService
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_interview_planning_workflow import (
     _app,

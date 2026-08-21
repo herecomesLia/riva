@@ -6,9 +6,9 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import select
 
+from riva.agents.runtime.observability import AgentObservabilityService
 from riva.db.database import Database
 from riva.models import AgentRun, AgentRunStatus, User
-from riva.services.agent_observability import AgentObservabilityService
 from tests.helpers.integration_database import get_integration_database_url
 
 pytestmark = pytest.mark.integration

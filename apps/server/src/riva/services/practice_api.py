@@ -6,6 +6,9 @@ from fastapi import status
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.evaluation import (
+    practice_evaluation_output_from_artifact,
+)
 from riva.core.errors import APIError
 from riva.core.language import InteractionLanguage
 from riva.models import PracticeAnswer, PracticeFollowUpQuestion, QuestionCard
@@ -72,9 +75,6 @@ from riva.schemas.practice_sessions import (
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
-)
-from riva.services.evaluation_generation import (
-    practice_evaluation_output_from_artifact,
 )
 from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,

@@ -5,6 +5,16 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from riva.agents.evaluation import (
+    PRACTICE_EVALUATION_ARTIFACT_CONFLICT,
+    PRACTICE_EVALUATION_COMPLETION_CONFLICT,
+    PRACTICE_EVALUATION_CONTEXT_CONFLICT,
+    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
+    EvaluationGenerationService,
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+)
+from riva.agents.follow_up import practice_follow_up_idempotency_key
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -22,16 +32,6 @@ from riva.schemas.evaluation import (
     PracticeEvaluationOutput,
 )
 from riva.schemas.follow_up import FollowUpRunPayload
-from riva.services.evaluation_generation import (
-    PRACTICE_EVALUATION_ARTIFACT_CONFLICT,
-    PRACTICE_EVALUATION_COMPLETION_CONFLICT,
-    PRACTICE_EVALUATION_CONTEXT_CONFLICT,
-    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
-    EvaluationGenerationService,
-    EvaluationGenerationStateError,
-    practice_evaluation_idempotency_key,
-)
-from riva.services.follow_up_generation import practice_follow_up_idempotency_key
 
 
 class NoopCompetencyIngestionService:

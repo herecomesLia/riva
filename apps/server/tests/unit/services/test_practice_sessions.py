@@ -5,6 +5,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from riva.agents.evaluation import (
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+)
+from riva.agents.follow_up import FollowUpGenerationStateError
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -46,11 +51,6 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import QuestionGenerationRunPayload
-from riva.services.evaluation_generation import (
-    EvaluationGenerationStateError,
-    practice_evaluation_idempotency_key,
-)
-from riva.services.follow_up_generation import FollowUpGenerationStateError
 from riva.services.practice_sessions import (
     PRACTICE_EVALUATION_GENERATION_FAILED,
     PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT,

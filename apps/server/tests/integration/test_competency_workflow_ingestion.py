@@ -7,6 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
+from riva.agents.evaluation import EvaluationGenerationService
+from riva.agents.runtime.runs import AgentRunService
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -23,9 +25,7 @@ from riva.models import (
 from riva.schemas.evaluation import PracticeEvaluationOutput
 from riva.schemas.interview_review import InterviewReviewOutput
 from riva.schemas.interview_turn import InterviewTurnOutput
-from riva.services.agent_runs import AgentRunService
 from riva.services.competency_ingestion import CompetencyIngestionService
-from riva.services.evaluation_generation import EvaluationGenerationService
 from riva.services.interview_review import InterviewReviewService
 from riva.services.interview_turn import InterviewTurnService
 from tests.helpers.integration_database import get_integration_database_url

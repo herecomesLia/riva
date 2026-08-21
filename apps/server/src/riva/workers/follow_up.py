@@ -4,16 +4,16 @@ from dataclasses import replace
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents import AgentResult, FollowUpAgent
+from riva.agents.follow_up import (
+    FollowUpGenerationService,
+    FollowUpGenerationStateError,
+)
 from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
     FollowUpGenerationOutput,
     FollowUpInput,
     FollowUpQuestionOutput,
-)
-from riva.services.follow_up_generation import (
-    FollowUpGenerationService,
-    FollowUpGenerationStateError,
 )
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory

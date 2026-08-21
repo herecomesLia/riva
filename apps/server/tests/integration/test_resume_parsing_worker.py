@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import func, select
 
 from riva.agents import ResumeParsingAgent
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.integrations import (
@@ -30,7 +31,6 @@ from riva.models import (
 from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.schemas.resume_parsing import ResumeParsingOutput
-from riva.services.agent_runs import AgentRunService
 from riva.services.resume_imports import (
     ResumeImportDraftService,
     build_resume_import_item_id,

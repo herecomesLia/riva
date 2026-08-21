@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.errors import APIError
 from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
@@ -32,7 +33,6 @@ from riva.schemas.roles import (
     ActiveTargetRolePreparationStatus,
     CreateTargetRoleRequest,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.job_description_analyses import (
     new_job_description_analysis,
 )

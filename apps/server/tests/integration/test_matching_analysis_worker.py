@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import MatchingAnalysisAgent
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.config import Settings
 from riva.core.errors import APIError
 from riva.db.database import Database
@@ -34,7 +35,6 @@ from riva.schemas.roles import (
     MatchingAnalysisStatusQuery,
     StartMatchingAnalysisRequest,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.roles import MATCHING_FAILURE_REASON, TargetRoleService
 from riva.workers import (
     AgentHandlerRegistry,

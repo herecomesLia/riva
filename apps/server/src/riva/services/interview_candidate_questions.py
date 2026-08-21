@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -38,7 +39,6 @@ from riva.schemas.interview_candidate_question import (
     InterviewCandidateQuestionSnapshot,
 )
 from riva.schemas.interview_planning import InterviewPlanningRunPayload
-from riva.services.agent_runs import AgentRunService
 from riva.services.interview_planning_prompt_versions import (
     get_interview_planning_prompt,
 )

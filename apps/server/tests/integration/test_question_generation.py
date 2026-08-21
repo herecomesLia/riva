@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import func, select
 
 from riva.agents import QuestionGenerationAgent
+from riva.agents.runtime.runs import AgentRunService
 from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import (
@@ -35,7 +36,6 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import QuestionGenerationOutput
-from riva.services.agent_runs import AgentRunService
 from riva.services.question_generation import QuestionGenerationService
 from riva.workers import AgentHandlerRegistry, AgentWorker, QuestionGenerationHandler
 from tests.helpers.llm import FakeLLMProvider

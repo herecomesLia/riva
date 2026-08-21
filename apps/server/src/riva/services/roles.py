@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.errors import APIError
 from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
@@ -60,7 +61,6 @@ from riva.schemas.roles import (
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.job_description_analyses import build_riva_summary
 from riva.services.profile_completion import career_profile_completed
 from riva.services.prompt_versions import (

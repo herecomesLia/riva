@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.db import migrations
 from riva.db.database import Database
 from riva.models import (
@@ -15,7 +16,6 @@ from riva.models import (
     InterviewSession,
     UserCompetency,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.interview_planning import InterviewPlanningService
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.interview import seed_interview_prerequisites

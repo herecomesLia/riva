@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.language import InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -55,7 +56,6 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
     QuestionGenerationWorkExperienceContext,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.practice_weaknesses import PracticeWeaknessFocus
 from riva.services.profile_completion import career_profile_completed
 from riva.services.question_generation_prompt_versions import (

@@ -8,6 +8,9 @@ from pydantic import ValidationError
 from sqlalchemy import and_, case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.evaluation import (
+    practice_evaluation_output_from_artifact,
+)
 from riva.models import (
     PracticeAnswer,
     PracticeAttempt,
@@ -39,9 +42,6 @@ from riva.schemas.training_records import (
     TrainingRecordStatus,
     TrainingRecordSummaryResponse,
     TrainingRecordTargetRoleResponse,
-)
-from riva.services.evaluation_generation import (
-    practice_evaluation_output_from_artifact,
 )
 from riva.services.interview_training_records import (
     TRAINING_RECORD_NOT_FOUND,

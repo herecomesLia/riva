@@ -7,6 +7,7 @@ import pytest
 from pydantic import BaseModel
 
 from riva.agents import AgentResult, PracticeEvaluationAgent
+from riva.agents.evaluation import EvaluationGenerationStateError
 from riva.integrations import (
     InvalidStructuredOutputError,
     LLMUsage,
@@ -18,7 +19,6 @@ from riva.schemas.evaluation import (
     EvaluationInput,
     PracticeEvaluationOutput,
 )
-from riva.services.evaluation_generation import EvaluationGenerationStateError
 from riva.workers import AgentExecutionError, PracticeEvaluationHandler
 from riva.workers.practice_evaluation import EvaluationGenerationServiceFactory
 from riva.workers.runtime import SessionFactory

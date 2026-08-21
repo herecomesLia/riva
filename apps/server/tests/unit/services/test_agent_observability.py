@@ -4,12 +4,12 @@ from uuid import uuid4
 
 import pytest
 
-from riva.models import AgentRunStatus
-from riva.services.agent_observability import (
+from riva.agents.runtime.observability import (
     AgentObservabilityService,
     AgentRunObservation,
     aggregate_agent_run_observations,
 )
+from riva.models import AgentRunStatus
 
 START = datetime(2026, 8, 17, 0, tzinfo=UTC)
 END = START + timedelta(days=2)

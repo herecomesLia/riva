@@ -10,6 +10,7 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -31,7 +32,6 @@ from riva.schemas.practice_recommendation import (
 )
 from riva.schemas.practice_review import PracticeReviewInput
 from riva.schemas.training_memory import TrainingMemoryContext
-from riva.services.agent_runs import AgentRunService
 from riva.services.practice_recommendation_prompt_versions import (
     PRACTICE_RECOMMENDATION_ACCEPTED_PROMPT_VERSIONS,
     get_practice_recommendation_prompt,

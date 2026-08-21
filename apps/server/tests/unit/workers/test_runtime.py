@@ -7,6 +7,10 @@ import pytest
 from pydantic import BaseModel
 
 from riva.agents import AgentResult
+from riva.agents.runtime.runs import (
+    AgentRunLeaseError,
+    AgentRunResultMismatchError,
+)
 from riva.integrations import (
     InvalidStructuredOutputError,
     LLMProviderConfigurationError,
@@ -17,10 +21,6 @@ from riva.integrations import (
     StructuredOutputValidationError,
 )
 from riva.models import AgentRun, AgentRunStatus
-from riva.services.agent_runs import (
-    AgentRunLeaseError,
-    AgentRunResultMismatchError,
-)
 from riva.workers import AgentExecutionError, AgentHandlerRegistry, AgentWorker
 
 NOW = datetime(2026, 7, 31, 8, tzinfo=UTC)

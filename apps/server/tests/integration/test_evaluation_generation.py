@@ -6,6 +6,14 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import PracticeEvaluationAgent
+from riva.agents.evaluation import (
+    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
+    EvaluationGenerationService,
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+)
+from riva.agents.follow_up import practice_follow_up_idempotency_key
+from riva.agents.runtime.runs import AgentRunService
 from riva.db.database import Database
 from riva.integrations import LLMUsage, MessageRole
 from riva.models import (
@@ -23,14 +31,6 @@ from riva.models import (
 )
 from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import FollowUpRunPayload
-from riva.services.agent_runs import AgentRunService
-from riva.services.evaluation_generation import (
-    PRACTICE_EVALUATION_FOLLOW_UP_CONTEXT_INVALID,
-    EvaluationGenerationService,
-    EvaluationGenerationStateError,
-    practice_evaluation_idempotency_key,
-)
-from riva.services.follow_up_generation import practice_follow_up_idempotency_key
 from riva.workers import AgentHandlerRegistry, AgentWorker, PracticeEvaluationHandler
 from tests.helpers.llm import FakeLLMProvider
 from tests.integration.test_follow_up_generation import (

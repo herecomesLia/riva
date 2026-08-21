@@ -11,6 +11,7 @@ from riva.agents import (
     PracticeEvaluationAgent,
     QuestionGenerationAgent,
 )
+from riva.agents.evaluation import practice_evaluation_idempotency_key
 from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
@@ -25,7 +26,6 @@ from riva.models import (
 )
 from riva.prompts import PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import EvaluationRunPayload
-from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.workers import (
     AgentHandlerRegistry,
     AgentWorker,

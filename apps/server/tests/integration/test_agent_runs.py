@@ -9,10 +9,10 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError, StatementError
 
 from riva.agents import AgentResult
+from riva.agents.runtime.runs import AgentRunLeaseError, AgentRunService
 from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import AgentRun, AgentRunStatus, User
-from riva.services.agent_runs import AgentRunLeaseError, AgentRunService
 
 pytestmark = pytest.mark.integration
 START = datetime(2026, 7, 30, 8, tzinfo=UTC)

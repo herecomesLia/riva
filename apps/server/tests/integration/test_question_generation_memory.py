@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import QuestionGenerationAgent
+from riva.agents.runtime.runs import AgentRunService
 from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import AgentRun, AgentRunStatus, QuestionCard, UserCompetency
@@ -17,7 +18,6 @@ from riva.schemas.question_generation import (
     QuestionGenerationRunPayload,
 )
 from riva.schemas.training_memory import TrainingMemoryContext
-from riva.services.agent_runs import AgentRunService
 from riva.services.question_generation import (
     QuestionGenerationService,
     validate_question_card_generation_lineage,

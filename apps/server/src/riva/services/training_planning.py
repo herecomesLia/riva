@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.language import InteractionLanguage
 from riva.core.training_planning import (
     TrainingPlanningOutputContractError,
@@ -51,7 +52,6 @@ from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordSummaryResponse,
     TrainingRecordSummaryResponse,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.interview_sessions import InterviewSessionService
 from riva.services.matching_analyses import _career_profile_loader_options
 from riva.services.practice_sessions import PracticeSessionService

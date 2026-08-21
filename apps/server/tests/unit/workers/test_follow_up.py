@@ -7,6 +7,7 @@ import pytest
 from pydantic import BaseModel
 
 from riva.agents import AgentResult, FollowUpAgent
+from riva.agents.follow_up import FollowUpGenerationStateError
 from riva.integrations import (
     InvalidStructuredOutputError,
     LLMUsage,
@@ -20,7 +21,6 @@ from riva.schemas.follow_up import (
     FollowUpInput,
     FollowUpQuestionOutput,
 )
-from riva.services.follow_up_generation import FollowUpGenerationStateError
 from riva.workers import AgentExecutionError, FollowUpHandler
 from riva.workers.follow_up import FollowUpGenerationServiceFactory
 from riva.workers.runtime import SessionFactory

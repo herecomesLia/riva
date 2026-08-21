@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.config import Settings
@@ -21,7 +22,6 @@ from riva.models import (
     InterviewSession,
 )
 from riva.schemas.interview_planning import InterviewPlanningOutput
-from riva.services.agent_runs import AgentRunService
 from riva.workers import build_agent_handler_registry, build_agent_worker
 from tests.helpers.integration_database import get_integration_database_url
 from tests.helpers.interview import seed_interview_prerequisites

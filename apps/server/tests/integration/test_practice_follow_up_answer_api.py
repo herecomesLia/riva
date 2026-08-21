@@ -13,6 +13,8 @@ from riva.agents import (
     PracticeRecommendationAgent,
     PracticeReviewAgent,
 )
+from riva.agents.evaluation import practice_evaluation_idempotency_key
+from riva.agents.follow_up import practice_follow_up_idempotency_key
 from riva.core.app import create_app
 from riva.core.auth import require_current_user
 from riva.core.practice import get_practice_api_service
@@ -29,8 +31,6 @@ from riva.models import (
     PracticeSession,
 )
 from riva.schemas.evaluation import EvaluationRunPayload
-from riva.services.evaluation_generation import practice_evaluation_idempotency_key
-from riva.services.follow_up_generation import practice_follow_up_idempotency_key
 from riva.services.practice_api import PracticeAPIService
 from riva.services.practice_sessions import PracticeSessionService
 from tests.helpers.llm import FakeLLMProvider

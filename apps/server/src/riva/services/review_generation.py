@@ -10,6 +10,14 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.evaluation import (
+    EvaluationGenerationService,
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+    practice_evaluation_output_from_artifact,
+    validate_evaluation_generation_run,
+)
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -26,15 +34,7 @@ from riva.schemas.practice_review import (
     PracticeReviewOutput,
     ReviewRunPayload,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.competency_ingestion import CompetencyIngestionService
-from riva.services.evaluation_generation import (
-    EvaluationGenerationService,
-    EvaluationGenerationStateError,
-    practice_evaluation_idempotency_key,
-    practice_evaluation_output_from_artifact,
-    validate_evaluation_generation_run,
-)
 from riva.utils import utc_now
 
 ReviewGenerationStateErrorCode = Literal[

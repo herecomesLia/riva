@@ -5,6 +5,12 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from riva.agents.follow_up import (
+    FOLLOW_UP_GENERATION_CONTEXT_CONFLICT,
+    FOLLOW_UP_PREVIOUS_EXCHANGE_NOT_READY,
+    FollowUpGenerationService,
+    FollowUpGenerationStateError,
+)
 from riva.models import (
     AgentRun,
     PracticeAnswer,
@@ -19,12 +25,6 @@ from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
     FollowUpQuestionOutput,
     FollowUpRunPayload,
-)
-from riva.services.follow_up_generation import (
-    FOLLOW_UP_GENERATION_CONTEXT_CONFLICT,
-    FOLLOW_UP_PREVIOUS_EXCHANGE_NOT_READY,
-    FollowUpGenerationService,
-    FollowUpGenerationStateError,
 )
 
 NOW = datetime(2026, 8, 11, 9, 30, tzinfo=UTC)

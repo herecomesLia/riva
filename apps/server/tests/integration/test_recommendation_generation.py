@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import PracticeRecommendationAgent
+from riva.agents.runtime.runs import AgentRunService
 from riva.db.database import Database
 from riva.integrations import LLMUsage, MessageRole, StructuredGenerationRequest
 from riva.models import (
@@ -21,7 +22,6 @@ from riva.models import (
     TargetRole,
 )
 from riva.prompts import PRACTICE_REVIEW_PROMPT
-from riva.services.agent_runs import AgentRunService
 from riva.services.recommendation_generation import (
     RecommendationGenerationService,
     RecommendationGenerationStateError,

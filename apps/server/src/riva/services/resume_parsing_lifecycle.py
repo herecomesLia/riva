@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.errors import APIError
 from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
@@ -30,7 +31,6 @@ from riva.schemas.resume_parsing import (
     ResumeParsingRunPayload,
 )
 from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
-from riva.services.agent_runs import AgentRunService
 from riva.services.prompt_versions import RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
 from riva.services.resume_imports import (
     RESUME_IMPORT_DRAFT_INVALID,

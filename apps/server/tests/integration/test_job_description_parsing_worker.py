@@ -13,6 +13,7 @@ from riva.agents import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
 )
+from riva.agents.runtime.runs import AgentRunService
 from riva.core.config import Settings
 from riva.core.errors import APIError
 from riva.db.database import Database
@@ -35,7 +36,6 @@ from riva.schemas.roles import (
     SaveJobDescriptionRequest,
     StartJobDescriptionParsingRequest,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.roles import TargetRoleService
 from riva.workers import (
     AgentHandlerRegistry,

@@ -7,6 +7,11 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import FollowUpAgent
+from riva.agents.follow_up import (
+    FollowUpGenerationService,
+    practice_follow_up_idempotency_key,
+)
+from riva.agents.runtime.runs import AgentRunService
 from riva.db.database import Database
 from riva.integrations import LLMUsage, MessageRole, StructuredGenerationRequest
 from riva.models import (
@@ -23,11 +28,6 @@ from riva.models import (
     User,
 )
 from riva.schemas.follow_up import FollowUpGenerationOutput
-from riva.services.agent_runs import AgentRunService
-from riva.services.follow_up_generation import (
-    FollowUpGenerationService,
-    practice_follow_up_idempotency_key,
-)
 from riva.workers import AgentHandlerRegistry, AgentWorker, FollowUpHandler
 from tests.helpers.llm import FakeLLMProvider
 

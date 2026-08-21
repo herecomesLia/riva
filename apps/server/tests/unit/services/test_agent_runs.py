@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from riva.agents.runtime.runs import AgentRunService, _serialize_payload
 from riva.schemas.interview_candidate_question import (
     InterviewCandidateCompletedFollowUpSnapshot,
     InterviewCandidateCompletedQuestionSnapshot,
@@ -39,7 +40,6 @@ from riva.schemas.question_generation import (
     QuestionGenerationWeaknessEvidence,
 )
 from riva.schemas.resume_parsing import ResumeParsingRunPayload
-from riva.services.agent_runs import AgentRunService, _serialize_payload
 from tests.unit.agents.test_interview_review import review_input
 from tests.unit.agents.test_interview_turn import turn_input
 

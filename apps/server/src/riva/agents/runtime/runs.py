@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.agents import AgentResult
+from riva.agents.base import AgentResult
 from riva.core.language import INTERACTION_LANGUAGES
 from riva.models import AgentRun, AgentRunStatus
 from riva.models.agent_runs import AgentRunPayload, AgentRunResult, JSONValue

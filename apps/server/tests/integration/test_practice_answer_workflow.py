@@ -10,6 +10,7 @@ from riva.agents import (
     PracticeEvaluationAgent,
     QuestionGenerationAgent,
 )
+from riva.agents.evaluation import practice_evaluation_idempotency_key
 from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import (
@@ -30,7 +31,6 @@ from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
-from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.services.practice_sessions import (
     PRACTICE_FOLLOW_UP_GENERATION_FAILED,
     PracticeSessionService,

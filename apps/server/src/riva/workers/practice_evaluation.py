@@ -6,12 +6,12 @@ from dataclasses import replace
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents import AgentResult, PracticeEvaluationAgent
-from riva.models import AgentRun, AgentRunStatus
-from riva.schemas.evaluation import PracticeEvaluationOutput
-from riva.services.evaluation_generation import (
+from riva.agents.evaluation import (
     EvaluationGenerationService,
     EvaluationGenerationStateError,
 )
+from riva.models import AgentRun, AgentRunStatus
+from riva.schemas.evaluation import PracticeEvaluationOutput
 from riva.workers.errors import AgentExecutionError
 from riva.workers.runtime import SessionFactory
 

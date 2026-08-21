@@ -11,6 +11,11 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents import AgentResult
+from riva.agents.runtime.runs import (
+    AgentRunLeaseError,
+    AgentRunResultMismatchError,
+    AgentRunService,
+)
 from riva.integrations import (
     InvalidStructuredOutputError,
     LLMProviderConfigurationError,
@@ -19,11 +24,6 @@ from riva.integrations import (
     StructuredOutputDiagnostics,
 )
 from riva.models import AgentRun, AgentRunStatus
-from riva.services.agent_runs import (
-    AgentRunLeaseError,
-    AgentRunResultMismatchError,
-    AgentRunService,
-)
 from riva.workers.errors import AgentExecutionError
 from riva.workers.handlers import AgentHandlerRegistry
 

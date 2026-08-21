@@ -10,6 +10,20 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.evaluation import (
+    EvaluationGenerationService,
+    EvaluationGenerationStateError,
+    practice_evaluation_idempotency_key,
+    practice_evaluation_output_from_artifact,
+    validate_evaluation_generation_run,
+)
+from riva.agents.follow_up import (
+    FollowUpGenerationService,
+    FollowUpGenerationStateError,
+    follow_up_output_from_persistence,
+    practice_follow_up_idempotency_key,
+    validate_follow_up_generation_run,
+)
 from riva.core.language import InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -61,20 +75,6 @@ from riva.schemas.question_cards import (
     QuestionCardQuestionType,
 )
 from riva.schemas.question_generation import QuestionGenerationRunPayload
-from riva.services.evaluation_generation import (
-    EvaluationGenerationService,
-    EvaluationGenerationStateError,
-    practice_evaluation_idempotency_key,
-    practice_evaluation_output_from_artifact,
-    validate_evaluation_generation_run,
-)
-from riva.services.follow_up_generation import (
-    FollowUpGenerationService,
-    FollowUpGenerationStateError,
-    follow_up_output_from_persistence,
-    practice_follow_up_idempotency_key,
-    validate_follow_up_generation_run,
-)
 from riva.services.practice_weaknesses import (
     PracticeWeaknessFocus,
     PracticeWeaknessService,

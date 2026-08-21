@@ -8,10 +8,10 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from riva.agents import AgentResult
+from riva.agents.runtime.runs import AgentRunLeaseError, AgentRunService
 from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import AgentRun, AgentRunStatus, User
-from riva.services.agent_runs import AgentRunLeaseError, AgentRunService
 from riva.workers import AgentHandlerRegistry, AgentWorker
 
 pytestmark = pytest.mark.integration

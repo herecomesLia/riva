@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.runtime.runs import AgentRunService
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -46,7 +47,6 @@ from riva.schemas.interview_turn import (
     InterviewTurnRunPayload,
     InterviewTurnSessionSnapshot,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.competency_ingestion import CompetencyIngestionService
 from riva.utils import utc_now
 
