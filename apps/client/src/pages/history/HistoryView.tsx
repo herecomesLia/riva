@@ -47,7 +47,7 @@ export function HistoryView({
       </header>
 
       <div
-        className="rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="outline-none"
         data-testid="history-state-region"
         ref={stateRegionRef}
         tabIndex={-1}

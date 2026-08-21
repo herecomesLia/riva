@@ -569,7 +569,9 @@ describe("PracticeView", () => {
       />,
     )
 
-    await waitFor(() => expect(screen.getByTestId("practice-state-region")).toHaveFocus())
+    const stateRegion = screen.getByTestId("practice-state-region")
+    await waitFor(() => expect(stateRegion).toHaveFocus())
+    expect(stateRegion).not.toHaveClass("focus-visible:ring-3", "focus-visible:ring-ring/50")
     expect(screen.getByTestId("practice-review-state")).toBeInTheDocument()
   })
 

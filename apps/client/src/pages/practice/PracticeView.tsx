@@ -216,7 +216,7 @@ export function PracticeView(props: PracticeViewProps) {
     <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
       <PracticeHeader />
       <div
-        className="min-w-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="min-w-0 outline-none"
         data-testid="practice-state-region"
         ref={stateRegionRef}
         tabIndex={-1}

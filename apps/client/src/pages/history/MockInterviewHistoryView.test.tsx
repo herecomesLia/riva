@@ -136,7 +136,9 @@ describe("MockInterviewHistoryView", () => {
         state={{ status: "notFound" }}
       />,
     )
-    expect(screen.getByTestId("mock-history-state-region")).toHaveFocus()
+    const stateRegion = screen.getByTestId("mock-history-state-region")
+    expect(stateRegion).toHaveFocus()
+    expect(stateRegion).not.toHaveClass("focus-visible:ring-3", "focus-visible:ring-ring/50")
     expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
     focusSpy.mockRestore()
     expect(

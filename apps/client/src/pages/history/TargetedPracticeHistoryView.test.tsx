@@ -196,7 +196,9 @@ describe("TargetedPracticeHistoryView", () => {
         state={{ status: "notFound" }}
       />,
     )
-    expect(screen.getByTestId("targeted-history-state-region")).toHaveFocus()
+    const stateRegion = screen.getByTestId("targeted-history-state-region")
+    expect(stateRegion).toHaveFocus()
+    expect(stateRegion).not.toHaveClass("focus-visible:ring-3", "focus-visible:ring-ring/50")
     expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
     focusSpy.mockRestore()
     const link = await screen.findByRole("button", {
