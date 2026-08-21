@@ -189,6 +189,7 @@ export const practice = {
   },
   referenceAnswer: {
     title: "RIVA 示例回答",
+    reviewTitle: "主问题示例回答",
     description: "在独立思考后查看一份用于比较表达方式和知识覆盖的参考。",
     kind: {
       personalizedExample: "个性化示例回答",

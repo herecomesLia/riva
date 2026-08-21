@@ -610,23 +610,23 @@ function PracticeReviewView({
       <p className="text-sm text-muted-foreground">
         {t("practice.review.attempt", { count: session.attemptNumber })}
       </p>
-      <PracticeScoreOverview
-        evaluation={session.evaluation}
-        overallPerformance={session.review.overallPerformance}
-      />
       <PracticeConversationTimeline
         followUpCompletion={session.followUpCompletion}
         followUpExchanges={session.followUpExchanges}
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
-      <PracticeFollowUpReview
-        completion={session.followUpCompletion}
-        exchanges={session.followUpExchanges}
+      <PracticeScoreOverview
+        evaluation={session.evaluation}
+        overallPerformance={session.review.overallPerformance}
       />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
       <PracticeReviewSummary review={session.review} />
       <PracticeReferenceAnswer mode="review" state={session.question.referenceAnswer} />
+      <PracticeFollowUpReview
+        completion={session.followUpCompletion}
+        exchanges={session.followUpExchanges}
+      />
       <PracticeReusableStructure items={session.review.reusableAnswerStructure} />
       <PracticeWeaknesses items={session.review.exposedWeaknesses} />
       <PracticeRecommendationCard recommendation={session.review.recommendation} />

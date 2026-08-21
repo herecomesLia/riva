@@ -201,6 +201,7 @@ export const practice = {
   },
   referenceAnswer: {
     title: "RIVA example answer",
+    reviewTitle: "Main Question Example Answer",
     description: "After thinking independently, compare your response with a useful example.",
     kind: {
       personalizedExample: "Personalized example answer",

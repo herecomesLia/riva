@@ -96,6 +96,26 @@ describe("PracticeReferenceAnswer", () => {
     expect(screen.getAllByRole("list")).toHaveLength(2)
   })
 
+  it("uses the main-question title and preserves review polling errors", () => {
+    renderWithProviders(
+      <PracticeReferenceAnswer
+        mode="review"
+        pollingError
+        state={{ status: "generating", content: null, viewedBeforeSubmission: false }}
+      />,
+      { router: false },
+    )
+
+    expect(
+      screen.getByRole("heading", {
+        name: i18n.t("practice.referenceAnswer.reviewTitle"),
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId("practice-reference-answer-polling-error")).toHaveTextContent(
+      i18n.t("practice.referenceAnswer.requestErrorDescription"),
+    )
+  })
+
   it("keeps confirmation available without an error when the interaction is ignored", async () => {
     const onRequest = vi.fn(async () => "ignored" as const)
     const user = userEvent.setup()

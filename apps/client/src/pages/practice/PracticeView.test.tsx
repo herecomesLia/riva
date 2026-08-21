@@ -1732,6 +1732,102 @@ describe("PracticeView", () => {
     expect(onRetryEvaluation).toHaveBeenCalledOnce()
   })
 
+  it("shows the main answer and scoring before the main question example and follow-up review", async () => {
+    const data = createPracticeMockResponse("reviewBalanced")
+    renderReadyView(data)
+    if (data.session.status !== "review") return
+
+    const timeline = await screen.findByTestId("practice-conversation-timeline")
+    const score = screen.getByTestId("practice-score-overview")
+    const dimensions = screen.getByTestId("practice-dimension-scores")
+    const summary = screen.getByTestId("practice-review-summary")
+    const reference = screen.getByTestId("practice-reference-answer")
+    const followUpReview = screen.getByTestId("practice-follow-up-review")
+    const orderedSections = [timeline, score, dimensions, summary, reference, followUpReview]
+
+    expect(timeline).toHaveTextContent(data.session.mainAnswer.content)
+    expect(
+      within(reference).getByRole("heading", {
+        name: i18n.t("practice.referenceAnswer.reviewTitle"),
+      }),
+    ).toBeInTheDocument()
+    for (let index = 0; index < orderedSections.length - 1; index += 1) {
+      expect(
+        orderedSections[index]!.compareDocumentPosition(orderedSections[index + 1]!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
+  })
+
+  it("keeps every follow-up reference supplement scoped to its own review item", async () => {
+    const user = userEvent.setup()
+    const data = createPracticeMockResponse("reviewBalanced")
+    renderReadyView(data)
+    if (data.session.status !== "review") return
+
+    const followUpReview = await screen.findByTestId("practice-follow-up-review")
+    const items = [...followUpReview.querySelectorAll("article")]
+    expect(items).toHaveLength(data.session.followUpExchanges.length)
+
+    for (const [index, exchange] of data.session.followUpExchanges.entries()) {
+      const reference = exchange.question.referenceAnswer
+      if (reference.status !== "revealed") throw new Error("Revealed follow-up reference required.")
+      const item = items[index]!
+      await user.click(
+        within(item).getByRole("button", {
+          name: i18n.t("practice.followUpReview.expandReference"),
+        }),
+      )
+      expect(item).toHaveTextContent(reference.content.addressedGap)
+      expect(item).toHaveTextContent(reference.content.answer)
+      if (data.session.question.referenceAnswer.status === "revealed") {
+        expect(item).not.toHaveTextContent(data.session.question.referenceAnswer.content.answer)
+      }
+    }
+  })
+
+  it("shows the main question example when no follow-up was required", async () => {
+    const data = createPracticeMockResponse("reviewMotivation")
+    renderReadyView(data)
+    if (data.session.status !== "review") return
+
+    const reference = await screen.findByTestId("practice-reference-answer")
+    expect(reference).toHaveTextContent(i18n.t("practice.referenceAnswer.reviewTitle"))
+    expect(screen.queryByTestId("practice-follow-up-review")).not.toBeInTheDocument()
+  })
+
+  it("keeps main question example loading and unavailable states visible in review", async () => {
+    const generating = createPracticeMockResponse("reviewMotivation")
+    if (generating.session.status !== "review") return
+    generating.session.question.referenceAnswer = {
+      status: "generating",
+      content: null,
+      viewedBeforeSubmission: false,
+    }
+    const { unmount } = renderReadyView(generating)
+
+    let reference = await screen.findByTestId("practice-reference-answer")
+    expect(within(reference).getByRole("status")).toHaveTextContent(
+      i18n.t("practice.referenceAnswer.generating"),
+    )
+    unmount()
+
+    const unavailable = createPracticeMockResponse("reviewMotivation")
+    if (unavailable.session.status !== "review") return
+    unavailable.session.question.referenceAnswer = {
+      status: "unavailable",
+      content: null,
+      viewedBeforeSubmission: false,
+    }
+    renderReadyView(unavailable)
+
+    reference = await screen.findByTestId("practice-reference-answer")
+    expect(within(reference).getByRole("status")).toHaveTextContent(
+      i18n.t("practice.referenceAnswer.unavailable"),
+    )
+    expect(reference).toHaveTextContent(i18n.t("practice.referenceAnswer.reviewTitle"))
+  })
+
   it("renders all eight score dimensions with response explanations", async () => {
     const data = createPracticeMockResponse("reviewBalanced")
     renderReadyView(data)

@@ -78,7 +78,13 @@ export function PracticeReferenceAnswer(props: Props) {
     <Card className="min-w-0" data-testid="practice-reference-answer">
       <CardHeader>
         <CardTitle>
-          <h2>{t("practice.referenceAnswer.title")}</h2>
+          <h2>
+            {t(
+              mode === "review"
+                ? "practice.referenceAnswer.reviewTitle"
+                : "practice.referenceAnswer.title",
+            )}
+          </h2>
         </CardTitle>
         <CardDescription>{t("practice.referenceAnswer.description")}</CardDescription>
       </CardHeader>
