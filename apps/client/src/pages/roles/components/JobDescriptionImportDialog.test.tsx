@@ -71,8 +71,8 @@ describe("JobDescriptionImportDialog", () => {
 
     await submitJobDescription(parsing.rawText)
 
-    const readyTitle = await screen.findByText(i18n.t("roles.import.ready.title"))
-    const dialog = readyTitle.closest('[role="dialog"]')!
+    await screen.findByText(i18n.t("roles.import.ready.title"))
+    const dialog = screen.getByRole("dialog")
     expect(getDraft).toHaveBeenCalledWith(parsing.id)
     expect(dialog).toHaveTextContent(ready.parsedCompany!)
     expect(dialog).toHaveTextContent(ready.parsedTitle!)

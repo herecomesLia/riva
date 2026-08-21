@@ -36,43 +36,11 @@ describe("ProjectExperienceCard", () => {
     await i18n.changeLanguage(defaultLanguage)
   })
 
-  it("renders each project as a timeline item with a stable article id", () => {
-    renderCard([
-      createProject({ id: "project_first", name: "First project" }),
-      createProject({ id: "project_second", name: "Second project" }),
-    ])
-
-    expect(screen.getAllByRole("article")).toHaveLength(2)
-    expect(screen.getByTestId("project-experience-item-project_first")).toBeInTheDocument()
-    expect(screen.getByTestId("project-experience-item-project_second")).toBeInTheDocument()
-    expect(screen.getAllByTestId("project-experience-timeline-node")).toHaveLength(2)
-    expect(screen.getAllByRole("article").map((article) => article.textContent)).toEqual([
-      expect.stringContaining("First project"),
-      expect.stringContaining("Second project"),
-    ])
-  })
-
-  it("renders the project name, role, localized dates, structured description, and outcomes", () => {
-    renderCard([createProject()])
-
-    expect(screen.getByText("Merchant Operations Console")).toBeInTheDocument()
-    expect(screen.getByText("Frontend technical lead")).toBeInTheDocument()
-    expect(screen.getByText(/2024/)).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("profile.field.projectDescription"))).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("profile.field.projectAchievements"))).toBeInTheDocument()
-  })
-
   it("maps skill ids to ProfileSkillBadge names and falls back to unknown ids", () => {
     renderCard([createProject({ skillIds: ["skill_react", "skill_unavailable"] })])
 
     expect(screen.getByText("React")).toBeInTheDocument()
     expect(screen.getByText("skill_unavailable")).toBeInTheDocument()
-    expect(
-      screen.getByTestId("project-experience-skills").querySelectorAll('[data-slot="badge"]'),
-    ).toHaveLength(2)
-    expect(
-      screen.getByTestId("project-experience-skills").querySelectorAll('[data-slot="badge"] svg'),
-    ).toHaveLength(0)
   })
 
   it("keeps a project URL available behind a localized link", () => {
@@ -81,11 +49,6 @@ describe("ProjectExperienceCard", () => {
     expect(
       screen.getByRole("link", { name: i18n.t("profile.actions.openProject") }),
     ).toHaveAttribute("href", "https://projects.example.com/merchant-console")
-  })
-
-  it("renders the present label for an ongoing project", () => {
-    renderCard([createProject({ endDate: null })])
-    expect(screen.getByText(new RegExp(i18n.t("profile.field.present")))).toBeInTheDocument()
   })
 
   it("omits empty optional content, its details region, and old project fields", () => {

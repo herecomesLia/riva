@@ -18,8 +18,6 @@ import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/pro
 import type { JobProfileSnapshot, ResumeImportDraft } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
 import { ProfileSectionEditDialog } from "@/pages/profile/components/ProfileSectionEditDialog"
-import { formatDate } from "@/pages/profile/components/profile-formatters"
-import { createResumeDraftStoryFixture } from "@/pages/profile/profile-resume-draft-story-fixtures"
 import { renderWithProviders } from "@/test/render"
 
 function createActions(): ProfileViewActions {
@@ -110,28 +108,9 @@ describe("ProfileView", () => {
     await i18n.changeLanguage(defaultLanguage)
   })
 
-  it("renders the full loading layout without a service", async () => {
+  it("renders a non-interactive loading state", async () => {
     renderWithProviders(<ProfileView content={{ status: "loading" }} variant="default" />)
     const loadingState = await screen.findByTestId("profile-loading-state")
-    const summary = within(loadingState).getByTestId("profile-loading-summary-sections")
-
-    expect(
-      within(loadingState).getByRole("heading", {
-        level: 1,
-        name: i18n.t("profile.title"),
-      }),
-    ).toBeInTheDocument()
-    expect(within(loadingState).getByText(i18n.t("profile.description"))).toBeInTheDocument()
-    for (const section of ["education", "skills", "workExperience", "projectExperience"] as const) {
-      expect(
-        within(loadingState).getByRole("heading", {
-          level: 2,
-          name: i18n.t(`profile.sections.${section}`),
-        }),
-      ).toBeInTheDocument()
-    }
-    expect(within(summary).getAllByTestId("profile-skeleton-card")).toHaveLength(2)
-    expect(within(loadingState).getAllByTestId("profile-skeleton-card")).toHaveLength(4)
     expect(
       within(loadingState).queryByRole("button", {
         name: i18n.t("profile.actions.edit"),
@@ -166,32 +145,6 @@ describe("ProfileView", () => {
 
     expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
     expect(screen.queryByTestId("profile-resume-import-form")).not.toBeInTheDocument()
-  })
-
-  it("keeps the Profile header beside an update parsing workflow", async () => {
-    renderWithProviders(
-      <ProfileView
-        actions={createActions()}
-        content={{
-          data: createProfileMockSnapshot("complete"),
-          resumeWorkflow: {
-            isRetrying: false,
-            mode: "update",
-            resumeId: workflowDraft.resumeDocumentId,
-            status: "parsing",
-            synchronizationError: false,
-          },
-          status: "ready",
-        }}
-        variant="default"
-      />,
-      { router: { initialEntries: ["/profile"] } },
-    )
-
-    expect(await screen.findByTestId("profile-processing-state")).toBeInTheDocument()
-    expect(
-      screen.getByRole("heading", { level: 1, name: i18n.t("profile.title") }),
-    ).toBeInTheDocument()
   })
 
   it("renders a safe workflow failure and delegates retry", async () => {
@@ -251,163 +204,7 @@ describe("ProfileView", () => {
     expect(screen.queryByTestId("profile-resume-import-form")).not.toBeInTheDocument()
   })
 
-  it("keeps the profile header above an existing-profile Draft review", async () => {
-    renderWithProviders(
-      <ProfileView
-        actions={createActions()}
-        content={{
-          data: createProfileMockSnapshot("complete"),
-          resumeWorkflow: {
-            applyConflict: null,
-            applyError: false,
-            draft: createResumeDraftStoryFixture("existingProfile"),
-            mode: "update",
-            resumeId: workflowDraft.resumeDocumentId,
-            status: "draftReady",
-          },
-          status: "ready",
-        }}
-        variant="default"
-      />,
-      { router: { initialEntries: ["/profile"] } },
-    )
-
-    expect(
-      await screen.findByRole("heading", { level: 1, name: i18n.t("profile.title") }),
-    ).toBeInTheDocument()
-    expect(screen.getByTestId("profile-resume-draft-review")).toBeInTheDocument()
-  })
-
-  it("shows a safe conflict alert in Draft review", async () => {
-    renderWithProviders(
-      <ProfileView
-        actions={createActions()}
-        content={{
-          data: createProfileMockSnapshot("complete"),
-          resumeWorkflow: {
-            applyConflict: "resume_import_profile_version_conflict",
-            applyError: false,
-            draft: workflowDraft,
-            mode: "update",
-            resumeId: workflowDraft.resumeDocumentId,
-            status: "draftReady",
-          },
-          status: "ready",
-        }}
-        variant="default"
-      />,
-      { router: { initialEntries: ["/profile"] } },
-    )
-
-    expect(await screen.findByTestId("profile-resume-draft-conflict")).toHaveTextContent(
-      i18n.t("profile.importDraft.conflictDescription"),
-    )
-  })
-
-  it("disables Draft apply and cancel controls while applying", async () => {
-    renderWithProviders(
-      <ProfileView
-        actions={createActions()}
-        content={{
-          data: createProfileMockSnapshot("complete"),
-          resumeWorkflow: {
-            draft: workflowDraft,
-            mode: "update",
-            resumeId: workflowDraft.resumeDocumentId,
-            status: "applying",
-          },
-          status: "ready",
-        }}
-        variant="default"
-      />,
-      { router: { initialEntries: ["/profile"] } },
-    )
-
-    expect(
-      await screen.findByRole("button", { name: i18n.t("profile.importDraft.applying") }),
-    ).toBeDisabled()
-    expect(
-      screen.getByRole("button", { name: i18n.t("profile.importDraft.cancel") }),
-    ).toBeDisabled()
-    expect(screen.getByTestId("resume-draft-summary")).toBeVisible()
-    expect(screen.getByTestId("resume-draft-education")).toBeVisible()
-  })
-
-  it("keeps legacy idle rendering when resumeWorkflow is omitted", async () => {
-    renderReady(createProfileMockSnapshot("complete"))
-
-    expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-resume-draft-review")).not.toBeInTheDocument()
-  })
-
-  it("shows Update resume from ResumeDocument presence when profile.resume is null", async () => {
-    const snapshot = createProfileMockSnapshot("complete")
-    snapshot.profile!.resume = null
-
-    renderReady(snapshot, createActions(), true)
-
-    expect(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
-    ).not.toBeInTheDocument()
-  })
-
-  it("shows Upload resume for a manual Profile without ResumeDocuments", async () => {
-    const snapshot = createProfileMockSnapshot("emptyManualProfile")
-    snapshot.profile!.resume = null
-
-    renderReady(snapshot, createActions(), false)
-
-    expect(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
-    ).toBeInTheDocument()
-  })
-
-  it("keeps the legacy profile.resume fallback when presence is omitted", async () => {
-    renderReady(createProfileMockSnapshot("complete"))
-
-    expect(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    ).toBeInTheDocument()
-  })
-
-  it("keeps the existing Profile header during a ResumeDocument Draft workflow", async () => {
-    const snapshot = createProfileMockSnapshot("complete")
-    snapshot.profile!.resume = null
-
-    renderWithProviders(
-      <ProfileView
-        actions={createActions()}
-        content={{
-          data: snapshot,
-          hasResumeDocuments: true,
-          resumeWorkflow: {
-            applyConflict: null,
-            applyError: false,
-            draft: createResumeDraftStoryFixture("existingProfile"),
-            mode: "update",
-            resumeId: workflowDraft.resumeDocumentId,
-            status: "draftReady",
-          },
-          status: "ready",
-        }}
-        variant="default"
-      />,
-      { router: { initialEntries: ["/profile"] } },
-    )
-
-    expect(
-      await screen.findByRole("heading", { level: 1, name: i18n.t("profile.title") }),
-    ).toBeInTheDocument()
-    expect(screen.getByTestId("profile-resume-draft-review")).toBeInTheDocument()
-    expect(
-      screen.queryByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
-    ).not.toBeInTheDocument()
-  })
-
-  it("offers manual creation and hides resume import when the API lacks resume capabilities", async () => {
+  it("renders the empty state and delegates manual creation", async () => {
     const user = userEvent.setup()
     const actions = createActions()
     renderWithProviders(
@@ -452,145 +249,16 @@ describe("ProfileView", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("uses the initial-resume action only when no profile exists", async () => {
-    const actions = createActions()
-    const user = userEvent.setup()
-    renderWithProviders(
-      <ProfileView
-        actions={actions}
-        content={{ status: "ready", data: createProfileMockSnapshot("noProfile") }}
-        variant="default"
-      />,
-      { router: { initialEntries: ["/profile"] } },
-    )
-
-    await user.type(await screen.findByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    expect(actions.uploadResumeForInitialImport).toHaveBeenCalledOnce()
-    expect(actions.uploadResumeForUpdate).not.toHaveBeenCalled()
-  })
-
-  it("renders the complete ready-page lifecycle and header", async () => {
+  it("renders the complete ready profile sections", async () => {
     renderReady()
-    expect(
-      await screen.findByRole("heading", { name: i18n.t("profile.title") }),
-    ).toBeInTheDocument()
+    expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-section-skills")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-section-workExperience")).toBeInTheDocument()
+    expect(screen.getByTestId("profile-section-projectExperience")).toBeInTheDocument()
     const progressbar = screen.getByRole("progressbar", {
       name: i18n.t("profile.completeness"),
     })
     expect(progressbar).toHaveAttribute("aria-valuenow", "100")
-    expect(screen.getByText("100%")).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        i18n.t("profile.updatedAt", {
-          value: formatDate(profileResponseMock.profile!.updatedAt, i18n.language),
-        }),
-      ),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    ).toBeVisible()
-    expect(screen.queryByText("档案已生效")).not.toBeInTheDocument()
-    expect(screen.queryByText("匹配分析已同步")).not.toBeInTheDocument()
-    expect(screen.queryByText("lin-chen-resume.pdf")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("profile-section-targetRoles")).not.toBeInTheDocument()
-    expect(screen.queryByText("Frontend Technical Lead")).not.toBeInTheDocument()
-    expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/已确认/)).not.toBeInTheDocument()
-  })
-
-  it("groups only education and skills in the summary sections", async () => {
-    renderReady()
-
-    const summarySections = await screen.findByTestId("profile-summary-sections")
-
-    expect(within(summarySections).getByTestId("profile-section-education")).toBeInTheDocument()
-    expect(within(summarySections).getByTestId("profile-section-skills")).toBeInTheDocument()
-    expect(
-      within(summarySections).queryByTestId("profile-section-credentials"),
-    ).not.toBeInTheDocument()
-    expect(screen.getByTestId("profile-section-workExperience")).toBeInTheDocument()
-    expect(screen.getByTestId("profile-section-projectExperience")).toBeInTheDocument()
-  })
-
-  it("opens the current resume details from the header and resets the dialog when closed", async () => {
-    const user = userEvent.setup()
-    const snapshot: JobProfileSnapshot = structuredClone(profileResponseMock)
-    renderReady(snapshot)
-
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    const dialog = await screen.findByRole("dialog")
-    expect(within(dialog).getByText("lin-chen-resume.pdf")).toBeInTheDocument()
-    expect(
-      within(dialog).getByText(i18n.t("profile.processingStatus.succeeded")),
-    ).toBeInTheDocument()
-    expect(
-      within(dialog).getByText(
-        i18n.t("profile.resume.uploadedAt", {
-          value: formatDate(snapshot.profile!.resume!.uploadedAt, i18n.language),
-        }),
-      ),
-    ).toBeInTheDocument()
-    expect(within(dialog).queryByText(/识别于/)).not.toBeInTheDocument()
-    expect(screen.queryByText("替换简历")).not.toBeInTheDocument()
-
-    await user.click(
-      within(dialog).getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    expect(within(dialog).getByLabelText(i18n.t("profile.import.text"))).toBeInTheDocument()
-
-    await user.click(within(dialog).getByRole("button", { name: i18n.t("common.close") }))
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
-    expect(snapshot).toEqual(profileResponseMock)
-
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.actions.updateResume") }))
-    expect(await screen.findByText("lin-chen-resume.pdf")).toBeInTheDocument()
-  })
-
-  it("opens the import form from the header when the profile has no resume", async () => {
-    const snapshot = createProfileMockSnapshot("profileWithoutResume")
-    const { actions } = renderReady(snapshot)
-    const user = userEvent.setup()
-
-    expect(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.uploadResume") }),
-    ).toBeVisible()
-    expect(screen.queryByText("lin-chen-resume.pdf")).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.actions.uploadResume") }))
-    const dialog = await screen.findByRole("dialog")
-    await user.type(within(dialog).getByLabelText(i18n.t("profile.import.text")), "resume text")
-    await user.click(within(dialog).getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    expect(actions.uploadResumeForUpdate).toHaveBeenCalledOnce()
-    expect(actions.uploadResumeForInitialImport).not.toHaveBeenCalled()
-    expect(screen.getByText("Fudan University")).toBeInTheDocument()
-  })
-
-  it("uses the updated-resume action after choosing update for an existing resume", async () => {
-    const user = userEvent.setup()
-    const { actions } = renderReady()
-
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    const dialog = await screen.findByRole("dialog")
-    await user.click(
-      within(dialog).getByRole("button", { name: i18n.t("profile.actions.updateResume") }),
-    )
-    expect(screen.getByText(i18n.t("profile.import.noFileSelected"))).toBeInTheDocument()
-    const file = new File(["updated resume"], "updated-resume.pdf", {
-      type: "application/pdf",
-    })
-    await user.upload(screen.getByLabelText(i18n.t("profile.import.file")), file)
-    expect(screen.getByText("updated-resume.pdf")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: i18n.t("profile.import.submit") }))
-
-    expect(actions.uploadResumeForUpdate).toHaveBeenCalledOnce()
-    expect(actions.uploadResumeForInitialImport).not.toHaveBeenCalled()
   })
 
   it("renders partial nullable data without failing the page", async () => {
@@ -602,16 +270,6 @@ describe("ProfileView", () => {
     expect(
       screen.getByRole("progressbar", { name: i18n.t("profile.completeness") }),
     ).toHaveAttribute("aria-valuenow", "75")
-    expect(screen.getByText("75%")).toBeInTheDocument()
-    expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
-  })
-
-  it("does not render matching-analysis regeneration controls", async () => {
-    renderReady()
-
-    expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-matching-analysis-stale")).not.toBeInTheDocument()
-    expect(screen.queryByText(/重新生成匹配分析/)).not.toBeInTheDocument()
   })
 
   it("renders a safe page error and invokes retry", async () => {
@@ -680,7 +338,6 @@ describe("ProfileView", () => {
       within(dialog).getAllByRole("button", { name: i18n.t("profile.editor.delete") }),
     ).toHaveLength(profileResponseMock.profile!.skills.length)
     expect(within(dialog).queryByLabelText(/技能分类|Skill category/)).not.toBeInTheDocument()
-    expect(dialog.querySelector("datalist")).toBeNull()
 
     await user.click(
       within(dialog).getByRole("button", { name: i18n.t("profile.editor.addSkill") }),

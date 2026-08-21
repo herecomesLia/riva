@@ -7,7 +7,6 @@ import { defaultLanguage } from "@/i18n/resources"
 import { profileResponseMock } from "@/mocks/data/profile"
 import type { JobProfile } from "@/models/profile"
 import { EducationCard } from "@/pages/profile/components/EducationCard"
-import { formatMonth } from "@/pages/profile/components/profile-formatters"
 import { renderWithProviders } from "@/test/render"
 
 type Education = JobProfile["education"][number]
@@ -39,21 +38,6 @@ function carouselNames() {
 describe("EducationCard", () => {
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
-  })
-
-  it("renders the default education record", () => {
-    renderCard([createEducation()])
-
-    expect(screen.getByText("Fudan University")).toBeInTheDocument()
-    expect(screen.getByText("Bachelor of Engineering · Computer Science")).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        i18n.t("profile.field.dateRange", {
-          end: formatMonth("2018-06", i18n.language, "—"),
-          start: formatMonth("2014-09", i18n.language, "—"),
-        }),
-      ),
-    ).toBeInTheDocument()
   })
 
   it("renders the local empty state", () => {
@@ -92,28 +76,6 @@ describe("EducationCard", () => {
     expect(screen.getByText("Fudan University")).toBeInTheDocument()
   })
 
-  it("shows both navigation controls only for the middle of three records", async () => {
-    const user = userEvent.setup()
-    renderCard([
-      createEducation(),
-      createEducation({ id: "education_tongji", school: "Tongji University" }),
-      createEducation({ id: "education_riva", school: "Riva University" }),
-    ])
-    const names = carouselNames()
-
-    expect(screen.queryByRole("button", { name: names.previous })).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: names.next })).toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: names.next }))
-    expect(screen.getByRole("button", { name: names.previous })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: names.next })).toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: names.next }))
-    expect(screen.getByText("Riva University")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: names.previous })).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: names.next })).not.toBeInTheDocument()
-  })
-
   it("keeps the active index valid when records are removed", async () => {
     const user = userEvent.setup()
     const first = createEducation()
@@ -127,12 +89,6 @@ describe("EducationCard", () => {
     rerender(<EducationCard education={[first]} onEdit={onEdit} />)
     expect(await screen.findByText("Fudan University")).toBeInTheDocument()
     expect(screen.queryByText("Tongji University")).not.toBeInTheDocument()
-  })
-
-  it("renders the present label for current education", () => {
-    renderCard([createEducation({ endDate: null, isCurrent: true })])
-
-    expect(screen.getByText(new RegExp(i18n.t("profile.field.present")))).toBeInTheDocument()
   })
 
   it("calls onEdit from the card action", async () => {

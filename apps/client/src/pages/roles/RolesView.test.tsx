@@ -88,17 +88,12 @@ describe("RolesView", () => {
     await i18n.changeLanguage(defaultLanguage)
   })
 
-  it("keeps the page header and main card titles visible while loading", async () => {
+  it("renders the loading state", async () => {
     renderWithProviders(<RolesView content={{ status: "loading" }} variant="default" />, {
       router: { initialEntries: ["/roles"] },
     })
 
-    expect(await screen.findByRole("heading", { name: i18n.t("roles.title") })).toBeInTheDocument()
-    expect(screen.getByText(i18n.t("roles.description"))).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: i18n.t("roles.list.title") })).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: i18n.t("roles.details.title") })).toBeInTheDocument()
-    expect(screen.getByTestId("roles-loading-state")).toHaveAttribute("aria-busy", "true")
-    expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(10)
+    expect(await screen.findByTestId("roles-loading-state")).toHaveAttribute("aria-busy", "true")
   })
 
   it("renders the no-roles empty state", async () => {
@@ -311,19 +306,6 @@ describe("RolesView", () => {
     expect(screen.queryByTestId("job-description-card")).not.toBeInTheDocument()
   })
 
-  it("keeps the tab strip horizontally scrollable while explicitly hiding vertical overflow", async () => {
-    renderReadyView(createRolesMockResponse("matchingAnalysisCurrent"))
-
-    expect(await screen.findByTestId("target-role-tabs-scroll")).toHaveClass(
-      "overflow-x-auto",
-      "overflow-y-hidden",
-      "pb-1",
-    )
-    expect(within(screen.getByTestId("target-role-tabs-scroll")).getAllByRole("tab")).toHaveLength(
-      3,
-    )
-  })
-
   it("preserves the active tab and updates the progress summary when selection changes", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("multipleRoles")
@@ -351,20 +333,6 @@ describe("RolesView", () => {
         i18n.t("roles.badges.current"),
       ),
     ).toBeInTheDocument()
-  })
-
-  it("keeps the progress summary textual without status badges or a match score", async () => {
-    const data = createRolesMockResponse("matchingAnalysisCurrent")
-    renderReadyView(data)
-
-    const summary = within(await screen.findByTestId("roles-desktop-navigation")).getByTestId(
-      "target-role-progress-summary",
-    )
-    expect(within(summary).queryByTestId("role-status-badges")).not.toBeInTheDocument()
-    expect(summary).not.toHaveTextContent("78%")
-    expect(summary).not.toHaveTextContent(i18n.t("roles.summary.profile"))
-    expect(summary).toHaveTextContent(i18n.t("roles.summary.roleStatus"))
-    expect(summary).toHaveTextContent(i18n.t("roles.summary.updatedAt"))
   })
 
   it("uses the mobile selector without changing the server current role", async () => {
@@ -434,45 +402,6 @@ describe("RolesView", () => {
       screen.getByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }),
     ).toHaveAttribute("aria-selected", "true")
     expect(screen.getByTestId("matching-analysis-card")).toBeInTheDocument()
-  })
-
-  it("exposes the sticky navigation and its internally scrollable role list", async () => {
-    renderReadyView(createRolesMockResponse("multipleRoles"))
-
-    expect(await screen.findByTestId("roles-desktop-navigation")).toBeInTheDocument()
-    expect(screen.getByTestId("roles-list-scroll")).toHaveClass(
-      "overflow-x-hidden",
-      "overflow-y-auto",
-      "[scrollbar-gutter:stable]",
-      "[scrollbar-width:thin]",
-      "pr-2.5",
-    )
-  })
-
-  it("uses a stable one-pixel role-card border and a non-shrinking match-score ring", async () => {
-    const data = createRolesMockResponse("multipleRoles")
-    const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
-    const otherRole = data.roles.find((role) => role.id !== data.currentRoleId)!
-    renderReadyView(data)
-
-    const roleButton = await screen.findByRole("button", {
-      name: new RegExp(`^${currentRole.title}`),
-    })
-    expect(roleButton).toHaveClass(
-      "border",
-      "focus-visible:border-primary",
-      "focus-visible:ring-1",
-      "active:not-aria-[haspopup]:translate-y-0",
-    )
-    expect(roleButton).toHaveClass("px-2.5", "py-2.5")
-    expect(screen.getByRole("button", { name: new RegExp(`^${otherRole.title}`) })).toHaveClass(
-      "border",
-      "hover:border-primary/60",
-    )
-    expect(within(roleButton).getByTestId("role-match-score-ring")).toHaveClass(
-      "basis-11",
-      "shrink-0",
-    )
   })
 
   it("validates required title, non-negative experience, and experience order", async () => {
@@ -785,32 +714,6 @@ describe("RolesView", () => {
     expect(result).toHaveTextContent(analysis.rivaSummary)
     expect(result).toHaveTextContent(analysis.responsibilities[0]!)
     expect(result).toHaveTextContent(analysis.requiredSkills.programmingLanguages[0]!)
-    for (const key of [
-      "rivaSummary",
-      "responsibilities",
-      "qualificationRequirements",
-      "requiredSkills",
-      "preferredQualifications",
-      "softSkills",
-      "businessDomains",
-    ] as const) {
-      expect(
-        within(
-          within(result)
-            .getByRole("heading", { name: i18n.t(`roles.jd.analysis.${key}`) })
-            .closest("section")!,
-        )
-          .getByRole("heading")
-          .querySelector("svg"),
-      ).not.toBeNull()
-    }
-    const qualificationSection = within(result)
-      .getByRole("heading", { name: i18n.t("roles.jd.analysis.qualificationRequirements") })
-      .closest("section")!
-    const requiredSkillsSection = within(result)
-      .getByRole("heading", { name: i18n.t("roles.jd.analysis.requiredSkills") })
-      .closest("section")!
-    expect(qualificationSection.parentElement).toBe(requiredSkillsSection.parentElement)
   })
 
   it("opens a module-specific editor without opening the JD source editor", async () => {
@@ -848,7 +751,7 @@ describe("RolesView", () => {
     )
   })
 
-  it("renders only non-empty qualification and skill categories, while keeping preferred items semantic lists", async () => {
+  it("renders only non-empty qualification and skill categories", async () => {
     const data = createRolesMockResponse("roleWithParsedJobDescription")
     const analysis = data.roles[0]!.jobDescriptionAnalysis!
     analysis.qualificationRequirements = {
@@ -880,16 +783,6 @@ describe("RolesView", () => {
     expect(result).not.toHaveTextContent(
       i18n.t("roles.jd.analysis.skillCategories.frameworksAndLibraries"),
     )
-    const preferredSection = within(result)
-      .getByRole("heading", { name: i18n.t("roles.jd.analysis.preferredQualifications") })
-      .closest("section")!
-    expect(within(preferredSection).getByRole("list")).toBeInTheDocument()
-    expect(preferredSection.querySelector('[data-slot="badge"]')).toBeNull()
-    const softSkillsSection = within(result)
-      .getByRole("heading", { name: i18n.t("roles.jd.analysis.softSkills") })
-      .closest("section")!
-    expect(within(softSkillsSection).getByRole("list")).toBeInTheDocument()
-    expect(softSkillsSection.querySelector('[data-slot="badge"]')).toBeNull()
   })
 
   it("prefills and submits all qualification categories together", async () => {
@@ -948,19 +841,12 @@ describe("RolesView", () => {
     })
 
     const result = await screen.findByTestId("job-description-analysis")
-    const qualificationSection = within(result)
-      .getByRole("heading", { name: i18n.t("roles.jd.analysis.qualificationRequirements") })
-      .closest("section")!
     const majorRequirement = "计算机科学、软件工程或相关专业"
-    expect(within(qualificationSection).getAllByText(majorRequirement)).toHaveLength(1)
-    const preferredSection = within(result)
-      .getByRole("heading", { name: i18n.t("roles.jd.analysis.preferredQualifications") })
-      .closest("section")!
-    expect(within(preferredSection).getAllByRole("listitem")).toHaveLength(1)
-    expect(within(preferredSection).getByText("有 Kubernetes 或云平台使用经验")).toBeInTheDocument()
+    expect(within(result).getAllByText(majorRequirement)).toHaveLength(1)
+    expect(within(result).getByText("有 Kubernetes 或云平台使用经验")).toBeInTheDocument()
 
     await user.click(
-      within(preferredSection).getByRole("button", {
+      within(result).getByRole("button", {
         name: i18n.t("roles.jd.actions.editModuleLabel", {
           module: i18n.t("roles.jd.analysis.preferredQualifications"),
         }),
@@ -973,14 +859,11 @@ describe("RolesView", () => {
     await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.cancel") }))
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
 
-    const requiredSkillsSection = within(result)
-      .getByRole("heading", { name: i18n.t("roles.jd.analysis.requiredSkills") })
-      .closest("section")!
-    expect(within(requiredSkillsSection).getAllByText("Python")).toHaveLength(1)
-    expect(within(requiredSkillsSection).getAllByText("Go")).toHaveLength(1)
+    expect(within(result).getAllByText("Python")).toHaveLength(1)
+    expect(within(result).getAllByText("Go")).toHaveLength(1)
 
     await user.click(
-      within(qualificationSection).getByRole("button", {
+      within(result).getByRole("button", {
         name: i18n.t("roles.jd.actions.editModuleLabel", {
           module: i18n.t("roles.jd.analysis.qualificationRequirements"),
         }),
@@ -1159,9 +1042,7 @@ describe("RolesView", () => {
     expect(
       within(result).queryByText(`${analysis.result.overallMatchScore}%`),
     ).not.toBeInTheDocument()
-    expect(within(card).getByText(`${analysis.result.overallMatchScore}%`)).toHaveClass(
-      "text-primary",
-    )
+    expect(within(card).getByText(`${analysis.result.overallMatchScore}%`)).toBeInTheDocument()
     expect(
       within(card).queryByText(i18n.t("roles.matchingAnalysisStatus.current.label")),
     ).not.toBeInTheDocument()

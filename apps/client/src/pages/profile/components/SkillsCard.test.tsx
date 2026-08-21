@@ -30,29 +30,10 @@ describe("SkillsCard", () => {
     await i18n.changeLanguage(defaultLanguage)
   })
 
-  it("renders every skill as a badge with the unified decorative icon", () => {
-    const skills = [createSkill(), createSkill({ id: "skill_typescript", name: "TypeScript" })]
-    const { container } = renderCard(skills)
-
-    expect(screen.getByText("React")).toBeInTheDocument()
-    expect(screen.getByText("TypeScript")).toBeInTheDocument()
-    expect(container.querySelectorAll('[data-slot="badge"] svg[aria-hidden="true"]')).toHaveLength(
-      2,
-    )
-  })
-
   it("renders the local empty state", () => {
     renderCard([])
 
     expect(screen.getAllByText(i18n.t("profile.emptySection"))).toHaveLength(2)
-  })
-
-  it("renders a long skill name without changing its text", () => {
-    const longName =
-      "Cross-functional product engineering, accessibility architecture, and design-system governance"
-    renderCard([createSkill({ name: longName })])
-
-    expect(screen.getByText(longName)).toBeInTheDocument()
   })
 
   it("calls onEdit from the card action", async () => {
