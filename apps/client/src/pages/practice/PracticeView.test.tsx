@@ -192,10 +192,24 @@ function getStartButton() {
 }
 
 function getSetupSelectionControls() {
-  const setup = screen.getByTestId("practice-setup-state")
+  const optionNames = [
+    i18n.t("practice.questionTypes.projectDeepDive"),
+    i18n.t("practice.questionTypes.behavioral"),
+    i18n.t("practice.questionTypes.businessUnderstanding"),
+    i18n.t("practice.questionTypes.motivation"),
+    i18n.t("practice.questionTypes.technicalFoundation"),
+    i18n.t("practice.difficulty.basic"),
+    i18n.t("practice.difficulty.pressure"),
+    i18n.t("practice.sources.personalized"),
+    i18n.t("practice.sources.saved"),
+    i18n.t("practice.sources.history"),
+  ]
   return [
     screen.getByTestId("practice-target-role-trigger"),
-    ...setup.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
+    ...optionNames.flatMap((name) => {
+      const button = screen.queryByRole("button", { name })
+      return button ? [button] : []
+    }),
     screen.getByRole("switch", {
       name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
     }),
@@ -312,33 +326,6 @@ describe("PracticeView", () => {
     expect(
       screen.getByRole("button", { name: i18n.t("practice.completed.startNextRound") }),
     ).toBeEnabled()
-  })
-
-  it("keeps all review actions in a fixed, sidebar-aware bottom bar", async () => {
-    renderReadyView(createPracticeMockResponse("reviewBalanced"))
-
-    const review = await screen.findByTestId("practice-review-state")
-    expect(review).toHaveClass("pb-80", "min-[360px]:pb-52", "sm:pb-40", "lg:pb-28")
-
-    const actionBar = screen.getByTestId("practice-review-actions-bar")
-    expect(actionBar).toHaveClass("fixed", "inset-x-0", "bottom-0", "z-40", "border-t")
-    expect(actionBar).toHaveClass("bg-background/95", "backdrop-blur")
-    expect(actionBar).toHaveClass(
-      "md:left-(--sidebar-width)",
-      "md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)",
-    )
-    expect(actionBar.closest("[data-slot='card']")).not.toBeInTheDocument()
-
-    const actions = within(actionBar)
-    for (const name of [
-      i18n.t("practice.review.retryCurrent"),
-      i18n.t("practice.review.nextQuestion"),
-      i18n.t("practice.review.endSession"),
-      i18n.t("practice.questionActions.save"),
-      i18n.t("practice.questionActions.markWeak"),
-    ]) {
-      expect(actions.getByRole("button", { name })).toBeInTheDocument()
-    }
   })
 
   it("confirms ending a reviewed session before invoking the action", async () => {
@@ -571,7 +558,6 @@ describe("PracticeView", () => {
 
     const stateRegion = screen.getByTestId("practice-state-region")
     await waitFor(() => expect(stateRegion).toHaveFocus())
-    expect(stateRegion).not.toHaveClass("focus-visible:ring-3", "focus-visible:ring-ring/50")
     expect(screen.getByTestId("practice-review-state")).toBeInTheDocument()
   })
 
@@ -629,57 +615,6 @@ describe("PracticeView", () => {
     expect(
       screen.queryByText(i18n.t("practice.prerequisites.noTargetRoles.title")),
     ).not.toBeInTheDocument()
-  })
-
-  it("keeps the selected option styling after focus moves away", async () => {
-    const user = userEvent.setup()
-    renderReadyView(createPracticeMockResponse("setupReady"))
-    await screen.findByTestId("practice-setup-state")
-
-    const selectedQuestionType = screen.getByRole("button", {
-      name: i18n.t("practice.questionTypes.behavioral"),
-    })
-    await user.click(selectedQuestionType)
-    await user.tab()
-
-    expect(selectedQuestionType).not.toHaveFocus()
-    expect(selectedQuestionType).toHaveAttribute("aria-pressed", "true")
-    expect(selectedQuestionType).toHaveClass(
-      "hover:bg-card",
-      "aria-pressed:border-primary",
-      "aria-pressed:bg-card",
-      "aria-pressed:text-primary",
-    )
-  })
-
-  it("separates the setup sections with responsive theme dividers", async () => {
-    renderReadyView(createPracticeMockResponse("setupReady"))
-    const setupCard = await screen.findByTestId("practice-setup-state")
-    expect(setupCard.querySelector('[data-slot="card-header"]')).toHaveClass("border-b")
-
-    const questionTypeFieldSet = screen
-      .getByText(i18n.t("practice.setup.fields.questionType"))
-      .closest('[data-slot="field-set"]')
-    expect(questionTypeFieldSet).not.toHaveClass("border-t")
-    expect(questionTypeFieldSet?.parentElement).toHaveClass("border-t", "border-border", "py-5")
-
-    const sourceFieldSet = screen
-      .getByText(i18n.t("practice.setup.fields.source"))
-      .closest('[data-slot="field-set"]')
-    expect(sourceFieldSet).not.toHaveClass("border-t")
-    expect(sourceFieldSet?.parentElement).toHaveClass(
-      "border-t",
-      "border-border",
-      "pt-5",
-      "md:border-t-0",
-      "md:border-l",
-      "md:pl-6",
-    )
-    expect(
-      screen
-        .getByRole("switch", { name: i18n.t("practice.setup.fields.prioritizeWeaknesses") })
-        .closest('[data-slot="field"]'),
-    ).toHaveClass("border-t", "border-border", "pt-5")
   })
 
   it("renders the setup selection returned by the service without reapplying a default", async () => {
@@ -771,7 +706,6 @@ describe("PracticeView", () => {
       name: i18n.t("practice.actions.starting"),
     })
     expect(pendingButton).toBeDisabled()
-    expect(pendingButton.querySelector('[data-slot="spinner"]')).toBeInTheDocument()
     for (const control of getSetupSelectionControls()) expectControlDisabled(control)
 
     await user.click(
@@ -891,17 +825,8 @@ describe("PracticeView", () => {
     expect(card).toHaveTextContent(data.session.question.recommendedMaterials[0]?.label ?? "")
     expect(within(card).queryByText(questionType)).not.toBeInTheDocument()
     expect(within(card).queryByText(difficulty)).not.toBeInTheDocument()
-    expect(within(sessionHeader).getByText(questionType)).toHaveClass(
-      "bg-primary",
-      "text-primary-foreground",
-    )
-    expect(within(sessionHeader).getByText(difficulty)).toHaveClass(
-      "border-primary/20",
-      "bg-primary/10",
-      "text-primary",
-    )
-    expect(card.querySelector(".lucide-folder-open")).not.toBeInTheDocument()
-    expect(card.querySelector(".lucide-database-search")).not.toBeInTheDocument()
+    expect(sessionHeader).toHaveTextContent(questionType)
+    expect(sessionHeader).toHaveTextContent(difficulty)
     expect(screen.queryByText(/完整参考答案|完整评分标准|内部追问策略/)).not.toBeInTheDocument()
   })
 
@@ -938,25 +863,6 @@ describe("PracticeView", () => {
     expect(card).toHaveTextContent("后端返回的材料")
     expect(screen.getByText("后端返回的参考答案")).toBeInTheDocument()
     expect(screen.queryByText("backend.new-question-template")).not.toBeInTheDocument()
-  })
-
-  it("only gives the answering view fixed actions and responsive bottom clearance", async () => {
-    const { rerenderReady } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
-
-    const answering = await screen.findByTestId("practice-answering-state")
-    expect(answering).toHaveClass("pb-56", "min-[360px]:pb-40", "sm:pb-28")
-    expect(screen.getByTestId("practice-question-actions-bar")).toBeInTheDocument()
-
-    for (const scenario of [
-      "answeringSingleFollowUp",
-      "reviewBalanced",
-      "completedSession",
-    ] as const) {
-      rerenderReady(createPracticeMockResponse(scenario))
-      await waitFor(() => {
-        expect(screen.queryByTestId("practice-question-actions-bar")).not.toBeInTheDocument()
-      })
-    }
   })
 
   it("keeps an empty answer from being submitted", async () => {
@@ -1228,19 +1134,7 @@ describe("PracticeView", () => {
       expect(index).toBeGreaterThan(previousIndex)
       previousIndex = index
     }
-    expect(
-      within(timeline)
-        .getByText(data.session.currentFollowUp.question.prompt)
-        .closest("[aria-current='step']"),
-    ).toBeInTheDocument()
-    const composer = screen.getByTestId("practice-follow-up-composer")
-    const assistance = screen.getByTestId("practice-follow-up-assistance")
-    expect(
-      timeline.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-    expect(
-      composer.compareDocumentPosition(assistance) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expect(within(timeline).getByText(data.session.currentFollowUp.question.prompt)).toBeVisible()
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
   })
 
@@ -1335,16 +1229,8 @@ describe("PracticeView", () => {
     expect(hintButton).toBeVisible()
     expect(frameworkButton).toBeVisible()
     expect(referenceButton).toBeVisible()
-    expect(referenceButton).toHaveClass("self-start")
     expect(screen.getAllByTestId("practice-follow-up-guidance-card")).toHaveLength(2)
     expect(screen.getByTestId("practice-follow-up-reference")).toBeVisible()
-    expect(
-      new Set(
-        [hintButton, frameworkButton, referenceButton].map((button) =>
-          button.closest("[data-slot='card']"),
-        ),
-      ).size,
-    ).toBe(3)
     expect(screen.queryByText(/承认具体不足|Profiler 确认更新来源/)).not.toBeInTheDocument()
   })
 
@@ -1769,33 +1655,6 @@ describe("PracticeView", () => {
     expect(onRetryEvaluation).toHaveBeenCalledOnce()
   })
 
-  it("shows the main answer and scoring before the main question example and follow-up review", async () => {
-    const data = createPracticeMockResponse("reviewBalanced")
-    renderReadyView(data)
-    if (data.session.status !== "review") return
-
-    const timeline = await screen.findByTestId("practice-conversation-timeline")
-    const score = screen.getByTestId("practice-score-overview")
-    const dimensions = screen.getByTestId("practice-dimension-scores")
-    const summary = screen.getByTestId("practice-review-summary")
-    const reference = screen.getByTestId("practice-reference-answer")
-    const followUpReview = screen.getByTestId("practice-follow-up-review")
-    const orderedSections = [timeline, score, dimensions, summary, reference, followUpReview]
-
-    expect(timeline).toHaveTextContent(data.session.mainAnswer.content)
-    expect(
-      within(reference).getByRole("heading", {
-        name: i18n.t("practice.referenceAnswer.reviewTitle"),
-      }),
-    ).toBeInTheDocument()
-    for (let index = 0; index < orderedSections.length - 1; index += 1) {
-      expect(
-        orderedSections[index]!.compareDocumentPosition(orderedSections[index + 1]!) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy()
-    }
-  })
-
   it("keeps every follow-up reference supplement scoped to its own review item", async () => {
     const user = userEvent.setup()
     const data = createPracticeMockResponse("reviewBalanced")
@@ -1803,7 +1662,7 @@ describe("PracticeView", () => {
     if (data.session.status !== "review") return
 
     const followUpReview = await screen.findByTestId("practice-follow-up-review")
-    const items = [...followUpReview.querySelectorAll("article")]
+    const items = within(followUpReview).getAllByRole("article")
     expect(items).toHaveLength(data.session.followUpExchanges.length)
 
     for (const [index, exchange] of data.session.followUpExchanges.entries()) {

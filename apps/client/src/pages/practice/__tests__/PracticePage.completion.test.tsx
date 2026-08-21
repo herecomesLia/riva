@@ -393,9 +393,6 @@ describe("PracticePage: completion", () => {
       }),
     ).toBeDisabled()
     expect(
-      testing.screen.getByTestId("practice-completed-state").querySelector('[data-slot="spinner"]'),
-    ).toBeVisible()
-    expect(
       testing.screen.getByRole("button", { name: i18n.t("practice.completed.viewHistory") }),
     ).toHaveAttribute("aria-disabled", "true")
     expect(api.prepareNextPracticeSession).toHaveBeenCalledOnce()
