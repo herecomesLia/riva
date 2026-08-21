@@ -19,12 +19,18 @@
     "client:test:watch:storybook": "pnpm --filter @riva/client --fail-if-no-match test:watch:storybook",
     "client:storybook": "pnpm --filter @riva/client --fail-if-no-match storybook",
     "client:storybook:build": "pnpm --filter @riva/client --fail-if-no-match build-storybook",
+    "server:format": "uv run --locked --directory apps/server ruff check --select I --fix && uv run --locked --directory apps/server ruff format",
+    "server:format:check": "uv run --locked --directory apps/server ruff check --select I && uv run --locked --directory apps/server ruff format --check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
   },
   "lint-staged": {
-    "*": "prettier --write --ignore-unknown"
+    "*": "prettier --write --ignore-unknown",
+    "apps/server/**/*.py": [
+      "uv run --locked --directory apps/server ruff check --select I --fix",
+      "uv run --locked --directory apps/server ruff format"
+    ]
   },
   "devDependencies": {
     "husky": "^9.1.7",
