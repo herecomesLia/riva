@@ -214,6 +214,55 @@ class AgentRunService:
             await self.session.rollback()
             raise
 
+    async def claim(
+        self,
+        *,
+        run_id: UUID,
+        lease_owner: str,
+        lease_duration: timedelta,
+    ) -> AgentRun | None:
+        """Claim one queued run for the synchronous API bridge.
+
+        The worker still owns the lease state while the API waits for the
+        model.  Selecting by id prevents a request from accidentally running
+        another request's queued work during the transition to synchronous
+        execution.
+        """
+
+        try:
+            lease_owner = _required_text("lease_owner", lease_owner, 255)
+            if lease_duration <= timedelta(0):
+                raise ValueError("lease_duration must be positive")
+            now = self.clock()
+            _require_aware_datetime("clock", now)
+            run = await self.session.scalar(
+                select(AgentRun)
+                .where(
+                    AgentRun.id == run_id,
+                    AgentRun.status == AgentRunStatus.QUEUED,
+                    AgentRun.available_at <= now,
+                    AgentRun.attempt_count < AgentRun.max_attempts,
+                )
+                .with_for_update()
+            )
+            if run is None:
+                await self.session.commit()
+                return None
+
+            run.status = AgentRunStatus.RUNNING
+            run.attempt_count += 1
+            run.lease_owner = lease_owner
+            run.lease_token = self.lease_token_factory()
+            run.lease_expires_at = now + lease_duration
+            if run.started_at is None:
+                run.started_at = now
+
+            await self.session.commit()
+            return run
+        except Exception:
+            await self.session.rollback()
+            raise
+
     async def mark_succeeded(
         self,
         *,

@@ -19,8 +19,6 @@ import type {
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
-  GetJobDescriptionParsingStatusInput,
-  GetMatchingAnalysisStatusInput,
   JobDescriptionAnalysisModuleField,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
@@ -71,12 +69,6 @@ export type RolesViewActions = {
   startJobDescriptionParsing?: (
     input: StartOrRetryJobDescriptionParsingInput,
   ) => Promise<RolesPageResponse>
-  retryJobDescriptionSynchronization?: (
-    input: GetJobDescriptionParsingStatusInput,
-  ) => Promise<RolesPageResponse>
-  retryMatchingAnalysisSynchronization?: (
-    input: GetMatchingAnalysisStatusInput,
-  ) => Promise<RolesPageResponse>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
   updateRolePreparationStatus: (
@@ -95,8 +87,6 @@ export type RolesViewProps =
       actions?: RolesViewActions
       initialActiveTab?: TargetRoleTab
       initialSelectedRoleId?: string
-      jobDescriptionSynchronizationErrorRoleIds?: string[]
-      matchingAnalysisSynchronizationErrorRoleIds?: string[]
       matchingAnalysisAvailable?: boolean
     }
   | {
@@ -123,12 +113,6 @@ export function RolesView(props: RolesViewProps) {
           data={props.content.data}
           initialActiveTab={props.initialActiveTab}
           initialSelectedRoleId={props.initialSelectedRoleId}
-          jobDescriptionSynchronizationErrorRoleIds={
-            props.jobDescriptionSynchronizationErrorRoleIds ?? []
-          }
-          matchingAnalysisSynchronizationErrorRoleIds={
-            props.matchingAnalysisSynchronizationErrorRoleIds ?? []
-          }
           matchingAnalysisAvailable={props.matchingAnalysisAvailable ?? true}
         />
       )}
@@ -141,16 +125,12 @@ function RolesReadyView({
   data,
   initialActiveTab,
   initialSelectedRoleId,
-  jobDescriptionSynchronizationErrorRoleIds,
-  matchingAnalysisSynchronizationErrorRoleIds,
   matchingAnalysisAvailable,
 }: {
   actions?: RolesViewActions
   data: RolesPageResponse
   initialActiveTab?: TargetRoleTab
   initialSelectedRoleId?: string
-  jobDescriptionSynchronizationErrorRoleIds: string[]
-  matchingAnalysisSynchronizationErrorRoleIds: string[]
   matchingAnalysisAvailable: boolean
 }) {
   const { t } = useTranslation()
@@ -355,38 +335,6 @@ function RolesReadyView({
                                 )
                               }
                             : undefined,
-                          retryJobDescriptionSynchronization:
-                            actions.retryJobDescriptionSynchronization
-                              ? () => {
-                                  const retryJobDescriptionSynchronization =
-                                    actions.retryJobDescriptionSynchronization
-                                  if (!retryJobDescriptionSynchronization) return
-                                  if (selectedRole.jobDescription.status !== "parsing") return
-                                  const jobDescriptionVersion = selectedRole.jobDescription.version
-                                  void runAction(() =>
-                                    retryJobDescriptionSynchronization({
-                                      roleId: selectedRole.id,
-                                      version: selectedRole.version,
-                                      jobDescriptionVersion,
-                                    }),
-                                  )
-                                }
-                              : undefined,
-                          retryMatchingAnalysisSynchronization:
-                            actions.retryMatchingAnalysisSynchronization
-                              ? () => {
-                                  const retryMatchingAnalysisSynchronization =
-                                    actions.retryMatchingAnalysisSynchronization
-                                  if (!retryMatchingAnalysisSynchronization) return
-                                  if (selectedRole.matchingAnalysis?.status !== "generating") return
-                                  void runAction(() =>
-                                    retryMatchingAnalysisSynchronization({
-                                      roleId: selectedRole.id,
-                                      version: selectedRole.version,
-                                    }),
-                                  )
-                                }
-                              : undefined,
                           setCurrent: () =>
                             void runAction(() =>
                               actions.setCurrentTargetRole({
@@ -413,12 +361,6 @@ function RolesReadyView({
                   pending={pendingAction}
                   profileContext={data.profileContext}
                   role={selectedRole}
-                  jobDescriptionSynchronizationError={jobDescriptionSynchronizationErrorRoleIds.includes(
-                    selectedRole.id,
-                  )}
-                  matchingAnalysisSynchronizationError={matchingAnalysisSynchronizationErrorRoleIds.includes(
-                    selectedRole.id,
-                  )}
                   matchingAnalysisAvailable={matchingAnalysisAvailable}
                 />
               ) : (

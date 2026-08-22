@@ -387,7 +387,7 @@ export async function saveJobDescription(
     ...role,
     ...nextRoleVersion(role),
     jobDescription: {
-      status: "parsing",
+      status: "saved",
       rawText,
       version: jobDescriptionVersion,
       parsingFailureReason: null,
@@ -410,11 +410,11 @@ export async function startJobDescriptionParsing(
   if (role.jobDescription.version !== input.jobDescriptionVersion) {
     throw new Error("Job description version is out of date.")
   }
-  if (role.jobDescription.status === "parsing" || role.jobDescription.status === "ready") {
+  if (role.jobDescription.status === "ready") {
     return copy(mockResponse)
   }
 
-  const updatedRole: TargetRole = {
+  const parsingRole: TargetRole = {
     ...role,
     ...nextRoleVersion(role),
     jobDescription: {
@@ -424,7 +424,7 @@ export async function startJobDescriptionParsing(
     },
     jobDescriptionAnalysis: null,
   }
-  return setMockResponse(replaceRole(updatedRole))
+  return setMockResponse(replaceRole(completeJobDescriptionParsing(parsingRole)))
 }
 
 export async function getJobDescriptionParsingStatus(
@@ -463,7 +463,7 @@ export async function generateMatchingAnalysis(
     return copy(mockResponse)
   }
 
-  const updatedRole: ReadyTargetRole = {
+  const generatingRole: ReadyTargetRole = {
     ...role,
     ...nextRoleVersion(role),
     matchingAnalysis: {
@@ -476,7 +476,7 @@ export async function generateMatchingAnalysis(
       result: null,
     },
   }
-  return setMockResponse(replaceRole(updatedRole))
+  return setMockResponse(replaceRole(completeMatchingAnalysis(generatingRole)))
 }
 
 export async function updateJobDescriptionAnalysisModule(

@@ -220,6 +220,12 @@ TrainingPlanningOutput = Annotated[
 ]
 
 
+class TrainingPlanningResponse(TrainingPlanningModel):
+    target_role_id: StandardUUID
+    interaction_language: InteractionLanguage
+    plan: TrainingPlanningOutput
+
+
 TrainingPlanningLifecycleStatus = Literal[
     "queued",
     "running",
@@ -315,6 +321,7 @@ __all__ = [
     "TrainingPlanningText",
     "TrainingPlanningLifecycleStatus",
     "TrainingPlanningRunPayload",
+    "TrainingPlanningResponse",
     "TrainingPlanningStatusResponse",
     "EnsureCurrentTrainingPlanningRequest",
     "StartTrainingPlanningRequest",

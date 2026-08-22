@@ -8,7 +8,7 @@ from riva.core.auth import get_auth_service, require_current_user
 from riva.core.errors import APIError
 from riva.core.roles import get_target_role_service
 from riva.models import User
-from riva.schemas.roles import RolesPageResponse, TargetRoleResponse
+from riva.schemas.roles import RolesPageResponse
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 ROLE_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -24,31 +24,6 @@ def empty_page() -> RolesPageResponse:
                 "version": None,
                 "completed": False,
             },
-        }
-    )
-
-
-def target_role() -> TargetRoleResponse:
-    return TargetRoleResponse.model_validate(
-        {
-            "id": str(ROLE_ID),
-            "title": "Backend Engineer",
-            "company": None,
-            "recruitmentType": None,
-            "location": None,
-            "experienceRange": None,
-            "preparationStatus": "preparing",
-            "createdAt": "2026-07-29T08:00:00Z",
-            "updatedAt": "2026-07-29T08:00:00Z",
-            "version": 2,
-            "jobDescription": {
-                "status": "saved",
-                "rawText": "Build APIs.",
-                "version": 1,
-                "parsingFailureReason": None,
-            },
-            "jobDescriptionAnalysis": None,
-            "matchingAnalysis": None,
         }
     )
 
@@ -126,24 +101,12 @@ class FakeTargetRoleService:
             "start-parsing", user, role_id, payload, interaction_language
         )
 
-    async def get_job_description_parsing_status(self, user, role_id, query):
-        self.calls.append(("parsing-status", (user, role_id, query)))
-        if self.error is not None:
-            raise self.error
-        return target_role()
-
     async def start_matching_analysis(
         self, user, role_id, payload, *, interaction_language
     ):
         return await self._result(
             "start-matching", user, role_id, payload, interaction_language
         )
-
-    async def get_matching_analysis_status(self, user, role_id, query):
-        self.calls.append(("matching-status", (user, role_id, query)))
-        if self.error is not None:
-            raise self.error
-        return target_role()
 
 
 def user() -> User:
@@ -192,20 +155,9 @@ def roles_client(app, service: FakeTargetRoleService) -> TestClient:
             {"version": 2, "jobDescriptionVersion": 1},
         ),
         (
-            "get",
-            f"/api/roles/{ROLE_ID}/job-description/parsing"
-            "?version=2&jobDescriptionVersion=1",
-            None,
-        ),
-        (
             "post",
             f"/api/roles/{ROLE_ID}/matching-analysis",
             {"version": 2},
-        ),
-        (
-            "get",
-            f"/api/roles/{ROLE_ID}/matching-analysis?version=2",
-            None,
         ),
     ],
 )
@@ -250,7 +202,7 @@ def test_create_returns_201_and_passes_normalized_request(app) -> None:
     assert request.title == "Backend Engineer"
 
 
-def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
+def test_start_parsing_returns_final_page(app) -> None:
     service = FakeTargetRoleService()
     path = f"/api/roles/{ROLE_ID}/job-description/parsing"
 
@@ -260,18 +212,15 @@ def test_start_parsing_returns_202_and_status_get_returns_role(app) -> None:
             json={"version": 2, "jobDescriptionVersion": 1},
             headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "en-US"},
         )
-        polled = client.get(f"{path}?version=2&jobDescriptionVersion=1")
 
-    assert started.status_code == 202
+    assert started.status_code == 200
     assert service.calls[0][0] == "start-parsing"
     assert service.calls[0][1][2].job_description_version == 1
     assert service.calls[0][1][3] == "en"
-    assert polled.status_code == 200
-    assert polled.json() == target_role().model_dump(mode="json")
-    assert service.calls[1][0] == "parsing-status"
+    assert started.json() == empty_page().model_dump(mode="json")
 
 
-def test_start_matching_returns_202_and_status_get_uses_query_version(app) -> None:
+def test_start_matching_returns_final_page(app) -> None:
     service = FakeTargetRoleService()
     path = f"/api/roles/{ROLE_ID}/matching-analysis"
 
@@ -281,16 +230,12 @@ def test_start_matching_returns_202_and_status_get_uses_query_version(app) -> No
             json={"version": 2},
             headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "zh"},
         )
-        polled = client.get(f"{path}?version=2")
 
-    assert started.status_code == 202
+    assert started.status_code == 200
     assert service.calls[0][0] == "start-matching"
     assert service.calls[0][1][2].version == 2
     assert service.calls[0][1][3] == "zh-CN"
-    assert polled.status_code == 200
-    assert polled.json() == target_role().model_dump(mode="json")
-    assert service.calls[1][0] == "matching-status"
-    assert service.calls[1][1][2].version == 2
+    assert started.json() == empty_page().model_dump(mode="json")
 
 
 @pytest.mark.parametrize(
@@ -415,26 +360,9 @@ def test_all_mutations_require_csrf(app, method, url, payload) -> None:
             {**analysis_update_payload(), "rivaSummary": "forbidden"},
         ),
         (
-            "get",
-            f"/api/roles/{ROLE_ID}/job-description/parsing"
-            "?version=0&jobDescriptionVersion=1",
-            None,
-        ),
-        (
-            "get",
-            "/api/roles/not-a-uuid/job-description/parsing"
-            "?version=1&jobDescriptionVersion=1",
-            None,
-        ),
-        (
             "post",
             f"/api/roles/{ROLE_ID}/matching-analysis",
             {"version": 0},
-        ),
-        (
-            "get",
-            f"/api/roles/{ROLE_ID}/matching-analysis?version=0",
-            None,
         ),
     ],
 )
@@ -489,3 +417,15 @@ def test_role_errors_keep_stable_error_contract(app, error, status_code) -> None
 
     assert response.status_code == status_code
     assert response.json() == {"error": error}
+
+
+def test_status_routes_are_removed(app) -> None:
+    with roles_client(app, FakeTargetRoleService()) as client:
+        parsing = client.get(
+            f"/api/roles/{ROLE_ID}/job-description/parsing"
+            "?version=2&jobDescriptionVersion=1"
+        )
+        matching = client.get(f"/api/roles/{ROLE_ID}/matching-analysis?version=2")
+
+    assert parsing.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+    assert matching.status_code == status.HTTP_405_METHOD_NOT_ALLOWED

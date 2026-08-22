@@ -99,6 +99,25 @@ class AgentWorker:
         run = await self._claim_next()
         if run is None:
             return False
+
+        return await self._process_claimed(run, allow_retry=True)
+
+    async def process_run(self, run_id: UUID) -> AgentRun | None:
+        """Execute one queued run synchronously for an API request."""
+
+        run = await self._claim_run(run_id)
+        if run is not None:
+            await self._process_claimed(run, allow_retry=False)
+
+        async with self.session_factory() as session:
+            return await session.get(AgentRun, run_id)
+
+    async def _process_claimed(
+        self,
+        run: AgentRun,
+        *,
+        allow_retry: bool,
+    ) -> bool:
         if run.lease_token is None:
             raise RuntimeError("Claimed agent run is missing its lease token.")
 
@@ -113,7 +132,12 @@ class AgentWorker:
         try:
             handler = self.registry.get(run.agent_id)
         except Exception as exc:
-            await self._record_failure(run, run.lease_token, _failure_for(exc))
+            await self._record_failure(
+                run,
+                run.lease_token,
+                _failure_for(exc),
+                allow_retry=allow_retry,
+            )
             return True
 
         outcome = await self._execute_with_heartbeat(
@@ -135,6 +159,7 @@ class AgentWorker:
                 run,
                 run.lease_token,
                 failure,
+                allow_retry=allow_retry,
             )
             await self._persist_terminal_failure(handler, failed, failure.code)
             return True
@@ -154,6 +179,7 @@ class AgentWorker:
                 run,
                 run.lease_token,
                 failure,
+                allow_retry=allow_retry,
             )
             await self._persist_terminal_failure(handler, failed, failure.code)
         except AgentRunLeaseError:
@@ -279,6 +305,14 @@ class AgentWorker:
                 lease_duration=self.lease_duration,
             )
 
+    async def _claim_run(self, run_id: UUID) -> AgentRun | None:
+        async with self.session_factory() as session:
+            return await self.service_factory(session).claim(
+                run_id=run_id,
+                lease_owner=self.worker_id,
+                lease_duration=self.lease_duration,
+            )
+
     async def _mark_succeeded(
         self,
         run_id: UUID,
@@ -297,17 +331,18 @@ class AgentWorker:
         run: AgentRun,
         lease_token: UUID,
         failure: _Failure,
+        *,
+        allow_retry: bool = True,
     ) -> AgentRun | None:
-        delay = (
-            self.retry_delay(run.attempt_count) if failure.retryable else timedelta(0)
-        )
+        retryable = failure.retryable and allow_retry
+        delay = self.retry_delay(run.attempt_count) if retryable else timedelta(0)
         try:
             async with self.session_factory() as session:
                 failed = await self.service_factory(session).mark_failed(
                     run_id=run.id,
                     lease_token=lease_token,
                     error_code=failure.code,
-                    retryable=failure.retryable,
+                    retryable=retryable,
                     retry_delay=delay,
                 )
         except AgentRunLeaseError:
@@ -323,7 +358,7 @@ class AgentWorker:
             "agent.worker.run",
             status=failed.status.value,
             error_code=failure.code,
-            retryable=failure.retryable,
+            retryable=retryable,
             retry_delay_ms=_timedelta_ms(delay),
             **(
                 {"next_available_at": failed.available_at}

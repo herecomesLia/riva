@@ -36,10 +36,10 @@ import {
 import {
   createTargetRole,
   deleteTargetRole,
-  getJobDescriptionParsingStatus,
   getRolesPage,
   saveJobDescription,
   setCurrentTargetRole,
+  startJobDescriptionParsing,
   updateTargetRole,
 } from "@/services/roles"
 import type {
@@ -76,16 +76,19 @@ export async function completeTargetRoleJobDescription(role: TargetRole) {
   })
   const parsingRole = saved.roles.find((candidate) => candidate.id === role.id)
   if (
-    parsingRole?.jobDescription.status !== "parsing" ||
+    parsingRole?.jobDescription.status !== "saved" ||
     parsingRole.jobDescription.version === null
   ) {
-    throw new Error("The target role must be parsing its job description.")
+    throw new Error("The target role must have a saved job description.")
   }
-  return getJobDescriptionParsingStatus({
+  const response = await startJobDescriptionParsing({
     jobDescriptionVersion: parsingRole.jobDescription.version,
     roleId: parsingRole.id,
     version: parsingRole.version,
   })
+  const completedRole = response.roles.find((candidate) => candidate.id === role.id)
+  if (!completedRole) throw new Error("The completed target role is missing.")
+  return completedRole
 }
 
 export function requireMockPageResponse(response: PracticeServiceResponse): PracticePageResponse {

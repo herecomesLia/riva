@@ -1,7 +1,5 @@
 import type { InteractionLanguage } from "@/types/language"
 
-export type TrainingPlanningStatus = "queued" | "running" | "succeeded" | "failed"
-
 export type TrainingPlanningTargetedPracticePlan = {
   action: "targetedPractice"
   reason: string
@@ -28,19 +26,10 @@ export type TrainingPlanningMockInterviewPlan = {
 export type TrainingPlanningPlan =
   TrainingPlanningTargetedPracticePlan | TrainingPlanningMockInterviewPlan
 
-export type TrainingPlanningStatusResponse = {
-  runId: string
-  status: TrainingPlanningStatus
+export type TrainingPlanningResponse = {
   targetRoleId: string
   interactionLanguage: InteractionLanguage
-  attemptCount: number
-  maxAttempts: number
-  errorCode: string | null
-  failureReason: string | null
-  createdAt: string
-  startedAt: string | null
-  finishedAt: string | null
-  plan: TrainingPlanningPlan | null
+  plan: TrainingPlanningPlan
 }
 
 export type EnsureCurrentTrainingPlanningInput = {

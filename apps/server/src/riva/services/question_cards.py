@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
 from fastapi import status
@@ -27,6 +27,8 @@ from riva.services.question_generation import (
     validate_question_generation_run,
 )
 
+AgentExecutor = Callable[[UUID], Awaitable[AgentRun]]
+
 QUESTION_GENERATION_FAILURE_REASON = (
     "The question could not be generated right now. Please try again."
 )
@@ -47,6 +49,7 @@ class QuestionCardService:
         *,
         llm_provider: str | None = None,
         llm_model: str | None = None,
+        agent_executor: AgentExecutor | None = None,
         generation_service_factory: QuestionGenerationServiceFactory = (
             QuestionGenerationService
         ),
@@ -54,6 +57,7 @@ class QuestionCardService:
         self.session = session
         self.llm_provider = (llm_provider or "").strip().lower()
         self.llm_model = (llm_model or "").strip()
+        self.agent_executor = agent_executor
         self.generation_service_factory = generation_service_factory
 
     async def start_generation(
@@ -62,7 +66,7 @@ class QuestionCardService:
         payload: StartQuestionGenerationRequest,
         *,
         interaction_language: InteractionLanguage,
-    ) -> QuestionGenerationStatusResponse:
+    ) -> QuestionCardResponse:
         try:
             idempotency_key = f"question-generation:{payload.request_id}"
             existing = await self._existing_run(
@@ -76,7 +80,7 @@ class QuestionCardService:
                     payload,
                     interaction_language,
                 )
-                return await self._status_response(existing)
+                return await self._execute(user.id, existing.id)
 
             self._configured_model()
             try:
@@ -97,7 +101,7 @@ class QuestionCardService:
                 payload,
                 interaction_language,
             )
-            return await self._status_response(run)
+            return await self._execute(user.id, run.id)
         except BaseException:
             await self.session.rollback()
             raise
@@ -110,6 +114,27 @@ class QuestionCardService:
     ) -> QuestionGenerationStatusResponse:
         run = await self._load_run(user_id=user_id, run_id=run_id)
         return await self._status_response(run)
+
+    async def _execute(
+        self,
+        user_id: UUID,
+        run_id: UUID,
+    ) -> QuestionCardResponse:
+        if self.agent_executor is None:
+            raise APIError(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                QUESTION_GENERATION_UNAVAILABLE,
+            )
+        await self.agent_executor(run_id)
+        await self.session.rollback()
+        run = await self._load_run(user_id=user_id, run_id=run_id)
+        status_response = await self._status_response(run)
+        if (
+            status_response.status != "succeeded"
+            or status_response.question_card is None
+        ):
+            raise _state_conflict()
+        return status_response.question_card
 
     async def get_question_card(
         self,

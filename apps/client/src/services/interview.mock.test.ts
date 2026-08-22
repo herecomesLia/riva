@@ -24,10 +24,10 @@ import {
 import {
   createTargetRole,
   deleteTargetRole,
-  getJobDescriptionParsingStatus,
   getRolesMockSnapshot,
   resetRolesMockState,
   saveJobDescription,
+  startJobDescriptionParsing,
   updateTargetRole,
 } from "@/mocks/services/roles"
 import { getProfileMockSnapshot, resetProfileMockState } from "@/mocks/services/profile"
@@ -1201,7 +1201,7 @@ describe("interview mock reset boundaries", () => {
       await vi.runAllTimersAsync()
       const parsing = await savePromise
       const parsingProduct = parsing.roles.find(({ id }) => id === product.id)!
-      const parsingPromise = getJobDescriptionParsingStatus({
+      const parsingPromise = startJobDescriptionParsing({
         roleId: parsingProduct.id,
         version: parsingProduct.version,
         jobDescriptionVersion: parsingProduct.jobDescription.version!,

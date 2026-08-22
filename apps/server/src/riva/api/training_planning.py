@@ -1,7 +1,4 @@
-from typing import Annotated
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, Path, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
@@ -12,7 +9,7 @@ from riva.models import User
 from riva.schemas.training_planning import (
     EnsureCurrentTrainingPlanningRequest,
     StartTrainingPlanningRequest,
-    TrainingPlanningStatusResponse,
+    TrainingPlanningResponse,
 )
 from riva.services.training_planning import (
     TRAINING_PLANNING_NOT_FOUND,
@@ -24,8 +21,6 @@ from riva.services.training_planning import (
     TrainingPlanningService,
     TrainingPlanningStateError,
 )
-
-TrainingPlanningRunId = Annotated[UUID, Path(alias="runId")]
 
 router = APIRouter(
     prefix="/training-plans",
@@ -52,8 +47,7 @@ def training_planning_state_api_error(
 
 @router.post(
     "",
-    response_model=TrainingPlanningStatusResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TrainingPlanningResponse,
 )
 async def start_training_planning(
     payload: StartTrainingPlanningRequest,
@@ -62,7 +56,7 @@ async def start_training_planning(
     training_planning_service: TrainingPlanningService = Depends(
         get_training_planning_service
     ),
-) -> TrainingPlanningStatusResponse:
+) -> TrainingPlanningResponse:
     try:
         return await training_planning_service.start_planning(
             current_user,
@@ -77,8 +71,7 @@ async def start_training_planning(
 
 @router.post(
     "/current",
-    response_model=TrainingPlanningStatusResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TrainingPlanningResponse,
 )
 async def ensure_current_training_planning(
     payload: EnsureCurrentTrainingPlanningRequest,
@@ -87,7 +80,7 @@ async def ensure_current_training_planning(
     training_planning_service: TrainingPlanningService = Depends(
         get_training_planning_service
     ),
-) -> TrainingPlanningStatusResponse:
+) -> TrainingPlanningResponse:
     try:
         return await training_planning_service.ensure_current_planning(
             current_user,
@@ -95,26 +88,6 @@ async def ensure_current_training_planning(
             interaction_language=normalize_interaction_language(
                 request.headers.get("accept-language")
             ),
-        )
-    except TrainingPlanningStateError as error:
-        raise training_planning_state_api_error(error) from None
-
-
-@router.get(
-    "/{runId}",
-    response_model=TrainingPlanningStatusResponse,
-)
-async def get_training_planning_status(
-    run_id: TrainingPlanningRunId,
-    current_user: User = Depends(require_current_user),
-    training_planning_service: TrainingPlanningService = Depends(
-        get_training_planning_service
-    ),
-) -> TrainingPlanningStatusResponse:
-    try:
-        return await training_planning_service.get_planning_status(
-            user_id=current_user.id,
-            run_id=run_id,
         )
     except TrainingPlanningStateError as error:
         raise training_planning_state_api_error(error) from None

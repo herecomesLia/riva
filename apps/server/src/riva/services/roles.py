@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import cast
 from uuid import UUID
 
@@ -69,6 +69,7 @@ from riva.services.prompt_versions import (
 )
 
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
+AgentExecutor = Callable[[UUID], Awaitable[AgentRun]]
 PARSING_FAILURE_REASON = (
     "Job description parsing failed. Please review the text and try again."
 )
@@ -102,11 +103,13 @@ class TargetRoleService:
         llm_provider: str | None = None,
         llm_model: str | None = None,
         agent_run_service_factory: AgentRunServiceFactory = AgentRunService,
+        agent_executor: AgentExecutor | None = None,
     ) -> None:
         self.session = session
         self.llm_provider = (llm_provider or "").strip().lower()
         self.llm_model = (llm_model or "").strip()
         self.agent_run_service_factory = agent_run_service_factory
+        self.agent_executor = agent_executor
 
     async def get_roles_page(self, user: User) -> RolesPageResponse:
         return await self._roles_page(user.id)
@@ -423,6 +426,9 @@ class TargetRoleService:
                     AgentRunStatus.QUEUED,
                     AgentRunStatus.RUNNING,
                 ):
+                    await self.session.commit()
+                    await self._execute(run.id)
+                    await self.session.rollback()
                     return await self._commit_page(user.id)
                 if run.status is AgentRunStatus.SUCCEEDED:
                     raise APIError(
@@ -461,6 +467,9 @@ class TargetRoleService:
             role.job_description_parsing_run_id = new_run.id
             role.job_description_parsing_run = new_run
             role.version += 1
+            await self._commit_page(user.id)
+            await self._execute(new_run.id)
+            await self.session.rollback()
             return await self._commit_page(user.id)
         except Exception:
             await self.session.rollback()
@@ -532,6 +541,9 @@ class TargetRoleService:
                     AgentRunStatus.QUEUED,
                     AgentRunStatus.RUNNING,
                 ):
+                    await self.session.commit()
+                    await self._execute(run.id)
+                    await self.session.rollback()
                     return await self._commit_page(user.id)
                 if run.status is AgentRunStatus.SUCCEEDED:
                     if (
@@ -583,6 +595,9 @@ class TargetRoleService:
             role.matching_analysis_run_id = new_run.id
             role.matching_analysis_run = new_run
             role.version += 1
+            await self._commit_page(user.id)
+            await self._execute(new_run.id)
+            await self.session.rollback()
             return await self._commit_page(user.id)
         except Exception:
             await self.session.rollback()
@@ -644,6 +659,14 @@ class TargetRoleService:
         page = await self._roles_page(user_id)
         await self.session.commit()
         return page
+
+    async def _execute(self, run_id: UUID) -> AgentRun:
+        if self.agent_executor is None:
+            raise APIError(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "llm_unavailable",
+            )
+        return await self.agent_executor(run_id)
 
     async def _profile(self, user_id: UUID) -> CareerProfile | None:
         return await self.session.scalar(

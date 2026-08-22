@@ -3,51 +3,35 @@ import * as trainingPlanningMockService from "@/mocks/services/training-planning
 import type {
   EnsureCurrentTrainingPlanningInput,
   StartTrainingPlanningInput,
-  TrainingPlanningStatusResponse,
+  TrainingPlanningResponse,
 } from "@/models/training-planning"
-import { trainingPlanningStatusResponseSchema } from "@/schemas/training-planning"
+import { trainingPlanningResponseSchema } from "@/schemas/training-planning"
 import { apiRequest } from "@/services/api"
 
-function parseStatusResponse(value: unknown): TrainingPlanningStatusResponse {
-  return trainingPlanningStatusResponseSchema.parse(value) as TrainingPlanningStatusResponse
-}
-
-async function requestStatusResponse(
-  path: string,
-  options?: Parameters<typeof apiRequest>[1],
-): Promise<TrainingPlanningStatusResponse> {
-  return parseStatusResponse(await apiRequest<unknown>(path, options))
+function parseResponse(value: unknown): TrainingPlanningResponse {
+  return trainingPlanningResponseSchema.parse(value) as TrainingPlanningResponse
 }
 
 export async function ensureCurrentTrainingPlanning(
   input: EnsureCurrentTrainingPlanningInput,
-): Promise<TrainingPlanningStatusResponse> {
+): Promise<TrainingPlanningResponse> {
   const response = env.mock
     ? await trainingPlanningMockService.ensureCurrentTrainingPlanning(input)
     : await apiRequest<unknown>("/training-plans/current", {
         json: input,
         method: "POST",
       })
-  return parseStatusResponse(response)
+  return parseResponse(response)
 }
 
 export async function startTrainingPlanning(
   input: StartTrainingPlanningInput,
-): Promise<TrainingPlanningStatusResponse> {
+): Promise<TrainingPlanningResponse> {
   const response = env.mock
     ? await trainingPlanningMockService.startTrainingPlanning(input)
     : await apiRequest<unknown>("/training-plans", {
         json: input,
         method: "POST",
       })
-  return parseStatusResponse(response)
-}
-
-export async function getTrainingPlanningStatus(
-  runId: string,
-): Promise<TrainingPlanningStatusResponse> {
-  if (env.mock) {
-    return parseStatusResponse(await trainingPlanningMockService.getTrainingPlanningStatus(runId))
-  }
-  return requestStatusResponse(`/training-plans/${encodeURIComponent(runId)}`)
+  return parseResponse(response)
 }

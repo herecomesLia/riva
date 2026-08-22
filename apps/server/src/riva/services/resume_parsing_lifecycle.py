@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +25,7 @@ from riva.models import (
     User,
 )
 from riva.prompts import RESUME_PARSING_PROMPT
+from riva.schemas.resume_import_api import ResumeImportDraftResponse
 from riva.schemas.resume_parsing import (
     ResumeParsingOutput,
     ResumeParsingRunPayload,
@@ -41,6 +42,8 @@ from riva.services.resume_parsing import (
     ResumeParsingStateError,
     resume_parsing_output_from_result,
 )
+
+AgentExecutor = Callable[[UUID], Awaitable[AgentRun]]
 
 RESUME_PARSING_FAILURE_REASON = (
     "Resume parsing failed. Your uploaded resume is preserved; please try again."
@@ -69,11 +72,13 @@ class ResumeParsingLifecycleService:
         *,
         llm_provider: str | None = None,
         llm_model: str | None = None,
+        agent_executor: AgentExecutor | None = None,
         agent_run_service_factory: Callable[..., AgentRunService] = (AgentRunService),
     ) -> None:
         self.session = session
         self.llm_provider = (llm_provider or "").strip().lower()
         self.llm_model = (llm_model or "").strip()
+        self.agent_executor = agent_executor
         self.agent_run_service_factory = agent_run_service_factory
 
     async def start(
@@ -82,7 +87,7 @@ class ResumeParsingLifecycleService:
         user_id: UUID,
         resume_document_id: UUID,
         interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE,
-    ) -> ResumeParsingStatusResponse:
+    ) -> ResumeImportDraftResponse:
         try:
             await self._lock_user(user_id)
             document = await self._load_document(
@@ -94,27 +99,12 @@ class ResumeParsingLifecycleService:
 
             if run is not None:
                 if run.status in (AgentRunStatus.QUEUED, AgentRunStatus.RUNNING):
-                    response = self._status_response(
-                        document,
-                        run,
-                        result=None,
-                        draft=None,
-                    )
                     await self.session.commit()
-                    return response
+                    await self._execute(run.id)
+                    await self.session.rollback()
+                    return await self._draft_response(document.id)
                 if run.status == AgentRunStatus.SUCCEEDED:
-                    result, draft = await self._load_artifacts(
-                        document.id,
-                        for_update=True,
-                    )
-                    response = self._status_response(
-                        document,
-                        run,
-                        result=result,
-                        draft=draft,
-                    )
-                    await self.session.commit()
-                    return response
+                    return await self._draft_response(document.id)
                 if run.status == AgentRunStatus.FAILED:
                     raise APIError(
                         status.HTTP_409_CONFLICT,
@@ -134,14 +124,10 @@ class ResumeParsingLifecycleService:
                 ),
             )
             document.parsing_run_id = new_run.id
-            response = self._status_response(
-                document,
-                new_run,
-                result=None,
-                draft=None,
-            )
             await self.session.commit()
-            return response
+            await self._execute(new_run.id)
+            await self.session.rollback()
+            return await self._draft_response(document.id)
         except BaseException:
             await self.session.rollback()
             raise
@@ -152,7 +138,7 @@ class ResumeParsingLifecycleService:
         user_id: UUID,
         resume_document_id: UUID,
         interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE,
-    ) -> ResumeParsingStatusResponse:
+    ) -> ResumeImportDraftResponse:
         try:
             await self._lock_user(user_id)
             document = await self._load_document(
@@ -167,14 +153,10 @@ class ResumeParsingLifecycleService:
                     RESUME_PARSING_NOT_STARTED,
                 )
             if run.status in (AgentRunStatus.QUEUED, AgentRunStatus.RUNNING):
-                response = self._status_response(
-                    document,
-                    run,
-                    result=None,
-                    draft=None,
-                )
                 await self.session.commit()
-                return response
+                await self._execute(run.id)
+                await self.session.rollback()
+                return await self._draft_response(document.id)
             if run.status == AgentRunStatus.SUCCEEDED:
                 raise APIError(
                     status.HTTP_409_CONFLICT,
@@ -206,17 +188,38 @@ class ResumeParsingLifecycleService:
                 ),
             )
             document.parsing_run_id = new_run.id
-            response = self._status_response(
-                document,
-                new_run,
-                result=None,
-                draft=None,
-            )
             await self.session.commit()
-            return response
+            await self._execute(new_run.id)
+            await self.session.rollback()
+            return await self._draft_response(document.id)
         except BaseException:
             await self.session.rollback()
             raise
+
+    async def _execute(self, run_id: UUID) -> AgentRun:
+        if self.agent_executor is None:
+            raise APIError(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                RESUME_PARSING_UNAVAILABLE,
+            )
+        return await self.agent_executor(run_id)
+
+    async def _draft_response(
+        self, resume_document_id: UUID
+    ) -> ResumeImportDraftResponse:
+        draft = await self.session.scalar(
+            select(ResumeImportDraft).where(
+                ResumeImportDraft.resume_document_id == resume_document_id,
+            )
+        )
+        if draft is None:
+            raise _state_conflict()
+        from riva.services.resume_import_api import build_resume_import_draft_response
+
+        try:
+            return build_resume_import_draft_response(draft)
+        except ResumeImportStateError as error:
+            raise APIError(status.HTTP_409_CONFLICT, error.code) from None
 
     async def get_status(
         self,

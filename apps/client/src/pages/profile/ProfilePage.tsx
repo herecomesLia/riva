@@ -2,20 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 
 import { useAuthenticationInvalidation } from "@/hooks/use-authentication-invalidation"
-import { useAgentPolling } from "@/lib/agent-polling"
-import type {
-  JobProfileSnapshot,
-  ResumeImportDraft,
-  ResumeParsingStatus,
-  ResumeUploadInput,
-} from "@/models/profile"
+import type { JobProfileSnapshot, ResumeUploadInput } from "@/models/profile"
 import { ApiError } from "@/services/api"
 import {
   applyResumeImportDraft,
   createManualJobProfile,
   getJobProfile,
   getResumeImportDraft,
-  getResumeParsingStatus,
   listResumeDocuments,
   profileCapabilities,
   retryResumeParsing,
@@ -34,10 +27,6 @@ import type {
 const profileQueryKey = ["profile"] as const
 const resumeDocumentsQueryKey = ["profile", "resumeDocuments"] as const
 const rolesQueryKey = ["roles"] as const
-
-function resumeParsingQueryKey(resumeId: string) {
-  return ["profile", "resumeParsing", resumeId] as const
-}
 
 function resumeDraftQueryKey(resumeId: string) {
   return ["profile", "resumeImportDraft", resumeId] as const
@@ -71,14 +60,6 @@ export function ProfilePage() {
     retry: false,
   })
   const hasResumeDocuments = (resumeDocumentsQuery.data?.length ?? 0) > 0
-  const cachedParsing = activeResume
-    ? queryClient.getQueryData<ResumeParsingStatus>(resumeParsingQueryKey(activeResume.id))
-    : undefined
-  const parsingOperationKey =
-    activeResume && (cachedParsing?.status === "queued" || cachedParsing?.status === "running")
-      ? `resume-parsing:${activeResume.id}`
-      : null
-  const parsingPolling = useAgentPolling(parsingOperationKey)
 
   useEffect(() => {
     invalidateAuthentication(profileQuery.error)
@@ -93,25 +74,8 @@ export function ProfilePage() {
     return snapshot
   }
 
-  const parsingQuery = useQuery({
-    enabled: activeResume !== null && !resumeSynchronizationError && !parsingPolling.isTimedOut,
-    queryFn: () => getResumeParsingStatus(activeResume!.id),
-    queryKey: resumeParsingQueryKey(activeResume?.id ?? "inactive"),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status
-      return status === "queued" || status === "running"
-        ? parsingPolling.getPollingInterval()
-        : false
-    },
-    refetchIntervalInBackground: false,
-    retry: false,
-  })
-
   const draftQuery = useQuery({
-    enabled:
-      activeResume !== null &&
-      parsingQuery.data?.status === "succeeded" &&
-      !resumeSynchronizationError,
+    enabled: activeResume !== null && !resumeSynchronizationError,
     queryFn: () => getResumeImportDraft(activeResume!.id),
     queryKey: resumeDraftQueryKey(activeResume?.id ?? "inactive"),
     refetchOnReconnect: false,
@@ -121,18 +85,9 @@ export function ProfilePage() {
   })
 
   useEffect(() => {
-    if (!parsingQuery.error || invalidateAuthentication(parsingQuery.error)) return
-    setResumeSynchronizationError(true)
-  }, [invalidateAuthentication, parsingQuery.error])
-
-  useEffect(() => {
     if (!draftQuery.error || invalidateAuthentication(draftQuery.error)) return
     setResumeSynchronizationError(true)
   }, [draftQuery.error, invalidateAuthentication])
-
-  useEffect(() => {
-    if (parsingPolling.isTimedOut) setResumeSynchronizationError(true)
-  }, [parsingPolling.isTimedOut])
 
   const saveMutation = useMutation({
     mutationFn: saveProfileSection,
@@ -166,8 +121,8 @@ export function ProfilePage() {
       const document = await uploadResume(input)
       queryClient.setQueryData(resumeDocumentsQueryKey, [document])
       try {
-        const parsing = await startResumeParsing(document.id)
-        queryClient.setQueryData(resumeParsingQueryKey(document.id), parsing)
+        const draft = await startResumeParsing(document.id)
+        queryClient.setQueryData(resumeDraftQueryKey(document.id), draft)
         setActiveResume({ id: document.id, mode })
       } catch (error) {
         setActiveResume({ id: document.id, mode })
@@ -181,54 +136,10 @@ export function ProfilePage() {
     onSettled: () => setPendingUploadMode(null),
   })
 
-  const resumeRecoveryMutation = useMutation({
-    mutationFn: async () => {
-      if (!activeResume) return
-
-      const resumeId = activeResume.id
-      const current = await getResumeParsingStatus(resumeId)
-
-      if (current.status === "succeeded") {
-        const cachedDraft = queryClient.getQueryData<ResumeImportDraft>(
-          resumeDraftQueryKey(resumeId),
-        )
-
-        if (cachedDraft?.status === "applied") {
-          setSnapshot(await getJobProfile())
-          await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
-          resetResumeWorkflow()
-          return
-        }
-      }
-
-      let nextStatus: ResumeParsingStatus
-
-      switch (current.status) {
-        case "notStarted":
-          nextStatus = await startResumeParsing(resumeId)
-          break
-
-        case "failed":
-          nextStatus = await retryResumeParsing(resumeId)
-          break
-
-        default:
-          nextStatus = current
-      }
-
-      queryClient.setQueryData(resumeParsingQueryKey(resumeId), nextStatus)
-      setResumeSynchronizationError(false)
-    },
-    onError: (error) => {
-      if (!invalidateAuthentication(error)) setResumeSynchronizationError(true)
-    },
-  })
-
   const resumeRetryMutation = useMutation({
     mutationFn: async (resumeId: string) => {
-      const parsing = await retryResumeParsing(resumeId)
-      queryClient.removeQueries({ queryKey: resumeDraftQueryKey(resumeId) })
-      queryClient.setQueryData(resumeParsingQueryKey(resumeId), parsing)
+      const draft = await retryResumeParsing(resumeId)
+      queryClient.setQueryData(resumeDraftQueryKey(resumeId), draft)
       setResumeApplyConflict(null)
       setResumeApplyError(false)
       setResumeSynchronizationError(false)
@@ -284,12 +195,6 @@ export function ProfilePage() {
         error.status === 409 &&
         error.code === "resume_import_draft_not_ready"
       ) {
-        try {
-          const parsing = await getResumeParsingStatus(resumeId)
-          queryClient.setQueryData(resumeParsingQueryKey(resumeId), parsing)
-        } catch (recoveryError) {
-          invalidateAuthentication(recoveryError)
-        }
         setResumeSynchronizationError(true)
         return
       }
@@ -308,7 +213,6 @@ export function ProfilePage() {
 
   function resetResumeWorkflow() {
     if (activeResume) {
-      queryClient.removeQueries({ queryKey: resumeParsingQueryKey(activeResume.id) })
       queryClient.removeQueries({ queryKey: resumeDraftQueryKey(activeResume.id) })
     }
     setActiveResume(null)
@@ -320,14 +224,8 @@ export function ProfilePage() {
 
   async function retryResumeWorkflow() {
     if (!activeResume) return
-    const parsing = parsingQuery.data
-    parsingPolling.reset()
     try {
-      if (parsing?.status === "failed" && parsing.canRetry) {
-        await resumeRetryMutation.mutateAsync(activeResume.id)
-        return
-      }
-      await resumeRecoveryMutation.mutateAsync()
+      await resumeRetryMutation.mutateAsync(activeResume.id)
     } catch {
       // Mutation callbacks convert transport errors into safe workflow state.
     }
@@ -361,8 +259,7 @@ export function ProfilePage() {
       return { mode: pendingUploadMode, status: "uploading" }
     }
     if (!activeResume) return { status: "idle" }
-    const parsing = parsingQuery.data
-    const isRetrying = resumeRecoveryMutation.isPending || resumeRetryMutation.isPending
+    const isRetrying = resumeRetryMutation.isPending
     if (resumeSynchronizationError) {
       return {
         isRetrying,
@@ -372,18 +269,8 @@ export function ProfilePage() {
         synchronizationError: true,
       }
     }
-    if (parsing?.status === "failed") {
-      return {
-        canRetry: parsing.canRetry,
-        failureReason: parsing.failureReason,
-        isRetrying,
-        mode: activeResume.mode,
-        resumeId: activeResume.id,
-        status: "failed",
-      }
-    }
     const draft = draftQuery.data
-    if (parsing?.status === "succeeded" && draft?.status === "ready") {
+    if (draft?.status === "ready") {
       if (resumeApplyMutation.isPending) {
         return { draft, mode: activeResume.mode, resumeId: activeResume.id, status: "applying" }
       }

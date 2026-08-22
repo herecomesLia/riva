@@ -25,12 +25,9 @@ import {
 import { ApiError } from "@/services/api"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
-import {
-  ROLES_QUERY_KEY,
-  useJobDescriptionSynchronization,
-} from "./hooks/useJobDescriptionSynchronization"
-import { useMatchingAnalysisSynchronization } from "./hooks/useMatchingAnalysisSynchronization"
 import { RolesActionError } from "./roles-errors"
+
+export const ROLES_QUERY_KEY = ["roles"] as const
 
 export function RolesPage() {
   const queryClient = useQueryClient()
@@ -40,13 +37,6 @@ export function RolesPage() {
     queryKey: ROLES_QUERY_KEY,
     retry: false,
   })
-  const { clearSynchronizationError, restartSynchronization, synchronizationErrorRoleIds } =
-    useJobDescriptionSynchronization(rolesQuery.data)
-  const {
-    clearSynchronizationError: clearMatchingAnalysisSynchronizationError,
-    restartSynchronization: restartMatchingAnalysisSynchronization,
-    synchronizationErrorRoleIds: matchingAnalysisSynchronizationErrorRoleIds,
-  } = useMatchingAnalysisSynchronization(rolesQuery.data)
 
   const setRolesResponse = useCallback(
     (response: RolesPageResponse) => {
@@ -154,7 +144,6 @@ export function RolesPage() {
       generateMatchingAnalysis: async (input) => {
         const response = await runMutation(generateMatchingAnalysisMutation.mutateAsync, input)
         setRolesResponse(response)
-        clearMatchingAnalysisSynchronizationError(input.roleId)
         return response
       },
     }),
@@ -162,26 +151,12 @@ export function RolesPage() {
       startJobDescriptionParsing: async (input) => {
         const response = await runMutation(startJobDescriptionParsingMutation.mutateAsync, input)
         setRolesResponse(response)
-        clearSynchronizationError(input.roleId)
-        return response
-      },
-      retryJobDescriptionSynchronization: async (input) => {
-        const response = restartSynchronization(input)
-        if (!response) throw new RolesActionError("requestFailed")
-        return response
-      },
-    }),
-    ...(rolesCapabilities.matchingAnalysis && {
-      retryMatchingAnalysisSynchronization: async (input) => {
-        const response = restartMatchingAnalysisSynchronization(input)
-        if (!response) throw new RolesActionError("requestFailed")
         return response
       },
     }),
     saveJobDescription: async (input) => {
       const savedResponse = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
       setRolesResponse(savedResponse)
-      clearSynchronizationError(input.roleId)
 
       const savedRole = savedResponse.roles.find((role) => role.id === input.roleId)
       if (!savedRole) throw new RolesActionError("requestFailed")
@@ -193,7 +168,6 @@ export function RolesPage() {
         version: savedRole.version,
       })
       setRolesResponse(parsingResponse)
-      clearSynchronizationError(input.roleId)
       return parsingResponse
     },
     jobDescriptionImport: {
@@ -210,7 +184,6 @@ export function RolesPage() {
           input,
         )
         setRolesResponse(response)
-        clearMatchingAnalysisSynchronizationError(input.roleId)
         return response
       },
     }),
@@ -223,8 +196,6 @@ export function RolesPage() {
       <RolesView
         actions={actions}
         content={{ status: "ready", data: rolesQuery.data }}
-        jobDescriptionSynchronizationErrorRoleIds={synchronizationErrorRoleIds}
-        matchingAnalysisSynchronizationErrorRoleIds={matchingAnalysisSynchronizationErrorRoleIds}
         matchingAnalysisAvailable={rolesCapabilities.matchingAnalysis}
         variant="default"
       />

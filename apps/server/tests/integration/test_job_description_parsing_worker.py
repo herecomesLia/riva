@@ -126,6 +126,10 @@ def database_url() -> str:
     return test_url
 
 
+async def leave_run_queued(_run_id: UUID) -> None:
+    """Keep worker-focused setup from executing the run through the API path."""
+
+
 def owner(user_id: UUID) -> User:
     return User(
         id=user_id,
@@ -393,6 +397,7 @@ def test_start_worker_status_end_to_end_with_fake_provider() -> None:
                         session,
                         llm_provider="qwen",
                         llm_model=" fake-api-model ",
+                        agent_executor=leave_run_queued,
                     ).start_job_description_parsing(
                         role_owner,
                         target.id,

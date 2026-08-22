@@ -12,14 +12,11 @@ from riva.schemas.roles import (
     ArchiveTargetRoleRequest,
     CreateTargetRoleRequest,
     DeleteTargetRoleVersion,
-    JobDescriptionParsingStatusQuery,
-    MatchingAnalysisStatusQuery,
     RolesPageResponse,
     SaveJobDescriptionRequest,
     SetCurrentTargetRoleRequest,
     StartJobDescriptionParsingRequest,
     StartMatchingAnalysisRequest,
-    TargetRoleResponse,
     UpdateJobDescriptionAnalysisModuleRequest,
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
@@ -28,8 +25,6 @@ from riva.services.roles import TargetRoleService
 
 RoleId = Annotated[UUID, Path(alias="roleId")]
 VersionQuery = Annotated[DeleteTargetRoleVersion, Query()]
-ParsingStatusQuery = Annotated[JobDescriptionParsingStatusQuery, Query()]
-MatchingStatusQuery = Annotated[MatchingAnalysisStatusQuery, Query()]
 
 router = APIRouter(
     prefix="/roles",
@@ -153,7 +148,6 @@ async def update_job_description_analysis_module(
 @router.post(
     "/{roleId}/job-description/parsing",
     response_model=RolesPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
 )
 async def start_job_description_parsing(
     role_id: RoleId,
@@ -172,27 +166,9 @@ async def start_job_description_parsing(
     )
 
 
-@router.get(
-    "/{roleId}/job-description/parsing",
-    response_model=TargetRoleResponse,
-)
-async def get_job_description_parsing_status(
-    role_id: RoleId,
-    query: ParsingStatusQuery,
-    current_user: User = Depends(require_current_user),
-    role_service: TargetRoleService = Depends(get_target_role_service),
-) -> TargetRoleResponse:
-    return await role_service.get_job_description_parsing_status(
-        current_user,
-        role_id,
-        query,
-    )
-
-
 @router.post(
     "/{roleId}/matching-analysis",
     response_model=RolesPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
 )
 async def start_matching_analysis(
     role_id: RoleId,
@@ -208,21 +184,4 @@ async def start_matching_analysis(
         interaction_language=normalize_interaction_language(
             request.headers.get("accept-language")
         ),
-    )
-
-
-@router.get(
-    "/{roleId}/matching-analysis",
-    response_model=TargetRoleResponse,
-)
-async def get_matching_analysis_status(
-    role_id: RoleId,
-    query: MatchingStatusQuery,
-    current_user: User = Depends(require_current_user),
-    role_service: TargetRoleService = Depends(get_target_role_service),
-) -> TargetRoleResponse:
-    return await role_service.get_matching_analysis_status(
-        current_user,
-        role_id,
-        query,
     )

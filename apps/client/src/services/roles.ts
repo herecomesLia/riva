@@ -5,18 +5,15 @@ import type {
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
-  GetJobDescriptionParsingStatusInput,
-  GetMatchingAnalysisStatusInput,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
-  TargetRole,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
-import { rolesPageResponseSchema, targetRoleResponseSchema } from "@/schemas/roles"
+import { rolesPageResponseSchema } from "@/schemas/roles"
 import { apiRequest } from "@/services/api"
 
 export type RolesCapabilities = {
@@ -36,13 +33,6 @@ async function requestRolesPage(
   options?: Parameters<typeof apiRequest>[1],
 ): Promise<RolesPageResponse> {
   return rolesPageResponseSchema.parse(await apiRequest<unknown>(path, options))
-}
-
-async function requestTargetRole(
-  path: string,
-  options?: Parameters<typeof apiRequest>[1],
-): Promise<TargetRole> {
-  return targetRoleResponseSchema.parse(await apiRequest<unknown>(path, options))
 }
 
 export function getRolesPage(): Promise<RolesPageResponse> {
@@ -121,19 +111,6 @@ export function startJobDescriptionParsing(
   })
 }
 
-export function getJobDescriptionParsingStatus(
-  input: GetJobDescriptionParsingStatusInput,
-): Promise<TargetRole> {
-  if (env.mock) return rolesMockService.getJobDescriptionParsingStatus(input)
-  const query = new URLSearchParams({
-    version: String(input.version),
-    jobDescriptionVersion: String(input.jobDescriptionVersion),
-  })
-  return requestTargetRole(
-    `/roles/${encodeURIComponent(input.roleId)}/job-description/parsing?${query}`,
-  )
-}
-
 export function generateMatchingAnalysis(
   input: GenerateOrRegenerateMatchingAnalysisInput,
 ): Promise<RolesPageResponse> {
@@ -142,14 +119,6 @@ export function generateMatchingAnalysis(
     json: { version: input.version },
     method: "POST",
   })
-}
-
-export function getMatchingAnalysisStatus(
-  input: GetMatchingAnalysisStatusInput,
-): Promise<TargetRole> {
-  if (env.mock) return rolesMockService.getMatchingAnalysisStatus(input)
-  const query = new URLSearchParams({ version: String(input.version) })
-  return requestTargetRole(`/roles/${encodeURIComponent(input.roleId)}/matching-analysis?${query}`)
 }
 
 export function updateJobDescriptionAnalysisModule(

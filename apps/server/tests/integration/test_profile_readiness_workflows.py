@@ -2,7 +2,7 @@ import asyncio
 import os
 from datetime import timedelta
 from typing import Literal
-from uuid import uuid4
+from uuid import UUID
 
 import pytest
 from sqlalchemy import select
@@ -154,6 +154,10 @@ def _assert_minimal_profile(snapshot, kind: MinimalProfile) -> None:
     assert len(snapshot.project_experiences) == (1 if kind == "project" else 0)
 
 
+async def leave_run_queued(_run_id: UUID) -> None:
+    """Leave the run for the worker assertions in this test module."""
+
+
 @pytest.mark.parametrize("kind", ["skills", "work", "project"])
 def test_minimal_profiles_are_ready_across_core_workflows(
     kind: MinimalProfile,
@@ -176,6 +180,7 @@ def test_minimal_profiles_are_ready_across_core_workflows(
                         session,
                         llm_provider="qwen",
                         llm_model=MODEL,
+                        agent_executor=leave_run_queued,
                     ).start_matching_analysis(
                         owner,
                         role.id,

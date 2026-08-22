@@ -18,7 +18,6 @@ import type {
   ResumeDocument,
   ResumeImportApplication,
   ResumeImportDraft,
-  ResumeParsingStatus,
   ResumeUploadInput,
   SaveProfileSectionInput,
   WorkExperience,
@@ -30,7 +29,6 @@ import {
   resumeDocumentsResponseSchema,
   resumeImportApplicationSchema,
   resumeImportDraftSchema,
-  resumeParsingStatusSchema,
 } from "@/schemas/profile"
 import { apiRequest, ApiError } from "@/services/api"
 
@@ -247,38 +245,28 @@ export async function uploadResume(input: ResumeUploadInput): Promise<ResumeDocu
   return resumeDocumentSchema.parse(await profileMockService.uploadResume(input))
 }
 
-export async function startResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
+export async function startResumeParsing(resumeId: string): Promise<ResumeImportDraft> {
   if (!env.mock) {
-    return resumeParsingStatusSchema.parse(
+    return resumeImportDraftSchema.parse(
       await apiRequest<unknown>(`${resumeApiPath(resumeId)}/parsing`, {
         method: "POST",
       }),
     )
   }
 
-  return resumeParsingStatusSchema.parse(await profileMockService.startResumeParsing(resumeId))
+  return resumeImportDraftSchema.parse(await profileMockService.startResumeParsing(resumeId))
 }
 
-export async function getResumeParsingStatus(resumeId: string): Promise<ResumeParsingStatus> {
+export async function retryResumeParsing(resumeId: string): Promise<ResumeImportDraft> {
   if (!env.mock) {
-    return resumeParsingStatusSchema.parse(
-      await apiRequest<unknown>(`${resumeApiPath(resumeId)}/parsing`),
-    )
-  }
-
-  return resumeParsingStatusSchema.parse(await profileMockService.getResumeParsingStatus(resumeId))
-}
-
-export async function retryResumeParsing(resumeId: string): Promise<ResumeParsingStatus> {
-  if (!env.mock) {
-    return resumeParsingStatusSchema.parse(
+    return resumeImportDraftSchema.parse(
       await apiRequest<unknown>(`${resumeApiPath(resumeId)}/parsing/retry`, {
         method: "POST",
       }),
     )
   }
 
-  return resumeParsingStatusSchema.parse(await profileMockService.retryResumeParsing(resumeId))
+  return resumeImportDraftSchema.parse(await profileMockService.retryResumeParsing(resumeId))
 }
 
 export async function getResumeImportDraft(resumeId: string): Promise<ResumeImportDraft> {

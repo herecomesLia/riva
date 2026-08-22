@@ -1,13 +1,9 @@
 import { z } from "zod"
 
-import type {
-  TrainingPlanningPlan,
-  TrainingPlanningStatusResponse,
-} from "@/models/training-planning"
+import type { TrainingPlanningPlan, TrainingPlanningResponse } from "@/models/training-planning"
 import type { InteractionLanguage } from "@/types/language"
 
 const identifierSchema = z.string().trim().min(1)
-const dateTimeSchema = z.iso.datetime({ offset: true })
 const interactionLanguageSchema: z.ZodType<InteractionLanguage> = z.enum(["zh-CN", "en"])
 
 const targetedPracticePlanSchema = z
@@ -43,82 +39,24 @@ export const trainingPlanningPlanSchema = z.discriminatedUnion("action", [
   mockInterviewPlanSchema,
 ])
 
-export const trainingPlanningStatusResponseSchema = z
+export const trainingPlanningResponseSchema = z
   .object({
-    runId: identifierSchema,
-    status: z.enum(["queued", "running", "succeeded", "failed"]),
     targetRoleId: identifierSchema,
     interactionLanguage: interactionLanguageSchema,
-    attemptCount: z.number().int().nonnegative(),
-    maxAttempts: z.number().int().positive(),
-    errorCode: z.string().trim().min(1).nullable(),
-    failureReason: z.string().trim().min(1).nullable(),
-    createdAt: dateTimeSchema,
-    startedAt: dateTimeSchema.nullable(),
-    finishedAt: dateTimeSchema.nullable(),
-    plan: trainingPlanningPlanSchema.nullable(),
+    plan: trainingPlanningPlanSchema,
   })
   .strict()
-  .superRefine((response, context) => {
-    if (response.status === "queued") {
-      if (
-        response.plan !== null ||
-        response.errorCode !== null ||
-        response.failureReason !== null ||
-        response.finishedAt !== null
-      ) {
-        context.addIssue({ code: "custom", message: "Queued planning response is invalid." })
-      }
-    }
-    if (response.status === "running") {
-      if (
-        response.plan !== null ||
-        response.errorCode !== null ||
-        response.failureReason !== null ||
-        response.startedAt === null ||
-        response.finishedAt !== null
-      ) {
-        context.addIssue({ code: "custom", message: "Running planning response is invalid." })
-      }
-    }
-    if (response.status === "succeeded") {
-      if (
-        response.plan === null ||
-        response.errorCode !== null ||
-        response.failureReason !== null ||
-        response.startedAt === null ||
-        response.finishedAt === null
-      ) {
-        context.addIssue({ code: "custom", message: "Succeeded planning response is invalid." })
-      }
-    }
-    if (response.status === "failed") {
-      if (
-        response.plan !== null ||
-        response.errorCode === null ||
-        response.failureReason === null ||
-        response.startedAt === null ||
-        response.finishedAt === null
-      ) {
-        context.addIssue({ code: "custom", message: "Failed planning response is invalid." })
-      }
-    }
-  })
 
-export type TrainingPlanningStatusResponseWire = z.infer<
-  typeof trainingPlanningStatusResponseSchema
->
+export type TrainingPlanningResponseWire = z.infer<typeof trainingPlanningResponseSchema>
 
 export type TrainingPlanningPlanWire = z.infer<typeof trainingPlanningPlanSchema>
 
-export function parseTrainingPlanningStatusResponse(
-  value: unknown,
-): TrainingPlanningStatusResponse {
-  return trainingPlanningStatusResponseSchema.parse(value) as TrainingPlanningStatusResponse
+export function parseTrainingPlanningResponse(value: unknown): TrainingPlanningResponse {
+  return trainingPlanningResponseSchema.parse(value) as TrainingPlanningResponse
 }
 
 export type _TrainingPlanningSchemaTypeCheck =
-  TrainingPlanningStatusResponseWire extends TrainingPlanningStatusResponse
+  TrainingPlanningResponseWire extends TrainingPlanningResponse
     ? TrainingPlanningPlanWire extends TrainingPlanningPlan
       ? true
       : never

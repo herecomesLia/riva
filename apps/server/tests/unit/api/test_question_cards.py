@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
@@ -11,12 +10,11 @@ from riva.core.question_cards import get_question_card_service
 from riva.models import User
 from riva.schemas.question_cards import (
     QuestionCardResponse,
-    QuestionGenerationStatusResponse,
+    StartQuestionGenerationRequest,
 )
 from riva.services.question_cards import QUESTION_GENERATION_REQUEST_CONFLICT
 
 TRUSTED_ORIGIN = "http://localhost:5173"
-RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
 CARD_ID = UUID("22222222-2222-4222-8222-222222222222")
 NOW = datetime(2026, 8, 10, 10, 0, tzinfo=UTC)
 
@@ -50,69 +48,22 @@ def card_response() -> QuestionCardResponse:
     )
 
 
-def status_response(
-    state: str,
-    *,
-    question_card: QuestionCardResponse | None = None,
-) -> QuestionGenerationStatusResponse:
-    return QuestionGenerationStatusResponse(
-        run_id=RUN_ID,
-        status=state,
-        question_type="projectDeepDive",
-        difficulty="basic",
-        language="zh-CN",
-        attempt_count=1 if state != "queued" else 0,
-        max_attempts=3,
-        error_code="provider_unavailable" if state == "failed" else None,
-        failure_reason=(
-            "The question could not be generated right now. Please try again."
-            if state == "failed"
-            else None
-        ),
-        created_at=NOW,
-        started_at=None if state == "queued" else NOW,
-        finished_at=NOW if state in {"succeeded", "failed"} else None,
-        question_card=question_card,
-    )
-
-
 class FakeQuestionCardService:
-    def __init__(
-        self,
-        *,
-        start_result: QuestionGenerationStatusResponse | None = None,
-        status_result: QuestionGenerationStatusResponse | None = None,
-        card_result: QuestionCardResponse | None = None,
-        error: APIError | None = None,
-    ) -> None:
-        self.start_result = start_result or status_response("queued")
-        self.status_result = status_result or status_response("queued")
-        self.card_result = card_result or card_response()
+    def __init__(self, *, error: APIError | None = None) -> None:
         self.error = error
         self.calls: list[tuple[str, object]] = []
 
     async def start_generation(
         self,
         current_user: User,
-        payload: object,
+        payload: StartQuestionGenerationRequest,
         *,
         interaction_language: str,
-    ) -> QuestionGenerationStatusResponse:
+    ) -> QuestionCardResponse:
         self.calls.append(("start", (current_user, payload, interaction_language)))
         if self.error is not None:
             raise self.error
-        return self.start_result
-
-    async def get_generation_status(
-        self,
-        *,
-        user_id: UUID,
-        run_id: UUID,
-    ) -> QuestionGenerationStatusResponse:
-        self.calls.append(("status", (user_id, run_id)))
-        if self.error is not None:
-            raise self.error
-        return self.status_result
+        return card_response()
 
     async def get_question_card(
         self,
@@ -123,7 +74,7 @@ class FakeQuestionCardService:
         self.calls.append(("card", (user_id, question_card_id)))
         if self.error is not None:
             raise self.error
-        return self.card_result
+        return card_response()
 
 
 def create_client(
@@ -145,46 +96,7 @@ def generation_payload() -> dict[str, object]:
     }
 
 
-@pytest.mark.parametrize(
-    ("method", "url", "json"),
-    [
-        ("post", "/api/question-cards/generations", generation_payload()),
-        ("get", f"/api/question-cards/generations/{RUN_ID}", None),
-        ("get", f"/api/question-cards/{CARD_ID}", None),
-    ],
-)
-def test_question_card_endpoints_require_authentication(
-    app,
-    method: str,
-    url: str,
-    json: dict[str, object] | None,
-) -> None:
-    service = FakeQuestionCardService()
-    app.dependency_overrides[get_question_card_service] = lambda: service
-    app.dependency_overrides[get_auth_service] = lambda: object()
-
-    with TestClient(app) as client:
-        response = client.request(
-            method,
-            url,
-            json=json,
-            headers={"Origin": TRUSTED_ORIGIN},
-        )
-
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert response.json() == {"error": "not_authenticated"}
-    assert service.calls == []
-
-
-@pytest.mark.parametrize(
-    ("header", "expected_language"),
-    [("zh-CN", "zh-CN"), ("en-US", "en")],
-)
-def test_start_generation_returns_202_and_freezes_accept_language(
-    app,
-    header: str,
-    expected_language: str,
-) -> None:
+def test_generation_returns_final_card_and_normalizes_language(app) -> None:
     service = FakeQuestionCardService()
     client, current_user = create_client(app, service)
 
@@ -192,23 +104,53 @@ def test_start_generation_returns_202_and_freezes_accept_language(
         response = client.post(
             "/api/question-cards/generations",
             json=generation_payload(),
-            headers={
-                "Origin": TRUSTED_ORIGIN,
-                "Accept-Language": header,
-            },
+            headers={"Origin": TRUSTED_ORIGIN, "Accept-Language": "en-US"},
         )
 
-    assert response.status_code == status.HTTP_202_ACCEPTED
-    assert response.json()["status"] == "queued"
-    assert response.json()["runId"] == str(RUN_ID)
-    assert service.calls[0][0] == "start"
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == card_response().model_dump(mode="json", by_alias=True)
     call_user, payload, language = service.calls[0][1]
     assert call_user is current_user
     assert payload.request_id is not None
-    assert language == expected_language
+    assert language == "en"
 
 
-def test_start_generation_body_cannot_override_language(app) -> None:
+def test_question_card_get_still_returns_card(app) -> None:
+    service = FakeQuestionCardService()
+    client, current_user = create_client(app, service)
+
+    with client:
+        response = client.get(f"/api/question-cards/{CARD_ID}")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["id"] == str(CARD_ID)
+    assert service.calls == [("card", (current_user.id, CARD_ID))]
+
+
+def test_generation_status_route_is_removed(app) -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/question-cards/generations/11111111-1111-4111-8111-111111111111"
+        )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_write_routes_require_csrf(app) -> None:
+    service = FakeQuestionCardService()
+    client, _current_user = create_client(app, service)
+
+    with client:
+        response = client.post(
+            "/api/question-cards/generations",
+            json=generation_payload(),
+        )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert service.calls == []
+
+
+def test_request_body_cannot_override_language(app) -> None:
     service = FakeQuestionCardService()
     client, _current_user = create_client(app, service)
 
@@ -223,80 +165,7 @@ def test_start_generation_body_cannot_override_language(app) -> None:
     assert service.calls == []
 
 
-def test_post_is_csrf_protected_but_get_status_is_not(app) -> None:
-    service = FakeQuestionCardService()
-    client, _current_user = create_client(app, service)
-
-    with client:
-        start = client.post(
-            "/api/question-cards/generations",
-            json=generation_payload(),
-        )
-        get_status = client.get(f"/api/question-cards/generations/{RUN_ID}")
-
-    assert start.status_code == status.HTTP_403_FORBIDDEN
-    assert get_status.status_code == status.HTTP_200_OK
-    assert [call[0] for call in service.calls] == ["status"]
-
-
-def test_status_and_card_routes_return_camel_case_public_contract(app) -> None:
-    service = FakeQuestionCardService(
-        status_result=status_response("succeeded", question_card=card_response()),
-        card_result=card_response(),
-    )
-    client, current_user = create_client(app, service)
-
-    with client:
-        status_result = client.get(f"/api/question-cards/generations/{RUN_ID}")
-        card_result = client.get(f"/api/question-cards/{CARD_ID}")
-
-    assert status_result.status_code == 200
-    assert status_result.json()["questionCard"]["isSaved"] is False
-    assert card_result.status_code == 200
-    card_json = card_result.json()
-    assert card_json["id"] == str(CARD_ID)
-    assert "sourceAgentRunId" not in card_json
-    assert "matchingAnalysisRunId" not in card_json
-    assert "followUpDirections" not in card_json
-    assert "scoringFocus" not in card_json
-    assert service.calls == [
-        ("status", (current_user.id, RUN_ID)),
-        ("card", (current_user.id, CARD_ID)),
-    ]
-
-
-def test_failed_status_uses_safe_service_error(app) -> None:
-    service = FakeQuestionCardService(
-        status_result=status_response("failed"),
-        error=APIError(409, "question_generation_state_conflict"),
-    )
-    client, _current_user = create_client(app, service)
-    service.error = None
-
-    with client:
-        response = client.get(f"/api/question-cards/generations/{RUN_ID}")
-
-    assert response.status_code == 200
-    assert response.json()["failureReason"] == (
-        "The question could not be generated right now. Please try again."
-    )
-    assert "provider response" not in response.text.lower()
-
-
-def test_application_error_contract_is_preserved(app) -> None:
-    service = FakeQuestionCardService(
-        error=APIError(404, "question_generation_not_found")
-    )
-    client, _current_user = create_client(app, service)
-
-    with client:
-        response = client.get(f"/api/question-cards/generations/{RUN_ID}")
-
-    assert response.status_code == 404
-    assert response.json() == {"error": "question_generation_not_found"}
-
-
-def test_start_generation_request_conflict_is_not_accepted_as_replay(app) -> None:
+def test_generation_conflicts_keep_the_public_error_contract(app) -> None:
     service = FakeQuestionCardService(
         error=APIError(409, QUESTION_GENERATION_REQUEST_CONFLICT)
     )
@@ -306,40 +175,37 @@ def test_start_generation_request_conflict_is_not_accepted_as_replay(app) -> Non
         response = client.post(
             "/api/question-cards/generations",
             json=generation_payload(),
-            headers={
-                "Origin": TRUSTED_ORIGIN,
-                "Accept-Language": "en-US",
-            },
+            headers={"Origin": TRUSTED_ORIGIN},
         )
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json() == {"error": QUESTION_GENERATION_REQUEST_CONFLICT}
 
 
-def test_openapi_exposes_question_card_contract(app) -> None:
-    paths = app.openapi()["paths"]
-    start = "/api/question-cards/generations"
-    generation = f"{start}/{{runId}}"
-    card = "/api/question-cards/{questionCardId}"
+def test_question_card_routes_require_authentication(app) -> None:
+    service = FakeQuestionCardService()
+    app.dependency_overrides[get_question_card_service] = lambda: service
+    app.dependency_overrides[get_auth_service] = lambda: object()
 
-    assert start in paths
-    assert generation in paths
-    assert card in paths
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/question-cards/generations",
+            json=generation_payload(),
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert service.calls == []
+
+
+def test_openapi_exposes_direct_question_card_contract(app) -> None:
+    paths = app.openapi()["paths"]
+    generation = "/api/question-cards/generations"
+
+    assert "/api/question-cards/generations/{runId}" not in paths
     assert (
-        paths[start]["post"]["responses"]["202"]["content"]["application/json"][
+        paths[generation]["post"]["responses"]["200"]["content"]["application/json"][
             "schema"
         ]["$ref"]
-        == "#/components/schemas/QuestionGenerationStatusResponse"
-    )
-    assert (
-        paths[generation]["get"]["responses"]["200"]["content"]["application/json"][
-            "schema"
-        ]["$ref"]
-        == "#/components/schemas/QuestionGenerationStatusResponse"
-    )
-    assert (
-        paths[card]["get"]["responses"]["200"]["content"]["application/json"]["schema"][
-            "$ref"
-        ]
         == "#/components/schemas/QuestionCardResponse"
     )

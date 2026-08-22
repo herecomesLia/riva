@@ -2,26 +2,17 @@ import { screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import type { TrainingPlanningStatusResponse } from "@/models/training-planning"
+import type { TrainingPlanningResponse } from "@/models/training-planning"
 import { renderWithProviders } from "@/test/render"
 
 import { RecommendationCard } from "./RecommendationCard"
 
 const roleId = "11111111-1111-4111-8111-111111111111"
 
-function response(plan: TrainingPlanningStatusResponse["plan"]): TrainingPlanningStatusResponse {
+function response(plan: TrainingPlanningResponse["plan"]): TrainingPlanningResponse {
   return {
-    runId: "22222222-2222-4222-8222-222222222222",
-    status: "succeeded",
     targetRoleId: roleId,
     interactionLanguage: "zh-CN",
-    attemptCount: 1,
-    maxAttempts: 3,
-    errorCode: null,
-    failureReason: null,
-    createdAt: "2026-08-18T10:00:00.000Z",
-    startedAt: "2026-08-18T10:00:00.000Z",
-    finishedAt: "2026-08-18T10:00:01.000Z",
     plan,
   }
 }

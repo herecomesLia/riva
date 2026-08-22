@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.core.agent_execution import get_agent_executor
 from riva.db import get_db_session
 from riva.resumes import ResumeTextExtractor
 from riva.services.resume_documents import ResumeDocumentService
@@ -46,6 +47,7 @@ async def get_resume_parsing_lifecycle_service(
         session=session,
         llm_provider=settings.llm_provider,
         llm_model=settings.llm_model,
+        agent_executor=get_agent_executor(request),
     )
 
 
@@ -63,6 +65,7 @@ async def get_resume_import_api_service(
                 db_session,
                 llm_provider=settings.llm_provider,
                 llm_model=settings.llm_model,
+                agent_executor=get_agent_executor(request),
             )
         ),
     )

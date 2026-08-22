@@ -95,6 +95,10 @@ def database_url() -> str:
     return value
 
 
+async def leave_run_queued(_run_id: UUID) -> None:
+    """Keep worker-focused setup from executing the run through the API path."""
+
+
 def make_user(user_id: UUID) -> User:
     return User(
         id=user_id,
@@ -471,6 +475,7 @@ def test_matching_service_worker_status_e2e_with_fake_provider() -> None:
                         session,
                         llm_provider="qwen",
                         llm_model="fake-matching-model",
+                        agent_executor=leave_run_queued,
                     ).start_matching_analysis(
                         setup.owner,
                         setup.role.id,
@@ -670,6 +675,7 @@ def test_matching_start_concurrent_same_version_creates_one_run() -> None:
                 session,
                 llm_provider="qwen",
                 llm_model="fake-matching-model",
+                agent_executor=leave_run_queued,
             ).start_matching_analysis(
                 setup.owner,
                 setup.role.id,
@@ -741,6 +747,7 @@ def test_matching_failed_run_retry_replaces_pointer_and_preserves_audit() -> Non
                         session,
                         llm_provider="qwen",
                         llm_model="fake-matching-model",
+                        agent_executor=leave_run_queued,
                     ).start_matching_analysis(
                         setup.owner,
                         setup.role.id,
@@ -771,6 +778,7 @@ def test_matching_failed_run_retry_replaces_pointer_and_preserves_audit() -> Non
                         session,
                         llm_provider="qwen",
                         llm_model="fake-matching-model",
+                        agent_executor=leave_run_queued,
                     ).start_matching_analysis(
                         setup.owner,
                         setup.role.id,

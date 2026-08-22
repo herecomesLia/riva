@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Literal, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -40,6 +40,7 @@ from riva.schemas.training_planning import (
     TrainingPlanningMockInterviewConstraints,
     TrainingPlanningMockInterviewRecord,
     TrainingPlanningOutput,
+    TrainingPlanningResponse,
     TrainingPlanningRunPayload,
     TrainingPlanningStatusResponse,
     TrainingPlanningTargetedPracticeConstraints,
@@ -102,6 +103,7 @@ TRAINING_PLANNING_FAILURE_REASON = (
 _SAFE_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 TrainingRecordServiceFactory = Callable[[AsyncSession], TrainingRecordService]
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
+AgentExecutor = Callable[[UUID], Awaitable[AgentRun]]
 
 _CURRENT_PLANNING_REQUEST_NAMESPACE = NAMESPACE_URL
 
@@ -121,6 +123,7 @@ class TrainingPlanningService:
         *,
         llm_provider: str | None = None,
         llm_model: str | None = None,
+        agent_executor: AgentExecutor | None = None,
         training_record_service_factory: TrainingRecordServiceFactory = (
             TrainingRecordService
         ),
@@ -129,6 +132,7 @@ class TrainingPlanningService:
         self.session = session
         self.llm_provider = (llm_provider or "").strip().lower()
         self.llm_model = (llm_model or "").strip()
+        self.agent_executor = agent_executor
         self.training_record_service_factory = training_record_service_factory
         self.agent_run_service_factory = agent_run_service_factory
 
@@ -138,7 +142,7 @@ class TrainingPlanningService:
         payload: StartTrainingPlanningRequest,
         *,
         interaction_language: InteractionLanguage,
-    ) -> TrainingPlanningStatusResponse:
+    ) -> TrainingPlanningResponse:
         try:
             idempotency_key = f"training-planning:{payload.request_id}"
             existing = await self._existing_run(
@@ -152,7 +156,7 @@ class TrainingPlanningService:
                     payload,
                     interaction_language,
                 )
-                return await self._status_response(existing)
+                return await self._execute(existing.id)
 
             self._configured_model()
             planning_input = await self._build_authoritative_input(
@@ -172,7 +176,7 @@ class TrainingPlanningService:
                 payload,
                 interaction_language,
             )
-            return await self._status_response(run)
+            return await self._execute(run.id)
         except TrainingPlanningStateError:
             await self.session.rollback()
             raise
@@ -186,7 +190,7 @@ class TrainingPlanningService:
         payload: EnsureCurrentTrainingPlanningRequest,
         *,
         interaction_language: InteractionLanguage,
-    ) -> TrainingPlanningStatusResponse:
+    ) -> TrainingPlanningResponse:
         try:
             planning_input = await self._build_authoritative_input(
                 user_id=user.id,
@@ -201,7 +205,7 @@ class TrainingPlanningService:
                 context_fingerprint=fingerprint,
             )
             if existing is not None:
-                return await self._status_response(existing)
+                return await self._execute(existing.id)
 
             request_id = uuid5(
                 _CURRENT_PLANNING_REQUEST_NAMESPACE,
@@ -232,7 +236,7 @@ class TrainingPlanningService:
                 ),
                 interaction_language,
             )
-            return await self._status_response(run)
+            return await self._execute(run.id)
         except TrainingPlanningStateError:
             await self.session.rollback()
             raise
@@ -248,6 +252,23 @@ class TrainingPlanningService:
     ) -> TrainingPlanningStatusResponse:
         run = await self._load_run(user_id=user_id, run_id=run_id)
         return await self._status_response(run)
+
+    async def _execute(self, run_id: UUID) -> TrainingPlanningResponse:
+        if self.agent_executor is None:
+            raise TrainingPlanningStateError(TRAINING_PLANNING_UNAVAILABLE)
+        await self.agent_executor(run_id)
+        await self.session.rollback()
+        run = await self.session.scalar(select(AgentRun).where(AgentRun.id == run_id))
+        if run is None:
+            raise TrainingPlanningStateError(TRAINING_PLANNING_NOT_FOUND)
+        status_response = await self._status_response(run)
+        if status_response.status != "succeeded" or status_response.plan is None:
+            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT)
+        return TrainingPlanningResponse(
+            target_role_id=status_response.target_role_id,
+            interaction_language=status_response.interaction_language,
+            plan=status_response.plan,
+        )
 
     async def load_generation_input(
         self,
