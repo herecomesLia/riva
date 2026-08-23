@@ -1,5 +1,3 @@
-from typing import Literal
-
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,19 +6,7 @@ from riva.agents.practice.evaluation_types import (
 )
 from riva.integrations.llm import LLMProvider
 from riva.models import PracticeEvaluation
-
-EvaluationGenerationStateErrorCode = Literal[
-    "practice_evaluation_context_conflict",
-    "practice_evaluation_output_invalid",
-]
-
-
-class EvaluationGenerationStateError(RuntimeError):
-    safe_message = "The practice evaluation state is invalid."
-
-    def __init__(self, code: EvaluationGenerationStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
+from riva.services.errors import service_error_for_code
 
 
 def practice_evaluation_output_from_artifact(
@@ -45,9 +31,7 @@ def practice_evaluation_output_from_artifact(
             )
         return output
     except TypeError, ValueError, ValidationError:
-        raise EvaluationGenerationStateError(
-            "practice_evaluation_output_invalid"
-        ) from None
+        raise service_error_for_code("practice_evaluation_output_invalid") from None
 
 
 class EvaluationGenerationService:

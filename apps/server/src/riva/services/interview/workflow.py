@@ -17,42 +17,37 @@ from riva.services.errors import (
     ExternalDependencyError,
     ResourceMissingError,
     ServiceError,
+    service_error_for_code,
 )
 from riva.services.interview.completion import (
     INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED,
     INTERVIEW_COMPLETION_SESSION_NOT_FOUND,
     InterviewCompletionService,
-    InterviewCompletionStateError,
 )
 from riva.services.interview.planning import (
     INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED,
     INTERVIEW_PLANNING_SESSION_NOT_FOUND,
     InterviewPlanningService,
-    InterviewPlanningStateError,
 )
 from riva.services.interview.questions import (
     INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED,
     INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND,
     InterviewCandidateQuestionService,
-    InterviewCandidateQuestionStateError,
 )
 from riva.services.interview.review import (
     INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED,
     INTERVIEW_REVIEW_SESSION_NOT_FOUND,
     InterviewReviewService,
-    InterviewReviewStateError,
 )
 from riva.services.interview.session import (
     INTERVIEW_SESSION_NOT_FOUND,
     InterviewSessionService,
-    InterviewSessionStateError,
     InterviewSetupContext,
 )
 from riva.services.interview.turn import (
     INTERVIEW_TURN_MODEL_NOT_CONFIGURED,
     INTERVIEW_TURN_SESSION_NOT_FOUND,
     InterviewTurnService,
-    InterviewTurnStateError,
 )
 from riva.services.interview.types import (
     BeginInterviewQuestionsRequest,
@@ -115,12 +110,16 @@ INTERVIEW_OPENING_MESSAGES: dict[InteractionLanguage, str] = {
         "你好，我是本次模拟面试的面试官。接下来会围绕岗位经历、项目能力和求职动机连续提问，请尽量像正式面试一样作答。"
     ),
     "en": (
-        "Hello, I am your interviewer for this session. We will discuss your experience, project capabilities, and motivation. Please answer as you would in a formal interview."
+        "Hello, I am your interviewer for this session. We will discuss your "
+        "experience, project capabilities, and motivation. Please answer as you "
+        "would in a formal interview."
     ),
 }
 CANDIDATE_QUESTIONS_PROMPTS: dict[InteractionLanguage, str] = {
     "zh-CN": "正式问题已经完成。现在你可以向面试官提问。",
-    "en": "The formal questions are complete. You may now ask the interviewer questions.",
+    "en": (
+        "The formal questions are complete. You may now ask the interviewer questions."
+    ),
 }
 
 SUPPORTED_ROUNDS: tuple[InterviewRound, ...] = (
@@ -156,9 +155,9 @@ class InterviewService:
         interview_turn_service_factory: InterviewTurnServiceFactory = (
             InterviewTurnService
         ),
-        interview_candidate_question_service_factory: InterviewCandidateQuestionServiceFactory = (
-            InterviewCandidateQuestionService
-        ),
+        interview_candidate_question_service_factory: (
+            InterviewCandidateQuestionServiceFactory
+        ) = (InterviewCandidateQuestionService),
         interview_completion_service_factory: InterviewCompletionServiceFactory = (
             InterviewCompletionService
         ),
@@ -208,10 +207,10 @@ class InterviewService:
             setup = await service.get_setup(user_id=user_id)
             active_session = await service.get_active_session(user_id=user_id)
             if active_session is None:
-                raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+                raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
             return build_interview_page_response(setup, active_session)
-        except InterviewSessionStateError as error:
-            raise interview_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_interview_session_error(error) from None
 
     async def begin_questions(
         self,
@@ -231,12 +230,10 @@ class InterviewService:
             setup = await interview_service.get_setup(user_id=user_id)
             active_session = await interview_service.get_active_session(user_id=user_id)
             if active_session is None or active_session.id != session_id:
-                raise InterviewPlanningStateError(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
+                raise service_error_for_code(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
             return build_interview_page_response(setup, active_session)
-        except InterviewPlanningStateError as error:
-            raise interview_planning_state_service_error(error) from None
-        except InterviewSessionStateError as error:
-            raise interview_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_interview_planning_error(error) from None
 
     async def submit_answer(
         self,
@@ -261,10 +258,8 @@ class InterviewService:
                 ),
             )
             return await self._page_for_session(user_id, session_id)
-        except InterviewTurnStateError as error:
-            raise interview_turn_state_service_error(error) from None
-        except InterviewSessionStateError as error:
-            raise interview_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_interview_turn_error(error) from None
 
     async def submit_candidate_question(
         self,
@@ -281,10 +276,8 @@ class InterviewService:
                 content=payload.content,
             )
             return await self._page_for_session(user_id, session_id)
-        except InterviewCandidateQuestionStateError as error:
-            raise interview_candidate_question_state_service_error(error) from None
-        except InterviewSessionStateError as error:
-            raise interview_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_interview_candidate_question_error(error) from None
 
     async def finish_session(
         self,
@@ -300,10 +293,8 @@ class InterviewService:
                 version=payload.version,
             )
             return await self._page_for_session(user_id, session_id)
-        except InterviewCompletionStateError as error:
-            raise interview_completion_state_service_error(error) from None
-        except InterviewSessionStateError as error:
-            raise interview_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_interview_completion_error(error) from None
 
     async def end_session(
         self,
@@ -319,10 +310,8 @@ class InterviewService:
                 version=payload.version,
             )
             return await self._page_for_session(user_id, session_id)
-        except InterviewCompletionStateError as error:
-            raise interview_completion_state_service_error(error) from None
-        except InterviewSessionStateError as error:
-            raise interview_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_interview_completion_error(error) from None
 
     async def get_review(
         self,
@@ -339,8 +328,8 @@ class InterviewService:
                 session_id=session_id,
             )
             return build_interview_review_response(interview_session, review)
-        except InterviewReviewStateError as error:
-            raise interview_review_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_interview_review_error(error) from None
 
     def _interview_service(self) -> InterviewSessionService:
         return self.interview_service_factory(self.session)
@@ -404,7 +393,7 @@ class InterviewService:
         )
         current_session = await get_current_session(user_id=user_id)
         if current_session is None or current_session.id != session_id:
-            raise InterviewTurnStateError(INTERVIEW_TURN_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_TURN_SESSION_NOT_FOUND)
         return build_interview_page_response(setup, current_session)
 
 
@@ -515,7 +504,7 @@ def build_interview_session_response(
     if session.status == "question":
         question = _active_question(questions)
         if question is None:
-            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
         return InterviewQuestionSessionResponse(
             status="question",
             session_id=session.id,
@@ -534,11 +523,11 @@ def build_interview_session_response(
     if session.status == "followUp":
         question = _active_question(questions)
         if question is None:
-            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
         answer = getattr(question, "answer", None)
         follow_up = _pending_follow_up(question)
         if answer is None or follow_up is None:
-            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
         return InterviewFollowUpSessionResponse(
             status="followUp",
             session_id=session.id,
@@ -580,7 +569,7 @@ def build_interview_session_response(
             or session.completed_at is None
             or session.completion_reason is None
         ):
-            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
         return InterviewCompletedSessionResponse(
             status="completed",
             session_id=session.id,
@@ -599,7 +588,7 @@ def build_interview_session_response(
             review=_review_state_response(review),
             question_details=list(review.question_details),
         )
-    raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+    raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
 
 
 def _candidate_question_response(
@@ -641,7 +630,7 @@ def _candidate_exchange_responses(
     try:
         return [_candidate_exchange_response(exchange) for exchange in exchanges]
     except AttributeError, TypeError, ValueError:
-        raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
+        raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND) from None
 
 
 def _current_candidate_question(
@@ -681,7 +670,7 @@ def _review_state_response(
             )
     except TypeError, ValueError:
         pass
-    raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+    raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
 
 
 def build_interview_review_response(
@@ -689,7 +678,7 @@ def build_interview_review_response(
     review: InterviewReview,
 ) -> GetInterviewReviewResponse:
     if session.completed_at is None or session.completion_reason is None:
-        raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
+        raise service_error_for_code(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
     question_details = list(review.question_details)
     completion_reason = cast(
         InterviewCompletionReason,
@@ -704,7 +693,7 @@ def build_interview_review_response(
             question_details=question_details,
         )
     if review.review is None:
-        raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
+        raise service_error_for_code(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
     if review.status == "partial":
         return GetInterviewPartialReviewResponse(
             status="partial",
@@ -721,7 +710,7 @@ def build_interview_review_response(
             completion_reason=completion_reason,
             question_details=question_details,
         )
-    raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
+    raise service_error_for_code(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
 
 
 def _session_configuration_response(
@@ -765,7 +754,7 @@ def _question_response(question: object) -> InterviewQuestionResponse:
             order=question.order,
         )
     except AttributeError, TypeError, ValueError:
-        raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
+        raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND) from None
 
 
 def _answer_response(answer: object) -> InterviewAnswerResponse:
@@ -776,7 +765,7 @@ def _answer_response(answer: object) -> InterviewAnswerResponse:
             submitted_at=answer.submitted_at,
         )
     except AttributeError, TypeError, ValueError:
-        raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
+        raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND) from None
 
 
 def _follow_up_question_response(
@@ -791,7 +780,7 @@ def _follow_up_question_response(
             created_at=follow_up.created_at,
         )
     except AttributeError, TypeError, ValueError:
-        raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND) from None
+        raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND) from None
 
 
 def _answered_follow_up_response(
@@ -799,7 +788,7 @@ def _answered_follow_up_response(
 ) -> InterviewAnsweredFollowUpResponse:
     answer = getattr(follow_up, "answer", None)
     if answer is None:
-        raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+        raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
     return InterviewAnsweredFollowUpResponse(
         status="answered",
         question=_follow_up_question_response(follow_up),
@@ -847,7 +836,7 @@ def _completed_questions(
             continue
         answer = getattr(question, "answer", None)
         if answer is None:
-            raise InterviewSessionStateError(INTERVIEW_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_SESSION_NOT_FOUND)
         result.append(
             InterviewCompletedQuestionResponse(
                 question=_question_response(question),
@@ -866,65 +855,71 @@ def _completed_questions(
     return result
 
 
-def interview_session_state_service_error(
-    error: InterviewSessionStateError,
+def map_interview_session_error(
+    error: ServiceError,
 ) -> ServiceError:
-    if error.code == INTERVIEW_SESSION_NOT_FOUND:
-        return ResourceMissingError(error.code)
-    return DomainConflictError(error.code)
+    if error.error == INTERVIEW_SESSION_NOT_FOUND:
+        return ResourceMissingError(error.error)
+    return DomainConflictError(error.error)
 
 
-def interview_planning_state_service_error(
-    error: InterviewPlanningStateError,
+def map_interview_planning_error(
+    error: ServiceError,
 ) -> ServiceError:
-    if error.code in {
+    if error.error in {
         INTERVIEW_PLANNING_SESSION_NOT_FOUND,
         INTERVIEW_SESSION_NOT_FOUND,
     }:
-        return ResourceMissingError(error.code)
-    if error.code == INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED:
-        return ExternalDependencyError(error.code)
-    return DomainConflictError(error.code)
+        return ResourceMissingError(error.error)
+    if error.error == INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED:
+        return ExternalDependencyError(error.error)
+    return DomainConflictError(error.error)
 
 
-def interview_turn_state_service_error(
-    error: InterviewTurnStateError,
+def map_interview_turn_error(
+    error: ServiceError,
 ) -> ServiceError:
-    if error.code in {
+    if error.error in {
         INTERVIEW_TURN_SESSION_NOT_FOUND,
         INTERVIEW_SESSION_NOT_FOUND,
     }:
-        return ResourceMissingError(error.code)
-    if error.code == INTERVIEW_TURN_MODEL_NOT_CONFIGURED:
-        return ExternalDependencyError(error.code)
-    return DomainConflictError(error.code)
+        return ResourceMissingError(error.error)
+    if error.error == INTERVIEW_TURN_MODEL_NOT_CONFIGURED:
+        return ExternalDependencyError(error.error)
+    return DomainConflictError(error.error)
 
 
-def interview_candidate_question_state_service_error(
-    error: InterviewCandidateQuestionStateError,
+def map_interview_candidate_question_error(
+    error: ServiceError,
 ) -> ServiceError:
-    if error.code == INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND:
-        return ResourceMissingError(error.code)
-    if error.code == INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED:
-        return ExternalDependencyError(error.code)
-    return DomainConflictError(error.code)
+    if error.error in {
+        INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND,
+        INTERVIEW_SESSION_NOT_FOUND,
+    }:
+        return ResourceMissingError(error.error)
+    if error.error == INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED:
+        return ExternalDependencyError(error.error)
+    return DomainConflictError(error.error)
 
 
-def interview_completion_state_service_error(
-    error: InterviewCompletionStateError,
+def map_interview_completion_error(
+    error: ServiceError,
 ) -> ServiceError:
-    if error.code == INTERVIEW_COMPLETION_SESSION_NOT_FOUND:
-        return ResourceMissingError(error.code)
-    if error.code == INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED:
-        return ExternalDependencyError(error.code)
-    return DomainConflictError(error.code)
+    if error.error in {
+        INTERVIEW_COMPLETION_SESSION_NOT_FOUND,
+        INTERVIEW_SESSION_NOT_FOUND,
+    }:
+        return ResourceMissingError(error.error)
+    if error.error == INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED:
+        return ExternalDependencyError(error.error)
+    return DomainConflictError(error.error)
 
 
-def interview_review_state_service_error(
-    error: InterviewReviewStateError,
+def map_interview_review_error(
+    error: ServiceError,
 ) -> ServiceError:
-    if error.code == INTERVIEW_REVIEW_SESSION_NOT_FOUND:
-        return ResourceMissingError(error.code)
-    if error.code == INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED:
-        return ExternalDependencyError(error.code)
-    return DomainConflictError(error.code)
+    if error.error == INTERVIEW_REVIEW_SESSION_NOT_FOUND:
+        return ResourceMissingError(error.error)
+    if error.error == INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED:
+        return ExternalDependencyError(error.error)
+    return DomainConflictError(error.error)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -15,39 +14,18 @@ from riva.agents.interview.review_types import (
 )
 from riva.integrations.llm import LLMProvider
 from riva.models import InterviewAnswer, InterviewQuestion, InterviewSession, User
+from riva.services.errors import ServiceError, service_error_for_code
 from riva.services.interview.review import (
     InterviewReviewService,
-    InterviewReviewStateError,
 )
 from riva.utils import utc_now
 
-InterviewCompletionStateErrorCode = Literal[
-    "interview_session_not_found",
-    "interview_completion_version_conflict",
-    "interview_completion_state_invalid",
-    "interview_completion_model_not_configured",
-]
-
-INTERVIEW_COMPLETION_SESSION_NOT_FOUND: InterviewCompletionStateErrorCode = (
-    "interview_session_not_found"
-)
-INTERVIEW_COMPLETION_VERSION_CONFLICT: InterviewCompletionStateErrorCode = (
-    "interview_completion_version_conflict"
-)
-INTERVIEW_COMPLETION_STATE_INVALID: InterviewCompletionStateErrorCode = (
-    "interview_completion_state_invalid"
-)
-INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED: InterviewCompletionStateErrorCode = (
+INTERVIEW_COMPLETION_SESSION_NOT_FOUND: str = "interview_session_not_found"
+INTERVIEW_COMPLETION_VERSION_CONFLICT: str = "interview_completion_version_conflict"
+INTERVIEW_COMPLETION_STATE_INVALID: str = "interview_completion_state_invalid"
+INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED: str = (
     "interview_completion_model_not_configured"
 )
-
-
-class InterviewCompletionStateError(RuntimeError):
-    safe_message = "The interview completion state is invalid."
-
-    def __init__(self, code: InterviewCompletionStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 Clock = Callable[[], datetime]
@@ -82,7 +60,7 @@ class InterviewCompletionService:
             interview_session = await self._locked_session(user_id, session_id)
             self._require_version(interview_session, version)
             if interview_session.status != "candidateQuestions":
-                raise InterviewCompletionStateError(INTERVIEW_COMPLETION_STATE_INVALID)
+                raise service_error_for_code(INTERVIEW_COMPLETION_STATE_INVALID)
             await self._review_service().generate_review(
                 user_id=user_id,
                 interview_session=interview_session,
@@ -91,12 +69,13 @@ class InterviewCompletionService:
             )
             await self.session.commit()
             return interview_session
-        except InterviewCompletionStateError:
+        except ServiceError as error:
             await self.session.rollback()
+            if error.error.startswith("interview_review_") or error.error == (
+                "interview_session_not_found"
+            ):
+                raise _completion_error(error) from None
             raise
-        except InterviewReviewStateError as error:
-            await self.session.rollback()
-            raise _completion_error(error) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -120,13 +99,11 @@ class InterviewCompletionService:
                 await self.session.commit()
                 return interview_session
             if interview_session.status not in {"question", "followUp"}:
-                raise InterviewCompletionStateError(INTERVIEW_COMPLETION_STATE_INVALID)
+                raise service_error_for_code(INTERVIEW_COMPLETION_STATE_INVALID)
             if interview_session.status == "followUp":
                 current_question = await self._current_question(interview_session.id)
                 if current_question is None or current_question.answer is None:
-                    raise InterviewCompletionStateError(
-                        INTERVIEW_COMPLETION_STATE_INVALID
-                    )
+                    raise service_error_for_code(INTERVIEW_COMPLETION_STATE_INVALID)
                 current_question.completed_at = self._now()
 
             main_answer_count = int(
@@ -151,12 +128,13 @@ class InterviewCompletionService:
                 )
             await self.session.commit()
             return interview_session
-        except InterviewCompletionStateError:
+        except ServiceError as error:
             await self.session.rollback()
+            if error.error.startswith("interview_review_") or error.error == (
+                "interview_session_not_found"
+            ):
+                raise _completion_error(error) from None
             raise
-        except InterviewReviewStateError as error:
-            await self.session.rollback()
-            raise _completion_error(error) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -176,7 +154,7 @@ class InterviewCompletionService:
             )
             is None
         ):
-            raise InterviewCompletionStateError(INTERVIEW_COMPLETION_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_COMPLETION_SESSION_NOT_FOUND)
 
     async def _locked_session(
         self, user_id: UUID, session_id: UUID
@@ -194,13 +172,13 @@ class InterviewCompletionService:
             .with_for_update()
         )
         if interview_session is None:
-            raise InterviewCompletionStateError(INTERVIEW_COMPLETION_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_COMPLETION_SESSION_NOT_FOUND)
         return interview_session
 
     @staticmethod
     def _require_version(session: InterviewSession, version: int) -> None:
         if session.version != version:
-            raise InterviewCompletionStateError(INTERVIEW_COMPLETION_VERSION_CONFLICT)
+            raise service_error_for_code(INTERVIEW_COMPLETION_VERSION_CONFLICT)
 
     async def _current_question(self, session_id: UUID) -> InterviewQuestion | None:
         return await self.session.scalar(
@@ -223,12 +201,12 @@ class InterviewCompletionService:
 
 
 def _completion_error(
-    error: InterviewReviewStateError,
-) -> InterviewCompletionStateError:
-    if error.code == "interview_review_model_not_configured":
-        return InterviewCompletionStateError(INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED)
-    if error.code == "interview_session_not_found":
-        return InterviewCompletionStateError(INTERVIEW_COMPLETION_SESSION_NOT_FOUND)
-    if error.code == "interview_review_version_conflict":
-        return InterviewCompletionStateError(INTERVIEW_COMPLETION_VERSION_CONFLICT)
-    return InterviewCompletionStateError(INTERVIEW_COMPLETION_STATE_INVALID)
+    error: ServiceError,
+) -> ServiceError:
+    if error.error == "interview_review_model_not_configured":
+        return service_error_for_code(INTERVIEW_COMPLETION_MODEL_NOT_CONFIGURED)
+    if error.error == "interview_session_not_found":
+        return service_error_for_code(INTERVIEW_COMPLETION_SESSION_NOT_FOUND)
+    if error.error == "interview_review_version_conflict":
+        return service_error_for_code(INTERVIEW_COMPLETION_VERSION_CONFLICT)
+    return service_error_for_code(INTERVIEW_COMPLETION_STATE_INVALID)

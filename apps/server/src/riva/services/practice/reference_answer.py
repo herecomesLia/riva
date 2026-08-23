@@ -34,18 +34,11 @@ from riva.models import (
     PracticeReferenceAnswerArtifact,
     QuestionCard,
 )
+from riva.services.errors import service_error_for_code
 from riva.utils import utc_now
 
 REFERENCE_ANSWER_GENERATION_UNAVAILABLE = "reference_answer_generation_unavailable"
 REFERENCE_ANSWER_ARTIFACT_CONFLICT = "reference_answer_artifact_conflict"
-
-
-class ReferenceAnswerGenerationStateError(RuntimeError):
-    safe_message = "The reference answer generation state is invalid."
-
-    def __init__(self, code: str) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 class PracticeReferenceAnswerLifecycleStatus(StrEnum):
@@ -99,9 +92,7 @@ def practice_reference_answer_output_from_artifact(
             TypeAdapter(PracticeReferenceAnswerOutput).validate_python(values),
         )
     except TypeError, ValueError, ValidationError:
-        raise ReferenceAnswerGenerationStateError(
-            REFERENCE_ANSWER_ARTIFACT_CONFLICT
-        ) from None
+        raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT) from None
 
 
 class ReferenceAnswerGenerationService:
@@ -137,9 +128,7 @@ class ReferenceAnswerGenerationService:
         )
         output = await self._run(input_snapshot)
         if not isinstance(output, PracticeMainReferenceAnswerOutput):
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_ARTIFACT_CONFLICT
-            )
+            raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT)
         return await self._persist(
             question_card=question_card,
             follow_up_question=None,
@@ -156,16 +145,12 @@ class ReferenceAnswerGenerationService:
         language: str,
     ) -> PracticeReferenceAnswerArtifact:
         if follow_up_question is None:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_ARTIFACT_CONFLICT
-            )
+            raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT)
         main_answer = next(
             (answer for answer in attempt.answers if answer.order == 1), None
         )
         if main_answer is None:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_ARTIFACT_CONFLICT
-            )
+            raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT)
         reference_context = await self.get_question_reference_context(
             user_id=user_id,
             question_card_id=question_card.id,
@@ -198,9 +183,7 @@ class ReferenceAnswerGenerationService:
         )
         output = await self._run(input_snapshot)
         if not isinstance(output, PracticeFollowUpReferenceAnswerOutput):
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_ARTIFACT_CONFLICT
-            )
+            raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT)
         return await self._persist(
             question_card=question_card,
             follow_up_question=follow_up_question,
@@ -258,24 +241,18 @@ class ReferenceAnswerGenerationService:
             )
         )
         if row is None:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_ARTIFACT_CONFLICT
-            )
+            raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT)
         try:
             return PracticeReferenceFrozenContext.model_validate(row.frozen_context)
         except TypeError, ValueError, ValidationError:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_ARTIFACT_CONFLICT
-            ) from None
+            raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT) from None
 
     async def _run(
         self,
         input_snapshot: PracticeReferenceAnswerInput,
     ) -> PracticeReferenceAnswerOutput:
         if self.llm_provider is None or not self.llm_model:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_GENERATION_UNAVAILABLE
-            )
+            raise service_error_for_code(REFERENCE_ANSWER_GENERATION_UNAVAILABLE)
         try:
             return (
                 await PracticeReferenceAnswerAgent(
@@ -284,9 +261,7 @@ class ReferenceAnswerGenerationService:
                 ).run(input_snapshot)
             ).output
         except Exception:
-            raise ReferenceAnswerGenerationStateError(
-                REFERENCE_ANSWER_ARTIFACT_CONFLICT
-            ) from None
+            raise service_error_for_code(REFERENCE_ANSWER_ARTIFACT_CONFLICT) from None
 
     async def _persist(
         self,

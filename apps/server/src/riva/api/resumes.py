@@ -36,11 +36,7 @@ from riva.schemas.resumes import (
 )
 from riva.services.resumes.documents import ResumeDocumentService
 from riva.services.resumes.import_service import ResumeImportService
-from riva.services.resumes.parsing import (
-    RESUME_DOCUMENT_NOT_FOUND,
-    ResumeParsingService,
-    ResumeParsingStateError,
-)
+from riva.services.resumes.parsing import ResumeParsingService
 
 ResumeId = Annotated[UUID, Path(alias="resumeId")]
 ResumeLimit = Annotated[int, Query(ge=1, le=100)]
@@ -221,19 +217,14 @@ async def _parse_resume_and_build_draft(
     *,
     retry: bool = False,
 ) -> ResumeImportDraftResponse:
-    try:
-        await parsing_service.parse(
-            user_id=user_id,
-            resume_document_id=resume_document_id,
-            interaction_language=interaction_language,
-            retry=retry,
-        )
-        result = await import_api_service.get_draft(
-            user_id=user_id,
-            resume_document_id=resume_document_id,
-        )
-        return _api_model(ResumeImportDraftResponse, result)
-    except ResumeParsingStateError as error:
-        if error.code == RESUME_DOCUMENT_NOT_FOUND:
-            raise APIError(status.HTTP_404_NOT_FOUND, error.code) from None
-        raise APIError(status.HTTP_409_CONFLICT, error.code) from None
+    await parsing_service.parse(
+        user_id=user_id,
+        resume_document_id=resume_document_id,
+        interaction_language=interaction_language,
+        retry=retry,
+    )
+    result = await import_api_service.get_draft(
+        user_id=user_id,
+        resume_document_id=resume_document_id,
+    )
+    return _api_model(ResumeImportDraftResponse, result)

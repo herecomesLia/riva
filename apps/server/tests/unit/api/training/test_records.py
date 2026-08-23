@@ -18,11 +18,11 @@ from riva.schemas.training_records import (
     TrainingRecordsOverviewResponse,
     TrainingRecordsPageResponse,
 )
+from riva.services.errors import service_error_for_code
 from riva.services.training.record_answers import (
     REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
     TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
     TRAINING_RECORD_QUESTION_NOT_FOUND,
-    TrainingRecordReferenceAnswerStateError,
 )
 from riva.services.training.record_answers import (
     TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
@@ -33,7 +33,6 @@ from riva.services.training.record_answers import (
 from riva.services.training.records import (
     TRAINING_RECORD_NOT_FOUND,
     TRAINING_RECORD_STATE_CONFLICT,
-    TrainingRecordStateError,
 )
 
 RECORD_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -186,7 +185,7 @@ class FakeTrainingRecordService:
     async def get_targeted_practice_record(self, *, user_id: UUID, record_id: UUID):
         self.calls.append((user_id, record_id))
         if self.error is not None:
-            raise TrainingRecordStateError(self.error)  # type: ignore[arg-type]
+            raise service_error_for_code(self.error)
         return self.result
 
     async def list_training_records(self, **kwargs: object):
@@ -212,7 +211,7 @@ class FakeTrainingRecordReferenceAnswerService:
     async def request_reference_answer(self, **kwargs: object):
         self.request_calls.append(kwargs)
         if self.error is not None:
-            raise TrainingRecordReferenceAnswerStateError(self.error)  # type: ignore[arg-type]
+            raise service_error_for_code(self.error)
         return self.result
 
 

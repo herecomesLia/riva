@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from typing import Literal
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -25,6 +24,11 @@ from riva.agents.training.planning_types import (
 from riva.core.language import InteractionLanguage
 from riva.integrations.llm import LLMProvider
 from riva.models import CareerProfile, TargetRole, User
+from riva.services.errors import (
+    DomainConflictError,
+    ServiceError,
+    service_error_for_code,
+)
 from riva.services.interview.session import InterviewSessionService
 from riva.services.interview.types import (
     InterviewDifficulty,
@@ -51,42 +55,16 @@ from riva.services.training.types import (
     TrainingRecordSummaryResponse,
 )
 
-TrainingPlanningStateErrorCode = Literal[
-    "training_planning_target_not_found",
-    "training_planning_target_unavailable",
-    "training_planning_snapshot_invalid",
-    "training_planning_unavailable",
-    "training_planning_state_conflict",
-]
-
-TRAINING_PLANNING_TARGET_NOT_FOUND: TrainingPlanningStateErrorCode = (
-    "training_planning_target_not_found"
-)
-TRAINING_PLANNING_TARGET_UNAVAILABLE: TrainingPlanningStateErrorCode = (
-    "training_planning_target_unavailable"
-)
-TRAINING_PLANNING_SNAPSHOT_INVALID: TrainingPlanningStateErrorCode = (
-    "training_planning_snapshot_invalid"
-)
-TRAINING_PLANNING_STATE_CONFLICT: TrainingPlanningStateErrorCode = (
-    "training_planning_state_conflict"
-)
-TRAINING_PLANNING_UNAVAILABLE: TrainingPlanningStateErrorCode = (
-    "training_planning_unavailable"
-)
+TRAINING_PLANNING_TARGET_NOT_FOUND: str = "training_planning_target_not_found"
+TRAINING_PLANNING_TARGET_UNAVAILABLE: str = "training_planning_target_unavailable"
+TRAINING_PLANNING_SNAPSHOT_INVALID: str = "training_planning_snapshot_invalid"
+TRAINING_PLANNING_STATE_CONFLICT: str = "training_planning_state_conflict"
+TRAINING_PLANNING_UNAVAILABLE: str = "training_planning_unavailable"
 
 TRAINING_PLANNING_FAILURE_REASON = (
     "The training plan could not be generated right now. Please try again."
 )
 TrainingRecordServiceFactory = Callable[[AsyncSession], TrainingRecordService]
-
-
-class TrainingPlanningStateError(RuntimeError):
-    safe_message = "The training planning state is invalid."
-
-    def __init__(self, code: TrainingPlanningStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 class TrainingPlanningService:
@@ -145,7 +123,7 @@ class TrainingPlanningService:
                 interaction_language=interaction_language,
             )
             if self.llm_provider is None or not self.llm_model:
-                raise TrainingPlanningStateError(TRAINING_PLANNING_UNAVAILABLE)
+                raise service_error_for_code(TRAINING_PLANNING_UNAVAILABLE)
             result = await TrainingPlanningAgent(
                 self.llm_provider,
                 self.llm_model,
@@ -160,7 +138,7 @@ class TrainingPlanningService:
                 interaction_language=interaction_language,
                 plan=plan,
             )
-        except TrainingPlanningStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except (
@@ -170,7 +148,7 @@ class TrainingPlanningService:
             ValueError,
         ):
             await self.session.rollback()
-            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_PLANNING_STATE_CONFLICT) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -191,15 +169,15 @@ class TrainingPlanningService:
             .where(TargetRole.id == target_role_id, TargetRole.user_id == user_id)
         )
         if role is None:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_NOT_FOUND)
+            raise service_error_for_code(TRAINING_PLANNING_TARGET_NOT_FOUND)
         if role.preparation_status == "archived":
-            raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
+            raise DomainConflictError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
         setup = await InterviewSessionService(self.session).get_setup(user_id=user_id)
         if not setup.profile_complete or not any(
             candidate.id == target_role_id for candidate in setup.target_roles
         ):
-            raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
+            raise DomainConflictError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
         profile = await self.session.scalar(
             select(CareerProfile)
@@ -207,7 +185,7 @@ class TrainingPlanningService:
             .where(CareerProfile.user_id == user_id)
         )
         if profile is None or not career_profile_completed(profile):
-            raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
+            raise DomainConflictError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
         matching_analysis = _current_matching_analysis(role, profile)
         training_memory = await TrainingMemoryService(self.session).get_context(user_id)
@@ -255,9 +233,7 @@ class TrainingPlanningService:
                 ),
             )
         except ValidationError, TypeError, ValueError:
-            raise TrainingPlanningStateError(
-                TRAINING_PLANNING_SNAPSHOT_INVALID
-            ) from None
+            raise service_error_for_code(TRAINING_PLANNING_SNAPSHOT_INVALID) from None
 
     async def _recent_training(
         self,
@@ -339,5 +315,5 @@ def _training_planning_record(
                 difficulty=record.difficulty,
             )
     except ValidationError, TypeError, ValueError:
-        raise TrainingPlanningStateError(TRAINING_PLANNING_SNAPSHOT_INVALID) from None
-    raise TrainingPlanningStateError(TRAINING_PLANNING_SNAPSHOT_INVALID)
+        raise service_error_for_code(TRAINING_PLANNING_SNAPSHOT_INVALID) from None
+    raise service_error_for_code(TRAINING_PLANNING_SNAPSHOT_INVALID)

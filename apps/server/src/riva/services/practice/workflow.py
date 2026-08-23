@@ -15,6 +15,7 @@ from riva.services.errors import (
     ExternalDependencyError,
     ResourceMissingError,
     ServiceError,
+    service_error_for_code,
 )
 from riva.services.practice.evaluation import (
     practice_evaluation_output_from_artifact,
@@ -31,7 +32,6 @@ from riva.services.practice.reference_answer import (
     PracticeReferenceAnswerTargetType,
     PracticeReferenceAnswerWorkflowState,
     ReferenceAnswerGenerationService,
-    ReferenceAnswerGenerationStateError,
 )
 from riva.services.practice.review import (
     practice_review_output_from_artifact,
@@ -52,7 +52,6 @@ from riva.services.practice.session import (
     PracticePublicWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionService,
-    PracticeSessionStateError,
 )
 from riva.services.practice.types import (
     CompletePracticeSessionRequest,
@@ -141,10 +140,12 @@ class PracticeService:
         practice_service_factory: PracticeSessionServiceFactory = (
             PracticeSessionService
         ),
-        training_role_eligibility_service_factory: TrainingRoleEligibilityServiceFactory = (
-            TrainingRoleEligibilityService
-        ),
-        reference_answer_generation_service_factory: ReferenceAnswerGenerationServiceFactory
+        training_role_eligibility_service_factory: (
+            TrainingRoleEligibilityServiceFactory
+        ) = (TrainingRoleEligibilityService),
+        reference_answer_generation_service_factory: (
+            ReferenceAnswerGenerationServiceFactory
+        )
         | None = None,
     ) -> None:
         self.session = session
@@ -183,8 +184,8 @@ class PracticeService:
                 interaction_language=interaction_language,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def get_setup_capabilities(
         self,
@@ -217,8 +218,8 @@ class PracticeService:
                     else []
                 ),
             )
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def continue_to_next_question(
         self,
@@ -235,8 +236,8 @@ class PracticeService:
                 question_id=payload.question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def retry_current_question(
         self,
@@ -253,8 +254,8 @@ class PracticeService:
                 question_id=payload.question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def skip_current_question(
         self,
@@ -271,8 +272,8 @@ class PracticeService:
                 question_id=payload.question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def set_question_saved(
         self,
@@ -290,8 +291,8 @@ class PracticeService:
                 is_saved=payload.is_saved,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def set_question_weak(
         self,
@@ -309,8 +310,8 @@ class PracticeService:
                 is_marked_weak=payload.is_marked_weak,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def reveal_question_hint(
         self,
@@ -327,8 +328,8 @@ class PracticeService:
                 question_id=payload.question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def reveal_question_framework(
         self,
@@ -345,8 +346,8 @@ class PracticeService:
                 question_id=payload.question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def reveal_follow_up_hint(
         self,
@@ -364,8 +365,8 @@ class PracticeService:
                 follow_up_question_id=payload.follow_up_question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def reveal_follow_up_framework(
         self,
@@ -383,8 +384,8 @@ class PracticeService:
                 follow_up_question_id=payload.follow_up_question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def submit_primary_answer(
         self,
@@ -403,8 +404,8 @@ class PracticeService:
                 content=payload.content,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def submit_follow_up_answer(
         self,
@@ -423,8 +424,8 @@ class PracticeService:
                 content=payload.content,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def end_follow_ups(
         self,
@@ -442,8 +443,8 @@ class PracticeService:
                 follow_up_question_id=payload.follow_up_question_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def request_question_reference_answer(
         self,
@@ -472,10 +473,10 @@ class PracticeService:
                 context=context,
             )
             if response.status == "completed":
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             return response
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def request_follow_up_reference_answer(
         self,
@@ -505,10 +506,10 @@ class PracticeService:
                 context=context,
             )
             if response.status == "completed":
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             return response
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def get_session(
         self,
@@ -522,8 +523,8 @@ class PracticeService:
                 session_id=session_id,
             )
             return await self._build_session_response(user_id=user_id, context=context)
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def complete_session(
         self,
@@ -543,10 +544,10 @@ class PracticeService:
                 context=context,
             )
             if response.status != "completed":
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             return response
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def end_session_early(
         self,
@@ -567,10 +568,10 @@ class PracticeService:
                 context=context,
             )
             if response.status != "completed":
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             return response
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     async def get_current_session(
         self,
@@ -588,8 +589,8 @@ class PracticeService:
                     else None
                 )
             )
-        except PracticeSessionStateError as error:
-            raise practice_session_state_service_error(error) from None
+        except ServiceError as error:
+            raise map_practice_error(error) from None
 
     def _practice_service(self) -> PracticeSessionService:
         return self.practice_service_factory(
@@ -709,8 +710,8 @@ class PracticeService:
                     follow_up_question_id=follow_up_question.id,
                     submitted_at=unanswered_submitted_at,
                 )
-        except ReferenceAnswerGenerationStateError:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        except ServiceError:
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
         return _PracticeReferenceAnswerProjection(
             main=main_state,
             follow_ups=follow_up_states,
@@ -760,7 +761,7 @@ def build_practice_session_response(
         }
         if isinstance(context, PracticeReviewWorkflowContext):
             if context.attempt.status != "review" or context.follow_up_decision is None:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             evaluation_output = practice_evaluation_output_from_artifact(
                 context.evaluation,
                 scoring_focus_count=len(context.question_card.scoring_focus),
@@ -809,7 +810,7 @@ def build_practice_session_response(
             )
         if context.attempt.status == "answering":
             if context.question_card is None:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             if isinstance(context, PracticePrimaryAnswerWorkflowContext):
                 return PracticeAnsweringResponse(
                     status="answering",
@@ -829,7 +830,7 @@ def build_practice_session_response(
             )
         if isinstance(context, PracticePrimaryAnswerWorkflowContext):
             if context.question_card is None:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             main_answer = build_practice_answer_response(context.main_answer)
             question = build_practice_question_response(
                 context.question_card,
@@ -841,7 +842,7 @@ def build_practice_session_response(
                     or context.follow_up_decision.action != "askFollowUp"
                     or context.follow_up_question is None
                 ):
-                    raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                    raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
                 current_follow_up = PracticeAwaitingFollowUpExchangeResponse(
                     status="awaitingAnswer",
                     question=build_practice_follow_up_question_response(
@@ -863,11 +864,11 @@ def build_practice_session_response(
                     current_follow_up=current_follow_up,
                     **base,
                 )
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
-    except PracticeSessionStateError:
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
+    except ServiceError:
         raise
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def build_practice_completed_session_response(
@@ -886,7 +887,7 @@ def build_practice_completed_session_response(
 
         review_contexts = context.attempt_review_contexts
         if not review_contexts:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
 
         final_context_by_question: dict[UUID, PracticeReviewWorkflowContext] = {}
         for review_context in review_contexts:
@@ -901,7 +902,7 @@ def build_practice_completed_session_response(
         final_review_context = review_contexts[-1]
         final_attempt = final_review_context.attempt
         if final_attempt.id != context.final_attempt.id:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
 
         return PracticeCompletedSessionResponse(
             status="completed",
@@ -937,10 +938,10 @@ def build_practice_completed_session_response(
             next_step_suggestion=final_review_context.recommendation.reason,
             unfinished_attempt=None,
         )
-    except PracticeSessionStateError:
+    except ServiceError:
         raise
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def _build_practice_ended_early_session_response(
@@ -967,7 +968,7 @@ def _build_practice_ended_early_session_response(
         unfinished_attempt = context.unfinished_attempt
         unfinished_question = context.question_context.question_card
         if unfinished_question is None:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
 
         unfinished_selection = PracticeSessionSelection(
             target_role_id=context.session.target_role_id,
@@ -1015,10 +1016,10 @@ def _build_practice_ended_early_session_response(
                 ),
             ),
         )
-    except PracticeSessionStateError:
+    except ServiceError:
         raise
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def build_practice_guidance_response(
@@ -1075,10 +1076,10 @@ def build_practice_main_reference_answer_response(
             ),
             viewed_before_submission=state.viewed_before_submission,
         )
-    except PracticeSessionStateError:
+    except ServiceError:
         raise
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def build_practice_follow_up_reference_answer_response(
@@ -1121,10 +1122,10 @@ def build_practice_follow_up_reference_answer_response(
             ),
             viewed_before_submission=state.viewed_before_submission,
         )
-    except PracticeSessionStateError:
+    except ServiceError:
         raise
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def build_practice_question_response(
@@ -1163,7 +1164,7 @@ def build_practice_question_response(
             }
         )
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def build_practice_answer_response(
@@ -1179,7 +1180,7 @@ def build_practice_answer_response(
             }
         )
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def build_practice_follow_up_question_response(
@@ -1214,7 +1215,7 @@ def build_practice_follow_up_question_response(
             }
         )
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def build_practice_answered_follow_up_exchange_response(
@@ -1232,7 +1233,7 @@ def build_practice_answered_follow_up_exchange_response(
             answer=build_practice_answer_response(exchange.answer),
         )
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
 
 def _build_practice_answered_follow_up_exchanges(
@@ -1263,7 +1264,7 @@ def build_practice_follow_up_completion_response(
 ) -> PracticeFollowUpCompletionResponse:
     if reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
         if unanswered_question is None:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         return PracticeEndedEarlyFollowUpCompletionResponse(
             status="endedEarly",
             unanswered_question=build_practice_follow_up_question_response(
@@ -1272,7 +1273,7 @@ def build_practice_follow_up_completion_response(
             ),
         )
     if unanswered_question is not None:
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
     if reason == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED:
         return PracticeNoFollowUpRequiredCompletionResponse(
             status="completed",
@@ -1283,15 +1284,15 @@ def build_practice_follow_up_completion_response(
             status="completed",
             reason="allAnswered",
         )
-    raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+    raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
 
 
-def practice_session_state_service_error(
-    error: PracticeSessionStateError,
+def map_practice_error(
+    error: ServiceError,
 ) -> ServiceError:
-    if error.code == PRACTICE_SESSION_NOT_FOUND:
-        return ResourceMissingError(error.code)
-    if error.code in {
+    if error.error == PRACTICE_SESSION_NOT_FOUND:
+        return ResourceMissingError(error.error)
+    if error.error in {
         PRACTICE_QUESTION_GENERATION_UNAVAILABLE,
         PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE,
         PRACTICE_EVALUATION_GENERATION_UNAVAILABLE,
@@ -1299,5 +1300,5 @@ def practice_session_state_service_error(
         PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE,
         PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
     }:
-        return ExternalDependencyError(error.code)
-    return DomainConflictError(error.code)
+        return ExternalDependencyError(error.error)
+    return DomainConflictError(error.error)

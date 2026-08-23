@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, TypeVar, cast
+from typing import TypeVar, cast
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -47,6 +47,7 @@ from riva.models import (
     QuestionCard,
     TargetRole,
 )
+from riva.services.errors import service_error_for_code
 from riva.services.practice.question_types import (
     MAX_QUESTION_CARD_LIST_ITEMS,
     QuestionCardDifficulty,
@@ -58,46 +59,22 @@ from riva.services.profile.completion import career_profile_completed
 from riva.services.training.memory import TrainingMemoryService
 from riva.utils import utc_now
 
-QuestionGenerationStateErrorCode = Literal[
-    "question_generation_target_not_found",
-    "question_generation_target_archived",
-    "question_generation_profile_not_found",
-    "question_generation_profile_incomplete",
-    "question_generation_job_description_not_ready",
-    "question_generation_job_description_analysis_not_ready",
-    "question_generation_matching_analysis_not_ready",
-    "question_generation_matching_analysis_stale",
-]
-QUESTION_GENERATION_TARGET_NOT_FOUND: QuestionGenerationStateErrorCode = (
-    "question_generation_target_not_found"
-)
-QUESTION_GENERATION_TARGET_ARCHIVED: QuestionGenerationStateErrorCode = (
-    "question_generation_target_archived"
-)
-QUESTION_GENERATION_PROFILE_NOT_FOUND: QuestionGenerationStateErrorCode = (
-    "question_generation_profile_not_found"
-)
-QUESTION_GENERATION_PROFILE_INCOMPLETE: QuestionGenerationStateErrorCode = (
-    "question_generation_profile_incomplete"
-)
-QUESTION_GENERATION_JOB_DESCRIPTION_NOT_READY: QuestionGenerationStateErrorCode = (
+QUESTION_GENERATION_TARGET_NOT_FOUND: str = "question_generation_target_not_found"
+QUESTION_GENERATION_TARGET_ARCHIVED: str = "question_generation_target_archived"
+QUESTION_GENERATION_PROFILE_NOT_FOUND: str = "question_generation_profile_not_found"
+QUESTION_GENERATION_PROFILE_INCOMPLETE: str = "question_generation_profile_incomplete"
+QUESTION_GENERATION_JOB_DESCRIPTION_NOT_READY: str = (
     "question_generation_job_description_not_ready"
 )
-QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY: QuestionGenerationStateErrorCode = "question_generation_job_description_analysis_not_ready"
-QUESTION_GENERATION_MATCHING_ANALYSIS_NOT_READY: QuestionGenerationStateErrorCode = (
+QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY: str = (
+    "question_generation_job_description_analysis_not_ready"
+)
+QUESTION_GENERATION_MATCHING_ANALYSIS_NOT_READY: str = (
     "question_generation_matching_analysis_not_ready"
 )
-QUESTION_GENERATION_MATCHING_ANALYSIS_STALE: QuestionGenerationStateErrorCode = (
+QUESTION_GENERATION_MATCHING_ANALYSIS_STALE: str = (
     "question_generation_matching_analysis_stale"
 )
-
-
-class QuestionGenerationStateError(RuntimeError):
-    safe_message = "The question generation state is invalid."
-
-    def __init__(self, code: QuestionGenerationStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 QuestionGenerationWeaknessFocusInput = PracticeWeaknessFocus | Iterable[object]
@@ -333,9 +310,7 @@ class QuestionGenerationService:
             output.question_type != input_snapshot.question_type
             or output.difficulty != input_snapshot.difficulty
         ):
-            raise QuestionGenerationStateError(
-                QUESTION_GENERATION_MATCHING_ANALYSIS_STALE
-            )
+            raise service_error_for_code(QUESTION_GENERATION_MATCHING_ANALYSIS_STALE)
         now = self.clock()
         _require_aware_datetime(now)
         values = output.model_dump(mode="json")
@@ -387,9 +362,9 @@ class QuestionGenerationService:
             role_statement = role_statement.with_for_update()
         role = await self.session.scalar(role_statement)
         if role is None:
-            raise QuestionGenerationStateError(QUESTION_GENERATION_TARGET_NOT_FOUND)
+            raise service_error_for_code(QUESTION_GENERATION_TARGET_NOT_FOUND)
         if role.preparation_status == "archived":
-            raise QuestionGenerationStateError(QUESTION_GENERATION_TARGET_ARCHIVED)
+            raise service_error_for_code(QUESTION_GENERATION_TARGET_ARCHIVED)
         profile_statement = (
             select(CareerProfile)
             .options(*_career_profile_loader_options())
@@ -399,17 +374,15 @@ class QuestionGenerationService:
             profile_statement = profile_statement.with_for_update()
         profile = await self.session.scalar(profile_statement)
         if profile is None:
-            raise QuestionGenerationStateError(QUESTION_GENERATION_PROFILE_NOT_FOUND)
+            raise service_error_for_code(QUESTION_GENERATION_PROFILE_NOT_FOUND)
         if not career_profile_completed(profile):
-            raise QuestionGenerationStateError(QUESTION_GENERATION_PROFILE_INCOMPLETE)
+            raise service_error_for_code(QUESTION_GENERATION_PROFILE_INCOMPLETE)
         if (
             role.job_description_status != "saved"
             or not role.raw_job_description
             or role.job_description_version is None
         ):
-            raise QuestionGenerationStateError(
-                QUESTION_GENERATION_JOB_DESCRIPTION_NOT_READY
-            )
+            raise service_error_for_code(QUESTION_GENERATION_JOB_DESCRIPTION_NOT_READY)
         analysis = await self.session.scalar(
             select(JobDescriptionAnalysis).where(
                 JobDescriptionAnalysis.role_id == role.id,
@@ -420,7 +393,7 @@ class QuestionGenerationService:
             analysis is None
             or analysis.job_description_version != role.job_description_version
         ):
-            raise QuestionGenerationStateError(
+            raise service_error_for_code(
                 QUESTION_GENERATION_JOB_DESCRIPTION_ANALYSIS_NOT_READY
             )
         matching = await self.session.scalar(
@@ -435,9 +408,7 @@ class QuestionGenerationService:
             or matching.job_description_version != role.job_description_version
             or matching.job_description_analysis_version != analysis.analysis_version
         ):
-            raise QuestionGenerationStateError(
-                QUESTION_GENERATION_MATCHING_ANALYSIS_STALE
-            )
+            raise service_error_for_code(QUESTION_GENERATION_MATCHING_ANALYSIS_STALE)
         return _QuestionGenerationContext(role, profile, analysis, matching)
 
     def _require_configuration(self) -> None:
@@ -464,9 +435,7 @@ def build_practice_reference_frozen_context(
         if material.type is QuestionCardMaterialType.WORK_EXPERIENCE:
             item = work_by_id.get(material.id)
             if item is None:
-                raise QuestionGenerationStateError(
-                    QUESTION_GENERATION_PROFILE_INCOMPLETE
-                )
+                raise service_error_for_code(QUESTION_GENERATION_PROFILE_INCOMPLETE)
             evidence.append(
                 PracticeReferenceWorkEvidence(
                     type="workExperience",
@@ -491,9 +460,7 @@ def build_practice_reference_frozen_context(
         elif material.type is QuestionCardMaterialType.PROJECT_EXPERIENCE:
             item = project_by_id.get(material.id)
             if item is None:
-                raise QuestionGenerationStateError(
-                    QUESTION_GENERATION_PROFILE_INCOMPLETE
-                )
+                raise service_error_for_code(QUESTION_GENERATION_PROFILE_INCOMPLETE)
             evidence.append(
                 PracticeReferenceProjectEvidence(
                     type="projectExperience",
@@ -516,7 +483,7 @@ def build_practice_reference_frozen_context(
                 )
             )
         else:
-            raise QuestionGenerationStateError(QUESTION_GENERATION_PROFILE_INCOMPLETE)
+            raise service_error_for_code(QUESTION_GENERATION_PROFILE_INCOMPLETE)
     return PracticeReferenceFrozenContext(
         target_role=role_context, candidate_evidence=evidence
     )

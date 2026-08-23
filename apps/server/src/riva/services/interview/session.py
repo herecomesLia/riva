@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
-from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -18,6 +17,11 @@ from riva.models import (
     InterviewSession,
     User,
 )
+from riva.services.errors import (
+    DomainConflictError,
+    ServiceError,
+    service_error_for_code,
+)
 from riva.services.interview.types import (
     InterviewConfiguration,
     InterviewDifficulty,
@@ -31,44 +35,15 @@ from riva.services.training.eligibility import (
 )
 from riva.utils import utc_now
 
-InterviewSessionStateErrorCode = Literal[
-    "interview_session_not_found",
-    "interview_session_already_active",
-    "interview_setup_profile_incomplete",
-    "interview_setup_job_description_missing",
-    "interview_target_role_unavailable",
-    "interview_session_configuration_invalid",
-]
-
-INTERVIEW_SESSION_NOT_FOUND: InterviewSessionStateErrorCode = (
-    "interview_session_not_found"
-)
-INTERVIEW_SESSION_ALREADY_ACTIVE: InterviewSessionStateErrorCode = (
-    "interview_session_already_active"
-)
-INTERVIEW_SETUP_PROFILE_INCOMPLETE: InterviewSessionStateErrorCode = (
-    "interview_setup_profile_incomplete"
-)
-INTERVIEW_SETUP_JOB_DESCRIPTION_MISSING: InterviewSessionStateErrorCode = (
-    "interview_setup_job_description_missing"
-)
-INTERVIEW_TARGET_ROLE_UNAVAILABLE: InterviewSessionStateErrorCode = (
-    "interview_target_role_unavailable"
-)
-INTERVIEW_SESSION_CONFIGURATION_INVALID: InterviewSessionStateErrorCode = (
-    "interview_session_configuration_invalid"
-)
+INTERVIEW_SESSION_NOT_FOUND: str = "interview_session_not_found"
+INTERVIEW_SESSION_ALREADY_ACTIVE: str = "interview_session_already_active"
+INTERVIEW_SETUP_PROFILE_INCOMPLETE: str = "interview_setup_profile_incomplete"
+INTERVIEW_SETUP_JOB_DESCRIPTION_MISSING: str = "interview_setup_job_description_missing"
+INTERVIEW_TARGET_ROLE_UNAVAILABLE: str = "interview_target_role_unavailable"
+INTERVIEW_SESSION_CONFIGURATION_INVALID: str = "interview_session_configuration_invalid"
 
 InterviewSetupAvailabilityReason = TrainingRoleEligibilityBlockedReason
 InterviewSetupContext = TrainingRoleEligibilityContext
-
-
-class InterviewSessionStateError(RuntimeError):
-    safe_message = "The interview session state is invalid."
-
-    def __init__(self, code: InterviewSessionStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 class InterviewSessionService:
@@ -159,7 +134,7 @@ class InterviewSessionService:
                 ):
                     await self.session.commit()
                     return active
-                raise InterviewSessionStateError(INTERVIEW_SESSION_ALREADY_ACTIVE)
+                raise service_error_for_code(INTERVIEW_SESSION_ALREADY_ACTIVE)
 
             setup = await self.get_setup(user_id=user_id)
             self._require_setup_available(setup)
@@ -172,7 +147,7 @@ class InterviewSessionService:
                 None,
             )
             if target_role is None:
-                raise InterviewSessionStateError(INTERVIEW_TARGET_ROLE_UNAVAILABLE)
+                raise DomainConflictError(INTERVIEW_TARGET_ROLE_UNAVAILABLE)
             self._validate_configuration(configuration, interaction_language)
 
             now = self.clock()
@@ -195,7 +170,7 @@ class InterviewSessionService:
             await self.session.flush()
             await self.session.commit()
             return interview_session
-        except InterviewSessionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception:
@@ -228,17 +203,17 @@ class InterviewSessionService:
         interaction_language: InteractionLanguage,
     ) -> None:
         if configuration.round not in tuple(InterviewRound):
-            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
+            raise service_error_for_code(INTERVIEW_SESSION_CONFIGURATION_INVALID)
         if configuration.difficulty not in tuple(InterviewDifficulty):
-            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
+            raise service_error_for_code(INTERVIEW_SESSION_CONFIGURATION_INVALID)
         if configuration.duration_minutes not in tuple(InterviewDurationMinutes):
-            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
+            raise service_error_for_code(INTERVIEW_SESSION_CONFIGURATION_INVALID)
         if interaction_language not in ("zh-CN", "en"):
-            raise InterviewSessionStateError(INTERVIEW_SESSION_CONFIGURATION_INVALID)
+            raise service_error_for_code(INTERVIEW_SESSION_CONFIGURATION_INVALID)
 
     @staticmethod
     def _require_setup_available(setup: InterviewSetupContext) -> None:
         if setup.blocked_reason == "profileIncomplete":
-            raise InterviewSessionStateError(INTERVIEW_SETUP_PROFILE_INCOMPLETE)
+            raise service_error_for_code(INTERVIEW_SETUP_PROFILE_INCOMPLETE)
         if setup.blocked_reason == "jobDescriptionMissing":
-            raise InterviewSessionStateError(INTERVIEW_SETUP_JOB_DESCRIPTION_MISSING)
+            raise service_error_for_code(INTERVIEW_SETUP_JOB_DESCRIPTION_MISSING)

@@ -1,24 +1,10 @@
-from typing import Literal
-
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents.practice.recommendation_types import PracticeRecommendationOutput
 from riva.integrations.llm import LLMProvider
 from riva.models import PracticeRecommendation
-
-RecommendationGenerationStateErrorCode = Literal[
-    "practice_recommendation_context_conflict",
-    "practice_recommendation_output_invalid",
-]
-
-
-class RecommendationGenerationStateError(RuntimeError):
-    safe_message = "The practice recommendation state is invalid."
-
-    def __init__(self, code: RecommendationGenerationStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
+from riva.services.errors import service_error_for_code
 
 
 def practice_recommendation_output_from_artifact(
@@ -37,9 +23,7 @@ def practice_recommendation_output_from_artifact(
     try:
         return TypeAdapter(PracticeRecommendationOutput).validate_python(values)
     except TypeError, ValueError, ValidationError:
-        raise RecommendationGenerationStateError(
-            "practice_recommendation_output_invalid"
-        ) from None
+        raise service_error_for_code("practice_recommendation_output_invalid") from None
 
 
 class RecommendationGenerationService:

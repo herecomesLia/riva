@@ -12,9 +12,9 @@ from riva.models import (
     CareerProfileWorkSkill,
 )
 from riva.schemas.profile import EmploymentType
+from riva.services.errors import DomainConflictError
 from riva.services.resumes.drafts import (
     RESUME_IMPORT_NAMESPACE,
-    ResumeImportStateError,
     build_resume_import_draft_data,
     build_resume_import_item_id,
     canonicalize_resume_import_identity,
@@ -489,11 +489,11 @@ def test_invalid_profile_source_is_safe() -> None:
             )
         ],
     )
-    with pytest.raises(ResumeImportStateError) as exc_info:
+    with pytest.raises(DomainConflictError) as exc_info:
         build_resume_import_draft_data(
             user_id=USER_ID,
             result=simple_output(),
             profile=profile,
         )
-    assert exc_info.value.code == "resume_import_profile_invalid"
+    assert exc_info.value.error == "resume_import_profile_invalid"
     assert str(USER_ID) not in str(exc_info.value)

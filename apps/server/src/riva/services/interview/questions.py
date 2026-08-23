@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -31,35 +30,27 @@ from riva.models import (
     InterviewSession,
     User,
 )
+from riva.services.errors import ServiceError, service_error_for_code
 from riva.services.interview.planning import InterviewPlanningService
 from riva.services.interview.types import InterviewConfiguration
 from riva.utils import utc_now
 
-InterviewCandidateQuestionStateErrorCode = Literal[
-    "interview_session_not_found",
-    "interview_candidate_question_version_conflict",
-    "interview_candidate_question_state_invalid",
-    "interview_candidate_question_snapshot_invalid",
-    "interview_candidate_question_model_not_configured",
-    "interview_candidate_question_content_invalid",
-]
-
-INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND: InterviewCandidateQuestionStateErrorCode = "interview_session_not_found"
-INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_version_conflict"
-INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID: InterviewCandidateQuestionStateErrorCode = (
+INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND: str = "interview_session_not_found"
+INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT: str = (
+    "interview_candidate_question_version_conflict"
+)
+INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID: str = (
     "interview_candidate_question_state_invalid"
 )
-INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_snapshot_invalid"
-INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_model_not_configured"
-INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID: InterviewCandidateQuestionStateErrorCode = "interview_candidate_question_content_invalid"
-
-
-class InterviewCandidateQuestionStateError(RuntimeError):
-    safe_message = "The interview candidate-question state is invalid."
-
-    def __init__(self, code: InterviewCandidateQuestionStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
+INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID: str = (
+    "interview_candidate_question_snapshot_invalid"
+)
+INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED: str = (
+    "interview_candidate_question_model_not_configured"
+)
+INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID: str = (
+    "interview_candidate_question_content_invalid"
+)
 
 
 Clock = Callable[[], datetime]
@@ -92,9 +83,7 @@ class InterviewCandidateQuestionService:
             interview_session = await self._locked_session(user_id, session_id)
             self._require_version(interview_session, version)
             if interview_session.status != "candidateQuestions":
-                raise InterviewCandidateQuestionStateError(
-                    INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID
-                )
+                raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID)
             normalized_content = _normalized_content(content)
             order = (
                 int(
@@ -138,12 +127,12 @@ class InterviewCandidateQuestionService:
             interview_session.updated_at = self._now()
             await self.session.commit()
             return interview_session
-        except InterviewCandidateQuestionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except TypeError, ValueError, ValidationError:
             await self.session.rollback()
-            raise InterviewCandidateQuestionStateError(
+            raise service_error_for_code(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             ) from None
         except Exception:
@@ -155,7 +144,7 @@ class InterviewCandidateQuestionService:
         input_snapshot: InterviewCandidateQuestionInput,
     ) -> InterviewCandidateQuestionOutput:
         if self.llm_provider is None or not self.llm_model:
-            raise InterviewCandidateQuestionStateError(
+            raise service_error_for_code(
                 INTERVIEW_CANDIDATE_QUESTION_MODEL_NOT_CONFIGURED
             )
         return (
@@ -177,9 +166,7 @@ class InterviewCandidateQuestionService:
             )
         )
         if plan is None:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID
-            )
+            raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_STATE_INVALID)
         planner_context = await InterviewPlanningService(
             self.session
         )._build_planning_input(
@@ -188,9 +175,7 @@ class InterviewCandidateQuestionService:
         )
         configuration = _session_configuration(interview_session)
         if planner_context.configuration != configuration:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
-            )
+            raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID)
         questions = list(
             (
                 await self.session.scalars(
@@ -249,7 +234,7 @@ class InterviewCandidateQuestionService:
                 ],
             )
         except TypeError, ValueError, ValidationError, AttributeError:
-            raise InterviewCandidateQuestionStateError(
+            raise service_error_for_code(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             ) from None
 
@@ -260,9 +245,7 @@ class InterviewCandidateQuestionService:
             )
             is None
         ):
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND
-            )
+            raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND)
 
     async def _locked_session(
         self, user_id: UUID, session_id: UUID
@@ -275,17 +258,13 @@ class InterviewCandidateQuestionService:
             .with_for_update()
         )
         if result is None:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND
-            )
+            raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_SESSION_NOT_FOUND)
         return result
 
     @staticmethod
     def _require_version(session: InterviewSession, version: int) -> None:
         if session.version != version:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT
-            )
+            raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_VERSION_CONFLICT)
 
     def _now(self) -> datetime:
         value = self.clock()
@@ -358,21 +337,17 @@ def _validate_output(output: object) -> InterviewCandidateQuestionOutput:
     try:
         return InterviewCandidateQuestionOutput.model_validate(output)
     except TypeError, ValueError, ValidationError:
-        raise InterviewCandidateQuestionStateError(
+        raise service_error_for_code(
             INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
         ) from None
 
 
 def _normalized_content(value: str) -> str:
     if not isinstance(value, str):
-        raise InterviewCandidateQuestionStateError(
-            INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID
-        )
+        raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID)
     normalized = value.strip()
     if not normalized or len(normalized) > 4_000:
-        raise InterviewCandidateQuestionStateError(
-            INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID
-        )
+        raise service_error_for_code(INTERVIEW_CANDIDATE_QUESTION_CONTENT_INVALID)
     return normalized
 
 

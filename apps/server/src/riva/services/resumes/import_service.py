@@ -12,6 +12,7 @@ from riva.services.errors import (
     DomainConflictError,
     ResourceMissingError,
     ServiceError,
+    service_error_for_code,
 )
 from riva.services.profile.types import CareerProfileResponse
 from riva.services.resumes.apply import (
@@ -31,7 +32,6 @@ from riva.services.resumes.drafts import (
     RESUME_PARSING_RESULT_INVALID,
     RESUME_PARSING_RESULT_NOT_FOUND,
     ResumeImportDraftService,
-    ResumeImportStateError,
     resume_import_draft_data_from_model,
 )
 from riva.services.resumes.import_types import (
@@ -88,8 +88,8 @@ class ResumeImportService:
                 resume_document_id=resume_document_id,
             )
             return build_resume_import_draft_response(draft)
-        except ResumeImportStateError as exc:
-            raise resume_import_state_service_error(exc) from None
+        except ServiceError as exc:
+            raise map_resume_import_error(exc) from None
 
     async def apply_draft(
         self,
@@ -109,8 +109,8 @@ class ResumeImportService:
                 draft_version=draft_version,
             )
             return build_resume_import_application_response(result)
-        except ResumeImportStateError as exc:
-            raise resume_import_state_service_error(exc) from None
+        except ServiceError as exc:
+            raise map_resume_import_error(exc) from None
 
     async def _require_parsing_succeeded(
         self,
@@ -148,10 +148,10 @@ def build_resume_import_draft_response(
             updated_at=draft.updated_at,
             **values,
         )
-    except ResumeImportStateError:
+    except ServiceError:
         raise
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID) from None
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID) from None
 
 
 def build_resume_import_application_response(
@@ -169,16 +169,15 @@ def build_resume_import_application_response(
             profile_created=result.profile_created,
             profile_changed=result.profile_changed,
         )
-    except ResumeImportStateError:
+    except ServiceError:
         raise
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID) from None
 
 
-def resume_import_state_service_error(error: ResumeImportStateError) -> ServiceError:
-
-    if error.code in _NOT_FOUND_CODES:
-        return ResourceMissingError(error.code)
-    if error.code in _CONFLICT_CODES:
-        return DomainConflictError(error.code)
-    return DomainConflictError(error.code)
+def map_resume_import_error(error: ServiceError) -> ServiceError:
+    if error.error in _NOT_FOUND_CODES:
+        return ResourceMissingError(error.error)
+    if error.error in _CONFLICT_CODES:
+        return DomainConflictError(error.error)
+    return DomainConflictError(error.error)

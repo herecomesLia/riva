@@ -56,3 +56,12 @@ class DataTooLargeError(ServiceError):
 
 class ExternalDependencyError(ServiceError):
     """An external dependency required by the operation is unavailable."""
+
+
+def service_error_for_code(error: str) -> ServiceError:
+    """Classify a legacy domain error code without introducing a new error type."""
+    if error.endswith("_not_found"):
+        return ResourceMissingError(error)
+    if error.endswith(("_unavailable", "_model_not_configured")):
+        return ExternalDependencyError(error)
+    return DomainConflictError(error)

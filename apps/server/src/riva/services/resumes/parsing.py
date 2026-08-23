@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from copy import deepcopy
 from datetime import datetime
-from typing import Literal, cast
+from typing import cast
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -13,36 +13,20 @@ from riva.agents.resumes.types import ResumeParsingInput, ResumeParsingOutput
 from riva.core.language import InteractionLanguage
 from riva.integrations.llm import LLMProvider
 from riva.models import ResumeDocument, ResumeParsingResult
-from riva.services.errors import DomainConflictError, ExternalDependencyError
+from riva.services.errors import (
+    DomainConflictError,
+    ExternalDependencyError,
+    service_error_for_code,
+)
 from riva.utils import utc_now
 
-ResumeParsingStateErrorCode = Literal[
-    "resume_document_not_found",
-    "resume_document_not_ready",
-    "resume_document_text_missing",
-    "resume_parsing_result_conflict",
-]
-INVALID_RESUME_PARSING_RESULT: ResumeParsingStateErrorCode = (
-    "resume_parsing_result_conflict"
-)
-RESUME_DOCUMENT_NOT_FOUND: ResumeParsingStateErrorCode = "resume_document_not_found"
-RESUME_DOCUMENT_NOT_READY: ResumeParsingStateErrorCode = "resume_document_not_ready"
-RESUME_DOCUMENT_TEXT_MISSING: ResumeParsingStateErrorCode = (
-    "resume_document_text_missing"
-)
-RESUME_PARSING_RESULT_CONFLICT: ResumeParsingStateErrorCode = (
-    "resume_parsing_result_conflict"
-)
+INVALID_RESUME_PARSING_RESULT: str = "resume_parsing_result_conflict"
+RESUME_DOCUMENT_NOT_FOUND: str = "resume_document_not_found"
+RESUME_DOCUMENT_NOT_READY: str = "resume_document_not_ready"
+RESUME_DOCUMENT_TEXT_MISSING: str = "resume_document_text_missing"
+RESUME_PARSING_RESULT_CONFLICT: str = "resume_parsing_result_conflict"
 RESUME_PARSING_NOT_STARTED = "resume_parsing_not_started"
 RESUME_PARSING_UNAVAILABLE = "resume_parsing_unavailable"
-
-
-class ResumeParsingStateError(RuntimeError):
-    safe_message = "The resume parsing state is invalid."
-
-    def __init__(self, code: ResumeParsingStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 class ResumeParsingService:
@@ -173,15 +157,15 @@ class ResumeParsingService:
             statement = statement.with_for_update()
         document = await self.session.scalar(statement)
         if document is None:
-            raise ResumeParsingStateError(RESUME_DOCUMENT_NOT_FOUND)
+            raise service_error_for_code(RESUME_DOCUMENT_NOT_FOUND)
         return document
 
     @staticmethod
     def _require_ready(document: ResumeDocument) -> None:
         if document.extraction_status != "succeeded":
-            raise ResumeParsingStateError(RESUME_DOCUMENT_NOT_READY)
+            raise service_error_for_code(RESUME_DOCUMENT_NOT_READY)
         if not document.extracted_text or not document.extracted_text.strip():
-            raise ResumeParsingStateError(RESUME_DOCUMENT_TEXT_MISSING)
+            raise service_error_for_code(RESUME_DOCUMENT_TEXT_MISSING)
 
 
 def resume_parsing_output_from_result(
@@ -199,25 +183,25 @@ def resume_parsing_output_from_result(
             }
         )
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise ResumeParsingStateError(INVALID_RESUME_PARSING_RESULT) from None
+        raise service_error_for_code(INVALID_RESUME_PARSING_RESULT) from None
 
 
 def _revalidate_output(output: ResumeParsingOutput) -> ResumeParsingOutput:
     try:
         return ResumeParsingOutput.model_validate(output.model_dump(mode="json"))
     except AttributeError, TypeError, ValueError, ValidationError:
-        raise ResumeParsingStateError(INVALID_RESUME_PARSING_RESULT) from None
+        raise service_error_for_code(INVALID_RESUME_PARSING_RESULT) from None
 
 
 def _copy_json_list(value: object) -> list[dict[str, object]]:
     if not isinstance(value, list):
-        raise ResumeParsingStateError(INVALID_RESUME_PARSING_RESULT)
+        raise service_error_for_code(INVALID_RESUME_PARSING_RESULT)
     return deepcopy(cast(list[dict[str, object]], value))
 
 
 def _copy_string_list(value: object) -> list[str]:
     if not isinstance(value, list):
-        raise ResumeParsingStateError(INVALID_RESUME_PARSING_RESULT)
+        raise service_error_for_code(INVALID_RESUME_PARSING_RESULT)
     return deepcopy(cast(list[str], value))
 
 

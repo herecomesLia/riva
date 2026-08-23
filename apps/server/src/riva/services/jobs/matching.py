@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterable
 from datetime import datetime
-from typing import Literal, TypeVar, cast
+from typing import TypeVar, cast
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -36,37 +36,17 @@ from riva.models import (
     MatchingAnalysis,
     TargetRole,
 )
+from riva.services.errors import service_error_for_code
 from riva.services.profile.completion import career_profile_completed
 from riva.utils import utc_now
 
-MatchingAnalysisStateErrorCode = Literal[
-    "matching_target_not_found",
-    "matching_profile_not_found",
-    "matching_profile_incomplete",
-    "matching_job_description_not_ready",
-    "matching_job_description_analysis_not_ready",
-]
-MATCHING_TARGET_NOT_FOUND: MatchingAnalysisStateErrorCode = "matching_target_not_found"
-MATCHING_PROFILE_NOT_FOUND: MatchingAnalysisStateErrorCode = (
-    "matching_profile_not_found"
-)
-MATCHING_PROFILE_INCOMPLETE: MatchingAnalysisStateErrorCode = (
-    "matching_profile_incomplete"
-)
-MATCHING_JOB_DESCRIPTION_NOT_READY: MatchingAnalysisStateErrorCode = (
-    "matching_job_description_not_ready"
-)
-MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY: MatchingAnalysisStateErrorCode = (
+MATCHING_TARGET_NOT_FOUND: str = "matching_target_not_found"
+MATCHING_PROFILE_NOT_FOUND: str = "matching_profile_not_found"
+MATCHING_PROFILE_INCOMPLETE: str = "matching_profile_incomplete"
+MATCHING_JOB_DESCRIPTION_NOT_READY: str = "matching_job_description_not_ready"
+MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY: str = (
     "matching_job_description_analysis_not_ready"
 )
-
-
-class MatchingAnalysisStateError(RuntimeError):
-    safe_message = "The matching analysis state is invalid."
-
-    def __init__(self, code: MatchingAnalysisStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 _Item = TypeVar("_Item")
@@ -285,15 +265,15 @@ class MatchingAnalysisService:
             role_statement = role_statement.with_for_update()
         role = await self.session.scalar(role_statement)
         if role is None:
-            raise MatchingAnalysisStateError(MATCHING_TARGET_NOT_FOUND)
+            raise service_error_for_code(MATCHING_TARGET_NOT_FOUND)
         if role.preparation_status == "archived":
-            raise MatchingAnalysisStateError(MATCHING_TARGET_NOT_FOUND)
+            raise service_error_for_code(MATCHING_TARGET_NOT_FOUND)
         if (
             role.job_description_status != "saved"
             or not role.raw_job_description
             or role.job_description_version is None
         ):
-            raise MatchingAnalysisStateError(MATCHING_JOB_DESCRIPTION_NOT_READY)
+            raise service_error_for_code(MATCHING_JOB_DESCRIPTION_NOT_READY)
 
         profile_statement = (
             select(CareerProfile)
@@ -304,9 +284,9 @@ class MatchingAnalysisService:
             profile_statement = profile_statement.with_for_update()
         profile = await self.session.scalar(profile_statement)
         if profile is None:
-            raise MatchingAnalysisStateError(MATCHING_PROFILE_NOT_FOUND)
+            raise service_error_for_code(MATCHING_PROFILE_NOT_FOUND)
         if not career_profile_completed(profile):
-            raise MatchingAnalysisStateError(MATCHING_PROFILE_INCOMPLETE)
+            raise service_error_for_code(MATCHING_PROFILE_INCOMPLETE)
 
         analysis = await self.session.scalar(
             select(JobDescriptionAnalysis).where(
@@ -318,9 +298,7 @@ class MatchingAnalysisService:
             analysis is None
             or analysis.job_description_version != role.job_description_version
         ):
-            raise MatchingAnalysisStateError(
-                MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY
-            )
+            raise service_error_for_code(MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY)
         existing = await self.session.scalar(
             select(MatchingAnalysis)
             .where(MatchingAnalysis.role_id == role.id)
@@ -341,7 +319,7 @@ class MatchingAnalysisService:
                 interaction_language=context.interaction_language,
             )
         except AttributeError, TypeError, ValueError, ValidationError:
-            raise MatchingAnalysisStateError(MATCHING_PROFILE_INCOMPLETE) from None
+            raise service_error_for_code(MATCHING_PROFILE_INCOMPLETE) from None
 
 
 class _MatchingContext:

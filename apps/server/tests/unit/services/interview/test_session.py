@@ -7,13 +7,13 @@ import pytest
 
 from riva.models import CurrentTargetRole, InterviewSession
 from riva.schemas.interview import StartInterviewRequest
+from riva.services.errors import DomainConflictError
 from riva.services.interview.session import (
     INTERVIEW_SESSION_ALREADY_ACTIVE,
     INTERVIEW_SETUP_JOB_DESCRIPTION_MISSING,
     INTERVIEW_SETUP_PROFILE_INCOMPLETE,
     INTERVIEW_TARGET_ROLE_UNAVAILABLE,
     InterviewSessionService,
-    InterviewSessionStateError,
 )
 
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
@@ -240,7 +240,7 @@ def test_start_rejects_unavailable_setup(blocked_reason, expected) -> None:
         current_role_id=target_role.id,
     )
 
-    with pytest.raises(InterviewSessionStateError) as error:
+    with pytest.raises(DomainConflictError) as error:
         asyncio.run(
             InterviewSessionService(session).start_session(
                 user_id=uuid4(),
@@ -249,7 +249,7 @@ def test_start_rejects_unavailable_setup(blocked_reason, expected) -> None:
             )
         )
 
-    assert error.value.code == expected
+    assert error.value.error == expected
     assert session.added == []
 
 
@@ -288,7 +288,7 @@ def test_same_intent_replays_active_session_and_other_intent_conflicts() -> None
     assert replay is active
     assert session.added == []
 
-    with pytest.raises(InterviewSessionStateError) as error:
+    with pytest.raises(DomainConflictError) as error:
         asyncio.run(
             service.start_session(
                 user_id=active.user_id,
@@ -301,7 +301,7 @@ def test_same_intent_replays_active_session_and_other_intent_conflicts() -> None
                 interaction_language="zh-CN",
             )
         )
-    assert error.value.code == INTERVIEW_SESSION_ALREADY_ACTIVE
+    assert error.value.error == INTERVIEW_SESSION_ALREADY_ACTIVE
 
 
 def test_start_rejects_role_outside_eligible_user_setup() -> None:
@@ -313,7 +313,7 @@ def test_start_rejects_role_outside_eligible_user_setup() -> None:
         current_role_id=eligible_role.id,
     )
 
-    with pytest.raises(InterviewSessionStateError) as error:
+    with pytest.raises(DomainConflictError) as error:
         asyncio.run(
             InterviewSessionService(session).start_session(
                 user_id=uuid4(),
@@ -321,4 +321,4 @@ def test_start_rejects_role_outside_eligible_user_setup() -> None:
                 interaction_language="zh-CN",
             )
         )
-    assert error.value.code == INTERVIEW_TARGET_ROLE_UNAVAILABLE
+    assert error.value.error == INTERVIEW_TARGET_ROLE_UNAVAILABLE

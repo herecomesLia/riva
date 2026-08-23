@@ -55,6 +55,11 @@ from riva.models import (
     QuestionCard,
     TargetRole,
 )
+from riva.services.errors import (
+    DomainConflictError,
+    ServiceError,
+    service_error_for_code,
+)
 from riva.services.practice.question_types import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
@@ -77,115 +82,57 @@ from riva.services.practice.weakness import (
 from riva.services.training.memory import TrainingMemoryService
 from riva.utils import utc_now
 
-PracticeSessionStateErrorCode = Literal[
-    "practice_session_not_found",
-    "practice_session_version_conflict",
-    "practice_session_already_active",
-    "practice_session_state_conflict",
-    "practice_session_source_unavailable",
-    "practice_weakness_prioritization_unavailable",
-    "practice_question_generation_prerequisite_failed",
-    "practice_question_generation_unavailable",
-    "practice_question_generation_failed",
-    "practice_question_generation_state_conflict",
-    "practice_follow_up_generation_failed",
-    "practice_follow_up_generation_state_conflict",
-    "practice_follow_up_generation_unavailable",
-    "practice_evaluation_generation_state_conflict",
-    "practice_evaluation_generation_unavailable",
-    "practice_evaluation_generation_failed",
-    "practice_review_generation_failed",
-    "practice_review_generation_state_conflict",
-    "practice_review_generation_unavailable",
-    "practice_recommendation_generation_failed",
-    "practice_recommendation_generation_state_conflict",
-    "practice_recommendation_generation_unavailable",
-    "practice_reference_answer_generation_unavailable",
-]
-
-PRACTICE_SESSION_NOT_FOUND: PracticeSessionStateErrorCode = "practice_session_not_found"
-PRACTICE_SESSION_VERSION_CONFLICT: PracticeSessionStateErrorCode = (
-    "practice_session_version_conflict"
-)
-PRACTICE_SESSION_ALREADY_ACTIVE: PracticeSessionStateErrorCode = (
-    "practice_session_already_active"
-)
-PRACTICE_SESSION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
-    "practice_session_state_conflict"
-)
-PRACTICE_SESSION_SOURCE_UNAVAILABLE: PracticeSessionStateErrorCode = (
-    "practice_session_source_unavailable"
-)
-PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+PRACTICE_SESSION_NOT_FOUND: str = "practice_session_not_found"
+PRACTICE_SESSION_VERSION_CONFLICT: str = "practice_session_version_conflict"
+PRACTICE_SESSION_ALREADY_ACTIVE: str = "practice_session_already_active"
+PRACTICE_SESSION_STATE_CONFLICT: str = "practice_session_state_conflict"
+PRACTICE_SESSION_SOURCE_UNAVAILABLE: str = "practice_session_source_unavailable"
+PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE: str = (
     "practice_weakness_prioritization_unavailable"
 )
-PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED: PracticeSessionStateErrorCode = (
+PRACTICE_QUESTION_GENERATION_PREREQUISITE_FAILED: str = (
     "practice_question_generation_prerequisite_failed"
 )
-PRACTICE_QUESTION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+PRACTICE_QUESTION_GENERATION_UNAVAILABLE: str = (
     "practice_question_generation_unavailable"
 )
-PRACTICE_QUESTION_GENERATION_FAILED: PracticeSessionStateErrorCode = (
-    "practice_question_generation_failed"
-)
-PRACTICE_QUESTION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+PRACTICE_QUESTION_GENERATION_FAILED: str = "practice_question_generation_failed"
+PRACTICE_QUESTION_GENERATION_STATE_CONFLICT: str = (
     "practice_question_generation_state_conflict"
 )
-PRACTICE_FOLLOW_UP_GENERATION_FAILED: PracticeSessionStateErrorCode = (
-    "practice_follow_up_generation_failed"
-)
-PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+PRACTICE_FOLLOW_UP_GENERATION_FAILED: str = "practice_follow_up_generation_failed"
+PRACTICE_FOLLOW_UP_GENERATION_STATE_CONFLICT: str = (
     "practice_follow_up_generation_state_conflict"
 )
-PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE: str = (
     "practice_follow_up_generation_unavailable"
 )
-PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+PRACTICE_EVALUATION_GENERATION_STATE_CONFLICT: str = (
     "practice_evaluation_generation_state_conflict"
 )
-PRACTICE_EVALUATION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+PRACTICE_EVALUATION_GENERATION_UNAVAILABLE: str = (
     "practice_evaluation_generation_unavailable"
 )
-PRACTICE_EVALUATION_GENERATION_FAILED: PracticeSessionStateErrorCode = (
-    "practice_evaluation_generation_failed"
-)
-PRACTICE_REVIEW_GENERATION_FAILED: PracticeSessionStateErrorCode = (
-    "practice_review_generation_failed"
-)
-PRACTICE_REVIEW_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+PRACTICE_EVALUATION_GENERATION_FAILED: str = "practice_evaluation_generation_failed"
+PRACTICE_REVIEW_GENERATION_FAILED: str = "practice_review_generation_failed"
+PRACTICE_REVIEW_GENERATION_STATE_CONFLICT: str = (
     "practice_review_generation_state_conflict"
 )
-PRACTICE_REVIEW_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
-    "practice_review_generation_unavailable"
-)
-PRACTICE_RECOMMENDATION_GENERATION_FAILED: PracticeSessionStateErrorCode = (
+PRACTICE_REVIEW_GENERATION_UNAVAILABLE: str = "practice_review_generation_unavailable"
+PRACTICE_RECOMMENDATION_GENERATION_FAILED: str = (
     "practice_recommendation_generation_failed"
 )
-PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT: PracticeSessionStateErrorCode = (
+PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT: str = (
     "practice_recommendation_generation_state_conflict"
 )
-PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+PRACTICE_RECOMMENDATION_GENERATION_UNAVAILABLE: str = (
     "practice_recommendation_generation_unavailable"
 )
-PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE: PracticeSessionStateErrorCode = (
+PRACTICE_REFERENCE_ANSWER_GENERATION_UNAVAILABLE: str = (
     "practice_reference_answer_generation_unavailable"
 )
 
 REUSED_QUESTION_SOURCES = frozenset({"saved", "history"})
-
-
-class PracticeSessionStateError(RuntimeError):
-    safe_message = "The practice session state is invalid."
-
-    def __init__(
-        self,
-        code: PracticeSessionStateErrorCode,
-        *,
-        source_code: str | None = None,
-    ) -> None:
-        self.code = code
-        self.source_code = source_code
-        super().__init__(self.safe_message)
 
 
 @dataclass(frozen=True)
@@ -388,7 +335,7 @@ class PracticeSessionService:
             active = await self._active_session(user_id, for_update=True)
             if active is not None:
                 if not self._same_intent(active, selection, interaction_language):
-                    raise PracticeSessionStateError(PRACTICE_SESSION_ALREADY_ACTIVE)
+                    raise service_error_for_code(PRACTICE_SESSION_ALREADY_ACTIVE)
                 return await self._active_context(active)
             if selection.prioritize_weaknesses and not await PracticeWeaknessService(
                 self.session
@@ -396,9 +343,7 @@ class PracticeSessionService:
                 user_id=user_id,
                 interaction_language=interaction_language,
             ):
-                raise PracticeSessionStateError(
-                    PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE
-                )
+                raise DomainConflictError(PRACTICE_WEAKNESS_PRIORITIZATION_UNAVAILABLE)
             card = None
             if selection.source.value in REUSED_QUESTION_SOURCES:
                 card = await self._reused_card(
@@ -407,7 +352,7 @@ class PracticeSessionService:
                     language=interaction_language,
                 )
                 if card is None:
-                    raise PracticeSessionStateError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
+                    raise DomainConflictError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
             now = self.clock()
             session = PracticeSession(
                 id=uuid4(),
@@ -451,13 +396,13 @@ class PracticeSessionService:
             attempt.status = PracticeAttemptStatus.ANSWERING.value
             await self.session.commit()
             return PracticeSessionWorkflowContext(session, attempt, card)
-        except PracticeSessionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception as error:
             await self.session.rollback()
             if isinstance(error, ValueError):
-                raise PracticeSessionStateError(
+                raise service_error_for_code(
                     PRACTICE_QUESTION_GENERATION_UNAVAILABLE
                 ) from None
             raise
@@ -477,9 +422,9 @@ class PracticeSessionService:
             current.status != PracticeAttemptStatus.REVIEW.value
             or current.question_card_id != question_id
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         if current.recommendation is None:
-            raise PracticeSessionStateError(
+            raise service_error_for_code(
                 PRACTICE_RECOMMENDATION_GENERATION_STATE_CONFLICT
             )
         question_type = QuestionCardQuestionType(
@@ -506,7 +451,7 @@ class PracticeSessionService:
                     exclude_id=current.question_card_id,
                 )
                 if card is None:
-                    raise PracticeSessionStateError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
+                    raise DomainConflictError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
             attempt = await self._create_attempt(
                 session=session,
                 attempt_number=current.attempt_number + 1,
@@ -533,14 +478,12 @@ class PracticeSessionService:
             session.updated_at = self.clock()
             await self.session.commit()
             return PracticeSessionWorkflowContext(session, attempt, card)
-        except PracticeSessionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception:
             await self.session.rollback()
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_FAILED
-            ) from None
+            raise service_error_for_code(PRACTICE_QUESTION_GENERATION_FAILED) from None
 
     async def skip_current_question(
         self,
@@ -557,7 +500,7 @@ class PracticeSessionService:
             current.status != PracticeAttemptStatus.ANSWERING.value
             or current.question_card_id != question_id
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         current.status = PracticeAttemptStatus.COMPLETED.value
         current.completed_at = self.clock()
         try:
@@ -576,7 +519,7 @@ class PracticeSessionService:
                     exclude_id=current.question_card_id,
                 )
                 if card is None:
-                    raise PracticeSessionStateError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
+                    raise DomainConflictError(PRACTICE_SESSION_SOURCE_UNAVAILABLE)
             attempt = await self._create_attempt(
                 session=session,
                 attempt_number=current.attempt_number + 1,
@@ -603,14 +546,12 @@ class PracticeSessionService:
             session.updated_at = self.clock()
             await self.session.commit()
             return PracticeSessionWorkflowContext(session, attempt, card)
-        except PracticeSessionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception:
             await self.session.rollback()
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_FAILED
-            ) from None
+            raise service_error_for_code(PRACTICE_QUESTION_GENERATION_FAILED) from None
 
     async def retry_current_question(
         self,
@@ -628,7 +569,7 @@ class PracticeSessionService:
             or current.question_card_id != question_id
             or current.question_card is None
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         try:
             current.status = PracticeAttemptStatus.COMPLETED.value
             current.completed_at = self.clock()
@@ -651,7 +592,7 @@ class PracticeSessionService:
             )
         except Exception:
             await self.session.rollback()
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT) from None
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT) from None
 
     async def submit_primary_answer(
         self,
@@ -671,7 +612,7 @@ class PracticeSessionService:
             or card is None
             or card.id != question_id
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         try:
             answer = PracticeAnswer(
                 id=uuid4(),
@@ -706,14 +647,12 @@ class PracticeSessionService:
             return self._primary_context(
                 session, attempt, card, answer, decision, question
             )
-        except PracticeSessionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception:
             await self.session.rollback()
-            raise PracticeSessionStateError(
-                PRACTICE_FOLLOW_UP_GENERATION_FAILED
-            ) from None
+            raise service_error_for_code(PRACTICE_FOLLOW_UP_GENERATION_FAILED) from None
 
     async def submit_follow_up_answer(
         self,
@@ -746,7 +685,7 @@ class PracticeSessionService:
             or follow_up.answer is not None
             or main is None
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         try:
             answer = PracticeAnswer(
                 id=uuid4(),
@@ -789,14 +728,12 @@ class PracticeSessionService:
                 reason=PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED,
                 unanswered_question=None,
             )
-        except PracticeSessionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception:
             await self.session.rollback()
-            raise PracticeSessionStateError(
-                PRACTICE_FOLLOW_UP_GENERATION_FAILED
-            ) from None
+            raise service_error_for_code(PRACTICE_FOLLOW_UP_GENERATION_FAILED) from None
 
     async def end_follow_ups(
         self,
@@ -828,7 +765,7 @@ class PracticeSessionService:
             or question.answer is not None
             or main is None
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         try:
             return await self._finish_pipeline(
                 session=session,
@@ -838,12 +775,12 @@ class PracticeSessionService:
                 reason=PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY,
                 unanswered_question=question,
             )
-        except PracticeSessionStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception:
             await self.session.rollback()
-            raise PracticeSessionStateError(
+            raise service_error_for_code(
                 PRACTICE_EVALUATION_GENERATION_FAILED
             ) from None
 
@@ -939,7 +876,7 @@ class PracticeSessionService:
             user_id, session_id, expected_version
         )
         if current.status != PracticeAttemptStatus.REVIEW.value:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         reviews = await self._review_contexts(session)
         final = self._review_context_from_attempt(session, current)
         now = self.clock()
@@ -970,12 +907,12 @@ class PracticeSessionService:
             user_id, session_id, expected_version
         )
         if current.question_card is None or current.question_card.id != question_id:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         if current.status not in {
             PracticeAttemptStatus.ANSWERING.value,
             PracticeAttemptStatus.ANSWERING_FOLLOW_UP.value,
         }:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         question_context = PracticeSessionWorkflowContext(
             session, current, current.question_card
         )
@@ -1031,7 +968,7 @@ class PracticeSessionService:
         weakness_focus: PracticeWeaknessFocus,
     ) -> QuestionCard:
         if self.llm_provider is None or not self.llm_model:
-            raise PracticeSessionStateError(PRACTICE_QUESTION_GENERATION_UNAVAILABLE)
+            raise service_error_for_code(PRACTICE_QUESTION_GENERATION_UNAVAILABLE)
         try:
             return await QuestionGenerationService(
                 self.session,
@@ -1046,12 +983,10 @@ class PracticeSessionService:
                 weakness_focus=weakness_focus,
                 commit=False,
             )
-        except PracticeSessionStateError:
+        except ServiceError:
             raise
         except Exception:
-            raise PracticeSessionStateError(
-                PRACTICE_QUESTION_GENERATION_FAILED
-            ) from None
+            raise service_error_for_code(PRACTICE_QUESTION_GENERATION_FAILED) from None
 
     async def _generate_follow_up(
         self,
@@ -1063,7 +998,7 @@ class PracticeSessionService:
         next_order: int,
     ) -> tuple[PracticeFollowUpDecision, PracticeFollowUpQuestion | None]:
         if self.llm_provider is None or not self.llm_model:
-            raise PracticeSessionStateError(PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE)
+            raise service_error_for_code(PRACTICE_FOLLOW_UP_GENERATION_UNAVAILABLE)
         input_snapshot = FollowUpInput(
             interaction_language=session.language,
             question=FollowUpQuestionContext(
@@ -1093,9 +1028,7 @@ class PracticeSessionService:
                 )
             ).output
         except Exception:
-            raise PracticeSessionStateError(
-                PRACTICE_FOLLOW_UP_GENERATION_FAILED
-            ) from None
+            raise service_error_for_code(PRACTICE_FOLLOW_UP_GENERATION_FAILED) from None
         decision = PracticeFollowUpDecision(
             id=uuid4(),
             attempt_id=attempt.id,
@@ -1136,7 +1069,7 @@ class PracticeSessionService:
         unanswered_question: PracticeFollowUpQuestion | None,
     ) -> PracticeReviewWorkflowContext:
         if self.llm_provider is None or not self.llm_model:
-            raise PracticeSessionStateError(PRACTICE_EVALUATION_GENERATION_UNAVAILABLE)
+            raise service_error_for_code(PRACTICE_EVALUATION_GENERATION_UNAVAILABLE)
         evaluation_input = self._evaluation_input(
             session, attempt, card, main_answer, reason
         )
@@ -1182,7 +1115,7 @@ class PracticeSessionService:
                 ).run(recommendation_input)
             ).output
         except Exception:
-            raise PracticeSessionStateError(
+            raise service_error_for_code(
                 PRACTICE_EVALUATION_GENERATION_FAILED
             ) from None
 
@@ -1284,14 +1217,14 @@ class PracticeSessionService:
     ) -> tuple[PracticeSession, PracticeAttempt]:
         session = await self._load_session(user_id, session_id, for_update=True)
         if session.status != "active":
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         if session.version != expected_version:
-            raise PracticeSessionStateError(PRACTICE_SESSION_VERSION_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_VERSION_CONFLICT)
         attempt = max(
             session.attempts, key=lambda value: value.attempt_number, default=None
         )
         if attempt is None:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         return session, attempt
 
     async def _load_session(
@@ -1313,7 +1246,7 @@ class PracticeSessionService:
             statement = statement.with_for_update()
         session = await self.session.scalar(statement)
         if session is None:
-            raise PracticeSessionStateError(PRACTICE_SESSION_NOT_FOUND)
+            raise service_error_for_code(PRACTICE_SESSION_NOT_FOUND)
         return session
 
     async def _active_session(
@@ -1363,14 +1296,14 @@ class PracticeSessionService:
             session.attempts, key=lambda value: value.attempt_number, default=None
         )
         if attempt is None or attempt.question_card is None:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         if attempt.status == PracticeAttemptStatus.ANSWERING.value:
             return PracticeSessionWorkflowContext(
                 session, attempt, attempt.question_card
             )
         main = self._main_answer(attempt)
         if main is None:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         if attempt.status == PracticeAttemptStatus.REVIEW.value:
             return self._review_context_from_attempt(session, attempt)
         if attempt.status in {
@@ -1381,7 +1314,7 @@ class PracticeSessionService:
             return self._primary_context(
                 session, attempt, attempt.question_card, main, decision, question
             )
-        raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+        raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
 
     async def _completed_context(
         self, session: PracticeSession
@@ -1393,11 +1326,11 @@ class PracticeSessionService:
             session.attempts, key=lambda value: value.attempt_number, default=None
         )
         if attempt is None:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         reviews = tuple(await self._review_contexts(session))
         if session.completion_reason == "userEndedEarly":
             if attempt.question_card is None:
-                raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+                raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
             return PracticeEndedEarlySessionWorkflowContext(
                 session=session,
                 unfinished_attempt=attempt,
@@ -1439,7 +1372,7 @@ class PracticeSessionService:
             or attempt.review is None
             or attempt.recommendation is None
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         reason = self._completion_reason(attempt)
         return PracticeReviewWorkflowContext(
             session=session,
@@ -1575,7 +1508,7 @@ class PracticeSessionService:
             or card.id != question_id
             or (follow_up_question_id and follow_up is None)
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         return PracticeReferenceAnswerRequestContext(
             target_type=(
                 PracticeReferenceAnswerTargetType.FOLLOW_UP
@@ -1603,7 +1536,7 @@ class PracticeSessionService:
             user_id, session_id, expected_version
         )
         if attempt.question_card is None or attempt.question_card.id != question_id:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         value = (
             kwargs.get("is_saved")
             if flag == "is_saved"
@@ -1630,7 +1563,7 @@ class PracticeSessionService:
         )
         card = attempt.question_card
         if card is None or card.id != question_id:
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         if reveal_hint:
             card.answer_hints_revealed = True
         if reveal_framework:
@@ -1667,7 +1600,7 @@ class PracticeSessionService:
             or attempt.question_card.id != question_id
             or question is None
         ):
-            raise PracticeSessionStateError(PRACTICE_SESSION_STATE_CONFLICT)
+            raise service_error_for_code(PRACTICE_SESSION_STATE_CONFLICT)
         if reveal_hint:
             question.answer_hints_revealed = True
         if reveal_framework:

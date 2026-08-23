@@ -10,6 +10,7 @@ from riva.services.errors import (
     DomainConflictError,
     ExternalDependencyError,
     ResourceMissingError,
+    ServiceError,
 )
 from riva.services.practice.question_types import (
     QuestionCardResponse,
@@ -17,7 +18,6 @@ from riva.services.practice.question_types import (
 )
 from riva.services.practice.questions import (
     QuestionGenerationService,
-    QuestionGenerationStateError,
 )
 
 QUESTION_GENERATION_UNAVAILABLE = "question_generation_unavailable"
@@ -58,9 +58,9 @@ class QuestionCardService:
                 interaction_language=interaction_language,
             )
             return build_question_card_response(card)
-        except QuestionGenerationStateError as error:
+        except ServiceError as error:
             await self.session.rollback()
-            raise DomainConflictError(error.code) from None
+            raise DomainConflictError(error.error) from None
         except Exception:
             await self.session.rollback()
             raise

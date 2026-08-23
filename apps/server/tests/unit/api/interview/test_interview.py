@@ -10,10 +10,9 @@ from riva.api.dependencies import (
     require_llm_provider,
 )
 from riva.models import InterviewSession, User
-from riva.services.errors import AuthenticationRequiredError
+from riva.services.errors import AuthenticationRequiredError, DomainConflictError
 from riva.services.interview.session import (
     INTERVIEW_SESSION_ALREADY_ACTIVE,
-    InterviewSessionStateError,
     InterviewSetupContext,
 )
 from riva.services.interview.workflow import InterviewService
@@ -192,12 +191,12 @@ def test_interview_requires_authentication(app) -> None:
     assert result.json() == {"error": "not_authenticated"}
 
 
-def test_interview_state_error_is_mapped_to_conflict(app) -> None:
+def test_interview_domain_conflict_is_mapped_to_conflict(app) -> None:
     current_user = make_user()
     domain, role = make_domain(current_user.id)
 
     async def conflict_start(**kwargs):
-        raise InterviewSessionStateError(INTERVIEW_SESSION_ALREADY_ACTIVE)
+        raise DomainConflictError(INTERVIEW_SESSION_ALREADY_ACTIVE)
 
     domain.start_session = conflict_start
     service = InterviewService(

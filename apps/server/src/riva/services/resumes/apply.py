@@ -24,6 +24,7 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
+from riva.services.errors import ServiceError, service_error_for_code
 from riva.services.profile.types import (
     CareerProfileEducationInput,
     CareerProfileProjectExperienceInput,
@@ -43,7 +44,6 @@ from riva.services.resumes.drafts import (
     RESUME_IMPORT_PROFILE_INVALID,
     RESUME_IMPORT_PROFILE_VERSION_CONFLICT,
     RESUME_PARSING_RESULT_NOT_FOUND,
-    ResumeImportStateError,
     _parse_persisted_result,
     _require_aware_datetime,
     _validate_profile,
@@ -93,7 +93,7 @@ class ResumeImportApplicationService:
             profile = await self._load_profile(user_id)
             draft = await self._load_draft(user_id, resume_document_id)
             if draft is None:
-                raise ResumeImportStateError(RESUME_IMPORT_DRAFT_NOT_FOUND)
+                raise service_error_for_code(RESUME_IMPORT_DRAFT_NOT_FOUND)
 
             _validate_draft_metadata(
                 draft,
@@ -105,9 +105,9 @@ class ResumeImportApplicationService:
 
             if draft.status == APPLIED:
                 if draft.parsing_result_version != result.result_version:
-                    raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+                    raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
             elif draft.parsing_result_version != result.result_version:
-                raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+                raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
 
             draft_data = resume_import_draft_data_from_model(draft)
 
@@ -140,7 +140,7 @@ class ResumeImportApplicationService:
             if profile is None:
                 profile_id = self.profile_id_factory()
                 if not isinstance(profile_id, UUID):
-                    raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+                    raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
                 profile = CareerProfile(
                     profile_id=profile_id,
                     user_id=user_id,
@@ -195,7 +195,7 @@ class ResumeImportApplicationService:
             select(User.id).where(User.id == user_id).with_for_update()
         )
         if user is None:
-            raise ResumeImportStateError(RESUME_DOCUMENT_NOT_FOUND)
+            raise service_error_for_code(RESUME_DOCUMENT_NOT_FOUND)
 
     async def _load_document(
         self,
@@ -211,9 +211,9 @@ class ResumeImportApplicationService:
             .with_for_update()
         )
         if document is None:
-            raise ResumeImportStateError(RESUME_DOCUMENT_NOT_FOUND)
+            raise service_error_for_code(RESUME_DOCUMENT_NOT_FOUND)
         if document.user_id != user_id or document.id != resume_document_id:
-            raise ResumeImportStateError(RESUME_DOCUMENT_NOT_FOUND)
+            raise service_error_for_code(RESUME_DOCUMENT_NOT_FOUND)
         return document
 
     async def _load_result(
@@ -230,9 +230,9 @@ class ResumeImportApplicationService:
             .with_for_update()
         )
         if result is None:
-            raise ResumeImportStateError(RESUME_PARSING_RESULT_NOT_FOUND)
+            raise service_error_for_code(RESUME_PARSING_RESULT_NOT_FOUND)
         if result.user_id != user_id or result.resume_document_id != resume_document_id:
-            raise ResumeImportStateError(RESUME_PARSING_RESULT_NOT_FOUND)
+            raise service_error_for_code(RESUME_PARSING_RESULT_NOT_FOUND)
         return result
 
     async def _load_profile(self, user_id: UUID) -> CareerProfile | None:
@@ -323,7 +323,7 @@ def merge_resume_import_skills(
     for skill in current:
         key = canonicalize_resume_import_identity(skill.name)
         if key in current_by_name or skill.id in current_ids:
-            raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+            raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID)
         current_by_name[key] = skill
         current_ids.add(skill.id)
 
@@ -334,7 +334,7 @@ def merge_resume_import_skills(
         existing = current_by_name.get(key)
         if existing is not None:
             if draft_skill.id in current_ids and draft_skill.id != existing.id:
-                raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+                raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
             persisted_ids[draft_skill.id] = existing.id
             if (
                 _profile_source_value(existing.source)
@@ -345,7 +345,7 @@ def merge_resume_import_skills(
             continue
 
         if draft_skill.id in current_ids:
-            raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+            raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
         skill = CareerProfileSkill(
             id=draft_skill.id,
             career_profile_id=profile.profile_id,
@@ -516,7 +516,7 @@ def _validate_requested_draft_version(draft_version: object) -> None:
         or isinstance(draft_version, bool)
         or draft_version < 1
     ):
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_VERSION_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_VERSION_CONFLICT)
 
 
 def _validate_draft_metadata(
@@ -527,16 +527,16 @@ def _validate_draft_metadata(
     draft_version: int,
 ) -> None:
     if draft.draft_version != draft_version:
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_VERSION_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_VERSION_CONFLICT)
     if draft.user_id != user_id or draft.resume_document_id != resume_document_id:
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
 
 
 def _validate_draft_status(status: object) -> None:
     if status == "superseded":
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_NOT_READY)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_NOT_READY)
     if status not in {READY, APPLIED}:
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
 
 
 def _validate_recomputed_draft(
@@ -552,12 +552,12 @@ def _validate_recomputed_draft(
             result=parsed_output,
             profile=profile,
         )
-    except ResumeImportStateError:
+    except ServiceError:
         raise
     except TypeError, ValueError, ValidationError:
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID) from None
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID) from None
     if _stable_model_json(expected) != _stable_model_json(persisted):
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
 
 
 def _stable_model_json(value: ResumeImportDraftData) -> str:
@@ -574,18 +574,18 @@ def _validate_ready_profile_snapshot(
     profile: CareerProfile | None,
 ) -> None:
     if (draft.base_profile_id is None) != (draft.base_profile_version is None):
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
     if draft.base_profile_id is None:
         if profile is not None:
-            raise ResumeImportStateError(RESUME_IMPORT_PROFILE_VERSION_CONFLICT)
+            raise service_error_for_code(RESUME_IMPORT_PROFILE_VERSION_CONFLICT)
         return
     if profile is None:
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_VERSION_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_VERSION_CONFLICT)
     if (
         profile.profile_id != draft.base_profile_id
         or profile.version != draft.base_profile_version
     ):
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_VERSION_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_VERSION_CONFLICT)
 
 
 def _validate_applied_replay(
@@ -593,9 +593,9 @@ def _validate_applied_replay(
     profile: CareerProfile | None,
 ) -> None:
     if profile is None:
-        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
     if (draft.base_profile_id is None) != (draft.base_profile_version is None):
-        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
     if (
         not isinstance(draft.applied_profile_version, int)
         or isinstance(draft.applied_profile_version, bool)
@@ -603,12 +603,12 @@ def _validate_applied_replay(
         or draft.applied_at is None
         or profile.version != draft.applied_profile_version
     ):
-        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
     if (
         draft.base_profile_id is not None
         and profile.profile_id != draft.base_profile_id
     ):
-        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
 
 
 def _validate_summary_action(
@@ -618,12 +618,12 @@ def _validate_summary_action(
 ) -> None:
     if draft.summary_action == "set":
         if draft.summary is None or not draft.summary.strip():
-            raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+            raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
     elif draft.summary_action == "preserve":
         if not profile_exists:
-            raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+            raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
     elif draft.summary_action != "none":
-        raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_DRAFT_INVALID)
 
 
 def _profile_source_value(source: object) -> str:
@@ -633,7 +633,7 @@ def _profile_source_value(source: object) -> str:
         ProfileSource.USER_EDITED.value,
         ProfileSource.USER_ADDED.value,
     }:
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID)
     return str(value)
 
 
@@ -642,7 +642,7 @@ def _validate_current_items(items: list[object]) -> None:
     for item in items:
         item_id = getattr(item, "id", None)
         if not isinstance(item_id, UUID) or item_id in ids:
-            raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+            raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID)
         ids.add(item_id)
         _profile_source_value(getattr(item, "source", None))
 
@@ -710,7 +710,7 @@ def _mapped_skill_ids(
             not isinstance(persisted_skill_id, UUID)
             or persisted_skill_id not in skills_by_id
         ):
-            raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+            raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
         mapped.append(persisted_skill_id)
     return mapped
 
@@ -729,16 +729,16 @@ def reconcile_work_skill_links(
         skills_by_id,
     )
     if len(mapped_skill_ids) != len(set(mapped_skill_ids)):
-        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
 
     existing_by_skill_id: dict[UUID, CareerProfileWorkSkill] = {}
     experience_id = getattr(experience, "id", None)
     if not isinstance(profile_id, UUID) or not isinstance(experience_id, UUID):
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID)
     try:
         existing_links = list(experience.skill_links)
     except AttributeError, TypeError:
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID) from None
     existing_link_ids: set[UUID] = set()
     for link in existing_links:
         link_id = getattr(link, "id", None)
@@ -752,7 +752,7 @@ def reconcile_work_skill_links(
             or getattr(link, "work_experience_id", None) != experience_id
             or getattr(link, "career_profile_id", None) != profile_id
         ):
-            raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+            raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID)
         existing_link_ids.add(link_id)
         existing_by_skill_id[skill_id] = link
 
@@ -786,16 +786,16 @@ def reconcile_project_skill_links(
         skills_by_id,
     )
     if len(mapped_skill_ids) != len(set(mapped_skill_ids)):
-        raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
+        raise service_error_for_code(RESUME_IMPORT_APPLY_CONFLICT)
 
     existing_by_skill_id: dict[UUID, CareerProfileProjectSkill] = {}
     project_id = getattr(project, "id", None)
     if not isinstance(profile_id, UUID) or not isinstance(project_id, UUID):
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID)
     try:
         existing_links = list(project.skill_links)
     except AttributeError, TypeError:
-        raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID) from None
+        raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID) from None
     existing_link_ids: set[UUID] = set()
     for link in existing_links:
         link_id = getattr(link, "id", None)
@@ -809,7 +809,7 @@ def reconcile_project_skill_links(
             or getattr(link, "project_experience_id", None) != project_id
             or getattr(link, "career_profile_id", None) != profile_id
         ):
-            raise ResumeImportStateError(RESUME_IMPORT_PROFILE_INVALID)
+            raise service_error_for_code(RESUME_IMPORT_PROFILE_INVALID)
         existing_link_ids.add(link_id)
         existing_by_skill_id[skill_id] = link
 

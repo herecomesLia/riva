@@ -25,6 +25,7 @@ from riva.services.errors import (
     InvalidDataError,
     ResourceMissingError,
     ServiceError,
+    service_error_for_code,
 )
 from riva.services.resumes.document_types import (
     FailedResumeDocumentResponse,
@@ -57,13 +58,6 @@ RESUME_EXTRACTION_FAILURE_REASON = (
 )
 
 _SUPPORTED_MEDIA_TYPES = frozenset({TEXT_PLAIN, APPLICATION_PDF, APPLICATION_DOCX})
-_RESUME_DOCUMENT_STATE_CODES = frozenset(
-    {
-        "resume_document_not_found",
-        "resume_document_not_ready",
-        "resume_document_text_missing",
-    }
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,16 +65,6 @@ class LoadedResumeText:
     resume_document_id: UUID
     media_type: str
     text: str
-
-
-class ResumeDocumentStateError(RuntimeError):
-    code: str
-
-    def __init__(self, code: str) -> None:
-        if code not in _RESUME_DOCUMENT_STATE_CODES:
-            raise ValueError("unsupported resume document state error code")
-        self.code = code
-        super().__init__(code)
 
 
 def normalize_resume_filename(value: str | None) -> str:
@@ -347,11 +331,11 @@ class ResumeDocumentService:
         result = await self.session.execute(statement)
         document = result.scalar_one_or_none()
         if document is None:
-            raise ResumeDocumentStateError("resume_document_not_found")
+            raise service_error_for_code("resume_document_not_found")
         if document.extraction_status != "succeeded":
-            raise ResumeDocumentStateError("resume_document_not_ready")
+            raise service_error_for_code("resume_document_not_ready")
         if document.extracted_text is None or not document.extracted_text.strip():
-            raise ResumeDocumentStateError("resume_document_text_missing")
+            raise service_error_for_code("resume_document_text_missing")
         return LoadedResumeText(
             resume_document_id=document.id,
             media_type=document.media_type,

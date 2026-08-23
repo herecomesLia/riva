@@ -20,11 +20,11 @@ from riva.models import (
     QuestionCard,
     TargetRole,
 )
+from riva.services.errors import ServiceError, service_error_for_code
 from riva.services.interview.records import (
     TRAINING_RECORD_NOT_FOUND,
     TRAINING_RECORD_STATE_CONFLICT,
     InterviewTrainingRecordService,
-    TrainingRecordStateError,
 )
 from riva.services.practice.evaluation import (
     practice_evaluation_output_from_artifact,
@@ -34,7 +34,6 @@ from riva.services.practice.recommendation import (
 )
 from riva.services.practice.reference_answer import (
     ReferenceAnswerGenerationService,
-    ReferenceAnswerGenerationStateError,
 )
 from riva.services.practice.review import (
     practice_review_output_from_artifact,
@@ -45,7 +44,6 @@ from riva.services.practice.session import (
     PracticeEndedEarlySessionWorkflowContext,
     PracticeReviewWorkflowContext,
     PracticeSessionService,
-    PracticeSessionStateError,
 )
 from riva.services.practice.types import (
     PracticeAnswerResponse,
@@ -295,7 +293,7 @@ class TrainingRecordService:
         started_at = row["started_at"]
         ended_at = row["ended_at"]
         if ended_at is None:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         _require_aware_timestamp(started_at)
         _require_aware_timestamp(ended_at)
         duration_seconds = max(0, int((ended_at - started_at).total_seconds()))
@@ -334,10 +332,10 @@ class TrainingRecordService:
                 user_id=user_id,
                 session_id=record_id,
             )
-        except PracticeSessionStateError as error:
-            if error.code == PRACTICE_SESSION_NOT_FOUND:
-                raise TrainingRecordStateError(TRAINING_RECORD_NOT_FOUND) from None
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+        except ServiceError as error:
+            if error.error == PRACTICE_SESSION_NOT_FOUND:
+                raise service_error_for_code(TRAINING_RECORD_NOT_FOUND) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
         try:
             if isinstance(context, PracticeCompletedSessionWorkflowContext):
@@ -350,17 +348,21 @@ class TrainingRecordService:
                     user_id=user_id,
                     context=context,
                 )
-            raise TrainingRecordStateError(TRAINING_RECORD_NOT_FOUND)
-        except TrainingRecordStateError:
-            raise
+            raise service_error_for_code(TRAINING_RECORD_NOT_FOUND)
+        except ServiceError as error:
+            if error.error in {
+                TRAINING_RECORD_NOT_FOUND,
+                TRAINING_RECORD_STATE_CONFLICT,
+            }:
+                raise
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
         except (
             AttributeError,
             TypeError,
             ValueError,
             ValidationError,
-            ReferenceAnswerGenerationStateError,
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
     def _reference_answer_generation_service(
         self,
@@ -380,7 +382,7 @@ class TrainingRecordService:
             not review_contexts
             or context.final_attempt.id != review_contexts[-1].attempt.id
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         self._validate_attempts(
             session=session,
             attempts=[review_context.attempt for review_context in review_contexts],
@@ -422,7 +424,7 @@ class TrainingRecordService:
         unfinished_attempt = context.unfinished_attempt
         unfinished_card = context.question_context.question_card
         if unfinished_card is None:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         self._validate_attempts(
             session=session,
             attempts=[
@@ -479,11 +481,11 @@ class TrainingRecordService:
             or session.completed_at is None
             or session.completion_reason != expected_reason
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         _require_aware_timestamp(session.started_at)
         _require_aware_timestamp(session.completed_at)
         if session.completed_at < session.started_at:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
     @staticmethod
     def _ordered_review_contexts(
@@ -491,7 +493,7 @@ class TrainingRecordService:
     ) -> list[PracticeReviewWorkflowContext]:
         ordered = sorted(contexts, key=lambda item: item.attempt.attempt_number)
         if len({item.attempt.id for item in ordered}) != len(ordered):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         return ordered
 
     @staticmethod
@@ -504,17 +506,17 @@ class TrainingRecordService:
         if [item.attempt_number for item in ordered] != list(
             range(1, len(ordered) + 1)
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         by_id = {item.id: item for item in ordered}
         if len(by_id) != len(ordered):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         for attempt in ordered:
             if (
                 attempt.user_id != session.user_id
                 or attempt.session_id != session.id
                 or attempt.question_card_id is None
             ):
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
             parent_id = attempt.retry_of_attempt_id
             if parent_id is None:
                 continue
@@ -526,7 +528,7 @@ class TrainingRecordService:
                 or parent.attempt_number >= attempt.attempt_number
                 or parent.question_card_id != attempt.question_card_id
             ):
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
     async def _load_target_role_snapshot(
         self,
@@ -543,7 +545,7 @@ class TrainingRecordService:
                 continue
             seen_cards.add(card.id)
             if card.target_role_id != session.target_role_id:
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
             frozen_context = await reference_service.get_question_reference_context(
                 user_id=user_id,
                 question_card_id=card.id,
@@ -555,10 +557,10 @@ class TrainingRecordService:
             if role_snapshot is None:
                 role_snapshot = current_snapshot
             elif role_snapshot != current_snapshot:
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
         if role_snapshot is None:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         return TrainingRecordTargetRoleResponse(
             id=session.target_role_id,
             title=role_snapshot[0],
@@ -583,7 +585,7 @@ class TrainingRecordService:
             or context.recommendation is None
             or attempt.question_card_id != card.id
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         _require_aware_timestamp(attempt.completed_at)
 
         main_reference_state = await reference_service.get_main_generation_state(
@@ -624,7 +626,7 @@ class TrainingRecordService:
                 exposed_weaknesses=review_output.exposed_weaknesses,
             )
         except AttributeError, TypeError, ValueError, ValidationError:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
         return TargetedPracticeAttemptRecordResponse(
             attempt_id=attempt.id,
             attempt_number=attempt.attempt_number,
@@ -651,7 +653,7 @@ class TrainingRecordService:
             or attempt.question_card_id != card.id
             or attempt.completed_at is None
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         main_reference_state = await reference_service.get_main_generation_state(
             user_id=user_id,
             question_card_id=card.id,
@@ -684,37 +686,37 @@ class TrainingRecordService:
         reason = context.follow_up_completion_reason
         exchanges = list(context.follow_up_exchanges)
         if reason is None:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         if [exchange.question.order for exchange in exchanges] != list(
             range(1, len(exchanges) + 1)
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         if reason == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED:
             if exchanges or context.follow_up_question is not None:
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         elif reason == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED:
             if (
                 not exchanges
                 or len(exchanges) > 2
                 or context.follow_up_question is not None
             ):
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         elif reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
             if (
                 len(exchanges) > 1
                 or context.follow_up_question is None
                 or context.follow_up_question.order != len(exchanges) + 1
             ):
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         else:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
         result: list[TrainingRecordFollowUpResponse] = []
         for exchange in exchanges:
             question = exchange.question
             answer = exchange.answer
             if answer is None or question.attempt_id != context.attempt.id:
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
             state = await reference_service.get_follow_up_generation_state(
                 user_id=user_id,
                 question_card_id=context.question_card.id,
@@ -735,7 +737,7 @@ class TrainingRecordService:
         pending = context.follow_up_question
         if pending is not None:
             if pending.attempt_id != context.attempt.id:
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
             state = await reference_service.get_follow_up_generation_state(
                 user_id=user_id,
                 question_card_id=context.question_card.id,
@@ -766,7 +768,7 @@ class TrainingRecordService:
             or card.question_type != attempt.question_type
             or card.difficulty != attempt.difficulty
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         return TargetedPracticeQuestionRecordResponse(
             question_card_id=card.id,
             prompt=card.prompt,
@@ -799,12 +801,12 @@ class TrainingRecordService:
         completed_at = session.completed_at
         started_at = session.started_at
         if completed_at is None:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         _require_aware_timestamp(started_at)
         _require_aware_timestamp(completed_at)
         duration = completed_at - started_at
         if duration.total_seconds() < 0:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         recommendation = next(
             (
                 attempt.recommendation
@@ -846,20 +848,20 @@ def _build_answer_response(answer: PracticeAnswer) -> PracticeAnswerResponse:
 def _build_main_reference_answer(state):
     try:
         return build_practice_main_reference_answer_response(state)
-    except PracticeSessionStateError:
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+    except ServiceError:
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
 
 def _build_follow_up_reference_answer(state):
     try:
         return build_practice_follow_up_reference_answer_response(state)
-    except PracticeSessionStateError:
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+    except ServiceError:
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
 
 def _require_aware_timestamp(value: datetime) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
 
 def _validate_pagination(*, page: int, page_size: int) -> None:

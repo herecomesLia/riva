@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Literal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -15,13 +15,16 @@ from riva.models import (
     PracticeSession,
     QuestionCard,
 )
+from riva.services.errors import (
+    ExternalDependencyError,
+    ServiceError,
+    service_error_for_code,
+)
 from riva.services.practice.reference_answer import (
     PracticeReferenceAnswerLifecycleStatus,
     PracticeReferenceAnswerWorkflowState,
     ReferenceAnswerGenerationService,
-    ReferenceAnswerGenerationStateError,
 )
-from riva.services.practice.session import PracticeSessionStateError
 from riva.services.practice.workflow import (
     build_practice_follow_up_reference_answer_response,
     build_practice_main_reference_answer_response,
@@ -33,37 +36,11 @@ from riva.services.training.types import (
     TrainingRecordReferenceAnswerResponse,
 )
 
-TrainingRecordReferenceAnswerStateErrorCode = Literal[
-    "training_record_not_found",
-    "training_record_question_not_found",
-    "training_record_follow_up_not_found",
-    "training_record_state_conflict",
-    "reference_answer_generation_unavailable",
-]
-
-TRAINING_RECORD_NOT_FOUND: TrainingRecordReferenceAnswerStateErrorCode = (
-    "training_record_not_found"
-)
-TRAINING_RECORD_QUESTION_NOT_FOUND: TrainingRecordReferenceAnswerStateErrorCode = (
-    "training_record_question_not_found"
-)
-TRAINING_RECORD_FOLLOW_UP_NOT_FOUND: TrainingRecordReferenceAnswerStateErrorCode = (
-    "training_record_follow_up_not_found"
-)
-TRAINING_RECORD_STATE_CONFLICT: TrainingRecordReferenceAnswerStateErrorCode = (
-    "training_record_state_conflict"
-)
-REFERENCE_ANSWER_GENERATION_UNAVAILABLE: TrainingRecordReferenceAnswerStateErrorCode = (
-    "reference_answer_generation_unavailable"
-)
-
-
-class TrainingRecordReferenceAnswerStateError(RuntimeError):
-    safe_message = "The training record reference answer state is invalid."
-
-    def __init__(self, code: TrainingRecordReferenceAnswerStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
+TRAINING_RECORD_NOT_FOUND: str = "training_record_not_found"
+TRAINING_RECORD_QUESTION_NOT_FOUND: str = "training_record_question_not_found"
+TRAINING_RECORD_FOLLOW_UP_NOT_FOUND: str = "training_record_follow_up_not_found"
+TRAINING_RECORD_STATE_CONFLICT: str = "training_record_state_conflict"
+REFERENCE_ANSWER_GENERATION_UNAVAILABLE: str = "reference_answer_generation_unavailable"
 
 
 @dataclass(frozen=True)
@@ -136,12 +113,18 @@ class TrainingRecordReferenceAnswerService:
                             attempt=target.attempt,
                             language=target.record.language,
                         )
-                except ReferenceAnswerGenerationStateError:
-                    raise TrainingRecordReferenceAnswerStateError(
+                except ExternalDependencyError as error:
+                    if error.error == REFERENCE_ANSWER_GENERATION_UNAVAILABLE:
+                        raise
+                    raise service_error_for_code(
+                        REFERENCE_ANSWER_GENERATION_UNAVAILABLE
+                    ) from None
+                except ServiceError:
+                    raise service_error_for_code(
                         TRAINING_RECORD_STATE_CONFLICT
                     ) from None
                 except ValueError:
-                    raise TrainingRecordReferenceAnswerStateError(
+                    raise service_error_for_code(
                         REFERENCE_ANSWER_GENERATION_UNAVAILABLE
                     ) from None
                 state = await self._read_state(
@@ -176,7 +159,7 @@ class TrainingRecordReferenceAnswerService:
             or record.completed_at is None
             or record.completion_reason not in {"reviewCompleted", "userEndedEarly"}
         ):
-            raise TrainingRecordReferenceAnswerStateError(TRAINING_RECORD_NOT_FOUND)
+            raise service_error_for_code(TRAINING_RECORD_NOT_FOUND)
 
         attempt = await self.session.scalar(
             select(PracticeAttempt).where(
@@ -191,9 +174,7 @@ class TrainingRecordReferenceAnswerService:
             or attempt.session_id != record.id
             or attempt.question_card_id is None
         ):
-            raise TrainingRecordReferenceAnswerStateError(
-                TRAINING_RECORD_QUESTION_NOT_FOUND
-            )
+            raise service_error_for_code(TRAINING_RECORD_QUESTION_NOT_FOUND)
 
         if payload.subject == "mainQuestion":
             answer = await self.session.scalar(
@@ -216,9 +197,7 @@ class TrainingRecordReferenceAnswerService:
             )
         )
         if follow_up_question is None:
-            raise TrainingRecordReferenceAnswerStateError(
-                TRAINING_RECORD_FOLLOW_UP_NOT_FOUND
-            )
+            raise service_error_for_code(TRAINING_RECORD_FOLLOW_UP_NOT_FOUND)
         answer = await self.session.scalar(
             select(PracticeAnswer).where(
                 PracticeAnswer.attempt_id == attempt.id,
@@ -256,10 +235,8 @@ class TrainingRecordReferenceAnswerService:
                 submitted_at=target.submitted_at,
                 for_update=for_update,
             )
-        except ReferenceAnswerGenerationStateError:
-            raise TrainingRecordReferenceAnswerStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
+        except ServiceError:
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
     async def _question_card(self, target: _ReferenceAnswerTarget) -> QuestionCard:
         card = await self.session.scalar(
@@ -268,9 +245,7 @@ class TrainingRecordReferenceAnswerService:
             )
         )
         if card is None:
-            raise TrainingRecordReferenceAnswerStateError(
-                TRAINING_RECORD_QUESTION_NOT_FOUND
-            )
+            raise service_error_for_code(TRAINING_RECORD_QUESTION_NOT_FOUND)
         return card
 
     def _generation_service(self) -> ReferenceAnswerGenerationService:
@@ -282,9 +257,7 @@ class TrainingRecordReferenceAnswerService:
 
     def _require_llm_configuration(self) -> None:
         if self.llm_provider is None or not self.llm_model:
-            raise TrainingRecordReferenceAnswerStateError(
-                REFERENCE_ANSWER_GENERATION_UNAVAILABLE
-            )
+            raise service_error_for_code(REFERENCE_ANSWER_GENERATION_UNAVAILABLE)
 
 
 def _build_response(
@@ -315,9 +288,7 @@ def _build_response(
             target=response_target,
             reference_answer=reference_answer,
         )
-    except TrainingRecordReferenceAnswerStateError:
-        raise
-    except AttributeError, TypeError, ValueError, PracticeSessionStateError:
-        raise TrainingRecordReferenceAnswerStateError(
-            TRAINING_RECORD_STATE_CONFLICT
-        ) from None
+    except ServiceError:
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
+    except AttributeError, TypeError, ValueError:
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None

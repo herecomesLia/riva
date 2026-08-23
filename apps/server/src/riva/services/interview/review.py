@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -44,47 +43,19 @@ from riva.models import (
     InterviewReview,
     InterviewSession,
 )
+from riva.services.errors import ServiceError, service_error_for_code
 from riva.services.interview.planning import InterviewPlanningService
 from riva.services.interview.types import InterviewConfiguration
 from riva.services.training.ingestion import CompetencyIngestionService
 from riva.services.training.memory import TrainingMemoryService
 from riva.utils import utc_now
 
-InterviewReviewStateErrorCode = Literal[
-    "interview_session_not_found",
-    "interview_review_version_conflict",
-    "interview_review_state_invalid",
-    "interview_review_snapshot_invalid",
-    "interview_review_model_not_configured",
-    "interview_review_artifact_conflict",
-]
-
-INTERVIEW_REVIEW_SESSION_NOT_FOUND: InterviewReviewStateErrorCode = (
-    "interview_session_not_found"
-)
-INTERVIEW_REVIEW_VERSION_CONFLICT: InterviewReviewStateErrorCode = (
-    "interview_review_version_conflict"
-)
-INTERVIEW_REVIEW_STATE_INVALID: InterviewReviewStateErrorCode = (
-    "interview_review_state_invalid"
-)
-INTERVIEW_REVIEW_SNAPSHOT_INVALID: InterviewReviewStateErrorCode = (
-    "interview_review_snapshot_invalid"
-)
-INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED: InterviewReviewStateErrorCode = (
-    "interview_review_model_not_configured"
-)
-INTERVIEW_REVIEW_ARTIFACT_CONFLICT: InterviewReviewStateErrorCode = (
-    "interview_review_artifact_conflict"
-)
-
-
-class InterviewReviewStateError(RuntimeError):
-    safe_message = "The interview review state is invalid."
-
-    def __init__(self, code: InterviewReviewStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
+INTERVIEW_REVIEW_SESSION_NOT_FOUND: str = "interview_session_not_found"
+INTERVIEW_REVIEW_VERSION_CONFLICT: str = "interview_review_version_conflict"
+INTERVIEW_REVIEW_STATE_INVALID: str = "interview_review_state_invalid"
+INTERVIEW_REVIEW_SNAPSHOT_INVALID: str = "interview_review_snapshot_invalid"
+INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED: str = "interview_review_model_not_configured"
+INTERVIEW_REVIEW_ARTIFACT_CONFLICT: str = "interview_review_artifact_conflict"
 
 
 Clock = Callable[[], datetime]
@@ -121,7 +92,7 @@ class InterviewReviewService:
         review_mode: InterviewReviewMode,
     ) -> InterviewReview:
         if self.llm_provider is None or not self.llm_model:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED)
+            raise service_error_for_code(INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED)
         training_memory = await self.training_memory_service_factory(
             self.session
         ).get_context(user_id)
@@ -183,7 +154,7 @@ class InterviewReviewService:
                 )
             )
             if plan is None:
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
+                raise service_error_for_code(INTERVIEW_REVIEW_STATE_INVALID)
             planner_context = await InterviewPlanningService(
                 self.session,
             )._build_planning_input(
@@ -193,7 +164,7 @@ class InterviewReviewService:
             )
             configuration = _session_configuration(interview_session)
             if planner_context.configuration != configuration:
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
+                raise service_error_for_code(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
 
             questions = list(
                 (
@@ -250,10 +221,10 @@ class InterviewReviewService:
                 ],
                 training_memory=training_memory,
             )
-        except InterviewReviewStateError:
+        except ServiceError:
             raise
         except TypeError, ValueError, ValidationError:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
+            raise service_error_for_code(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
 
     async def get_completed_review(
         self,
@@ -271,7 +242,7 @@ class InterviewReviewService:
             )
         )
         if interview_session is None or interview_session.review is None:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
         return interview_session, interview_session.review
 
     async def persist_unavailable_without_agent(
@@ -282,9 +253,9 @@ class InterviewReviewService:
     ) -> InterviewReview:
         try:
             if interview_session.status not in {"opening", "question", "followUp"}:
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
+                raise service_error_for_code(INTERVIEW_REVIEW_STATE_INVALID)
             if interview_session.version < 1:
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
+                raise service_error_for_code(INTERVIEW_REVIEW_STATE_INVALID)
             now = self._now()
             review = InterviewReview(
                 id=uuid4(),
@@ -308,7 +279,7 @@ class InterviewReviewService:
             interview_session.completed_at = now
             interview_session.version += 1
             return review
-        except InterviewReviewStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except Exception:
@@ -351,7 +322,7 @@ class InterviewReviewService:
         for question in questions:
             main_reference = references.get(f"main:{question.id}")
             if main_reference is None:
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
+                raise service_error_for_code(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
             answer = question.answer
             follow_up_records: list[dict[str, object]] = []
             follow_up_details: list[dict[str, object]] = []
@@ -361,7 +332,7 @@ class InterviewReviewService:
             ):
                 follow_up_reference = references.get(f"followUp:{follow_up.id}")
                 if follow_up_reference is None:
-                    raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
+                    raise service_error_for_code(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
                 follow_up_answer = follow_up.answer
                 follow_up_record = {
                     "status": "answered"
@@ -496,7 +467,7 @@ def _review_question_snapshot(
             ],
         )
     except StopIteration, TypeError, ValueError, ValidationError, AttributeError:
-        raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
+        raise service_error_for_code(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
 
 
 def _review_answer_snapshot(answer: InterviewAnswer) -> InterviewReviewAnswerSnapshot:
@@ -532,7 +503,7 @@ def _validate_output(
     try:
         validated = InterviewReviewOutput.model_validate(output)
     except TypeError, ValueError, ValidationError:
-        raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
+        raise service_error_for_code(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
     if mode == InterviewReviewMode.COMPLETE:
         if (
             validated.overall_performance is None
@@ -542,7 +513,7 @@ def _validate_output(
             or {item.dimension for item in validated.dimension_scores}
             != set(InterviewReviewDimension)
         ):
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
+            raise service_error_for_code(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
     elif mode == InterviewReviewMode.PARTIAL:
         if (
             validated.overall_performance is None
@@ -550,7 +521,7 @@ def _validate_output(
             or validated.dimension_scores
             or validated.next_training is not None
         ):
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
+            raise service_error_for_code(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
     elif (
         validated.overall_performance is not None
         or validated.overall_score is not None
@@ -565,7 +536,7 @@ def _validate_output(
         or validated.communication_suggestions
         or validated.preparation_suggestions
     ):
-        raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
+        raise service_error_for_code(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
     return validated
 
 

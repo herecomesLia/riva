@@ -20,6 +20,7 @@ from riva.integrations.storage.local import (
 from riva.models import ResumeDocument, User
 from riva.services.errors import (
     DataTooLargeError,
+    DomainConflictError,
     ExternalDependencyError,
     InvalidDataError,
     ResourceMissingError,
@@ -29,7 +30,6 @@ from riva.services.resumes.documents import (
     RESUME_EXTRACTION_FAILURE_REASON,
     LoadedResumeText,
     ResumeDocumentService,
-    ResumeDocumentStateError,
     normalize_resume_filename,
 )
 from riva.services.resumes.extraction import (
@@ -774,7 +774,7 @@ def test_list_get_and_load_are_user_scoped_and_explicitly_mapped() -> None:
         ("succeeded", "   ", "resume_document_text_missing"),
     ],
 )
-def test_load_extracted_text_state_errors(
+def test_load_extracted_text_domain_errors(
     status: str,
     extracted_text: str | None,
     code: str,
@@ -787,11 +787,11 @@ def test_load_extracted_text_state_errors(
     )
     service, _, _, _ = create_service(session=FakeSession(document=document))
 
-    with pytest.raises(ResumeDocumentStateError) as error:
+    with pytest.raises(DomainConflictError) as error:
         asyncio.run(
             service.load_extracted_text(
                 user_id=user.id,
                 resume_document_id=document.id,
             )
         )
-    assert error.value.code == code
+    assert error.value.error == code

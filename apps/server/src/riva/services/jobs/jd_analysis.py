@@ -1,6 +1,6 @@
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
-from typing import Literal, cast
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -13,29 +13,13 @@ from riva.agents.jobs.jd_parser_types import (
 )
 from riva.core.language import InteractionLanguage
 from riva.models import JobDescriptionAnalysis, TargetRole
+from riva.services.errors import service_error_for_code
 from riva.utils import utc_now
 
-JobDescriptionParsingStateErrorCode = Literal[
-    "job_description_target_not_found",
-    "job_description_missing",
-    "job_description_version_stale",
-]
-TARGET_NOT_FOUND: JobDescriptionParsingStateErrorCode = (
-    "job_description_target_not_found"
-)
-JOB_DESCRIPTION_MISSING: JobDescriptionParsingStateErrorCode = "job_description_missing"
-JOB_DESCRIPTION_VERSION_STALE: JobDescriptionParsingStateErrorCode = (
-    "job_description_version_stale"
-)
+TARGET_NOT_FOUND: str = "job_description_target_not_found"
+JOB_DESCRIPTION_MISSING: str = "job_description_missing"
+JOB_DESCRIPTION_VERSION_STALE: str = "job_description_version_stale"
 RIVA_SUMMARY_FALLBACK = "No specific structured requirements were identified."
-
-
-class JobDescriptionParsingStateError(RuntimeError):
-    safe_message = "The job description parsing state is invalid."
-
-    def __init__(self, code: JobDescriptionParsingStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
 
 
 def new_job_description_analysis(
@@ -219,13 +203,13 @@ class JobDescriptionAnalysisService:
             statement = statement.with_for_update()
         role = await self.session.scalar(statement)
         if role is None:
-            raise JobDescriptionParsingStateError(TARGET_NOT_FOUND)
+            raise service_error_for_code(TARGET_NOT_FOUND)
         if (
             role.job_description_status != "saved"
             or not role.raw_job_description
             or role.job_description_version is None
         ):
-            raise JobDescriptionParsingStateError(JOB_DESCRIPTION_MISSING)
+            raise service_error_for_code(JOB_DESCRIPTION_MISSING)
         return role
 
 

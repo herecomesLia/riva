@@ -18,6 +18,7 @@ from riva.models import (
     InterviewReview,
     InterviewSession,
 )
+from riva.services.errors import service_error_for_code
 from riva.services.interview.types import (
     InterviewAnswerResponse,
     InterviewCandidateQuestionExchangeResponse,
@@ -48,22 +49,8 @@ from riva.services.training.types import (
     TrainingRecordTargetRoleResponse,
 )
 
-TrainingRecordStateErrorCode = Literal[
-    "training_record_not_found",
-    "training_record_state_conflict",
-]
-TRAINING_RECORD_NOT_FOUND: TrainingRecordStateErrorCode = "training_record_not_found"
-TRAINING_RECORD_STATE_CONFLICT: TrainingRecordStateErrorCode = (
-    "training_record_state_conflict"
-)
-
-
-class TrainingRecordStateError(RuntimeError):
-    safe_message = "The training record state is invalid."
-
-    def __init__(self, code: TrainingRecordStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
+TRAINING_RECORD_NOT_FOUND: str = "training_record_not_found"
+TRAINING_RECORD_STATE_CONFLICT: str = "training_record_state_conflict"
 
 
 class InterviewTrainingRecordService:
@@ -113,7 +100,7 @@ class InterviewTrainingRecordService:
             )
         )
         if record is None:
-            raise TrainingRecordStateError(TRAINING_RECORD_NOT_FOUND)
+            raise service_error_for_code(TRAINING_RECORD_NOT_FOUND)
         return self._build_detail(record)
 
     async def _load_completed_sessions(
@@ -177,7 +164,7 @@ class InterviewTrainingRecordService:
         review = record.review
         completed_at = record.completed_at
         if role is None or review is None or completed_at is None:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         status, overall_score, review_summary = cls._summary_review_values(
             record,
             review,
@@ -224,11 +211,11 @@ class InterviewTrainingRecordService:
                 else TrainingRecordStatus.ENDED_EARLY
             )
         else:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
         parsed_review = cls._review_state(review)
         if parsed_review.status != cls._expected_review_status(record, answered_count):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         if parsed_review.status == "unavailable":
             return status, None, None
         review_payload = parsed_review.review
@@ -256,7 +243,7 @@ class InterviewTrainingRecordService:
                 "userEndedEarly",
             }
         ):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
         details = cls._authoritative_question_details(record, review)
         review_state = cls._review_state(review)
@@ -264,7 +251,7 @@ class InterviewTrainingRecordService:
             1 for question in record.questions if question.answer is not None
         )
         if review_state.status != cls._expected_review_status(record, answered_count):
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
         status = (
             TrainingRecordStatus.COMPLETED
             if record.completion_reason == "formalQuestionsCompleted"
@@ -313,7 +300,7 @@ class InterviewTrainingRecordService:
                 for item in review.question_details
             ]
         except TypeError, ValueError, ValidationError:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
         snapshot_by_question_id = {
             detail.record.question.id: detail for detail in snapshots
@@ -322,7 +309,7 @@ class InterviewTrainingRecordService:
         if len(snapshot_by_question_id) != len(snapshots) or set(
             snapshot_by_question_id
         ) != {question.id for question in questions}:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
         result: list[InterviewQuestionLearningDetailResponse] = []
         for question in questions:
@@ -335,7 +322,7 @@ class InterviewTrainingRecordService:
                     or snapshot.follow_ups
                     or question.follow_up_questions
                 ):
-                    raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                    raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
                 result.append(
                     InterviewQuestionLearningDetailResponse(
                         record=InterviewQuestionRecordResponse(
@@ -361,7 +348,7 @@ class InterviewTrainingRecordService:
             if len(snapshot_follow_ups) != len(snapshot.follow_ups) or set(
                 snapshot_follow_ups
             ) != {follow_up.id for follow_up in follow_up_questions}:
-                raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
             follow_up_records: list[InterviewFollowUpRecordResponse] = []
             follow_up_details: list[InterviewFollowUpLearningDetailResponse] = []
@@ -373,7 +360,7 @@ class InterviewTrainingRecordService:
                     follow_up_answer is None
                     and follow_up_snapshot.performance is not None
                 ):
-                    raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+                    raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
                 follow_up_record = InterviewFollowUpRecordResponse(
                     status="answered" if follow_up_answer is not None else "unanswered",
                     question=cls._follow_up_question_response(follow_up),
@@ -441,7 +428,7 @@ class InterviewTrainingRecordService:
                 )
         except TypeError, ValueError, ValidationError:
             pass
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
     @staticmethod
     def _expected_review_status(
@@ -452,7 +439,7 @@ class InterviewTrainingRecordService:
             return "complete"
         if record.completion_reason == "userEndedEarly":
             return "partial" if answered_count else "unavailable"
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
     @staticmethod
     def _candidate_exchanges(
@@ -485,7 +472,7 @@ class InterviewTrainingRecordService:
                 for exchange in exchanges
             ]
         except AttributeError, TypeError, ValueError:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _question_response(question: InterviewQuestion) -> InterviewQuestionResponse:
@@ -498,7 +485,7 @@ class InterviewTrainingRecordService:
                 order=question.order,
             )
         except AttributeError, TypeError, ValueError:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _answer_response(answer: InterviewAnswer) -> InterviewAnswerResponse:
@@ -509,7 +496,7 @@ class InterviewTrainingRecordService:
                 submitted_at=answer.submitted_at,
             )
         except AttributeError, TypeError, ValueError:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _follow_up_question_response(
@@ -524,12 +511,12 @@ class InterviewTrainingRecordService:
                 created_at=question.created_at,
             )
         except AttributeError, TypeError, ValueError:
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT) from None
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT) from None
 
     @staticmethod
     def _require_ready_reference(reference_answer: object) -> None:
         if getattr(reference_answer, "status", None) != "ready":
-            raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+            raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
 
 
 def _duration_seconds(started_at: datetime, ended_at: datetime) -> int:
@@ -537,10 +524,10 @@ def _duration_seconds(started_at: datetime, ended_at: datetime) -> int:
     _require_aware_timestamp(ended_at)
     duration = ended_at - started_at
     if duration.total_seconds() < 0:
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)
     return int(duration.total_seconds())
 
 
 def _require_aware_timestamp(value: datetime) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise TrainingRecordStateError(TRAINING_RECORD_STATE_CONFLICT)
+        raise service_error_for_code(TRAINING_RECORD_STATE_CONFLICT)

@@ -16,10 +16,8 @@ from riva.schemas.training_planning import (
     StartTrainingPlanningRequest,
     TrainingPlanningResponse,
 )
-from riva.services.training.planning import (
-    TRAINING_PLANNING_REQUEST_CONFLICT,
-    TrainingPlanningStateError,
-)
+from riva.services.errors import DomainConflictError, ServiceError
+from riva.services.training.planning import TRAINING_PLANNING_STATE_CONFLICT
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 ROLE_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -54,7 +52,7 @@ class FakeTrainingPlanningService:
     def __init__(
         self,
         *,
-        error: TrainingPlanningStateError | None = None,
+        error: ServiceError | None = None,
     ):
         self.error = error
         self.calls: list[tuple[str, object, str]] = []
@@ -166,9 +164,9 @@ def test_request_body_cannot_override_language(app) -> None:
     assert service.calls == []
 
 
-def test_state_errors_keep_the_public_error_contract(app) -> None:
+def test_domain_conflicts_keep_the_public_error_contract(app) -> None:
     service = FakeTrainingPlanningService(
-        error=TrainingPlanningStateError(TRAINING_PLANNING_REQUEST_CONFLICT)
+        error=DomainConflictError(TRAINING_PLANNING_STATE_CONFLICT)
     )
     client, _current_user = create_client(app, service)
 
@@ -180,7 +178,7 @@ def test_state_errors_keep_the_public_error_contract(app) -> None:
         )
 
     assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json() == {"error": TRAINING_PLANNING_REQUEST_CONFLICT}
+    assert response.json() == {"error": TRAINING_PLANNING_STATE_CONFLICT}
 
 
 def test_training_planning_routes_require_authentication(app) -> None:

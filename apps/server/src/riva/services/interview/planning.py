@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
-from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -30,6 +29,7 @@ from riva.models import (
     InterviewSession,
     TargetRole,
 )
+from riva.services.errors import ServiceError, service_error_for_code
 from riva.services.interview.types import (
     InterviewConfiguration,
     InterviewDifficulty,
@@ -45,53 +45,19 @@ from riva.services.profile.completion import career_profile_completed
 from riva.services.training.memory import TrainingMemoryService
 from riva.utils import utc_now
 
-InterviewPlanningStateErrorCode = Literal[
-    "interview_session_not_found",
-    "interview_session_version_conflict",
-    "interview_planning_state_invalid",
-    "interview_planning_snapshot_invalid",
-    "interview_planning_profile_incomplete",
-    "interview_planning_profile_not_found",
-    "interview_planning_target_role_not_found",
-    "interview_planning_job_description_not_ready",
-    "interview_planner_model_not_configured",
-]
-
-INTERVIEW_PLANNING_SESSION_NOT_FOUND: InterviewPlanningStateErrorCode = (
-    "interview_session_not_found"
-)
-INTERVIEW_PLANNING_VERSION_CONFLICT: InterviewPlanningStateErrorCode = (
-    "interview_session_version_conflict"
-)
-INTERVIEW_PLANNING_STATE_INVALID: InterviewPlanningStateErrorCode = (
-    "interview_planning_state_invalid"
-)
-INTERVIEW_PLANNING_SNAPSHOT_INVALID: InterviewPlanningStateErrorCode = (
-    "interview_planning_snapshot_invalid"
-)
-INTERVIEW_PLANNING_PROFILE_INCOMPLETE: InterviewPlanningStateErrorCode = (
-    "interview_planning_profile_incomplete"
-)
-INTERVIEW_PLANNING_PROFILE_NOT_FOUND: InterviewPlanningStateErrorCode = (
-    "interview_planning_profile_not_found"
-)
-INTERVIEW_PLANNING_TARGET_ROLE_NOT_FOUND: InterviewPlanningStateErrorCode = (
+INTERVIEW_PLANNING_SESSION_NOT_FOUND: str = "interview_session_not_found"
+INTERVIEW_PLANNING_VERSION_CONFLICT: str = "interview_session_version_conflict"
+INTERVIEW_PLANNING_STATE_INVALID: str = "interview_planning_state_invalid"
+INTERVIEW_PLANNING_SNAPSHOT_INVALID: str = "interview_planning_snapshot_invalid"
+INTERVIEW_PLANNING_PROFILE_INCOMPLETE: str = "interview_planning_profile_incomplete"
+INTERVIEW_PLANNING_PROFILE_NOT_FOUND: str = "interview_planning_profile_not_found"
+INTERVIEW_PLANNING_TARGET_ROLE_NOT_FOUND: str = (
     "interview_planning_target_role_not_found"
 )
-INTERVIEW_PLANNING_JOB_DESCRIPTION_NOT_READY: InterviewPlanningStateErrorCode = (
+INTERVIEW_PLANNING_JOB_DESCRIPTION_NOT_READY: str = (
     "interview_planning_job_description_not_ready"
 )
-INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED: InterviewPlanningStateErrorCode = (
-    "interview_planner_model_not_configured"
-)
-
-
-class InterviewPlanningStateError(RuntimeError):
-    safe_message = "The interview planning state is invalid."
-
-    def __init__(self, code: InterviewPlanningStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
+INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED: str = "interview_planner_model_not_configured"
 
 
 class InterviewPlanningService:
@@ -129,18 +95,16 @@ class InterviewPlanningService:
                 .with_for_update()
             )
             if interview_session is None:
-                raise InterviewPlanningStateError(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
+                raise service_error_for_code(INTERVIEW_PLANNING_SESSION_NOT_FOUND)
             if interview_session.version != version:
-                raise InterviewPlanningStateError(INTERVIEW_PLANNING_VERSION_CONFLICT)
+                raise service_error_for_code(INTERVIEW_PLANNING_VERSION_CONFLICT)
             if interview_session.status == "question":
                 await self.session.commit()
                 return interview_session
             if interview_session.status != "opening":
-                raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID)
+                raise service_error_for_code(INTERVIEW_PLANNING_STATE_INVALID)
             if self.llm_provider is None or not self.llm_model:
-                raise InterviewPlanningStateError(
-                    INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED
-                )
+                raise service_error_for_code(INTERVIEW_PLANNER_MODEL_NOT_CONFIGURED)
             planning_input = await self._build_planning_input(
                 interview_session, user_id=user_id
             )
@@ -189,14 +153,12 @@ class InterviewPlanningService:
             interview_session.updated_at = now
             await self.session.commit()
             return interview_session
-        except InterviewPlanningStateError:
+        except ServiceError:
             await self.session.rollback()
             raise
         except ValidationError, TypeError, ValueError:
             await self.session.rollback()
-            raise InterviewPlanningStateError(
-                INTERVIEW_PLANNING_SNAPSHOT_INVALID
-            ) from None
+            raise service_error_for_code(INTERVIEW_PLANNING_SNAPSHOT_INVALID) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -214,9 +176,9 @@ class InterviewPlanningService:
             .where(CareerProfile.user_id == user_id)
         )
         if profile is None:
-            raise InterviewPlanningStateError(INTERVIEW_PLANNING_PROFILE_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_PLANNING_PROFILE_NOT_FOUND)
         if not career_profile_completed(profile):
-            raise InterviewPlanningStateError(INTERVIEW_PLANNING_PROFILE_INCOMPLETE)
+            raise service_error_for_code(INTERVIEW_PLANNING_PROFILE_INCOMPLETE)
         role = await self.session.scalar(
             select(TargetRole)
             .options(
@@ -229,7 +191,7 @@ class InterviewPlanningService:
             )
         )
         if role is None or role.preparation_status == "archived":
-            raise InterviewPlanningStateError(INTERVIEW_PLANNING_TARGET_ROLE_NOT_FOUND)
+            raise service_error_for_code(INTERVIEW_PLANNING_TARGET_ROLE_NOT_FOUND)
         analysis = role.job_description_analysis
         if (
             role.job_description_status != "saved"
@@ -238,9 +200,7 @@ class InterviewPlanningService:
             or analysis is None
             or analysis.job_description_version != role.job_description_version
         ):
-            raise InterviewPlanningStateError(
-                INTERVIEW_PLANNING_JOB_DESCRIPTION_NOT_READY
-            )
+            raise service_error_for_code(INTERVIEW_PLANNING_JOB_DESCRIPTION_NOT_READY)
         try:
             career_profile = build_matching_career_profile(profile)
             job_context = build_matching_job_context(role, analysis)
@@ -282,12 +242,10 @@ class InterviewPlanningService:
                     ).get_context(user_id)
                 ),
             )
-        except InterviewPlanningStateError:
+        except ServiceError:
             raise
         except ValidationError, TypeError, ValueError, AttributeError:
-            raise InterviewPlanningStateError(
-                INTERVIEW_PLANNING_SNAPSHOT_INVALID
-            ) from None
+            raise service_error_for_code(INTERVIEW_PLANNING_SNAPSHOT_INVALID) from None
 
     def _now(self) -> datetime:
         value = self.clock()
@@ -305,7 +263,7 @@ def _session_configuration(session: InterviewSession) -> InterviewConfiguration:
             duration_minutes=InterviewDurationMinutes(session.duration_minutes),
         )
     except TypeError, ValueError:
-        raise InterviewPlanningStateError(INTERVIEW_PLANNING_STATE_INVALID) from None
+        raise service_error_for_code(INTERVIEW_PLANNING_STATE_INVALID) from None
 
 
 def _matching_snapshot(

@@ -26,12 +26,10 @@ from riva.services.errors import (
 )
 from riva.services.jobs.jd_analysis import (
     JobDescriptionAnalysisService,
-    JobDescriptionParsingStateError,
     build_riva_summary,
 )
 from riva.services.jobs.matching import (
     MatchingAnalysisService,
-    MatchingAnalysisStateError,
 )
 from riva.services.jobs.matching_types import MatchingAnalysisResultResponse
 from riva.services.jobs.role_types import (
@@ -343,9 +341,14 @@ class TargetRoleService:
                 user_id=user.id, role_id=role.id, output=output
             )
             return await self._commit_page(user.id)
-        except JobDescriptionParsingStateError as error:
+        except ServiceError as error:
             await self.session.rollback()
-            raise DomainConflictError(error.code) from None
+            if error.error in {
+                "target_role_not_found",
+                "job_description_parsing_unavailable",
+            }:
+                raise
+            raise DomainConflictError(error.error) from None
         except Exception:
             await self.session.rollback()
             raise
@@ -379,9 +382,14 @@ class TargetRoleService:
                 output=output,
             )
             return await self._commit_page(user.id)
-        except MatchingAnalysisStateError as error:
+        except ServiceError as error:
             await self.session.rollback()
-            raise DomainConflictError(error.code) from None
+            if error.error in {
+                "target_role_not_found",
+                "matching_analysis_unavailable",
+            }:
+                raise
+            raise DomainConflictError(error.error) from None
         except Exception:
             await self.session.rollback()
             raise

@@ -13,7 +13,6 @@ from riva.api.dependencies import (
     require_training_record_reference_answer_service,
     require_training_record_service,
 )
-from riva.api.errors import APIError
 from riva.core.language import normalize_interaction_language
 from riva.models import User
 from riva.schemas.competencies import CompetencyListResponse
@@ -34,38 +33,17 @@ from riva.schemas.training_records import (
 )
 from riva.services.training.catalog import canonical_competency_sort_key
 from riva.services.training.competencies import CompetencyService
-from riva.services.training.planning import (
-    TRAINING_PLANNING_STATE_CONFLICT,
-    TRAINING_PLANNING_TARGET_NOT_FOUND,
-    TRAINING_PLANNING_TARGET_UNAVAILABLE,
-    TRAINING_PLANNING_UNAVAILABLE,
-    TrainingPlanningService,
-    TrainingPlanningStateError,
-)
+from riva.services.training.planning import TrainingPlanningService
 from riva.services.training.planning_types import (
     EnsureCurrentTrainingPlanningRequest as DomainEnsureCurrentTrainingPlanningRequest,
 )
 from riva.services.training.planning_types import (
     StartTrainingPlanningRequest as DomainStartTrainingPlanningRequest,
 )
-from riva.services.training.record_answers import (
-    REFERENCE_ANSWER_GENERATION_UNAVAILABLE,
-    TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
-    TRAINING_RECORD_QUESTION_NOT_FOUND,
-    TrainingRecordReferenceAnswerService,
-    TrainingRecordReferenceAnswerStateError,
-)
-from riva.services.training.record_answers import (
-    TRAINING_RECORD_NOT_FOUND as REFERENCE_ANSWER_RECORD_NOT_FOUND,
-)
-from riva.services.training.records import (
-    TRAINING_RECORD_NOT_FOUND,
-    TRAINING_RECORD_STATE_CONFLICT,
-    TrainingRecordService,
-    TrainingRecordStateError,
-)
+from riva.services.training.record_answers import TrainingRecordReferenceAnswerService
+from riva.services.training.records import TrainingRecordService
 from riva.services.training.types import (
-    TargetedPracticeReferenceAnswerRequest as DomainTargetedPracticeReferenceAnswerRequest,
+    TargetedPracticeReferenceAnswerRequest as DomainReferenceAnswerRequest,
 )
 
 # Competency routes
@@ -103,20 +81,6 @@ records_router = APIRouter(
     tags=["training-records"],
     dependencies=[Depends(require_csrf)],
 )
-
-
-def training_record_reference_answer_state_api_error(
-    error: TrainingRecordReferenceAnswerStateError,
-) -> APIError:
-    if error.code in {
-        REFERENCE_ANSWER_RECORD_NOT_FOUND,
-        TRAINING_RECORD_QUESTION_NOT_FOUND,
-        TRAINING_RECORD_FOLLOW_UP_NOT_FOUND,
-    }:
-        return APIError(status.HTTP_404_NOT_FOUND, error.code)
-    if error.code == REFERENCE_ANSWER_GENERATION_UNAVAILABLE:
-        return APIError(status.HTTP_503_SERVICE_UNAVAILABLE, error.code)
-    return APIError(status.HTTP_409_CONFLICT, error.code)
 
 
 @records_router.get(
@@ -185,14 +149,11 @@ async def request_training_record_reference_answer(
         require_training_record_reference_answer_service
     ),
 ) -> TrainingRecordReferenceAnswerResponse:
-    try:
-        return await reference_answer_service.request_reference_answer(
-            user_id=current_user.id,
-            record_id=record_id,
-            payload=_to_domain(payload, DomainTargetedPracticeReferenceAnswerRequest),
-        )
-    except TrainingRecordReferenceAnswerStateError as error:
-        raise training_record_reference_answer_state_api_error(error) from None
+    return await reference_answer_service.request_reference_answer(
+        user_id=current_user.id,
+        record_id=record_id,
+        payload=_to_domain(payload, DomainReferenceAnswerRequest),
+    )
 
 
 @records_router.get(
@@ -207,22 +168,10 @@ async def get_targeted_practice_training_record(
         require_training_record_service
     ),
 ) -> TargetedPracticeTrainingRecordDetailResponse:
-    try:
-        return await training_record_service.get_targeted_practice_record(
-            user_id=current_user.id,
-            record_id=record_id,
-        )
-    except TrainingRecordStateError as error:
-        if error.code == TRAINING_RECORD_NOT_FOUND:
-            raise APIError(
-                status.HTTP_404_NOT_FOUND, TRAINING_RECORD_NOT_FOUND
-            ) from None
-        if error.code == TRAINING_RECORD_STATE_CONFLICT:
-            raise APIError(
-                status.HTTP_409_CONFLICT,
-                TRAINING_RECORD_STATE_CONFLICT,
-            ) from None
-        raise
+    return await training_record_service.get_targeted_practice_record(
+        user_id=current_user.id,
+        record_id=record_id,
+    )
 
 
 @records_router.get(
@@ -237,22 +186,10 @@ async def get_mock_interview_training_record(
         require_training_record_service
     ),
 ) -> MockInterviewTrainingRecordDetailResponse:
-    try:
-        return await training_record_service.get_mock_interview_record(
-            user_id=current_user.id,
-            record_id=record_id,
-        )
-    except TrainingRecordStateError as error:
-        if error.code == TRAINING_RECORD_NOT_FOUND:
-            raise APIError(
-                status.HTTP_404_NOT_FOUND, TRAINING_RECORD_NOT_FOUND
-            ) from None
-        if error.code == TRAINING_RECORD_STATE_CONFLICT:
-            raise APIError(
-                status.HTTP_409_CONFLICT,
-                TRAINING_RECORD_STATE_CONFLICT,
-            ) from None
-        raise
+    return await training_record_service.get_mock_interview_record(
+        user_id=current_user.id,
+        record_id=record_id,
+    )
 
 
 # Training planning routes
@@ -268,18 +205,6 @@ def _to_domain(payload, model):
     return model.model_validate(payload.model_dump(mode="python", by_alias=False))
 
 
-def training_planning_state_api_error(
-    error: TrainingPlanningStateError,
-) -> APIError:
-    if error.code == TRAINING_PLANNING_TARGET_NOT_FOUND:
-        return APIError(status.HTTP_404_NOT_FOUND, error.code)
-    if error.code == TRAINING_PLANNING_TARGET_UNAVAILABLE:
-        return APIError(status.HTTP_409_CONFLICT, error.code)
-    if error.code == TRAINING_PLANNING_UNAVAILABLE:
-        return APIError(status.HTTP_503_SERVICE_UNAVAILABLE, error.code)
-    return APIError(status.HTTP_409_CONFLICT, TRAINING_PLANNING_STATE_CONFLICT)
-
-
 @planning_router.post(
     "",
     response_model=TrainingPlanningResponse,
@@ -293,16 +218,13 @@ async def start_training_planning(
         require_training_planning_service
     ),
 ) -> TrainingPlanningResponse:
-    try:
-        return await training_planning_service.start_planning(
-            current_user,
-            _to_domain(payload, DomainStartTrainingPlanningRequest),
-            interaction_language=normalize_interaction_language(
-                request.headers.get("accept-language")
-            ),
-        )
-    except TrainingPlanningStateError as error:
-        raise training_planning_state_api_error(error) from None
+    return await training_planning_service.start_planning(
+        current_user,
+        _to_domain(payload, DomainStartTrainingPlanningRequest),
+        interaction_language=normalize_interaction_language(
+            request.headers.get("accept-language")
+        ),
+    )
 
 
 @planning_router.post(
@@ -318,16 +240,13 @@ async def ensure_current_training_planning(
         require_training_planning_service
     ),
 ) -> TrainingPlanningResponse:
-    try:
-        return await training_planning_service.ensure_current_planning(
-            current_user,
-            _to_domain(payload, DomainEnsureCurrentTrainingPlanningRequest),
-            interaction_language=normalize_interaction_language(
-                request.headers.get("accept-language")
-            ),
-        )
-    except TrainingPlanningStateError as error:
-        raise training_planning_state_api_error(error) from None
+    return await training_planning_service.ensure_current_planning(
+        current_user,
+        _to_domain(payload, DomainEnsureCurrentTrainingPlanningRequest),
+        interaction_language=normalize_interaction_language(
+            request.headers.get("accept-language")
+        ),
+    )
 
 
 router = APIRouter()
