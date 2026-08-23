@@ -84,17 +84,59 @@ apps/server/
 └── tests/
 ```
 
+服务端的 HTTP 入口和领域 workflow 按产品领域归组，跨领域的 API 组合逻辑保留在 `api/`
+根目录：
+
+```text
+src/riva/
+├── api/
+│   ├── auth.py        # 认证和账户接口
+│   ├── dashboard.py   # Dashboard 接口
+│   ├── health.py      # 健康检查接口
+│   ├── interview.py   # 面试接口
+│   ├── jobs.py        # 岗位和 JD 接口
+│   ├── practice.py    # 练习会话和题目接口
+│   ├── profile.py     # Profile 接口
+│   ├── resumes.py     # 简历接口
+│   ├── training.py    # 训练、能力和记录接口
+│   ├── dependencies.py
+│   ├── errors.py
+│   ├── cookies.py
+│   └── routes.py      # 只负责 router 组合
+├── services/
+│   ├── auth.py
+│   ├── profile/
+│   ├── resumes/
+│   ├── jobs/
+│   ├── practice/
+│   ├── interview/
+│   ├── training/
+│   └── dashboard/
+└── integrations/
+    ├── llm/
+    └── storage/
+```
+
 职责分层：
 
-- `api/`：FastAPI 路由、请求校验和响应处理。
+- `api/`：每个业务领域一个 FastAPI 路由文件；跨领域的依赖注入、错误映射、Cookie 和 router
+  组合逻辑保留在 `api/` 根目录文件中。
 - `cli/`：Typer 命令定义和命令侧编排逻辑。
-- `core/`：配置、日志、鉴权依赖和应用生命周期。
+- `core/`：配置、日志、安全、language helper 和应用生命周期。
 - `db/`：数据库连接、事务和基于 Model 的 schema 管理能力。
 - `models/`：数据库模型，例如用户、简历、岗位、题卡、面试会话、复盘和业务结果。
-- `schemas/`：Pydantic 请求和响应结构。
-- `services/`：业务服务，承载简历、岗位、匹配分析、题卡、面试和评分复盘等主要逻辑。
-- `agents/`：Agent、对应 Prompt、输出 Schema 和工作流。
-- `integrations/`：LLM Provider、对象存储、邮件和第三方 API 等外部服务适配。
+- `schemas/`：只保留 HTTP Request、Response 和 API contract。
+- `services/`：业务服务按领域归组；`profile/`、`resumes/`、`jobs/`、`practice/`、
+  `interview/`、`training/`、`dashboard/` 保留领域目录，职责较小的认证服务集中在
+  `auth.py`。Service 的领域输入和结果投影使用各领域旁边的普通 Pydantic model，
+  不直接使用 HTTP schema。
+- `agents/`：按领域归组，每个领域都使用局部子包；Agent 实现及其输入输出 contract、Prompt
+  和校验逻辑保持就近。
+- `integrations/`：按 `llm/` 和 `storage/` 归组的外部适配；业务层依赖抽象而不是传输实现。
+
+预期依赖方向是 `api → services → agents/integrations/db`。Service 不导入 FastAPI、
+Starlette、API error、Cookie 或 `riva.schemas`；API 负责把 HTTP contract 转换为领域输入，
+把领域异常映射为 HTTP 状态，并把领域结果序列化为 response contract。
 
 ## Interaction Language Contract
 

@@ -32,6 +32,3 @@ class CompetencySummaryResponse(_StrictAPIModel):
 
 class CompetencyListResponse(_StrictAPIModel):
     items: list[CompetencySummaryResponse]
-
-
-__all__ = ["CompetencyListResponse", "CompetencySummaryResponse"]

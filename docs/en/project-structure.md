@@ -86,19 +86,63 @@ apps/server/
 └── tests/
 ```
 
+The server keeps the HTTP entry points and domain workflows grouped by product
+area. Cross-cutting API composition stays at the API root:
+
+```text
+src/riva/
+├── api/
+│   ├── auth.py        # authentication and account routes
+│   ├── dashboard.py   # dashboard routes
+│   ├── health.py      # health routes
+│   ├── interview.py   # interview routes
+│   ├── jobs.py        # role and job-description routes
+│   ├── practice.py    # practice session and question routes
+│   ├── profile.py     # profile routes
+│   ├── resumes.py     # resume routes
+│   ├── training.py    # training, competency, and record routes
+│   ├── dependencies.py
+│   ├── errors.py
+│   ├── cookies.py
+│   └── routes.py      # router composition only
+├── services/
+│   ├── auth.py
+│   ├── profile/
+│   ├── resumes/
+│   ├── jobs/
+│   ├── practice/
+│   ├── interview/
+│   ├── training/
+│   └── dashboard/
+└── integrations/
+    ├── llm/
+    └── storage/
+```
+
 Layer responsibilities:
 
-- `api/`: FastAPI routes, request validation, and response handling.
+- `api/`: one FastAPI route module per business domain. Cross-cutting dependency injection,
+  error mapping, cookies, and router composition stay in the API root modules.
 - `cli/`: Typer command definitions and command-specific orchestration.
-- `core/`: configuration, logging, auth dependencies, and lifecycle code.
+- `core/`: configuration, logging, security, language helpers, and application lifecycle.
 - `db/`: database connections, transactions, and model-managed schema operations.
 - `models/`: database models, such as users, resumes, jobs, questions, interview
   sessions, reviews, and business result records.
-- `schemas/`: Pydantic request and response schemas.
-- `services/`: business services for resumes, jobs, matching analysis, questions,
-  interviews, and review scoring.
-- `agents/`: agents, their prompts, output schemas, and workflows.
-- `integrations/`: adapters for LLM providers, object storage, email, and third-party APIs.
+- `schemas/`: Pydantic HTTP request and response contracts only.
+- `services/`: domain services grouped under `profile/`, `resumes/`, `jobs/`,
+  `practice/`, `interview/`, `training/`, and `dashboard/`; the compact auth
+  service stays in `auth.py`. Service inputs and projections use the plain
+  Pydantic models kept beside each domain service, not HTTP schemas.
+- `agents/`: Agent implementations grouped by domain, with every domain in a
+  local package and its internal
+  input/output contracts, prompts, and validation kept next to the Agent.
+- `integrations/`: external adapters under `llm/` and `storage/`; services and
+  Agents depend on their abstractions rather than transport implementations.
+
+The intended dependency direction is `api -> services -> agents/integrations/db`.
+Services do not import FastAPI, Starlette, API errors, cookies, or `riva.schemas`;
+the API translates HTTP contracts into domain inputs, maps domain errors to HTTP,
+and serializes domain results back into response contracts.
 
 ## Interaction Language Contract
 

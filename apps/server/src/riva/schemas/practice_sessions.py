@@ -4,34 +4,34 @@ from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
-from riva.core.language import InteractionLanguage
-from riva.schemas.base import APIModel
-from riva.schemas.evaluation import (
+from riva.agents.practice.evaluation_types import (
     MAX_PRACTICE_EVALUATION_DIMENSIONS,
     PracticeDimensionScore,
     PracticeEvaluationScore,
 )
-from riva.schemas.practice_interactions import (
+from riva.agents.practice.interaction_types import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerContent,
 )
-from riva.schemas.practice_recommendation import (
+from riva.agents.practice.recommendation_types import (
     PracticeRecommendationOutput,
     RecommendationReason,
 )
-from riva.schemas.practice_reference_answer import (
+from riva.agents.practice.reference_types import (
     PracticeReferenceAnswerCommonMistakes,
     PracticeReferenceAnswerKeyPoints,
     PracticeReferenceAnswerKind,
     ReferenceAnswer,
     ReferenceAnswerAddressedGap,
 )
-from riva.schemas.practice_review import (
+from riva.agents.practice.review_types import (
     MAX_PRACTICE_REVIEW_ITEMS,
     ReviewItem,
     ReviewOverallPerformance,
     ReviewWeakness,
 )
+from riva.core.language import InteractionLanguage
+from riva.schemas.base import APIModel
 from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_LIST_ITEMS,
@@ -699,62 +699,3 @@ PracticeSessionResponse = Annotated[
 
 class CurrentPracticeSessionResponse(PracticeAPIModel):
     session: PracticeActiveSessionResponse | None
-
-
-__all__ = [
-    "PracticeAttemptStatus",
-    "PracticeActiveSessionBase",
-    "PracticeActiveSessionResponse",
-    "PracticeCompletedSessionResponse",
-    "PracticeUnfinishedAttemptResponse",
-    "PracticeAnswerResponse",
-    "PracticeAnsweredFollowUpExchangeResponse",
-    "PracticeAnsweringFollowUpResponse",
-    "PracticeAnsweringResponse",
-    "PracticeAwaitingFollowUpExchangeResponse",
-    "PracticeEvaluationResponse",
-    "PracticeFollowUpQuestionResponse",
-    "PracticeGuidanceNotRequestedResponse",
-    "PracticeGuidanceRevealedResponse",
-    "PracticeGuidanceResponse",
-    "PracticeGuidanceUnavailableResponse",
-    "PracticeQuestionSource",
-    "PracticeQuestionSourceAvailability",
-    "PracticeQuestionResponse",
-    "PracticeQuestionReferenceAnswerRequest",
-    "PracticeFollowUpReferenceAnswerRequest",
-    "PracticeReferenceAnswerNotRequestedResponse",
-    "PracticeReferenceAnswerUnavailableResponse",
-    "PracticeMainReferenceAnswerContentResponse",
-    "PracticeMainReferenceAnswerRevealedResponse",
-    "PracticeMainReferenceAnswerResponse",
-    "PracticeFollowUpReferenceAnswerContentResponse",
-    "PracticeFollowUpReferenceAnswerRevealedResponse",
-    "PracticeFollowUpReferenceAnswerResponse",
-    "PracticeNoFollowUpRequiredCompletionResponse",
-    "PracticeAllAnsweredCompletionResponse",
-    "PracticeCompletedFollowUpCompletionResponse",
-    "PracticeEndedEarlyFollowUpCompletionResponse",
-    "PracticeFollowUpCompletionResponse",
-    "PracticeReviewContentResponse",
-    "PracticeReviewResponse",
-    "CurrentPracticeSessionResponse",
-    "PracticeSessionResponse",
-    "PracticeSessionCompletionReason",
-    "PracticeSessionSelection",
-    "PracticeSetupCapabilitiesResponse",
-    "PracticeSetupResponse",
-    "PracticeSessionStatus",
-    "CompletePracticeSessionRequest",
-    "EndPracticeSessionEarlyRequest",
-    "EndPracticeFollowUpsRequest",
-    "RetryPracticeQuestionRequest",
-    "SkipPracticeQuestionRequest",
-    "RevealPracticeFollowUpGuidanceRequest",
-    "RevealPracticeQuestionGuidanceRequest",
-    "SetPracticeQuestionSavedRequest",
-    "SetPracticeQuestionWeakRequest",
-    "SubmitPrimaryAnswerRequest",
-    "SubmitFollowUpAnswerRequest",
-    "StartPracticeSessionRequest",
-]

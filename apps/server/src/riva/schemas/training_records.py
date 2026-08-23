@@ -4,13 +4,21 @@ from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
-from riva.core.language import InteractionLanguage
-from riva.schemas.base import APIModel
-from riva.schemas.evaluation import (
+from riva.agents.jobs.jd_parser_types import Company, RoleTitle
+from riva.agents.practice.evaluation_types import (
     MAX_PRACTICE_EVALUATION_DIMENSIONS,
     PracticeDimensionScore,
     PracticeEvaluationScore,
 )
+from riva.agents.practice.recommendation_types import PracticeRecommendationOutput
+from riva.agents.practice.review_types import (
+    MAX_PRACTICE_REVIEW_ITEMS,
+    ReviewItem,
+    ReviewOverallPerformance,
+    ReviewWeakness,
+)
+from riva.core.language import InteractionLanguage
+from riva.schemas.base import APIModel
 from riva.schemas.interview import (
     InterviewCandidateQuestionExchangeResponse,
     InterviewCompletionReason,
@@ -19,14 +27,6 @@ from riva.schemas.interview import (
     InterviewQuestionLearningDetailResponse,
     InterviewRound,
     InterviewSessionReviewResponse,
-)
-from riva.schemas.job_description_parsing import Company, RoleTitle
-from riva.schemas.practice_recommendation import PracticeRecommendationOutput
-from riva.schemas.practice_review import (
-    MAX_PRACTICE_REVIEW_ITEMS,
-    ReviewItem,
-    ReviewOverallPerformance,
-    ReviewWeakness,
 )
 from riva.schemas.practice_sessions import (
     MAX_PRACTICE_FOLLOW_UPS,
@@ -343,35 +343,3 @@ class MockInterviewTrainingRecordDetailResponse(TrainingRecordAPIModel):
 # a second wire contract for the same projections.
 TrainingRecordQuestionResponse = TargetedPracticeQuestionRecordResponse
 TrainingRecordAttemptResponse = TargetedPracticeAttemptRecordResponse
-
-__all__ = [
-    "TargetedPracticeAttemptRecordResponse",
-    "TargetedPracticeQuestionRecordResponse",
-    "TargetedPracticeTrainingRecordSummaryResponse",
-    "TargetedPracticeSetupResponse",
-    "TargetedPracticeTrainingRecordDetailResponse",
-    "MockInterviewTrainingRecordDetailResponse",
-    "MockInterviewTrainingRecordSetupResponse",
-    "MockInterviewTrainingRecordSummaryResponse",
-    "TargetedPracticeFollowUpReferenceAnswerRequest",
-    "TargetedPracticeFollowUpReferenceAnswerTargetResponse",
-    "TargetedPracticeMainReferenceAnswerRequest",
-    "TargetedPracticeMainReferenceAnswerTargetResponse",
-    "TargetedPracticeReferenceAnswerRequest",
-    "TargetedPracticeReferenceAnswerTargetResponse",
-    "TrainingRecordAPIModel",
-    "TrainingRecordAttemptResponse",
-    "TrainingRecordEvaluationResponse",
-    "TrainingRecordFollowUpResponse",
-    "TrainingRecordKindOverviewResponse",
-    "TrainingRecordKind",
-    "TrainingRecordQuestionResponse",
-    "TrainingRecordReviewResponse",
-    "TrainingRecordReferenceAnswerResponse",
-    "TrainingRecordSummaryResponse",
-    "TrainingRecordStatus",
-    "TrainingRecordTargetRoleResponse",
-    "TrainingRecordsOverviewResponse",
-    "TrainingRecordsPageResponse",
-    "TrainingRecordsPaginationResponse",
-]

@@ -3,11 +3,9 @@ import os
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from riva.core.errors import APIError
 from riva.db.database import Database
 from riva.models import (
     CareerProfile,
@@ -25,7 +23,8 @@ from riva.schemas.roles import (
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
 )
-from riva.services.roles import TargetRoleService
+from riva.services.errors import ResourceMissingError, ServiceError
+from riva.services.jobs.roles import TargetRoleService
 
 pytestmark = pytest.mark.integration
 
@@ -159,7 +158,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     assert update_no_op.version == 2
                     assert update_no_op.updated_at == updated_at
                 async with database.sessionmaker() as session:
-                    with pytest.raises(APIError) as stale_update_no_op:
+                    with pytest.raises(ServiceError) as stale_update_no_op:
                         await TargetRoleService(session).update_role(
                             owner,
                             first.id,
@@ -178,7 +177,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     assert current_no_op.current_role_id == first.id
                     assert current_no_op.roles[0].version == 2
                 async with database.sessionmaker() as session:
-                    with pytest.raises(APIError) as stale_current_no_op:
+                    with pytest.raises(ServiceError) as stale_current_no_op:
                         await TargetRoleService(session).set_current_role(
                             owner,
                             first.id,
@@ -223,7 +222,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     )
 
                 async with database.sessionmaker() as session:
-                    with pytest.raises(APIError) as stale_no_op:
+                    with pytest.raises(ServiceError) as stale_no_op:
                         await TargetRoleService(session).update_preparation_status(
                             owner,
                             first.id,
@@ -274,7 +273,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                         == 2
                     )
                 async with database.sessionmaker() as session:
-                    with pytest.raises(APIError) as stale_archive_no_op:
+                    with pytest.raises(ServiceError) as stale_archive_no_op:
                         await TargetRoleService(session).archive_role(
                             owner,
                             second.id,
@@ -286,7 +285,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     )
 
                 async with database.sessionmaker() as session:
-                    with pytest.raises(APIError) as archived_current:
+                    with pytest.raises(ServiceError) as archived_current:
                         await TargetRoleService(session).set_current_role(
                             owner,
                             second.id,
@@ -451,7 +450,7 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     assert same_jd.version == 2
                     assert same_jd.job_description.version == 1
                 async with database.sessionmaker() as session:
-                    with pytest.raises(APIError) as stale_jd:
+                    with pytest.raises(ServiceError) as stale_jd:
                         await TargetRoleService(session).save_job_description(
                             jd_owner,
                             jd_role.id,
@@ -484,13 +483,13 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     )
                     private_role = other_page.roles[0]
                 async with database.sessionmaker() as session:
-                    with pytest.raises(APIError) as isolated:
+                    with pytest.raises(ServiceError) as isolated:
                         await TargetRoleService(session).update_role(
                             owner,
                             private_role.id,
                             update_request(1, "Stolen"),
                         )
-                    assert isolated.value.status_code == status.HTTP_404_NOT_FOUND
+                    assert isinstance(isolated.value, ResourceMissingError)
                     assert isolated.value.error == "target_role_not_found"
 
                 concurrent_owner = users[6]
@@ -522,7 +521,9 @@ def test_roles_transactions_concurrency_profiles_and_constraints() -> None:
                     == 1
                 )
                 conflicts = [
-                    result for result in update_results if isinstance(result, APIError)
+                    result
+                    for result in update_results
+                    if isinstance(result, ServiceError)
                 ]
                 assert len(conflicts) == 1
                 assert conflicts[0].error == "target_role_version_conflict"

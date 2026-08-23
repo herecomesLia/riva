@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
-from riva.core.errors import DatabaseUnavailableError
-from riva.schemas import DependencyHealthStatus, HealthResponse, ServiceHealthStatus
+from riva.db.errors import DatabaseUnavailableError
+from riva.schemas.health import (
+    DependencyHealthStatus,
+    HealthResponse,
+    ServiceHealthStatus,
+)
 
 router = APIRouter()
 

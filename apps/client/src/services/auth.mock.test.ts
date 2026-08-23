@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { mockLoginCredentials, userMock } from "@/mocks/data/auth"
-import { getCurrentAuthUser, login, logout, register, restoreCurrentUser } from "@/services/auth"
+import { login, logout, register, restoreCurrentUser } from "@/services/auth"
 
 async function resolveMockLogin(
   username: string = mockLoginCredentials.username,
@@ -81,16 +81,5 @@ describe("auth service mock login", () => {
     await vi.advanceTimersByTimeAsync(500)
 
     await expect(logoutPromise).resolves.toBeUndefined()
-  })
-
-  it("returns the mock authentication identity", async () => {
-    const currentUserPromise = getCurrentAuthUser()
-
-    await vi.advanceTimersByTimeAsync(500)
-
-    await expect(currentUserPromise).resolves.toEqual({
-      id: userMock.id,
-      username: userMock.username,
-    })
   })
 })

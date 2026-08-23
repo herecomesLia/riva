@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from riva.models.practice_sessions import PracticeSession
     from riva.models.profile import CareerProfile
     from riva.models.question_cards import QuestionCard
-    from riva.models.resume_documents import ResumeDocument
+    from riva.models.resumes import ResumeDocument
     from riva.models.roles import CurrentTargetRole, TargetRole
 
 

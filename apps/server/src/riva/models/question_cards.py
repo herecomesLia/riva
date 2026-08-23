@@ -173,6 +173,3 @@ class QuestionCard(Base):
         passive_deletes=True,
         overlaps="user,target_role,question_cards",
     )
-
-
-__all__ = ["QuestionCard"]

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ZodError } from "zod"
 
-import { getCurrentAuthUser, login, logout, register, restoreCurrentUser } from "@/services/auth"
+import { login, logout, register, restoreCurrentUser } from "@/services/auth"
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -201,16 +201,6 @@ describe("auth service API", () => {
       code: "service_unavailable",
       status: 503,
     })
-  })
-
-  it("calls auth/me for the current authentication identity", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ id: userId, username: "lia" }))
-
-    await expect(getCurrentAuthUser()).resolves.toEqual({
-      id: userId,
-      username: "lia",
-    })
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/auth/me")
   })
 
   it("rejects a users/me account that does not match the login identity", async () => {

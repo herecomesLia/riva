@@ -159,28 +159,3 @@ class QuestionCardResponse(APIModel):
     is_marked_weak: bool
     created_at: datetime
     updated_at: datetime
-
-
-__all__ = [
-    "MAX_QUESTION_CARD_ANSWER_FRAMEWORK",
-    "MAX_QUESTION_CARD_ANSWER_HINTS",
-    "MAX_QUESTION_CARD_ASSESSED_CAPABILITIES",
-    "MAX_QUESTION_CARD_FOLLOW_UP_DIRECTIONS",
-    "MAX_QUESTION_CARD_LIST_ITEM_LENGTH",
-    "MAX_QUESTION_CARD_LIST_ITEMS",
-    "MAX_QUESTION_CARD_MATERIAL_LABEL_LENGTH",
-    "MAX_QUESTION_CARD_MATERIAL_REASON_LENGTH",
-    "MAX_QUESTION_CARD_PROMPT_LENGTH",
-    "MAX_QUESTION_CARD_RECOMMENDED_MATERIALS",
-    "MAX_QUESTION_CARD_SCORING_FOCUS",
-    "QuestionCardDifficulty",
-    "QuestionCardMaterialList",
-    "QuestionCardMaterialReference",
-    "QuestionCardMaterialType",
-    "QuestionCardPrompt",
-    "QuestionCardQuestionType",
-    "QuestionCardResponse",
-    "QuestionCardTextItem",
-    "QuestionCardTextList",
-    "StartQuestionGenerationRequest",
-]

@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from string import Formatter
 from typing import ClassVar, Generic, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
-from riva.integrations import (
+from riva.integrations.llm import (
     GenerationParameters,
     LLMMessage,
     LLMProvider,
@@ -18,6 +19,16 @@ from riva.integrations import (
 AgentInputT = TypeVar("AgentInputT")
 AgentOutputT = TypeVar("AgentOutputT", bound=BaseModel)
 AgentResultT = TypeVar("AgentResultT", bound=BaseModel, covariant=True)
+
+
+class AgentModel(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
 
 
 @dataclass(frozen=True)

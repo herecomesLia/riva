@@ -301,6 +301,3 @@ class PracticeAttempt(Base):
         passive_deletes=True,
         uselist=False,
     )
-
-
-__all__ = ["PracticeAttempt", "PracticeSession"]

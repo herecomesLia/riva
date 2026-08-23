@@ -4,17 +4,17 @@ from uuid import uuid4
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from riva.schemas import (
+from riva.schemas.interview import (
     InterviewConfiguration,
     InterviewDifficulty,
     InterviewDurationMinutes,
     InterviewOpeningSessionResponse,
     InterviewPageResponse,
     InterviewRound,
+    InterviewSetupAvailabilityResponse,
     InterviewSetupResponse,
     StartInterviewRequest,
 )
-from riva.schemas.interview import InterviewSetupAvailabilityResponse
 
 ROLE_ID = uuid4()
 

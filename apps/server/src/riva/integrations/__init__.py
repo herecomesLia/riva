@@ -18,7 +18,7 @@ from riva.integrations.llm import (
     TextGenerationRequest,
     validate_structured_output,
 )
-from riva.integrations.qwen import QwenProvider, build_llm_provider
+from riva.integrations.llm.qwen import QwenProvider, build_llm_provider
 
 __all__ = [
     "GenerationParameters",

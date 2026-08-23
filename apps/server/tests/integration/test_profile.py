@@ -3,11 +3,9 @@ import os
 from uuid import UUID
 
 import pytest
-from fastapi import status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from riva.core.errors import APIError
 from riva.db.database import Database
 from riva.models import (
     CareerProfile,
@@ -17,7 +15,8 @@ from riva.models import (
     User,
 )
 from riva.schemas.profile import CareerProfilePutRequest
-from riva.services.profile import CareerProfileService
+from riva.services.errors import DomainConflictError, ServiceError
+from riva.services.profile.profile import CareerProfileService
 
 pytestmark = pytest.mark.integration
 
@@ -169,11 +168,11 @@ def test_profile_constraints_concurrency_isolation_and_rollback() -> None:
                     result for result in results if isinstance(result, CareerProfile)
                 ]
                 conflicts = [
-                    result for result in results if isinstance(result, APIError)
+                    result for result in results if isinstance(result, ServiceError)
                 ]
                 assert len(successes) == 1
                 assert len(conflicts) == 1
-                assert conflicts[0].status_code == status.HTTP_409_CONFLICT
+                assert isinstance(conflicts[0], DomainConflictError)
                 assert successes[0].version == 2
 
                 winning_summary = successes[0].summary

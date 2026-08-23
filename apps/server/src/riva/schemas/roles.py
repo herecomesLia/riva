@@ -11,11 +11,11 @@ from pydantic import (
     model_validator,
 )
 
-from riva.schemas.base import MAX_RAW_JOB_DESCRIPTION_LENGTH, APIModel
-from riva.schemas.job_description_parsing import (
+from riva.agents.jobs.jd_parser_types import (
     AnalysisItemList,
     Summary,
 )
+from riva.schemas.base import MAX_RAW_JOB_DESCRIPTION_LENGTH, APIModel
 from riva.schemas.matching_analysis import MatchingAnalysisResultResponse
 
 

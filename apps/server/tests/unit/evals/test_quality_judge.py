@@ -9,8 +9,8 @@ from riva.evals.quality_judge import (
     QualityJudgeInput,
     QualityJudgeRubricMismatchError,
 )
+from riva.evals.quality_judge_types import QualityJudgeOutput
 from riva.integrations import LLMUsage
-from riva.schemas.eval_quality_judge import QualityJudgeOutput
 from tests.helpers.llm import FakeLLMProvider
 
 

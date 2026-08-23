@@ -6,12 +6,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from riva.api.dependencies import require_current_user
 from riva.core.app import create_app
-from riva.core.auth import require_current_user
 from riva.core.config import Settings
 from riva.db.database import Database
 from riva.models import User, UserCompetency
-from riva.services.competencies import CompetencyService
+from riva.services.training.competencies import CompetencyService
 from tests.helpers.integration_database import get_integration_database_url
 
 pytestmark = pytest.mark.integration

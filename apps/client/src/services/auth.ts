@@ -136,14 +136,3 @@ export async function restoreCurrentUser(): Promise<User | null> {
     throw error
   }
 }
-
-export async function getCurrentAuthUser(): Promise<AuthenticatedUser> {
-  if (env.mock) {
-    await waitForMockDelay(authDelayMs)
-    const { id, username } = createUserMockCopy()
-
-    return { id, username }
-  }
-
-  return authenticatedUserSchema.parse(await apiRequest<unknown>("/auth/me"))
-}

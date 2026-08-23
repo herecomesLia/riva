@@ -755,17 +755,3 @@ class InterviewReview(Base):
     session: Mapped[InterviewSession] = relationship(
         back_populates="review",
     )
-
-
-__all__ = [
-    "InterviewAnswer",
-    "InterviewCandidateQuestion",
-    "InterviewCandidateQuestionExchange",
-    "InterviewFollowUpAnswer",
-    "InterviewFollowUpQuestion",
-    "InterviewPlan",
-    "InterviewQuestion",
-    "InterviewReview",
-    "InterviewSession",
-    "InterviewTurnAssessment",
-]

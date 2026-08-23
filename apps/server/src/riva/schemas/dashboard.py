@@ -147,22 +147,3 @@ class DashboardResponse(_DashboardAPIModel):
     metrics: DashboardMetricsResponse
     performance_trend: DashboardPerformanceTrendResponse
     weaknesses: list[DashboardWeaknessResponse]
-
-
-__all__ = [
-    "DashboardCurrentRoleResponse",
-    "DashboardDurationMetricSnapshotResponse",
-    "DashboardExperienceYearsResponse",
-    "DashboardMetricSnapshotResponse",
-    "DashboardMetricsResponse",
-    "DashboardMockInterviewRecommendationResponse",
-    "DashboardPerformanceRecordResponse",
-    "DashboardPerformanceTrendResponse",
-    "DashboardRecommendationOutput",
-    "DashboardRecommendationQuestionType",
-    "DashboardRecommendationResponse",
-    "DashboardResponse",
-    "DashboardScoreMetricSnapshotResponse",
-    "DashboardTargetedPracticeRecommendationResponse",
-    "DashboardWeaknessResponse",
-]

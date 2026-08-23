@@ -4,8 +4,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from riva.agents import Agent
-from riva.agents.base import AgentPromptError
+from riva.agents.base import Agent, AgentPromptError
 from riva.integrations import LLMUsage, MessageRole
 from tests.helpers.llm import FakeLLMProvider
 

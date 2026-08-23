@@ -7,7 +7,7 @@ import riva.cli.eval as eval_module
 from riva.cli.main import app
 from riva.integrations import LLMUsage
 from tests.helpers.llm import FakeLLMProvider
-from tests.helpers.question_generation import valid_question_generation_input
+from tests.helpers.question import valid_question_generation_input
 
 
 def _configure_env(monkeypatch) -> None:

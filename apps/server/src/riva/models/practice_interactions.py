@@ -403,13 +403,3 @@ class PracticeRecommendation(Base):
         foreign_keys=[attempt_id],
         passive_deletes=True,
     )
-
-
-__all__ = [
-    "PracticeAnswer",
-    "PracticeEvaluation",
-    "PracticeFollowUpDecision",
-    "PracticeFollowUpQuestion",
-    "PracticeRecommendation",
-    "PracticeReview",
-]

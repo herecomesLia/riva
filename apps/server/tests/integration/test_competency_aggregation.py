@@ -8,9 +8,8 @@ from sqlalchemy import select
 
 from riva.db.database import Database
 from riva.models import CompetencyEvidence, User, UserCompetency
-from riva.services.competencies import CompetencyService
-from riva.services.competency_aggregation import CompetencyAggregationService
-from riva.services.competency_ingestion import CompetencyIngestionService
+from riva.services.training.aggregation import CompetencyAggregationService
+from riva.services.training.ingestion import CompetencyIngestionService
 from tests.helpers.integration_database import get_integration_database_url
 
 pytestmark = pytest.mark.integration

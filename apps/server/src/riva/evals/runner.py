@@ -27,7 +27,7 @@ from riva.evals.quality_judge import (
     QualityJudgeRubricMismatchError,
 )
 from riva.evals.registry import AgentEvalRegistry, UnknownAgentError
-from riva.integrations import LLMProvider
+from riva.integrations.llm import LLMProvider
 
 _MISSING = object()
 
@@ -422,6 +422,3 @@ def _number_range_result(
         f"got {actual!r}"
     )
     return passed, detail
-
-
-__all__ = ["AgentEvalRunner", "load_eval_cases"]

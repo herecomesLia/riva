@@ -9,12 +9,12 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from riva.api import router
+from riva.api.errors import register_exception_handlers
 from riva.core.config import Settings
-from riva.core.errors import register_exception_handlers
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
-from riva.resumes import DefaultResumeTextExtractor
-from riva.storage import LocalResumeObjectStorage
+from riva.integrations.storage import LocalResumeObjectStorage
+from riva.services.resumes.extraction import DefaultResumeTextExtractor
 from riva.utils import seconds_to_ms
 
 

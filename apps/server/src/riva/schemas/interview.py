@@ -4,9 +4,9 @@ from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, StringConstraints, field_validator
 
+from riva.agents.jobs.jd_parser_types import Company, RoleTitle
 from riva.core.language import InteractionLanguage
 from riva.schemas.base import APIModel
-from riva.schemas.job_description_parsing import Company, RoleTitle
 from riva.schemas.profile import RequiredText, StandardUUID
 
 
@@ -640,70 +640,3 @@ GetInterviewReviewBaseResponse.model_rebuild()
 GetInterviewUnavailableReviewResponse.model_rebuild()
 GetInterviewPartialReviewResponse.model_rebuild()
 GetInterviewCompleteReviewResponse.model_rebuild()
-
-
-__all__ = [
-    "InterviewConfiguration",
-    "InterviewAwaitingQuestionResponse",
-    "BeginInterviewQuestionsRequest",
-    "InterviewAnswerResponse",
-    "InterviewAnsweredFollowUpResponse",
-    "InterviewAwaitingFollowUpResponse",
-    "InterviewCandidateQuestionsSessionResponse",
-    "InterviewCandidateQuestionExchangeResponse",
-    "InterviewCandidateQuestionFeedbackResponse",
-    "InterviewCandidateQuestionResponse",
-    "InterviewCompletedQuestionResponse",
-    "InterviewCompletedSessionResponse",
-    "InterviewCompleteReviewResponse",
-    "InterviewCompletionReason",
-    "InterviewDefaultConfiguration",
-    "InterviewDifficulty",
-    "InterviewDurationMinutes",
-    "InterviewAnsweredQuestionResponse",
-    "InterviewFollowUpQuestionResponse",
-    "InterviewFollowUpSessionResponse",
-    "InterviewOpeningSessionResponse",
-    "InterviewPageResponse",
-    "InterviewProgressResponse",
-    "InterviewQuestionResponse",
-    "InterviewQuestionLearningDetailResponse",
-    "InterviewQuestionRecordResponse",
-    "InterviewQuestionReviewResponse",
-    "InterviewQuestionSessionResponse",
-    "InterviewQuestionType",
-    "InterviewRound",
-    "InterviewSessionStatus",
-    "InterviewReviewNarrativeResponse",
-    "InterviewPartialReviewResponse",
-    "InterviewPartialReviewStateResponse",
-    "InterviewCompleteReviewStateResponse",
-    "InterviewSessionReviewResponse",
-    "InterviewScoreDimension",
-    "InterviewDimensionScoreResponse",
-    "InterviewFollowUpLearningDetailResponse",
-    "InterviewFollowUpRecordResponse",
-    "InterviewFollowUpReviewResponse",
-    "InterviewReferenceAnswerContentResponse",
-    "InterviewReferenceAnswerResponse",
-    "InterviewReferenceAnswerStateResponse",
-    "InterviewTrainingSuggestionResponse",
-    "GetInterviewReviewResponse",
-    "GetInterviewReviewBaseResponse",
-    "GetInterviewUnavailableReviewResponse",
-    "GetInterviewPartialReviewResponse",
-    "GetInterviewCompleteReviewResponse",
-    "InterviewSetupAvailabilityResponse",
-    "InterviewSetupAvailableResponse",
-    "InterviewSetupBlockedReason",
-    "InterviewSetupBlockedResponse",
-    "InterviewSetupResponse",
-    "InterviewTargetRoleResponse",
-    "SubmitCandidateQuestionRequest",
-    "FinishInterviewRequest",
-    "EndInterviewRequest",
-    "SubmitFollowUpInterviewAnswerRequest",
-    "SubmitInterviewAnswerRequest",
-    "SubmitMainInterviewAnswerRequest",
-    "StartInterviewRequest",
-]

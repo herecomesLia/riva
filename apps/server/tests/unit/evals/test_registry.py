@@ -1,39 +1,41 @@
 import pytest
 
-from riva.agents.evaluation import PracticeEvaluationAgent
-from riva.agents.follow_up import FollowUpAgent
-from riva.agents.interview_candidate_question import InterviewCandidateQuestionAgent
-from riva.agents.interview_planning import InterviewPlanningAgent
-from riva.agents.interview_review import InterviewReviewAgent
-from riva.agents.interview_turn import InterviewTurnAgent
-from riva.agents.job_description_parsing import JobDescriptionParsingAgent
-from riva.agents.matching_analysis import MatchingAnalysisAgent
-from riva.agents.practice_recommendation import PracticeRecommendationAgent
-from riva.agents.practice_reference_answer import PracticeReferenceAnswerAgent
-from riva.agents.practice_review import PracticeReviewAgent
-from riva.agents.question_generation import QuestionGenerationAgent
-from riva.agents.resume_parsing import ResumeParsingAgent
-from riva.agents.training_planning import TrainingPlanningAgent
+from riva.agents.interview.candidate_question import InterviewCandidateQuestionAgent
+from riva.agents.interview.candidate_types import (
+    InterviewCandidateQuestionInput,
+)
+from riva.agents.interview.planning import InterviewPlanningAgent
+from riva.agents.interview.planning_types import InterviewPlanningInput
+from riva.agents.interview.review import InterviewReviewAgent
+from riva.agents.interview.review_types import InterviewReviewInput
+from riva.agents.interview.turn import InterviewTurnAgent
+from riva.agents.interview.turn_types import InterviewTurnInput
+from riva.agents.jobs.jd_parser import JobDescriptionParsingAgent
+from riva.agents.jobs.jd_parser_types import JobDescriptionParsingInput
+from riva.agents.jobs.matcher import MatchingAnalysisAgent
+from riva.agents.jobs.matcher_types import MatchingAnalysisInput
+from riva.agents.practice.evaluation import PracticeEvaluationAgent
+from riva.agents.practice.evaluation_types import EvaluationInput
+from riva.agents.practice.follow_up import FollowUpAgent
+from riva.agents.practice.follow_up_types import FollowUpInput
+from riva.agents.practice.question import QuestionGenerationAgent
+from riva.agents.practice.question_types import QuestionGenerationInput
+from riva.agents.practice.recommendation import PracticeRecommendationAgent
+from riva.agents.practice.recommendation_types import PracticeRecommendationInput
+from riva.agents.practice.reference_answer import PracticeReferenceAnswerAgent
+from riva.agents.practice.reference_types import PracticeReferenceAnswerInput
+from riva.agents.practice.review import PracticeReviewAgent
+from riva.agents.practice.review_types import PracticeReviewInput
+from riva.agents.resumes.parser import ResumeParsingAgent
+from riva.agents.resumes.types import ResumeParsingInput
+from riva.agents.training.planning import TrainingPlanningAgent
+from riva.agents.training.planning_types import TrainingPlanningInput
 from riva.evals.registry import (
     AgentEvalRegistration,
     AgentEvalRegistry,
     UnknownAgentError,
     build_default_registry,
 )
-from riva.schemas.evaluation import EvaluationInput
-from riva.schemas.follow_up import FollowUpInput
-from riva.schemas.interview_candidate_question import InterviewCandidateQuestionInput
-from riva.schemas.interview_planning import InterviewPlanningInput
-from riva.schemas.interview_review import InterviewReviewInput
-from riva.schemas.interview_turn import InterviewTurnInput
-from riva.schemas.job_description_parsing import JobDescriptionParsingInput
-from riva.schemas.matching_analysis import MatchingAnalysisInput
-from riva.schemas.practice_recommendation import PracticeRecommendationInput
-from riva.schemas.practice_reference_answer import PracticeReferenceAnswerInput
-from riva.schemas.practice_review import PracticeReviewInput
-from riva.schemas.question_generation import QuestionGenerationInput
-from riva.schemas.resume_parsing import ResumeParsingInput
-from riva.schemas.training_planning import TrainingPlanningInput
 
 
 def test_default_registry_contains_all_canonical_agents() -> None:

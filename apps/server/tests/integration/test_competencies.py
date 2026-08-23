@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from riva.db.database import Database
 from riva.models import CompetencyEvidence, User, UserCompetency
-from riva.services.competencies import CompetencyService
+from riva.services.training.competencies import CompetencyService
 from tests.helpers.integration_database import get_integration_database_url
 
 pytestmark = pytest.mark.integration

@@ -21,8 +21,8 @@ from riva.utils import utc_now
 
 if TYPE_CHECKING:
     from riva.models.interviews import InterviewSession
-    from riva.models.job_description_analyses import JobDescriptionAnalysis
-    from riva.models.matching_analyses import MatchingAnalysis
+    from riva.models.job_analysis import JobDescriptionAnalysis
+    from riva.models.matching import MatchingAnalysis
     from riva.models.practice_sessions import PracticeSession
     from riva.models.question_cards import QuestionCard
     from riva.models.user import User

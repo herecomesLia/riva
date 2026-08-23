@@ -1,22 +1,20 @@
 import pytest
 from pydantic import BaseModel
 
-from riva.agents import (
-    FollowUpAgent,
-    InterviewCandidateQuestionAgent,
-    InterviewPlanningAgent,
-    InterviewReviewAgent,
-    InterviewTurnAgent,
-    JobDescriptionParsingAgent,
-    MatchingAnalysisAgent,
-    PracticeEvaluationAgent,
-    PracticeRecommendationAgent,
-    PracticeReferenceAnswerAgent,
-    PracticeReviewAgent,
-    QuestionGenerationAgent,
-    ResumeParsingAgent,
-    TrainingPlanningAgent,
-)
+from riva.agents.interview.candidate_question import InterviewCandidateQuestionAgent
+from riva.agents.interview.planning import InterviewPlanningAgent
+from riva.agents.interview.review import InterviewReviewAgent
+from riva.agents.interview.turn import InterviewTurnAgent
+from riva.agents.jobs.jd_parser import JobDescriptionParsingAgent
+from riva.agents.jobs.matcher import MatchingAnalysisAgent
+from riva.agents.practice.evaluation import PracticeEvaluationAgent
+from riva.agents.practice.follow_up import FollowUpAgent
+from riva.agents.practice.question import QuestionGenerationAgent
+from riva.agents.practice.recommendation import PracticeRecommendationAgent
+from riva.agents.practice.reference_answer import PracticeReferenceAnswerAgent
+from riva.agents.practice.review import PracticeReviewAgent
+from riva.agents.resumes.parser import ResumeParsingAgent
+from riva.agents.training.planning import TrainingPlanningAgent
 from riva.evals.quality_judge import AgentEvalQualityJudge
 
 

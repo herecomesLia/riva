@@ -220,6 +220,3 @@ class CompetencyEvidence(Base):
         passive_deletes=True,
         overlaps="user",
     )
-
-
-__all__ = ["CompetencyEvidence", "UserCompetency"]

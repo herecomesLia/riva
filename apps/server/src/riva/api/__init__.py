@@ -1,3 +1,1 @@
-from riva.api.routes import router
-
-__all__ = ["router"]
+from riva.api.routes import router as router

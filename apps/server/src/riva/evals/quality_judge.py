@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 from riva.agents.base import Agent, AgentResult
 from riva.evals.models import AgentEvalRubric
-from riva.integrations import GenerationParameters, LLMProvider, LLMUsage
-from riva.schemas.eval_quality_judge import QualityJudgeOutput
+from riva.evals.quality_judge_types import QualityJudgeOutput
+from riva.integrations.llm import GenerationParameters, LLMProvider, LLMUsage
 
 
 class QualityJudgeInput(BaseModel):
@@ -157,10 +157,3 @@ def _stable_json(value: object) -> str:
         sort_keys=True,
         separators=(",", ":"),
     )
-
-
-__all__ = [
-    "AgentEvalQualityJudge",
-    "QualityJudgeInput",
-    "QualityJudgeRubricMismatchError",
-]

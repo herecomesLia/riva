@@ -170,6 +170,3 @@ def register_eval_command(root_app: typer.Typer) -> None:
 def _fail(message: str, *, code: int) -> NoReturn:
     typer.secho(message, fg=typer.colors.RED, err=True)
     raise typer.Exit(code=code)
-
-
-__all__ = ["app", "register_eval_command", "run"]

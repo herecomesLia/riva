@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.db.database import Database
 
 
-async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
+async def require_db_session(request: Request) -> AsyncIterator[AsyncSession]:
     database: Database = request.app.state.database
     async with database.sessionmaker() as session:
         yield session

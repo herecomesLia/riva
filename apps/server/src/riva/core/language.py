@@ -17,11 +17,3 @@ def normalize_interaction_language(value: str | None) -> InteractionLanguage:
     if candidate == "en" or candidate.startswith("en-"):
         return "en"
     return DEFAULT_INTERACTION_LANGUAGE
-
-
-__all__ = [
-    "DEFAULT_INTERACTION_LANGUAGE",
-    "INTERACTION_LANGUAGES",
-    "InteractionLanguage",
-    "normalize_interaction_language",
-]
