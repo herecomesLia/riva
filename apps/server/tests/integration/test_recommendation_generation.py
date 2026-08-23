@@ -20,7 +20,6 @@ from riva.models import (
     QuestionCard,
     TargetRole,
 )
-from riva.prompts import PRACTICE_REVIEW_PROMPT
 from riva.services.agent_runs import AgentRunService
 from riva.services.recommendation_generation import (
     RecommendationGenerationService,

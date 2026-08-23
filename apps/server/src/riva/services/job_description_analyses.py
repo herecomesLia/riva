@@ -8,17 +8,13 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.core.language import InteractionLanguage
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.models import AgentRun, JobDescriptionAnalysis, TargetRole
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import (
     MAX_JOB_DESCRIPTION_SUMMARY_LENGTH,
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
     JobDescriptionParsingRunPayload,
-)
-from riva.services.prompt_versions import (
-    JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS,
 )
 from riva.utils import utc_now
 
@@ -274,13 +270,11 @@ class JobDescriptionAnalysisService:
         *,
         for_update: bool,
     ) -> _ParsingContext:
-        prompt = JOB_DESCRIPTION_PARSING_PROMPT
         if (
-            run.agent_id != "job-description-parser"
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version
-            not in JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS
-            or run.output_schema_id != prompt.output_schema_id
+            run.agent_id != JobDescriptionParsingAgent.agent_id
+            or run.prompt_id != JobDescriptionParsingAgent.agent_id
+            or run.prompt_version != JobDescriptionParsingAgent.agent_version
+            or run.output_schema_id != JobDescriptionParsingAgent.output_schema_id
         ):
             raise JobDescriptionParsingStateError(INVALID_PARSE_RUN)
 

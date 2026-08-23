@@ -10,6 +10,7 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.follow_up import FollowUpAgent
 from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -20,7 +21,6 @@ from riva.models import (
     PracticeSession,
     QuestionCard,
 )
-from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
     FollowUpGenerationOutput,
@@ -113,12 +113,11 @@ def validate_follow_up_generation_run(
 ) -> FollowUpRunPayload:
     """Validate the immutable contract shared by follow-up consumers."""
 
-    prompt = FOLLOW_UP_PROMPT
     if (
-        run.agent_id != "follow-up-generator"
-        or run.prompt_id != prompt.prompt_id
-        or run.prompt_version != prompt.version
-        or run.output_schema_id != prompt.output_schema_id
+        run.agent_id != FollowUpAgent.agent_id
+        or run.prompt_id != FollowUpAgent.agent_id
+        or run.prompt_version != FollowUpAgent.agent_version
+        or run.output_schema_id != FollowUpAgent.output_schema_id
     ):
         raise FollowUpGenerationStateError(INVALID_FOLLOW_UP_GENERATION_RUN)
     try:
@@ -222,10 +221,10 @@ class FollowUpGenerationService:
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="follow-up-generator",
-            prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-            prompt_version=FOLLOW_UP_PROMPT.version,
-            output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+            agent_id=FollowUpAgent.agent_id,
+            prompt_id=FollowUpAgent.agent_id,
+            prompt_version=FollowUpAgent.agent_version,
+            output_schema_id=FollowUpAgent.output_schema_id,
             model=self.llm_model,
             payload=payload.model_dump(mode="json", by_alias=True),
             idempotency_key=idempotency_key,

@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.interview_turn import InterviewTurnAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -21,7 +22,6 @@ from riva.models import (
     InterviewTurnAssessment,
     User,
 )
-from riva.prompts import INTERVIEW_TURN_PROMPT
 from riva.schemas.interview import (
     InterviewConfiguration,
     InterviewDifficulty,
@@ -550,10 +550,10 @@ class InterviewTurnService:
             raise InterviewTurnStateError(INTERVIEW_TURN_MODEL_NOT_CONFIGURED)
         return await AgentRunService(self.session).enqueue_in_transaction(
             user_id=user_id,
-            agent_id=INTERVIEW_TURN_PROMPT.prompt_id,
-            prompt_id=INTERVIEW_TURN_PROMPT.prompt_id,
-            prompt_version=INTERVIEW_TURN_PROMPT.version,
-            output_schema_id=INTERVIEW_TURN_PROMPT.output_schema_id,
+            agent_id=InterviewTurnAgent.agent_id,
+            prompt_id=InterviewTurnAgent.agent_id,
+            prompt_version=InterviewTurnAgent.agent_version,
+            output_schema_id=InterviewTurnAgent.output_schema_id,
             model=model,
             payload=cast(
                 dict[str, object],
@@ -750,10 +750,10 @@ class InterviewTurnService:
     def _validate_run_metadata(run: AgentRun, user_id: UUID) -> None:
         if (
             run.user_id != user_id
-            or run.agent_id != INTERVIEW_TURN_PROMPT.prompt_id
-            or run.prompt_id != INTERVIEW_TURN_PROMPT.prompt_id
-            or run.prompt_version != INTERVIEW_TURN_PROMPT.version
-            or run.output_schema_id != INTERVIEW_TURN_PROMPT.output_schema_id
+            or run.agent_id != InterviewTurnAgent.agent_id
+            or run.prompt_id != InterviewTurnAgent.agent_id
+            or run.prompt_version != InterviewTurnAgent.agent_version
+            or run.output_schema_id != InterviewTurnAgent.output_schema_id
         ):
             raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
 

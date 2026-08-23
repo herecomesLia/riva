@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.core.errors import APIError
 from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
@@ -17,7 +18,6 @@ from riva.models import (
     JobDescriptionImportDraft,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_import_drafts import (
     JobDescriptionImportDraftCreate,
     JobDescriptionImportDraftResponse,
@@ -35,9 +35,6 @@ from riva.schemas.roles import (
 from riva.services.agent_runs import AgentRunService
 from riva.services.job_description_analyses import (
     new_job_description_analysis,
-)
-from riva.services.prompt_versions import (
-    JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS,
 )
 from riva.services.roles import TargetRoleService
 from riva.utils import utc_now
@@ -92,7 +89,6 @@ class JobDescriptionImportDraftService:
             self.session.add(draft)
             await self.session.flush()
 
-            prompt = JOB_DESCRIPTION_PARSING_PROMPT
             run_payload = JobDescriptionParsingRunPayload(
                 job_description_import_draft_id=draft.id,
                 interaction_language=interaction_language,
@@ -101,10 +97,10 @@ class JobDescriptionImportDraftService:
                 self.session
             ).enqueue_in_transaction(
                 user_id=user.id,
-                agent_id="job-description-parser",
-                prompt_id=prompt.prompt_id,
-                prompt_version=prompt.version,
-                output_schema_id=prompt.output_schema_id,
+                agent_id=JobDescriptionParsingAgent.agent_id,
+                prompt_id=JobDescriptionParsingAgent.agent_id,
+                prompt_version=JobDescriptionParsingAgent.agent_version,
+                output_schema_id=JobDescriptionParsingAgent.output_schema_id,
                 model=self.llm_model,
                 payload=run_payload.model_dump(
                     mode="json",
@@ -313,13 +309,11 @@ class JobDescriptionImportDraftService:
 
     @staticmethod
     def _run_payload(run: AgentRun) -> JobDescriptionParsingRunPayload:
-        prompt = JOB_DESCRIPTION_PARSING_PROMPT
         if (
-            run.agent_id != "job-description-parser"
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version
-            not in JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS
-            or run.output_schema_id != prompt.output_schema_id
+            run.agent_id != JobDescriptionParsingAgent.agent_id
+            or run.prompt_id != JobDescriptionParsingAgent.agent_id
+            or run.prompt_version != JobDescriptionParsingAgent.agent_version
+            or run.output_schema_id != JobDescriptionParsingAgent.output_schema_id
         ):
             raise JobDescriptionImportDraftStateError(IMPORT_DRAFT_INVALID_RUN)
         try:

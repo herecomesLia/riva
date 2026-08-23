@@ -10,6 +10,11 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.follow_up import FollowUpAgent
+from riva.agents.practice_evaluation import PracticeEvaluationAgent
+from riva.agents.practice_recommendation import PracticeRecommendationAgent
+from riva.agents.practice_review import PracticeReviewAgent
+from riva.agents.question_generation import QuestionGenerationAgent
 from riva.core.language import InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -25,13 +30,6 @@ from riva.models import (
     QuestionCard,
     TargetRole,
     User,
-)
-from riva.prompts import (
-    FOLLOW_UP_PROMPT,
-    PRACTICE_EVALUATION_PROMPT,
-    PRACTICE_RECOMMENDATION_PROMPT,
-    PRACTICE_REVIEW_PROMPT,
-    QUESTION_GENERATION_PROMPT,
 )
 from riva.schemas.evaluation import (
     EvaluationRunPayload,
@@ -4102,19 +4100,19 @@ class PracticeSessionService:
 
         for agent_id, idempotency_key in (
             (
-                "follow-up-generator",
+                FollowUpAgent.agent_id,
                 practice_follow_up_idempotency_key(attempt.id, 1),
             ),
             (
-                "practice-evaluator",
+                PracticeEvaluationAgent.agent_id,
                 practice_evaluation_idempotency_key(attempt.id),
             ),
             (
-                "practice-reviewer",
+                PracticeReviewAgent.agent_id,
                 practice_review_idempotency_key(attempt.id),
             ),
             (
-                "practice-recommender",
+                PracticeRecommendationAgent.agent_id,
                 practice_recommendation_idempotency_key(attempt.id),
             ),
         ):
@@ -4455,7 +4453,7 @@ class PracticeSessionService:
             select(AgentRun)
             .where(
                 AgentRun.user_id == practice_session.user_id,
-                AgentRun.agent_id == "follow-up-generator",
+                AgentRun.agent_id == FollowUpAgent.agent_id,
                 AgentRun.payload["attemptId"].as_string() == str(attempt.id),
             )
             .order_by(AgentRun.created_at, AgentRun.id)
@@ -4723,9 +4721,9 @@ class PracticeSessionService:
     ) -> AgentRun:
         statement = select(AgentRun).where(
             AgentRun.user_id == user_id,
-            AgentRun.agent_id == "follow-up-generator",
-            AgentRun.prompt_id == FOLLOW_UP_PROMPT.prompt_id,
-            AgentRun.prompt_version == FOLLOW_UP_PROMPT.version,
+            AgentRun.agent_id == FollowUpAgent.agent_id,
+            AgentRun.prompt_id == FollowUpAgent.agent_id,
+            AgentRun.prompt_version == FollowUpAgent.agent_version,
             AgentRun.idempotency_key
             == practice_follow_up_idempotency_key(
                 attempt_id,
@@ -4750,9 +4748,9 @@ class PracticeSessionService:
     ) -> AgentRun:
         statement = select(AgentRun).where(
             AgentRun.user_id == user_id,
-            AgentRun.agent_id == "practice-evaluator",
-            AgentRun.prompt_id == PRACTICE_EVALUATION_PROMPT.prompt_id,
-            AgentRun.prompt_version == PRACTICE_EVALUATION_PROMPT.version,
+            AgentRun.agent_id == PracticeEvaluationAgent.agent_id,
+            AgentRun.prompt_id == PracticeEvaluationAgent.agent_id,
+            AgentRun.prompt_version == PracticeEvaluationAgent.agent_version,
             AgentRun.idempotency_key == practice_evaluation_idempotency_key(attempt_id),
         )
         if for_update:
@@ -4776,12 +4774,12 @@ class PracticeSessionService:
         # it must be rejected by lineage validation rather than treated as
         # absent and replaced.
         statement = select(AgentRun).where(
-            AgentRun.agent_id == "practice-reviewer",
+            AgentRun.agent_id == PracticeReviewAgent.agent_id,
             or_(
                 and_(
                     AgentRun.user_id == user_id,
-                    AgentRun.prompt_id == PRACTICE_REVIEW_PROMPT.prompt_id,
-                    AgentRun.prompt_version == PRACTICE_REVIEW_PROMPT.version,
+                    AgentRun.prompt_id == PracticeReviewAgent.agent_id,
+                    AgentRun.prompt_version == PracticeReviewAgent.agent_version,
                     AgentRun.idempotency_key
                     == practice_review_idempotency_key(attempt_id),
                 ),
@@ -4810,12 +4808,13 @@ class PracticeSessionService:
         # See the review lookup: a damaged stable key must surface as a
         # conflict, never become permission to enqueue a second run.
         statement = select(AgentRun).where(
-            AgentRun.agent_id == "practice-recommender",
+            AgentRun.agent_id == PracticeRecommendationAgent.agent_id,
             or_(
                 and_(
                     AgentRun.user_id == user_id,
-                    AgentRun.prompt_id == PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
-                    AgentRun.prompt_version == PRACTICE_RECOMMENDATION_PROMPT.version,
+                    AgentRun.prompt_id == PracticeRecommendationAgent.agent_id,
+                    AgentRun.prompt_version
+                    == PracticeRecommendationAgent.agent_version,
                     AgentRun.idempotency_key
                     == practice_recommendation_idempotency_key(attempt_id),
                 ),
@@ -6395,7 +6394,7 @@ class PracticeSessionService:
         statement = select(AgentRun).where(
             AgentRun.id == source_attempt.question_generation_run_id,
             AgentRun.user_id == practice_session.user_id,
-            AgentRun.agent_id == "question-generator",
+            AgentRun.agent_id == QuestionGenerationAgent.agent_id,
         )
         if for_update:
             statement = statement.with_for_update()
@@ -6455,7 +6454,7 @@ class PracticeSessionService:
         statement = select(AgentRun).where(
             AgentRun.id == card.source_agent_run_id,
             AgentRun.user_id == practice_session.user_id,
-            AgentRun.agent_id == "question-generator",
+            AgentRun.agent_id == QuestionGenerationAgent.agent_id,
         )
         if for_update:
             statement = statement.with_for_update()

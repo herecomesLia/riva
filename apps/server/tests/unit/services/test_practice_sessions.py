@@ -4,7 +4,13 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+from riva.agents.practice_evaluation import PracticeEvaluationAgent
 
+from riva.agents.follow_up import FollowUpAgent
+from riva.agents.practice_recommendation import PracticeRecommendationAgent
+from riva.agents.practice_reference_answer import PracticeReferenceAnswerAgent
+from riva.agents.practice_review import PracticeReviewAgent
+from riva.agents.question_generation import QuestionGenerationAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -17,14 +23,6 @@ from riva.models import (
     PracticeReview,
     PracticeSession,
     QuestionCard,
-)
-from riva.prompts import (
-    FOLLOW_UP_PROMPT,
-    PRACTICE_EVALUATION_PROMPT,
-    PRACTICE_RECOMMENDATION_PROMPT,
-    PRACTICE_REFERENCE_ANSWER_PROMPT,
-    PRACTICE_REVIEW_PROMPT,
-    QUESTION_GENERATION_PROMPT,
 )
 from riva.schemas.evaluation import (
     EvaluationRunPayload,
@@ -389,9 +387,9 @@ def reference_answer_run(*, user_id: UUID) -> AgentRun:
         id=uuid4(),
         user_id=user_id,
         agent_id="practice-reference-answer-generator",
-        prompt_id=PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REFERENCE_ANSWER_PROMPT.version,
-        output_schema_id=PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+        prompt_id=PracticeReferenceAnswerAgent.agent_id,
+        prompt_version=PracticeReferenceAnswerAgent.agent_version,
+        output_schema_id=PracticeReferenceAnswerAgent.output_schema_id,
         status=AgentRunStatus.QUEUED,
         payload={},
         idempotency_key=f"reference:{uuid4()}",
@@ -464,9 +462,9 @@ def generation_run(
         id=uuid4(),
         user_id=user_id,
         agent_id="question-generator",
-        prompt_id=QUESTION_GENERATION_PROMPT.prompt_id,
-        prompt_version=QUESTION_GENERATION_PROMPT.version,
-        output_schema_id=QUESTION_GENERATION_PROMPT.output_schema_id,
+        prompt_id=QuestionGenerationAgent.agent_id,
+        prompt_version=QuestionGenerationAgent.agent_version,
+        output_schema_id=QuestionGenerationAgent.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=f"generation:{uuid4()}",
@@ -617,9 +615,9 @@ def follow_up_run(
         id=uuid4(),
         user_id=user_id,
         agent_id="follow-up-generator",
-        prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-        prompt_version=FOLLOW_UP_PROMPT.version,
-        output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+        prompt_id=FollowUpAgent.agent_id,
+        prompt_version=FollowUpAgent.agent_version,
+        output_schema_id=FollowUpAgent.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=practice_follow_up_idempotency_key(attempt_id, order),
@@ -1503,9 +1501,9 @@ def evaluation_run(
         id=uuid4(),
         user_id=user_id,
         agent_id="practice-evaluator",
-        prompt_id=PRACTICE_EVALUATION_PROMPT.prompt_id,
-        prompt_version=PRACTICE_EVALUATION_PROMPT.version,
-        output_schema_id=PRACTICE_EVALUATION_PROMPT.output_schema_id,
+        prompt_id=PracticeEvaluationAgent.agent_id,
+        prompt_version=PracticeEvaluationAgent.agent_version,
+        output_schema_id=PracticeEvaluationAgent.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=practice_evaluation_idempotency_key(attempt_id),
@@ -1577,9 +1575,9 @@ def review_run(
         id=uuid4(),
         user_id=user_id,
         agent_id="practice-reviewer",
-        prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REVIEW_PROMPT.version,
-        output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+        prompt_id=PracticeReviewAgent.agent_id,
+        prompt_version=PracticeReviewAgent.agent_version,
+        output_schema_id=PracticeReviewAgent.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=idempotency_key or practice_review_idempotency_key(attempt_id),
@@ -1641,9 +1639,9 @@ def recommendation_run(
         id=uuid4(),
         user_id=user_id,
         agent_id="practice-recommender",
-        prompt_id=PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
-        prompt_version=PRACTICE_RECOMMENDATION_PROMPT.version,
-        output_schema_id=PRACTICE_RECOMMENDATION_PROMPT.output_schema_id,
+        prompt_id=PracticeRecommendationAgent.agent_id,
+        prompt_version=PracticeRecommendationAgent.agent_version,
+        output_schema_id=PracticeRecommendationAgent.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=idempotency_key

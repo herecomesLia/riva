@@ -1,12 +1,13 @@
 import asyncio
 import os
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -16,13 +17,11 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.services.resume_imports import (
     ResumeImportDraftService,
     ResumeImportStateError,
 )
-from riva.utils import utc_now
 
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
@@ -51,9 +50,9 @@ def seed_graph(suffix: str):
         id=uuid4(),
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT.prompt_id,
+        prompt_id=ResumeParsingAgent.agent_id,
         prompt_version="2",
-        output_schema_id=RESUME_PARSING_PROMPT.output_schema_id,
+        output_schema_id=ResumeParsingAgent.output_schema_id,
         payload={"resumeDocumentId": str(document_id)},
         idempotency_key=f"import-service-{suffix}-{uuid4()}",
         max_attempts=3,

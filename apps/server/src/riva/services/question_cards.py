@@ -7,10 +7,10 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.question_generation import QuestionGenerationAgent
 from riva.core.errors import APIError
 from riva.core.language import InteractionLanguage
 from riva.models import AgentRun, AgentRunStatus, QuestionCard, User
-from riva.prompts import QUESTION_GENERATION_PROMPT
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
@@ -172,14 +172,13 @@ class QuestionCardService:
         user_id: UUID,
         idempotency_key: str,
     ) -> AgentRun | None:
-        prompt = QUESTION_GENERATION_PROMPT
         return await self.session.scalar(
             select(AgentRun)
             .where(
                 AgentRun.user_id == user_id,
-                AgentRun.agent_id == "question-generator",
-                AgentRun.prompt_id == prompt.prompt_id,
-                AgentRun.output_schema_id == prompt.output_schema_id,
+                AgentRun.agent_id == QuestionGenerationAgent.agent_id,
+                AgentRun.prompt_id == QuestionGenerationAgent.agent_id,
+                AgentRun.output_schema_id == QuestionGenerationAgent.output_schema_id,
                 AgentRun.idempotency_key == idempotency_key,
             )
             .order_by(AgentRun.created_at.asc(), AgentRun.id.asc())

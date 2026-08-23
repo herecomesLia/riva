@@ -6,9 +6,9 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import select
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.db.database import Database
 from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_parsing import (
     RESUME_DOCUMENT_NOT_FOUND,
@@ -48,9 +48,9 @@ def make_run(user_id: UUID, document_id: UUID, suffix: str) -> AgentRun:
         id=uuid4(),
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT.prompt_id,
-        prompt_version=RESUME_PARSING_PROMPT.version,
-        output_schema_id=RESUME_PARSING_PROMPT.output_schema_id,
+        prompt_id=ResumeParsingAgent.agent_id,
+        prompt_version=ResumeParsingAgent.agent_version,
+        output_schema_id=ResumeParsingAgent.output_schema_id,
         payload={
             "resumeDocumentId": str(document_id),
             "interactionLanguage": "zh-CN",

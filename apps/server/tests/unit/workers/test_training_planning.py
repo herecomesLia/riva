@@ -1,14 +1,13 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import cast
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
 from riva.agents import TrainingPlanningAgent
 from riva.integrations import LLMUsage, ProviderUnavailableError
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import TRAINING_PLANNING_PROMPT
 from riva.schemas.training_planning import (
     TrainingPlanningInput,
     TrainingPlanningRunPayload,
@@ -85,10 +84,10 @@ def running_run(
     return AgentRun(
         id=uuid4(),
         user_id=uuid4(),
-        agent_id=TRAINING_PLANNING_PROMPT.prompt_id,
-        prompt_id=TRAINING_PLANNING_PROMPT.prompt_id,
-        prompt_version=TRAINING_PLANNING_PROMPT.version,
-        output_schema_id=TRAINING_PLANNING_PROMPT.output_schema_id,
+        agent_id=TrainingPlanningAgent.agent_id,
+        prompt_id=TrainingPlanningAgent.agent_id,
+        prompt_version=TrainingPlanningAgent.agent_version,
+        output_schema_id=TrainingPlanningAgent.output_schema_id,
         status=status,
         payload=cast(dict[str, object], payload.model_dump(mode="json", by_alias=True)),
         idempotency_key=f"training-planning:{request_id}",

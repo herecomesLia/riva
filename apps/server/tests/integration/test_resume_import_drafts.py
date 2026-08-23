@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -14,7 +15,6 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_imports import ResumeImportDraftData
 from riva.utils import utc_now
 
@@ -45,9 +45,9 @@ def make_run(user_id: UUID, document_id: UUID, suffix: str) -> AgentRun:
         id=uuid4(),
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT.prompt_id,
+        prompt_id=ResumeParsingAgent.agent_id,
         prompt_version="2",
-        output_schema_id=RESUME_PARSING_PROMPT.output_schema_id,
+        output_schema_id=ResumeParsingAgent.output_schema_id,
         payload={"resumeDocumentId": str(document_id)},
         idempotency_key=f"resume-import-{suffix}-{uuid4()}",
         max_attempts=3,

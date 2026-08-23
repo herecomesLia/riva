@@ -13,7 +13,6 @@ from riva.integrations import (
     ProviderUnavailableError,
 )
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
     FollowUpGenerationOutput,
@@ -85,9 +84,9 @@ def running_run() -> AgentRun:
         id=uuid4(),
         user_id=uuid4(),
         agent_id="follow-up-generator",
-        prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-        prompt_version=FOLLOW_UP_PROMPT.version,
-        output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+        prompt_id=FollowUpAgent.agent_id,
+        prompt_version=FollowUpAgent.agent_version,
+        output_schema_id=FollowUpAgent.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload={
             "attemptId": str(uuid4()),

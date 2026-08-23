@@ -6,9 +6,9 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import select
 
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.db.database import Database
 from riva.models import AgentRun, JobDescriptionAnalysis, TargetRole, User
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import JobDescriptionParsingOutput
 from riva.schemas.roles import SaveJobDescriptionRequest
 from riva.services.job_description_analyses import (
@@ -58,9 +58,9 @@ def parsing_run(
     run_id: UUID | None = None,
     job_description_version: int = 1,
     agent_id: str = "job-description-parser",
-    prompt_id: str = JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-    prompt_version: str = JOB_DESCRIPTION_PARSING_PROMPT.version,
-    output_schema_id: str = JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
+    prompt_id: str = JobDescriptionParsingAgent.agent_id,
+    prompt_version: str = JobDescriptionParsingAgent.agent_version,
+    output_schema_id: str = JobDescriptionParsingAgent.output_schema_id,
     payload: dict[str, str | int] | None = None,
 ) -> AgentRun:
     identifier = run_id or uuid4()

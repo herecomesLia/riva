@@ -4,7 +4,9 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
+from riva.agents.practice_evaluation import PracticeEvaluationAgent
 
+from riva.agents.follow_up import FollowUpAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -16,7 +18,6 @@ from riva.models import (
     PracticeSession,
     QuestionCard,
 )
-from riva.prompts import FOLLOW_UP_PROMPT, PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import (
     EvaluationRunPayload,
     PracticeEvaluationOutput,
@@ -273,9 +274,9 @@ def run_for(
         id=uuid4(),
         user_id=attempt.user_id,
         agent_id="practice-evaluator",
-        prompt_id=PRACTICE_EVALUATION_PROMPT.prompt_id,
-        prompt_version=PRACTICE_EVALUATION_PROMPT.version,
-        output_schema_id=PRACTICE_EVALUATION_PROMPT.output_schema_id,
+        prompt_id=PracticeEvaluationAgent.agent_id,
+        prompt_version=PracticeEvaluationAgent.agent_version,
+        output_schema_id=PracticeEvaluationAgent.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload=payload.model_dump(
             mode="json",
@@ -320,9 +321,9 @@ def follow_up_source_runs(
                 id=decision.source_agent_run_id,
                 user_id=attempt.user_id,
                 agent_id="follow-up-generator",
-                prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-                prompt_version=FOLLOW_UP_PROMPT.version,
-                output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+                prompt_id=FollowUpAgent.agent_id,
+                prompt_version=FollowUpAgent.agent_version,
+                output_schema_id=FollowUpAgent.output_schema_id,
                 status=AgentRunStatus.SUCCEEDED,
                 payload=payload.model_dump(mode="json", by_alias=True),
                 idempotency_key=practice_follow_up_idempotency_key(
@@ -605,7 +606,7 @@ def test_enqueue_freezes_the_complete_evaluation_graph(
     assert expected_run_service.calls[0]["max_attempts"] == 3
     assert expected_run_service.calls[0]["agent_id"] == "practice-evaluator"
     assert expected_run_service.calls[0]["prompt_id"] == (
-        PRACTICE_EVALUATION_PROMPT.prompt_id
+        PracticeEvaluationAgent.agent_id
     )
     payload = cast(dict[str, object], expected_run_service.calls[0]["payload"])
     assert payload == run.payload

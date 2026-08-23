@@ -17,7 +17,7 @@ TurnServiceFactory = Callable[[AsyncSession], InterviewTurnService]
 
 
 class InterviewTurnHandler:
-    agent_id = "interview-turn"
+    agent_id = InterviewTurnAgent.agent_id
 
     def __init__(
         self,

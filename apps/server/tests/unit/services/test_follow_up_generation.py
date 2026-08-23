@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from riva.agents.follow_up import FollowUpAgent
 from riva.models import (
     AgentRun,
     PracticeAnswer,
@@ -14,7 +15,6 @@ from riva.models import (
     PracticeSession,
     QuestionCard,
 )
-from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
     FollowUpQuestionOutput,
@@ -191,9 +191,9 @@ def run_for(
         id=uuid4(),
         user_id=attempt.user_id,
         agent_id="follow-up-generator",
-        prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-        prompt_version=FOLLOW_UP_PROMPT.version,
-        output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+        prompt_id=FollowUpAgent.agent_id,
+        prompt_version=FollowUpAgent.agent_version,
+        output_schema_id=FollowUpAgent.output_schema_id,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key="practice-attempt-follow-up",
         attempt_count=1,
@@ -227,7 +227,7 @@ def test_enqueue_order_one_freezes_ids_without_committing_transaction_variant() 
     assert db.commit_count == 0
     assert agent_runs.calls[0]["max_attempts"] == 3
     assert agent_runs.calls[0]["agent_id"] == "follow-up-generator"
-    assert agent_runs.calls[0]["prompt_id"] == FOLLOW_UP_PROMPT.prompt_id
+    assert agent_runs.calls[0]["prompt_id"] == FollowUpAgent.agent_id
     assert agent_runs.calls[0]["payload"] == expected_run.payload
 
 

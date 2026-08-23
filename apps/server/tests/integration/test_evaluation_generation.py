@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import PracticeEvaluationAgent
+from riva.agents.follow_up import FollowUpAgent
 from riva.db.database import Database
 from riva.integrations import LLMUsage, MessageRole
 from riva.models import (
@@ -21,7 +22,6 @@ from riva.models import (
     QuestionCard,
     TargetRole,
 )
-from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.services.agent_runs import AgentRunService
 from riva.services.evaluation_generation import (
@@ -98,9 +98,9 @@ def succeeded_follow_up_run(
         id=uuid4(),
         user_id=user_id,
         agent_id="follow-up-generator",
-        prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-        prompt_version=FOLLOW_UP_PROMPT.version,
-        output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+        prompt_id=FollowUpAgent.agent_id,
+        prompt_version=FollowUpAgent.agent_version,
+        output_schema_id=FollowUpAgent.output_schema_id,
         status=AgentRunStatus.SUCCEEDED,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=practice_follow_up_idempotency_key(attempt.id, order),

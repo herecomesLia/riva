@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.interview_planning import InterviewPlanningAgent
 from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.interview_planning import InterviewPlanningOutput
 from riva.schemas.training_memory import TrainingMemoryContext
@@ -14,9 +15,6 @@ from riva.services.interview_planning import (
     INTERVIEW_PLANNING_VERSION_CONFLICT,
     InterviewPlanningService,
     InterviewPlanningStateError,
-)
-from riva.services.interview_planning_prompt_versions import (
-    get_interview_planning_prompt,
 )
 
 NOW = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
@@ -181,14 +179,13 @@ def _run(
     payload=None,
     prompt_version="2",
 ):
-    prompt = get_interview_planning_prompt(prompt_version)
     return AgentRun(
         id=run_id or uuid4(),
         user_id=user_id,
         agent_id="interview-planner",
         prompt_id="interview-planner",
         prompt_version=prompt_version,
-        output_schema_id=prompt.output_schema_id,
+        output_schema_id=InterviewPlanningAgent.output_schema_id,
         status=status,
         payload=payload or {},
         idempotency_key="interview-test",

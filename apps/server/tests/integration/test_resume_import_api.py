@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.core.app import create_app
 from riva.core.config import Settings
 from riva.core.errors import APIError
@@ -29,7 +30,6 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.profile import CareerProfilePutRequest, CareerProfileResponse
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.profile import CareerProfileService
@@ -167,9 +167,9 @@ def make_run(
         id=uuid4(),
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT.prompt_id,
+        prompt_id=ResumeParsingAgent.agent_id,
         prompt_version="2",
-        output_schema_id=RESUME_PARSING_PROMPT.output_schema_id,
+        output_schema_id=ResumeParsingAgent.output_schema_id,
         status=status,
         payload={"resumeDocumentId": str(document_id)},
         idempotency_key=f"import-api-{suffix}-{uuid4()}",

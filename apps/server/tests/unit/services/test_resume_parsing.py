@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_parsing import (
     INVALID_RESUME_PARSING_RUN,
@@ -51,7 +51,7 @@ class ScriptedSession:
 
 def graph(
     *,
-    prompt_version: str = RESUME_PARSING_PROMPT.version,
+    prompt_version: str = ResumeParsingAgent.agent_version,
     extracted_text: str | None = "姓名不应输出\n负责 Python API。",
 ) -> tuple[User, ResumeDocument, AgentRun]:
     owner = User(
@@ -65,9 +65,9 @@ def graph(
         id=uuid4(),
         user_id=owner.id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT.prompt_id,
+        prompt_id=ResumeParsingAgent.agent_id,
         prompt_version=prompt_version,
-        output_schema_id=RESUME_PARSING_PROMPT.output_schema_id,
+        output_schema_id=ResumeParsingAgent.output_schema_id,
         payload={
             "resumeDocumentId": str(uuid4()),
             "interactionLanguage": "zh-CN",

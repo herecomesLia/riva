@@ -13,7 +13,6 @@ from riva.integrations import (
     ProviderUnavailableError,
 )
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import PRACTICE_REVIEW_PROMPT
 from riva.schemas.practice_review import PracticeReviewInput, PracticeReviewOutput
 from riva.services.review_generation import ReviewGenerationStateError
 from riva.workers import AgentExecutionError, PracticeReviewHandler
@@ -80,9 +79,9 @@ def running_run() -> AgentRun:
         id=uuid4(),
         user_id=uuid4(),
         agent_id="practice-reviewer",
-        prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REVIEW_PROMPT.version,
-        output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+        prompt_id=PracticeReviewAgent.agent_id,
+        prompt_version=PracticeReviewAgent.agent_version,
+        output_schema_id=PracticeReviewAgent.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload={
             "attemptId": str(uuid4()),
@@ -179,8 +178,8 @@ def result(
     *,
     output_value: object | None = None,
     agent_id: str = "practice-reviewer",
-    prompt_id: str = PRACTICE_REVIEW_PROMPT.prompt_id,
-    prompt_version: str = PRACTICE_REVIEW_PROMPT.version,
+    prompt_id: str = PracticeReviewAgent.agent_id,
+    prompt_version: str = PracticeReviewAgent.agent_version,
 ) -> AgentResult[PracticeReviewOutput]:
     return AgentResult(
         output=cast(

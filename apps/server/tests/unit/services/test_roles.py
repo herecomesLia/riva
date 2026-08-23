@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -13,9 +14,6 @@ from riva.models import (
     CareerProfileSkill,
     JobDescriptionAnalysis,
     TargetRole,
-)
-from riva.prompts import (
-    JOB_DESCRIPTION_PARSING_PROMPT,
 )
 from riva.schemas.roles import UpdateTargetRoleRequest
 from riva.services.roles import TargetRoleService, career_profile_completed
@@ -110,13 +108,13 @@ def test_role_response_maps_database_jd_without_ai_analysis(
 
 
 def parsing_run(role: TargetRole, status: AgentRunStatus) -> AgentRun:
-    prompt = JOB_DESCRIPTION_PARSING_PROMPT
+    prompt = JobDescriptionParsingAgent
     run = AgentRun(
         id=uuid4(),
         user_id=role.user_id,
         agent_id="job-description-parser",
-        prompt_id=prompt.prompt_id,
-        prompt_version=prompt.version,
+        prompt_id=prompt.agent_id,
+        prompt_version=prompt.agent_version,
         output_schema_id=prompt.output_schema_id,
         status=status,
         payload={
@@ -186,7 +184,7 @@ def test_role_response_rejects_stale_or_wrong_contract_run_projection() -> None:
     run.prompt_version = "2"
     assert TargetRoleService._role_response(role).job_description.status == "parsing"
 
-    run.prompt_version = JOB_DESCRIPTION_PARSING_PROMPT.version
+    run.prompt_version = JobDescriptionParsingAgent.agent_version
     run.output_schema_id = "wrong-schema"
     assert TargetRoleService._role_response(role).job_description.status == "saved"
 

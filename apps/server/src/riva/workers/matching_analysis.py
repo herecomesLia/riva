@@ -18,7 +18,7 @@ AnalysisServiceFactory = Callable[[AsyncSession], MatchingAnalysisService]
 
 
 class MatchingAnalysisHandler:
-    agent_id = "matching-analyzer"
+    agent_id = MatchingAnalysisAgent.agent_id
 
     def __init__(
         self,

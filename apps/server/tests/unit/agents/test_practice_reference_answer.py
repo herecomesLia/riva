@@ -5,7 +5,6 @@ import pytest
 
 from riva.agents import PracticeReferenceAnswerAgent
 from riva.integrations import MessageRole
-from riva.prompts import PRACTICE_REFERENCE_ANSWER_PROMPT
 from riva.schemas.practice_reference_answer import (
     PracticeReferenceAnswerOutput,
 )
@@ -149,14 +148,14 @@ def test_follow_up_prompt_values_include_answer_lineage_and_focus() -> None:
         model="test-reference-answer-model",
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input_model))
+    rendered = agent.render_prompt(agent.prompt_values(input_model))
 
-    assert "我负责了服务边界" in rendered.user
-    assert "I compared the failure rate" in rendered.user
-    assert "Result attribution" in rendered.user
-    assert "<BEGIN_UNTRUSTED_MAIN_ANSWER>" in rendered.user
-    assert "<BEGIN_UNTRUSTED_PREVIOUS_FOLLOW_UPS>" in rendered.user
-    assert "<BEGIN_UNTRUSTED_CURRENT_FOLLOW_UP>" in rendered.user
+    assert "我负责了服务边界" in rendered[1]
+    assert "I compared the failure rate" in rendered[1]
+    assert "Result attribution" in rendered[1]
+    assert "<BEGIN_UNTRUSTED_MAIN_ANSWER>" in rendered[1]
+    assert "<BEGIN_UNTRUSTED_PREVIOUS_FOLLOW_UPS>" in rendered[1]
+    assert "<BEGIN_UNTRUSTED_CURRENT_FOLLOW_UP>" in rendered[1]
 
 
 def test_trusted_controls_are_explicit_and_question_injection_stays_untrusted() -> None:
@@ -176,17 +175,17 @@ def test_trusted_controls_are_explicit_and_question_injection_stays_untrusted() 
         model="test-reference-answer-model",
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input_model))
+    rendered = agent.render_prompt(agent.prompt_values(input_model))
 
-    assert "Target type: main" in rendered.system
-    assert "Expected kind: technicalReference" in rendered.system
-    assert "Interaction language: en" in rendered.system
-    assert malicious not in rendered.system
-    assert malicious in rendered.user
-    assert rendered.user.index(malicious) > rendered.user.index(
+    assert "Target type: main" in rendered[0]
+    assert "Expected kind: technicalReference" in rendered[0]
+    assert "Interaction language: en" in rendered[0]
+    assert malicious not in rendered[0]
+    assert malicious in rendered[1]
+    assert rendered[1].index(malicious) > rendered[1].index(
         "<BEGIN_UNTRUSTED_QUESTION_CONTEXT>"
     )
-    assert rendered.user.index(malicious) < rendered.user.index(
+    assert rendered[1].index(malicious) < rendered[1].index(
         "<END_UNTRUSTED_QUESTION_CONTEXT>"
     )
 
@@ -205,17 +204,17 @@ def test_interaction_language_remains_a_trusted_control(language: str) -> None:
         model="test-reference-answer-model",
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input_model))
+    rendered = agent.render_prompt(agent.prompt_values(input_model))
 
-    assert f"Interaction language: {language}" in rendered.system
-    assert f"Interaction language: {language}" in rendered.user
+    assert f"Interaction language: {language}" in rendered[0]
+    assert f"Interaction language: {language}" in rendered[1]
 
 
 def test_prompt_identity_is_canonical() -> None:
-    assert PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id == (
+    assert PracticeReferenceAnswerAgent.agent_id == (
         "practice-reference-answer-generator"
     )
-    assert PRACTICE_REFERENCE_ANSWER_PROMPT.version == "1"
-    assert PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id == (
+    assert PracticeReferenceAnswerAgent.agent_version == "1"
+    assert PracticeReferenceAnswerAgent.output_schema_id == (
         "practice-reference-answer-v1"
     )

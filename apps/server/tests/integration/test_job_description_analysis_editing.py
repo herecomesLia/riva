@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.core.errors import APIError
 from riva.db import Database
 from riva.models import (
@@ -14,7 +15,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.roles import UpdateJobDescriptionAnalysisModuleRequest
 from riva.services.roles import TargetRoleService
 
@@ -57,13 +57,13 @@ def role(user_id: UUID, *, saved: bool = True, jd_version: int = 1) -> TargetRol
 
 def source_run(user_id: UUID) -> AgentRun:
     run_id = uuid4()
-    prompt = JOB_DESCRIPTION_PARSING_PROMPT
+    prompt = JobDescriptionParsingAgent
     return AgentRun(
         id=run_id,
         user_id=user_id,
-        agent_id=prompt.prompt_id,
-        prompt_id=prompt.prompt_id,
-        prompt_version=prompt.version,
+        agent_id=prompt.agent_id,
+        prompt_id=prompt.agent_id,
+        prompt_version=prompt.agent_version,
         output_schema_id=prompt.output_schema_id,
         payload={},
         idempotency_key=f"analysis-edit-{run_id}",

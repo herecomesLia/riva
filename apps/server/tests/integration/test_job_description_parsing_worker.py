@@ -13,6 +13,7 @@ from riva.agents import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
 )
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.core.config import Settings
 from riva.core.errors import APIError
 from riva.db.database import Database
@@ -29,7 +30,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.roles import (
     JobDescriptionParsingStatusQuery,
     SaveJobDescriptionRequest,
@@ -149,12 +149,12 @@ async def enqueue_parsing_run(
     key: str,
 ) -> AgentRun:
     async with database.sessionmaker() as session:
-        prompt = JOB_DESCRIPTION_PARSING_PROMPT
+        prompt = JobDescriptionParsingAgent
         return await AgentRunService(session).enqueue(
             user_id=user_id,
             agent_id="job-description-parser",
-            prompt_id=prompt.prompt_id,
-            prompt_version=prompt.version,
+            prompt_id=prompt.agent_id,
+            prompt_version=prompt.agent_version,
             output_schema_id=prompt.output_schema_id,
             model="fake-jd-model",
             payload={

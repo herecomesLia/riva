@@ -11,7 +11,6 @@ from riva.integrations import (
     MessageRole,
     ProviderUnavailableError,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import (
     MatchingAnalysisInput,
     MatchingAnalysisOutput,
@@ -134,19 +133,20 @@ def test_agent_uses_matching_prompt_and_stable_utf8_compact_json_without_mutatio
     asyncio.run(agent.run(input))
 
     request = provider.calls[0]
-    assert request.messages[0].content == MATCHING_ANALYSIS_PROMPT.render(values).system
-    assert request.messages[1].content == MATCHING_ANALYSIS_PROMPT.render(values).user
+    rendered = agent.render_prompt(values)
+    assert request.messages[0].content == rendered[0]
+    assert request.messages[1].content == rendered[1]
     assert input.model_dump(mode="json") == before
 
 
 def test_agent_uses_interaction_language_over_structured_source_languages() -> None:
     agent = MatchingAnalysisAgent(FakeLLMProvider([valid_output()]), model="test-model")
     values = agent.prompt_values(matching_input("en"))
-    rendered = agent.prompt.render(values)
+    rendered = agent.render_prompt(values)
 
     assert values["interaction_language"] == "en"
-    assert "Interaction language: en" in rendered.system
-    assert "primary language of the structured JD" not in rendered.system
+    assert "Interaction language: en" in rendered[0]
+    assert "primary language of the structured JD" not in rendered[0]
 
 
 def test_agent_returns_output_and_provider_metadata_and_usage() -> None:

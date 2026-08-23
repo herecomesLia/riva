@@ -15,7 +15,6 @@ from riva.integrations import (
     ProviderUnavailableError,
 )
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 from riva.schemas.job_description_parsing import (
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
@@ -74,7 +73,7 @@ def agent_result(
     *,
     agent_id: str = "job-description-parser",
     prompt_id: str = "job-description-parser",
-    prompt_version: str = JOB_DESCRIPTION_PARSING_PROMPT.version,
+    prompt_version: str = JobDescriptionParsingAgent.agent_version,
     result_output: BaseModel | None = None,
 ) -> AgentResult[BaseModel]:
     return AgentResult(
@@ -95,8 +94,8 @@ def running_agent_run() -> AgentRun:
         user_id=uuid4(),
         agent_id="job-description-parser",
         prompt_id="job-description-parser",
-        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
-        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
+        prompt_version=JobDescriptionParsingAgent.agent_version,
+        output_schema_id=JobDescriptionParsingAgent.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload={"roleId": str(uuid4()), "jobDescriptionVersion": 1},
         idempotency_key="parse-test",

@@ -7,6 +7,8 @@ import pytest
 from sqlalchemy import func, select
 
 from riva.agents import QuestionGenerationAgent
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
+from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.db.database import Database
 from riva.integrations import LLMUsage
 from riva.models import (
@@ -25,10 +27,6 @@ from riva.models import (
     QuestionCard,
     TargetRole,
     User,
-)
-from riva.prompts import (
-    JOB_DESCRIPTION_PARSING_PROMPT,
-    MATCHING_ANALYSIS_PROMPT,
 )
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -194,10 +192,10 @@ async def seed_context(
 
     parsing_run = succeeded_run(
         user_id=user_id,
-        agent_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
-        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
+        agent_id=JobDescriptionParsingAgent.agent_id,
+        prompt_id=JobDescriptionParsingAgent.agent_id,
+        prompt_version=JobDescriptionParsingAgent.agent_version,
+        output_schema_id=JobDescriptionParsingAgent.output_schema_id,
         payload={"roleId": str(role_id), "jobDescriptionVersion": 1},
         key=f"question-generation-jd-{role_id}",
     )
@@ -235,10 +233,10 @@ async def seed_context(
     )
     matching_run = succeeded_run(
         user_id=user_id,
-        agent_id=MATCHING_ANALYSIS_PROMPT.prompt_id,
-        prompt_id=MATCHING_ANALYSIS_PROMPT.prompt_id,
-        prompt_version=MATCHING_ANALYSIS_PROMPT.version,
-        output_schema_id=MATCHING_ANALYSIS_PROMPT.output_schema_id,
+        agent_id=MatchingAnalysisAgent.agent_id,
+        prompt_id=MatchingAnalysisAgent.agent_id,
+        prompt_version=MatchingAnalysisAgent.agent_version,
+        output_schema_id=MatchingAnalysisAgent.output_schema_id,
         payload={
             "roleId": str(role_id),
             "profileId": str(profile_id),

@@ -11,6 +11,7 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.practice_reference_answer import PracticeReferenceAnswerAgent
 from riva.core.language import InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -23,7 +24,6 @@ from riva.models import (
     PracticeReferenceAnswerArtifact,
     QuestionCard,
 )
-from riva.prompts import PRACTICE_REFERENCE_ANSWER_PROMPT
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_interactions import (
     MAX_PRACTICE_FOLLOW_UPS,
@@ -133,12 +133,11 @@ def practice_follow_up_reference_answer_idempotency_key(
 def validate_reference_answer_generation_run(
     run: AgentRun,
 ) -> PracticeReferenceAnswerRunPayload:
-    prompt = PRACTICE_REFERENCE_ANSWER_PROMPT
     if (
-        run.agent_id != "practice-reference-answer-generator"
-        or run.prompt_id != prompt.prompt_id
-        or run.prompt_version != prompt.version
-        or run.output_schema_id != prompt.output_schema_id
+        run.agent_id != PracticeReferenceAnswerAgent.agent_id
+        or run.prompt_id != PracticeReferenceAnswerAgent.agent_id
+        or run.prompt_version != PracticeReferenceAnswerAgent.agent_version
+        or run.output_schema_id != PracticeReferenceAnswerAgent.output_schema_id
     ):
         raise ReferenceAnswerGenerationStateError(
             INVALID_REFERENCE_ANSWER_GENERATION_RUN
@@ -261,10 +260,10 @@ class ReferenceAnswerGenerationService:
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="practice-reference-answer-generator",
-            prompt_id=PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
-            prompt_version=PRACTICE_REFERENCE_ANSWER_PROMPT.version,
-            output_schema_id=PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+            agent_id=PracticeReferenceAnswerAgent.agent_id,
+            prompt_id=PracticeReferenceAnswerAgent.agent_id,
+            prompt_version=PracticeReferenceAnswerAgent.agent_version,
+            output_schema_id=PracticeReferenceAnswerAgent.output_schema_id,
             model=self.llm_model,
             payload=payload.model_dump(mode="json", by_alias=True),
             idempotency_key=idempotency_key,
@@ -316,10 +315,10 @@ class ReferenceAnswerGenerationService:
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="practice-reference-answer-generator",
-            prompt_id=PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
-            prompt_version=PRACTICE_REFERENCE_ANSWER_PROMPT.version,
-            output_schema_id=PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+            agent_id=PracticeReferenceAnswerAgent.agent_id,
+            prompt_id=PracticeReferenceAnswerAgent.agent_id,
+            prompt_version=PracticeReferenceAnswerAgent.agent_version,
+            output_schema_id=PracticeReferenceAnswerAgent.output_schema_id,
             model=self.llm_model,
             payload=payload.model_dump(mode="json", by_alias=True),
             idempotency_key=idempotency_key,
@@ -550,11 +549,10 @@ class ReferenceAnswerGenerationService:
     ) -> AgentRun | None:
         statement = select(AgentRun).where(
             AgentRun.user_id == user_id,
-            AgentRun.agent_id == "practice-reference-answer-generator",
-            AgentRun.prompt_id == PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
-            AgentRun.prompt_version == PRACTICE_REFERENCE_ANSWER_PROMPT.version,
-            AgentRun.output_schema_id
-            == PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+            AgentRun.agent_id == PracticeReferenceAnswerAgent.agent_id,
+            AgentRun.prompt_id == PracticeReferenceAnswerAgent.agent_id,
+            AgentRun.prompt_version == PracticeReferenceAnswerAgent.agent_version,
+            AgentRun.output_schema_id == PracticeReferenceAnswerAgent.output_schema_id,
             AgentRun.idempotency_key == idempotency_key,
         )
         if for_update:
@@ -575,7 +573,7 @@ class ReferenceAnswerGenerationService:
         )
         candidate_statement = select(AgentRun).where(
             AgentRun.user_id == user_id,
-            AgentRun.agent_id == "practice-reference-answer-generator",
+            AgentRun.agent_id == PracticeReferenceAnswerAgent.agent_id,
             or_(
                 target_field == str(target_id),
                 AgentRun.idempotency_key == idempotency_key,

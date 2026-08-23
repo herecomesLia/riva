@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.models import (
     AgentRun,
     CareerProfile,
@@ -15,7 +16,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import MatchingAnalysisOutput
 from riva.services.matching_analyses import (
     INVALID_MATCHING_ANALYSIS_RUN,
@@ -114,10 +114,10 @@ def graph() -> tuple[User, TargetRole, CareerProfile, JobDescriptionAnalysis, Ag
     run = AgentRun(
         id=uuid4(),
         user_id=owner.id,
-        agent_id=MATCHING_ANALYSIS_PROMPT.prompt_id,
-        prompt_id=MATCHING_ANALYSIS_PROMPT.prompt_id,
-        prompt_version=MATCHING_ANALYSIS_PROMPT.version,
-        output_schema_id=MATCHING_ANALYSIS_PROMPT.output_schema_id,
+        agent_id=MatchingAnalysisAgent.agent_id,
+        prompt_id=MatchingAnalysisAgent.agent_id,
+        prompt_version=MatchingAnalysisAgent.agent_version,
+        output_schema_id=MatchingAnalysisAgent.output_schema_id,
         payload={
             "roleId": str(role.id),
             "profileId": str(profile.profile_id),

@@ -20,22 +20,6 @@ from riva.evals.registry import (
     UnknownAgentError,
     build_default_registry,
 )
-from riva.prompts import (
-    FOLLOW_UP_PROMPT,
-    INTERVIEW_CANDIDATE_QUESTION_PROMPT,
-    INTERVIEW_PLANNING_PROMPT,
-    INTERVIEW_REVIEW_PROMPT,
-    INTERVIEW_TURN_PROMPT,
-    JOB_DESCRIPTION_PARSING_PROMPT,
-    MATCHING_ANALYSIS_PROMPT,
-    PRACTICE_EVALUATION_PROMPT,
-    PRACTICE_RECOMMENDATION_PROMPT,
-    PRACTICE_REFERENCE_ANSWER_PROMPT,
-    PRACTICE_REVIEW_PROMPT,
-    QUESTION_GENERATION_PROMPT,
-    RESUME_PARSING_PROMPT,
-    TRAINING_PLANNING_PROMPT,
-)
 from riva.schemas.evaluation import EvaluationInput
 from riva.schemas.follow_up import FollowUpInput
 from riva.schemas.interview_candidate_question import InterviewCandidateQuestionInput
@@ -59,68 +43,68 @@ def test_default_registry_contains_all_canonical_agents() -> None:
         "question-generator": (
             QuestionGenerationInput,
             QuestionGenerationAgent,
-            QUESTION_GENERATION_PROMPT,
+            QuestionGenerationAgent,
         ),
         "resume-parser": (
             ResumeParsingInput,
             ResumeParsingAgent,
-            RESUME_PARSING_PROMPT,
+            ResumeParsingAgent,
         ),
         "job-description-parser": (
             JobDescriptionParsingInput,
             JobDescriptionParsingAgent,
-            JOB_DESCRIPTION_PARSING_PROMPT,
+            JobDescriptionParsingAgent,
         ),
         "matching-analyzer": (
             MatchingAnalysisInput,
             MatchingAnalysisAgent,
-            MATCHING_ANALYSIS_PROMPT,
+            MatchingAnalysisAgent,
         ),
-        "follow-up-generator": (FollowUpInput, FollowUpAgent, FOLLOW_UP_PROMPT),
+        "follow-up-generator": (FollowUpInput, FollowUpAgent, FollowUpAgent),
         "practice-reference-answer-generator": (
             PracticeReferenceAnswerInput,
             PracticeReferenceAnswerAgent,
-            PRACTICE_REFERENCE_ANSWER_PROMPT,
+            PracticeReferenceAnswerAgent,
         ),
         "interview-candidate-question": (
             InterviewCandidateQuestionInput,
             InterviewCandidateQuestionAgent,
-            INTERVIEW_CANDIDATE_QUESTION_PROMPT,
+            InterviewCandidateQuestionAgent,
         ),
         "interview-turn": (
             InterviewTurnInput,
             InterviewTurnAgent,
-            INTERVIEW_TURN_PROMPT,
+            InterviewTurnAgent,
         ),
         "practice-evaluator": (
             EvaluationInput,
             PracticeEvaluationAgent,
-            PRACTICE_EVALUATION_PROMPT,
+            PracticeEvaluationAgent,
         ),
         "practice-reviewer": (
             PracticeReviewInput,
             PracticeReviewAgent,
-            PRACTICE_REVIEW_PROMPT,
+            PracticeReviewAgent,
         ),
         "practice-recommender": (
             PracticeRecommendationInput,
             PracticeRecommendationAgent,
-            PRACTICE_RECOMMENDATION_PROMPT,
+            PracticeRecommendationAgent,
         ),
         "interview-planner": (
             InterviewPlanningInput,
             InterviewPlanningAgent,
-            INTERVIEW_PLANNING_PROMPT,
+            InterviewPlanningAgent,
         ),
         "interview-review": (
             InterviewReviewInput,
             InterviewReviewAgent,
-            INTERVIEW_REVIEW_PROMPT,
+            InterviewReviewAgent,
         ),
         "training-planner": (
             TrainingPlanningInput,
             TrainingPlanningAgent,
-            TRAINING_PLANNING_PROMPT,
+            TrainingPlanningAgent,
         ),
     }
 
@@ -130,8 +114,8 @@ def test_default_registry_contains_all_canonical_agents() -> None:
         assert registration.agent_id == agent_id
         assert registration.input_schema is input_schema
         assert registration.agent_factory is agent_factory
-        assert registration.prompt_id == prompt.prompt_id
-        assert registration.prompt_version == prompt.version
+        assert registration.prompt_id == prompt.agent_id
+        assert registration.prompt_version == prompt.agent_version
 
 
 def test_registry_rejects_duplicate_and_unknown_agents() -> None:

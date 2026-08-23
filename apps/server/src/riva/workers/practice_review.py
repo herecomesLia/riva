@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents import AgentResult, PracticeReviewAgent
 from riva.models import AgentRun, AgentRunStatus
-from riva.schemas.practice_review import PracticeReviewInput, PracticeReviewOutput
+from riva.schemas.practice_review import PracticeReviewOutput
 from riva.services.review_generation import (
     ReviewGenerationService,
     ReviewGenerationStateError,
@@ -19,7 +19,7 @@ ReviewGenerationServiceFactory = Callable[[AsyncSession], ReviewGenerationServic
 
 
 class PracticeReviewHandler:
-    agent_id = "practice-reviewer"
+    agent_id = PracticeReviewAgent.agent_id
 
     def __init__(
         self,

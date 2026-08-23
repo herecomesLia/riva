@@ -10,7 +10,6 @@ from riva.integrations import (
     MessageRole,
     ProviderUnavailableError,
 )
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
     ResumeParsingOutput,
@@ -54,10 +53,10 @@ def test_agent_uses_fixed_identity_schema_model_parameters_and_two_messages() ->
 
     assert agent.agent_id == "resume-parser"
     assert agent.prompt_id == "resume-parser"
-    assert agent.prompt_version == RESUME_PARSING_PROMPT.version
+    assert agent.prompt_version == ResumeParsingAgent.agent_version
     assert result.agent_id == "resume-parser"
     assert result.prompt_id == "resume-parser"
-    assert result.prompt_version == RESUME_PARSING_PROMPT.version
+    assert result.prompt_version == ResumeParsingAgent.agent_version
     request = provider.calls[0]
     assert request.output_schema is ResumeParsingOutput
     assert request.model == "test-resume-model"
@@ -98,18 +97,11 @@ def test_agent_uses_fixed_prompt_and_preserves_unicode_and_injection_as_data() -
     asyncio.run(agent.run(input))
 
     system_message, user_message = provider.calls[0].messages
-    assert (
-        system_message.content
-        == RESUME_PARSING_PROMPT.render(
-            {"resume_text": input.resume_text, "interaction_language": "zh-CN"}
-        ).system
+    rendered = agent.render_prompt(
+        {"resume_text": input.resume_text, "interaction_language": "zh-CN"}
     )
-    assert (
-        user_message.content
-        == RESUME_PARSING_PROMPT.render(
-            {"resume_text": input.resume_text, "interaction_language": "zh-CN"}
-        ).user
-    )
+    assert system_message.content == rendered[0]
+    assert user_message.content == rendered[1]
     assert "中文简历" in user_message.content
     assert "confidence" in user_message.content
     assert request_schema(provider) is ResumeParsingOutput
@@ -120,11 +112,11 @@ def test_agent_uses_interaction_language_over_resume_source_language() -> None:
     input = resume_input("en")
 
     values = agent.prompt_values(input)
-    rendered = agent.prompt.render(values)
+    rendered = agent.render_prompt(values)
 
     assert values["interaction_language"] == "en"
-    assert "Interaction language: en" in rendered.system
-    assert "primary language of the resume" not in rendered.system
+    assert "Interaction language: en" in rendered[0]
+    assert "primary language of the resume" not in rendered[0]
 
 
 def request_schema(provider: FakeLLMProvider) -> type[ResumeParsingOutput]:

@@ -15,9 +15,6 @@ from riva.integrations import (
     MessageRole,
     ProviderUnavailableError,
 )
-from riva.prompts import (
-    JOB_DESCRIPTION_PARSING_PROMPT,
-)
 from tests.helpers.llm import FakeLLMProvider
 
 
@@ -111,26 +108,26 @@ def test_prompt_contains_context_delimiters_and_treats_malicious_jd_as_data() ->
 
 
 def test_prompt_has_current_contract() -> None:
-    prompt = JOB_DESCRIPTION_PARSING_PROMPT
+    prompt = JobDescriptionParsingAgent
 
-    assert prompt.prompt_id == "job-description-parser"
-    assert prompt.version == "3"
+    assert prompt.agent_id == "job-description-parser"
+    assert prompt.agent_version == "3"
     assert prompt.output_schema_id == "job-description-analysis-v1"
     assert prompt.output_schema is JobDescriptionParsingOutput
-    assert "Return an empty list" in prompt.system_template
-    assert "Do not output Markdown" in prompt.system_template
+    assert "Return an empty list" in prompt.system_prompt
+    assert "Do not output Markdown" in prompt.system_prompt
 
 
 def test_job_description_prompt_defines_distinct_list_semantics() -> None:
-    prompt = JOB_DESCRIPTION_PARSING_PROMPT
+    prompt = JobDescriptionParsingAgent
 
-    assert "complete" in prompt.system_template
-    assert "atomic hard-skill" in prompt.system_template
+    assert "complete" in prompt.system_prompt
+    assert "atomic hard-skill" in prompt.system_prompt
     assert "complete, independently understandable preferred condition" in (
-        prompt.system_template
+        prompt.system_prompt
     )
-    assert "related field" in prompt.system_template
-    assert "interaction_language" in prompt.system_template
+    assert "related field" in prompt.system_prompt
+    assert "interaction_language" in prompt.system_prompt
 
 
 def test_agent_uses_interaction_language_over_jd_source_language() -> None:
@@ -138,11 +135,11 @@ def test_agent_uses_interaction_language_over_jd_source_language() -> None:
         FakeLLMProvider([valid_output()]), model="test-model"
     )
     values = agent.prompt_values(malicious_input("en"))
-    rendered = agent.prompt.render(values)
+    rendered = agent.render_prompt(values)
 
     assert values["interaction_language"] == "en"
-    assert "Interaction language: en" in rendered.system
-    assert "primary language of the job description" not in rendered.system
+    assert "Interaction language: en" in rendered[0]
+    assert "primary language of the job description" not in rendered[0]
 
 
 def test_agent_returns_validated_result_with_provider_model_and_usage() -> None:

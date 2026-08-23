@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -24,7 +25,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import ResumeParsingOutput
 from riva.services.resume_import_application import (
     ResumeImportApplicationService,
@@ -138,9 +138,9 @@ async def seed(
         id=source_run_id,
         user_id=user_id,
         agent_id="resume-parser",
-        prompt_id=RESUME_PARSING_PROMPT.prompt_id,
+        prompt_id=ResumeParsingAgent.agent_id,
         prompt_version="2",
-        output_schema_id=RESUME_PARSING_PROMPT.output_schema_id,
+        output_schema_id=ResumeParsingAgent.output_schema_id,
         payload={"resumeDocumentId": str(document_id)},
         idempotency_key=f"application-{suffix}-{uuid4()}",
         max_attempts=3,

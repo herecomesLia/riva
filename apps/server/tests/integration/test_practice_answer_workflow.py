@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from riva.agents.practice_evaluation import PracticeEvaluationAgent
 from sqlalchemy import func, select
 
 from riva.agents import (
@@ -24,7 +25,6 @@ from riva.models import (
     QuestionCard,
     User,
 )
-from riva.prompts import PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import EvaluationRunPayload
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -446,7 +446,7 @@ def test_practice_follow_up_refresh_reconciles_canonical_result(
                         evaluation_run = evaluation_runs[0]
                         assert evaluation_run.status is AgentRunStatus.QUEUED
                         assert evaluation_run.prompt_id == (
-                            PRACTICE_EVALUATION_PROMPT.prompt_id
+                            PracticeEvaluationAgent.agent_id
                         )
                         assert EvaluationRunPayload.model_validate(
                             evaluation_run.payload

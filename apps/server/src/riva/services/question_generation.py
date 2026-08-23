@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.question_generation import QuestionGenerationAgent
 from riva.core.language import InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -24,7 +25,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import QUESTION_GENERATION_PROMPT
 from riva.schemas.practice_reference_answer import (
     PracticeReferenceFrozenContext,
     PracticeReferenceProjectEvidence,
@@ -58,10 +58,6 @@ from riva.schemas.question_generation import (
 from riva.services.agent_runs import AgentRunService
 from riva.services.practice_weaknesses import PracticeWeaknessFocus
 from riva.services.profile_completion import career_profile_completed
-from riva.services.question_generation_prompt_versions import (
-    QUESTION_GENERATION_ACCEPTED_PROMPT_VERSIONS,
-    get_question_generation_prompt,
-)
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
@@ -130,15 +126,11 @@ def validate_question_generation_run(
 ) -> QuestionGenerationRunPayload:
     """Validate the immutable contract shared by generation consumers."""
 
-    try:
-        prompt = get_question_generation_prompt(run.prompt_version)
-    except ValueError:
-        raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN) from None
     if (
-        run.agent_id != "question-generator"
-        or run.prompt_id != prompt.prompt_id
-        or run.prompt_version not in QUESTION_GENERATION_ACCEPTED_PROMPT_VERSIONS
-        or run.output_schema_id != prompt.output_schema_id
+        run.agent_id != QuestionGenerationAgent.agent_id
+        or run.prompt_id != QuestionGenerationAgent.agent_id
+        or run.prompt_version != QuestionGenerationAgent.agent_version
+        or run.output_schema_id != QuestionGenerationAgent.output_schema_id
     ):
         raise QuestionGenerationStateError(INVALID_QUESTION_GENERATION_RUN)
     try:
@@ -423,15 +415,14 @@ class QuestionGenerationService:
             training_memory=training_memory,
         )
         _build_context_input(context, payload)
-        prompt = QUESTION_GENERATION_PROMPT
         return await self.agent_run_service_factory(
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="question-generator",
-            prompt_id=prompt.prompt_id,
-            prompt_version=prompt.version,
-            output_schema_id=prompt.output_schema_id,
+            agent_id=QuestionGenerationAgent.agent_id,
+            prompt_id=QuestionGenerationAgent.agent_id,
+            prompt_version=QuestionGenerationAgent.agent_version,
+            output_schema_id=QuestionGenerationAgent.output_schema_id,
             model=self.llm_model,
             payload=payload.model_dump(mode="json", by_alias=True),
             idempotency_key=idempotency_key,
@@ -600,8 +591,8 @@ class QuestionGenerationService:
             select(AgentRun)
             .where(
                 AgentRun.user_id == user_id,
-                AgentRun.agent_id == "question-generator",
-                AgentRun.prompt_id == QUESTION_GENERATION_PROMPT.prompt_id,
+                AgentRun.agent_id == QuestionGenerationAgent.agent_id,
+                AgentRun.prompt_id == QuestionGenerationAgent.agent_id,
                 AgentRun.idempotency_key == idempotency_key,
             )
             .order_by(AgentRun.created_at.asc(), AgentRun.id.asc())

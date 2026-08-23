@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.training_planning import TrainingPlanningAgent
 from riva.core.language import InteractionLanguage
 from riva.core.training_planning import (
     TrainingPlanningOutputContractError,
@@ -21,7 +22,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import TRAINING_PLANNING_PROMPT
 from riva.schemas.interview import (
     InterviewDifficulty,
     InterviewDurationMinutes,
@@ -215,7 +215,7 @@ class TrainingPlanningService:
                         str(user.id),
                         str(payload.target_role_id),
                         interaction_language,
-                        TRAINING_PLANNING_PROMPT.version,
+                        TrainingPlanningAgent.agent_version,
                         fingerprint,
                     )
                 ),
@@ -420,10 +420,10 @@ class TrainingPlanningService:
         )
         return await self.agent_run_service_factory(self.session).enqueue(
             user_id=user_id,
-            agent_id=TRAINING_PLANNING_PROMPT.prompt_id,
-            prompt_id=TRAINING_PLANNING_PROMPT.prompt_id,
-            prompt_version=TRAINING_PLANNING_PROMPT.version,
-            output_schema_id=TRAINING_PLANNING_PROMPT.output_schema_id,
+            agent_id=TrainingPlanningAgent.agent_id,
+            prompt_id=TrainingPlanningAgent.agent_id,
+            prompt_version=TrainingPlanningAgent.agent_version,
+            output_schema_id=TrainingPlanningAgent.output_schema_id,
             model=self._configured_model(),
             payload=cast(
                 dict[str, object],
@@ -446,9 +446,9 @@ class TrainingPlanningService:
                 select(AgentRun)
                 .where(
                     AgentRun.user_id == user_id,
-                    AgentRun.agent_id == TRAINING_PLANNING_PROMPT.prompt_id,
-                    AgentRun.prompt_id == TRAINING_PLANNING_PROMPT.prompt_id,
-                    AgentRun.prompt_version == TRAINING_PLANNING_PROMPT.version,
+                    AgentRun.agent_id == TrainingPlanningAgent.agent_id,
+                    AgentRun.prompt_id == TrainingPlanningAgent.agent_id,
+                    AgentRun.prompt_version == TrainingPlanningAgent.agent_version,
                 )
                 .order_by(AgentRun.created_at.desc(), AgentRun.id.desc())
             )
@@ -478,7 +478,7 @@ class TrainingPlanningService:
             select(AgentRun)
             .where(
                 AgentRun.user_id == user_id,
-                AgentRun.agent_id == TRAINING_PLANNING_PROMPT.prompt_id,
+                AgentRun.agent_id == TrainingPlanningAgent.agent_id,
                 AgentRun.idempotency_key == idempotency_key,
             )
             .order_by(AgentRun.created_at.asc(), AgentRun.id.asc())
@@ -617,10 +617,10 @@ def validate_training_planning_run(
     run: AgentRun,
 ) -> TrainingPlanningRunPayload:
     if (
-        run.agent_id != TRAINING_PLANNING_PROMPT.prompt_id
-        or run.prompt_id != TRAINING_PLANNING_PROMPT.prompt_id
-        or run.prompt_version != TRAINING_PLANNING_PROMPT.version
-        or run.output_schema_id != TRAINING_PLANNING_PROMPT.output_schema_id
+        run.agent_id != TrainingPlanningAgent.agent_id
+        or run.prompt_id != TrainingPlanningAgent.agent_id
+        or run.prompt_version != TrainingPlanningAgent.agent_version
+        or run.output_schema_id != TrainingPlanningAgent.output_schema_id
     ):
         raise TrainingPlanningStateError(TRAINING_PLANNING_RUN_INVALID)
     try:

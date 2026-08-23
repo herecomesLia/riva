@@ -13,7 +13,6 @@ from riva.integrations import (
     ProviderUnavailableError,
 )
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import (
     EvaluationInput,
     PracticeEvaluationOutput,
@@ -76,9 +75,9 @@ def running_run() -> AgentRun:
         id=uuid4(),
         user_id=uuid4(),
         agent_id="practice-evaluator",
-        prompt_id=PRACTICE_EVALUATION_PROMPT.prompt_id,
-        prompt_version=PRACTICE_EVALUATION_PROMPT.version,
-        output_schema_id=PRACTICE_EVALUATION_PROMPT.output_schema_id,
+        prompt_id=PracticeEvaluationAgent.agent_id,
+        prompt_version=PracticeEvaluationAgent.agent_version,
+        output_schema_id=PracticeEvaluationAgent.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload={
             "attemptId": str(ids[0]),
@@ -178,8 +177,8 @@ def result(
     *,
     output_value: object | None = None,
     agent_id: str = "practice-evaluator",
-    prompt_id: str = PRACTICE_EVALUATION_PROMPT.prompt_id,
-    prompt_version: str = PRACTICE_EVALUATION_PROMPT.version,
+    prompt_id: str = PracticeEvaluationAgent.agent_id,
+    prompt_version: str = PracticeEvaluationAgent.agent_version,
 ) -> AgentResult[PracticeEvaluationOutput]:
     return AgentResult(
         output=cast(

@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.core.errors import APIError
 from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
@@ -24,7 +25,6 @@ from riva.models import (
     ResumeParsingResult,
     User,
 )
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_import_api import ResumeImportDraftResponse
 from riva.schemas.resume_parsing import (
     ResumeParsingOutput,
@@ -32,7 +32,6 @@ from riva.schemas.resume_parsing import (
 )
 from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
 from riva.services.agent_runs import AgentRunService
-from riva.services.prompt_versions import RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
 from riva.services.resume_imports import (
     RESUME_IMPORT_DRAFT_INVALID,
     ResumeImportStateError,
@@ -302,12 +301,11 @@ class ResumeParsingLifecycleService:
     ) -> tuple[AgentRun, ResumeParsingRunPayload] | None:
         if document.parsing_run_id != run.id or run.user_id != document.user_id:
             return None
-        active_prompt = RESUME_PARSING_PROMPT
         if (
-            run.agent_id != "resume-parser"
-            or run.prompt_id != active_prompt.prompt_id
-            or run.prompt_version not in RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
-            or run.output_schema_id != active_prompt.output_schema_id
+            run.agent_id != ResumeParsingAgent.agent_id
+            or run.prompt_id != ResumeParsingAgent.agent_id
+            or run.prompt_version != ResumeParsingAgent.agent_version
+            or run.output_schema_id != ResumeParsingAgent.output_schema_id
         ):
             return None
         try:
@@ -346,7 +344,6 @@ class ResumeParsingLifecycleService:
         interaction_language: InteractionLanguage,
         idempotency_key: str,
     ) -> AgentRun:
-        prompt = RESUME_PARSING_PROMPT
         payload = ResumeParsingRunPayload(
             resume_document_id=document_id,
             interaction_language=interaction_language,
@@ -355,10 +352,10 @@ class ResumeParsingLifecycleService:
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="resume-parser",
-            prompt_id=prompt.prompt_id,
-            prompt_version=prompt.version,
-            output_schema_id=prompt.output_schema_id,
+            agent_id=ResumeParsingAgent.agent_id,
+            prompt_id=ResumeParsingAgent.agent_id,
+            prompt_version=ResumeParsingAgent.agent_version,
+            output_schema_id=ResumeParsingAgent.output_schema_id,
             model=model,
             payload=payload.model_dump(mode="json", by_alias=True),
             idempotency_key=idempotency_key,

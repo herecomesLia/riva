@@ -15,21 +15,18 @@ from riva.integrations import (
     ProviderUnavailableError,
 )
 from riva.models import AgentRun, AgentRunStatus, ResumeParsingResult
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
     ResumeParsingOutput,
 )
 from riva.services.resume_imports import (
     RESUME_IMPORT_DRAFT_CONFLICT,
-    ResumeImportDraftService,
     ResumeImportStateError,
 )
 from riva.services.resume_parsing import (
     INVALID_RESUME_PARSING_RUN,
     RESUME_DOCUMENT_NOT_READY,
     RESUME_PARSING_SUPERSEDED,
-    ResumeParsingService,
     ResumeParsingStateError,
 )
 from riva.workers import AgentExecutionError, ResumeParsingWorkerHandler
@@ -87,7 +84,7 @@ def result(
     *,
     agent_id: str = "resume-parser",
     prompt_id: str = "resume-parser",
-    prompt_version: str = RESUME_PARSING_PROMPT.version,
+    prompt_version: str = ResumeParsingAgent.agent_version,
     result_output: BaseModel | None = None,
 ) -> AgentResult[BaseModel]:
     return AgentResult(
@@ -107,7 +104,7 @@ def running_run(*, payload: dict[str, object] | None = None) -> AgentRun:
         user_id=USER_ID,
         agent_id="resume-parser",
         prompt_id="resume-parser",
-        prompt_version=RESUME_PARSING_PROMPT.version,
+        prompt_version=ResumeParsingAgent.agent_version,
         output_schema_id="resume-parsing-v1",
         status=AgentRunStatus.RUNNING,
         payload=payload

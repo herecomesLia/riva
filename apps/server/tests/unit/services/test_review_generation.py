@@ -5,13 +5,13 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.practice_review import PracticeReviewAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
     PracticeEvaluation,
     PracticeReview,
 )
-from riva.prompts import PRACTICE_REVIEW_PROMPT
 from riva.schemas.practice_review import (
     PracticeReviewOutput,
     ReviewRunPayload,
@@ -151,9 +151,9 @@ def review_run(
         id=uuid4(),
         user_id=evaluation_run.user_id,
         agent_id="practice-reviewer",
-        prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REVIEW_PROMPT.version,
-        output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+        prompt_id=PracticeReviewAgent.agent_id,
+        prompt_version=PracticeReviewAgent.agent_version,
+        output_schema_id=PracticeReviewAgent.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=practice_review_idempotency_key(attempt_id),
@@ -251,9 +251,9 @@ def test_enqueue_in_transaction_freezes_only_attempt_evaluation_and_language() -
         id=uuid4(),
         user_id=attempt.user_id,
         agent_id="practice-reviewer",
-        prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REVIEW_PROMPT.version,
-        output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+        prompt_id=PracticeReviewAgent.agent_id,
+        prompt_version=PracticeReviewAgent.agent_version,
+        output_schema_id=PracticeReviewAgent.output_schema_id,
         status=AgentRunStatus.QUEUED,
         payload={},
         idempotency_key=practice_review_idempotency_key(attempt.id),
@@ -278,9 +278,9 @@ def test_enqueue_in_transaction_freezes_only_attempt_evaluation_and_language() -
     assert db.rollback_count == 0
     call = fake_run_service.calls[0]
     assert call["agent_id"] == "practice-reviewer"
-    assert call["prompt_id"] == PRACTICE_REVIEW_PROMPT.prompt_id
-    assert call["prompt_version"] == PRACTICE_REVIEW_PROMPT.version
-    assert call["output_schema_id"] == PRACTICE_REVIEW_PROMPT.output_schema_id
+    assert call["prompt_id"] == PracticeReviewAgent.agent_id
+    assert call["prompt_version"] == PracticeReviewAgent.agent_version
+    assert call["output_schema_id"] == PracticeReviewAgent.output_schema_id
     assert call["max_attempts"] == 3
     assert call["idempotency_key"] == practice_review_idempotency_key(attempt.id)
     assert call["payload"] == {
@@ -297,9 +297,9 @@ def test_enqueue_wrapper_commits_and_rejects_noncanonical_key() -> None:
         id=uuid4(),
         user_id=attempt.user_id,
         agent_id="practice-reviewer",
-        prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REVIEW_PROMPT.version,
-        output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+        prompt_id=PracticeReviewAgent.agent_id,
+        prompt_version=PracticeReviewAgent.agent_version,
+        output_schema_id=PracticeReviewAgent.output_schema_id,
         status=AgentRunStatus.QUEUED,
         payload={},
         idempotency_key=practice_review_idempotency_key(attempt.id),

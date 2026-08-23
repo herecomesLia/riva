@@ -6,7 +6,6 @@ from pydantic import ValidationError
 
 from riva.agents import FollowUpAgent
 from riva.integrations import InvalidStructuredOutputError, MessageRole
-from riva.prompts import FOLLOW_UP_PROMPT
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
     FollowUpGenerationOutput,
@@ -118,10 +117,10 @@ def test_agent_serializes_complete_previous_context_for_second_follow_up() -> No
         }
     ]
 
-    rendered = agent.prompt.render(values)
-    assert "What trade-off did you make?" in rendered.user
-    assert "I chose isolation to reduce operational coupling." in rendered.user
-    assert "Interaction language: en" in rendered.system
+    rendered = agent.render_prompt(values)
+    assert "What trade-off did you make?" in rendered[1]
+    assert "I chose isolation to reduce operational coupling." in rendered[1]
+    assert "Interaction language: en" in rendered[0]
 
 
 @pytest.mark.parametrize(
@@ -177,14 +176,14 @@ def test_agent_prompt_keeps_answer_in_untrusted_boundary() -> None:
     input = valid_input(main_answer=malicious)
     agent = FollowUpAgent(FakeLLMProvider([{"action": "complete"}]), model="test-model")
 
-    rendered = agent.prompt.render(agent.prompt_values(input))
+    rendered = agent.render_prompt(agent.prompt_values(input))
 
-    assert malicious not in rendered.system
-    assert malicious in rendered.user
-    assert rendered.user.index(malicious) > rendered.user.index(
+    assert malicious not in rendered[0]
+    assert malicious in rendered[1]
+    assert rendered[1].index(malicious) > rendered[1].index(
         "<BEGIN_UNTRUSTED_MAIN_ANSWER>"
     )
-    assert rendered.user.index(malicious) < rendered.user.index(
+    assert rendered[1].index(malicious) < rendered[1].index(
         "<END_UNTRUSTED_MAIN_ANSWER>"
     )
 
@@ -206,6 +205,6 @@ def test_follow_up_input_schema_rejects_invalid_fixture_before_agent_run() -> No
 
 
 def test_follow_up_prompt_identity_is_canonical() -> None:
-    assert FOLLOW_UP_PROMPT.prompt_id == "follow-up-generator"
-    assert FOLLOW_UP_PROMPT.version == "1"
-    assert FOLLOW_UP_PROMPT.output_schema_id == "follow-up-generation-v1"
+    assert FollowUpAgent.agent_id == "follow-up-generator"
+    assert FollowUpAgent.agent_version == "1"
+    assert FollowUpAgent.output_schema_id == "follow-up-generation-v1"

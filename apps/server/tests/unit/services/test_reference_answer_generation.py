@@ -5,6 +5,8 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.follow_up import FollowUpAgent
+from riva.agents.practice_reference_answer import PracticeReferenceAnswerAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -16,7 +18,6 @@ from riva.models import (
     PracticeReferenceAnswerArtifact,
     QuestionCard,
 )
-from riva.prompts import FOLLOW_UP_PROMPT, PRACTICE_REFERENCE_ANSWER_PROMPT
 from riva.schemas.follow_up import FollowUpRunPayload
 from riva.schemas.practice_reference_answer import (
     PracticeFollowUpReferenceAnswerOutput,
@@ -136,9 +137,9 @@ def main_run(
         id=uuid4(),
         user_id=owner.id,
         agent_id="practice-reference-answer-generator",
-        prompt_id=PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REFERENCE_ANSWER_PROMPT.version,
-        output_schema_id=PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+        prompt_id=PracticeReferenceAnswerAgent.agent_id,
+        prompt_version=PracticeReferenceAnswerAgent.agent_version,
+        output_schema_id=PracticeReferenceAnswerAgent.output_schema_id,
         status=status,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=key or practice_main_reference_answer_idempotency_key(card.id),
@@ -576,9 +577,9 @@ def follow_up_graph(order: int = 1):
             id=uuid4(),
             user_id=owner.id,
             agent_id="follow-up-generator",
-            prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-            prompt_version=FOLLOW_UP_PROMPT.version,
-            output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+            prompt_id=FollowUpAgent.agent_id,
+            prompt_version=FollowUpAgent.agent_version,
+            output_schema_id=FollowUpAgent.output_schema_id,
             status=AgentRunStatus.SUCCEEDED,
             payload=FollowUpRunPayload(
                 attemptId=attempt.id,
@@ -618,9 +619,9 @@ def follow_up_graph(order: int = 1):
         id=uuid4(),
         user_id=owner.id,
         agent_id="follow-up-generator",
-        prompt_id=FOLLOW_UP_PROMPT.prompt_id,
-        prompt_version=FOLLOW_UP_PROMPT.version,
-        output_schema_id=FOLLOW_UP_PROMPT.output_schema_id,
+        prompt_id=FollowUpAgent.agent_id,
+        prompt_version=FollowUpAgent.agent_version,
+        output_schema_id=FollowUpAgent.output_schema_id,
         status=AgentRunStatus.SUCCEEDED,
         payload=FollowUpRunPayload(
             attemptId=attempt.id,
@@ -713,9 +714,9 @@ def test_follow_up_load_freezes_only_completed_previous_lineage(order: int) -> N
         id=uuid4(),
         user_id=owner.id,
         agent_id="practice-reference-answer-generator",
-        prompt_id=PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REFERENCE_ANSWER_PROMPT.version,
-        output_schema_id=PRACTICE_REFERENCE_ANSWER_PROMPT.output_schema_id,
+        prompt_id=PracticeReferenceAnswerAgent.agent_id,
+        prompt_version=PracticeReferenceAnswerAgent.agent_version,
+        output_schema_id=PracticeReferenceAnswerAgent.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload=reference_payload.model_dump(mode="json", by_alias=True),
         idempotency_key=practice_follow_up_reference_answer_idempotency_key(

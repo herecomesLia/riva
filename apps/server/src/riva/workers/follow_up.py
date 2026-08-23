@@ -8,7 +8,6 @@ from riva.models import AgentRun, AgentRunStatus
 from riva.schemas.follow_up import (
     FollowUpCompleteOutput,
     FollowUpGenerationOutput,
-    FollowUpInput,
     FollowUpQuestionOutput,
 )
 from riva.services.follow_up_generation import (
@@ -22,7 +21,7 @@ FollowUpGenerationServiceFactory = Callable[[AsyncSession], FollowUpGenerationSe
 
 
 class FollowUpHandler:
-    agent_id = "follow-up-generator"
+    agent_id = FollowUpAgent.agent_id
 
     def __init__(
         self,

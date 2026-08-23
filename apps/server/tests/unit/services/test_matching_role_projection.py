@@ -3,6 +3,7 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -14,7 +15,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import MATCHING_ANALYSIS_PROMPT
 from riva.schemas.roles import StartMatchingAnalysisRequest
 from riva.services.roles import (
     MATCHING_FAILURE_REASON,
@@ -76,13 +76,13 @@ def graph() -> tuple[
             )
         ],
     )
-    prompt = MATCHING_ANALYSIS_PROMPT
+    prompt = MatchingAnalysisAgent
     run = AgentRun(
         id=uuid4(),
         user_id=owner.id,
         agent_id="matching-analyzer",
-        prompt_id=prompt.prompt_id,
-        prompt_version=prompt.version,
+        prompt_id=prompt.agent_id,
+        prompt_version=prompt.agent_version,
         output_schema_id=prompt.output_schema_id,
         status=AgentRunStatus.SUCCEEDED,
         payload={
@@ -229,7 +229,7 @@ def test_invalid_run_is_ignored_and_succeeded_without_result_is_null() -> None:
 
     role.matching_analysis = None
     role.matching_analysis_run = run
-    run.prompt_id = MATCHING_ANALYSIS_PROMPT.prompt_id
+    run.prompt_id = MatchingAnalysisAgent.agent_id
     run.status = AgentRunStatus.SUCCEEDED
     no_result = TargetRoleService._role_response(role, profile)
     assert no_result.matching_analysis is None

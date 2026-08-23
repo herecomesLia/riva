@@ -10,6 +10,7 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.evaluation import PracticeEvaluationAgent
 from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -22,7 +23,6 @@ from riva.models import (
     PracticeSession,
     QuestionCard,
 )
-from riva.prompts import PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import (
     EvaluationFollowUpExchange,
     EvaluationInput,
@@ -131,12 +131,11 @@ def validate_evaluation_generation_run(
 ) -> EvaluationRunPayload:
     """Validate the immutable contract shared by evaluation consumers."""
 
-    prompt = PRACTICE_EVALUATION_PROMPT
     if (
-        run.agent_id != "practice-evaluator"
-        or run.prompt_id != prompt.prompt_id
-        or run.prompt_version != prompt.version
-        or run.output_schema_id != prompt.output_schema_id
+        run.agent_id != PracticeEvaluationAgent.agent_id
+        or run.prompt_id != PracticeEvaluationAgent.agent_id
+        or run.prompt_version != PracticeEvaluationAgent.agent_version
+        or run.output_schema_id != PracticeEvaluationAgent.output_schema_id
     ):
         raise EvaluationGenerationStateError(INVALID_PRACTICE_EVALUATION_RUN)
     try:
@@ -244,10 +243,10 @@ class EvaluationGenerationService:
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="practice-evaluator",
-            prompt_id=PRACTICE_EVALUATION_PROMPT.prompt_id,
-            prompt_version=PRACTICE_EVALUATION_PROMPT.version,
-            output_schema_id=PRACTICE_EVALUATION_PROMPT.output_schema_id,
+            agent_id=PracticeEvaluationAgent.agent_id,
+            prompt_id=PracticeEvaluationAgent.agent_id,
+            prompt_version=PracticeEvaluationAgent.agent_version,
+            output_schema_id=PracticeEvaluationAgent.output_schema_id,
             model=self.llm_model,
             payload=payload.model_dump(
                 mode="json",

@@ -3,7 +3,6 @@ from riva.core.training_planning import (
     validate_training_planning_output_contract,
 )
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import TRAINING_PLANNING_PROMPT
 from riva.services.training_planning import (
     TrainingPlanningStateError,
     validate_training_planning_run,
@@ -14,7 +13,7 @@ from riva.workers.runtime import SessionFactory
 
 
 class TrainingPlanningHandler:
-    agent_id = "training-planner"
+    agent_id = TrainingPlanningAgent.agent_id
 
     def __init__(
         self,
@@ -26,9 +25,7 @@ class TrainingPlanningHandler:
             raise ValueError("a training planning agent is required")
         if (
             agent.agent_id != self.agent_id
-            or agent.prompt is not TRAINING_PLANNING_PROMPT
-            or agent.prompt_id != TRAINING_PLANNING_PROMPT.prompt_id
-            or agent.prompt_version != TRAINING_PLANNING_PROMPT.version
+            or agent.agent_version != TrainingPlanningAgent.agent_version
         ):
             raise ValueError("agent must be the canonical training planning agent")
         self.session_factory = session_factory

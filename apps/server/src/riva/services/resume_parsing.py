@@ -10,14 +10,13 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.resume_parsing import ResumeParsingAgent
 from riva.models import AgentRun, ResumeDocument, ResumeParsingResult, User
-from riva.prompts import RESUME_PARSING_PROMPT
 from riva.schemas.resume_parsing import (
     ResumeParsingInput,
     ResumeParsingOutput,
     ResumeParsingRunPayload,
 )
-from riva.services.prompt_versions import RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
 from riva.utils import utc_now
 
 ResumeParsingStateErrorCode = Literal[
@@ -220,12 +219,11 @@ def resume_parsing_output_from_result(
 
 
 def _validate_run(run: AgentRun) -> ResumeParsingRunPayload:
-    active_prompt = RESUME_PARSING_PROMPT
     if (
-        run.agent_id != "resume-parser"
-        or run.prompt_id != active_prompt.prompt_id
-        or run.prompt_version not in RESUME_PARSING_ACCEPTED_PROMPT_VERSIONS
-        or run.output_schema_id != active_prompt.output_schema_id
+        run.agent_id != ResumeParsingAgent.agent_id
+        or run.prompt_id != ResumeParsingAgent.agent_id
+        or run.prompt_version != ResumeParsingAgent.agent_version
+        or run.output_schema_id != ResumeParsingAgent.output_schema_id
     ):
         raise ResumeParsingStateError(INVALID_RESUME_PARSING_RUN)
 

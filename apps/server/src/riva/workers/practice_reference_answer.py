@@ -25,7 +25,7 @@ ReferenceAnswerGenerationServiceFactory = Callable[
 
 
 class PracticeReferenceAnswerHandler:
-    agent_id = "practice-reference-answer-generator"
+    agent_id = PracticeReferenceAnswerAgent.agent_id
 
     def __init__(
         self,

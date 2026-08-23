@@ -25,7 +25,7 @@ ImportDraftServiceFactory = Callable[[AsyncSession], JobDescriptionImportDraftSe
 
 
 class JobDescriptionParsingHandler:
-    agent_id = "job-description-parser"
+    agent_id = JobDescriptionParsingAgent.agent_id
 
     def __init__(
         self,

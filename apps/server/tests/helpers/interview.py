@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -14,7 +15,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT
 
 START = datetime(2026, 8, 16, 10, 0, tzinfo=UTC)
 
@@ -116,10 +116,10 @@ def create_jd_ready_role(
     parsing_run = AgentRun(
         id=uuid4(),
         user_id=user_id,
-        agent_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
-        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
+        agent_id=JobDescriptionParsingAgent.agent_id,
+        prompt_id=JobDescriptionParsingAgent.agent_id,
+        prompt_version=JobDescriptionParsingAgent.agent_version,
+        output_schema_id=JobDescriptionParsingAgent.output_schema_id,
         status=AgentRunStatus.SUCCEEDED,
         payload={
             "roleId": str(role_id),

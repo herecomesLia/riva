@@ -8,6 +8,8 @@ import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
+from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.db.database import Database
 from riva.models import (
     AgentRun,
@@ -23,7 +25,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import (
     MatchingAnalysisOutput,
     MatchingAnalysisRunPayload,
@@ -118,7 +119,7 @@ def make_run(
     job_description_version: int = 2,
     analysis_version: int = 4,
 ) -> AgentRun:
-    prompt = MATCHING_ANALYSIS_PROMPT
+    prompt = MatchingAnalysisAgent
     identifier = run_id or uuid4()
     run_payload = MatchingAnalysisRunPayload(
         role_id=role_id,
@@ -131,9 +132,9 @@ def make_run(
     return AgentRun(
         id=identifier,
         user_id=owner_id,
-        agent_id=prompt.prompt_id,
-        prompt_id=prompt.prompt_id,
-        prompt_version=prompt.version,
+        agent_id=prompt.agent_id,
+        prompt_id=prompt.agent_id,
+        prompt_version=prompt.agent_version,
         output_schema_id=prompt.output_schema_id,
         payload=run_payload.model_dump(mode="json", by_alias=True),
         idempotency_key=f"matching-service-{suffix}-{identifier}",
@@ -306,10 +307,10 @@ def make_graph(suffix: str) -> tuple[Graph, JobDescriptionAnalysis]:
     parsing_run = AgentRun(
         id=uuid4(),
         user_id=owner.id,
-        agent_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
-        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
+        agent_id=JobDescriptionParsingAgent.agent_id,
+        prompt_id=JobDescriptionParsingAgent.agent_id,
+        prompt_version=JobDescriptionParsingAgent.agent_version,
+        output_schema_id=JobDescriptionParsingAgent.output_schema_id,
         payload={
             "roleId": str(role.id),
             "jobDescriptionVersion": 2,

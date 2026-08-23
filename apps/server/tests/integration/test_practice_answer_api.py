@@ -1,9 +1,10 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from riva.agents.practice_evaluation import PracticeEvaluationAgent
 from sqlalchemy import select
 
 from riva.agents import (
@@ -23,7 +24,6 @@ from riva.models import (
     PracticeEvaluation,
     PracticeFollowUpDecision,
 )
-from riva.prompts import PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import EvaluationRunPayload
 from riva.services.evaluation_generation import practice_evaluation_idempotency_key
 from riva.workers import (
@@ -449,7 +449,7 @@ def test_practice_answer_api_exposes_evaluating_completion_and_replay() -> None:
                         evaluation_run = evaluation_runs[0]
                         assert evaluation_run.status is AgentRunStatus.QUEUED
                         assert evaluation_run.prompt_id == (
-                            PRACTICE_EVALUATION_PROMPT.prompt_id
+                            PracticeEvaluationAgent.agent_id
                         )
                         evaluation_payload = EvaluationRunPayload.model_validate(
                             evaluation_run.payload

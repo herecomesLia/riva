@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from riva.agents import MatchingAnalysisAgent
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
 from riva.core.config import Settings
 from riva.core.errors import APIError
 from riva.db.database import Database
@@ -25,7 +26,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import JOB_DESCRIPTION_PARSING_PROMPT, MATCHING_ANALYSIS_PROMPT
 from riva.schemas.matching_analysis import (
     MatchingAnalysisOutput,
     MatchingAnalysisRunPayload,
@@ -135,13 +135,13 @@ def make_run(
     profile_id: UUID,
     key: str,
 ) -> AgentRun:
-    prompt = MATCHING_ANALYSIS_PROMPT
+    prompt = MatchingAnalysisAgent
     return AgentRun(
         id=uuid4(),
         user_id=user_id,
-        agent_id=prompt.prompt_id,
-        prompt_id=prompt.prompt_id,
-        prompt_version=prompt.version,
+        agent_id=prompt.agent_id,
+        prompt_id=prompt.agent_id,
+        prompt_version=prompt.agent_version,
         output_schema_id=prompt.output_schema_id,
         payload=matching_payload(role_id=role_id, profile_id=profile_id),
         idempotency_key=key,
@@ -202,10 +202,10 @@ async def setup_matching(
     parsing_run = AgentRun(
         id=uuid4(),
         user_id=user_id,
-        agent_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_id=JOB_DESCRIPTION_PARSING_PROMPT.prompt_id,
-        prompt_version=JOB_DESCRIPTION_PARSING_PROMPT.version,
-        output_schema_id=JOB_DESCRIPTION_PARSING_PROMPT.output_schema_id,
+        agent_id=JobDescriptionParsingAgent.agent_id,
+        prompt_id=JobDescriptionParsingAgent.agent_id,
+        prompt_version=JobDescriptionParsingAgent.agent_version,
+        output_schema_id=JobDescriptionParsingAgent.output_schema_id,
         status=AgentRunStatus.SUCCEEDED,
         payload={
             "roleId": str(role_id),
@@ -286,12 +286,12 @@ async def setup_matching(
         await session.commit()
 
     async with database.sessionmaker() as session:
-        prompt = MATCHING_ANALYSIS_PROMPT
+        prompt = MatchingAnalysisAgent
         run = await AgentRunService(session).enqueue(
             user_id=user_id,
-            agent_id=prompt.prompt_id,
-            prompt_id=prompt.prompt_id,
-            prompt_version=prompt.version,
+            agent_id=prompt.agent_id,
+            prompt_id=prompt.agent_id,
+            prompt_version=prompt.agent_version,
             output_schema_id=prompt.output_schema_id,
             model="fake-matching-model",
             payload=matching_payload(role_id=role_id, profile_id=profile_id),
@@ -895,12 +895,12 @@ def test_matching_enqueue_is_invisible_until_role_binding_commits() -> None:
                         .with_for_update()
                     )
                     assert stored_role is not None
-                    prompt = MATCHING_ANALYSIS_PROMPT
+                    prompt = MatchingAnalysisAgent
                     run = await AgentRunService(enqueue_session).enqueue_in_transaction(
                         user_id=setup.owner.id,
                         agent_id="matching-analyzer",
-                        prompt_id=prompt.prompt_id,
-                        prompt_version=prompt.version,
+                        prompt_id=prompt.agent_id,
+                        prompt_version=prompt.agent_version,
                         output_schema_id=prompt.output_schema_id,
                         model="fake-matching-model",
                         payload=matching_payload(

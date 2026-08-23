@@ -5,7 +5,6 @@ import pytest
 
 from riva.agents import PracticeEvaluationAgent
 from riva.integrations import InvalidStructuredOutputError, MessageRole
-from riva.prompts import PRACTICE_EVALUATION_PROMPT
 from riva.schemas.evaluation import EvaluationInput, PracticeEvaluationOutput
 from tests.helpers.llm import FakeLLMProvider
 
@@ -140,11 +139,11 @@ def test_agent_includes_complete_follow_up_chain_as_untrusted_context() -> None:
         }
     ]
 
-    rendered = agent.prompt.render(values)
-    assert "What result did you observe?" in rendered.user
-    assert "The failure rate fell after the rollout." in rendered.user
-    assert "result evidence" in rendered.user
-    assert "allAnswered" in rendered.user
+    rendered = agent.render_prompt(values)
+    assert "What result did you observe?" in rendered[1]
+    assert "The failure rate fell after the rollout." in rendered[1]
+    assert "result evidence" in rendered[1]
+    assert "allAnswered" in rendered[1]
 
 
 def test_agent_accepts_ended_early_without_inventing_an_unanswered_answer() -> None:
@@ -161,7 +160,7 @@ def test_agent_accepts_ended_early_without_inventing_an_unanswered_answer() -> N
     assert values["follow_up_completion_reason"] == "endedEarly"
     assert json.loads(str(values["follow_up_exchanges"])) == []
     assert "unanswered" not in values
-    assert "endedEarly" in agent.prompt.render(values).user
+    assert "endedEarly" in agent.render_prompt(values)[1]
 
 
 def test_agent_accepts_optional_dimensions() -> None:
@@ -272,10 +271,10 @@ def test_agent_keeps_language_in_trusted_control(language: str) -> None:
         FakeLLMProvider([valid_output()]), model="test-model"
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input))
+    rendered = agent.render_prompt(agent.prompt_values(input))
 
-    assert f"Interaction language: {language}" in rendered.system
-    assert f"Interaction language: {language}" in rendered.user
+    assert f"Interaction language: {language}" in rendered[0]
+    assert f"Interaction language: {language}" in rendered[1]
 
 
 def test_agent_keeps_injection_in_untrusted_main_answer_block() -> None:
@@ -285,19 +284,19 @@ def test_agent_keeps_injection_in_untrusted_main_answer_block() -> None:
         FakeLLMProvider([valid_output()]), model="test-model"
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input))
+    rendered = agent.render_prompt(agent.prompt_values(input))
 
-    assert malicious not in rendered.system
-    assert malicious in rendered.user
-    assert rendered.user.index(malicious) > rendered.user.index(
+    assert malicious not in rendered[0]
+    assert malicious in rendered[1]
+    assert rendered[1].index(malicious) > rendered[1].index(
         "<BEGIN_UNTRUSTED_MAIN_ANSWER>"
     )
-    assert rendered.user.index(malicious) < rendered.user.index(
+    assert rendered[1].index(malicious) < rendered[1].index(
         "<END_UNTRUSTED_MAIN_ANSWER>"
     )
 
 
 def test_agent_prompt_identity_is_canonical() -> None:
-    assert PRACTICE_EVALUATION_PROMPT.prompt_id == "practice-evaluator"
-    assert PRACTICE_EVALUATION_PROMPT.version == "1"
-    assert PRACTICE_EVALUATION_PROMPT.output_schema_id == "practice-evaluation-v1"
+    assert PracticeEvaluationAgent.agent_id == "practice-evaluator"
+    assert PracticeEvaluationAgent.agent_version == "1"
+    assert PracticeEvaluationAgent.output_schema_id == "practice-evaluation-v1"

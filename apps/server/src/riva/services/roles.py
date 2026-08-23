@@ -8,6 +8,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.job_description_parsing import JobDescriptionParsingAgent
+from riva.agents.matching_analysis import MatchingAnalysisAgent
 from riva.core.errors import APIError
 from riva.core.language import (
     DEFAULT_INTERACTION_LANGUAGE,
@@ -22,10 +24,6 @@ from riva.models import (
     MatchingAnalysis,
     TargetRole,
     User,
-)
-from riva.prompts import (
-    JOB_DESCRIPTION_PARSING_PROMPT,
-    MATCHING_ANALYSIS_PROMPT,
 )
 from riva.schemas.job_description_parsing import JobDescriptionParsingRunPayload
 from riva.schemas.matching_analysis import (
@@ -63,10 +61,6 @@ from riva.schemas.roles import (
 from riva.services.agent_runs import AgentRunService
 from riva.services.job_description_analyses import build_riva_summary
 from riva.services.profile_completion import career_profile_completed
-from riva.services.prompt_versions import (
-    JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS,
-    MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS,
-)
 
 AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
 AgentExecutor = Callable[[UUID], Awaitable[AgentRun]]
@@ -437,7 +431,6 @@ class TargetRoleService:
                     )
 
             self._require_parsing_configuration()
-            prompt = JOB_DESCRIPTION_PARSING_PROMPT
             run_payload = JobDescriptionParsingRunPayload(
                 role_id=role.id,
                 job_description_version=cast(int, role.job_description_version),
@@ -447,10 +440,10 @@ class TargetRoleService:
                 self.session
             ).enqueue_in_transaction(
                 user_id=user.id,
-                agent_id="job-description-parser",
-                prompt_id=prompt.prompt_id,
-                prompt_version=prompt.version,
-                output_schema_id=prompt.output_schema_id,
+                agent_id=JobDescriptionParsingAgent.agent_id,
+                prompt_id=JobDescriptionParsingAgent.agent_id,
+                prompt_version=JobDescriptionParsingAgent.agent_version,
+                output_schema_id=JobDescriptionParsingAgent.output_schema_id,
                 model=self.llm_model,
                 payload=run_payload.model_dump(
                     mode="json",
@@ -560,7 +553,6 @@ class TargetRoleService:
                 return await self._commit_page(user.id)
 
             self._require_matching_configuration()
-            prompt = MATCHING_ANALYSIS_PROMPT
             run_payload = MatchingAnalysisRunPayload(
                 role_id=role.id,
                 profile_id=profile.profile_id,
@@ -583,10 +575,10 @@ class TargetRoleService:
                 self.session
             ).enqueue_in_transaction(
                 user_id=user.id,
-                agent_id="matching-analyzer",
-                prompt_id=prompt.prompt_id,
-                prompt_version=prompt.version,
-                output_schema_id=prompt.output_schema_id,
+                agent_id=MatchingAnalysisAgent.agent_id,
+                prompt_id=MatchingAnalysisAgent.agent_id,
+                prompt_version=MatchingAnalysisAgent.agent_version,
+                output_schema_id=MatchingAnalysisAgent.output_schema_id,
                 model=self.llm_model,
                 payload=run_payload.model_dump(mode="json", by_alias=True),
                 idempotency_key=idempotency_key,
@@ -949,13 +941,11 @@ class TargetRoleService:
         ):
             return None
 
-        prompt = JOB_DESCRIPTION_PARSING_PROMPT
         if (
-            run.agent_id != "job-description-parser"
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version
-            not in JOB_DESCRIPTION_PARSING_ACCEPTED_PROMPT_VERSIONS
-            or run.output_schema_id != prompt.output_schema_id
+            run.agent_id != JobDescriptionParsingAgent.agent_id
+            or run.prompt_id != JobDescriptionParsingAgent.agent_id
+            or run.prompt_version != JobDescriptionParsingAgent.agent_version
+            or run.output_schema_id != JobDescriptionParsingAgent.output_schema_id
         ):
             return None
         try:
@@ -985,12 +975,11 @@ class TargetRoleService:
         ):
             return None
 
-        prompt = MATCHING_ANALYSIS_PROMPT
         if (
-            run.agent_id != "matching-analyzer"
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version not in MATCHING_ANALYSIS_ACCEPTED_PROMPT_VERSIONS
-            or run.output_schema_id != prompt.output_schema_id
+            run.agent_id != MatchingAnalysisAgent.agent_id
+            or run.prompt_id != MatchingAnalysisAgent.agent_id
+            or run.prompt_version != MatchingAnalysisAgent.agent_version
+            or run.output_schema_id != MatchingAnalysisAgent.output_schema_id
         ):
             return None
         try:

@@ -10,10 +10,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.interview_candidate_question import InterviewCandidateQuestionAgent
+from riva.agents.interview_planning import InterviewPlanningAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
-    InterviewAnswer,
     InterviewCandidateQuestion,
     InterviewCandidateQuestionExchange,
     InterviewFollowUpQuestion,
@@ -21,9 +22,6 @@ from riva.models import (
     InterviewQuestion,
     InterviewSession,
     User,
-)
-from riva.prompts import (
-    INTERVIEW_CANDIDATE_QUESTION_PROMPT,
 )
 from riva.schemas.interview import InterviewConfiguration
 from riva.schemas.interview_candidate_question import (
@@ -39,9 +37,6 @@ from riva.schemas.interview_candidate_question import (
 )
 from riva.schemas.interview_planning import InterviewPlanningRunPayload
 from riva.services.agent_runs import AgentRunService
-from riva.services.interview_planning_prompt_versions import (
-    get_interview_planning_prompt,
-)
 from riva.utils import utc_now
 
 InterviewCandidateQuestionStateErrorCode = Literal[
@@ -353,17 +348,12 @@ class InterviewCandidateQuestionService:
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
             )
-        try:
-            planning_prompt = get_interview_planning_prompt(planning_run.prompt_version)
-        except ValueError:
-            raise InterviewCandidateQuestionStateError(
-                INTERVIEW_CANDIDATE_QUESTION_SNAPSHOT_INVALID
-            ) from None
         if (
             planning_run.user_id != interview_session.user_id
-            or planning_run.agent_id != planning_prompt.prompt_id
-            or planning_run.prompt_id != planning_prompt.prompt_id
-            or planning_run.output_schema_id != planning_prompt.output_schema_id
+            or planning_run.agent_id != InterviewPlanningAgent.agent_id
+            or planning_run.prompt_id != InterviewPlanningAgent.agent_id
+            or planning_run.prompt_version != InterviewPlanningAgent.agent_version
+            or planning_run.output_schema_id != InterviewPlanningAgent.output_schema_id
             or _status_value(planning_run.status) != AgentRunStatus.SUCCEEDED.value
         ):
             raise InterviewCandidateQuestionStateError(
@@ -481,10 +471,10 @@ class InterviewCandidateQuestionService:
             )
         return await AgentRunService(self.session).enqueue_in_transaction(
             user_id=user_id,
-            agent_id=INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id,
-            prompt_id=INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id,
-            prompt_version=INTERVIEW_CANDIDATE_QUESTION_PROMPT.version,
-            output_schema_id=INTERVIEW_CANDIDATE_QUESTION_PROMPT.output_schema_id,
+            agent_id=InterviewCandidateQuestionAgent.agent_id,
+            prompt_id=InterviewCandidateQuestionAgent.agent_id,
+            prompt_version=InterviewCandidateQuestionAgent.agent_version,
+            output_schema_id=InterviewCandidateQuestionAgent.output_schema_id,
             model=self.llm_model,
             payload=cast(
                 dict[str, object],
@@ -541,11 +531,10 @@ class InterviewCandidateQuestionService:
     def _validate_run_metadata(run: AgentRun, user_id: UUID) -> None:
         if (
             run.user_id != user_id
-            or run.agent_id != INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id
-            or run.prompt_id != INTERVIEW_CANDIDATE_QUESTION_PROMPT.prompt_id
-            or run.prompt_version != INTERVIEW_CANDIDATE_QUESTION_PROMPT.version
-            or run.output_schema_id
-            != INTERVIEW_CANDIDATE_QUESTION_PROMPT.output_schema_id
+            or run.agent_id != InterviewCandidateQuestionAgent.agent_id
+            or run.prompt_id != InterviewCandidateQuestionAgent.agent_id
+            or run.prompt_version != InterviewCandidateQuestionAgent.agent_version
+            or run.output_schema_id != InterviewCandidateQuestionAgent.output_schema_id
         ):
             raise InterviewCandidateQuestionStateError(
                 INTERVIEW_CANDIDATE_QUESTION_RUN_INVALID

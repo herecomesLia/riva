@@ -21,19 +21,6 @@ from riva.agents import (
 )
 from riva.core.config import Settings
 from riva.integrations import LLMProviderConfigurationError, QwenProvider
-from riva.prompts import (
-    INTERVIEW_PLANNING_PROMPT,
-    INTERVIEW_REVIEW_PROMPT,
-    JOB_DESCRIPTION_PARSING_PROMPT,
-    QUESTION_GENERATION_PROMPT,
-    TRAINING_PLANNING_PROMPT,
-)
-from riva.services.interview_planning_prompt_versions import (
-    get_interview_planning_prompt,
-)
-from riva.services.question_generation_prompt_versions import (
-    get_question_generation_prompt,
-)
 from riva.workers import (
     AgentHandlerRegistry,
     DuplicateAgentHandlerError,
@@ -317,9 +304,9 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(matching_agent, MatchingAnalysisAgent)
     assert isinstance(resume_parsing_agent, ResumeParsingAgent)
     assert job_description_agent.provider is provider
-    assert job_description_agent.prompt_id == JOB_DESCRIPTION_PARSING_PROMPT.prompt_id
+    assert job_description_agent.prompt_id == JobDescriptionParsingAgent.agent_id
     assert (
-        job_description_agent.prompt_version == JOB_DESCRIPTION_PARSING_PROMPT.version
+        job_description_agent.prompt_version == JobDescriptionParsingAgent.agent_version
     )
     assert matching_agent.provider is provider
     assert resume_parsing_agent.provider is provider
@@ -333,30 +320,23 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(training_planning, TrainingPlanningHandler)
     assert isinstance(training_planning.agent, TrainingPlanningAgent)
     assert training_planning.agent.provider is provider
-    assert training_planning.agent.prompt is TRAINING_PLANNING_PROMPT
-    assert training_planning.agent.prompt_version == "1"
+    assert training_planning.agent.agent_id == TrainingPlanningAgent.agent_id
+    assert training_planning.agent.agent_version == TrainingPlanningAgent.agent_version
     question_generation = registry.get("question-generator")
     assert isinstance(question_generation, QuestionGenerationHandler)
     assert isinstance(question_generation.agent, QuestionGenerationAgent)
     assert question_generation.agent.provider is provider
-    assert question_generation.agent.prompt_version == "3"
-    assert question_generation.agent.prompt is QUESTION_GENERATION_PROMPT
-    assert question_generation.legacy_agent is not None
-    assert question_generation.legacy_agent.prompt_version == "1"
-    assert question_generation.legacy_agent.prompt is get_question_generation_prompt(
-        "1"
+    assert question_generation.agent.agent_id == QuestionGenerationAgent.agent_id
+    assert (
+        question_generation.agent.agent_version == QuestionGenerationAgent.agent_version
     )
-    assert question_generation.agents.keys() == {"1", "2", "3"}
-    assert question_generation.agents["2"].prompt is get_question_generation_prompt("2")
     interview_planning = registry.get("interview-planner")
     assert isinstance(interview_planning, InterviewPlanningHandler)
     assert isinstance(interview_planning.agent, InterviewPlanningAgent)
-    assert interview_planning.agent.prompt_version == "2"
-    assert interview_planning.agent.prompt is INTERVIEW_PLANNING_PROMPT
-    assert interview_planning.legacy_agent is not None
-    assert interview_planning.legacy_agent.prompt_version == "1"
-    assert interview_planning.legacy_agent.prompt is get_interview_planning_prompt("1")
-    assert interview_planning.agents.keys() == {"1", "2"}
+    assert interview_planning.agent.agent_id == InterviewPlanningAgent.agent_id
+    assert (
+        interview_planning.agent.agent_version == InterviewPlanningAgent.agent_version
+    )
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)
@@ -372,19 +352,19 @@ def test_registry_builds_configured_handler_once_with_normalized_model() -> None
     assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
     assert practice_recommendation.agent.provider is provider
     assert practice_recommendation.agent.model == "qwen-test-model"
-    assert practice_recommendation.agent.prompt_version == "2"
-    assert practice_recommendation.legacy_agent is not None
-    assert practice_recommendation.legacy_agent.prompt_version == "1"
-    assert practice_recommendation.agents.keys() == {"1", "2"}
+    assert (
+        practice_recommendation.agent.agent_id == PracticeRecommendationAgent.agent_id
+    )
+    assert (
+        practice_recommendation.agent.agent_version
+        == PracticeRecommendationAgent.agent_version
+    )
     interview_review = registry.get("interview-review")
     assert isinstance(interview_review, InterviewReviewHandler)
     assert isinstance(interview_review.agent, InterviewReviewAgent)
     assert interview_review.agent.provider is provider
-    assert interview_review.agent.prompt is INTERVIEW_REVIEW_PROMPT
-    assert interview_review.agent.prompt_version == "2"
-    assert interview_review.legacy_agent is not None
-    assert interview_review.legacy_agent.prompt_version == "1"
-    assert interview_review.agents.keys() == {"1", "2"}
+    assert interview_review.agent.agent_id == InterviewReviewAgent.agent_id
+    assert interview_review.agent.agent_version == InterviewReviewAgent.agent_version
     practice_reference_answer = registry.get("practice-reference-answer-generator")
     assert isinstance(practice_reference_answer, PracticeReferenceAnswerHandler)
     assert isinstance(
@@ -442,19 +422,13 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(training_planning, TrainingPlanningHandler)
     assert isinstance(training_planning.agent, TrainingPlanningAgent)
     assert training_planning.agent.provider is handler.agent.provider
-    assert training_planning.agent.prompt is TRAINING_PLANNING_PROMPT
-    assert training_planning.agent.prompt_version == "1"
+    assert training_planning.agent.agent_id == TrainingPlanningAgent.agent_id
+    assert training_planning.agent.agent_version == TrainingPlanningAgent.agent_version
     question_generation = registry.get("question-generator")
     assert isinstance(question_generation, QuestionGenerationHandler)
     assert isinstance(question_generation.agent, QuestionGenerationAgent)
     assert question_generation.agent.provider is handler.agent.provider
     assert question_generation.agent.model == "qwen-test-model"
-    assert question_generation.legacy_agent is not None
-    assert question_generation.legacy_agent.prompt_version == "1"
-    assert question_generation.legacy_agent.prompt is get_question_generation_prompt(
-        "1"
-    )
-    assert question_generation.agents.keys() == {"1", "2", "3"}
     practice_evaluation = registry.get("practice-evaluator")
     assert isinstance(practice_evaluation, PracticeEvaluationHandler)
     assert isinstance(practice_evaluation.agent, PracticeEvaluationAgent)
@@ -470,17 +444,19 @@ def test_registry_builds_production_qwen_handler_without_network() -> None:
     assert isinstance(practice_recommendation.agent, PracticeRecommendationAgent)
     assert practice_recommendation.agent.provider is handler.agent.provider
     assert practice_recommendation.agent.model == "qwen-test-model"
-    assert practice_recommendation.agent.prompt_version == "2"
-    assert practice_recommendation.legacy_agent is not None
-    assert practice_recommendation.legacy_agent.prompt_version == "1"
+    assert (
+        practice_recommendation.agent.agent_id == PracticeRecommendationAgent.agent_id
+    )
+    assert (
+        practice_recommendation.agent.agent_version
+        == PracticeRecommendationAgent.agent_version
+    )
     interview_review = registry.get("interview-review")
     assert isinstance(interview_review, InterviewReviewHandler)
     assert isinstance(interview_review.agent, InterviewReviewAgent)
     assert interview_review.agent.provider is handler.agent.provider
-    assert interview_review.agent.prompt is INTERVIEW_REVIEW_PROMPT
-    assert interview_review.agent.prompt_version == "2"
-    assert interview_review.legacy_agent is not None
-    assert interview_review.legacy_agent.prompt_version == "1"
+    assert interview_review.agent.agent_id == InterviewReviewAgent.agent_id
+    assert interview_review.agent.agent_version == InterviewReviewAgent.agent_version
     practice_reference_answer = registry.get("practice-reference-answer-generator")
     assert isinstance(practice_reference_answer, PracticeReferenceAnswerHandler)
     assert isinstance(

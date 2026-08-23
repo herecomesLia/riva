@@ -5,7 +5,6 @@ import pytest
 
 from riva.agents import PracticeReviewAgent
 from riva.integrations import InvalidStructuredOutputError, MessageRole
-from riva.prompts import PRACTICE_REVIEW_PROMPT
 from riva.schemas.practice_review import PracticeReviewInput, PracticeReviewOutput
 from tests.helpers.llm import FakeLLMProvider
 
@@ -118,12 +117,12 @@ def test_prompt_values_include_no_follow_up_answer_and_evaluation() -> None:
     assert evaluation["overall_score"] == 80
     assert evaluation["dimension_scores"][0]["dimension"] == "relevance"
 
-    rendered = agent.prompt.render(values)
-    assert "noFollowUpRequired" in rendered.user
-    assert "overall_score" in rendered.user
-    assert "dimension_scores" in rendered.user
-    assert "focus_assessments" in rendered.user
-    assert "<BEGIN_UNTRUSTED_EVALUATION>" in rendered.user
+    rendered = agent.render_prompt(values)
+    assert "noFollowUpRequired" in rendered[1]
+    assert "overall_score" in rendered[1]
+    assert "dimension_scores" in rendered[1]
+    assert "focus_assessments" in rendered[1]
+    assert "<BEGIN_UNTRUSTED_EVALUATION>" in rendered[1]
 
 
 def test_prompt_values_include_complete_follow_up_chain() -> None:
@@ -146,13 +145,13 @@ def test_prompt_values_include_complete_follow_up_chain() -> None:
     )
 
     values = agent.prompt_values(input)
-    rendered = agent.prompt.render(values)
+    rendered = agent.render_prompt(values)
 
     assert values["follow_up_completion_reason"] == "allAnswered"
-    assert "What result did you observe?" in rendered.user
-    assert "The failure rate fell after the rollout." in rendered.user
-    assert "result evidence" in rendered.user
-    assert "allAnswered" in rendered.user
+    assert "What result did you observe?" in rendered[1]
+    assert "The failure rate fell after the rollout." in rendered[1]
+    assert "result evidence" in rendered[1]
+    assert "allAnswered" in rendered[1]
 
 
 @pytest.mark.parametrize("field", ["recommendation", "overallScore"])
@@ -176,10 +175,10 @@ def test_agent_keeps_language_in_trusted_control(language: str) -> None:
         model="test-review-model",
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input))
+    rendered = agent.render_prompt(agent.prompt_values(input))
 
-    assert f"Interaction language: {language}" in rendered.system
-    assert f"Interaction language: {language}" in rendered.user
+    assert f"Interaction language: {language}" in rendered[0]
+    assert f"Interaction language: {language}" in rendered[1]
 
 
 def test_main_answer_injection_stays_in_untrusted_block() -> None:
@@ -190,14 +189,14 @@ def test_main_answer_injection_stays_in_untrusted_block() -> None:
         model="test-review-model",
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input))
+    rendered = agent.render_prompt(agent.prompt_values(input))
 
-    assert malicious not in rendered.system
-    assert malicious in rendered.user
-    assert rendered.user.index(malicious) > rendered.user.index(
+    assert malicious not in rendered[0]
+    assert malicious in rendered[1]
+    assert rendered[1].index(malicious) > rendered[1].index(
         "<BEGIN_UNTRUSTED_MAIN_ANSWER>"
     )
-    assert rendered.user.index(malicious) < rendered.user.index(
+    assert rendered[1].index(malicious) < rendered[1].index(
         "<END_UNTRUSTED_MAIN_ANSWER>"
     )
 
@@ -210,19 +209,19 @@ def test_evaluation_injection_stays_in_untrusted_block() -> None:
         model="test-review-model",
     )
 
-    rendered = agent.prompt.render(agent.prompt_values(input))
+    rendered = agent.render_prompt(agent.prompt_values(input))
 
-    assert malicious not in rendered.system
-    assert malicious in rendered.user
-    assert rendered.user.index(malicious) > rendered.user.index(
+    assert malicious not in rendered[0]
+    assert malicious in rendered[1]
+    assert rendered[1].index(malicious) > rendered[1].index(
         "<BEGIN_UNTRUSTED_EVALUATION>"
     )
-    assert rendered.user.index(malicious) < rendered.user.index(
+    assert rendered[1].index(malicious) < rendered[1].index(
         "<END_UNTRUSTED_EVALUATION>"
     )
 
 
 def test_agent_prompt_identity_is_canonical() -> None:
-    assert PRACTICE_REVIEW_PROMPT.prompt_id == "practice-reviewer"
-    assert PRACTICE_REVIEW_PROMPT.version == "1"
-    assert PRACTICE_REVIEW_PROMPT.output_schema_id == "practice-review-v1"
+    assert PracticeReviewAgent.agent_id == "practice-reviewer"
+    assert PracticeReviewAgent.agent_version == "1"
+    assert PracticeReviewAgent.output_schema_id == "practice-review-v1"

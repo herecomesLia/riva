@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.question_generation import QuestionGenerationAgent
 from riva.models import (
     AgentRun,
     CareerProfile,
@@ -21,7 +22,6 @@ from riva.models import (
     TargetRole,
     User,
 )
-from riva.prompts import QUESTION_GENERATION_PROMPT
 from riva.schemas.practice_reference_answer import PracticeReferenceFrozenContext
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
@@ -44,7 +44,6 @@ from riva.services.question_generation import (
     QUESTION_GENERATION_JOB_DESCRIPTION_NOT_READY,
     QUESTION_GENERATION_MATCHING_ANALYSIS_NOT_READY,
     QUESTION_GENERATION_MATCHING_ANALYSIS_STALE,
-    QUESTION_GENERATION_PROFILE_INCOMPLETE,
     QUESTION_GENERATION_PROFILE_NOT_FOUND,
     QUESTION_GENERATION_PROFILE_VERSION_STALE,
     QUESTION_GENERATION_TARGET_ARCHIVED,
@@ -54,9 +53,6 @@ from riva.services.question_generation import (
     build_question_generation_profile_context,
     question_generation_output_from_card,
     validate_question_generation_run,
-)
-from riva.services.question_generation_prompt_versions import (
-    QUESTION_GENERATION_LEGACY_PROMPT,
 )
 
 NOW = datetime(2026, 8, 10, 9, 30, tzinfo=UTC)
@@ -300,10 +296,10 @@ def run_for(
     return AgentRun(
         id=uuid4(),
         user_id=owner.id,
-        agent_id=QUESTION_GENERATION_PROMPT.prompt_id,
-        prompt_id=QUESTION_GENERATION_PROMPT.prompt_id,
-        prompt_version=QUESTION_GENERATION_PROMPT.version,
-        output_schema_id=QUESTION_GENERATION_PROMPT.output_schema_id,
+        agent_id=QuestionGenerationAgent.agent_id,
+        prompt_id=QuestionGenerationAgent.agent_id,
+        prompt_version=QuestionGenerationAgent.agent_version,
+        output_schema_id=QuestionGenerationAgent.output_schema_id,
         payload=payload.model_dump(mode="json", by_alias=True),
         idempotency_key=f"question-generation-{uuid4()}",
         max_attempts=3,
@@ -485,7 +481,7 @@ def test_enqueue_generation_freezes_only_snapshot_and_controls() -> None:
     assert run is expected_run
     call = fake_agent_runs.calls[0]
     assert call["agent_id"] == "question-generator"
-    assert call["prompt_id"] == QUESTION_GENERATION_PROMPT.prompt_id
+    assert call["prompt_id"] == QuestionGenerationAgent.agent_id
     assert call["prompt_version"] == "3"
     assert call["output_schema_id"] == "question-generation-v1"
     assert call["model"] == "test-model"
@@ -613,18 +609,15 @@ def test_enqueue_generation_snapshots_injected_training_memory() -> None:
     }
 
 
-def test_v1_run_without_weakness_focus_keeps_empty_backward_compatible_snapshot() -> (
-    None
-):
+def test_old_prompt_version_is_rejected() -> None:
     owner, role, profile, analysis, matching = graph()
     run_payload = payload(role, profile, analysis, matching)
     run = run_for(owner, run_payload)
-    run.prompt_version = QUESTION_GENERATION_LEGACY_PROMPT.version
-    run.payload.pop("weaknessFocus", None)
+    run.prompt_version = "2"
 
-    validated = validate_question_generation_run(run)
-
-    assert validated.weakness_focus == []
+    with pytest.raises(QuestionGenerationStateError) as error:
+        validate_question_generation_run(run)
+    assert error.value.code == INVALID_QUESTION_GENERATION_RUN
 
 
 def test_enqueue_generation_in_transaction_does_not_commit_or_rollback() -> None:
@@ -790,19 +783,10 @@ def test_load_generation_input_rejects_unready_jd_context(
     assert error.value.code == expected
 
 
-@pytest.mark.parametrize(
-    "prompt_version",
-    [QUESTION_GENERATION_LEGACY_PROMPT.version, QUESTION_GENERATION_PROMPT.version],
-)
-def test_persist_success_creates_question_card_with_lineage(
-    prompt_version: str,
-) -> None:
+def test_persist_success_creates_question_card_with_lineage() -> None:
     owner, role, profile, analysis, matching = graph()
     run_payload = payload(role, profile, analysis, matching)
     run = run_for(owner, run_payload)
-    if prompt_version == QUESTION_GENERATION_LEGACY_PROMPT.version:
-        run.prompt_version = prompt_version
-        run.payload.pop("weaknessFocus", None)
     session = ScriptedSession(
         owner.id,
         None,

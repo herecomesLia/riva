@@ -10,6 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.agents.interview_planning import InterviewPlanningAgent
+from riva.agents.interview_review import InterviewReviewAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -20,11 +22,9 @@ from riva.models import (
     InterviewQuestion,
     InterviewReview,
     InterviewSession,
-    InterviewTurnAssessment,
     User,
 )
-from riva.prompts import INTERVIEW_REVIEW_PROMPT
-from riva.schemas.interview import InterviewConfiguration, InterviewQuestionType
+from riva.schemas.interview import InterviewConfiguration
 from riva.schemas.interview_candidate_question import (
     InterviewCandidateQuestionExchangeSnapshot,
     InterviewCandidateQuestionSnapshot,
@@ -52,13 +52,6 @@ from riva.schemas.interview_review import (
 from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services.agent_runs import AgentRunService
 from riva.services.competency_ingestion import CompetencyIngestionService
-from riva.services.interview_planning_prompt_versions import (
-    get_interview_planning_prompt,
-)
-from riva.services.interview_review_prompt_versions import (
-    INTERVIEW_REVIEW_ACCEPTED_PROMPT_VERSIONS,
-    get_interview_review_prompt,
-)
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
@@ -160,10 +153,10 @@ class InterviewReviewService:
         )
         return await AgentRunService(self.session).enqueue_in_transaction(
             user_id=user_id,
-            agent_id=INTERVIEW_REVIEW_PROMPT.prompt_id,
-            prompt_id=INTERVIEW_REVIEW_PROMPT.prompt_id,
-            prompt_version=INTERVIEW_REVIEW_PROMPT.version,
-            output_schema_id=INTERVIEW_REVIEW_PROMPT.output_schema_id,
+            agent_id=InterviewReviewAgent.agent_id,
+            prompt_id=InterviewReviewAgent.agent_id,
+            prompt_version=InterviewReviewAgent.agent_version,
+            output_schema_id=InterviewReviewAgent.output_schema_id,
             model=self.llm_model,
             payload=cast(
                 dict[str, object],
@@ -195,13 +188,12 @@ class InterviewReviewService:
                 "retry_of_run_id": failed_run.id,
             }
         )
-        prompt = get_interview_review_prompt(failed_run.prompt_version)
         return await AgentRunService(self.session).enqueue_in_transaction(
             user_id=user_id,
-            agent_id=prompt.prompt_id,
-            prompt_id=prompt.prompt_id,
-            prompt_version=prompt.version,
-            output_schema_id=prompt.output_schema_id,
+            agent_id=InterviewReviewAgent.agent_id,
+            prompt_id=InterviewReviewAgent.agent_id,
+            prompt_version=InterviewReviewAgent.agent_version,
+            output_schema_id=InterviewReviewAgent.output_schema_id,
             model=self.llm_model,
             payload=cast(
                 dict[str, object],
@@ -234,19 +226,13 @@ class InterviewReviewService:
             planning_run = await self.session.get(AgentRun, plan.source_agent_run_id)
             if planning_run is None:
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
-            try:
-                planning_prompt = get_interview_planning_prompt(
-                    planning_run.prompt_version
-                )
-            except ValueError:
-                raise InterviewReviewStateError(
-                    INTERVIEW_REVIEW_SNAPSHOT_INVALID
-                ) from None
             if (
                 planning_run.user_id != interview_session.user_id
-                or planning_run.agent_id != planning_prompt.prompt_id
-                or planning_run.prompt_id != planning_prompt.prompt_id
-                or planning_run.output_schema_id != planning_prompt.output_schema_id
+                or planning_run.agent_id != InterviewPlanningAgent.agent_id
+                or planning_run.prompt_id != InterviewPlanningAgent.agent_id
+                or planning_run.prompt_version != InterviewPlanningAgent.agent_version
+                or planning_run.output_schema_id
+                != InterviewPlanningAgent.output_schema_id
                 or _status_value(planning_run.status) != AgentRunStatus.SUCCEEDED.value
             ):
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
@@ -618,17 +604,12 @@ class InterviewReviewService:
 
     @staticmethod
     def _validate_run_metadata(run: AgentRun, user_id: UUID) -> None:
-        try:
-            prompt = get_interview_review_prompt(run.prompt_version)
-        except ValueError:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID) from None
         if (
             run.user_id != user_id
-            or run.agent_id != prompt.prompt_id
-            or run.prompt_id != prompt.prompt_id
-            or run.prompt_version not in INTERVIEW_REVIEW_ACCEPTED_PROMPT_VERSIONS
-            or run.prompt_version != prompt.version
-            or run.output_schema_id != prompt.output_schema_id
+            or run.agent_id != InterviewReviewAgent.agent_id
+            or run.prompt_id != InterviewReviewAgent.agent_id
+            or run.prompt_version != InterviewReviewAgent.agent_version
+            or run.output_schema_id != InterviewReviewAgent.output_schema_id
         ):
             raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID)
 

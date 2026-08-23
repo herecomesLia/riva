@@ -10,6 +10,7 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.practice_recommendation import PracticeRecommendationAgent
 from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -20,7 +21,6 @@ from riva.models import (
     PracticeReview,
     PracticeSession,
 )
-from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT
 from riva.schemas.practice_recommendation import (
     PracticeNextQuestionRecommendation,
     PracticeRecommendationInput,
@@ -32,10 +32,6 @@ from riva.schemas.practice_recommendation import (
 from riva.schemas.practice_review import PracticeReviewInput
 from riva.schemas.training_memory import TrainingMemoryContext
 from riva.services.agent_runs import AgentRunService
-from riva.services.practice_recommendation_prompt_versions import (
-    PRACTICE_RECOMMENDATION_ACCEPTED_PROMPT_VERSIONS,
-    get_practice_recommendation_prompt,
-)
 from riva.services.review_generation import (
     ReviewGenerationService,
     ReviewGenerationStateError,
@@ -105,18 +101,11 @@ def validate_recommendation_generation_run(
 ) -> RecommendationRunPayload:
     """Validate the immutable contract shared by recommendation consumers."""
 
-    try:
-        prompt = get_practice_recommendation_prompt(run.prompt_version)
-    except ValueError:
-        raise RecommendationGenerationStateError(
-            INVALID_PRACTICE_RECOMMENDATION_RUN
-        ) from None
     if (
-        run.agent_id != "practice-recommender"
-        or run.prompt_id != prompt.prompt_id
-        or run.prompt_version not in PRACTICE_RECOMMENDATION_ACCEPTED_PROMPT_VERSIONS
-        or run.prompt_version != prompt.version
-        or run.output_schema_id != prompt.output_schema_id
+        run.agent_id != PracticeRecommendationAgent.agent_id
+        or run.prompt_id != PracticeRecommendationAgent.agent_id
+        or run.prompt_version != PracticeRecommendationAgent.agent_version
+        or run.output_schema_id != PracticeRecommendationAgent.output_schema_id
     ):
         raise RecommendationGenerationStateError(INVALID_PRACTICE_RECOMMENDATION_RUN)
     try:
@@ -236,10 +225,10 @@ class RecommendationGenerationService:
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="practice-recommender",
-            prompt_id=PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
-            prompt_version=PRACTICE_RECOMMENDATION_PROMPT.version,
-            output_schema_id=PRACTICE_RECOMMENDATION_PROMPT.output_schema_id,
+            agent_id=PracticeRecommendationAgent.agent_id,
+            prompt_id=PracticeRecommendationAgent.agent_id,
+            prompt_version=PracticeRecommendationAgent.agent_version,
+            output_schema_id=PracticeRecommendationAgent.output_schema_id,
             model=self.llm_model,
             payload=payload.model_dump(mode="json", by_alias=True),
             idempotency_key=idempotency_key,

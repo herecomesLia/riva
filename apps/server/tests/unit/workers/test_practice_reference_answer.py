@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from riva.agents import AgentResult, PracticeReferenceAnswerAgent
 from riva.integrations import LLMUsage, ProviderUnavailableError
 from riva.models import AgentRun, AgentRunStatus
-from riva.prompts import PRACTICE_REFERENCE_ANSWER_PROMPT
 from riva.schemas.practice_reference_answer import (
     PracticeMainReferenceAnswerInput,
     PracticeMainReferenceAnswerOutput,
@@ -131,8 +130,8 @@ def result(
     *,
     output: object | None = None,
     agent_id: str = "practice-reference-answer-generator",
-    prompt_id: str = PRACTICE_REFERENCE_ANSWER_PROMPT.prompt_id,
-    prompt_version: str = PRACTICE_REFERENCE_ANSWER_PROMPT.version,
+    prompt_id: str = PracticeReferenceAnswerAgent.agent_id,
+    prompt_version: str = PracticeReferenceAnswerAgent.agent_version,
 ) -> AgentResult[object]:
     return AgentResult(
         output=output if output is not None else main_output(),

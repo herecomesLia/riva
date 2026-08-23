@@ -21,7 +21,7 @@ EvaluationGenerationServiceFactory = Callable[
 
 
 class PracticeEvaluationHandler:
-    agent_id = "practice-evaluator"
+    agent_id = PracticeEvaluationAgent.agent_id
 
     def __init__(
         self,

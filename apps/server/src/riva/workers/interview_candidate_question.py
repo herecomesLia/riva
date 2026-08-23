@@ -21,7 +21,7 @@ CandidateQuestionServiceFactory = Callable[
 
 
 class InterviewCandidateQuestionHandler:
-    agent_id = "interview-candidate-question"
+    agent_id = InterviewCandidateQuestionAgent.agent_id
 
     def __init__(
         self,

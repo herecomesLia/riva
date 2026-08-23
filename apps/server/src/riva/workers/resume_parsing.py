@@ -28,7 +28,7 @@ DraftServiceFactory = Callable[[AsyncSession], ResumeImportDraftService]
 
 
 class ResumeParsingWorkerHandler:
-    agent_id = "resume-parser"
+    agent_id = ResumeParsingAgent.agent_id
 
     def __init__(
         self,

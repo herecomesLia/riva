@@ -5,6 +5,8 @@ from uuid import uuid4
 
 import pytest
 
+from riva.agents.practice_recommendation import PracticeRecommendationAgent
+from riva.agents.practice_review import PracticeReviewAgent
 from riva.models import (
     AgentRun,
     AgentRunStatus,
@@ -12,7 +14,6 @@ from riva.models import (
     PracticeRecommendation,
     PracticeReview,
 )
-from riva.prompts import PRACTICE_RECOMMENDATION_PROMPT, PRACTICE_REVIEW_PROMPT
 from riva.schemas.practice_recommendation import (
     PracticeNextQuestionRecommendation,
     PracticeRecommendationOutput,
@@ -116,9 +117,9 @@ def recommendation_context(
         id=uuid4(),
         user_id=attempt.user_id,
         agent_id="practice-reviewer",
-        prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
-        prompt_version=PRACTICE_REVIEW_PROMPT.version,
-        output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+        prompt_id=PracticeReviewAgent.agent_id,
+        prompt_version=PracticeReviewAgent.agent_version,
+        output_schema_id=PracticeReviewAgent.output_schema_id,
         status=review_status,
         payload=ReviewRunPayload(
             attempt_id=attempt.id,
@@ -184,9 +185,9 @@ def recommendation_context(
         id=uuid4(),
         user_id=attempt.user_id,
         agent_id="practice-recommender",
-        prompt_id=PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
-        prompt_version=PRACTICE_RECOMMENDATION_PROMPT.version,
-        output_schema_id=PRACTICE_RECOMMENDATION_PROMPT.output_schema_id,
+        prompt_id=PracticeRecommendationAgent.agent_id,
+        prompt_version=PracticeRecommendationAgent.agent_version,
+        output_schema_id=PracticeRecommendationAgent.output_schema_id,
         status=AgentRunStatus.RUNNING,
         payload=RecommendationRunPayload(
             attempt_id=attempt.id,
@@ -279,9 +280,9 @@ def test_enqueue_freezes_evaluation_review_and_language_ids() -> None:
         id=uuid4(),
         user_id=attempt.user_id,
         agent_id="practice-recommender",
-        prompt_id=PRACTICE_RECOMMENDATION_PROMPT.prompt_id,
-        prompt_version=PRACTICE_RECOMMENDATION_PROMPT.version,
-        output_schema_id=PRACTICE_RECOMMENDATION_PROMPT.output_schema_id,
+        prompt_id=PracticeRecommendationAgent.agent_id,
+        prompt_version=PracticeRecommendationAgent.agent_version,
+        output_schema_id=PracticeRecommendationAgent.output_schema_id,
         status=AgentRunStatus.QUEUED,
         payload={},
         idempotency_key=practice_recommendation_idempotency_key(attempt.id),

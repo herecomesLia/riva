@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riva.agents.practice_review import PracticeReviewAgent
 from riva.core.language import INTERACTION_LANGUAGES, InteractionLanguage
 from riva.models import (
     AgentRun,
@@ -19,7 +20,6 @@ from riva.models import (
     PracticeReview,
     PracticeSession,
 )
-from riva.prompts import PRACTICE_REVIEW_PROMPT
 from riva.schemas.evaluation import EvaluationInput
 from riva.schemas.practice_review import (
     PracticeReviewInput,
@@ -97,12 +97,11 @@ def validate_review_generation_run(
 ) -> ReviewRunPayload:
     """Validate the immutable contract shared by review consumers."""
 
-    prompt = PRACTICE_REVIEW_PROMPT
     if (
-        run.agent_id != "practice-reviewer"
-        or run.prompt_id != prompt.prompt_id
-        or run.prompt_version != prompt.version
-        or run.output_schema_id != prompt.output_schema_id
+        run.agent_id != PracticeReviewAgent.agent_id
+        or run.prompt_id != PracticeReviewAgent.agent_id
+        or run.prompt_version != PracticeReviewAgent.agent_version
+        or run.output_schema_id != PracticeReviewAgent.output_schema_id
     ):
         raise ReviewGenerationStateError(INVALID_PRACTICE_REVIEW_RUN)
     try:
@@ -200,10 +199,10 @@ class ReviewGenerationService:
             self.session
         ).enqueue_in_transaction(
             user_id=user_id,
-            agent_id="practice-reviewer",
-            prompt_id=PRACTICE_REVIEW_PROMPT.prompt_id,
-            prompt_version=PRACTICE_REVIEW_PROMPT.version,
-            output_schema_id=PRACTICE_REVIEW_PROMPT.output_schema_id,
+            agent_id=PracticeReviewAgent.agent_id,
+            prompt_id=PracticeReviewAgent.agent_id,
+            prompt_version=PracticeReviewAgent.agent_version,
+            output_schema_id=PracticeReviewAgent.output_schema_id,
             model=self.llm_model,
             payload=payload.model_dump(mode="json", by_alias=True),
             idempotency_key=idempotency_key,
