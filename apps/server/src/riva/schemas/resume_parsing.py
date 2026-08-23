@@ -21,7 +21,6 @@ from riva.schemas.profile import (
     OptionalProjectUrl,
     OptionalText,
     RequiredText,
-    StandardUUID,
 )
 from riva.schemas.profile import (
     Summary as ProfileSummary,
@@ -253,18 +252,3 @@ class ResumeParsingOutput(_ResumeParsingModel):
                 normalized.append(canonical)
             experience.skills = normalized
         return self
-
-
-class ResumeParsingRunPayload(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_by_alias=True,
-        validate_by_name=True,
-        serialize_by_alias=True,
-    )
-
-    resume_document_id: StandardUUID = Field(alias="resumeDocumentId")
-    interaction_language: InteractionLanguage = Field(
-        default=DEFAULT_INTERACTION_LANGUAGE,
-        alias="interactionLanguage",
-    )

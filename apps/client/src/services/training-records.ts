@@ -25,10 +25,6 @@ import {
   adaptTrainingRecordsPage,
 } from "@/services/training-records-adapter"
 
-async function realApiUnavailable(): Promise<never> {
-  throw new Error("Real training records API is not implemented.")
-}
-
 type TargetedPracticeReferenceAnswerTarget = Extract<
   TrainingRecordReferenceAnswerTarget,
   { kind: "targetedPractice" }
@@ -36,7 +32,6 @@ type TargetedPracticeReferenceAnswerTarget = Extract<
 
 async function requestTargetedPracticeReferenceAnswer(
   target: TargetedPracticeReferenceAnswerTarget,
-  pathSuffix = "",
 ): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
   const body =
     target.subject === "mainQuestion"
@@ -51,7 +46,7 @@ async function requestTargetedPracticeReferenceAnswer(
         }
   const wire = targetedPracticeTrainingRecordReferenceAnswerResponseSchema.parse(
     await apiRequest<unknown>(
-      `/training-records/practice/${encodeURIComponent(target.recordId)}/reference-answer${pathSuffix}`,
+      `/training-records/practice/${encodeURIComponent(target.recordId)}/reference-answer`,
       { method: "POST", json: body },
     ),
   )
@@ -127,16 +122,8 @@ export async function requestTrainingRecordReferenceAnswer(
   target: TrainingRecordReferenceAnswerTarget,
 ): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
   if (env.mock) return trainingRecordsMockService.requestTrainingRecordReferenceAnswer(target)
-  if (target.kind !== "targetedPractice") return realApiUnavailable()
-  return requestTargetedPracticeReferenceAnswer(target)
-}
-
-export async function getTrainingRecordReferenceAnswerGenerationStatus(
-  target: TrainingRecordReferenceAnswerTarget,
-): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
-  if (env.mock) {
-    return trainingRecordsMockService.getTrainingRecordReferenceAnswerGenerationStatus(target)
+  if (target.kind !== "targetedPractice") {
+    throw new Error("Reference answers are not available for mock interviews.")
   }
-  if (target.kind !== "targetedPractice") return realApiUnavailable()
-  return requestTargetedPracticeReferenceAnswer(target, "/refresh")
+  return requestTargetedPracticeReferenceAnswer(target)
 }

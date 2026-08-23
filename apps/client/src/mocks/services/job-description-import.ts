@@ -16,9 +16,11 @@ export async function createJobDescriptionImportDraft(
   input: CreateJobDescriptionImportDraftInput,
 ): Promise<JobDescriptionImportDraft> {
   await waitForMockDelay()
-  const draft = createJobDescriptionImportDraftFixture("parsing", {
-    rawText: input.rawText.trim(),
-  })
+  const normalizedText = input.rawText.trim()
+  if (normalizedText.toLowerCase().includes("unparseable")) {
+    throw new Error("Job description could not be parsed.")
+  }
+  const draft = createJobDescriptionImportDraftFixture("ready", { rawText: normalizedText })
   drafts.set(draft.id, draft)
   return structuredClone(draft)
 }
@@ -28,14 +30,7 @@ export async function getJobDescriptionImportDraft(
 ): Promise<JobDescriptionImportDraft> {
   await waitForMockDelay()
   const draft = requireDraft(draftId)
-  if (draft.status !== "parsing") return structuredClone(draft)
-
-  const nextDraft = createJobDescriptionImportDraftFixture(
-    draft.rawText.toLowerCase().includes("unparseable") ? "failed" : "ready",
-    { id: draft.id, rawText: draft.rawText },
-  )
-  drafts.set(draft.id, nextDraft)
-  return structuredClone(nextDraft)
+  return structuredClone(draft)
 }
 
 export async function applyJobDescriptionImportDraft(

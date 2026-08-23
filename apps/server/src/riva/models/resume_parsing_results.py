@@ -8,11 +8,9 @@ from sqlalchemy import (
     JSON,
     CheckConstraint,
     DateTime,
-    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
@@ -37,10 +35,6 @@ class ResumeParsingResult(Base):
             "result_version >= 1",
             name="ck_resume_parsing_results_result_version",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_resume_parsing_results_source_run",
-        ),
         Index(
             "ix_resume_parsing_results_user_document",
             "user_id",
@@ -63,11 +57,6 @@ class ResumeParsingResult(Base):
     result_version: Mapped[int] = mapped_column(
         nullable=False,
         default=1,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
     )
     parsed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

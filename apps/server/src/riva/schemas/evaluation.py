@@ -1,6 +1,5 @@
 from enum import StrEnum
 from typing import Annotated, Any, Self
-from uuid import UUID
 
 from pydantic import (
     AliasChoices,
@@ -18,7 +17,6 @@ from riva.schemas.practice_interactions import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerContent,
 )
-from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardPrompt,
@@ -104,92 +102,6 @@ class EvaluationQuestionContext(_EvaluationModel):
         "assessed_capabilities", "assessedCapabilities"
     )
     scoring_focus: QuestionCardTextList = _alias("scoring_focus", "scoringFocus")
-
-
-class EvaluationRunPayload(_EvaluationModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_by_alias=True,
-        validate_by_name=True,
-        serialize_by_alias=True,
-    )
-
-    attempt_id: StandardUUID = Field(alias="attemptId")
-    question_card_id: StandardUUID = Field(alias="questionCardId")
-    main_answer_id: StandardUUID = Field(alias="mainAnswerId")
-    interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
-    follow_up_completion_reason: PracticeEvaluationFollowUpCompletionReason = Field(
-        alias="followUpCompletionReason"
-    )
-    terminal_follow_up_decision_id: StandardUUID = Field(
-        alias="terminalFollowUpDecisionId"
-    )
-    unanswered_follow_up_question_id: UUID | None = Field(
-        default=None,
-        alias="unansweredFollowUpQuestionId",
-    )
-    follow_up_question_1_id: UUID | None = Field(
-        default=None,
-        alias="followUpQuestion1Id",
-    )
-    follow_up_answer_1_id: UUID | None = Field(
-        default=None,
-        alias="followUpAnswer1Id",
-    )
-    follow_up_question_2_id: UUID | None = Field(
-        default=None,
-        alias="followUpQuestion2Id",
-    )
-    follow_up_answer_2_id: UUID | None = Field(
-        default=None,
-        alias="followUpAnswer2Id",
-    )
-
-    @model_validator(mode="after")
-    def validate_follow_up_snapshot(self) -> Self:
-        first_pair = (
-            self.follow_up_question_1_id,
-            self.follow_up_answer_1_id,
-        )
-        second_pair = (
-            self.follow_up_question_2_id,
-            self.follow_up_answer_2_id,
-        )
-        if (first_pair[0] is None) != (first_pair[1] is None):
-            raise ValueError("follow-up question and answer one must be paired")
-        if (second_pair[0] is None) != (second_pair[1] is None):
-            raise ValueError("follow-up question and answer two must be paired")
-        if second_pair[0] is not None and first_pair[0] is None:
-            raise ValueError("follow-up order two requires order one")
-
-        reason = self.follow_up_completion_reason
-        if reason == PracticeEvaluationFollowUpCompletionReason.NO_FOLLOW_UP_REQUIRED:
-            if self.unanswered_follow_up_question_id is not None:
-                raise ValueError(
-                    "noFollowUpRequired must not include an unanswered question"
-                )
-            if any(value is not None for value in (*first_pair, *second_pair)):
-                raise ValueError("noFollowUpRequired must not include follow-up IDs")
-        elif reason == PracticeEvaluationFollowUpCompletionReason.ALL_ANSWERED:
-            if self.unanswered_follow_up_question_id is not None:
-                raise ValueError("allAnswered must not include an unanswered question")
-            if first_pair[0] is None:
-                raise ValueError("allAnswered requires the first follow-up pair")
-        elif reason == PracticeEvaluationFollowUpCompletionReason.ENDED_EARLY:
-            if self.unanswered_follow_up_question_id is None:
-                raise ValueError("endedEarly requires an unanswered follow-up question")
-            if second_pair[0] is not None:
-                raise ValueError(
-                    "endedEarly permits at most one completed follow-up pair"
-                )
-            if self.unanswered_follow_up_question_id in {
-                first_pair[0],
-                first_pair[1],
-            }:
-                raise ValueError(
-                    "unanswered question must not be a completed follow-up"
-                )
-        return self
 
 
 class EvaluationMainAnswer(_EvaluationModel):
@@ -299,7 +211,6 @@ __all__ = [
     "EvaluationInput",
     "EvaluationMainAnswer",
     "EvaluationQuestionContext",
-    "EvaluationRunPayload",
     "MAX_PRACTICE_EVALUATION_DIMENSIONS",
     "MAX_PRACTICE_EVALUATION_EXPLANATION_LENGTH",
     "MAX_PRACTICE_FOCUS_EXPLANATION_LENGTH",

@@ -34,8 +34,8 @@ RIVA 生成的所有人类可读内容。
 1. **UI language** 是当前界面语言，可以随时切换；真实 API 请求默认携带当前规范化的
    `Accept-Language`。
 2. **Artifact language** 是一次独立 AI 结果的冻结语言。Resume Parsing、JD Parsing、
-   Matching Analysis 以及未来独立生成的 QuestionCard，在创建 AgentRun 时捕获当前 UI
-   language，并通过 `interactionLanguage` 保存在 invocation metadata 中。
+   Matching Analysis 以及未来独立生成的 QuestionCard，在调用 Agent 时捕获当前 UI
+   language，并通过 `interactionLanguage` 随业务结果保存。
 3. **Session language** 是连续训练的业务属性。创建 `PracticeSession` 或
    `InterviewSession` 时捕获并持久化当前 UI language；本场的 QuestionCard、Question
    Generation、Follow-up、Evaluation、Review 和 Recommendation 全部继承该值。
@@ -52,17 +52,16 @@ UI language 改变只影响导航、按钮和其他固定 UI 文案，不改变�
 输出“负责使用 Python 和 FastAPI 开发后端 API”，而不是强制翻译技术名词。语言转换不得
 增加、删除或改变事实。用户的原始简历、原始 JD 和用户回答原样保存，不由 RIVA 自动翻译。
 
-任何新的用户可见 AI workflow 都必须明确声明语言来源：独立 artifact 使用
-`AgentRun.interactionLanguage`，Session 子操作使用所属 Session 的 `language`。禁止使用
+任何新的用户可见 AI workflow 都必须明确声明语言来源：独立 artifact 使用调用 Agent 时
+捕获的 `interactionLanguage`，Session 子操作使用所属 Session 的 `language`。禁止使用
 “检测主要语言并选择输出语言”作为新 Prompt 的主策略；只有历史兼容数据缺少语言时才
 允许使用默认值 `zh-CN`。
 
 ### 当前 Agent 与未来能力
 
-当前 Resume Parsing、JD Parsing 和 Matching Analysis 的一次性任务都把规范化语言写入
-AgentRun payload，并由 Worker 从 payload 恢复到 Agent Input 和 Prompt。Worker 不读取
-`Accept-Language`、全局 locale 或浏览器状态。未来 QuestionCard、动态追问、评分、复盘和
-推荐等 Session 子 Agent 不能独立读取 UI language，必须继承 Session language；
+当前 Resume Parsing、JD Parsing 和 Matching Analysis 的一次性任务都把规范化语言直接传给
+当前 Agent。Agent 使用自身 Prompt，且不读取 `Accept-Language`、全局 locale 或浏览器状态。
+未来 QuestionCard、动态追问、评分、复盘和推荐等 Session 子 Agent 不能独立读取 UI language，必须继承 Session language；
 `PracticeSession.language` 和 `InterviewSession.language` 必须在生命周期内不可变并持久化，
 以保证一整轮训练不会出现中英文混杂。
 
@@ -154,7 +153,7 @@ Riva 应结合用户简历和目标岗位 JD，生成匹配分析报告。报告
 8. 可能追问方向。
 9. 评分参考。
 
-题卡不能依赖文本内容猜测语言。独立题卡使用创建 AgentRun 时捕获的
+题卡不能依赖文本内容猜测语言。独立题卡使用调用 Agent 时捕获的
 `interactionLanguage`；属于 `PracticeSession` 或 `InterviewSession` 的题卡必须与所属
 Session 的 `language` 相同。
 

@@ -3,9 +3,6 @@ import { vi } from "vitest"
 vi.mock("@/services/practice", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/practice")>()),
   getPracticePage: vi.fn(),
-  getPracticeEvaluationStatus: vi.fn(),
-  getFollowUpGenerationStatus: vi.fn(),
-  getQuestionGenerationStatus: vi.fn(),
   endPracticeFollowUps: vi.fn(),
   requestAnswerFramework: vi.fn(),
   requestEndPracticeSession: vi.fn(),
@@ -14,7 +11,6 @@ vi.mock("@/services/practice", async (importOriginal) => ({
   requestPracticeFollowUpFramework: vi.fn(),
   requestPracticeFollowUpHint: vi.fn(),
   requestPracticeFollowUpReferenceAnswer: vi.fn(),
-  retryPracticeEvaluation: vi.fn(),
   retryCurrentPracticeQuestion: vi.fn(),
   continueToNextPracticeQuestion: vi.fn(),
   endPracticeSession: vi.fn(),

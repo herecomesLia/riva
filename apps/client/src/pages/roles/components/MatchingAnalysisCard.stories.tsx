@@ -9,7 +9,7 @@ import type { RolesMockScenario } from "@/mocks/data/roles"
 import {
   createLongMatchingAnalysisResponse,
   createRoleStoryResponse,
-  createStaleWhileParsingResponse,
+  createStaleWhileSavedJobDescriptionResponse,
 } from "../stories/role-story-fixtures"
 import { MatchingAnalysisCard } from "./MatchingAnalysisCard"
 
@@ -25,7 +25,6 @@ function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   return {
     profileContext: response.profileContext,
     role: response.roles[0]!,
-    synchronizationError: false,
   }
 }
 
@@ -34,59 +33,20 @@ export const ProfileIncomplete = meta.story({ args: argsFor("profileIncomplete")
 export const JobDescriptionMissing = meta.story({
   args: argsFor("singleRoleWithoutJobDescription"),
 })
-export const JobDescriptionParsing = meta.story({ args: argsFor("roleWithJobDescriptionParsing") })
 export const None = meta.story({
   args: { ...argsFor("roleWithParsedJobDescription"), onGenerate: fn() },
-})
-export const Generating = meta.story({ args: argsFor("matchingAnalysisGenerating") })
-export const SynchronizationError = meta.story({
-  args: {
-    ...argsFor("matchingAnalysisGenerating"),
-    onRetrySynchronization: fn(),
-    synchronizationError: true,
-  },
-})
-
-function SynchronizationRetryHarness() {
-  const initial = createRoleStoryResponse("matchingAnalysisGenerating")
-  const completed = createRoleStoryResponse("matchingAnalysisCurrent")
-  const [response, setResponse] = useState(initial)
-  const [synchronizationError, setSynchronizationError] = useState(true)
-  return (
-    <MatchingAnalysisCard
-      onRetrySynchronization={() => {
-        setSynchronizationError(false)
-        setResponse(completed)
-      }}
-      profileContext={response.profileContext}
-      role={response.roles[0]!}
-      synchronizationError={synchronizationError}
-    />
-  )
-}
-
-export const SynchronizationRetry = meta.story({
-  render: () => <SynchronizationRetryHarness />,
-  play: async ({ userEvent }) => {
-    await userEvent.click(screen.getByRole("button", { name: /重新同步状态|synchronize status/i }))
-    await expect(screen.getByTestId("matching-analysis-result")).toBeVisible()
-  },
-})
-export const Failed = meta.story({
-  args: { ...argsFor("matchingAnalysisFailed"), onGenerate: fn() },
 })
 export const Stale = meta.story({
   args: { ...argsFor("matchingAnalysisStale"), onGenerate: fn() },
 })
 export const Current = meta.story({ args: argsFor("matchingAnalysisCurrent") })
 
-const staleWhileParsing = createStaleWhileParsingResponse()
+const staleWhileSavedJobDescription = createStaleWhileSavedJobDescriptionResponse()
 
-export const StaleWhileJobDescriptionParsing = meta.story({
+export const StaleWhileSavedJobDescription = meta.story({
   args: {
-    profileContext: staleWhileParsing.profileContext,
-    role: staleWhileParsing.roles[0]!,
-    synchronizationError: false,
+    profileContext: staleWhileSavedJobDescription.profileContext,
+    role: staleWhileSavedJobDescription.roles[0]!,
   },
 })
 
@@ -96,7 +56,6 @@ export const LongMatchingAnalysis = meta.story({
   args: {
     profileContext: longMatchingAnalysis.profileContext,
     role: longMatchingAnalysis.roles[0]!,
-    synchronizationError: false,
   },
 })
 
@@ -110,7 +69,6 @@ function AnalysisFlowHarness({ initialScenario }: { initialScenario: RolesMockSc
       onGenerate={() => setResponse(completed)}
       profileContext={response.profileContext}
       role={role}
-      synchronizationError={false}
     />
   )
 }
@@ -129,14 +87,6 @@ export const RegenerateStale = meta.story({
   render: () => <AnalysisFlowHarness initialScenario="matchingAnalysisStale" />,
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByRole("button", { name: /重新生成分析|regenerate analysis/i }))
-    await expect(screen.getByTestId("matching-analysis-result")).toBeVisible()
-  },
-})
-
-export const RetryFailed = meta.story({
-  render: () => <AnalysisFlowHarness initialScenario="matchingAnalysisFailed" />,
-  play: async ({ userEvent }) => {
-    await userEvent.click(screen.getByRole("button", { name: /重试生成|retry generation/i }))
     await expect(screen.getByTestId("matching-analysis-result")).toBeVisible()
   },
 })

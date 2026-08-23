@@ -247,7 +247,6 @@ function interviewReferenceAnswer(
   if (state.status === "ready") {
     return { status: "ready", content: structuredClone(state.content) }
   }
-  if (state.status === "generating") return { status: "generating", content: null }
   return { status: "unavailable", content: null, reason: "generationFailed" }
 }
 

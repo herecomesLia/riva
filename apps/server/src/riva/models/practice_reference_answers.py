@@ -12,7 +12,6 @@ from sqlalchemy import (
     Index,
     String,
     Text,
-    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,7 +21,6 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
-    from riva.models.agent_runs import AgentRun
     from riva.models.practice_interactions import PracticeFollowUpQuestion
     from riva.models.question_cards import QuestionCard
 
@@ -66,10 +64,6 @@ class PracticeReferenceAnswerArtifact(Base):
             "AND length(trim(addressed_gap)) > 0))",
             name="ck_practice_reference_answers_target_kind",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_practice_reference_answers_source_run",
-        ),
         Index(
             "uq_practice_reference_answers_main_target",
             "question_card_id",
@@ -103,11 +97,6 @@ class PracticeReferenceAnswerArtifact(Base):
         nullable=True,
         index=True,
     )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
-    )
     target_type: Mapped[str] = mapped_column(String(16), nullable=False)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     addressed_gap: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -132,10 +121,6 @@ class PracticeReferenceAnswerArtifact(Base):
     )
     follow_up_question: Mapped[PracticeFollowUpQuestion | None] = relationship(
         foreign_keys=[follow_up_question_id],
-        passive_deletes=True,
-    )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
         passive_deletes=True,
     )
 

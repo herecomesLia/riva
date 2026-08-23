@@ -8,13 +8,7 @@ import {
 import type {
   PracticeActiveSessionState,
   PracticeCompletedState,
-  GetQuestionGenerationStatusInput,
-  GetFollowUpGenerationStatusInput,
-  GetPracticeReferenceAnswerStatusInput,
-  GetPracticeFollowUpReferenceAnswerStatusInput,
-  GetPracticeEvaluationStatusInput,
   EndPracticeFollowUpsInput,
-  PracticeMutationResponse,
   PracticeServiceResponse,
   PracticePageResponse,
   PrepareNextPracticeSessionInput,
@@ -25,7 +19,6 @@ import type {
   RequestPracticeFollowUpFrameworkInput,
   RequestPracticeFollowUpHintInput,
   RequestPracticeFollowUpReferenceAnswerInput,
-  RetryPracticeEvaluationInput,
   RetryCurrentPracticeQuestionInput,
   ContinueToNextPracticeQuestionInput,
   EndPracticeSessionInput,
@@ -59,10 +52,6 @@ import {
   resolvePracticeTrainingEntry,
   resolveTrainingEntryRoleAvailability,
 } from "@/models/training-entry"
-
-function realApiUnavailable(): never {
-  throw new Error("Real practice API is not implemented.")
-}
 
 async function requestCurrentPracticeSession() {
   return currentPracticeSessionResponseSchema.parse(
@@ -150,8 +139,13 @@ export async function getPracticePage(): Promise<PracticePageResponse> {
 export async function startPracticeSession(
   input: StartPracticeSessionInput,
 ): Promise<PracticeActiveSessionState> {
-  if (env.mock)
-    return requireActivePracticeSession(await practiceMockService.startPracticeSession(input))
+  if (env.mock) {
+    const response = await practiceMockService.startPracticeSession(input)
+    if (response.session.status === "setup" || response.session.status === "completed") {
+      throw new Error("Practice session did not start.")
+    }
+    return response.session
+  }
   return requestPracticeActiveSession("/practice/sessions", {
     json: input,
     method: "POST",
@@ -221,55 +215,6 @@ async function prepareRealPracticeTrainingEntry(
     },
     resolution,
   }
-}
-
-export async function getQuestionGenerationStatus(
-  input: GetQuestionGenerationStatusInput,
-): Promise<PracticeActiveSessionState> {
-  if (env.mock) {
-    return requireActivePracticeSession(
-      await practiceMockService.getQuestionGenerationStatus(input),
-    )
-  }
-  return requestPracticeActiveSession(
-    `/practice/sessions/${encodeURIComponent(input.sessionId)}/question-generation/refresh`,
-    {
-      json: { version: input.version },
-      method: "POST",
-    },
-  )
-}
-
-export function getFollowUpGenerationStatus(
-  input: GetFollowUpGenerationStatusInput,
-): Promise<PracticeActiveSessionState> {
-  if (env.mock) return realApiUnavailable()
-  return requestPracticeActiveSession(
-    `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-up-generation/refresh`,
-    {
-      json: { version: input.version },
-      method: "POST",
-    },
-  )
-}
-
-export function getPracticeEvaluationStatus(
-  input: GetPracticeEvaluationStatusInput,
-): Promise<PracticeServiceResponse> {
-  if (env.mock) return practiceMockService.getPracticeEvaluationStatus(input)
-  return requestPracticeActiveSession(
-    `/practice/sessions/${encodeURIComponent(input.sessionId)}/evaluation/refresh`,
-    {
-      json: { version: input.version },
-      method: "POST",
-    },
-  )
-}
-
-export function retryPracticeEvaluation(
-  input: RetryPracticeEvaluationInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.retryPracticeEvaluation(input) : realApiUnavailable()
 }
 
 export function retryCurrentPracticeQuestion(
@@ -370,22 +315,6 @@ export function requestPracticeReferenceAnswer(
   )
 }
 
-export function getPracticeReferenceAnswerStatus(
-  input: GetPracticeReferenceAnswerStatusInput,
-): Promise<PracticeServiceResponse> {
-  if (env.mock) return realApiUnavailable()
-  return requestPracticeActiveSession(
-    `/practice/sessions/${encodeURIComponent(input.sessionId)}/questions/reference-answer/refresh`,
-    {
-      json: {
-        version: input.version,
-        questionId: input.questionId,
-      },
-      method: "POST",
-    },
-  )
-}
-
 export function requestPracticeFollowUpHint(
   input: RequestPracticeFollowUpHintInput,
 ): Promise<PracticeServiceResponse> {
@@ -426,23 +355,6 @@ export function requestPracticeFollowUpReferenceAnswer(
   if (env.mock) return practiceMockService.requestPracticeFollowUpReferenceAnswer(input)
   return requestPracticeActiveSession(
     `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-ups/reference-answer`,
-    {
-      json: {
-        version: input.version,
-        questionId: input.questionId,
-        followUpQuestionId: input.followUpQuestionId,
-      },
-      method: "POST",
-    },
-  )
-}
-
-export function getPracticeFollowUpReferenceAnswerStatus(
-  input: GetPracticeFollowUpReferenceAnswerStatusInput,
-): Promise<PracticeServiceResponse> {
-  if (env.mock) return realApiUnavailable()
-  return requestPracticeActiveSession(
-    `/practice/sessions/${encodeURIComponent(input.sessionId)}/follow-ups/reference-answer/refresh`,
     {
       json: {
         version: input.version,
@@ -589,25 +501,11 @@ export function toPracticeActiveSessionState(
   }
 
   switch (session.status) {
-    case "generatingQuestion":
-      return {
-        ...base,
-        previousAttempt: null,
-        status: "generatingQuestion",
-      }
     case "answering":
       return {
         ...base,
         question: session.question,
         status: "answering",
-      }
-    case "generatingFollowUp":
-      return {
-        ...base,
-        followUpExchanges: session.followUpExchanges,
-        mainAnswer: session.mainAnswer,
-        question: session.question,
-        status: "generatingFollowUp",
       }
     case "answeringFollowUp":
       return {
@@ -617,16 +515,6 @@ export function toPracticeActiveSessionState(
         mainAnswer: session.mainAnswer,
         question: session.question,
         status: "answeringFollowUp",
-      }
-    case "evaluating":
-      return {
-        ...base,
-        followUpCompletion: session.followUpCompletion,
-        followUpExchanges: session.followUpExchanges,
-        mainAnswer: session.mainAnswer,
-        question: session.question,
-        status: "evaluating",
-        submittedAt: session.submittedAt,
       }
     case "review":
       return {
@@ -686,24 +574,4 @@ export function toPracticeSessionState(
   return session.status === "completed"
     ? toPracticeCompletedSessionState(session)
     : toPracticeActiveSessionState(session)
-}
-
-function requireActivePracticeSession(
-  response: PracticeServiceResponse,
-): PracticeActiveSessionState {
-  if (isActivePracticeSessionState(response)) return response
-  if (
-    "session" in response &&
-    response.session.status !== "setup" &&
-    response.session.status !== "completed"
-  ) {
-    return response.session
-  }
-  throw new Error("The practice session response is not active.")
-}
-
-function isActivePracticeSessionState(
-  response: PracticeServiceResponse,
-): response is PracticeActiveSessionState {
-  return "status" in response
 }

@@ -202,7 +202,6 @@ def test_openapi_exposes_direct_question_card_contract(app) -> None:
     paths = app.openapi()["paths"]
     generation = "/api/question-cards/generations"
 
-    assert "/api/question-cards/generations/{runId}" not in paths
     assert (
         paths[generation]["post"]["responses"]["200"]["content"]["application/json"][
             "schema"

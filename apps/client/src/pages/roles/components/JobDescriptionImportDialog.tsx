@@ -19,36 +19,31 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   applyJobDescriptionImportDraft,
   createJobDescriptionImportDraft,
-  getJobDescriptionImportDraft,
   type JobDescriptionImportDraft,
 } from "@/services/job-description-import"
 
 type ImportDialogState =
   | { status: "input" }
-  | { status: "parsing"; draft: JobDescriptionImportDraft | null }
+  | { status: "parsing" }
   | { status: "ready"; draft: JobDescriptionImportDraft }
   | { status: "failed"; failureReason: string }
 
 type JobDescriptionImportDialogProps = {
   applyDraft?: typeof applyJobDescriptionImportDraft
   createDraft?: typeof createJobDescriptionImportDraft
-  getDraft?: typeof getJobDescriptionImportDraft
   onApplied: (roleId: string) => Promise<void> | void
   onDirtyChange?: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
   open: boolean
-  pollIntervalMs?: number
 }
 
 export function JobDescriptionImportDialog({
   applyDraft = applyJobDescriptionImportDraft,
   createDraft = createJobDescriptionImportDraft,
-  getDraft = getJobDescriptionImportDraft,
   onApplied,
   onDirtyChange,
   onOpenChange,
   open,
-  pollIntervalMs = 1_500,
 }: JobDescriptionImportDialogProps) {
   const { t } = useTranslation()
   const [rawText, setRawText] = useState("")
@@ -70,40 +65,6 @@ export function JobDescriptionImportDialog({
     setState({ status: "input" })
   }, [open])
 
-  useEffect(() => {
-    if (!open || state.status !== "parsing" || !state.draft) return
-
-    let active = true
-    const draftId = state.draft.id
-    const timeout = window.setTimeout(() => {
-      void getDraft(draftId)
-        .then((draft) => {
-          if (active) {
-            setState(
-              getStateFromDraft(
-                draft,
-                t("roles.import.failed.defaultReason"),
-                t("roles.import.failed.unexpectedState"),
-              ),
-            )
-          }
-        })
-        .catch(() => {
-          if (active) {
-            setState({
-              failureReason: t("roles.import.failed.requestDescription"),
-              status: "failed",
-            })
-          }
-        })
-    }, pollIntervalMs)
-
-    return () => {
-      active = false
-      window.clearTimeout(timeout)
-    }
-  }, [getDraft, open, pollIntervalMs, state, t])
-
   async function handleSubmit() {
     const normalizedText = rawText.trim()
     if (!normalizedText) {
@@ -112,15 +73,11 @@ export function JobDescriptionImportDialog({
     }
 
     setInputError(false)
-    setState({ draft: null, status: "parsing" })
+    setState({ status: "parsing" })
     try {
-      setState(
-        getStateFromDraft(
-          await createDraft({ rawText: normalizedText }),
-          t("roles.import.failed.defaultReason"),
-          t("roles.import.failed.unexpectedState"),
-        ),
-      )
+      const draft = await createDraft({ rawText: normalizedText })
+      if (draft.status !== "ready") throw new Error("Job description import draft is not ready.")
+      setState({ draft, status: "ready" })
     } catch {
       setState({
         failureReason: t("roles.import.failed.requestDescription"),
@@ -309,20 +266,4 @@ function ImportResult({
       <dd className="mt-1 font-medium">{children}</dd>
     </div>
   )
-}
-
-function getStateFromDraft(
-  draft: JobDescriptionImportDraft,
-  defaultFailureReason: string,
-  unexpectedStateReason: string,
-): ImportDialogState {
-  if (draft.status === "parsing") return { draft, status: "parsing" }
-  if (draft.status === "ready") return { draft, status: "ready" }
-  if (draft.status === "failed") {
-    return {
-      failureReason: draft.failureReason ?? defaultFailureReason,
-      status: "failed",
-    }
-  }
-  return { failureReason: unexpectedStateReason, status: "failed" }
 }

@@ -20,9 +20,7 @@ export type RoleDetailsActions = {
   editJobDescription: () => void
   editJobDescriptionAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
   startJobDescriptionParsing?: () => void
-  retryJobDescriptionSynchronization?: () => void
   generateMatchingAnalysis?: () => void
-  retryMatchingAnalysisSynchronization?: () => void
 }
 
 export function RoleDetails({
@@ -33,15 +31,11 @@ export function RoleDetails({
   pending,
   profileContext,
   role,
-  jobDescriptionSynchronizationError = false,
-  matchingAnalysisSynchronizationError = false,
   matchingAnalysisAvailable = true,
 }: {
   actions?: RoleDetailsActions
   activeTab: TargetRoleTab
   currentRoleId: string | null
-  jobDescriptionSynchronizationError?: boolean
-  matchingAnalysisSynchronizationError?: boolean
   matchingAnalysisAvailable?: boolean
   onTabChange: (tab: TargetRoleTab) => void
   pending?: boolean
@@ -120,10 +114,8 @@ export function RoleDetails({
                 }
                 onEditAnalysisModule={actions?.editJobDescriptionAnalysisModule}
                 onStartParsing={actions?.startJobDescriptionParsing}
-                onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
                 pending={pending}
                 role={role}
-                synchronizationError={jobDescriptionSynchronizationError}
               />
             )}
           </TabsContent>
@@ -132,11 +124,9 @@ export function RoleDetails({
               {activeTab === "matching-analysis" && (
                 <MatchingAnalysisCard
                   onGenerate={actions?.generateMatchingAnalysis}
-                  onRetrySynchronization={actions?.retryMatchingAnalysisSynchronization}
                   pending={pending}
                   profileContext={profileContext}
                   role={role}
-                  synchronizationError={matchingAnalysisSynchronizationError}
                 />
               )}
             </TabsContent>

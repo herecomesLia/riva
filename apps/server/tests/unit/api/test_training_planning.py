@@ -194,7 +194,6 @@ def test_training_planning_routes_require_authentication(app) -> None:
 def test_openapi_exposes_direct_training_planning_contract(app) -> None:
     paths = app.openapi()["paths"]
 
-    assert "/api/training-plans/{runId}" not in paths
     for path in ("/api/training-plans", "/api/training-plans/current"):
         response = paths[path]["post"]["responses"]
         assert "202" not in response

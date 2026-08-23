@@ -16,11 +16,11 @@ from fastapi import (
 from riva.core.auth import require_current_user
 from riva.core.csrf import csrf_protect
 from riva.core.errors import APIError
-from riva.core.language import normalize_interaction_language
+from riva.core.language import InteractionLanguage, normalize_interaction_language
 from riva.core.resumes import (
     get_resume_document_service,
     get_resume_import_api_service,
-    get_resume_parsing_lifecycle_service,
+    get_resume_parsing_service,
 )
 from riva.models import User
 from riva.schemas.resume_documents import (
@@ -34,7 +34,11 @@ from riva.schemas.resume_import_api import (
 )
 from riva.services.resume_documents import ResumeDocumentService
 from riva.services.resume_import_api import ResumeImportAPIService
-from riva.services.resume_parsing_lifecycle import ResumeParsingLifecycleService
+from riva.services.resume_parsing import (
+    RESUME_DOCUMENT_NOT_FOUND,
+    ResumeParsingService,
+    ResumeParsingStateError,
+)
 
 ResumeId = Annotated[UUID, Path(alias="resumeId")]
 ResumeLimit = Annotated[int, Query(ge=1, le=100)]
@@ -114,16 +118,15 @@ async def start_resume_parsing(
     resume_document_id: ResumeId,
     request: Request,
     current_user: User = Depends(require_current_user),
-    lifecycle_service: ResumeParsingLifecycleService = Depends(
-        get_resume_parsing_lifecycle_service
-    ),
+    parsing_service: ResumeParsingService = Depends(get_resume_parsing_service),
+    import_api_service: ResumeImportAPIService = Depends(get_resume_import_api_service),
 ) -> ResumeImportDraftResponse:
-    return await lifecycle_service.start(
-        user_id=current_user.id,
-        resume_document_id=resume_document_id,
-        interaction_language=normalize_interaction_language(
-            request.headers.get("accept-language")
-        ),
+    return await _parse_resume_and_build_draft(
+        parsing_service,
+        import_api_service,
+        current_user.id,
+        resume_document_id,
+        normalize_interaction_language(request.headers.get("accept-language")),
     )
 
 
@@ -135,16 +138,16 @@ async def retry_resume_parsing(
     resume_document_id: ResumeId,
     request: Request,
     current_user: User = Depends(require_current_user),
-    lifecycle_service: ResumeParsingLifecycleService = Depends(
-        get_resume_parsing_lifecycle_service
-    ),
+    parsing_service: ResumeParsingService = Depends(get_resume_parsing_service),
+    import_api_service: ResumeImportAPIService = Depends(get_resume_import_api_service),
 ) -> ResumeImportDraftResponse:
-    return await lifecycle_service.retry(
-        user_id=current_user.id,
-        resume_document_id=resume_document_id,
-        interaction_language=normalize_interaction_language(
-            request.headers.get("accept-language")
-        ),
+    return await _parse_resume_and_build_draft(
+        parsing_service,
+        import_api_service,
+        current_user.id,
+        resume_document_id,
+        normalize_interaction_language(request.headers.get("accept-language")),
+        retry=True,
     )
 
 
@@ -181,3 +184,29 @@ async def apply_resume_import_draft(
 
 
 __all__ = ["router"]
+
+
+async def _parse_resume_and_build_draft(
+    parsing_service: ResumeParsingService,
+    import_api_service: ResumeImportAPIService,
+    user_id: UUID,
+    resume_document_id: UUID,
+    interaction_language: InteractionLanguage,
+    *,
+    retry: bool = False,
+) -> ResumeImportDraftResponse:
+    try:
+        await parsing_service.parse(
+            user_id=user_id,
+            resume_document_id=resume_document_id,
+            interaction_language=interaction_language,
+            retry=retry,
+        )
+        return await import_api_service.get_draft(
+            user_id=user_id,
+            resume_document_id=resume_document_id,
+        )
+    except ResumeParsingStateError as error:
+        if error.code == RESUME_DOCUMENT_NOT_FOUND:
+            raise APIError(status.HTTP_404_NOT_FOUND, error.code) from None
+        raise APIError(status.HTTP_409_CONFLICT, error.code) from None

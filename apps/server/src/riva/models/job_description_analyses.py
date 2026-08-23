@@ -8,11 +8,9 @@ from sqlalchemy import (
     JSON,
     CheckConstraint,
     DateTime,
-    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
@@ -45,10 +43,6 @@ class JobDescriptionAnalysis(Base):
             "length(trim(riva_summary)) > 0",
             name="ck_job_description_analyses_summary_not_blank",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_job_description_analyses_source_run",
-        ),
         Index(
             "ix_job_description_analyses_user_role",
             "user_id",
@@ -66,11 +60,6 @@ class JobDescriptionAnalysis(Base):
     )
     job_description_version: Mapped[int] = mapped_column(nullable=False)
     analysis_version: Mapped[int] = mapped_column(nullable=False, default=1)
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id"),
-        nullable=False,
-    )
     parsed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

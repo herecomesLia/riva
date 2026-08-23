@@ -55,10 +55,6 @@ TrainingPlanningFocusAreas = Annotated[
     list[TrainingPlanningFocusArea],
     Field(max_length=3),
 ]
-TrainingPlanningContextFingerprint = Annotated[
-    str,
-    StringConstraints(pattern=r"^[0-9a-f]{64}$"),
-]
 
 
 class TrainingPlanningTargetRole(TrainingPlanningModel):
@@ -177,25 +173,6 @@ class EnsureCurrentTrainingPlanningRequest(TrainingPlanningModel):
     target_role_id: StandardUUID
 
 
-class TrainingPlanningRunPayload(TrainingPlanningModel):
-    request_id: StandardUUID
-    target_role_id: StandardUUID
-    interaction_language: InteractionLanguage
-    context_fingerprint: TrainingPlanningContextFingerprint
-    training_planning_input: TrainingPlanningInput
-
-    @model_validator(mode="after")
-    def validate_lineage(self) -> Self:
-        if self.target_role_id != self.training_planning_input.target_role.id:
-            raise ValueError("targetRoleId does not match trainingPlanningInput")
-        if (
-            self.interaction_language
-            != self.training_planning_input.interaction_language
-        ):
-            raise ValueError("interactionLanguage does not match trainingPlanningInput")
-        return self
-
-
 class TrainingPlanningTargetedPracticeOutput(TrainingPlanningModel):
     action: Literal["targetedPractice"]
     reason: TrainingPlanningText
@@ -226,84 +203,8 @@ class TrainingPlanningResponse(TrainingPlanningModel):
     plan: TrainingPlanningOutput
 
 
-TrainingPlanningLifecycleStatus = Literal[
-    "queued",
-    "running",
-    "succeeded",
-    "failed",
-]
-
-
-class TrainingPlanningStatusResponse(TrainingPlanningModel):
-    run_id: StandardUUID
-    status: TrainingPlanningLifecycleStatus
-    target_role_id: StandardUUID
-    interaction_language: InteractionLanguage
-    attempt_count: int = Field(ge=0)
-    max_attempts: int = Field(ge=1)
-    error_code: str | None
-    failure_reason: str | None
-    created_at: datetime
-    started_at: datetime | None
-    finished_at: datetime | None
-    plan: TrainingPlanningOutput | None
-
-    @field_validator("created_at", "started_at", "finished_at")
-    @classmethod
-    def validate_aware_timestamp(cls, value: datetime | None) -> datetime | None:
-        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
-            raise ValueError("timestamps must be timezone-aware")
-        return value
-
-    @model_validator(mode="after")
-    def validate_state(self) -> Self:
-        if self.status == "queued":
-            self._require(
-                self.plan is None
-                and self.error_code is None
-                and self.failure_reason is None
-                and self.finished_at is None,
-                "queued training planning state contains terminal data",
-            )
-        elif self.status == "running":
-            self._require(
-                self.plan is None
-                and self.error_code is None
-                and self.failure_reason is None
-                and self.started_at is not None
-                and self.finished_at is None,
-                "running training planning state is invalid",
-            )
-        elif self.status == "succeeded":
-            self._require(
-                self.plan is not None
-                and self.error_code is None
-                and self.failure_reason is None
-                and self.started_at is not None
-                and self.finished_at is not None,
-                "succeeded training planning state is incomplete",
-            )
-        elif self.status == "failed":
-            self._require(
-                self.plan is None
-                and self.error_code is not None
-                and self.failure_reason is not None
-                and bool(self.failure_reason.strip())
-                and self.started_at is not None
-                and self.finished_at is not None,
-                "failed training planning state is invalid",
-            )
-        return self
-
-    @staticmethod
-    def _require(condition: bool, message: str) -> None:
-        if not condition:
-            raise ValueError(message)
-
-
 __all__ = [
     "TrainingPlanningConstraints",
-    "TrainingPlanningContextFingerprint",
     "TrainingPlanningFocusArea",
     "TrainingPlanningFocusAreas",
     "TrainingPlanningInput",
@@ -319,10 +220,7 @@ __all__ = [
     "TrainingPlanningTargetedPracticeOutput",
     "TrainingPlanningTargetedPracticeRecord",
     "TrainingPlanningText",
-    "TrainingPlanningLifecycleStatus",
-    "TrainingPlanningRunPayload",
     "TrainingPlanningResponse",
-    "TrainingPlanningStatusResponse",
     "EnsureCurrentTrainingPlanningRequest",
     "StartTrainingPlanningRequest",
 ]

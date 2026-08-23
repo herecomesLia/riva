@@ -737,7 +737,7 @@ class TrainingRecordService:
                 user_id=user_id,
                 question_card_id=context.question_card.id,
                 follow_up_question_id=pending.id,
-                submitted_at=context.evaluation_generation_run.created_at,
+                submitted_at=pending.created_at,
             )
             result.append(
                 TrainingRecordFollowUpResponse(

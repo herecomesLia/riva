@@ -51,13 +51,12 @@ function createMissingJobDescriptionRole(
       status: "missing",
       rawText: null,
       version: null,
-      parsingFailureReason: null,
     },
     jobDescriptionAnalysis: null,
   }
 }
 
-function createParsingJobDescriptionRole(
+function createSavedJobDescriptionRole(
   id: string,
   title: string,
   overrides: Partial<TargetRoleBaseFixture> = {},
@@ -65,30 +64,10 @@ function createParsingJobDescriptionRole(
   return {
     ...createRoleBase(id, title, overrides),
     jobDescription: {
-      status: "parsing",
+      status: "saved",
       rawText:
         "Own the frontend architecture for merchant operations workflows and collaborate across product teams.",
       version: 2,
-      parsingFailureReason: null,
-    },
-    jobDescriptionAnalysis: null,
-  }
-}
-
-function createFailedJobDescriptionRole(
-  id: string,
-  title: string,
-  overrides: Partial<TargetRoleBaseFixture> = {},
-): TargetRoleWithoutReadyJobDescription {
-  return {
-    ...createRoleBase(id, title, overrides),
-    jobDescription: {
-      status: "failed",
-      rawText:
-        "Build reliable web applications for international creators and improve user-facing performance.",
-      version: 3,
-      parsingFailureReason:
-        "We could not extract structured requirements from this JD. Please review the text and try again.",
     },
     jobDescriptionAnalysis: null,
   }
@@ -108,7 +87,6 @@ function createReadyJobDescriptionRole(
       rawText:
         "Lead frontend architecture for merchant operations products. Build React and TypeScript experiences, improve performance, and mentor engineers through complex delivery decisions.",
       version: jobDescriptionVersion,
-      parsingFailureReason: null,
     },
     jobDescriptionAnalysis: createJobDescriptionAnalysisFixture({
       jobDescriptionVersion,
@@ -124,7 +102,6 @@ function createCurrentMatchingAnalysis(): MatchingAnalysis {
     jobDescriptionVersion: 4,
     jobDescriptionAnalysisVersion: 1,
     generatedAt: "2026-07-14T09:00:00.000Z",
-    failureReason: null,
     result: createMatchingAnalysisResultFixture(),
   }
 }
@@ -136,33 +113,7 @@ function createStaleMatchingAnalysis(): MatchingAnalysis {
     jobDescriptionVersion: 3,
     jobDescriptionAnalysisVersion: 1,
     generatedAt: "2026-07-10T10:30:00.000Z",
-    failureReason: null,
     result: createMatchingAnalysisResultFixture(),
-  }
-}
-
-function createGeneratingMatchingAnalysis(): MatchingAnalysis {
-  return {
-    status: "generating",
-    profileVersion: completeProfileContext.version,
-    jobDescriptionVersion: 4,
-    jobDescriptionAnalysisVersion: 1,
-    generatedAt: null,
-    failureReason: null,
-    result: null,
-  }
-}
-
-function createFailedMatchingAnalysis(): MatchingAnalysis {
-  return {
-    status: "failed",
-    profileVersion: completeProfileContext.version,
-    jobDescriptionVersion: 4,
-    jobDescriptionAnalysisVersion: 1,
-    generatedAt: null,
-    failureReason:
-      "The matching analysis could not be generated right now. Your profile and JD are preserved; please try again.",
-    result: null,
   }
 }
 
@@ -174,13 +125,10 @@ export type RolesMockScenario =
   | "multipleRolesCurrentMissing"
   | "multipleRolesJdMissing"
   | "rolesWithoutCurrent"
-  | "roleWithJobDescriptionParsing"
-  | "roleWithJobDescriptionFailed"
+  | "roleWithSavedJobDescription"
   | "roleWithParsedJobDescription"
   | "profileMissing"
   | "profileIncomplete"
-  | "matchingAnalysisGenerating"
-  | "matchingAnalysisFailed"
   | "matchingAnalysisStale"
   | "matchingAnalysisCurrent"
   | "archivedRoles"
@@ -272,18 +220,9 @@ const rolesMockScenarios = {
     currentRoleId: null,
     profileContext: completeProfileContext,
   },
-  roleWithJobDescriptionParsing: {
-    roles: [createParsingJobDescriptionRole("role_frontend_bytedance", "Senior Frontend Engineer")],
+  roleWithSavedJobDescription: {
+    roles: [createSavedJobDescriptionRole("role_frontend_bytedance", "Senior Frontend Engineer")],
     currentRoleId: "role_frontend_bytedance",
-    profileContext: completeProfileContext,
-  },
-  roleWithJobDescriptionFailed: {
-    roles: [
-      createFailedJobDescriptionRole("role_frontend_tiktok", "Frontend Engineer", {
-        company: "TikTok",
-      }),
-    ],
-    currentRoleId: "role_frontend_tiktok",
     profileContext: completeProfileContext,
   },
   roleWithParsedJobDescription: {
@@ -314,30 +253,6 @@ const rolesMockScenarios = {
       version: 12,
       completed: false,
     },
-  },
-  matchingAnalysisGenerating: {
-    roles: [
-      createReadyJobDescriptionRole(
-        "role_frontend_bytedance",
-        "Senior Frontend Engineer",
-        4,
-        createGeneratingMatchingAnalysis(),
-      ),
-    ],
-    currentRoleId: "role_frontend_bytedance",
-    profileContext: completeProfileContext,
-  },
-  matchingAnalysisFailed: {
-    roles: [
-      createReadyJobDescriptionRole(
-        "role_frontend_bytedance",
-        "Senior Frontend Engineer",
-        4,
-        createFailedMatchingAnalysis(),
-      ),
-    ],
-    currentRoleId: "role_frontend_bytedance",
-    profileContext: completeProfileContext,
   },
   matchingAnalysisStale: {
     roles: [

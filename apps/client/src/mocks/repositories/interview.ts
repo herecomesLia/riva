@@ -117,7 +117,6 @@ const referenceAnswerSchema = z.discriminatedUnion("status", [
       generatedAt: z.string().min(1),
     }),
   }),
-  z.object({ status: z.literal("generating") }),
   z.object({
     status: z.literal("unavailable"),
     reason: z.literal("generationFailed"),

@@ -18,12 +18,12 @@ import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
-  GenerateOrRegenerateMatchingAnalysisInput,
+  StartMatchingAnalysisInput,
   JobDescriptionAnalysisModuleField,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
-  StartOrRetryJobDescriptionParsingInput,
+  StartJobDescriptionParsingInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
   UpdateJobDescriptionAnalysisModuleInput,
@@ -57,17 +57,14 @@ export type RolesViewActions = {
   archiveTargetRole: (input: ArchiveTargetRoleInput) => Promise<RolesPageResponse>
   createTargetRole: (input: CreateTargetRoleInput) => Promise<RolesPageResponse>
   deleteTargetRole: (input: DeleteTargetRoleInput) => Promise<RolesPageResponse>
-  generateMatchingAnalysis?: (
-    input: GenerateOrRegenerateMatchingAnalysisInput,
-  ) => Promise<RolesPageResponse>
+  generateMatchingAnalysis?: (input: StartMatchingAnalysisInput) => Promise<RolesPageResponse>
   jobDescriptionImport: {
     applyDraft: (draftId: string) => Promise<JobDescriptionImportDraft>
     createDraft: (input: CreateJobDescriptionImportDraftInput) => Promise<JobDescriptionImportDraft>
-    getDraft: (draftId: string) => Promise<JobDescriptionImportDraft>
     refreshRoles: (roleId: string) => Promise<RolesPageResponse>
   }
   startJobDescriptionParsing?: (
-    input: StartOrRetryJobDescriptionParsingInput,
+    input: StartJobDescriptionParsingInput,
   ) => Promise<RolesPageResponse>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
@@ -301,7 +298,6 @@ function RolesReadyView({
                                   !data.profileContext.exists ||
                                   !data.profileContext.completed ||
                                   selectedRole.jobDescription.status !== "ready" ||
-                                  selectedRole.matchingAnalysis?.status === "generating" ||
                                   selectedRole.matchingAnalysis?.status === "current"
                                 ) {
                                   return
@@ -319,10 +315,7 @@ function RolesReadyView({
                                 const startJobDescriptionParsing =
                                   actions.startJobDescriptionParsing
                                 if (!startJobDescriptionParsing) return
-                                if (
-                                  selectedRole.jobDescription.status !== "saved" &&
-                                  selectedRole.jobDescription.status !== "failed"
-                                ) {
+                                if (selectedRole.jobDescription.status !== "saved") {
                                   return
                                 }
                                 const jobDescriptionVersion = selectedRole.jobDescription.version
@@ -402,7 +395,6 @@ function RolesReadyView({
           <JobDescriptionImportDialog
             applyDraft={actions.jobDescriptionImport.applyDraft}
             createDraft={actions.jobDescriptionImport.createDraft}
-            getDraft={actions.jobDescriptionImport.getDraft}
             onApplied={async (roleId) => {
               await actions.jobDescriptionImport.refreshRoles(roleId)
               openRoleDetails(roleId)

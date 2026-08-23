@@ -253,7 +253,6 @@ export const interview = {
       structure: "Recommended structure",
       keyPoints: "Key points",
       example: "Riva example answer",
-      generating: "Riva reference answer is being generated",
       unavailable: "Riva reference answer is unavailable",
     },
     sections: {

@@ -82,8 +82,6 @@ apps/server/
 │       ├── schemas/
 │       ├── services/
 │       ├── agents/
-│       ├── workers/
-│       ├── prompts/
 │       └── integrations/
 ├── tests/
 └── migrations/
@@ -96,13 +94,11 @@ Layer responsibilities:
 - `core/`: configuration, logging, auth dependencies, and lifecycle code.
 - `db/`: database connections, transactions, and migration support.
 - `models/`: database models, such as users, resumes, jobs, questions, interview
-  sessions, reviews, and agent run records.
+  sessions, reviews, and business result records.
 - `schemas/`: Pydantic request and response schemas.
 - `services/`: business services for resumes, jobs, matching analysis, questions,
   interviews, and review scoring.
-- `agents/`: agents and workflows.
-- `workers/`: AgentRun handlers, registry, lease heartbeats, and queue execution.
-- `prompts/`: prompt templates, scoring rubrics, and output formats.
+- `agents/`: agents, their prompts, output schemas, and workflows.
 - `integrations/`: adapters for LLM providers, object storage, email, and third-party APIs.
 
 ## Interaction Language Contract
@@ -119,8 +115,8 @@ The language source has three distinct layers:
   time so the first request does not race language initialization.
 - **Artifact language**: the language frozen for one Resume Parsing, JD Parsing,
   Matching Analysis, or future independent QuestionCard generation. It is captured
-  from the UI language when the AgentRun is created and stored as
-  `AgentRun.payload.interactionLanguage`; Workers restore it only from that payload.
+  from the UI language when the Agent is invoked and stored with the resulting
+  business artifact; the Agent receives it directly from the service.
   Future QuestionCard models must also expose `language: InteractionLanguage` explicitly;
   their language must never be inferred only from their text.
 - **Session language**: the language frozen when a PracticeSession or
@@ -130,8 +126,8 @@ The language source has three distinct layers:
   Session remains unchanged.
 
 Every new user-visible AI workflow must declare its language source in both design
-and code: an independent artifact uses the AgentRun `interactionLanguage`, while a
-Session child operation uses its owning Session's `language`. Do not use “detect the
+and code: an independent artifact uses the Agent invocation's `interactionLanguage`,
+while a Session child operation uses its owning Session's `language`. Do not use “detect the
 primary language of the JD, resume, or answer” as the main output-language strategy.
 
 Company, school, project, product, skill, programming-language, framework, database,

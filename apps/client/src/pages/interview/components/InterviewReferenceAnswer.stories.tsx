@@ -11,10 +11,6 @@ if (review.status !== "complete") throw new Error("Complete review fixture requi
 const readyReference = review.questionDetails[0]!.referenceAnswer
 if (readyReference.status !== "ready") throw new Error("Ready reference fixture required.")
 
-const generatingReference = {
-  status: "generating",
-} satisfies InterviewReferenceAnswerResponse
-
 const unavailableReference = {
   status: "unavailable",
   reason: "generationFailed",
@@ -33,18 +29,6 @@ export const Ready = meta.story({
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByRole("button", { name: /查看 RIVA 示例回答/ }))
     await expect(canvas.getByText(readyReference.content.exampleAnswer)).toBeVisible()
-  },
-})
-
-export const Generating = meta.story({
-  args: {
-    id: "generating-reference",
-    referenceAnswer: generatingReference,
-  },
-  play: async ({ canvas }) => {
-    await expect(
-      canvas.getByText(/RIVA 参考答案正在生成|RIVA reference answer is being generated/i),
-    ).toBeVisible()
   },
 })
 

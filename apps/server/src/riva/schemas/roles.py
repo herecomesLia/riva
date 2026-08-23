@@ -88,43 +88,24 @@ class MissingJobDescriptionResponse(RoleAPIModel):
     status: Literal["missing"]
     raw_text: None
     version: None
-    parsing_failure_reason: None
 
 
 class SavedJobDescriptionResponse(RoleAPIModel):
     status: Literal["saved"]
     raw_text: RawJobDescription
     version: TargetRoleVersion
-    parsing_failure_reason: None
-
-
-class ParsingJobDescriptionResponse(RoleAPIModel):
-    status: Literal["parsing"]
-    raw_text: RawJobDescription
-    version: TargetRoleVersion
-    parsing_failure_reason: None
 
 
 class ReadyJobDescriptionResponse(RoleAPIModel):
     status: Literal["ready"]
     raw_text: RawJobDescription
     version: TargetRoleVersion
-    parsing_failure_reason: None
-
-
-class FailedJobDescriptionResponse(RoleAPIModel):
-    status: Literal["failed"]
-    raw_text: RawJobDescription
-    version: TargetRoleVersion
-    parsing_failure_reason: RequiredText
 
 
 JobDescriptionResponse = Annotated[
     MissingJobDescriptionResponse
     | SavedJobDescriptionResponse
-    | ParsingJobDescriptionResponse
-    | ReadyJobDescriptionResponse
-    | FailedJobDescriptionResponse,
+    | ReadyJobDescriptionResponse,
     Field(discriminator="status"),
 ]
 
@@ -168,39 +149,20 @@ class MatchingAnalysisVersionContext(RoleAPIModel):
     job_description_analysis_version: TargetRoleVersion
 
 
-class GeneratingMatchingAnalysisResponse(MatchingAnalysisVersionContext):
-    status: Literal["generating"]
-    generated_at: None
-    failure_reason: None
-    result: None
-
-
 class CurrentMatchingAnalysisResponse(MatchingAnalysisVersionContext):
     status: Literal["current"]
     generated_at: datetime
-    failure_reason: None
     result: MatchingAnalysisResultResponse
 
 
 class StaleMatchingAnalysisResponse(MatchingAnalysisVersionContext):
     status: Literal["stale"]
     generated_at: datetime
-    failure_reason: None
     result: MatchingAnalysisResultResponse
 
 
-class FailedMatchingAnalysisResponse(MatchingAnalysisVersionContext):
-    status: Literal["failed"]
-    generated_at: None
-    failure_reason: RequiredText
-    result: None
-
-
 MatchingAnalysisResponse = Annotated[
-    GeneratingMatchingAnalysisResponse
-    | CurrentMatchingAnalysisResponse
-    | StaleMatchingAnalysisResponse
-    | FailedMatchingAnalysisResponse,
+    CurrentMatchingAnalysisResponse | StaleMatchingAnalysisResponse,
     Field(discriminator="status"),
 ]
 
@@ -347,16 +309,7 @@ class StartJobDescriptionParsingRequest(RoleAPIModel):
     job_description_version: TargetRoleVersion
 
 
-class JobDescriptionParsingStatusQuery(RoleAPIModel):
-    version: TargetRoleVersion
-    job_description_version: TargetRoleVersion
-
-
 class StartMatchingAnalysisRequest(RoleAPIModel):
-    version: TargetRoleVersion
-
-
-class MatchingAnalysisStatusQuery(RoleAPIModel):
     version: TargetRoleVersion
 
 

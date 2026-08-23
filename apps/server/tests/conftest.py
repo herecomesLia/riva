@@ -13,17 +13,7 @@ TESTS_ROOT = Path(__file__).parent.resolve()
 SLOW_TEST_PATHS = frozenset(
     {
         "integration/test_competency_migration.py",
-        "integration/test_interview_completion_workflow.py",
-        "integration/test_job_description_parsing_worker.py",
-        "integration/test_matching_analysis_service.py",
-        "integration/test_matching_analysis_worker.py",
         "integration/test_migrations.py",
-        "integration/test_practice_reference_answer_workflow.py",
-        "integration/test_practice_review_workflow.py",
-        "integration/test_practice_weakness_priority_workflow.py",
-        "integration/test_resume_import_api.py",
-        "integration/test_resume_parsing_worker.py",
-        "integration/test_training_intelligence_journey.py",
         "unit/evals/test_runner.py",
     }
 )

@@ -8,11 +8,9 @@ from sqlalchemy import (
     JSON,
     CheckConstraint,
     DateTime,
-    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
@@ -59,10 +57,6 @@ class MatchingAnalysis(Base):
             "length(trim(core_requirements_summary)) > 0",
             name="ck_matching_analyses_summary_not_blank",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_matching_analyses_source_run",
-        ),
         Index(
             "ix_matching_analyses_user_role",
             "user_id",
@@ -90,11 +84,6 @@ class MatchingAnalysis(Base):
     profile_version: Mapped[int] = mapped_column(nullable=False)
     job_description_version: Mapped[int] = mapped_column(nullable=False)
     job_description_analysis_version: Mapped[int] = mapped_column(nullable=False)
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
-    )
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

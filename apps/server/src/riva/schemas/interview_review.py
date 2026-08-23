@@ -182,34 +182,6 @@ class InterviewReviewInput(InterviewReviewModel):
         return self
 
 
-class InterviewReviewRunPayload(InterviewReviewModel):
-    session_id: StandardUUID
-    session_version: Annotated[int, Field(strict=True, ge=1)]
-    session_state_version: Annotated[int, Field(strict=True, ge=1)]
-    completion_reason: InterviewReviewCompletionReason
-    review_mode: InterviewReviewMode
-    interaction_language: InteractionLanguage
-    interview_review_input: InterviewReviewInput
-    retry_of_run_id: StandardUUID | None = None
-
-    @model_validator(mode="after")
-    def validate_payload_lineage(self) -> Self:
-        if self.session_state_version <= self.session_version:
-            raise ValueError("review state version must advance snapshot")
-        review_input = self.interview_review_input
-        if review_input.session.id != self.session_id:
-            raise ValueError("review session id mismatch")
-        if review_input.session.version != self.session_version:
-            raise ValueError("review session version mismatch")
-        if review_input.interaction_language != self.interaction_language:
-            raise ValueError("review language mismatch")
-        if review_input.completion_reason != self.completion_reason:
-            raise ValueError("review completion reason mismatch")
-        if review_input.review_mode != self.review_mode:
-            raise ValueError("review mode mismatch")
-        return self
-
-
 class InterviewReviewQuestionAssessment(InterviewReviewModel):
     question_id: StandardUUID
     score: Annotated[int, Field(strict=True, ge=0, le=100)]
@@ -311,7 +283,6 @@ __all__ = [
     "InterviewReviewQuestionAssessment",
     "InterviewReviewQuestionSnapshot",
     "InterviewReviewReferenceAnswer",
-    "InterviewReviewRunPayload",
     "InterviewReviewSessionSnapshot",
     "InterviewReviewTargetedPractice",
     "InterviewReviewTurnAssessmentSnapshot",

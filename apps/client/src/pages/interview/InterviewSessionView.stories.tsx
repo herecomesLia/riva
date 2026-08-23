@@ -296,27 +296,6 @@ export const CandidateQuestions = meta.story({
   },
 })
 
-export const CandidateQuestionAnalysisError = meta.story({
-  args: {
-    status: "generatingCandidateAnswer",
-    summary: fixture.summary,
-    generationStatus: "failed",
-    currentCandidateQuestion: fixture.candidateExchange.question,
-    history: fixture.history,
-    isRetrying: false,
-    retryFailed: false,
-    onRetry: fn(async () => undefined),
-    onBack: fn(),
-  },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText(fixture.candidateExchange.question.content)).toBeVisible()
-    await expect(
-      canvas.getByText(/RIVA 提问分析生成失败|RIVA question analysis could not be generated/i),
-    ).toBeVisible()
-    await expect(canvas.queryByText(/面试官回答|interviewer answer/i)).not.toBeInTheDocument()
-  },
-})
-
 export const English = meta.story({
   args: {
     status: "candidateQuestions",

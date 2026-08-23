@@ -32,14 +32,6 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_timeout_seconds: float = Field(default=60, gt=0)
     llm_enable_thinking: bool = False
-    worker_id: str | None = None
-    worker_lease_seconds: float = Field(default=300, gt=0)
-    worker_heartbeat_seconds: float = Field(default=60, gt=0)
-    worker_poll_seconds: float = Field(default=1, gt=0)
-    worker_requeue_seconds: float = Field(default=60, gt=0)
-    worker_retry_base_seconds: float = Field(default=10, gt=0)
-    worker_retry_max_seconds: float = Field(default=300, gt=0)
-    worker_requeue_batch_size: int = Field(default=100, gt=0)
     resume_storage_dir: Path = Path(".riva/resumes")
     resume_max_upload_bytes: int = Field(
         default=10 * 1024 * 1024,
@@ -89,18 +81,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SameSite=None cookies require RIVA_SESSION_COOKIE_SECURE."
             )
-        if self.worker_heartbeat_seconds >= self.worker_lease_seconds:
-            raise ValueError(
-                "RIVA_WORKER_HEARTBEAT_SECONDS must be less than "
-                "RIVA_WORKER_LEASE_SECONDS."
-            )
-        if self.worker_retry_max_seconds < self.worker_retry_base_seconds:
-            raise ValueError(
-                "RIVA_WORKER_RETRY_MAX_SECONDS must be greater than or equal to "
-                "RIVA_WORKER_RETRY_BASE_SECONDS."
-            )
-        if self.worker_id and len(self.worker_id.strip()) > 255:
-            raise ValueError("RIVA_WORKER_ID must not exceed 255 characters.")
         return self
 
     def write_environ(self) -> None:
@@ -115,18 +95,6 @@ class Settings(BaseSettings):
         _write_optional_environ("RIVA_LLM_BASE_URL", self.llm_base_url)
         os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.llm_timeout_seconds)
         os.environ["RIVA_LLM_ENABLE_THINKING"] = str(self.llm_enable_thinking).lower()
-        _write_optional_environ("RIVA_WORKER_ID", self.worker_id)
-        os.environ["RIVA_WORKER_LEASE_SECONDS"] = str(self.worker_lease_seconds)
-        os.environ["RIVA_WORKER_HEARTBEAT_SECONDS"] = str(self.worker_heartbeat_seconds)
-        os.environ["RIVA_WORKER_POLL_SECONDS"] = str(self.worker_poll_seconds)
-        os.environ["RIVA_WORKER_REQUEUE_SECONDS"] = str(self.worker_requeue_seconds)
-        os.environ["RIVA_WORKER_RETRY_BASE_SECONDS"] = str(
-            self.worker_retry_base_seconds
-        )
-        os.environ["RIVA_WORKER_RETRY_MAX_SECONDS"] = str(self.worker_retry_max_seconds)
-        os.environ["RIVA_WORKER_REQUEUE_BATCH_SIZE"] = str(
-            self.worker_requeue_batch_size
-        )
         os.environ["RIVA_RESUME_STORAGE_DIR"] = str(self.resume_storage_dir)
         os.environ["RIVA_RESUME_MAX_UPLOAD_BYTES"] = str(self.resume_max_upload_bytes)
         os.environ["RIVA_RESUME_MAX_EXTRACTED_CHARACTERS"] = str(

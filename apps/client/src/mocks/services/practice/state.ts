@@ -9,9 +9,7 @@ export type PracticeMockOperation =
   | "continueToNextPracticeQuestion"
   | "endPracticeFollowUps"
   | "endPracticeSession"
-  | "getPracticeEvaluationStatus"
   | "getPracticePage"
-  | "getQuestionGenerationStatus"
   | "prepareNextPracticeSession"
   | "preparePracticeTrainingEntry"
   | "requestAnswerFramework"
@@ -22,7 +20,6 @@ export type PracticeMockOperation =
   | "requestPracticeHint"
   | "requestPracticeReferenceAnswer"
   | "retryCurrentPracticeQuestion"
-  | "retryPracticeEvaluation"
   | "setQuestionSaved"
   | "setQuestionWeak"
   | "skipPracticeQuestion"
@@ -50,8 +47,6 @@ let sessionSequence = 0
 let mutationSequence = 0
 let configuredDefaultDelayMs: number | undefined
 let historyEntryRoleSelectionRequired = false
-const generationPollCounts = new Map<string, number>()
-const evaluationPollCounts = new Map<string, number>()
 const questionOrdinals = new Map<string, number>()
 const delayedOperations = new Map<PracticeMockOperation, number>()
 const failingOperations = new Set<PracticeMockOperation>()
@@ -102,8 +97,6 @@ export function resetPracticeMockState(
   mutationSequence = 0
   configuredDefaultDelayMs = nextDefaultDelayMs
   historyEntryRoleSelectionRequired = false
-  generationPollCounts.clear()
-  evaluationPollCounts.clear()
   questionOrdinals.clear()
   delayedOperations.clear()
   failingOperations.clear()
@@ -151,26 +144,6 @@ export function nextQuestionOrdinal(sessionId: string) {
 
 export function ensureQuestionOrdinal(sessionId: string) {
   if (!questionOrdinals.has(sessionId)) questionOrdinals.set(sessionId, 1)
-}
-
-export function nextGenerationPoll(sessionId: string) {
-  const count = (generationPollCounts.get(sessionId) ?? 0) + 1
-  generationPollCounts.set(sessionId, count)
-  return count
-}
-
-export function resetGenerationPoll(sessionId: string) {
-  generationPollCounts.set(sessionId, 0)
-}
-
-export function nextEvaluationPoll(key: string) {
-  const count = (evaluationPollCounts.get(key) ?? 0) + 1
-  evaluationPollCounts.set(key, count)
-  return count
-}
-
-export function resetEvaluationPoll(key: string) {
-  evaluationPollCounts.set(key, 0)
 }
 
 export function nextPracticeMutationTimestamp() {

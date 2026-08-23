@@ -13,7 +13,6 @@ from sqlalchemy import (
     Index,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
@@ -73,10 +72,6 @@ class QuestionCard(Base):
             "job_description_analysis_version >= 1",
             name="ck_question_cards_analysis_version",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_question_cards_source_run",
-        ),
         Index(
             "ix_question_cards_user_target_role",
             "user_id",
@@ -107,17 +102,6 @@ class QuestionCard(Base):
     profile_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         nullable=False,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    matching_analysis_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
     )
     language: Mapped[str] = mapped_column(String(16), nullable=False)
     question_type: Mapped[str] = mapped_column(String(64), nullable=False)

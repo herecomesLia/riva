@@ -17,11 +17,9 @@ const meta = preview.meta({
 function DialogHarness({
   applyDraft = fn(() => new Promise<JobDescriptionImportDraft>(() => undefined)),
   createResult,
-  getDraft = fn(() => new Promise<JobDescriptionImportDraft>(() => undefined)),
 }: {
   applyDraft?: (draftId: string) => Promise<JobDescriptionImportDraft>
   createResult?: JobDescriptionImportDraft
-  getDraft?: (draftId: string) => Promise<JobDescriptionImportDraft>
 }) {
   const [open, setOpen] = useState(true)
   return (
@@ -32,11 +30,9 @@ function DialogHarness({
           ? fn(async () => createResult)
           : fn(() => new Promise<JobDescriptionImportDraft>(() => undefined))
       }
-      getDraft={getDraft}
       onApplied={fn()}
       onOpenChange={setOpen}
       open={open}
-      pollIntervalMs={0}
     />
   )
 }
@@ -62,28 +58,12 @@ export const Input = meta.story({
   },
 })
 
-export const Parsing = meta.story({
-  render: () => <DialogHarness createResult={createJobDescriptionImportDraftFixture("parsing")} />,
-  play: async ({ userEvent }) => {
-    await submitStoryJd(userEvent)
-    await expect(screen.findByText(/正在解析 JD|parsing the JD/i)).resolves.toBeVisible()
-  },
-})
-
 export const Ready = meta.story({
   render: () => <DialogHarness createResult={createJobDescriptionImportDraftFixture("ready")} />,
   play: async ({ userEvent }) => {
     await submitStoryJd(userEvent)
     await expect(screen.findByText(/JD 解析完成|JD parsing complete/i)).resolves.toBeVisible()
     await expect(screen.findByText("高级前端工程师")).resolves.toBeVisible()
-  },
-})
-
-export const Failed = meta.story({
-  render: () => <DialogHarness createResult={createJobDescriptionImportDraftFixture("failed")} />,
-  play: async ({ userEvent }) => {
-    await submitStoryJd(userEvent)
-    await expect(screen.findByText(/JD 解析失败|JD parsing failed/i)).resolves.toBeVisible()
   },
 })
 

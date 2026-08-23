@@ -77,15 +77,15 @@ export function createLongMatchingAnalysisResponse() {
   return response
 }
 
-export function createStaleWhileParsingResponse() {
+export function createStaleWhileSavedJobDescriptionResponse() {
   const response = createRolesMockResponse("matchingAnalysisStale")
   const staleAnalysis = response.roles[0]!.matchingAnalysis
-  const parsingRole = createRolesMockResponse("roleWithJobDescriptionParsing").roles[0]!
+  const savedRole = createRolesMockResponse("roleWithSavedJobDescription").roles[0]!
   if (staleAnalysis?.status !== "stale") {
     throw new Error("Expected a stale matching-analysis fixture.")
   }
   response.roles[0] = {
-    ...parsingRole,
+    ...savedRole,
     matchingAnalysis: structuredClone(staleAnalysis),
   }
   return response

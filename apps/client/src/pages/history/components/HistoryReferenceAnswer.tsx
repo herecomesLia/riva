@@ -75,44 +75,6 @@ export function HistoryReferenceAnswer({
           <PracticeReferenceAnswerContent referenceAnswer={referenceAnswer} />
         )}
 
-        {referenceAnswer.status === "generating" && (
-          <div className="flex flex-col items-start gap-4">
-            <Alert role="status">
-              <Spinner aria-hidden="true" />
-              <AlertTitle>{t("history.detail.reference.generating")}</AlertTitle>
-              <AlertDescription>
-                {t("history.detail.reference.generatingDescription")}
-              </AlertDescription>
-            </Alert>
-            {onGenerate && <GenerateButton disabled onGenerate={onGenerate} />}
-          </div>
-        )}
-
-        {referenceAnswer.status === "pollingRetrying" && (
-          <div className="flex flex-col items-start gap-4">
-            <Alert role="status">
-              <Spinner aria-hidden="true" />
-              <AlertTitle>{t("history.detail.reference.pollingRetrying")}</AlertTitle>
-              <AlertDescription>
-                {t("history.detail.reference.pollingRetryingDescription")}
-              </AlertDescription>
-            </Alert>
-            {onGenerate && <GenerateButton disabled onGenerate={onGenerate} />}
-          </div>
-        )}
-
-        {referenceAnswer.status === "pollingFailed" && (
-          <ReferenceUnavailable
-            actionLabel={t("history.detail.reference.recheck")}
-            description={t(
-              `history.detail.reference.pollingFailedDescription.${referenceAnswer.reason}`,
-            )}
-            isRequesting={isRequesting}
-            onGenerate={onGenerate}
-            title={t("history.detail.reference.pollingFailed")}
-          />
-        )}
-
         {referenceAnswer.status === "unavailable" &&
           ("reason" in referenceAnswer ? (
             <ReferenceUnavailable

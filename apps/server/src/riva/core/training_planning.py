@@ -7,7 +7,7 @@ from fastapi import Depends, Request
 from pydantic import TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.core.agent_execution import get_agent_executor
+from riva.core.llm import get_llm_provider
 from riva.db import get_db_session
 from riva.schemas.training_planning import (
     TrainingPlanningInput,
@@ -135,9 +135,8 @@ async def get_training_planning_service(
     settings = request.app.state.settings
     return TrainingPlanningService(
         session,
-        llm_provider=settings.llm_provider,
+        llm_provider=get_llm_provider(request),
         llm_model=settings.llm_model,
-        agent_executor=get_agent_executor(request),
     )
 
 

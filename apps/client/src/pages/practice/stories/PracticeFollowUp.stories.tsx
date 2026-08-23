@@ -2,10 +2,7 @@ import preview from "#storybook/preview"
 import { expect, fn, userEvent, within } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
-import {
-  createGeneratingFollowUpStoryArgs,
-  createPracticeViewArgs,
-} from "./practice-story-fixtures"
+import { createPracticeViewArgs } from "./practice-story-fixtures"
 import { PracticeView } from "../PracticeView"
 
 const meta = preview.meta({
@@ -20,28 +17,6 @@ export const SingleFollowUp = meta.story({
   play: async ({ canvas }) => {
     await expect(canvas.getByTestId("practice-answering-follow-up-state")).toBeVisible()
     await expect(canvas.getAllByRole("textbox")).toHaveLength(1)
-  },
-})
-
-export const GeneratingFirstFollowUp = meta.story({
-  args: createGeneratingFollowUpStoryArgs(1),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-generating-follow-up-state")).toBeVisible()
-    await expect(
-      canvas.getByText(/正在分析回答并准备下一步|reviewing your answer and preparing/i),
-    ).toBeVisible()
-    await expect(canvas.queryByRole("textbox")).not.toBeInTheDocument()
-  },
-})
-
-export const GeneratingSecondFollowUp = meta.story({
-  args: createGeneratingFollowUpStoryArgs(2),
-  play: async ({ canvas }) => {
-    const timeline = canvas.getByTestId("practice-conversation-timeline")
-
-    await expect(timeline).toHaveTextContent(/追问 1|Follow-up 1/i)
-    await expect(canvas.getByTestId("practice-generating-follow-up-state")).toBeVisible()
-    await expect(canvas.queryByRole("textbox")).not.toBeInTheDocument()
   },
 })
 
@@ -172,9 +147,9 @@ export const FollowUpSubmitError = meta.story({
 })
 
 export const FollowUpCompleted = meta.story({
-  args: createPracticeViewArgs("evaluatingAnswer"),
+  args: createPracticeViewArgs("reviewAnswer"),
   play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
+    await expect(canvas.getByTestId("practice-review-state")).toBeVisible()
     await expect(canvas.getByTestId("practice-conversation-timeline")).toBeVisible()
   },
 })

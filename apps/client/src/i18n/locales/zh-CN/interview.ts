@@ -227,7 +227,6 @@ export const interview = {
       structure: "推荐回答结构",
       keyPoints: "回答关键点",
       example: "RIVA 示例回答",
-      generating: "RIVA 参考答案正在生成",
       unavailable: "RIVA 参考答案暂不可用",
     },
     sections: {

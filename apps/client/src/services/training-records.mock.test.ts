@@ -13,7 +13,6 @@ import {
   type TrainingRecordReferenceAnswerTarget,
 } from "@/models/training-records"
 import {
-  getTrainingRecordReferenceAnswerGenerationStatus,
   getMockInterviewRecord,
   getTargetedPracticeRecord,
   getTrainingRecordsOverview,
@@ -313,7 +312,6 @@ describe("training records mock service", () => {
   ])("generates and persists a reference for $label", async ({ target }) => {
     resetTrainingRecordsMockState("default", {
       referenceAnswerOutcome: "ready",
-      referenceAnswerPollsBeforeCompletion: 1,
     })
     const before =
       target.kind === "targetedPractice"
@@ -322,14 +320,6 @@ describe("training records mock service", () => {
 
     await expect(settle(requestTrainingRecordReferenceAnswer(target))).resolves.toMatchObject({
       target,
-      referenceAnswer: { status: "generating" },
-    })
-    await expect(
-      settle(getTrainingRecordReferenceAnswerGenerationStatus(target)),
-    ).resolves.toMatchObject({ referenceAnswer: { status: "generating" } })
-    await expect(
-      settle(getTrainingRecordReferenceAnswerGenerationStatus(target)),
-    ).resolves.toMatchObject({
       referenceAnswer: { status: target.kind === "targetedPractice" ? "revealed" : "ready" },
     })
 
@@ -342,28 +332,9 @@ describe("training records mock service", () => {
     expect(after).toEqual(expected)
   })
 
-  it("protects a generating target from duplicate concurrent requests", async () => {
-    const target = {
-      kind: "targetedPractice",
-      subject: "mainQuestion",
-      recordId: "targeted-practice-record-003",
-      questionId: "history-practice-question-003",
-    } as const
-    const first = requestTrainingRecordReferenceAnswer(target)
-    const duplicate = requestTrainingRecordReferenceAnswer(target)
-    const duplicateAssertion = expect(duplicate).rejects.toMatchObject({
-      code: "alreadyGenerating",
-    })
-    await vi.runAllTimersAsync()
-
-    await expect(first).resolves.toMatchObject({ referenceAnswer: { status: "generating" } })
-    await duplicateAssertion
-  })
-
   it("allows generationFailed retries but rejects insufficientContext retries", async () => {
     resetTrainingRecordsMockState("default", {
       referenceAnswerOutcome: "generationFailed",
-      referenceAnswerPollsBeforeCompletion: 0,
     })
     const retryable = {
       kind: "mockInterview",
@@ -371,14 +342,12 @@ describe("training records mock service", () => {
       recordId: "mock-interview-record-001",
       questionId: "history-interview-question-002",
     } as const
-    await settle(requestTrainingRecordReferenceAnswer(retryable))
-    await expect(
-      settle(getTrainingRecordReferenceAnswerGenerationStatus(retryable)),
-    ).resolves.toMatchObject({
+    await expect(settle(requestTrainingRecordReferenceAnswer(retryable))).resolves.toMatchObject({
       referenceAnswer: { status: "unavailable", reason: "generationFailed" },
     })
+    resetTrainingRecordsMockState("default", { referenceAnswerOutcome: "ready" })
     await expect(settle(requestTrainingRecordReferenceAnswer(retryable))).resolves.toMatchObject({
-      referenceAnswer: { status: "generating" },
+      referenceAnswer: { status: "ready" },
     })
 
     const insufficient = {

@@ -21,11 +21,7 @@ export const Complete = meta.story({ args: argsFor("matchingAnalysisCurrent") })
 export const JobDescriptionMissing = meta.story({
   args: argsFor("singleRoleWithoutJobDescription"),
 })
-export const JobDescriptionParsing = meta.story({ args: argsFor("roleWithJobDescriptionParsing") })
-export const MatchingAnalysisGenerating = meta.story({
-  args: argsFor("matchingAnalysisGenerating"),
-})
-export const MatchingAnalysisFailed = meta.story({ args: argsFor("matchingAnalysisFailed") })
+export const JobDescriptionSaved = meta.story({ args: argsFor("roleWithSavedJobDescription") })
 export const MatchingAnalysisStale = meta.story({ args: argsFor("matchingAnalysisStale") })
 export const MatchingAnalysisCurrent = meta.story({ args: argsFor("matchingAnalysisCurrent") })
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Literal, cast
+from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -10,11 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from riva.agents.interview_planning import InterviewPlanningAgent
 from riva.agents.interview_review import InterviewReviewAgent
+from riva.integrations import LLMProvider
 from riva.models import (
-    AgentRun,
-    AgentRunStatus,
     InterviewAnswer,
     InterviewCandidateQuestionExchange,
     InterviewFollowUpQuestion,
@@ -22,7 +20,6 @@ from riva.models import (
     InterviewQuestion,
     InterviewReview,
     InterviewSession,
-    User,
 )
 from riva.schemas.interview import InterviewConfiguration
 from riva.schemas.interview_candidate_question import (
@@ -31,7 +28,6 @@ from riva.schemas.interview_candidate_question import (
 )
 from riva.schemas.interview_planning import (
     InterviewPlanningQuestion,
-    InterviewPlanningRunPayload,
 )
 from riva.schemas.interview_review import (
     InterviewReviewAnswerSnapshot,
@@ -45,13 +41,12 @@ from riva.schemas.interview_review import (
     InterviewReviewQuestionAssessment,
     InterviewReviewQuestionSnapshot,
     InterviewReviewReferenceAnswer,
-    InterviewReviewRunPayload,
     InterviewReviewSessionSnapshot,
     InterviewReviewTurnAssessmentSnapshot,
 )
 from riva.schemas.training_memory import TrainingMemoryContext
-from riva.services.agent_runs import AgentRunService
 from riva.services.competency_ingestion import CompetencyIngestionService
+from riva.services.interview_planning import InterviewPlanningService
 from riva.services.training_memory import TrainingMemoryService
 from riva.utils import utc_now
 
@@ -59,7 +54,6 @@ InterviewReviewStateErrorCode = Literal[
     "interview_session_not_found",
     "interview_review_version_conflict",
     "interview_review_state_invalid",
-    "interview_review_run_invalid",
     "interview_review_snapshot_invalid",
     "interview_review_model_not_configured",
     "interview_review_artifact_conflict",
@@ -73,9 +67,6 @@ INTERVIEW_REVIEW_VERSION_CONFLICT: InterviewReviewStateErrorCode = (
 )
 INTERVIEW_REVIEW_STATE_INVALID: InterviewReviewStateErrorCode = (
     "interview_review_state_invalid"
-)
-INTERVIEW_REVIEW_RUN_INVALID: InterviewReviewStateErrorCode = (
-    "interview_review_run_invalid"
 )
 INTERVIEW_REVIEW_SNAPSHOT_INVALID: InterviewReviewStateErrorCode = (
     "interview_review_snapshot_invalid"
@@ -104,6 +95,7 @@ class InterviewReviewService:
         self,
         session: AsyncSession,
         *,
+        llm_provider: LLMProvider | None = None,
         llm_model: str | None = None,
         clock: Clock = utc_now,
         competency_ingestion_service_factory: Callable[
@@ -114,25 +106,22 @@ class InterviewReviewService:
         ] = TrainingMemoryService,
     ) -> None:
         self.session = session
+        self.llm_provider = llm_provider
         self.llm_model = (llm_model or "").strip()
         self.clock = clock
         self.competency_ingestion_service_factory = competency_ingestion_service_factory
         self.training_memory_service_factory = training_memory_service_factory
 
-    async def enqueue_review_in_transaction(
+    async def generate_review(
         self,
         *,
         user_id: UUID,
         interview_session: InterviewSession,
         completion_reason: InterviewReviewCompletionReason,
         review_mode: InterviewReviewMode,
-        session_state_version: int,
-        idempotency_key: str,
-    ) -> AgentRun:
-        if not self.llm_model:
+    ) -> InterviewReview:
+        if self.llm_provider is None or not self.llm_model:
             raise InterviewReviewStateError(INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED)
-        if interview_session.version + 1 != session_state_version:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
         training_memory = await self.training_memory_service_factory(
             self.session
         ).get_context(user_id)
@@ -142,69 +131,41 @@ class InterviewReviewService:
             review_mode=review_mode,
             training_memory=training_memory,
         )
-        payload = InterviewReviewRunPayload(
+        output = (
+            await InterviewReviewAgent(self.llm_provider, self.llm_model).run(
+                input_snapshot
+            )
+        ).output
+        validated_output = _validate_output(output, review_mode)
+        now = self._now()
+        question_details = await self.build_question_details(
+            interview_session,
+            validated_output,
+            now=now,
+        )
+        review = InterviewReview(
+            id=uuid4(),
             session_id=interview_session.id,
-            session_version=interview_session.version,
-            session_state_version=session_state_version,
-            completion_reason=completion_reason,
-            review_mode=review_mode,
-            interaction_language=interview_session.language,
-            interview_review_input=input_snapshot,
+            status=review_mode.value,
+            review=_review_json(validated_output, review_mode, now),
+            question_details=question_details,
+            created_at=now,
         )
-        return await AgentRunService(self.session).enqueue_in_transaction(
+        self.session.add(review)
+        await self.session.flush()
+        await self.competency_ingestion_service_factory(
+            self.session
+        ).ingest_interview_review(
             user_id=user_id,
-            agent_id=InterviewReviewAgent.agent_id,
-            prompt_id=InterviewReviewAgent.agent_id,
-            prompt_version=InterviewReviewAgent.agent_version,
-            output_schema_id=InterviewReviewAgent.output_schema_id,
-            model=self.llm_model,
-            payload=cast(
-                dict[str, object],
-                payload.model_dump(mode="json", by_alias=True),
-            ),
-            idempotency_key=idempotency_key,
-            max_attempts=3,
+            interview_session=interview_session,
+            review=review,
         )
-
-    async def retry_review_in_transaction(
-        self,
-        *,
-        user_id: UUID,
-        interview_session: InterviewSession,
-        failed_run: AgentRun,
-        idempotency_key: str,
-    ) -> AgentRun:
-        if not self.llm_model:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED)
-        payload = self._validate_run_payload(failed_run)
-        if (
-            payload.session_id != interview_session.id
-            or payload.session_state_version != interview_session.version
-        ):
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID)
-        retry_payload = payload.model_copy(
-            update={
-                "session_state_version": interview_session.version + 1,
-                "retry_of_run_id": failed_run.id,
-            }
-        )
-        return await AgentRunService(self.session).enqueue_in_transaction(
-            user_id=user_id,
-            agent_id=InterviewReviewAgent.agent_id,
-            prompt_id=InterviewReviewAgent.agent_id,
-            prompt_version=InterviewReviewAgent.agent_version,
-            output_schema_id=InterviewReviewAgent.output_schema_id,
-            model=self.llm_model,
-            payload=cast(
-                dict[str, object],
-                retry_payload.model_dump(
-                    mode="json",
-                    by_alias=True,
-                ),
-            ),
-            idempotency_key=idempotency_key,
-            max_attempts=3,
-        )
+        interview_session.status = "completed"
+        interview_session.completion_reason = completion_reason.value
+        interview_session.completed_at = now
+        interview_session.version += 1
+        interview_session.updated_at = now
+        return review
 
     async def build_review_input(
         self,
@@ -223,28 +184,16 @@ class InterviewReviewService:
             )
             if plan is None:
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
-            planning_run = await self.session.get(AgentRun, plan.source_agent_run_id)
-            if planning_run is None:
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
-            if (
-                planning_run.user_id != interview_session.user_id
-                or planning_run.agent_id != InterviewPlanningAgent.agent_id
-                or planning_run.prompt_id != InterviewPlanningAgent.agent_id
-                or planning_run.prompt_version != InterviewPlanningAgent.agent_version
-                or planning_run.output_schema_id
-                != InterviewPlanningAgent.output_schema_id
-                or _status_value(planning_run.status) != AgentRunStatus.SUCCEEDED.value
-            ):
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
-            planner_payload = InterviewPlanningRunPayload.model_validate(
-                planning_run.payload
+            planner_context = await InterviewPlanningService(
+                self.session,
+            )._build_planning_input(
+                interview_session,
+                user_id=interview_session.user_id,
+                training_memory=training_memory,
             )
-            planner_context = planner_payload.interview_planning_input
             configuration = _session_configuration(interview_session)
             if planner_context.configuration != configuration:
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID)
-            if training_memory is None:
-                training_memory = planner_context.training_memory
 
             questions = list(
                 (
@@ -306,10 +255,6 @@ class InterviewReviewService:
         except TypeError, ValueError, ValidationError:
             raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
 
-    async def load_review_input(self, run: AgentRun) -> InterviewReviewInput:
-        payload = self._validate_run_payload(run)
-        return payload.interview_review_input
-
     async def get_completed_review(
         self,
         *,
@@ -329,93 +274,6 @@ class InterviewReviewService:
             raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
         return interview_session, interview_session.review
 
-    async def persist_success(
-        self,
-        run: AgentRun,
-        output: InterviewReviewOutput,
-    ) -> InterviewReviewOutput:
-        try:
-            payload = self._validate_run_payload(run)
-            validated_output = _validate_output(output, payload.review_mode)
-            await self._lock_user(run.user_id)
-            persisted_run = await self.session.scalar(
-                select(AgentRun).where(AgentRun.id == run.id).with_for_update()
-            )
-            if persisted_run is None or _status_value(persisted_run.status) != (
-                AgentRunStatus.RUNNING.value
-            ):
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID)
-            self._validate_run_metadata(persisted_run, run.user_id)
-            interview_session = await self._locked_session(
-                run.user_id,
-                payload.session_id,
-            )
-            if (
-                interview_session.review_run_id != run.id
-                or interview_session.status != "generatingReview"
-                or interview_session.version != payload.session_state_version
-            ):
-                raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID)
-
-            existing = await self.session.scalar(
-                select(InterviewReview)
-                .where(InterviewReview.session_id == interview_session.id)
-                .with_for_update()
-            )
-            if existing is not None:
-                if existing.source_agent_run_id != run.id:
-                    raise InterviewReviewStateError(INTERVIEW_REVIEW_ARTIFACT_CONFLICT)
-                await self.competency_ingestion_service_factory(
-                    self.session
-                ).ingest_interview_review(
-                    user_id=run.user_id,
-                    interview_session=interview_session,
-                    review=existing,
-                )
-                await self.session.commit()
-                return validated_output
-
-            now = self._now()
-            question_details = await self.build_question_details(
-                interview_session,
-                validated_output,
-                now=now,
-            )
-            review_json = _review_json(validated_output, payload.review_mode, now)
-            review = InterviewReview(
-                id=uuid4(),
-                session_id=interview_session.id,
-                source_agent_run_id=run.id,
-                status=payload.review_mode.value,
-                review=review_json,
-                question_details=question_details,
-                created_at=now,
-            )
-            self.session.add(review)
-            await self.session.flush()
-            await self.competency_ingestion_service_factory(
-                self.session
-            ).ingest_interview_review(
-                user_id=run.user_id,
-                interview_session=interview_session,
-                review=review,
-            )
-            interview_session.status = "completed"
-            interview_session.completion_reason = payload.completion_reason.value
-            interview_session.completed_at = now
-            interview_session.version += 1
-            await self.session.commit()
-            return validated_output
-        except InterviewReviewStateError:
-            await self.session.rollback()
-            raise
-        except TypeError, ValueError, ValidationError:
-            await self.session.rollback()
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
-        except Exception:
-            await self.session.rollback()
-            raise
-
     async def persist_unavailable_without_agent(
         self,
         interview_session: InterviewSession,
@@ -423,7 +281,7 @@ class InterviewReviewService:
         completion_reason: InterviewReviewCompletionReason,
     ) -> InterviewReview:
         try:
-            if interview_session.status != "opening":
+            if interview_session.status not in {"opening", "question", "followUp"}:
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
             if interview_session.version < 1:
                 raise InterviewReviewStateError(INTERVIEW_REVIEW_STATE_INVALID)
@@ -431,7 +289,6 @@ class InterviewReviewService:
             review = InterviewReview(
                 id=uuid4(),
                 session_id=interview_session.id,
-                source_agent_run_id=None,
                 status=InterviewReviewMode.UNAVAILABLE.value,
                 review=None,
                 question_details=[],
@@ -450,7 +307,6 @@ class InterviewReviewService:
             interview_session.completion_reason = completion_reason.value
             interview_session.completed_at = now
             interview_session.version += 1
-            await self.session.commit()
             return review
         except InterviewReviewStateError:
             await self.session.rollback()
@@ -570,56 +426,11 @@ class InterviewReviewService:
             )
         return details
 
-    async def _lock_user(self, user_id: UUID) -> None:
-        if (
-            await self.session.scalar(
-                select(User.id).where(User.id == user_id).with_for_update()
-            )
-            is None
-        ):
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
-
-    async def _locked_session(
-        self,
-        user_id: UUID,
-        session_id: UUID,
-    ) -> InterviewSession:
-        interview_session = await self.session.scalar(
-            select(InterviewSession)
-            .where(
-                InterviewSession.id == session_id,
-                InterviewSession.user_id == user_id,
-            )
-            .with_for_update()
-        )
-        if interview_session is None:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_SESSION_NOT_FOUND)
-        return interview_session
-
     def _now(self) -> datetime:
         value = self.clock()
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("clock must return a timezone-aware datetime")
         return value.astimezone(UTC)
-
-    @staticmethod
-    def _validate_run_metadata(run: AgentRun, user_id: UUID) -> None:
-        if (
-            run.user_id != user_id
-            or run.agent_id != InterviewReviewAgent.agent_id
-            or run.prompt_id != InterviewReviewAgent.agent_id
-            or run.prompt_version != InterviewReviewAgent.agent_version
-            or run.output_schema_id != InterviewReviewAgent.output_schema_id
-        ):
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_RUN_INVALID)
-
-    @classmethod
-    def _validate_run_payload(cls, run: AgentRun) -> InterviewReviewRunPayload:
-        cls._validate_run_metadata(run, run.user_id)
-        try:
-            return InterviewReviewRunPayload.model_validate(run.payload)
-        except TypeError, ValueError, ValidationError:
-            raise InterviewReviewStateError(INTERVIEW_REVIEW_SNAPSHOT_INVALID) from None
 
 
 def _review_question_snapshot(
@@ -930,7 +741,6 @@ def _status_value(value: object) -> str:
 __all__ = [
     "INTERVIEW_REVIEW_ARTIFACT_CONFLICT",
     "INTERVIEW_REVIEW_MODEL_NOT_CONFIGURED",
-    "INTERVIEW_REVIEW_RUN_INVALID",
     "INTERVIEW_REVIEW_SESSION_NOT_FOUND",
     "INTERVIEW_REVIEW_SNAPSHOT_INVALID",
     "INTERVIEW_REVIEW_STATE_INVALID",

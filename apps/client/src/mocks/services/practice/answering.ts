@@ -1,9 +1,12 @@
 import {
+  createGeneratedPracticeQuestion,
   createGeneratedPracticeQuestionGuidance,
   createPracticeFollowUpQuestion,
   createPracticeReferenceAnswer,
   getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
+  createPracticeReviewState,
+  type PracticeSubmittedMockState,
 } from "@/mocks/data/practice"
 import type {
   PracticeAnsweringState,
@@ -27,7 +30,7 @@ import {
   getCurrentTargetRoleTitle,
   getPracticeMockState,
   nextPracticeMutationTimestamp,
-  resetGenerationPoll,
+  nextQuestionOrdinal,
   setPracticeMockState,
 } from "./state"
 
@@ -215,17 +218,24 @@ export async function submitPrimaryAnswer(
   const firstTemplate = followUpPlan[0]
 
   if (!firstTemplate) {
+    const submitted: PracticeSubmittedMockState = {
+      sessionId: session.sessionId,
+      language: session.language,
+      version: session.version + 1,
+      selection: copyPracticeState(session.selection),
+      startedAt: session.startedAt,
+      attemptId: session.attemptId,
+      attemptNumber: session.attemptNumber,
+      attemptRecords: copyPracticeState(session.attemptRecords),
+      question: copyPracticeState(session.question),
+      mainAnswer,
+      followUpExchanges: [],
+      followUpCompletion: { status: "completed", reason: "noFollowUpRequired" },
+      submittedAt,
+    }
     return setPracticeMockState({
       ...getPracticeMockState(),
-      session: {
-        ...session,
-        status: "evaluating",
-        version: session.version + 1,
-        mainAnswer,
-        followUpExchanges: [],
-        followUpCompletion: { status: "completed", reason: "noFollowUpRequired" },
-        submittedAt,
-      },
+      session: createPracticeReviewState(submitted),
     })
   }
 
@@ -256,12 +266,12 @@ export async function skipPracticeQuestion(
   await consumePracticeMockOperation("skipPracticeQuestion")
   const session = requireCurrentQuestion(input)
   ensureQuestionOrdinal(session.sessionId)
-  resetGenerationPoll(session.sessionId)
+  const ordinal = nextQuestionOrdinal(session.sessionId)
 
   return setPracticeMockState({
     ...getPracticeMockState(),
     session: {
-      status: "generatingQuestion",
+      status: "answering",
       sessionId: session.sessionId,
       language: session.language,
       version: session.version + 1,
@@ -270,7 +280,11 @@ export async function skipPracticeQuestion(
       attemptId: session.attemptId,
       attemptNumber: session.attemptNumber,
       attemptRecords: copyPracticeState(session.attemptRecords),
-      previousAttempt: null,
+      question: createGeneratedPracticeQuestion({
+        ordinal,
+        selection: session.selection,
+        sessionId: session.sessionId,
+      }),
     },
   })
 }

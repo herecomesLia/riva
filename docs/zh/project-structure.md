@@ -80,8 +80,6 @@ apps/server/
 │       ├── schemas/
 │       ├── services/
 │       ├── agents/
-│       ├── workers/
-│       ├── prompts/
 │       └── integrations/
 ├── tests/
 └── migrations/
@@ -93,12 +91,10 @@ apps/server/
 - `cli/`：Typer 命令定义和命令侧编排逻辑。
 - `core/`：配置、日志、鉴权依赖和应用生命周期。
 - `db/`：数据库连接、事务和迁移基础能力。
-- `models/`：数据库模型，例如用户、简历、岗位、题卡、面试会话、复盘和 Agent 运行记录。
+- `models/`：数据库模型，例如用户、简历、岗位、题卡、面试会话、复盘和业务结果。
 - `schemas/`：Pydantic 请求和响应结构。
 - `services/`：业务服务，承载简历、岗位、匹配分析、题卡、面试和评分复盘等主要逻辑。
-- `agents/`：Agent 和工作流。
-- `workers/`：AgentRun Handler、注册表、租约心跳和队列执行。
-- `prompts/`：Prompt 模板、评分标准和输出格式要求。
+- `agents/`：Agent、对应 Prompt、输出 Schema 和工作流。
 - `integrations/`：LLM Provider、对象存储、邮件和第三方 API 等外部服务适配。
 
 ## Interaction Language Contract
@@ -112,15 +108,15 @@ RIVA 的公共语言类型是 `InteractionLanguage`，当前值只有 `zh-CN` �
 - **UI language**：当前界面语言，可以随时切换。真实 API 请求默认携带
   `Accept-Language`，并在发送请求时从 i18next 的当前 resolved language 读取，避免首屏竞态。
 - **Artifact language**：一次 Resume Parsing、JD Parsing、Matching Analysis 或未来独立
-  QuestionCard 生成任务的语言。创建 AgentRun 时从当前 UI language 捕获，并写入
-  `AgentRun.payload.interactionLanguage`；Worker 只能从该 payload 恢复。未来 QuestionCard
+  QuestionCard 生成任务的语言。调用 Agent 时从当前 UI language 捕获，并随业务结果保存；
+  Service 将它直接传给 Agent。未来 QuestionCard
   model 也必须显式暴露 `language: InteractionLanguage`，不能依赖文本猜测。
 - **Session language**：PracticeSession 或 InterviewSession 创建时冻结的语言。Session
-  子操作（题目、追问、评分、复盘和推荐）必须继承 `Session.language`，不能在每个 AgentRun
-  中重新读取浏览器语言。UI chrome 可以切换，但活动 Session 的 AI 内容不迁移语言。
+  子操作（题目、追问、评分、复盘和推荐）必须继承 `Session.language`，不能重新读取浏览器语言。
+  UI chrome 可以切换，但活动 Session 的 AI 内容不迁移语言。
 
 任何新的用户可见 AI workflow 都必须在设计和代码中声明语言来源：独立 artifact 使用
-AgentRun 的 `interactionLanguage`，Session 子操作使用所属 Session 的 `language`。
+Agent 调用的 `interactionLanguage`，Session 子操作使用所属 Session 的 `language`。
 禁止以“检测 JD、简历或用户回答的主要语言并据此决定输出语言”作为主策略。
 
 公司名、学校名、项目名、产品名、技能名、编程语言、框架、数据库、协议、标准和 URL 等

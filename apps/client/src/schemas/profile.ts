@@ -13,7 +13,6 @@ import type {
   ResumeDocumentsResponseDto,
   ResumeImportApplication,
   ResumeImportDraft,
-  ResumeParsingStatus,
 } from "@/models/profile"
 
 export const profileEmploymentTypes = [
@@ -288,124 +287,6 @@ export const resumeDocumentsResponseSchema: z.ZodType<ResumeDocumentsResponseDto
   .strict()
 
 const resumeImportDraftStatusSchema = z.enum(["ready", "applied", "superseded"])
-const resumeParsingLifecycleStatusSchema = z.enum([
-  "notStarted",
-  "queued",
-  "running",
-  "succeeded",
-  "failed",
-])
-
-export const resumeParsingStatusSchema: z.ZodType<ResumeParsingStatus> = z
-  .object({
-    attemptCount: z.number().int().nonnegative(),
-    canRetry: z.boolean(),
-    createdAt: resumeDateTimeSchema.nullable(),
-    draftStatus: resumeImportDraftStatusSchema.nullable(),
-    draftVersion: z.number().int().positive().nullable(),
-    errorCode: z.string().nullable(),
-    failureReason: z.string().nullable(),
-    finishedAt: resumeDateTimeSchema.nullable(),
-    maxAttempts: z.number().int().positive().nullable(),
-    resultVersion: z.number().int().positive().nullable(),
-    resumeDocumentId: resumeUuidSchema,
-    runId: resumeUuidSchema.nullable(),
-    startedAt: resumeDateTimeSchema.nullable(),
-    status: resumeParsingLifecycleStatusSchema,
-  })
-  .strict()
-  .superRefine((value, context) => {
-    const requireState = (condition: boolean, message: string) => {
-      if (!condition) context.addIssue({ code: "custom", message })
-    }
-    const requireActiveState = () => {
-      requireState(
-        value.runId !== null && value.maxAttempts !== null && value.createdAt !== null,
-        "active state is incomplete",
-      )
-    }
-    const requireTerminalState = () => {
-      requireState(
-        value.runId !== null &&
-          value.maxAttempts !== null &&
-          value.createdAt !== null &&
-          value.finishedAt !== null,
-        "terminal state is incomplete",
-      )
-    }
-
-    switch (value.status) {
-      case "notStarted":
-        requireState(
-          value.runId === null &&
-            value.attemptCount === 0 &&
-            value.maxAttempts === null &&
-            value.errorCode === null &&
-            value.failureReason === null &&
-            !value.canRetry &&
-            value.createdAt === null &&
-            value.startedAt === null &&
-            value.finishedAt === null &&
-            value.resultVersion === null &&
-            value.draftVersion === null &&
-            value.draftStatus === null,
-          "notStarted state contains run data",
-        )
-        break
-      case "queued":
-        requireActiveState()
-        requireState(
-          value.failureReason === null &&
-            !value.canRetry &&
-            value.finishedAt === null &&
-            value.errorCode === null &&
-            value.resultVersion === null &&
-            value.draftVersion === null &&
-            value.draftStatus === null,
-          "queued state contains finished data",
-        )
-        break
-      case "running":
-        requireActiveState()
-        requireState(
-          value.startedAt !== null &&
-            value.failureReason === null &&
-            !value.canRetry &&
-            value.finishedAt === null &&
-            value.errorCode === null &&
-            value.resultVersion === null &&
-            value.draftVersion === null &&
-            value.draftStatus === null,
-          "running state contains invalid lifecycle data",
-        )
-        break
-      case "succeeded":
-        requireTerminalState()
-        requireState(
-          value.errorCode === null &&
-            value.failureReason === null &&
-            !value.canRetry &&
-            value.resultVersion !== null &&
-            value.draftVersion !== null &&
-            value.draftStatus !== null,
-          "succeeded state is incomplete",
-        )
-        break
-      case "failed":
-        requireTerminalState()
-        requireState(
-          value.errorCode !== null &&
-            value.failureReason !== null &&
-            value.failureReason.trim().length > 0 &&
-            value.canRetry &&
-            value.resultVersion === null &&
-            value.draftVersion === null &&
-            value.draftStatus === null,
-          "failed state is invalid",
-        )
-        break
-    }
-  })
 
 const resumeImportSectionSchema = z.enum([
   "education",
@@ -477,7 +358,6 @@ export const resumeImportDraftSchema: z.ZodType<ResumeImportDraft> = z
     resumeDocumentId: resumeUuidSchema,
     skippedItems: z.array(resumeImportSkippedItemSchema),
     skills: z.array(careerProfileSkillInputSchema).max(200),
-    sourceRunId: resumeUuidSchema,
     status: resumeImportDraftStatusSchema,
     summary: resumeImportSummarySchema,
     summaryAction: resumeImportSummaryActionSchema,

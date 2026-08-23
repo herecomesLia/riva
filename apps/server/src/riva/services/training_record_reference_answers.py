@@ -13,6 +13,7 @@ from riva.models import (
     PracticeAttempt,
     PracticeFollowUpQuestion,
     PracticeSession,
+    QuestionCard,
 )
 from riva.schemas.training_records import (
     TargetedPracticeFollowUpReferenceAnswerTargetResponse,
@@ -30,8 +31,6 @@ from riva.services.reference_answer_generation import (
     PracticeReferenceAnswerWorkflowState,
     ReferenceAnswerGenerationService,
     ReferenceAnswerGenerationStateError,
-    practice_follow_up_reference_answer_idempotency_key,
-    practice_main_reference_answer_idempotency_key,
 )
 
 TrainingRecordReferenceAnswerStateErrorCode = Literal[
@@ -87,14 +86,14 @@ class TrainingRecordReferenceAnswerService:
         self,
         session: AsyncSession,
         *,
-        llm_provider: str | None = None,
+        llm_provider: object | None = None,
         llm_model: str | None = None,
         reference_answer_generation_service_factory: (
             ReferenceAnswerGenerationServiceFactory
         ) = ReferenceAnswerGenerationService,
     ) -> None:
         self.session = session
-        self.llm_provider = (llm_provider or "").strip().lower()
+        self.llm_provider = llm_provider
         self.llm_model = (llm_model or "").strip()
         self.reference_answer_generation_service_factory = (
             reference_answer_generation_service_factory
@@ -123,11 +122,20 @@ class TrainingRecordReferenceAnswerService:
             if state.status is PracticeReferenceAnswerLifecycleStatus.NOT_REQUESTED:
                 self._require_llm_configuration()
                 try:
-                    await self._enqueue_generation(
-                        generation_service,
-                        user_id=user_id,
-                        target=target,
-                    )
+                    if target.follow_up_question is None:
+                        await generation_service.generate_main(
+                            user_id=user_id,
+                            question_card=await self._question_card(target),
+                            language=target.record.language,
+                        )
+                    else:
+                        await generation_service.generate_follow_up(
+                            user_id=user_id,
+                            question_card=await self._question_card(target),
+                            follow_up_question=target.follow_up_question,
+                            attempt=target.attempt,
+                            language=target.record.language,
+                        )
                 except ReferenceAnswerGenerationStateError:
                     raise TrainingRecordReferenceAnswerStateError(
                         TRAINING_RECORD_STATE_CONFLICT
@@ -144,36 +152,6 @@ class TrainingRecordReferenceAnswerService:
                 )
             await self.session.commit()
             return _build_response(record_id=record_id, target=target, state=state)
-        except BaseException:
-            await self.session.rollback()
-            raise
-
-    async def refresh_reference_answer(
-        self,
-        *,
-        user_id: UUID,
-        record_id: UUID,
-        payload: TargetedPracticeReferenceAnswerRequest,
-    ) -> TrainingRecordReferenceAnswerResponse:
-        try:
-            target = await self._resolve_target(
-                user_id=user_id,
-                record_id=record_id,
-                payload=payload,
-            )
-            state = await self._read_state(
-                self._generation_service(),
-                user_id=user_id,
-                target=target,
-                for_update=False,
-            )
-            await self.session.commit()
-            return _build_response(record_id=record_id, target=target, state=state)
-        except ReferenceAnswerGenerationStateError:
-            await self.session.rollback()
-            raise TrainingRecordReferenceAnswerStateError(
-                TRAINING_RECORD_STATE_CONFLICT
-            ) from None
         except BaseException:
             await self.session.rollback()
             raise
@@ -283,40 +261,27 @@ class TrainingRecordReferenceAnswerService:
                 TRAINING_RECORD_STATE_CONFLICT
             ) from None
 
-    async def _enqueue_generation(
-        self,
-        generation_service: ReferenceAnswerGenerationService,
-        *,
-        user_id: UUID,
-        target: _ReferenceAnswerTarget,
-    ) -> None:
-        question_card_id = target.attempt.question_card_id
-        if target.follow_up_question is None:
-            await generation_service.enqueue_main_generation_in_transaction(
-                user_id=user_id,
-                question_card_id=question_card_id,
-                idempotency_key=practice_main_reference_answer_idempotency_key(
-                    question_card_id
-                ),
+    async def _question_card(self, target: _ReferenceAnswerTarget) -> QuestionCard:
+        card = await self.session.scalar(
+            select(QuestionCard).where(
+                QuestionCard.id == target.attempt.question_card_id
             )
-            return
-        await generation_service.enqueue_follow_up_generation_in_transaction(
-            user_id=user_id,
-            question_card_id=question_card_id,
-            follow_up_question_id=target.follow_up_question.id,
-            idempotency_key=practice_follow_up_reference_answer_idempotency_key(
-                target.follow_up_question.id
-            ),
         )
+        if card is None:
+            raise TrainingRecordReferenceAnswerStateError(
+                TRAINING_RECORD_QUESTION_NOT_FOUND
+            )
+        return card
 
     def _generation_service(self) -> ReferenceAnswerGenerationService:
         return self.reference_answer_generation_service_factory(
             self.session,
+            llm_provider=self.llm_provider,
             llm_model=self.llm_model,
         )
 
     def _require_llm_configuration(self) -> None:
-        if self.llm_provider != "qwen" or not self.llm_model:
+        if self.llm_provider is None or not self.llm_model:
             raise TrainingRecordReferenceAnswerStateError(
                 REFERENCE_ANSWER_GENERATION_UNAVAILABLE
             )

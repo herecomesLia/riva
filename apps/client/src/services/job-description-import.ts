@@ -6,18 +6,16 @@ import { apiRequest } from "@/services/api"
 
 const jobDescriptionImportDraftSchema = z
   .object({
-    agentRunId: z.uuid().nullable(),
     appliedRoleId: z.uuid().nullable(),
     canApply: z.boolean(),
     createdAt: z.iso.datetime({ offset: true }),
-    failureReason: z.string().trim().min(1).nullable(),
     id: z.uuid(),
     parsedCompany: z.string().max(255).nullable(),
     parsedDescription: z.string().trim().min(1).max(50_000).nullable(),
     parsedLocation: z.string().max(255).nullable(),
     parsedTitle: z.string().trim().min(1).max(255).nullable(),
     rawText: z.string().trim().min(1).max(50_000),
-    status: z.enum(["parsing", "ready", "failed", "applied"]),
+    status: z.enum(["ready", "applied"]),
     updatedAt: z.iso.datetime({ offset: true }),
   })
   .strict()

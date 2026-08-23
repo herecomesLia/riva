@@ -18,7 +18,6 @@ from riva.models import (
     CareerProfile,
     CareerProfileEducation,
     CareerProfileProjectExperience,
-    CareerProfileSkill,
     CareerProfileWorkExperience,
     ResumeDocument,
     ResumeImportDraft,
@@ -48,7 +47,6 @@ ResumeImportStateErrorCode = Literal[
     "resume_document_not_found",
     "resume_parsing_result_not_found",
     "resume_parsing_result_invalid",
-    "resume_parsing_result_superseded",
     "resume_import_profile_invalid",
     "resume_import_draft_conflict",
     "resume_import_draft_not_found",
@@ -65,9 +63,6 @@ RESUME_PARSING_RESULT_NOT_FOUND: ResumeImportStateErrorCode = (
 )
 RESUME_PARSING_RESULT_INVALID: ResumeImportStateErrorCode = (
     "resume_parsing_result_invalid"
-)
-RESUME_PARSING_RESULT_SUPERSEDED: ResumeImportStateErrorCode = (
-    "resume_parsing_result_superseded"
 )
 RESUME_IMPORT_PROFILE_INVALID: ResumeImportStateErrorCode = (
     "resume_import_profile_invalid"
@@ -404,8 +399,6 @@ class ResumeImportDraftService:
             document = await self._load_document(user_id, resume_document_id)
             result = await self._load_result(user_id, document.id)
 
-            if document.parsing_run_id != result.source_agent_run_id:
-                raise ResumeImportStateError(RESUME_PARSING_RESULT_SUPERSEDED)
             parsed_output = _parse_persisted_result(result)
 
             profile = await self._load_profile(user_id)
@@ -415,14 +408,6 @@ class ResumeImportDraftService:
                     await self.session.commit()
                     return draft
                 if draft.status not in (SUPERSEDED,):
-                    raise ResumeImportStateError(RESUME_IMPORT_DRAFT_CONFLICT)
-
-            if draft is None:
-                conflict = await self._find_source_conflict(
-                    result.source_agent_run_id,
-                    document.id,
-                )
-                if conflict is not None:
                     raise ResumeImportStateError(RESUME_IMPORT_DRAFT_CONFLICT)
 
             data = build_resume_import_draft_data(
@@ -439,7 +424,6 @@ class ResumeImportDraftService:
                     resume_document_id=document.id,
                     user_id=user_id,
                     parsing_result_version=result.result_version,
-                    source_agent_run_id=result.source_agent_run_id,
                     base_profile_id=(
                         profile.profile_id if profile is not None else None
                     ),
@@ -463,15 +447,7 @@ class ResumeImportDraftService:
                 )
                 self.session.add(draft)
             else:
-                conflict = await self._find_source_conflict(
-                    result.source_agent_run_id,
-                    document.id,
-                )
-                if conflict is not None:
-                    raise ResumeImportStateError(RESUME_IMPORT_DRAFT_CONFLICT)
-
                 draft.parsing_result_version = result.result_version
-                draft.source_agent_run_id = result.source_agent_run_id
                 draft.base_profile_id = (
                     profile.profile_id if profile is not None else None
                 )
@@ -576,20 +552,6 @@ class ResumeImportDraftService:
             .with_for_update()
         )
 
-    async def _find_source_conflict(
-        self,
-        source_agent_run_id: UUID,
-        resume_document_id: UUID,
-    ) -> ResumeImportDraft | None:
-        return await self.session.scalar(
-            select(ResumeImportDraft)
-            .where(
-                ResumeImportDraft.source_agent_run_id == source_agent_run_id,
-                ResumeImportDraft.resume_document_id != resume_document_id,
-            )
-            .with_for_update()
-        )
-
 
 def _parse_persisted_result(result: ResumeParsingResult) -> ResumeParsingOutput:
     if (
@@ -626,10 +588,7 @@ def _same_draft_source(
     result: ResumeParsingResult,
     profile: CareerProfile | None,
 ) -> bool:
-    parsing_source_matches = (
-        draft.parsing_result_version == result.result_version
-        and draft.source_agent_run_id == result.source_agent_run_id
-    )
+    parsing_source_matches = draft.parsing_result_version == result.result_version
 
     if draft.status == READY:
         return parsing_source_matches and (
@@ -1172,7 +1131,6 @@ __all__ = [
     "RESUME_IMPORT_PROFILE_VERSION_CONFLICT",
     "RESUME_PARSING_RESULT_INVALID",
     "RESUME_PARSING_RESULT_NOT_FOUND",
-    "RESUME_PARSING_RESULT_SUPERSEDED",
     "ResumeImportDraftService",
     "ResumeImportStateError",
     "build_resume_import_draft_data",

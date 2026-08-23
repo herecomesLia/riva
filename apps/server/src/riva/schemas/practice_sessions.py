@@ -61,10 +61,8 @@ class PracticeSessionCompletionReason(StrEnum):
 
 
 class PracticeAttemptStatus(StrEnum):
-    GENERATING_QUESTION = "generatingQuestion"
     ANSWERING = "answering"
     ANSWERING_FOLLOW_UP = "answeringFollowUp"
-    EVALUATING = "evaluating"
     REVIEW = "review"
     COMPLETED = "completed"
     ENDED_EARLY = "endedEarly"
@@ -169,12 +167,6 @@ class SetPracticeQuestionWeakRequest(APIModel):
     is_marked_weak: Annotated[bool, Field(strict=True)]
 
 
-class RefreshPracticeQuestionGenerationRequest(APIModel):
-    model_config = ConfigDict(extra="forbid")
-
-    version: Annotated[int, Field(ge=1)]
-
-
 class PracticeQuestionReferenceAnswerRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -207,24 +199,12 @@ class SubmitFollowUpAnswerRequest(APIModel):
     content: PracticeAnswerContent
 
 
-class RefreshPracticeFollowUpGenerationRequest(APIModel):
-    model_config = ConfigDict(extra="forbid")
-
-    version: Annotated[int, Field(ge=1)]
-
-
 class EndPracticeFollowUpsRequest(APIModel):
     model_config = ConfigDict(extra="forbid")
 
     version: Annotated[int, Field(ge=1)]
     question_id: StandardUUID
     follow_up_question_id: StandardUUID
-
-
-class RefreshPracticeEvaluationRequest(APIModel):
-    model_config = ConfigDict(extra="forbid")
-
-    version: Annotated[int, Field(ge=1)]
 
 
 class CompletePracticeSessionRequest(APIModel):
@@ -297,12 +277,6 @@ class PracticeReferenceAnswerNotRequestedResponse(PracticeAPIModel):
     viewed_before_submission: Literal[False] = False
 
 
-class PracticeReferenceAnswerGeneratingResponse(PracticeAPIModel):
-    status: Literal["generating"]
-    content: None = None
-    viewed_before_submission: Literal[False] = False
-
-
 class PracticeReferenceAnswerUnavailableResponse(PracticeAPIModel):
     status: Literal["unavailable"]
     content: None = None
@@ -350,7 +324,6 @@ class PracticeFollowUpReferenceAnswerRevealedResponse(PracticeAPIModel):
 
 PracticeMainReferenceAnswerResponse = Annotated[
     PracticeReferenceAnswerNotRequestedResponse
-    | PracticeReferenceAnswerGeneratingResponse
     | PracticeMainReferenceAnswerRevealedResponse
     | PracticeReferenceAnswerUnavailableResponse,
     Field(discriminator="status"),
@@ -358,7 +331,6 @@ PracticeMainReferenceAnswerResponse = Annotated[
 
 PracticeFollowUpReferenceAnswerResponse = Annotated[
     PracticeReferenceAnswerNotRequestedResponse
-    | PracticeReferenceAnswerGeneratingResponse
     | PracticeFollowUpReferenceAnswerRevealedResponse
     | PracticeReferenceAnswerUnavailableResponse,
     Field(discriminator="status"),
@@ -444,10 +416,6 @@ class PracticeActiveSessionBase(PracticeAPIModel):
         return value
 
 
-class PracticeGeneratingQuestionResponse(PracticeActiveSessionBase):
-    status: Literal["generatingQuestion"]
-
-
 class PracticeAnsweringResponse(PracticeActiveSessionBase):
     status: Literal["answering"]
     question: PracticeQuestionResponse
@@ -487,27 +455,6 @@ def _validate_answered_exchange_orders(
         or len({exchange.answer.id for exchange in exchanges}) != len(exchanges)
     ):
         raise ValueError("follow-up exchanges must be ordered and contiguous")
-
-
-class PracticeGeneratingFollowUpResponse(PracticeActiveSessionBase):
-    status: Literal["generatingFollowUp"]
-    question: PracticeQuestionResponse
-    main_answer: PracticeAnswerResponse
-    follow_up_exchanges: list[PracticeAnsweredFollowUpExchangeResponse] = Field(
-        default_factory=list,
-        max_length=MAX_PRACTICE_FOLLOW_UPS,
-    )
-
-    @field_validator("follow_up_exchanges")
-    @classmethod
-    def validate_follow_up_exchanges(
-        cls,
-        exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
-    ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
-        _validate_answered_exchange_orders(exchanges)
-        if len(exchanges) > 1:
-            raise ValueError("generating follow-up may only contain the first exchange")
-        return exchanges
 
 
 class PracticeAnsweringFollowUpResponse(PracticeActiveSessionBase):
@@ -570,55 +517,6 @@ PracticeFollowUpCompletionResponse = (
     PracticeCompletedFollowUpCompletionResponse
     | PracticeEndedEarlyFollowUpCompletionResponse
 )
-
-
-class PracticeEvaluatingResponse(PracticeActiveSessionBase):
-    status: Literal["evaluating"]
-    question: PracticeQuestionResponse
-    main_answer: PracticeAnswerResponse
-    follow_up_exchanges: list[PracticeAnsweredFollowUpExchangeResponse] = Field(
-        default_factory=list,
-        max_length=MAX_PRACTICE_FOLLOW_UPS,
-    )
-    follow_up_completion: PracticeFollowUpCompletionResponse
-    submitted_at: datetime
-
-    _validate_submitted_at = field_validator("submitted_at")(_validate_aware_timestamp)
-
-    @field_validator("follow_up_exchanges")
-    @classmethod
-    def validate_follow_up_exchanges(
-        cls,
-        exchanges: list[PracticeAnsweredFollowUpExchangeResponse],
-    ) -> list[PracticeAnsweredFollowUpExchangeResponse]:
-        _validate_answered_exchange_orders(exchanges)
-        return exchanges
-
-    @field_validator("follow_up_completion")
-    @classmethod
-    def validate_follow_up_completion(
-        cls,
-        completion: PracticeFollowUpCompletionResponse,
-        info,
-    ) -> PracticeFollowUpCompletionResponse:
-        exchanges = info.data.get("follow_up_exchanges", [])
-        if completion.status == "endedEarly":
-            if len(exchanges) not in (0, 1):
-                raise ValueError(
-                    "ended-early completion must have zero or one exchange"
-                )
-            if completion.unanswered_question.order != len(exchanges) + 1:
-                raise ValueError("unanswered follow-up question order is invalid")
-            if completion.unanswered_question.id in {
-                exchange.question.id for exchange in exchanges
-            }:
-                raise ValueError("unanswered follow-up question must not be answered")
-            return completion
-        if completion.reason == "noFollowUpRequired" and exchanges:
-            raise ValueError("no-follow-up completion must have no exchanges")
-        if completion.reason == "allAnswered" and len(exchanges) not in (1, 2):
-            raise ValueError("all-answered completion must have one or two exchanges")
-        return completion
 
 
 class PracticeEvaluationResponse(PracticeAPIModel):
@@ -706,11 +604,8 @@ class PracticeReviewResponse(PracticeActiveSessionBase):
 
 
 PracticeActiveSessionResponse = Annotated[
-    PracticeGeneratingQuestionResponse
-    | PracticeAnsweringResponse
-    | PracticeGeneratingFollowUpResponse
+    PracticeAnsweringResponse
     | PracticeAnsweringFollowUpResponse
-    | PracticeEvaluatingResponse
     | PracticeReviewResponse,
     Field(discriminator="status"),
 ]
@@ -817,11 +712,8 @@ __all__ = [
     "PracticeAnsweringFollowUpResponse",
     "PracticeAnsweringResponse",
     "PracticeAwaitingFollowUpExchangeResponse",
-    "PracticeEvaluatingResponse",
     "PracticeEvaluationResponse",
     "PracticeFollowUpQuestionResponse",
-    "PracticeGeneratingFollowUpResponse",
-    "PracticeGeneratingQuestionResponse",
     "PracticeGuidanceNotRequestedResponse",
     "PracticeGuidanceRevealedResponse",
     "PracticeGuidanceResponse",
@@ -831,7 +723,6 @@ __all__ = [
     "PracticeQuestionResponse",
     "PracticeQuestionReferenceAnswerRequest",
     "PracticeFollowUpReferenceAnswerRequest",
-    "PracticeReferenceAnswerGeneratingResponse",
     "PracticeReferenceAnswerNotRequestedResponse",
     "PracticeReferenceAnswerUnavailableResponse",
     "PracticeMainReferenceAnswerContentResponse",
@@ -863,9 +754,6 @@ __all__ = [
     "RevealPracticeQuestionGuidanceRequest",
     "SetPracticeQuestionSavedRequest",
     "SetPracticeQuestionWeakRequest",
-    "RefreshPracticeFollowUpGenerationRequest",
-    "RefreshPracticeEvaluationRequest",
-    "RefreshPracticeQuestionGenerationRequest",
     "SubmitPrimaryAnswerRequest",
     "SubmitFollowUpAnswerRequest",
     "StartPracticeSessionRequest",

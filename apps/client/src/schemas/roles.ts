@@ -37,7 +37,6 @@ const experienceRangeSchema = z
 const jobDescriptionSchema = z.discriminatedUnion("status", [
   z
     .object({
-      parsingFailureReason: z.null(),
       rawText: z.null(),
       status: z.literal("missing"),
       version: z.null(),
@@ -45,7 +44,6 @@ const jobDescriptionSchema = z.discriminatedUnion("status", [
     .strict(),
   z
     .object({
-      parsingFailureReason: z.null(),
       rawText: z.string().trim().min(1).max(50_000),
       status: z.literal("saved"),
       version: versionSchema,
@@ -53,25 +51,8 @@ const jobDescriptionSchema = z.discriminatedUnion("status", [
     .strict(),
   z
     .object({
-      parsingFailureReason: z.null(),
-      rawText: z.string().trim().min(1).max(50_000),
-      status: z.literal("parsing"),
-      version: versionSchema,
-    })
-    .strict(),
-  z
-    .object({
-      parsingFailureReason: z.null(),
       rawText: z.string().trim().min(1).max(50_000),
       status: z.literal("ready"),
-      version: versionSchema,
-    })
-    .strict(),
-  z
-    .object({
-      parsingFailureReason: requiredTextSchema,
-      rawText: z.string().trim().min(1).max(50_000),
-      status: z.literal("failed"),
       version: versionSchema,
     })
     .strict(),
@@ -141,15 +122,6 @@ const matchingAnalysisVersionContextSchema = z
 const matchingAnalysisSchema: z.ZodType<MatchingAnalysis> = z.discriminatedUnion("status", [
   matchingAnalysisVersionContextSchema
     .extend({
-      failureReason: z.null(),
-      generatedAt: z.null(),
-      result: z.null(),
-      status: z.literal("generating"),
-    })
-    .strict(),
-  matchingAnalysisVersionContextSchema
-    .extend({
-      failureReason: z.null(),
       generatedAt: dateTimeSchema,
       result: matchingAnalysisResultSchema,
       status: z.literal("current"),
@@ -157,18 +129,9 @@ const matchingAnalysisSchema: z.ZodType<MatchingAnalysis> = z.discriminatedUnion
     .strict(),
   matchingAnalysisVersionContextSchema
     .extend({
-      failureReason: z.null(),
       generatedAt: dateTimeSchema,
       result: matchingAnalysisResultSchema,
       status: z.literal("stale"),
-    })
-    .strict(),
-  matchingAnalysisVersionContextSchema
-    .extend({
-      failureReason: requiredTextSchema,
-      generatedAt: z.null(),
-      result: z.null(),
-      status: z.literal("failed"),
     })
     .strict(),
 ])

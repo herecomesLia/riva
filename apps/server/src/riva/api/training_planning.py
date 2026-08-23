@@ -12,8 +12,6 @@ from riva.schemas.training_planning import (
     TrainingPlanningResponse,
 )
 from riva.services.training_planning import (
-    TRAINING_PLANNING_NOT_FOUND,
-    TRAINING_PLANNING_REQUEST_CONFLICT,
     TRAINING_PLANNING_STATE_CONFLICT,
     TRAINING_PLANNING_TARGET_NOT_FOUND,
     TRAINING_PLANNING_TARGET_UNAVAILABLE,
@@ -34,11 +32,7 @@ def training_planning_state_api_error(
 ) -> APIError:
     if error.code == TRAINING_PLANNING_TARGET_NOT_FOUND:
         return APIError(status.HTTP_404_NOT_FOUND, error.code)
-    if error.code == TRAINING_PLANNING_NOT_FOUND:
-        return APIError(status.HTTP_404_NOT_FOUND, error.code)
     if error.code == TRAINING_PLANNING_TARGET_UNAVAILABLE:
-        return APIError(status.HTTP_409_CONFLICT, error.code)
-    if error.code == TRAINING_PLANNING_REQUEST_CONFLICT:
         return APIError(status.HTTP_409_CONFLICT, error.code)
     if error.code == TRAINING_PLANNING_UNAVAILABLE:
         return APIError(status.HTTP_503_SERVICE_UNAVAILABLE, error.code)

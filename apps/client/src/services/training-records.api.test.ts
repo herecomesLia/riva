@@ -10,7 +10,6 @@ import {
   getTargetedPracticeRecord,
   getMockInterviewRecord,
   getTrainingRecordsOverview,
-  getTrainingRecordReferenceAnswerGenerationStatus,
   listTrainingRecords,
   requestTrainingRecordReferenceAnswer,
 } from "./training-records"
@@ -243,9 +242,7 @@ function overviewResponse() {
   }
 }
 
-function mainReferenceAnswerResponse(
-  status: "generating" | "revealed" = "generating",
-): Record<string, unknown> {
+function mainReferenceAnswerResponse(): Record<string, unknown> {
   return {
     target: {
       kind: "targetedPractice",
@@ -253,20 +250,17 @@ function mainReferenceAnswerResponse(
       questionId: "33333333-3333-4333-8333-333333333333",
       subject: "mainQuestion",
     },
-    referenceAnswer:
-      status === "generating"
-        ? { status, content: null, viewedBeforeSubmission: false }
-        : {
-            status,
-            viewedBeforeSubmission: false,
-            content: {
-              kind: "technicalReference",
-              answer: "A reference answer.",
-              keyPoints: ["Context", "Trade-off"],
-              commonMistakes: ["No evidence"],
-              generatedAt: timestamp,
-            },
-          },
+    referenceAnswer: {
+      status: "revealed",
+      viewedBeforeSubmission: false,
+      content: {
+        kind: "technicalReference",
+        answer: "A reference answer.",
+        keyPoints: ["Context", "Trade-off"],
+        commonMistakes: ["No evidence"],
+        generatedAt: timestamp,
+      },
+    },
   }
 }
 
@@ -280,9 +274,16 @@ function followUpReferenceAnswerResponse(): Record<string, unknown> {
       followUpId: "55555555-5555-4555-8555-555555555555",
     },
     referenceAnswer: {
-      status: "generating",
-      content: null,
+      status: "revealed",
       viewedBeforeSubmission: false,
+      content: {
+        kind: "technicalReference",
+        addressedGap: "Add concrete evidence.",
+        answer: "A follow-up reference answer.",
+        keyPoints: ["Context", "Trade-off"],
+        commonMistakes: ["No evidence"],
+        generatedAt: timestamp,
+      },
     },
   }
 }
@@ -519,7 +520,7 @@ describe("targeted practice training record API service", () => {
 
     await expect(requestTrainingRecordReferenceAnswer(target)).resolves.toMatchObject({
       target,
-      referenceAnswer: { status: "generating" },
+      referenceAnswer: { status: "revealed" },
     })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
@@ -550,34 +551,12 @@ describe("targeted practice training record API service", () => {
 
     await expect(requestTrainingRecordReferenceAnswer(target)).resolves.toMatchObject({
       target,
-      referenceAnswer: { status: "generating" },
+      referenceAnswer: { status: "revealed" },
     })
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
       subject: "followUp",
       questionId: target.questionId,
       followUpId: target.followUpId,
-    })
-  })
-
-  it("refreshes a targeted practice reference answer through the refresh endpoint", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(mainReferenceAnswerResponse("revealed")))
-    const target = {
-      kind: "targetedPractice" as const,
-      recordId,
-      questionId: "33333333-3333-4333-8333-333333333333",
-      subject: "mainQuestion" as const,
-    }
-
-    await expect(getTrainingRecordReferenceAnswerGenerationStatus(target)).resolves.toMatchObject({
-      target,
-      referenceAnswer: { status: "revealed" },
-    })
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      `/api/training-records/practice/${recordId}/reference-answer/refresh`,
-    )
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
-      subject: "mainQuestion",
-      questionId: target.questionId,
     })
   })
 
@@ -602,10 +581,7 @@ describe("targeted practice training record API service", () => {
     }
 
     await expect(requestTrainingRecordReferenceAnswer(target)).rejects.toThrow(
-      "Real training records API is not implemented.",
-    )
-    await expect(getTrainingRecordReferenceAnswerGenerationStatus(target)).rejects.toThrow(
-      "Real training records API is not implemented.",
+      "Reference answers are not available for mock interviews.",
     )
     expect(fetchMock).not.toHaveBeenCalled()
   })

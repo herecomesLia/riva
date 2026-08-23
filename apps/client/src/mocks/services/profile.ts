@@ -16,7 +16,6 @@ import type {
   ResumeFile,
   ResumeImportApplication,
   ResumeImportDraft,
-  ResumeParsingStatus,
   ResumeUploadInput,
   SaveProfileSectionInput,
 } from "@/models/profile"
@@ -45,7 +44,7 @@ type ResumeImportMockState = {
   draft: ResumeImportDraft | null
   failuresRemaining: number
   isInitialImport: boolean
-  parsing: ResumeParsingStatus
+  parsingResultVersion: number
 }
 
 const resumeImportStates = new Map<string, ResumeImportMockState>()
@@ -486,10 +485,9 @@ function buildResumeImportDraft(state: ResumeImportMockState): ResumeImportDraft
     changeSummary: buildChangeSummary(profile, state.candidate),
     createdAt: previous?.createdAt ?? timestamp,
     draftVersion: (previous?.draftVersion ?? 0) + 1,
-    parsingResultVersion: state.parsing.resultVersion ?? 1,
+    parsingResultVersion: state.parsingResultVersion,
     protectedItems: buildProtectedItems(profile, state.candidate),
     resumeDocumentId: state.document.id,
-    sourceRunId: state.parsing.runId!,
     status: "ready",
     summaryAction,
     updatedAt: timestamp,
@@ -608,83 +606,21 @@ function setCareerProfile(profile: CareerProfileDto, state: ResumeImportMockStat
   setMockSnapshot({ profile: next })
 }
 
-function notStartedParsing(resumeDocumentId: string): ResumeParsingStatus {
-  return {
-    attemptCount: 0,
-    canRetry: false,
-    createdAt: null,
-    draftStatus: null,
-    draftVersion: null,
-    errorCode: null,
-    failureReason: null,
-    finishedAt: null,
-    maxAttempts: null,
-    resultVersion: null,
-    resumeDocumentId,
-    runId: null,
-    startedAt: null,
-    status: "notStarted",
-  }
-}
-
-function startParsingRun(state: ResumeImportMockState): ResumeParsingStatus {
+function runResumeParsing(state: ResumeImportMockState): ResumeImportDraft {
   const timestamp = nextMockTimestamp()
   state.document = {
     ...state.document,
     extractedAt: timestamp,
     extractionStatus: "succeeded",
   }
-  state.parsing = {
-    attemptCount: 1,
-    canRetry: false,
-    createdAt: timestamp,
-    draftStatus: null,
-    draftVersion: null,
-    errorCode: null,
-    failureReason: null,
-    finishedAt: null,
-    maxAttempts: 3,
-    resultVersion: null,
-    resumeDocumentId: state.document.id,
-    runId: nextContractUuid(),
-    startedAt: timestamp,
-    status: "running",
-  }
-  return copy(state.parsing)
-}
-
-function completeParsingRun(state: ResumeImportMockState): ResumeParsingStatus {
-  const timestamp = nextMockTimestamp()
   if (state.failuresRemaining > 0) {
     state.failuresRemaining -= 1
-    state.parsing = {
-      ...state.parsing,
-      canRetry: true,
-      errorCode: "resume_parsing_unavailable",
-      failureReason: "The resume parsing service temporarily failed.",
-      finishedAt: timestamp,
-      status: "failed",
-    }
-    return copy(state.parsing)
+    resumeImportError("resume_parsing_unavailable")
   }
 
-  const resultVersion = (state.parsing.resultVersion ?? 0) + 1
-  state.parsing = {
-    ...state.parsing,
-    canRetry: false,
-    errorCode: null,
-    failureReason: null,
-    finishedAt: timestamp,
-    resultVersion,
-    status: "succeeded",
-  }
+  state.parsingResultVersion += 1
   state.draft = buildResumeImportDraft(state)
-  state.parsing = {
-    ...state.parsing,
-    draftStatus: state.draft.status,
-    draftVersion: state.draft.draftVersion,
-  }
-  return copy(state.parsing)
+  return copy(state.draft)
 }
 
 export async function uploadResume(input: ResumeUploadInput): Promise<ResumeDocument> {
@@ -714,7 +650,7 @@ export async function uploadResume(input: ResumeUploadInput): Promise<ResumeDocu
     draft: null,
     failuresRemaining: name.includes("unreadable") || name.includes("retryable") ? 1 : 0,
     isInitialImport: mockSnapshot.profile === null,
-    parsing: notStartedParsing(document.id),
+    parsingResultVersion: 0,
   })
   return copy(document)
 }
@@ -734,60 +670,33 @@ export async function listResumeDocuments(limit = 20): Promise<ResumeDocument[]>
 export async function startResumeParsing(resumeId: string): Promise<ResumeImportDraft> {
   await waitForMockDelay()
   const state = requireResumeImportState(resumeId)
-  if (state.parsing.status === "failed") resumeImportError("resume_parsing_retry_required")
-  if (state.parsing.status === "succeeded" && state.draft) return copy(state.draft)
-  if (state.parsing.status === "notStarted") startParsingRun(state)
-  const parsing = completeParsingRun(state)
-  if (parsing.status === "failed") {
-    resumeImportError(parsing.errorCode ?? "resume_parsing_unavailable")
-  }
-  if (!state.draft) resumeImportError("resume_import_draft_not_ready")
-  return copy(state.draft)
-}
-
-export async function getResumeParsingStatus(resumeId: string): Promise<ResumeParsingStatus> {
-  await waitForMockDelay()
-  const state = requireResumeImportState(resumeId)
-  if (state.parsing.status !== "running" && state.parsing.status !== "queued") {
-    return copy(state.parsing)
-  }
-  return completeParsingRun(state)
+  if (state.draft) return copy(state.draft)
+  return runResumeParsing(state)
 }
 
 export async function retryResumeParsing(resumeId: string): Promise<ResumeImportDraft> {
   await waitForMockDelay()
   const state = requireResumeImportState(resumeId)
 
-  if (state.parsing.status === "notStarted") {
+  if (!state.draft) {
     resumeImportError("resume_parsing_not_started")
   }
 
-  if (state.parsing.status === "succeeded") {
+  if (state.draft.status === "applied") {
     resumeImportError("resume_parsing_retry_not_allowed")
-  }
-
-  if (state.parsing.status === "running" || state.parsing.status === "queued") {
-    if (!state.draft) resumeImportError("resume_import_draft_not_ready")
-    return copy(state.draft)
   }
 
   if (state.draft?.status === "ready") {
     state.draft = { ...state.draft, canApply: false, status: "superseded" }
   }
 
-  startParsingRun(state)
-  const parsing = completeParsingRun(state)
-  if (parsing.status === "failed") {
-    resumeImportError(parsing.errorCode ?? "resume_parsing_unavailable")
-  }
-  if (!state.draft) resumeImportError("resume_import_draft_not_ready")
-  return copy(state.draft)
+  return runResumeParsing(state)
 }
 
 export async function getResumeImportDraft(resumeId: string): Promise<ResumeImportDraft> {
   await waitForMockDelay()
   const state = requireResumeImportState(resumeId)
-  if (state.parsing.status !== "succeeded" || !state.draft) {
+  if (!state.draft) {
     resumeImportError("resume_import_draft_not_ready")
   }
   const profile = toCareerProfile(mockSnapshot.profile)
@@ -803,11 +712,6 @@ export async function getResumeImportDraft(resumeId: string): Promise<ResumeImpo
     state.draft.baseProfileVersion === profileVersion
   if (!appliedIsCurrent && !readyIsCurrent) {
     state.draft = buildResumeImportDraft(state)
-    state.parsing = {
-      ...state.parsing,
-      draftStatus: state.draft.status,
-      draftVersion: state.draft.draftVersion,
-    }
   }
   return copy(state.draft)
 }
@@ -818,7 +722,7 @@ export async function applyResumeImportDraft(
 ): Promise<ResumeImportApplication> {
   await waitForMockDelay()
   const state = requireResumeImportState(resumeId)
-  if (state.parsing.status !== "succeeded" || !state.draft) {
+  if (!state.draft) {
     resumeImportError("resume_import_draft_not_ready")
   }
   const draft = state.draft
@@ -869,11 +773,6 @@ export async function applyResumeImportDraft(
     status: "applied",
     updatedAt: appliedAt,
   }
-  state.parsing = {
-    ...state.parsing,
-    draftStatus: "applied",
-    draftVersion: state.draft.draftVersion,
-  }
   if (profileChanged) {
     for (const [otherResumeId, otherState] of resumeImportStates) {
       if (otherResumeId !== resumeId && otherState.draft?.status === "ready") {
@@ -883,7 +782,6 @@ export async function applyResumeImportDraft(
           status: "superseded",
           updatedAt: appliedAt,
         }
-        otherState.parsing = { ...otherState.parsing, draftStatus: "superseded" }
       }
     }
   }

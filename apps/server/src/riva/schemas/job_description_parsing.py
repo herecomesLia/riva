@@ -1,5 +1,4 @@
 from typing import Annotated
-from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -7,7 +6,6 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
-    model_validator,
 )
 
 from riva.core.language import (
@@ -230,44 +228,3 @@ class JobDescriptionParsingInput(BaseModel):
     company: Company
     raw_job_description: RawJobDescription
     interaction_language: InteractionLanguage = DEFAULT_INTERACTION_LANGUAGE
-
-
-class JobDescriptionParsingRunPayload(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
-
-    role_id: UUID | None = Field(
-        default=None,
-        alias="roleId",
-        exclude_if=lambda value: value is None,
-    )
-    job_description_import_draft_id: UUID | None = Field(
-        default=None,
-        alias="jobDescriptionImportDraftId",
-        exclude_if=lambda value: value is None,
-    )
-    job_description_version: int | None = Field(
-        default=None,
-        alias="jobDescriptionVersion",
-        ge=1,
-        exclude_if=lambda value: value is None,
-    )
-    interaction_language: InteractionLanguage = Field(
-        default=DEFAULT_INTERACTION_LANGUAGE,
-        alias="interactionLanguage",
-    )
-
-    @model_validator(mode="after")
-    def validate_target(self) -> "JobDescriptionParsingRunPayload":
-        has_role = self.role_id is not None
-        has_draft = self.job_description_import_draft_id is not None
-        if has_role == has_draft:
-            raise ValueError("exactly one job description parsing target is required")
-        if has_role != (self.job_description_version is not None):
-            raise ValueError(
-                "job_description_version is required only for role parsing"
-            )
-        return self

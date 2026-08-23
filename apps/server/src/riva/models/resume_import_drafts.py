@@ -13,7 +13,6 @@ from sqlalchemy import (
     Index,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
@@ -65,10 +64,6 @@ class ResumeImportDraft(Base):
             "AND applied_profile_version >= 1 AND applied_at IS NOT NULL)",
             name="ck_resume_import_drafts_applied_state",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_resume_import_drafts_source_run",
-        ),
         Index(
             "ix_resume_import_drafts_user_document",
             "user_id",
@@ -95,11 +90,6 @@ class ResumeImportDraft(Base):
         nullable=False,
     )
     parsing_result_version: Mapped[int] = mapped_column(nullable=False)
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id"),
-        nullable=False,
-    )
     base_profile_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         nullable=True,

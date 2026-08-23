@@ -74,22 +74,3 @@ export const StartFailureRetry = meta.story({
     await expect(await canvas.findByTestId("practice-generating-state")).toBeVisible()
   },
 })
-
-export const GenerationPollingFailureRetry = meta.story({
-  args: {
-    controller: {
-      defaultDelayMs: 0,
-      failNext: ["getQuestionGenerationStatus"],
-    },
-    scenario: "generatingQuestion",
-  },
-  play: async ({ canvas }) => {
-    await expect(await canvas.findByRole("alert")).toHaveTextContent(
-      /题目生成未完成|question generation/i,
-    )
-    await expect(canvas.queryByText(/Practice mock operation failed/)).not.toBeInTheDocument()
-
-    await userEvent.click(canvas.getByRole("button", { name: /重新生成|generate again/i }))
-    await expect(await canvas.findByTestId("practice-answering-state")).toBeVisible()
-  },
-})

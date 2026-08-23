@@ -1,9 +1,8 @@
-import re
-from collections.abc import Awaitable, Callable
-from typing import Literal, cast
-from uuid import NAMESPACE_URL, UUID, uuid5
+from collections.abc import Callable
+from typing import Literal
+from uuid import UUID
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,16 +11,10 @@ from riva.agents.training_planning import TrainingPlanningAgent
 from riva.core.language import InteractionLanguage
 from riva.core.training_planning import (
     TrainingPlanningOutputContractError,
-    training_planning_context_fingerprint,
     validate_training_planning_output_contract,
 )
-from riva.models import (
-    AgentRun,
-    AgentRunStatus,
-    CareerProfile,
-    TargetRole,
-    User,
-)
+from riva.integrations import LLMProvider
+from riva.models import CareerProfile, TargetRole, User
 from riva.schemas.interview import (
     InterviewDifficulty,
     InterviewDurationMinutes,
@@ -39,10 +32,7 @@ from riva.schemas.training_planning import (
     TrainingPlanningMatchingAnalysis,
     TrainingPlanningMockInterviewConstraints,
     TrainingPlanningMockInterviewRecord,
-    TrainingPlanningOutput,
     TrainingPlanningResponse,
-    TrainingPlanningRunPayload,
-    TrainingPlanningStatusResponse,
     TrainingPlanningTargetedPracticeConstraints,
     TrainingPlanningTargetedPracticeRecord,
     TrainingPlanningTargetRole,
@@ -52,7 +42,6 @@ from riva.schemas.training_records import (
     TargetedPracticeTrainingRecordSummaryResponse,
     TrainingRecordSummaryResponse,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.interview_sessions import InterviewSessionService
 from riva.services.matching_analyses import _career_profile_loader_options
 from riva.services.practice_sessions import PracticeSessionService
@@ -62,20 +51,14 @@ from riva.services.training_records import TrainingRecordService
 
 TrainingPlanningStateErrorCode = Literal[
     "training_planning_target_not_found",
-    "training_planning_not_found",
     "training_planning_target_unavailable",
     "training_planning_snapshot_invalid",
-    "training_planning_run_invalid",
-    "training_planning_state_conflict",
     "training_planning_unavailable",
-    "training_planning_request_conflict",
+    "training_planning_state_conflict",
 ]
 
 TRAINING_PLANNING_TARGET_NOT_FOUND: TrainingPlanningStateErrorCode = (
     "training_planning_target_not_found"
-)
-TRAINING_PLANNING_NOT_FOUND: TrainingPlanningStateErrorCode = (
-    "training_planning_not_found"
 )
 TRAINING_PLANNING_TARGET_UNAVAILABLE: TrainingPlanningStateErrorCode = (
     "training_planning_target_unavailable"
@@ -83,29 +66,17 @@ TRAINING_PLANNING_TARGET_UNAVAILABLE: TrainingPlanningStateErrorCode = (
 TRAINING_PLANNING_SNAPSHOT_INVALID: TrainingPlanningStateErrorCode = (
     "training_planning_snapshot_invalid"
 )
-TRAINING_PLANNING_RUN_INVALID: TrainingPlanningStateErrorCode = (
-    "training_planning_run_invalid"
-)
 TRAINING_PLANNING_STATE_CONFLICT: TrainingPlanningStateErrorCode = (
     "training_planning_state_conflict"
 )
 TRAINING_PLANNING_UNAVAILABLE: TrainingPlanningStateErrorCode = (
     "training_planning_unavailable"
 )
-TRAINING_PLANNING_REQUEST_CONFLICT: TrainingPlanningStateErrorCode = (
-    "training_planning_request_conflict"
-)
 
 TRAINING_PLANNING_FAILURE_REASON = (
     "The training plan could not be generated right now. Please try again."
 )
-
-_SAFE_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 TrainingRecordServiceFactory = Callable[[AsyncSession], TrainingRecordService]
-AgentRunServiceFactory = Callable[[AsyncSession], AgentRunService]
-AgentExecutor = Callable[[UUID], Awaitable[AgentRun]]
-
-_CURRENT_PLANNING_REQUEST_NAMESPACE = NAMESPACE_URL
 
 
 class TrainingPlanningStateError(RuntimeError):
@@ -121,20 +92,16 @@ class TrainingPlanningService:
         self,
         session: AsyncSession,
         *,
-        llm_provider: str | None = None,
+        llm_provider: LLMProvider | None = None,
         llm_model: str | None = None,
-        agent_executor: AgentExecutor | None = None,
         training_record_service_factory: TrainingRecordServiceFactory = (
             TrainingRecordService
         ),
-        agent_run_service_factory: AgentRunServiceFactory = AgentRunService,
     ) -> None:
         self.session = session
-        self.llm_provider = (llm_provider or "").strip().lower()
+        self.llm_provider = llm_provider
         self.llm_model = (llm_model or "").strip()
-        self.agent_executor = agent_executor
         self.training_record_service_factory = training_record_service_factory
-        self.agent_run_service_factory = agent_run_service_factory
 
     async def start_planning(
         self,
@@ -143,46 +110,11 @@ class TrainingPlanningService:
         *,
         interaction_language: InteractionLanguage,
     ) -> TrainingPlanningResponse:
-        try:
-            idempotency_key = f"training-planning:{payload.request_id}"
-            existing = await self._existing_run(
-                user_id=user.id,
-                idempotency_key=idempotency_key,
-            )
-            if existing is not None:
-                existing_payload = self._validate_replay_payload(existing)
-                self._require_replay_intent(
-                    existing_payload,
-                    payload,
-                    interaction_language,
-                )
-                return await self._execute(existing.id)
-
-            self._configured_model()
-            planning_input = await self._build_authoritative_input(
-                user_id=user.id,
-                target_role_id=payload.target_role_id,
-                interaction_language=interaction_language,
-            )
-            run = await self._enqueue_planning(
-                user_id=user.id,
-                request_id=payload.request_id,
-                planning_input=planning_input,
-                idempotency_key=idempotency_key,
-            )
-            replay_payload = self._validate_replay_payload(run)
-            self._require_replay_intent(
-                replay_payload,
-                payload,
-                interaction_language,
-            )
-            return await self._execute(run.id)
-        except TrainingPlanningStateError:
-            await self.session.rollback()
-            raise
-        except Exception:
-            await self.session.rollback()
-            raise
+        return await self._generate(
+            user_id=user.id,
+            target_role_id=payload.target_role_id,
+            interaction_language=interaction_language,
+        )
 
     async def ensure_current_planning(
         self,
@@ -191,97 +123,55 @@ class TrainingPlanningService:
         *,
         interaction_language: InteractionLanguage,
     ) -> TrainingPlanningResponse:
-        try:
-            planning_input = await self._build_authoritative_input(
-                user_id=user.id,
-                target_role_id=payload.target_role_id,
-                interaction_language=interaction_language,
-            )
-            fingerprint = training_planning_context_fingerprint(planning_input)
-            existing = await self._existing_current_run(
-                user_id=user.id,
-                target_role_id=payload.target_role_id,
-                interaction_language=interaction_language,
-                context_fingerprint=fingerprint,
-            )
-            if existing is not None:
-                return await self._execute(existing.id)
+        return await self._generate(
+            user_id=user.id,
+            target_role_id=payload.target_role_id,
+            interaction_language=interaction_language,
+        )
 
-            request_id = uuid5(
-                _CURRENT_PLANNING_REQUEST_NAMESPACE,
-                ":".join(
-                    (
-                        "riva-training-planner",
-                        str(user.id),
-                        str(payload.target_role_id),
-                        interaction_language,
-                        TrainingPlanningAgent.agent_version,
-                        fingerprint,
-                    )
-                ),
-            )
-            self._configured_model()
-            run = await self._enqueue_planning(
-                user_id=user.id,
-                request_id=request_id,
-                planning_input=planning_input,
-                idempotency_key=f"training-planning:{request_id}",
-            )
-            replay_payload = self._validate_replay_payload(run)
-            self._require_replay_intent(
-                replay_payload,
-                StartTrainingPlanningRequest(
-                    request_id=request_id,
-                    target_role_id=payload.target_role_id,
-                ),
-                interaction_language,
-            )
-            return await self._execute(run.id)
-        except TrainingPlanningStateError:
-            await self.session.rollback()
-            raise
-        except Exception:
-            await self.session.rollback()
-            raise
-
-    async def get_planning_status(
+    async def _generate(
         self,
         *,
         user_id: UUID,
-        run_id: UUID,
-    ) -> TrainingPlanningStatusResponse:
-        run = await self._load_run(user_id=user_id, run_id=run_id)
-        return await self._status_response(run)
-
-    async def _execute(self, run_id: UUID) -> TrainingPlanningResponse:
-        if self.agent_executor is None:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_UNAVAILABLE)
-        await self.agent_executor(run_id)
-        await self.session.rollback()
-        run = await self.session.scalar(select(AgentRun).where(AgentRun.id == run_id))
-        if run is None:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_NOT_FOUND)
-        status_response = await self._status_response(run)
-        if status_response.status != "succeeded" or status_response.plan is None:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT)
-        return TrainingPlanningResponse(
-            target_role_id=status_response.target_role_id,
-            interaction_language=status_response.interaction_language,
-            plan=status_response.plan,
-        )
-
-    async def load_generation_input(
-        self,
-        run: AgentRun,
-    ) -> TrainingPlanningInput:
+        target_role_id: UUID,
+        interaction_language: InteractionLanguage,
+    ) -> TrainingPlanningResponse:
         try:
-            return validate_training_planning_run(run).training_planning_input
+            planning_input = await self._build_authoritative_input(
+                user_id=user_id,
+                target_role_id=target_role_id,
+                interaction_language=interaction_language,
+            )
+            if self.llm_provider is None or not self.llm_model:
+                raise TrainingPlanningStateError(TRAINING_PLANNING_UNAVAILABLE)
+            result = await TrainingPlanningAgent(
+                self.llm_provider,
+                self.llm_model,
+            ).run(planning_input)
+            plan = validate_training_planning_output_contract(
+                planning_input,
+                result.output,
+            )
+            await self.session.commit()
+            return TrainingPlanningResponse(
+                target_role_id=target_role_id,
+                interaction_language=interaction_language,
+                plan=plan,
+            )
         except TrainingPlanningStateError:
+            await self.session.rollback()
             raise
+        except (
+            TrainingPlanningOutputContractError,
+            ValidationError,
+            TypeError,
+            ValueError,
+        ):
+            await self.session.rollback()
+            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT) from None
         except Exception:
-            raise TrainingPlanningStateError(
-                TRAINING_PLANNING_SNAPSHOT_INVALID
-            ) from None
+            await self.session.rollback()
+            raise
 
     async def _build_authoritative_input(
         self,
@@ -295,21 +185,15 @@ class TrainingPlanningService:
             .options(
                 selectinload(TargetRole.job_description_analysis),
                 selectinload(TargetRole.matching_analysis),
-                selectinload(TargetRole.matching_analysis_run),
             )
-            .where(
-                TargetRole.id == target_role_id,
-                TargetRole.user_id == user_id,
-            )
+            .where(TargetRole.id == target_role_id, TargetRole.user_id == user_id)
         )
         if role is None:
             raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_NOT_FOUND)
         if role.preparation_status == "archived":
             raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
-        setup = await InterviewSessionService(self.session).get_setup(
-            user_id=user_id,
-        )
+        setup = await InterviewSessionService(self.session).get_setup(user_id=user_id)
         if not setup.profile_complete or not any(
             candidate.id == target_role_id for candidate in setup.target_roles
         ):
@@ -323,45 +207,34 @@ class TrainingPlanningService:
         if profile is None or not career_profile_completed(profile):
             raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
-        try:
-            matching_analysis = _current_matching_analysis(role, profile)
-            training_memory = await TrainingMemoryService(self.session).get_context(
-                user_id
-            )
-            recent_training = await self._recent_training(
+        matching_analysis = _current_matching_analysis(role, profile)
+        training_memory = await TrainingMemoryService(self.session).get_context(user_id)
+        recent_training = await self._recent_training(
+            user_id=user_id,
+            target_role_id=target_role_id,
+        )
+        targeted_practice = None
+        if matching_analysis is not None:
+            capabilities = await PracticeSessionService(
+                self.session,
+                llm_provider=self.llm_provider,
+                llm_model=self.llm_model,
+            ).get_setup_capabilities(
                 user_id=user_id,
-                target_role_id=target_role_id,
+                interaction_language=interaction_language,
             )
-            targeted_practice = None
-            if matching_analysis is not None:
-                practice_capabilities = await PracticeSessionService(
-                    self.session
-                ).get_setup_capabilities(
-                    user_id=user_id,
-                    interaction_language=interaction_language,
-                )
-                targeted_practice = TrainingPlanningTargetedPracticeConstraints(
-                    question_types=list(QuestionCardQuestionType),
-                    difficulties=list(QuestionCardDifficulty),
-                    can_prioritize_weaknesses=(
-                        practice_capabilities.can_prioritize_weaknesses
-                    ),
-                )
-
-            mock_interview = (
-                TrainingPlanningMockInterviewConstraints(
-                    rounds=list(InterviewRound),
-                    difficulties=list(InterviewDifficulty),
-                    duration_minutes=list(InterviewDurationMinutes),
-                )
-                if any(
-                    candidate.id == target_role_id for candidate in setup.target_roles
-                )
-                else None
+            targeted_practice = TrainingPlanningTargetedPracticeConstraints(
+                question_types=list(QuestionCardQuestionType),
+                difficulties=list(QuestionCardDifficulty),
+                can_prioritize_weaknesses=capabilities.can_prioritize_weaknesses,
             )
-            if targeted_practice is None and mock_interview is None:
-                raise TrainingPlanningStateError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
+        mock_interview = TrainingPlanningMockInterviewConstraints(
+            rounds=list(InterviewRound),
+            difficulties=list(InterviewDifficulty),
+            duration_minutes=list(InterviewDurationMinutes),
+        )
+        try:
             return TrainingPlanningInput(
                 interaction_language=interaction_language,
                 target_role=TrainingPlanningTargetRole(
@@ -379,9 +252,7 @@ class TrainingPlanningService:
                     mock_interview=mock_interview,
                 ),
             )
-        except TrainingPlanningStateError:
-            raise
-        except Exception:
+        except ValidationError, TypeError, ValueError:
             raise TrainingPlanningStateError(
                 TRAINING_PLANNING_SNAPSHOT_INVALID
             ) from None
@@ -406,265 +277,25 @@ class TrainingPlanningService:
         )
         return [_training_planning_record(record) for record in role_records[:5]]
 
-    async def _enqueue_planning(
-        self,
-        *,
-        user_id: UUID,
-        request_id: UUID,
-        planning_input: TrainingPlanningInput,
-        idempotency_key: str,
-    ) -> AgentRun:
-        run_payload = self._build_run_payload(
-            request_id=request_id,
-            planning_input=planning_input,
-        )
-        return await self.agent_run_service_factory(self.session).enqueue(
-            user_id=user_id,
-            agent_id=TrainingPlanningAgent.agent_id,
-            prompt_id=TrainingPlanningAgent.agent_id,
-            prompt_version=TrainingPlanningAgent.agent_version,
-            output_schema_id=TrainingPlanningAgent.output_schema_id,
-            model=self._configured_model(),
-            payload=cast(
-                dict[str, object],
-                run_payload.model_dump(mode="json", by_alias=True),
-            ),
-            idempotency_key=idempotency_key,
-            max_attempts=3,
-        )
-
-    async def _existing_current_run(
-        self,
-        *,
-        user_id: UUID,
-        target_role_id: UUID,
-        interaction_language: InteractionLanguage,
-        context_fingerprint: str,
-    ) -> AgentRun | None:
-        runs = (
-            await self.session.scalars(
-                select(AgentRun)
-                .where(
-                    AgentRun.user_id == user_id,
-                    AgentRun.agent_id == TrainingPlanningAgent.agent_id,
-                    AgentRun.prompt_id == TrainingPlanningAgent.agent_id,
-                    AgentRun.prompt_version == TrainingPlanningAgent.agent_version,
-                )
-                .order_by(AgentRun.created_at.desc(), AgentRun.id.desc())
-            )
-        ).all()
-        for run in runs:
-            try:
-                payload = validate_training_planning_run(run)
-                if (
-                    payload.target_role_id != target_role_id
-                    or payload.interaction_language != interaction_language
-                    or payload.context_fingerprint != context_fingerprint
-                ):
-                    continue
-                await self._status_response(run)
-            except TrainingPlanningStateError:
-                continue
-            return run
-        return None
-
-    async def _existing_run(
-        self,
-        *,
-        user_id: UUID,
-        idempotency_key: str,
-    ) -> AgentRun | None:
-        return await self.session.scalar(
-            select(AgentRun)
-            .where(
-                AgentRun.user_id == user_id,
-                AgentRun.agent_id == TrainingPlanningAgent.agent_id,
-                AgentRun.idempotency_key == idempotency_key,
-            )
-            .order_by(AgentRun.created_at.asc(), AgentRun.id.asc())
-            .limit(1)
-        )
-
-    async def _load_run(self, *, user_id: UUID, run_id: UUID) -> AgentRun:
-        run = await self.session.scalar(
-            select(AgentRun).where(
-                AgentRun.id == run_id,
-                AgentRun.user_id == user_id,
-            )
-        )
-        if run is None:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_NOT_FOUND)
-        return run
-
-    async def _status_response(
-        self,
-        run: AgentRun,
-    ) -> TrainingPlanningStatusResponse:
-        payload = validate_training_planning_run(run)
-        status_value = _status_value(run.status)
-        try:
-            _validate_persisted_run_state(run, status_value)
-        except TrainingPlanningStateError:
-            raise
-        except AttributeError, TypeError, ValueError:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT) from None
-        plan: TrainingPlanningOutput | None = None
-        if status_value == AgentRunStatus.SUCCEEDED.value:
-            if run.result is None or run.finished_at is None:
-                raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT)
-            try:
-                plan = validate_training_planning_output_contract(
-                    payload.training_planning_input,
-                    TypeAdapter(TrainingPlanningOutput).validate_python(run.result),
-                )
-            except (
-                TypeError,
-                ValueError,
-                ValidationError,
-                TrainingPlanningOutputContractError,
-            ):
-                raise TrainingPlanningStateError(
-                    TRAINING_PLANNING_STATE_CONFLICT
-                ) from None
-        elif status_value == AgentRunStatus.FAILED.value:
-            if (
-                run.result is not None
-                or run.finished_at is None
-                or not isinstance(run.error_code, str)
-                or _SAFE_ERROR_CODE_PATTERN.fullmatch(run.error_code) is None
-            ):
-                raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT)
-        elif status_value not in {
-            AgentRunStatus.QUEUED.value,
-            AgentRunStatus.RUNNING.value,
-        }:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT)
-
-        try:
-            return TrainingPlanningStatusResponse(
-                run_id=run.id,
-                status=status_value,
-                target_role_id=payload.target_role_id,
-                interaction_language=payload.interaction_language,
-                attempt_count=run.attempt_count,
-                max_attempts=run.max_attempts,
-                error_code=(run.error_code if status_value == "failed" else None),
-                failure_reason=(
-                    TRAINING_PLANNING_FAILURE_REASON
-                    if status_value == "failed"
-                    else None
-                ),
-                created_at=run.created_at,
-                started_at=run.started_at,
-                finished_at=run.finished_at,
-                plan=plan,
-            )
-        except AttributeError, TypeError, ValueError, ValidationError:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT) from None
-
-    def _configured_model(self) -> str:
-        if self.llm_provider != "qwen" or not self.llm_model:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_UNAVAILABLE)
-        return self.llm_model
-
-    @staticmethod
-    def _build_run_payload(
-        *,
-        request_id: UUID,
-        planning_input: TrainingPlanningInput,
-    ) -> TrainingPlanningRunPayload:
-        try:
-            return TrainingPlanningRunPayload(
-                request_id=request_id,
-                target_role_id=planning_input.target_role.id,
-                interaction_language=planning_input.interaction_language,
-                context_fingerprint=training_planning_context_fingerprint(
-                    planning_input
-                ),
-                training_planning_input=planning_input,
-            )
-        except TypeError, ValueError, ValidationError:
-            raise TrainingPlanningStateError(
-                TRAINING_PLANNING_SNAPSHOT_INVALID
-            ) from None
-
-    @staticmethod
-    def _validate_replay_payload(
-        run: AgentRun,
-    ) -> TrainingPlanningRunPayload:
-        try:
-            return validate_training_planning_run(run)
-        except TrainingPlanningStateError:
-            raise
-        except TypeError, ValueError, ValidationError:
-            raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT) from None
-
-    @staticmethod
-    def _require_replay_intent(
-        existing_payload: TrainingPlanningRunPayload,
-        request: StartTrainingPlanningRequest,
-        interaction_language: InteractionLanguage,
-    ) -> None:
-        if (
-            existing_payload.request_id != request.request_id
-            or existing_payload.target_role_id != request.target_role_id
-            or existing_payload.interaction_language != interaction_language
-        ):
-            raise TrainingPlanningStateError(TRAINING_PLANNING_REQUEST_CONFLICT)
-
-
-def validate_training_planning_run(
-    run: AgentRun,
-) -> TrainingPlanningRunPayload:
-    if (
-        run.agent_id != TrainingPlanningAgent.agent_id
-        or run.prompt_id != TrainingPlanningAgent.agent_id
-        or run.prompt_version != TrainingPlanningAgent.agent_version
-        or run.output_schema_id != TrainingPlanningAgent.output_schema_id
-    ):
-        raise TrainingPlanningStateError(TRAINING_PLANNING_RUN_INVALID)
-    try:
-        payload = TrainingPlanningRunPayload.model_validate(run.payload)
-    except TypeError, ValueError, ValidationError:
-        raise TrainingPlanningStateError(TRAINING_PLANNING_SNAPSHOT_INVALID) from None
-    if run.idempotency_key != f"training-planning:{payload.request_id}":
-        raise TrainingPlanningStateError(TRAINING_PLANNING_RUN_INVALID)
-    if payload.context_fingerprint != training_planning_context_fingerprint(
-        payload.training_planning_input
-    ):
-        raise TrainingPlanningStateError(TRAINING_PLANNING_SNAPSHOT_INVALID)
-    return payload
-
 
 def _current_matching_analysis(
     role: TargetRole,
     profile: CareerProfile,
 ) -> TrainingPlanningMatchingAnalysis | None:
     matching = role.matching_analysis
-    matching_run = role.matching_analysis_run
-    if matching is None or matching_run is None:
-        return None
-    if _status_value(matching_run.status) != AgentRunStatus.SUCCEEDED.value:
+    analysis = role.job_description_analysis
+    if matching is None or analysis is None:
         return None
     if (
         role.job_description_status != "saved"
-        or role.raw_job_description is None
-        or not role.raw_job_description.strip()
+        or not role.raw_job_description
         or role.job_description_version is None
-        or role.job_description_analysis is None
-        or matching.job_description_analysis_version
-        != role.job_description_analysis.analysis_version
-        or role.job_description_analysis.job_description_version
-        != role.job_description_version
-    ):
-        return None
-    if (
-        role.matching_analysis_run_id != matching.source_agent_run_id
         or matching.role_id != role.id
         or matching.user_id != role.user_id
         or matching.profile_id != profile.profile_id
         or matching.profile_version != profile.version
         or matching.job_description_version != role.job_description_version
+        or matching.job_description_analysis_version != analysis.analysis_version
     ):
         return None
     try:
@@ -677,7 +308,7 @@ def _current_matching_analysis(
             high_risk_questions=matching.high_risk_questions,
             preparation_recommendations=matching.preparation_recommendations,
         )
-    except AttributeError, TypeError, ValueError, ValidationError:
+    except ValidationError, TypeError, ValueError:
         return None
 
 
@@ -705,89 +336,13 @@ def _training_planning_record(
                 round=record.round,
                 difficulty=record.difficulty,
             )
-    except AttributeError, TypeError, ValueError, ValidationError:
+    except ValidationError, TypeError, ValueError:
         raise TrainingPlanningStateError(TRAINING_PLANNING_SNAPSHOT_INVALID) from None
     raise TrainingPlanningStateError(TRAINING_PLANNING_SNAPSHOT_INVALID)
 
 
-def _status_value(status: object) -> str:
-    value = getattr(status, "value", status)
-    return str(value)
-
-
-def _validate_persisted_run_state(run: AgentRun, status: str) -> None:
-    common_terminal = (
-        run.lease_owner is None
-        and run.lease_token is None
-        and run.lease_expires_at is None
-    )
-    if status == AgentRunStatus.QUEUED.value:
-        valid = (
-            run.attempt_count < run.max_attempts
-            and run.result is None
-            and run.provider is None
-            and run.input_tokens is None
-            and run.output_tokens is None
-            and run.error_code is None
-            and run.finished_at is None
-            and common_terminal
-            and (
-                (run.attempt_count == 0 and run.started_at is None)
-                or (run.attempt_count > 0 and run.started_at is not None)
-            )
-        )
-    elif status == AgentRunStatus.RUNNING.value:
-        valid = (
-            run.attempt_count >= 1
-            and run.attempt_count <= run.max_attempts
-            and run.result is None
-            and run.provider is None
-            and run.input_tokens is None
-            and run.output_tokens is None
-            and run.error_code is None
-            and run.started_at is not None
-            and run.finished_at is None
-            and run.lease_owner is not None
-            and run.lease_token is not None
-            and run.lease_expires_at is not None
-        )
-    elif status == AgentRunStatus.SUCCEEDED.value:
-        valid = (
-            run.attempt_count >= 1
-            and run.attempt_count <= run.max_attempts
-            and run.result is not None
-            and run.provider is not None
-            and run.input_tokens is not None
-            and run.output_tokens is not None
-            and run.error_code is None
-            and run.started_at is not None
-            and run.finished_at is not None
-            and common_terminal
-        )
-    elif status == AgentRunStatus.FAILED.value:
-        valid = (
-            run.attempt_count >= 1
-            and run.attempt_count <= run.max_attempts
-            and run.result is None
-            and run.provider is None
-            and run.input_tokens is None
-            and run.output_tokens is None
-            and run.error_code is not None
-            and run.started_at is not None
-            and run.finished_at is not None
-            and common_terminal
-        )
-    else:
-        valid = False
-    if not valid:
-        raise TrainingPlanningStateError(TRAINING_PLANNING_STATE_CONFLICT)
-
-
 __all__ = [
     "TRAINING_PLANNING_FAILURE_REASON",
-    "TRAINING_PLANNING_NOT_FOUND",
-    "TRAINING_PLANNING_REQUEST_CONFLICT",
-    "TRAINING_PLANNING_RUN_INVALID",
     "TRAINING_PLANNING_SNAPSHOT_INVALID",
     "TRAINING_PLANNING_STATE_CONFLICT",
     "TRAINING_PLANNING_TARGET_NOT_FOUND",
@@ -796,5 +351,4 @@ __all__ = [
     "TrainingPlanningService",
     "TrainingPlanningStateError",
     "TrainingPlanningStateErrorCode",
-    "validate_training_planning_run",
 ]

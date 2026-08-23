@@ -259,13 +259,6 @@ export const practice = {
     stay: "继续回答",
     leave: "离开页面",
   },
-  evaluating: {
-    title: "正在生成本题评分",
-    description: "本题问答已结束，Riva 正在结合完整回答生成多维评分和复盘。",
-    progress: "评分通常只需要片刻，请保持此页面打开。",
-    retry: "重新评分",
-    retrying: "正在重新评分",
-  },
   scoreDimensions: {
     relevance: "内容相关性",
     structure: "结构清晰度",

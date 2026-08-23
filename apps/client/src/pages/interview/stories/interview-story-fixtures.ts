@@ -277,14 +277,6 @@ export function createMultipleFollowUpsReviewStoryFixture(): GetInterviewReviewR
   )
 }
 
-export function createGeneratingReferenceReviewStoryFixture(): GetInterviewReviewResponse {
-  const response = createInterviewReviewResponseMock()
-  if (response.status !== "complete") throw new Error("Complete review fixture required.")
-  const copy = structuredClone(response)
-  copy.questionDetails[0]!.referenceAnswer = { status: "generating" }
-  return copy
-}
-
 export function createLongCandidateExchangesStoryFixture(): InterviewCandidateQuestionExchangeResponse[] {
   return [
     createCandidateQuestionExchange(

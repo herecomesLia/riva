@@ -2,7 +2,7 @@ export type ProfileStatus = "active"
 
 export type ProfileSource = "resumeExtracted" | "userEdited" | "userAdded"
 
-export type ResumeProcessingStatus = "uploaded" | "parsing" | "succeeded" | "failed"
+export type ResumeProcessingStatus = "uploaded" | "succeeded" | "failed"
 
 export type ProfileSection =
   "education" | "workExperience" | "projectExperience" | "skills" | "credentials" | "targetRoles"
@@ -129,29 +129,7 @@ export type ResumeDocumentsResponseDto = {
   documents: ResumeDocument[]
 }
 
-export type ResumeParsingLifecycleStatus =
-  "notStarted" | "queued" | "running" | "succeeded" | "failed"
-
 export type ResumeImportDraftLifecycleStatus = "ready" | "applied" | "superseded"
-
-export type ResumeParsingStatus = {
-  resumeDocumentId: string
-  status: ResumeParsingLifecycleStatus
-  runId: string | null
-  attemptCount: number
-  maxAttempts: number | null
-  errorCode: string | null
-  failureReason: string | null
-  canRetry: boolean
-  createdAt: string | null
-  startedAt: string | null
-  finishedAt: string | null
-  resultVersion: number | null
-  draftVersion: number | null
-  draftStatus: ResumeImportDraftLifecycleStatus | null
-}
-
-export type ResumeParsingStatusDto = ResumeParsingStatus
 
 export type ResumeImportSection =
   "education" | "workExperience" | "projectExperience" | "skills" | "summary"
@@ -189,7 +167,6 @@ export type ResumeImportChangeSummary = {
 
 export type ResumeImportDraft = {
   resumeDocumentId: string
-  sourceRunId: string
   parsingResultVersion: number
   draftVersion: number
   status: ResumeImportDraftLifecycleStatus

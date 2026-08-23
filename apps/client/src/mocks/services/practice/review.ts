@@ -3,6 +3,7 @@ import type {
   PracticeMutationResponse,
   RetryCurrentPracticeQuestionInput,
 } from "@/models/practice"
+import { createGeneratedPracticeQuestion } from "@/mocks/data/practice"
 
 import { toAttemptRecord } from "./completion"
 import { requireReview } from "./guards"
@@ -10,7 +11,8 @@ import {
   consumePracticeMockOperation,
   copyPracticeState,
   getPracticeMockState,
-  resetGenerationPoll,
+  ensureQuestionOrdinal,
+  nextQuestionOrdinal,
   setPracticeMockState,
 } from "./state"
 
@@ -64,12 +66,13 @@ export async function continueToNextPracticeQuestion(
           difficulty: recommendation.nextQuestion.difficulty,
         }
       : session.selection
-  resetGenerationPoll(session.sessionId)
+  ensureQuestionOrdinal(session.sessionId)
+  const ordinal = nextQuestionOrdinal(session.sessionId)
 
   return setPracticeMockState({
     ...getPracticeMockState(),
     session: {
-      status: "generatingQuestion",
+      status: "answering",
       sessionId: session.sessionId,
       language: session.language,
       version: session.version + 1,
@@ -78,7 +81,11 @@ export async function continueToNextPracticeQuestion(
       attemptId: `${session.sessionId}_attempt_${session.attemptNumber + 1}`,
       attemptNumber: session.attemptNumber + 1,
       attemptRecords: [...copyPracticeState(session.attemptRecords), previousAttempt],
-      previousAttempt,
+      question: createGeneratedPracticeQuestion({
+        ordinal,
+        selection,
+        sessionId: session.sessionId,
+      }),
     },
   })
 }

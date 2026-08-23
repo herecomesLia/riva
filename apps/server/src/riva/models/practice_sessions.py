@@ -19,7 +19,6 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
-    from riva.models.agent_runs import AgentRun
     from riva.models.practice_interactions import (
         PracticeAnswer,
         PracticeEvaluation,
@@ -196,8 +195,7 @@ class PracticeAttempt(Base):
         ),
         CheckConstraint(
             "status IN ("
-            "'generatingQuestion', 'answering', 'answeringFollowUp', "
-            "'evaluating', 'review', 'completed', 'endedEarly'"
+            "'answering', 'answeringFollowUp', 'review', 'completed', 'endedEarly'"
             ")",
             name="ck_practice_attempts_status",
         ),
@@ -205,10 +203,6 @@ class PracticeAttempt(Base):
             "session_id",
             "attempt_number",
             name="uq_practice_attempts_session_attempt_number",
-        ),
-        UniqueConstraint(
-            "question_generation_run_id",
-            name="uq_practice_attempts_question_generation_run",
         ),
     )
 
@@ -231,12 +225,7 @@ class PracticeAttempt(Base):
     status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
-        default="generatingQuestion",
-    )
-    question_generation_run_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="SET NULL"),
-        nullable=True,
+        default="answering",
     )
     question_card_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
@@ -268,9 +257,6 @@ class PracticeAttempt(Base):
         back_populates="attempts",
         foreign_keys=[user_id, session_id],
         passive_deletes=True,
-    )
-    question_generation_run: Mapped[AgentRun | None] = relationship(
-        foreign_keys=[question_generation_run_id],
     )
     question_card: Mapped[QuestionCard | None] = relationship(
         foreign_keys=[question_card_id],

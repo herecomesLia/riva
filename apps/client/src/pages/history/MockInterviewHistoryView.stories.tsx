@@ -27,14 +27,6 @@ unansweredMockInterviewStoryFixture.questions[0].answer = null
 unansweredMockInterviewStoryFixture.questions[0].evaluation = null
 unansweredMockInterviewStoryFixture.questions[0].review = null
 
-const generatingReferenceMockInterviewStoryFixture = structuredClone(
-  completeMockInterviewHistoryStoryFixture,
-)
-generatingReferenceMockInterviewStoryFixture.questions[0].referenceAnswer = {
-  status: "generating",
-  content: null,
-}
-
 export const Complete = meta.story({
   args: {
     historySearch: defaultHistorySearch,
@@ -88,14 +80,6 @@ export const WithUnansweredQuestion = meta.story({
     historySearch: defaultHistorySearch,
     onRetry: fn(),
     state: { status: "ready", data: unansweredMockInterviewStoryFixture },
-  },
-})
-
-export const ReferenceGenerating = meta.story({
-  args: {
-    historySearch: defaultHistorySearch,
-    onRetry: fn(),
-    state: { status: "ready", data: generatingReferenceMockInterviewStoryFixture },
   },
 })
 

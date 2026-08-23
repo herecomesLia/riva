@@ -3,16 +3,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from riva.core.training_planning import training_planning_context_fingerprint
 from riva.schemas.training_planning import (
-    EnsureCurrentTrainingPlanningRequest,
-    StartTrainingPlanningRequest,
     TrainingPlanningInput,
     TrainingPlanningMockInterviewOutput,
     TrainingPlanningMockInterviewRecord,
     TrainingPlanningOutput,
-    TrainingPlanningRunPayload,
-    TrainingPlanningStatusResponse,
     TrainingPlanningTargetedPracticeOutput,
     TrainingPlanningTargetedPracticeRecord,
 )
@@ -225,92 +220,3 @@ def test_ended_at_must_be_timezone_aware() -> None:
 
     with pytest.raises(ValidationError, match="timezone-aware"):
         TrainingPlanningInput.model_validate(invalid)
-
-
-def test_lifecycle_request_and_payload_preserve_lineage_and_fingerprint() -> None:
-    request = StartTrainingPlanningRequest.model_validate(
-        {
-            "requestId": "00000000-0000-0000-0000-000000000251",
-            "targetRoleId": "00000000-0000-0000-0000-000000000201",
-        }
-    )
-    planning_input = TrainingPlanningInput.model_validate(input_payload())
-    payload = TrainingPlanningRunPayload.model_validate(
-        {
-            "requestId": request.request_id,
-            "targetRoleId": request.target_role_id,
-            "interactionLanguage": planning_input.interaction_language,
-            "contextFingerprint": training_planning_context_fingerprint(planning_input),
-            "trainingPlanningInput": planning_input,
-        }
-    )
-
-    assert payload.target_role_id == planning_input.target_role.id
-    assert payload.context_fingerprint == training_planning_context_fingerprint(
-        planning_input
-    )
-    assert payload.model_dump(mode="json", by_alias=True)["trainingPlanningInput"][
-        "targetRole"
-    ]["id"] == str(request.target_role_id)
-
-    ensure_request = EnsureCurrentTrainingPlanningRequest.model_validate(
-        {"targetRoleId": request.target_role_id}
-    )
-    assert ensure_request.target_role_id == request.target_role_id
-
-    mismatched = payload.model_dump(mode="json", by_alias=True)
-    mismatched["targetRoleId"] = "00000000-0000-0000-0000-000000000299"
-    with pytest.raises(ValidationError, match="targetRoleId"):
-        TrainingPlanningRunPayload.model_validate(mismatched)
-
-    bad_fingerprint = payload.model_dump(mode="json", by_alias=True)
-    bad_fingerprint["contextFingerprint"] = "not-a-sha256"
-    with pytest.raises(ValidationError):
-        TrainingPlanningRunPayload.model_validate(bad_fingerprint)
-
-
-def test_status_response_enforces_lifecycle_state_constraints() -> None:
-    queued = TrainingPlanningStatusResponse(
-        runId="00000000-0000-0000-0000-000000000261",
-        status="queued",
-        targetRoleId="00000000-0000-0000-0000-000000000201",
-        interactionLanguage="en",
-        attemptCount=1,
-        maxAttempts=3,
-        errorCode=None,
-        failureReason=None,
-        createdAt=datetime(2026, 8, 18, 10, tzinfo=UTC),
-        startedAt=datetime(2026, 8, 18, 10, tzinfo=UTC),
-        finishedAt=None,
-        plan=None,
-    )
-    assert queued.status == "queued"
-
-    successful_plan = TrainingPlanningTargetedPracticeOutput(
-        action="targetedPractice",
-        reason="Practice the current gap.",
-        focusAreas=["project results"],
-        questionType="projectDeepDive",
-        difficulty="basic",
-        prioritizeWeaknesses=False,
-    )
-    succeeded = TrainingPlanningStatusResponse(
-        runId="00000000-0000-0000-0000-000000000262",
-        status="succeeded",
-        targetRoleId="00000000-0000-0000-0000-000000000201",
-        interactionLanguage="en",
-        attemptCount=1,
-        maxAttempts=3,
-        errorCode=None,
-        failureReason=None,
-        createdAt=datetime(2026, 8, 18, 10, tzinfo=UTC),
-        startedAt=datetime(2026, 8, 18, 10, tzinfo=UTC),
-        finishedAt=datetime(2026, 8, 18, 10, 1, tzinfo=UTC),
-        plan=successful_plan,
-    )
-    assert succeeded.plan is successful_plan
-
-    invalid = succeeded.model_dump(mode="json", by_alias=True)
-    invalid["plan"] = None
-    with pytest.raises(ValidationError):
-        TrainingPlanningStatusResponse.model_validate(invalid)

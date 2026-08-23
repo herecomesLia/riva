@@ -163,19 +163,6 @@ export const history = {
       guidance: "Usage guidance",
       generatedAt: "Generated {{date}}",
       notViewedBeforeSubmission: "Reference answer not viewed before submission",
-      generating: "Generating reference answer",
-      generatingDescription:
-        "A reference answer is being generated for this historical question and will update automatically.",
-      pollingRetrying: "Unable to check generation progress",
-      pollingRetryingDescription:
-        "This progress check failed and is being retried with a limited retry policy.",
-      pollingFailed: "Generation progress checks stopped",
-      pollingFailedDescription: {
-        consecutiveFailures:
-          "Generation progress could not be checked repeatedly. You can check the current task again.",
-        timeout: "Generation progress checking timed out. You can check the current task again.",
-      },
-      recheck: "Check again",
       unavailable: "Reference answer unavailable",
       unavailableDescription:
         "Generation failed and can be retried. Insufficient context requires a new training session.",

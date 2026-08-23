@@ -1,6 +1,7 @@
 import { getCurrentInteractionLanguage } from "@/i18n/language"
 import { getRolesPage } from "@/mocks/services/roles"
 import {
+  createGeneratedPracticeQuestion,
   buildPracticeSetupContext,
   getEligiblePracticeQuestionCount,
   reconcilePracticeSetupSelection,
@@ -26,6 +27,7 @@ import {
   getHistoryEntryRoleSelectionRequired,
   getPracticeMockState,
   initializeQuestionOrdinal,
+  nextQuestionOrdinal,
   nextPracticeSessionSequence,
   setPracticeMockState,
   setHistoryEntryRoleSelectionRequired,
@@ -100,7 +102,7 @@ export async function startPracticeSession(
   return setPracticeMockState({
     ...current,
     session: {
-      status: "generatingQuestion",
+      status: "answering",
       sessionId,
       language: getCurrentInteractionLanguage(),
       version: 1,
@@ -109,7 +111,11 @@ export async function startPracticeSession(
       attemptId: `${sessionId}_attempt_1`,
       attemptNumber: 1,
       attemptRecords: [],
-      previousAttempt: null,
+      question: createGeneratedPracticeQuestion({
+        ordinal: nextQuestionOrdinal(sessionId),
+        selection: input,
+        sessionId,
+      }),
     },
   })
 }

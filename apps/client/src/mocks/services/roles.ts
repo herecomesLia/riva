@@ -8,16 +8,14 @@ import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
-  GenerateOrRegenerateMatchingAnalysisInput,
-  GetJobDescriptionParsingStatusInput,
-  GetMatchingAnalysisStatusInput,
   JobDescriptionAnalysis,
   MatchingAnalysis,
   ReadyTargetRole,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
-  StartOrRetryJobDescriptionParsingInput,
+  StartJobDescriptionParsingInput,
+  StartMatchingAnalysisInput,
   TargetRole,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
@@ -32,13 +30,11 @@ function copy<T>(value: T): T {
 let mockResponse = createRolesMockResponse()
 let createdRoleCount = 0
 let timestampSequence = 0
-const parsingAttempts = new Map<string, number>()
 
 export function resetRolesMockState(scenario: RolesMockScenario = "matchingAnalysisCurrent") {
   mockResponse = createRolesMockResponse(scenario)
   createdRoleCount = 0
   timestampSequence = 0
-  parsingAttempts.clear()
 }
 
 export function getRolesMockSnapshot(): RolesPageResponse {
@@ -123,24 +119,6 @@ function invalidateMatchingAnalysisAfterAnalysisCorrection(
   return null
 }
 
-function parsingKey(role: TargetRole) {
-  if (role.jobDescription.version === null) throw new Error("Job description is missing.")
-  return `${role.id}:${role.jobDescription.version}`
-}
-
-function parsingShouldFail(role: TargetRole) {
-  if (role.jobDescription.status !== "parsing") return false
-  const text = role.jobDescription.rawText.toLowerCase()
-  const key = parsingKey(role)
-  const attempts = (parsingAttempts.get(key) ?? 0) + 1
-  parsingAttempts.set(key, attempts)
-  return text.includes("unparseable") || (text.includes("retryable") && attempts === 1)
-}
-
-function matchingShouldFail(role: ReadyTargetRole) {
-  return role.jobDescription.rawText.toLowerCase().includes("analysis-failure")
-}
-
 function isReadyTargetRole(role: TargetRole): role is ReadyTargetRole {
   return role.jobDescription.status === "ready" && role.jobDescriptionAnalysis !== null
 }
@@ -150,69 +128,6 @@ function resolveFallbackCurrentRoleId(roles: TargetRole[], excludedRoleId?: stri
     roles.find((role) => role.id !== excludedRoleId && role.preparationStatus === "preparing")
       ?.id ?? null
   )
-}
-
-function completeJobDescriptionParsing(role: TargetRole): TargetRole {
-  if (role.jobDescription.status !== "parsing") return role
-  const versionUpdate = nextRoleVersion(role)
-
-  if (parsingShouldFail(role)) {
-    return {
-      ...role,
-      ...versionUpdate,
-      jobDescription: {
-        ...role.jobDescription,
-        status: "failed",
-        parsingFailureReason:
-          "We could not extract structured requirements from this JD. Please review the text and try again.",
-      },
-      jobDescriptionAnalysis: null,
-    }
-  }
-
-  const jobDescriptionVersion = role.jobDescription.version
-  return {
-    ...role,
-    ...versionUpdate,
-    jobDescription: { ...role.jobDescription, status: "ready" },
-    jobDescriptionAnalysis: createJobDescriptionAnalysisFixture({
-      jobDescriptionVersion,
-      parsedAt: nextTimestamp(),
-    }),
-  } as ReadyTargetRole
-}
-
-function completeMatchingAnalysis(role: TargetRole): TargetRole {
-  const matchingAnalysis = role.matchingAnalysis
-  if (matchingAnalysis?.status !== "generating") return role
-  if (!isReadyTargetRole(role)) {
-    throw new Error("A matching analysis requires a parsed job description.")
-  }
-
-  const versionUpdate = nextRoleVersion(role)
-  if (matchingShouldFail(role)) {
-    return {
-      ...role,
-      ...versionUpdate,
-      matchingAnalysis: {
-        ...matchingAnalysis,
-        status: "failed",
-        failureReason:
-          "The matching analysis could not be generated right now. Your profile and JD are preserved; please try again.",
-      },
-    }
-  }
-
-  return {
-    ...role,
-    ...versionUpdate,
-    matchingAnalysis: {
-      ...matchingAnalysis,
-      status: "current",
-      generatedAt: nextTimestamp(),
-      result: createMatchingAnalysisResultFixture(),
-    },
-  }
 }
 
 export async function getRolesPage(): Promise<RolesPageResponse> {
@@ -240,7 +155,6 @@ export async function createTargetRole(input: CreateTargetRoleInput): Promise<Ro
       status: "missing",
       rawText: null,
       version: null,
-      parsingFailureReason: null,
     },
     jobDescriptionAnalysis: null,
     matchingAnalysis: null,
@@ -267,7 +181,6 @@ export function addImportedTargetRole(input: {
     experienceRange: null,
     id: roleId,
     jobDescription: {
-      parsingFailureReason: null,
       rawText: input.rawText,
       status: "ready",
       version: 1,
@@ -390,7 +303,6 @@ export async function saveJobDescription(
       status: "saved",
       rawText,
       version: jobDescriptionVersion,
-      parsingFailureReason: null,
     },
     jobDescriptionAnalysis: null,
     matchingAnalysis: markMatchingAnalysisStale(role.matchingAnalysis),
@@ -399,12 +311,12 @@ export async function saveJobDescription(
 }
 
 export async function startJobDescriptionParsing(
-  input: StartOrRetryJobDescriptionParsingInput,
+  input: StartJobDescriptionParsingInput,
 ): Promise<RolesPageResponse> {
   await waitForMockDelay()
   const role = requireRole(input.roleId)
   requireCurrentVersion(role, input.version)
-  if (role.jobDescription.status === "missing") {
+  if (role.jobDescription.status !== "saved") {
     throw new Error("Save a job description before starting parsing.")
   }
   if (role.jobDescription.version !== input.jobDescriptionVersion) {
@@ -414,38 +326,28 @@ export async function startJobDescriptionParsing(
     return copy(mockResponse)
   }
 
-  const parsingRole: TargetRole = {
+  if (role.jobDescription.rawText.toLowerCase().includes("unparseable")) {
+    throw new Error("The job description could not be parsed.")
+  }
+
+  const jobDescriptionVersion = role.jobDescription.version
+  const readyRole: ReadyTargetRole = {
     ...role,
     ...nextRoleVersion(role),
     jobDescription: {
       ...role.jobDescription,
-      status: "parsing",
-      parsingFailureReason: null,
+      status: "ready",
     },
-    jobDescriptionAnalysis: null,
+    jobDescriptionAnalysis: createJobDescriptionAnalysisFixture({
+      jobDescriptionVersion,
+      parsedAt: nextTimestamp(),
+    }),
   }
-  return setMockResponse(replaceRole(completeJobDescriptionParsing(parsingRole)))
-}
-
-export async function getJobDescriptionParsingStatus(
-  input: GetJobDescriptionParsingStatusInput,
-): Promise<TargetRole> {
-  await waitForMockDelay()
-  const role = requireRole(input.roleId)
-  if (
-    role.version !== input.version ||
-    role.jobDescription.version !== input.jobDescriptionVersion ||
-    role.jobDescription.status !== "parsing"
-  ) {
-    return copy(role)
-  }
-  const completedRole = completeJobDescriptionParsing(role)
-  setMockResponse(replaceRole(completedRole))
-  return copy(completedRole)
+  return setMockResponse(replaceRole(readyRole))
 }
 
 export async function generateMatchingAnalysis(
-  input: GenerateOrRegenerateMatchingAnalysisInput,
+  input: StartMatchingAnalysisInput,
 ): Promise<RolesPageResponse> {
   await waitForMockDelay()
   const role = requireRole(input.roleId)
@@ -456,27 +358,23 @@ export async function generateMatchingAnalysis(
   if (!isReadyTargetRole(role)) {
     throw new Error("A parsed job description is required to generate matching analysis.")
   }
-  if (
-    role.matchingAnalysis?.status === "generating" ||
-    role.matchingAnalysis?.status === "current"
-  ) {
+  if (role.matchingAnalysis?.status === "current") {
     return copy(mockResponse)
   }
 
-  const generatingRole: ReadyTargetRole = {
+  const readyRole: ReadyTargetRole = {
     ...role,
     ...nextRoleVersion(role),
     matchingAnalysis: {
-      status: "generating",
+      status: "current",
       profileVersion: mockResponse.profileContext.version,
       jobDescriptionVersion: role.jobDescription.version,
       jobDescriptionAnalysisVersion: role.jobDescriptionAnalysis.analysisVersion,
-      generatedAt: null,
-      failureReason: null,
-      result: null,
+      generatedAt: nextTimestamp(),
+      result: createMatchingAnalysisResultFixture(),
     },
   }
-  return setMockResponse(replaceRole(completeMatchingAnalysis(generatingRole)))
+  return setMockResponse(replaceRole(readyRole))
 }
 
 export async function updateJobDescriptionAnalysisModule(
@@ -549,17 +447,4 @@ function isValidAnalysisModuleValue(input: UpdateJobDescriptionAnalysisModuleInp
   if (input.field === "qualificationRequirements") return isQualificationRequirements(input.value)
   if (input.field === "requiredSkills") return isRequiredSkillGroups(input.value)
   return isStringList(input.value)
-}
-
-export async function getMatchingAnalysisStatus(
-  input: GetMatchingAnalysisStatusInput,
-): Promise<TargetRole> {
-  await waitForMockDelay()
-  const role = requireRole(input.roleId)
-  if (role.version !== input.version || role.matchingAnalysis?.status !== "generating") {
-    return copy(role)
-  }
-  const completedRole = completeMatchingAnalysis(role)
-  setMockResponse(replaceRole(completedRole))
-  return copy(completedRole)
 }

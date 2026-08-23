@@ -65,8 +65,6 @@ export type InterviewQuestionResponse = {
   order: number
 }
 
-export type InterviewGenerationStatus = "generating" | "failed"
-
 export type InterviewAnswerResponse = {
   id: string
   content: string
@@ -160,21 +158,6 @@ export type InterviewOpeningSessionResponse = InterviewActiveSessionResponseBase
   openingMessage: string
 }
 
-export type InterviewGeneratingQuestionSessionResponse = InterviewActiveSessionResponseBase & {
-  status: "generatingQuestion"
-  generationStatus: InterviewGenerationStatus
-}
-
-export type InterviewGeneratingTurnSessionResponse = InterviewActiveSessionResponseBase & {
-  status: "generatingTurn"
-  generationStatus: InterviewGenerationStatus
-  currentQuestion: {
-    question: InterviewQuestionResponse
-    answer: InterviewAnswerResponse
-    answeredFollowUps: AnsweredInterviewFollowUpResponse[]
-  }
-}
-
 export type InterviewQuestionSessionResponse = InterviewActiveSessionResponseBase & {
   status: "question"
   currentQuestion: {
@@ -202,21 +185,6 @@ export type InterviewCandidateQuestionsSessionResponse = InterviewActiveSessionR
   status: "candidateQuestions"
   prompt: string
   exchanges: InterviewCandidateQuestionExchangeResponse[]
-}
-
-export type InterviewGeneratingCandidateAnswerSessionResponse =
-  InterviewActiveSessionResponseBase & {
-    status: "generatingCandidateAnswer"
-    generationStatus: InterviewGenerationStatus
-    currentCandidateQuestion: InterviewCandidateQuestionResponse
-    exchanges: InterviewCandidateQuestionExchangeResponse[]
-  }
-
-export type InterviewGeneratingReviewSessionResponse = InterviewActiveSessionResponseBase & {
-  status: "generatingReview"
-  generationStatus: InterviewGenerationStatus
-  completionReason: InterviewCompletionReason
-  candidateQuestionExchanges: InterviewCandidateQuestionExchangeResponse[]
 }
 
 export type InterviewScoreDimension =
@@ -257,9 +225,6 @@ export type InterviewReferenceAnswerResponse =
   | {
       status: "ready"
       content: InterviewReferenceAnswerContentResponse
-    }
-  | {
-      status: "generating"
     }
   | {
       status: "unavailable"
@@ -353,13 +318,9 @@ export type InterviewCompletedSessionResponse = InterviewActiveSessionResponseBa
 
 export type ActiveInterviewSessionResponse =
   | InterviewOpeningSessionResponse
-  | InterviewGeneratingQuestionSessionResponse
-  | InterviewGeneratingTurnSessionResponse
   | InterviewQuestionSessionResponse
   | InterviewFollowUpSessionResponse
   | InterviewCandidateQuestionsSessionResponse
-  | InterviewGeneratingCandidateAnswerSessionResponse
-  | InterviewGeneratingReviewSessionResponse
 
 export type InterviewSessionResponse =
   ActiveInterviewSessionResponse | InterviewCompletedSessionResponse
@@ -462,12 +423,6 @@ export type InterviewSessionMutationInput = {
 }
 
 export type BeginInterviewQuestionsInput = InterviewSessionMutationInput
-
-export type RetryInterviewTurnInput = InterviewSessionMutationInput
-
-export type RetryInterviewCandidateAnswerInput = InterviewSessionMutationInput
-
-export type RetryInterviewReviewInput = InterviewSessionMutationInput
 
 export type SubmitInterviewAnswerInput =
   | (InterviewSessionMutationInput & {

@@ -32,7 +32,6 @@ def draft_response() -> ResumeImportDraftResponse:
     return ResumeImportDraftResponse.model_validate(
         {
             "resumeDocumentId": RESUME_ID,
-            "sourceRunId": uuid4(),
             "parsingResultVersion": 1,
             "draftVersion": 1,
             "status": "ready",

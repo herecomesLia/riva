@@ -6,7 +6,6 @@ import type { RolesPageResponse } from "@/models/roles"
 import {
   applyJobDescriptionImportDraft,
   createJobDescriptionImportDraft,
-  getJobDescriptionImportDraft,
 } from "@/services/job-description-import"
 import {
   archiveTargetRole,
@@ -112,10 +111,6 @@ export function RolesPage() {
       runImportDraftRequest(() => createJobDescriptionImportDraft(input)),
     [runImportDraftRequest],
   )
-  const getImportDraft = useCallback(
-    (draftId: string) => runImportDraftRequest(() => getJobDescriptionImportDraft(draftId)),
-    [runImportDraftRequest],
-  )
   const applyImportDraft = useCallback(
     (draftId: string) => runImportDraftRequest(() => applyJobDescriptionImportDraft(draftId)),
     [runImportDraftRequest],
@@ -173,7 +168,6 @@ export function RolesPage() {
     jobDescriptionImport: {
       applyDraft: applyImportDraft,
       createDraft: createImportDraft,
-      getDraft: getImportDraft,
       refreshRoles: refreshRolesAfterImport,
     },
     setCurrentTargetRole: (input) => runMutation(setCurrentMutation.mutateAsync, input),

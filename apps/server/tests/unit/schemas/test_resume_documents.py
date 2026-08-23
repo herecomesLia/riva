@@ -85,7 +85,7 @@ def test_response_is_camel_case_and_forbids_sensitive_or_extra_fields() -> None:
         "storageKey",
         "extractedText",
         "extractionFailureCode",
-        "agentRun",
+        "internalExecution",
         "provider",
         "token",
     ):

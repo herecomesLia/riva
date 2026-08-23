@@ -13,9 +13,6 @@ from riva.schemas.interview import (
     FinishInterviewRequest,
     GetInterviewReviewResponse,
     InterviewPageResponse,
-    RetryInterviewCandidateAnswerRequest,
-    RetryInterviewReviewRequest,
-    RetryInterviewTurnRequest,
     StartInterviewRequest,
     SubmitCandidateQuestionRequest,
     SubmitInterviewAnswerRequest,
@@ -60,7 +57,7 @@ async def start_interview_session(
 @router.post(
     "/sessions/{session_id}/questions/begin",
     response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def begin_interview_questions(
     session_id: UUID,
@@ -78,7 +75,7 @@ async def begin_interview_questions(
 @router.post(
     "/sessions/{session_id}/answers",
     response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def submit_interview_answer(
     session_id: UUID,
@@ -94,27 +91,9 @@ async def submit_interview_answer(
 
 
 @router.post(
-    "/sessions/{session_id}/turn/retry",
-    response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def retry_interview_turn(
-    session_id: UUID,
-    payload: RetryInterviewTurnRequest,
-    current_user: User = Depends(require_current_user),
-    interview_api_service: InterviewAPIService = Depends(get_interview_api_service),
-) -> InterviewPageResponse:
-    return await interview_api_service.retry_turn(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
     "/sessions/{session_id}/candidate-questions",
     response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def submit_candidate_question(
     session_id: UUID,
@@ -130,27 +109,9 @@ async def submit_candidate_question(
 
 
 @router.post(
-    "/sessions/{session_id}/candidate-answer/retry",
-    response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def retry_candidate_answer(
-    session_id: UUID,
-    payload: RetryInterviewCandidateAnswerRequest,
-    current_user: User = Depends(require_current_user),
-    interview_api_service: InterviewAPIService = Depends(get_interview_api_service),
-) -> InterviewPageResponse:
-    return await interview_api_service.retry_candidate_answer(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
     "/sessions/{session_id}/finish",
     response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def finish_interview(
     session_id: UUID,
@@ -168,7 +129,7 @@ async def finish_interview(
 @router.post(
     "/sessions/{session_id}/end",
     response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def end_interview(
     session_id: UUID,
@@ -177,24 +138,6 @@ async def end_interview(
     interview_api_service: InterviewAPIService = Depends(get_interview_api_service),
 ) -> InterviewPageResponse:
     return await interview_api_service.end_session(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
-    "/sessions/{session_id}/review/retry",
-    response_model=InterviewPageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def retry_interview_review(
-    session_id: UUID,
-    payload: RetryInterviewReviewRequest,
-    current_user: User = Depends(require_current_user),
-    interview_api_service: InterviewAPIService = Depends(get_interview_api_service),
-) -> InterviewPageResponse:
-    return await interview_api_service.retry_review(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

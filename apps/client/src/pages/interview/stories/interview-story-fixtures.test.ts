@@ -10,7 +10,6 @@ import {
   createInterviewSessionStoryFixture,
   createEnglishInterviewSessionStoryFixture,
   createInterviewSetupStoryFixture,
-  createGeneratingReferenceReviewStoryFixture,
   createLongCandidateExchangesStoryFixture,
   createSparseInterviewReviewStoryFixture,
 } from "./interview-story-fixtures"
@@ -76,15 +75,7 @@ describe("interview Story fixtures", () => {
     expect(secondReference.content.exampleAnswer).not.toBe("被 Story 修改的参考答案")
   })
 
-  it("returns independent generating-reference and candidate-exchange fixtures", () => {
-    const firstReview = createGeneratingReferenceReviewStoryFixture()
-    firstReview.questionDetails[0]!.referenceAnswer = {
-      status: "unavailable",
-      reason: "generationFailed",
-    }
-    const secondReview = createGeneratingReferenceReviewStoryFixture()
-    expect(secondReview.questionDetails[0]!.referenceAnswer.status).toBe("generating")
-
+  it("returns independent candidate-exchange fixtures", () => {
     const firstExchanges = createLongCandidateExchangesStoryFixture()
     firstExchanges[0]!.question.content = "被 Story 修改的问题"
     const secondExchanges = createLongCandidateExchangesStoryFixture()

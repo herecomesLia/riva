@@ -162,13 +162,6 @@ export const interviewOpeningSessionSchema = sessionBaseSchema
   })
   .strict()
 
-export const interviewGeneratingQuestionSessionSchema = sessionBaseSchema
-  .extend({
-    status: z.literal("generatingQuestion"),
-    generationStatus: z.enum(["generating", "failed"]),
-  })
-  .strict()
-
 const awaitingQuestionSchema = z
   .object({
     status: z.literal("awaitingAnswer"),
@@ -192,14 +185,6 @@ const answeredQuestionSnapshotSchema = z
   })
   .strict()
 
-export const interviewGeneratingTurnSessionSchema = sessionBaseSchema
-  .extend({
-    status: z.literal("generatingTurn"),
-    generationStatus: z.enum(["generating", "failed"]),
-    currentQuestion: answeredQuestionSnapshotSchema,
-  })
-  .strict()
-
 const awaitingFollowUpSchema = z
   .object({
     status: z.literal("awaitingAnswer"),
@@ -220,15 +205,6 @@ export const interviewCandidateQuestionsSessionSchema = sessionBaseSchema
   .extend({
     status: z.literal("candidateQuestions"),
     prompt: z.string().trim().min(1).max(255),
-    exchanges: z.array(interviewCandidateQuestionExchangeSchema),
-  })
-  .strict()
-
-export const interviewGeneratingCandidateAnswerSessionSchema = sessionBaseSchema
-  .extend({
-    status: z.literal("generatingCandidateAnswer"),
-    generationStatus: z.enum(["generating", "failed"]),
-    currentCandidateQuestion: interviewCandidateQuestionSchema,
     exchanges: z.array(interviewCandidateQuestionExchangeSchema),
   })
   .strict()
@@ -290,13 +266,6 @@ const interviewReferenceAnswerWireSchema = z.discriminatedUnion("status", [
     .strict(),
   z
     .object({
-      status: z.literal("generating"),
-      content: z.null(),
-      reason: z.null(),
-    })
-    .strict(),
-  z
-    .object({
       status: z.literal("unavailable"),
       content: z.null(),
       reason: z.literal("generationFailed"),
@@ -312,13 +281,10 @@ const interviewReferenceAnswerSchema = interviewReferenceAnswerWireSchema.transf
         content: referenceAnswer.content,
       }
     }
-    if (referenceAnswer.status === "unavailable") {
-      return {
-        status: referenceAnswer.status,
-        reason: referenceAnswer.reason,
-      }
+    return {
+      status: referenceAnswer.status,
+      reason: referenceAnswer.reason,
     }
-    return { status: referenceAnswer.status }
   },
 )
 
@@ -439,15 +405,6 @@ export const interviewSessionReviewSchema = z.discriminatedUnion("status", [
     .strict(),
 ])
 
-export const interviewGeneratingReviewSessionSchema = sessionBaseSchema
-  .extend({
-    status: z.literal("generatingReview"),
-    generationStatus: z.enum(["generating", "failed"]),
-    completionReason: z.enum(["formalQuestionsCompleted", "userEndedEarly"]),
-    candidateQuestionExchanges: z.array(interviewCandidateQuestionExchangeSchema),
-  })
-  .strict()
-
 export const interviewCompletedSessionSchema = sessionBaseSchema
   .extend({
     status: z.literal("completed"),
@@ -461,13 +418,9 @@ export const interviewCompletedSessionSchema = sessionBaseSchema
 
 export const interviewSessionSchema = z.discriminatedUnion("status", [
   interviewOpeningSessionSchema,
-  interviewGeneratingQuestionSessionSchema,
   interviewQuestionSessionSchema,
-  interviewGeneratingTurnSessionSchema,
   interviewFollowUpSessionSchema,
   interviewCandidateQuestionsSessionSchema,
-  interviewGeneratingCandidateAnswerSessionSchema,
-  interviewGeneratingReviewSessionSchema,
   interviewCompletedSessionSchema,
 ])
 

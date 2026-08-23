@@ -46,24 +46,19 @@ review path.
 
 Use `pnpm` for JavaScript and TypeScript packages, and `uv` for Python services.
 
-### Local API and Worker
+### Local API
 
-Start PostgreSQL, initialize the schema, then run the API and Worker in
-separate terminals:
+Start PostgreSQL, initialize the schema, then run the API:
 
 ```bash
 podman compose -f infra/local/docker-compose.yml up -d postgres
 uv run --directory apps/server riva db setup --env-file "$PWD/.env"
 uv run --directory apps/server riva start --env-file "$PWD/.env"
-uv run --directory apps/server riva worker --env-file "$PWD/.env"
 ```
 
-Without `RIVA_LLM_PROVIDER`, the Worker starts with an empty handler registry.
-With complete Qwen settings (`RIVA_LLM_PROVIDER=qwen`, model, API key, and base
-URL), it registers `job-description-parser`, `matching-analyzer`, and
-`resume-parser`; the startup log then reports `handler_count=3`. The API already exposes the
-job-description parsing lifecycle and the matching-analysis lifecycle. The
-Worker registers all three handlers. The frontend is integrated with the real job-description parsing and matching-analysis lifecycles. It polls while Agent runs are in progress, marks existing matching results stale when the career profile or structured JD analysis changes, and supports regeneration from the latest data.
+The API invokes the current Agent synchronously and returns the persisted business
+result after the LLM call completes. The frontend keeps request-level loading and
+error feedback while a request is in progress; no queue or polling is required.
 
 The API accepts TXT, PDF, DOCX, or pasted resume text through the three
 resume-document endpoints under `/api/profile/resumes`. This step stores the

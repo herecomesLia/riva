@@ -20,7 +20,6 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
-    from riva.models.agent_runs import AgentRun
     from riva.models.practice_sessions import PracticeAttempt
 
 
@@ -108,10 +107,6 @@ class PracticeFollowUpQuestion(Base):
             "order",
             name="uq_practice_follow_up_questions_attempt_order",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_practice_follow_up_questions_source_run",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -124,11 +119,6 @@ class PracticeFollowUpQuestion(Base):
         ForeignKey("practice_attempts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
     )
     order: Mapped[int] = mapped_column(nullable=False)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
@@ -157,10 +147,6 @@ class PracticeFollowUpQuestion(Base):
 
     attempt: Mapped[PracticeAttempt] = relationship(
         back_populates="follow_up_questions",
-        passive_deletes=True,
-    )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
         passive_deletes=True,
     )
     answer: Mapped[PracticeAnswer | None] = relationship(
@@ -195,10 +181,6 @@ class PracticeFollowUpDecision(Base):
             name="ck_practice_follow_up_decisions_action_question",
         ),
         UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_practice_follow_up_decisions_source_run",
-        ),
-        UniqueConstraint(
             "attempt_id",
             "order",
             name="uq_practice_follow_up_decisions_attempt_order",
@@ -220,11 +202,6 @@ class PracticeFollowUpDecision(Base):
         nullable=False,
         index=True,
     )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
-    )
     order: Mapped[int] = mapped_column(nullable=False)
     action: Mapped[str] = mapped_column(String(16), nullable=False)
     follow_up_question_id: Mapped[UUID | None] = mapped_column(
@@ -240,10 +217,6 @@ class PracticeFollowUpDecision(Base):
 
     attempt: Mapped[PracticeAttempt] = relationship(
         back_populates="follow_up_decisions",
-        passive_deletes=True,
-    )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
         passive_deletes=True,
     )
     follow_up_question: Mapped[PracticeFollowUpQuestion | None] = relationship(
@@ -265,10 +238,6 @@ class PracticeEvaluation(Base):
             "attempt_id",
             name="uq_practice_evaluations_attempt",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_practice_evaluations_source_run",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -281,11 +250,6 @@ class PracticeEvaluation(Base):
         ForeignKey("practice_attempts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
     )
     overall_score: Mapped[int] = mapped_column(nullable=False)
     dimension_scores: Mapped[list[dict[str, object]]] = mapped_column(
@@ -307,10 +271,6 @@ class PracticeEvaluation(Base):
         foreign_keys=[attempt_id],
         passive_deletes=True,
     )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
-        passive_deletes=True,
-    )
 
 
 class PracticeReview(Base):
@@ -325,10 +285,6 @@ class PracticeReview(Base):
             "attempt_id",
             name="uq_practice_reviews_attempt",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_practice_reviews_source_run",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -341,11 +297,6 @@ class PracticeReview(Base):
         ForeignKey("practice_attempts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
     )
     overall_performance: Mapped[str] = mapped_column(Text, nullable=False)
     highlights: Mapped[list[str]] = mapped_column(
@@ -377,10 +328,6 @@ class PracticeReview(Base):
     attempt: Mapped[PracticeAttempt] = relationship(
         back_populates="review",
         foreign_keys=[attempt_id],
-        passive_deletes=True,
-    )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
         passive_deletes=True,
     )
 
@@ -418,10 +365,6 @@ class PracticeRecommendation(Base):
             "attempt_id",
             name="uq_practice_recommendations_attempt",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_practice_recommendations_source_run",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -434,11 +377,6 @@ class PracticeRecommendation(Base):
         ForeignKey("practice_attempts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
     )
     action: Mapped[str] = mapped_column(String(16), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
@@ -463,10 +401,6 @@ class PracticeRecommendation(Base):
     attempt: Mapped[PracticeAttempt] = relationship(
         back_populates="recommendation",
         foreign_keys=[attempt_id],
-        passive_deletes=True,
-    )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
         passive_deletes=True,
     )
 

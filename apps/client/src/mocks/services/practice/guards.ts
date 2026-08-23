@@ -1,7 +1,4 @@
-import type {
-  GetPracticeEvaluationStatusInput,
-  PracticeQuestionMutationInput,
-} from "@/models/practice"
+import type { PracticeQuestionMutationInput } from "@/models/practice"
 
 import { getPracticeMockState } from "./state"
 
@@ -43,19 +40,6 @@ export function requireCurrentReviewableQuestion(input: PracticeQuestionMutation
     session.question.id !== input.questionId
   ) {
     throw new Error("Practice question version is out of date.")
-  }
-  return session
-}
-
-export function requireEvaluatingSession(input: GetPracticeEvaluationStatusInput) {
-  const session = getPracticeMockState().session
-  if (
-    session.status !== "evaluating" ||
-    session.sessionId !== input.sessionId ||
-    session.version !== input.version ||
-    session.question.id !== input.questionId
-  ) {
-    throw new Error("Practice evaluation version is out of date.")
   }
   return session
 }

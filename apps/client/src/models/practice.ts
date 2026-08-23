@@ -48,7 +48,6 @@ export type PracticeReferenceAnswer = {
 
 export type PracticeReferenceAnswerState =
   | { status: "notRequested"; content: null; viewedBeforeSubmission: false }
-  | { status: "generating"; content: null; viewedBeforeSubmission: false }
   | {
       status: "revealed"
       content: PracticeReferenceAnswer
@@ -130,7 +129,6 @@ export type PracticeFollowUpReferenceAnswer = {
 
 export type PracticeFollowUpReferenceAnswerState =
   | { status: "notRequested"; content: null; viewedBeforeSubmission: false }
-  | { status: "generating"; content: null; viewedBeforeSubmission: false }
   | {
       status: "revealed"
       content: PracticeFollowUpReferenceAnswer
@@ -272,39 +270,18 @@ export type PracticeSetupState = {
   selection: PracticeSetupSelection
 }
 
-export type PracticeGeneratingQuestionState = PracticeActiveSessionBase & {
-  status: "generatingQuestion"
-  previousAttempt: PracticeAttemptRecord | null
-}
-
 export type PracticeAnsweringState = PracticeQuestionSessionBase & {
   status: "answering"
 }
 
-export type PracticeGeneratingFollowUpState = PracticeQuestionSessionBase & {
-  status: "generatingFollowUp"
-  mainAnswer: PracticeAnswer
-  followUpExchanges: AnsweredPracticeFollowUpExchange[]
-}
-
 export type PracticeActiveSessionState =
-  | PracticeGeneratingQuestionState
-  | PracticeAnsweringState
-  | PracticeGeneratingFollowUpState
-  | PracticeAnsweringFollowUpState
-  | PracticeEvaluatingState
-  | PracticeReviewState
+  PracticeAnsweringState | PracticeAnsweringFollowUpState | PracticeReviewState
 
 export type PracticeAnsweringFollowUpState = PracticeQuestionSessionBase & {
   status: "answeringFollowUp"
   mainAnswer: PracticeAnswer
   followUpExchanges: AnsweredPracticeFollowUpExchange[]
   currentFollowUp: AwaitingPracticeFollowUpExchange
-}
-
-export type PracticeEvaluatingState = PracticeSubmittedAnswerRecord & {
-  status: "evaluating"
-  submittedAt: string
 }
 
 export type PracticeReviewState = PracticeSubmittedAnswerRecord & {
@@ -339,11 +316,8 @@ export type PracticeCompletedState = PracticeCompletedReviewState | PracticeComp
 
 export type PracticeSessionState =
   | PracticeSetupState
-  | PracticeGeneratingQuestionState
   | PracticeAnsweringState
-  | PracticeGeneratingFollowUpState
   | PracticeAnsweringFollowUpState
-  | PracticeEvaluatingState
   | PracticeReviewState
   | PracticeCompletedState
 
@@ -355,33 +329,11 @@ export type PracticePageResponse = {
 /** Mock service mutations continue to expose the complete page snapshot. */
 export type PracticeMutationResponse = PracticePageResponse
 
-/** Real mutations and polling may return a session without setup context. */
+/** Mutations may return the updated session without setup context. */
 export type PracticeServiceResponse =
   PracticePageResponse | PracticeActiveSessionState | PracticeCompletedState
 
 export type StartPracticeSessionInput = ActivePracticeSelection
-
-export type GetQuestionGenerationStatusInput = {
-  sessionId: string
-  version: number
-}
-
-export type GetFollowUpGenerationStatusInput = {
-  sessionId: string
-  version: number
-}
-
-export type GetPracticeEvaluationStatusInput = {
-  sessionId: string
-  version: number
-  questionId: string
-}
-
-export type GetPracticeReferenceAnswerStatusInput = PracticeQuestionMutationInput
-
-export type GetPracticeFollowUpReferenceAnswerStatusInput = PracticeFollowUpMutationInput
-
-export type RetryPracticeEvaluationInput = GetPracticeEvaluationStatusInput
 
 export type PracticeQuestionMutationInput = {
   sessionId: string

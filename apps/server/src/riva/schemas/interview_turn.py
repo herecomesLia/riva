@@ -157,67 +157,6 @@ class InterviewTurnInput(InterviewTurnModel):
         return self
 
 
-class InterviewTurnRunPayload(InterviewTurnModel):
-    session_id: StandardUUID
-    session_version: Annotated[int, Field(strict=True, ge=1)]
-    session_state_version: Annotated[int, Field(strict=True, ge=1)]
-    plan_id: StandardUUID
-    plan_revision: Annotated[int, Field(strict=True, ge=1)]
-    question_id: StandardUUID
-    target_type: Literal["main", "followUp"]
-    submitted_answer_id: StandardUUID
-    main_answer_id: StandardUUID
-    follow_up_question_id: StandardUUID | None = None
-    follow_up_answer_id: StandardUUID | None = None
-    interaction_language: InteractionLanguage
-    remaining_follow_up_slots: Annotated[
-        int,
-        Field(strict=True, ge=0, le=MAX_INTERVIEW_FOLLOW_UPS),
-    ]
-    interview_turn_input: InterviewTurnInput
-    retry_of_run_id: StandardUUID | None = None
-
-    @model_validator(mode="after")
-    def validate_payload_lineage(self) -> Self:
-        turn_input = self.interview_turn_input
-        if self.session_state_version <= self.session_version:
-            raise ValueError("session state version must advance the snapshot")
-        if turn_input.session.id != self.session_id:
-            raise ValueError("payload session id does not match turn input")
-        if turn_input.session.version != self.session_version:
-            raise ValueError("payload session version does not match turn input")
-        if turn_input.session.language != self.interaction_language:
-            raise ValueError("payload language does not match turn input")
-        if turn_input.plan_id != self.plan_id:
-            raise ValueError("payload plan id does not match turn input")
-        if turn_input.plan_revision != self.plan_revision:
-            raise ValueError("payload plan revision does not match turn input")
-        if turn_input.question_id != self.question_id:
-            raise ValueError("payload question id does not match turn input")
-        if turn_input.main_answer.id != self.main_answer_id:
-            raise ValueError("payload main answer id does not match turn input")
-        if turn_input.remaining_follow_up_slots != self.remaining_follow_up_slots:
-            raise ValueError("payload follow-up slots do not match turn input")
-        if self.target_type == "main":
-            if self.submitted_answer_id != self.main_answer_id:
-                raise ValueError("main turn answer lineage is invalid")
-            if (
-                self.follow_up_question_id is not None
-                or self.follow_up_answer_id is not None
-            ):
-                raise ValueError("main turn must not contain follow-up lineage")
-        else:
-            if self.follow_up_question_id is None or self.follow_up_answer_id is None:
-                raise ValueError("follow-up turn requires follow-up lineage")
-            if self.submitted_answer_id != self.follow_up_answer_id:
-                raise ValueError("follow-up turn answer lineage is invalid")
-            if not turn_input.answered_follow_ups or (
-                turn_input.answered_follow_ups[-1].answer.id != self.follow_up_answer_id
-            ):
-                raise ValueError("turn input does not contain the submitted follow-up")
-        return self
-
-
 class InterviewTurnAssessmentOutput(InterviewTurnModel):
     score: Annotated[int, Field(strict=True, ge=0, le=100)]
     summary: TurnText
@@ -262,7 +201,6 @@ __all__ = [
     "InterviewTurnNextAction",
     "InterviewTurnOutput",
     "InterviewTurnQuestionContext",
-    "InterviewTurnRunPayload",
     "InterviewTurnSessionSnapshot",
     "MAX_INTERVIEW_FOLLOW_UPS",
     "MAX_INTERVIEW_FOLLOW_UPS_BASIC",

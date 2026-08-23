@@ -40,7 +40,6 @@ describe("ProfileResumeDraftReviewState", () => {
 
     expect(screen.getByText(i18n.t("profile.importDraft.firstImport"))).toBeInTheDocument()
     expect(screen.queryByText(draft.resumeDocumentId)).not.toBeInTheDocument()
-    expect(screen.queryByText(draft.sourceRunId)).not.toBeInTheDocument()
     expect(screen.queryByText(String(draft.draftVersion), { exact: true })).not.toBeInTheDocument()
   })
 

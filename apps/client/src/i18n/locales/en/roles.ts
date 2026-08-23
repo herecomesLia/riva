@@ -133,8 +133,6 @@ export const roles = {
       saveCorrection: "Save changes",
       savingCorrection: "Saving",
       startParsing: "Start parsing",
-      retry: "Retry parsing",
-      resynchronize: "Synchronize status",
     },
     editor: {
       addTitle: "Paste job description",
@@ -153,14 +151,6 @@ export const roles = {
       title: "JD saved",
       description:
         "The original JD is saved, but structured parsing has not started. Start parsing and finish it before generating match analysis.",
-    },
-    failed: {
-      title: "JD parsing did not complete",
-    },
-    synchronization: {
-      title: "Unable to retrieve the parsing result",
-      description:
-        "The JD is saved and remains in parsing. Synchronizing again will not create another parsing job.",
     },
     analysis: {
       rivaSummary: "RIVA Role Summary",
@@ -248,28 +238,12 @@ export const roles = {
           title: "JD saved but not parsed",
           description: "Start and finish structured JD parsing before generating match analysis.",
         },
-        parsing: {
-          title: "Waiting for JD parsing",
-          description: "Match analysis will be available after JD parsing completes.",
-        },
-        failed: {
-          title: "Retry JD parsing first",
-          description: "A structured JD result is required before match analysis can start.",
-        },
       },
-    },
-    synchronization: {
-      title: "Unable to retrieve the match-analysis result",
-      description:
-        "The analysis task is still generating. Synchronizing again will not create another task.",
     },
     stale: {
       title: "This result needs an update",
       description:
         "Your profile or JD changed. The previous generated analysis remains visible below.",
-    },
-    failed: {
-      title: "Match analysis did not complete",
     },
     result: {
       overallMatch: "Overall match",
@@ -356,27 +330,15 @@ export const roles = {
       label: "Saved",
       description: "The original JD is saved and waiting for parsing.",
     },
-    parsing: {
-      label: "Parsing",
-      description: "Extracting responsibilities, skills, and business requirements.",
-    },
     ready: {
       label: "Parsed",
       description: "The JD has been parsed into structured requirements.",
-    },
-    failed: {
-      label: "Parsing failed",
-      description: "The original JD is preserved and parsing can be retried later.",
     },
   },
   matchingAnalysisStatus: {
     none: {
       label: "Not generated",
       description: "This role does not have a match analysis yet.",
-    },
-    generating: {
-      label: "Generating",
-      description: "Combining your job profile and JD into a match analysis.",
     },
     current: {
       label: "Current",
@@ -385,10 +347,6 @@ export const roles = {
     stale: {
       label: "Update needed",
       description: "Your profile or JD changed; this is the previous analysis result.",
-    },
-    failed: {
-      label: "Generation failed",
-      description: "No analysis was generated; your role and JD data are unchanged.",
     },
   },
   experience: {

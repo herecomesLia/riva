@@ -30,8 +30,6 @@ import type {
   EndPracticeFollowUpsInput,
   PracticeAnsweringFollowUpState,
   PracticeAnsweringState,
-  PracticeEvaluatingState,
-  PracticeGeneratingFollowUpState,
   PracticePageResponse,
   PracticeReviewState,
   PracticeCompletedState,
@@ -56,8 +54,6 @@ import { reconcilePracticeSetupSelection } from "@/models/practice-setup"
 import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 import {
-  PracticeGeneratingState,
-  PracticeGenerationErrorState,
   PracticeLoadErrorState,
   PracticeLoadingState,
   PracticeSetupBlockedState,
@@ -72,7 +68,6 @@ import { PracticeConversationTimeline } from "./components/PracticeConversationT
 import { PracticeFollowUpComposer } from "./components/PracticeFollowUpComposer"
 import { PracticeFollowUpAssistance } from "./components/PracticeFollowUpAssistance"
 import { PracticeFollowUpReview } from "./components/PracticeFollowUpReview"
-import { PracticeEvaluationStatus } from "./components/PracticeEvaluationStatus"
 import { PracticeScoreOverview } from "./components/PracticeScoreOverview"
 import { PracticeDimensionScores } from "./components/PracticeDimensionScores"
 import {
@@ -177,25 +172,9 @@ type PracticeViewProps =
       answeringPending: PracticeAnsweringPending
       followUpActions: PracticeFollowUpActions
       followUpPending: PracticeFollowUpPending
-      followUpGenerationError: boolean
-      followUpGenerationPollingTimedOut?: boolean
-      isFollowUpGenerationRetrying: boolean
       reviewActions: PracticeReviewActions
       reviewPending: PracticeReviewPending
-      evaluationError: boolean
-      evaluationPollingTimedOut?: boolean
-      isEvaluationRetrying: boolean
-      generationError: boolean
-      generationPollingTimedOut?: boolean
-      isGenerationRetrying: boolean
       isStarting: boolean
-      onRetryGeneration: () => void
-      onRetryFollowUpGeneration: () => void
-      onRetryEvaluation: () => void
-      isReferenceAnswerRetrying?: boolean
-      onRetryReferenceAnswer?: () => void
-      referenceAnswerError?: boolean
-      referenceAnswerPollingTimedOut?: boolean
       onStart: (input: ActivePracticeSelection) => Promise<void>
       trainingEntryResolution?: PracticeTrainingEntryResolution
     }
@@ -268,7 +247,6 @@ function PracticeViewContent(props: PracticeViewProps) {
   }
 
   if (props.content.status === "loading") return <PracticeLoadingState />
-  if (!("generationError" in props)) return <PracticeLoadingState />
 
   const response = props.content.data
   const { session, setupContext } = response
@@ -309,44 +287,13 @@ function PracticeViewContent(props: PracticeViewProps) {
       )
     }
 
-    case "generatingQuestion":
-      if (props.generationError) {
-        return (
-          <PracticeGenerationErrorState
-            context={setupContext}
-            isRetrying={props.isGenerationRetrying}
-            onRetry={props.onRetryGeneration}
-            pollingTimedOut={props.generationPollingTimedOut}
-            selection={session.selection}
-          />
-        )
-      }
-
-      return <PracticeGeneratingState context={setupContext} selection={session.selection} />
-
     case "answering":
       return (
         <PracticeAnsweringView
           actions={props.answeringActions}
           context={setupContext}
           pending={props.answeringPending}
-          isReferenceAnswerRetrying={props.isReferenceAnswerRetrying}
-          onRetryReferenceAnswer={props.onRetryReferenceAnswer}
-          referenceAnswerError={props.referenceAnswerError}
-          referenceAnswerPollingTimedOut={props.referenceAnswerPollingTimedOut}
           session={session}
-        />
-      )
-
-    case "generatingFollowUp":
-      return (
-        <PracticeGeneratingFollowUpView
-          context={setupContext}
-          isRetrying={props.isFollowUpGenerationRetrying}
-          onRetry={props.onRetryFollowUpGeneration}
-          session={session}
-          showError={props.followUpGenerationError}
-          pollingTimedOut={props.followUpGenerationPollingTimedOut}
         />
       )
 
@@ -356,22 +303,6 @@ function PracticeViewContent(props: PracticeViewProps) {
           actions={props.followUpActions}
           context={setupContext}
           pending={props.followUpPending}
-          isReferenceAnswerRetrying={props.isReferenceAnswerRetrying}
-          onRetryReferenceAnswer={props.onRetryReferenceAnswer}
-          referenceAnswerError={props.referenceAnswerError}
-          referenceAnswerPollingTimedOut={props.referenceAnswerPollingTimedOut}
-          session={session}
-        />
-      )
-
-    case "evaluating":
-      return (
-        <PracticeEvaluatingView
-          context={setupContext}
-          evaluationError={props.evaluationError}
-          evaluationPollingTimedOut={props.evaluationPollingTimedOut}
-          isEvaluationRetrying={props.isEvaluationRetrying}
-          onRetryEvaluation={props.onRetryEvaluation}
           session={session}
         />
       )
@@ -399,90 +330,15 @@ function PracticeViewContent(props: PracticeViewProps) {
   return assertNever(session)
 }
 
-function PracticeGeneratingFollowUpView({
-  context,
-  isRetrying,
-  onRetry,
-  session,
-  showError,
-  pollingTimedOut = false,
-}: {
-  context: PracticePageResponse["setupContext"]
-  isRetrying: boolean
-  onRetry: () => void
-  session: PracticeGeneratingFollowUpState
-  showError: boolean
-  pollingTimedOut?: boolean
-}) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="flex flex-col gap-5" data-testid="practice-generating-follow-up-state">
-      <PracticeSessionHeader context={context} selection={session.selection} />
-      <PracticeConversationTimeline
-        followUpExchanges={session.followUpExchanges}
-        mainAnswer={session.mainAnswer}
-        question={session.question}
-      />
-      {showError ? (
-        <Card data-testid="practice-generating-follow-up-error">
-          <CardContent className="pt-6">
-            <Alert variant="destructive">
-              <AlertTitle>
-                {pollingTimedOut
-                  ? t("common.agentPolling.timeoutTitle")
-                  : t("practice.errors.followUpGenerationTitle")}
-              </AlertTitle>
-              <AlertDescription>
-                {pollingTimedOut
-                  ? t("common.agentPolling.timeoutDescription")
-                  : t("practice.errors.followUpGenerationDescription")}
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-          <CardFooter>
-            <Button disabled={isRetrying} onClick={onRetry}>
-              {isRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
-              {isRetrying
-                ? t("practice.followUp.retryingProcessing")
-                : pollingTimedOut
-                  ? t("common.agentPolling.recheck")
-                  : t("practice.followUp.retryProcessing")}
-            </Button>
-          </CardFooter>
-        </Card>
-      ) : (
-        <Card aria-busy="true" aria-live="polite">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Spinner aria-hidden="true" />
-              {t("practice.followUp.processing")}
-            </CardTitle>
-            <CardDescription>{t("practice.followUp.processingDescription")}</CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-    </div>
-  )
-}
-
 function PracticeFollowUpView({
   actions,
   context,
   pending,
-  isReferenceAnswerRetrying,
-  onRetryReferenceAnswer,
-  referenceAnswerError,
-  referenceAnswerPollingTimedOut,
   session,
 }: {
   actions: PracticeFollowUpActions
   context: PracticePageResponse["setupContext"]
   pending: PracticeFollowUpPending
-  isReferenceAnswerRetrying?: boolean
-  onRetryReferenceAnswer?: () => void
-  referenceAnswerError?: boolean
-  referenceAnswerPollingTimedOut?: boolean
   session: PracticeAnsweringFollowUpState
 }) {
   const { t } = useTranslation()
@@ -525,10 +381,6 @@ function PracticeFollowUpView({
         onRequestHint={() => actions.onRequestHint(mutationInput)}
         onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
         pending={pending}
-        isPollingRetrying={isReferenceAnswerRetrying}
-        onRecheck={onRetryReferenceAnswer}
-        pollingError={referenceAnswerError}
-        pollingTimedOut={referenceAnswerPollingTimedOut}
         question={session.currentFollowUp.question}
       />
 
@@ -550,40 +402,6 @@ function PracticeFollowUpView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  )
-}
-
-function PracticeEvaluatingView({
-  context,
-  evaluationError,
-  evaluationPollingTimedOut,
-  isEvaluationRetrying,
-  onRetryEvaluation,
-  session,
-}: {
-  context: PracticePageResponse["setupContext"]
-  evaluationError: boolean
-  evaluationPollingTimedOut?: boolean
-  isEvaluationRetrying: boolean
-  onRetryEvaluation: () => void
-  session: PracticeEvaluatingState
-}) {
-  return (
-    <div className="flex flex-col gap-5" data-testid="practice-evaluating-state">
-      <PracticeSessionHeader context={context} selection={session.selection} />
-      <PracticeConversationTimeline
-        followUpCompletion={session.followUpCompletion}
-        followUpExchanges={session.followUpExchanges}
-        mainAnswer={session.mainAnswer}
-        question={session.question}
-      />
-      <PracticeEvaluationStatus
-        error={evaluationError}
-        pollingTimedOut={evaluationPollingTimedOut}
-        isRetrying={isEvaluationRetrying}
-        onRetry={onRetryEvaluation}
-      />
     </div>
   )
 }
@@ -728,19 +546,11 @@ function PracticeAnsweringView({
   actions,
   context,
   pending,
-  isReferenceAnswerRetrying,
-  onRetryReferenceAnswer,
-  referenceAnswerError,
-  referenceAnswerPollingTimedOut,
   session,
 }: {
   actions: PracticeAnsweringActions
   context: PracticePageResponse["setupContext"]
   pending: PracticeAnsweringPending
-  isReferenceAnswerRetrying?: boolean
-  onRetryReferenceAnswer?: () => void
-  referenceAnswerError?: boolean
-  referenceAnswerPollingTimedOut?: boolean
   session: PracticeAnsweringState
 }) {
   const { t } = useTranslation()
@@ -790,10 +600,6 @@ function PracticeAnsweringView({
           isPending={pending.referenceAnswer}
           mode="answering"
           onRequest={() => actions.onRequestReferenceAnswer(mutationInput)}
-          isPollingRetrying={isReferenceAnswerRetrying}
-          onRecheck={onRetryReferenceAnswer}
-          pollingError={referenceAnswerError}
-          pollingTimedOut={referenceAnswerPollingTimedOut}
           state={session.question.referenceAnswer}
         />
       </div>

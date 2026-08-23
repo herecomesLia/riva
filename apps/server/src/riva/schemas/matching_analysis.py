@@ -28,7 +28,6 @@ from riva.schemas.profile import (
     Month,
     OptionalText,
     RequiredText,
-    StandardUUID,
 )
 from riva.schemas.profile import (
     Summary as ProfileSummary,
@@ -207,24 +206,3 @@ class MatchingAnalysisResultResponse(APIModel):
     resume_gaps: AnalysisItemList
     high_risk_questions: AnalysisItemList
     preparation_recommendations: AnalysisItemList
-
-
-class MatchingAnalysisRunPayload(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_by_alias=True,
-        validate_by_name=True,
-        serialize_by_alias=True,
-    )
-
-    role_id: StandardUUID = Field(alias="roleId")
-    profile_id: StandardUUID = Field(alias="profileId")
-    profile_version: int = Field(alias="profileVersion", ge=1)
-    job_description_version: int = Field(alias="jobDescriptionVersion", ge=1)
-    job_description_analysis_version: int = Field(
-        alias="jobDescriptionAnalysisVersion", ge=1
-    )
-    interaction_language: InteractionLanguage = Field(
-        default=DEFAULT_INTERACTION_LANGUAGE,
-        alias="interactionLanguage",
-    )

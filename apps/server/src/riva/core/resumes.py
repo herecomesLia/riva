@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.core.agent_execution import get_agent_executor
+from riva.core.llm import get_llm_provider
 from riva.db import get_db_session
 from riva.resumes import ResumeTextExtractor
 from riva.services.resume_documents import ResumeDocumentService
-from riva.services.resume_parsing_lifecycle import ResumeParsingLifecycleService
+from riva.services.resume_parsing import ResumeParsingService
 from riva.storage import ResumeObjectStorage
 
 if TYPE_CHECKING:
@@ -38,16 +38,15 @@ async def get_resume_document_service(
     )
 
 
-async def get_resume_parsing_lifecycle_service(
+async def get_resume_parsing_service(
     request: Request,
     session: AsyncSession = Depends(get_db_session),
-) -> ResumeParsingLifecycleService:
+) -> ResumeParsingService:
     settings = request.app.state.settings
-    return ResumeParsingLifecycleService(
+    return ResumeParsingService(
         session=session,
-        llm_provider=settings.llm_provider,
+        llm_provider=get_llm_provider(request),
         llm_model=settings.llm_model,
-        agent_executor=get_agent_executor(request),
     )
 
 
@@ -57,24 +56,13 @@ async def get_resume_import_api_service(
 ) -> "ResumeImportAPIService":
     from riva.services.resume_import_api import ResumeImportAPIService
 
-    settings = request.app.state.settings
-    return ResumeImportAPIService(
-        session=session,
-        parsing_lifecycle_service_factory=(
-            lambda db_session: ResumeParsingLifecycleService(
-                db_session,
-                llm_provider=settings.llm_provider,
-                llm_model=settings.llm_model,
-                agent_executor=get_agent_executor(request),
-            )
-        ),
-    )
+    return ResumeImportAPIService(session=session)
 
 
 __all__ = [
     "get_resume_document_service",
     "get_resume_import_api_service",
     "get_resume_object_storage",
-    "get_resume_parsing_lifecycle_service",
+    "get_resume_parsing_service",
     "get_resume_text_extractor",
 ]

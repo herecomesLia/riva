@@ -33,7 +33,6 @@ function createRole(
     return {
       ...base,
       jobDescription: {
-        parsingFailureReason: null,
         rawText: null,
         status: "missing",
         version: null,
@@ -45,7 +44,6 @@ function createRole(
   return {
     ...base,
     jobDescription: {
-      parsingFailureReason: null,
       rawText: "Build reliable customer-facing products.",
       status: "ready",
       version: 1,
@@ -79,7 +77,6 @@ function createRole(
       softSkills: [],
     },
     matchingAnalysis: {
-      failureReason: null,
       generatedAt: "2026-08-20T09:00:00Z",
       jobDescriptionAnalysisVersion: 1,
       jobDescriptionVersion: 1,

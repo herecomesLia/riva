@@ -3,7 +3,6 @@ import {
   AlertCircleIcon,
   BriefcaseBusinessIcon,
   FileTextIcon,
-  LoaderCircleIcon,
   UserRoundPenIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -28,7 +27,6 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import type { ActivePracticeSelection, PracticeSetupContext } from "@/models/practice"
 
 export function PracticeLoadingState() {
   const { t } = useTranslation()
@@ -132,113 +130,5 @@ export function PracticeSetupBlockedState({
         </Empty>
       </CardContent>
     </Card>
-  )
-}
-
-export function PracticeGeneratingState({
-  context,
-  selection,
-}: {
-  context: PracticeSetupContext
-  selection: ActivePracticeSelection
-}) {
-  const { t } = useTranslation()
-
-  return (
-    <Card aria-busy="true" data-testid="practice-generating-state">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LoaderCircleIcon className="animate-spin motion-reduce:animate-none" />
-          {t("practice.generation.title")}
-        </CardTitle>
-        <CardDescription>{t("practice.generation.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <PracticeSelectionSummary context={context} selection={selection} />
-        <p className="text-sm text-muted-foreground">{t("practice.generation.progress")}</p>
-      </CardContent>
-    </Card>
-  )
-}
-
-export function PracticeGenerationErrorState({
-  context,
-  isRetrying,
-  onRetry,
-  pollingTimedOut = false,
-  selection,
-}: {
-  context: PracticeSetupContext
-  isRetrying: boolean
-  onRetry: () => void
-  pollingTimedOut?: boolean
-  selection: ActivePracticeSelection
-}) {
-  const { t } = useTranslation()
-
-  return (
-    <Card data-testid="practice-generation-error-state">
-      <CardHeader>
-        <CardTitle>
-          <h2>{t("practice.setup.title")}</h2>
-        </CardTitle>
-        <CardDescription>{t("practice.setup.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <Alert variant="destructive">
-          <AlertCircleIcon />
-          <AlertTitle>
-            {pollingTimedOut
-              ? t("common.agentPolling.timeoutTitle")
-              : t("practice.errors.generationTitle")}
-          </AlertTitle>
-          <AlertDescription>
-            {pollingTimedOut
-              ? t("common.agentPolling.timeoutDescription")
-              : t("practice.errors.generationDescription")}
-          </AlertDescription>
-        </Alert>
-        <PracticeSelectionSummary context={context} selection={selection} />
-      </CardContent>
-      <CardFooter>
-        <Button disabled={isRetrying} onClick={onRetry}>
-          {isRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
-          {isRetrying
-            ? t("practice.actions.retryingGeneration")
-            : pollingTimedOut
-              ? t("common.agentPolling.recheck")
-              : t("practice.actions.retryGeneration")}
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
-export function PracticeSelectionSummary({
-  context,
-  selection,
-}: {
-  context: PracticeSetupContext
-  selection: ActivePracticeSelection
-}) {
-  const { t } = useTranslation()
-  const role = context.targetRoles.find((candidate) => candidate.id === selection.targetRoleId)
-
-  const items = [
-    [t("practice.summary.targetRole"), role?.title ?? t("practice.session.unknownRole")],
-    [t("practice.summary.questionType"), t(`practice.questionTypes.${selection.questionType}`)],
-    [t("practice.summary.difficulty"), t(`practice.difficulty.${selection.difficulty}`)],
-    [t("practice.summary.source"), t(`practice.sources.${selection.source}`)],
-  ]
-
-  return (
-    <dl className="grid gap-4 rounded-xl bg-muted/60 p-4 sm:grid-cols-2">
-      {items.map(([label, value]) => (
-        <div className="flex min-w-0 flex-col gap-1" key={label}>
-          <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-          <dd className="truncate text-sm font-medium">{value}</dd>
-        </div>
-      ))}
-    </dl>
   )
 }

@@ -9,21 +9,12 @@ export type TargetRoleExperienceRange = {
   maxYears: number | null
 }
 
-export type JobDescriptionParsingStatus = "missing" | "saved" | "parsing" | "ready" | "failed"
+export type JobDescriptionParsingStatus = "missing" | "saved" | "ready"
 
 export type MissingJobDescription = {
   status: "missing"
   rawText: null
   version: null
-  parsingFailureReason: null
-}
-
-export type ParsingJobDescription = {
-  status: "parsing"
-  rawText: string
-  /** Increments only when the saved JD text changes. */
-  version: number
-  parsingFailureReason: null
 }
 
 export type SavedJobDescription = {
@@ -31,7 +22,6 @@ export type SavedJobDescription = {
   rawText: string
   /** Increments only when the saved JD text changes. */
   version: number
-  parsingFailureReason: null
 }
 
 export type ReadyJobDescription = {
@@ -39,23 +29,9 @@ export type ReadyJobDescription = {
   rawText: string
   /** Increments only when the saved JD text changes. */
   version: number
-  parsingFailureReason: null
 }
 
-export type FailedJobDescription = {
-  status: "failed"
-  rawText: string
-  /** Increments only when the saved JD text changes. */
-  version: number
-  parsingFailureReason: string
-}
-
-export type JobDescription =
-  | MissingJobDescription
-  | SavedJobDescription
-  | ParsingJobDescription
-  | ReadyJobDescription
-  | FailedJobDescription
+export type JobDescription = MissingJobDescription | SavedJobDescription | ReadyJobDescription
 
 export type QualificationRequirements = {
   education: string[]
@@ -94,7 +70,7 @@ export type JobDescriptionAnalysis = {
   businessDomains: string[]
 }
 
-export type MatchingAnalysisStatus = "generating" | "current" | "stale" | "failed"
+export type MatchingAnalysisStatus = "current" | "stale"
 
 export type MatchingAnalysisResult = {
   /** Whole-number percentage from 0 to 100. */
@@ -118,18 +94,10 @@ type MatchingAnalysisVersionContext = {
   jobDescriptionAnalysisVersion: number
 }
 
-export type GeneratingMatchingAnalysis = MatchingAnalysisVersionContext & {
-  status: "generating"
-  generatedAt: null
-  failureReason: null
-  result: null
-}
-
 export type CurrentMatchingAnalysis = MatchingAnalysisVersionContext & {
   /** Recorded dependency versions must match the current profile and JD versions. */
   status: "current"
   generatedAt: string
-  failureReason: null
   result: MatchingAnalysisResult
 }
 
@@ -137,22 +105,10 @@ export type StaleMatchingAnalysis = MatchingAnalysisVersionContext & {
   /** At least one recorded dependency version is older than its current counterpart. */
   status: "stale"
   generatedAt: string
-  failureReason: null
   result: MatchingAnalysisResult
 }
 
-export type FailedMatchingAnalysis = MatchingAnalysisVersionContext & {
-  status: "failed"
-  generatedAt: null
-  failureReason: string
-  result: null
-}
-
-export type MatchingAnalysis =
-  | GeneratingMatchingAnalysis
-  | CurrentMatchingAnalysis
-  | StaleMatchingAnalysis
-  | FailedMatchingAnalysis
+export type MatchingAnalysis = CurrentMatchingAnalysis | StaleMatchingAnalysis
 
 type TargetRoleBase = {
   id: string
@@ -189,15 +145,7 @@ export type TargetRoleWithoutReadyJobDescription = TargetRoleBase &
         jobDescriptionAnalysis: null
       }
     | {
-        jobDescription: ParsingJobDescription
-        jobDescriptionAnalysis: null
-      }
-    | {
         jobDescription: SavedJobDescription
-        jobDescriptionAnalysis: null
-      }
-    | {
-        jobDescription: FailedJobDescription
         jobDescriptionAnalysis: null
       }
   )
@@ -280,28 +228,15 @@ export type SaveTargetRoleJobDescriptionInput = {
   rawText: string
 }
 
-export type StartOrRetryJobDescriptionParsingInput = {
+export type StartJobDescriptionParsingInput = {
   roleId: string
   version: number
   jobDescriptionVersion: number
 }
 
-export type GetJobDescriptionParsingStatusInput = {
-  roleId: string
-  /** Target-role version returned when this parsing job entered parsing. */
-  version: number
-  jobDescriptionVersion: number
-}
-
-export type GenerateOrRegenerateMatchingAnalysisInput = {
+export type StartMatchingAnalysisInput = {
   roleId: string
   /** Optimistic-concurrency version for the target role, not an analysis dependency. */
-  version: number
-}
-
-export type GetMatchingAnalysisStatusInput = {
-  roleId: string
-  /** Target-role version returned when this generation entered generating. */
   version: number
 }
 

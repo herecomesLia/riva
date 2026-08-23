@@ -126,10 +126,6 @@ class InterviewSessionService:
     @staticmethod
     def _session_load_options():
         return (
-            selectinload(InterviewSession.planning_run),
-            selectinload(InterviewSession.turn_run),
-            selectinload(InterviewSession.candidate_answer_run),
-            selectinload(InterviewSession.review_run),
             selectinload(InterviewSession.candidate_questions).selectinload(
                 InterviewCandidateQuestion.exchange
             ),

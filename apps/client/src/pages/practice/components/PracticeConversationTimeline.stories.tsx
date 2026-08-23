@@ -9,14 +9,14 @@ if (multipleFollowUps.session.status !== "answeringFollowUp") {
   throw new Error("The follow-up timeline story requires a follow-up fixture.")
 }
 
-const completed = createPracticeMockResponse("evaluatingAnswer")
-if (completed.session.status !== "evaluating") {
-  throw new Error("The completed timeline story requires an evaluating fixture.")
+const completed = createPracticeMockResponse("reviewAnswer")
+if (completed.session.status !== "review") {
+  throw new Error("The completed timeline story requires a review fixture.")
 }
 
-const endedEarly = createPracticeMockResponse("evaluatingFollowUpEndedEarly")
-if (endedEarly.session.status !== "evaluating") {
-  throw new Error("The ended-early timeline story requires an evaluating fixture.")
+const endedEarly = createPracticeMockResponse("reviewFollowUpEndedEarly")
+if (endedEarly.session.status !== "review") {
+  throw new Error("The ended-early timeline story requires a review fixture.")
 }
 
 const meta = preview.meta({

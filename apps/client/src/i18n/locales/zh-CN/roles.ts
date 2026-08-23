@@ -125,8 +125,6 @@ export const roles = {
       saveCorrection: "保存修改",
       savingCorrection: "正在保存",
       startParsing: "开始解析",
-      retry: "重试解析",
-      resynchronize: "重新同步状态",
     },
     editor: {
       addTitle: "粘贴岗位 JD",
@@ -143,13 +141,6 @@ export const roles = {
     saved: {
       title: "JD 已保存",
       description: "JD 原文已保存，但尚未开始结构化解析。开始解析并完成后，才能生成匹配分析。",
-    },
-    failed: {
-      title: "JD 解析未完成",
-    },
-    synchronization: {
-      title: "暂时无法获取解析结果",
-      description: "JD 已保存并仍处于解析中。可以重新同步，不会重复创建解析任务。",
     },
     analysis: {
       rivaSummary: "RIVA 岗位总结",
@@ -234,26 +225,11 @@ export const roles = {
           title: "JD 已保存，尚未解析",
           description: "请先开始并完成 JD 结构化解析，完成后才能生成匹配分析。",
         },
-        parsing: {
-          title: "正在等待 JD 解析",
-          description: "JD 解析完成后即可生成匹配分析。",
-        },
-        failed: {
-          title: "请先重试 JD 解析",
-          description: "当前 JD 尚未得到结构化结果，匹配分析暂不可用。",
-        },
       },
-    },
-    synchronization: {
-      title: "暂时无法获取匹配分析结果",
-      description: "分析任务仍在生成中。可以重新同步，不会重复创建分析任务。",
     },
     stale: {
       title: "当前结果需要更新",
       description: "求职档案或 JD 已发生变化；下方保留的是上次生成的分析。",
-    },
-    failed: {
-      title: "匹配分析未完成",
     },
     result: {
       overallMatch: "总体匹配度",
@@ -340,27 +316,15 @@ export const roles = {
       label: "已保存",
       description: "JD 原文已保存，等待后续解析。",
     },
-    parsing: {
-      label: "解析中",
-      description: "正在提取职责、技能和业务要求。",
-    },
     ready: {
       label: "已解析",
       description: "JD 已完成结构化解析。",
-    },
-    failed: {
-      label: "解析失败",
-      description: "JD 原文已保留，可稍后重试解析。",
     },
   },
   matchingAnalysisStatus: {
     none: {
       label: "未生成",
       description: "当前岗位还没有匹配分析。",
-    },
-    generating: {
-      label: "生成中",
-      description: "正在结合求职档案与 JD 生成分析。",
     },
     current: {
       label: "当前有效",
@@ -369,10 +333,6 @@ export const roles = {
     stale: {
       label: "需要更新",
       description: "档案或 JD 已变化，当前展示的是上次分析结果。",
-    },
-    failed: {
-      label: "生成失败",
-      description: "分析未生成，岗位和 JD 数据未受影响。",
     },
   },
   experience: {

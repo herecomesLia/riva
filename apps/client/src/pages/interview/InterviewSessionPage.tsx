@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 
 import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { trainingRecordQueryKeys } from "@/app/training-record-query"
-import { AGENT_POLLING_FAST_INTERVAL_MS, useAgentPolling } from "@/lib/agent-polling"
 import type {
   ActiveInterviewSessionResponse,
   InterviewConversationRecordViewData,
@@ -18,9 +17,6 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
-  retryInterviewCandidateAnswer,
-  retryInterviewReview,
-  retryInterviewTurn,
   submitCandidateQuestion,
   submitInterviewAnswer,
 } from "@/services/interview"
@@ -31,8 +27,6 @@ import {
   type InterviewSessionSummary,
 } from "./InterviewSessionView"
 import { INTERVIEW_QUERY_KEY } from "./interview-query"
-
-export const INTERVIEW_GENERATING_POLL_INTERVAL_MS = AGENT_POLLING_FAST_INTERVAL_MS
 
 export function InterviewSessionPage() {
   const { sessionId } = useParams({ from: "/app/interview/session/$sessionId" })
@@ -49,41 +43,18 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   const finishLock = useRef(false)
   const endLock = useRef(false)
   const [beginFailed, setBeginFailed] = useState(false)
-  const [turnRetryFailed, setTurnRetryFailed] = useState(false)
-  const [candidateAnswerRetryFailed, setCandidateAnswerRetryFailed] = useState(false)
-  const [reviewRetryFailed, setReviewRetryFailed] = useState(false)
   const completedReviewNavigation = useRef(false)
-  const cachedSession =
-    queryClient.getQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY)?.session
-  const pollingOperationKey = getInterviewPollingOperationKey(cachedSession, sessionId)
-  const polling = useAgentPolling(pollingOperationKey)
 
   const interviewQuery = useQuery({
     queryFn: getInterviewPage,
     queryKey: INTERVIEW_QUERY_KEY,
     retry: false,
-    refetchInterval: (query) =>
-      !polling.isTimedOut &&
-      ((query.state.data?.session?.status === "generatingQuestion" &&
-        query.state.data.session.generationStatus === "generating") ||
-        (query.state.data?.session?.status === "generatingTurn" &&
-          query.state.data.session.generationStatus === "generating") ||
-        (query.state.data?.session?.status === "generatingCandidateAnswer" &&
-          query.state.data.session.generationStatus === "generating") ||
-        (query.state.data?.session?.status === "generatingReview" &&
-          query.state.data.session.generationStatus === "generating"))
-        ? polling.getPollingInterval()
-        : false,
-    refetchIntervalInBackground: false,
   })
   const beginMutation = useMutation({ mutationFn: beginInterviewQuestions })
   const submitMutation = useMutation({ mutationFn: submitInterviewAnswer })
-  const turnRetryMutation = useMutation({ mutationFn: retryInterviewTurn })
   const candidateQuestionMutation = useMutation({ mutationFn: submitCandidateQuestion })
-  const candidateAnswerRetryMutation = useMutation({ mutationFn: retryInterviewCandidateAnswer })
   const finishMutation = useMutation({ mutationFn: finishInterview })
   const endMutation = useMutation({ mutationFn: endInterview })
-  const reviewRetryMutation = useMutation({ mutationFn: retryInterviewReview })
 
   function commit(response: InterviewMutationResponse) {
     queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, response)
@@ -150,99 +121,10 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     }
   }
 
-  async function handleRetryPlanning() {
-    if (beginLock.current || beginMutation.isPending) return
-    const session = currentSession()
-    if (session.status !== "generatingQuestion" || session.generationStatus !== "failed") {
-      return
-    }
-
-    beginLock.current = true
-    setBeginFailed(false)
-    try {
-      commit(
-        await beginMutation.mutateAsync({
-          sessionId: session.sessionId,
-          version: session.version,
-        }),
-      )
-    } catch {
-      setBeginFailed(true)
-    } finally {
-      beginLock.current = false
-    }
-  }
-
-  async function handleRetryTurn() {
-    if (turnRetryMutation.isPending) return
-    const session = currentSession()
-    if (session.status !== "generatingTurn" || session.generationStatus !== "failed") {
-      return
-    }
-
-    setTurnRetryFailed(false)
-    try {
-      commit(
-        await turnRetryMutation.mutateAsync({
-          sessionId: session.sessionId,
-          version: session.version,
-        }),
-      )
-    } catch {
-      setTurnRetryFailed(true)
-    }
-  }
-
-  async function handleRetryCandidateAnswer() {
-    if (candidateAnswerRetryMutation.isPending) return
-    const session = currentSession()
-    if (session.status !== "generatingCandidateAnswer" || session.generationStatus !== "failed") {
-      return
-    }
-
-    setCandidateAnswerRetryFailed(false)
-    try {
-      commit(
-        await candidateAnswerRetryMutation.mutateAsync({
-          sessionId: session.sessionId,
-          version: session.version,
-        }),
-      )
-    } catch {
-      setCandidateAnswerRetryFailed(true)
-    }
-  }
-
-  async function handleRetryReview() {
-    if (reviewRetryMutation.isPending) return
-    const session = currentSession()
-    if (session.status !== "generatingReview" || session.generationStatus !== "failed") {
-      return
-    }
-
-    setReviewRetryFailed(false)
-    try {
-      commit(
-        await reviewRetryMutation.mutateAsync({
-          sessionId: session.sessionId,
-          version: session.version,
-        }),
-      )
-    } catch {
-      setReviewRetryFailed(true)
-    }
-  }
-
-  async function handlePollingRecheck() {
-    polling.reset()
-    await interviewQuery.refetch()
-  }
-
   async function handleSubmit(content: string) {
     if (
       submitLock.current ||
       submitMutation.isPending ||
-      turnRetryMutation.isPending ||
       endLock.current ||
       endMutation.isPending
     ) {
@@ -326,10 +208,7 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
       beginLock.current ||
       beginMutation.isPending ||
       submitLock.current ||
-      submitMutation.isPending ||
-      turnRetryMutation.isPending ||
-      candidateAnswerRetryMutation.isPending ||
-      reviewRetryMutation.isPending
+      submitMutation.isPending
     ) {
       return
     }
@@ -425,76 +304,6 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     )
   }
 
-  if (session.status === "generatingQuestion") {
-    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
-    return (
-      <InterviewSessionView
-        generationStatus={session.generationStatus}
-        isRetrying={pollingTimedOut ? interviewQuery.isFetching : beginMutation.isPending}
-        onBack={() => void backToSetup()}
-        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryPlanning}
-        pollingTimedOut={pollingTimedOut}
-        retryFailed={beginFailed}
-        status="generatingQuestion"
-        summary={summary}
-      />
-    )
-  }
-
-  if (session.status === "generatingTurn") {
-    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
-    return (
-      <InterviewSessionView
-        generationStatus={session.generationStatus}
-        history={history}
-        isRetrying={pollingTimedOut ? interviewQuery.isFetching : turnRetryMutation.isPending}
-        onBack={() => void backToSetup()}
-        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryTurn}
-        pollingTimedOut={pollingTimedOut}
-        retryFailed={turnRetryFailed}
-        status="generatingTurn"
-        summary={summary}
-      />
-    )
-  }
-
-  if (session.status === "generatingCandidateAnswer") {
-    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
-    return (
-      <InterviewSessionView
-        currentCandidateQuestion={session.currentCandidateQuestion}
-        generationStatus={session.generationStatus}
-        history={history}
-        isRetrying={
-          pollingTimedOut ? interviewQuery.isFetching : candidateAnswerRetryMutation.isPending
-        }
-        onBack={() => void backToSetup()}
-        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryCandidateAnswer}
-        pollingTimedOut={pollingTimedOut}
-        retryFailed={candidateAnswerRetryFailed}
-        status="generatingCandidateAnswer"
-        summary={summary}
-      />
-    )
-  }
-
-  if (session.status === "generatingReview") {
-    const pollingTimedOut = session.generationStatus === "generating" && polling.isTimedOut
-    return (
-      <InterviewSessionView
-        generationStatus={session.generationStatus}
-        history={history}
-        isRetrying={pollingTimedOut ? interviewQuery.isFetching : reviewRetryMutation.isPending}
-        onBack={() => void backToSetup()}
-        onRetry={pollingTimedOut ? handlePollingRecheck : handleRetryReview}
-        pollingTimedOut={pollingTimedOut}
-        retryFailed={reviewRetryFailed}
-        status="generatingReview"
-        summary={summary}
-      />
-    )
-  }
-
   if (session.status === "candidateQuestions") {
     return (
       <InterviewSessionView
@@ -528,25 +337,6 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   )
 }
 
-function getInterviewPollingOperationKey(
-  session: InterviewSessionResponse | null | undefined,
-  routeSessionId: string,
-): string | null {
-  if (!session || session.sessionId !== routeSessionId || session.status === "completed") {
-    return null
-  }
-  if (
-    session.status !== "generatingQuestion" &&
-    session.status !== "generatingTurn" &&
-    session.status !== "generatingCandidateAnswer" &&
-    session.status !== "generatingReview"
-  ) {
-    return null
-  }
-  if (session.generationStatus !== "generating") return null
-  return `${session.status}:${session.sessionId}:${session.version}`
-}
-
 function toSummary(
   session: InterviewSessionResponse,
   targetRole: string,
@@ -567,13 +357,7 @@ function toPrompt(
   session: Exclude<
     ActiveInterviewSessionResponse,
     {
-      status:
-        | "opening"
-        | "candidateQuestions"
-        | "generatingQuestion"
-        | "generatingTurn"
-        | "generatingCandidateAnswer"
-        | "generatingReview"
+      status: "opening" | "candidateQuestions"
     }
   >,
 ): InterviewPromptViewData {
@@ -613,7 +397,7 @@ function toConversationHistory(
     })),
   ])
 
-  if (session.status === "followUp" || session.status === "generatingTurn") {
+  if (session.status === "followUp") {
     records.push({
       id: session.currentQuestion.question.id,
       kind: "question",

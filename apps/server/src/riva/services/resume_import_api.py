@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import status
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.models import CareerProfile, ResumeImportDraft
+from riva.core.errors import APIError
+from riva.models import ResumeImportDraft, ResumeParsingResult
 from riva.schemas.profile import CareerProfileResponse
 from riva.schemas.resume_import_api import (
     ResumeImportApplicationResponse,
     ResumeImportDraftResponse,
 )
-from riva.schemas.resume_parsing_lifecycle import ResumeParsingStatusResponse
 from riva.services.resume_import_application import (
     ResumeImportApplicationResult,
     ResumeImportApplicationService,
@@ -31,18 +31,10 @@ from riva.services.resume_imports import (
     RESUME_IMPORT_PROFILE_VERSION_CONFLICT,
     RESUME_PARSING_RESULT_INVALID,
     RESUME_PARSING_RESULT_NOT_FOUND,
-    RESUME_PARSING_RESULT_SUPERSEDED,
     ResumeImportDraftService,
     ResumeImportStateError,
     resume_import_draft_data_from_model,
 )
-
-if TYPE_CHECKING:
-    from riva.core.errors import APIError
-    from riva.services.resume_parsing_lifecycle import (
-        ResumeParsingLifecycleService,
-    )
-
 
 _NOT_FOUND_CODES = {
     RESUME_DOCUMENT_NOT_FOUND,
@@ -52,7 +44,6 @@ _CONFLICT_CODES = {
     RESUME_IMPORT_DRAFT_NOT_READY,
     RESUME_PARSING_RESULT_NOT_FOUND,
     RESUME_PARSING_RESULT_INVALID,
-    RESUME_PARSING_RESULT_SUPERSEDED,
     RESUME_IMPORT_DRAFT_INVALID,
     RESUME_IMPORT_DRAFT_VERSION_CONFLICT,
     RESUME_IMPORT_PROFILE_VERSION_CONFLICT,
@@ -67,10 +58,6 @@ class ResumeImportAPIService:
         self,
         session: AsyncSession,
         *,
-        parsing_lifecycle_service_factory: Callable[
-            [AsyncSession], ResumeParsingLifecycleService
-        ]
-        | None = None,
         draft_service_factory: Callable[
             [AsyncSession], ResumeImportDraftService
         ] = ResumeImportDraftService,
@@ -79,13 +66,6 @@ class ResumeImportAPIService:
         ] = ResumeImportApplicationService,
     ) -> None:
         self.session = session
-        if parsing_lifecycle_service_factory is None:
-            from riva.services.resume_parsing_lifecycle import (
-                ResumeParsingLifecycleService,
-            )
-
-            parsing_lifecycle_service_factory = ResumeParsingLifecycleService
-        self.parsing_lifecycle_service_factory = parsing_lifecycle_service_factory
         self.draft_service_factory = draft_service_factory
         self.application_service_factory = application_service_factory
 
@@ -134,21 +114,15 @@ class ResumeImportAPIService:
         *,
         user_id: UUID,
         resume_document_id: UUID,
-    ) -> ResumeParsingStatusResponse:
-        from riva.core.errors import APIError
-
-        parsing_status = await self.parsing_lifecycle_service_factory(
-            self.session
-        ).get_status(
-            user_id=user_id,
-            resume_document_id=resume_document_id,
-        )
-        if parsing_status.status != "succeeded":
-            raise APIError(
-                status.HTTP_409_CONFLICT,
-                RESUME_IMPORT_DRAFT_NOT_READY,
+    ) -> None:
+        result = await self.session.scalar(
+            select(ResumeParsingResult).where(
+                ResumeParsingResult.user_id == user_id,
+                ResumeParsingResult.resume_document_id == resume_document_id,
             )
-        return parsing_status
+        )
+        if result is None:
+            raise APIError(status.HTTP_409_CONFLICT, RESUME_IMPORT_DRAFT_NOT_READY)
 
 
 def build_resume_import_draft_response(
@@ -159,7 +133,6 @@ def build_resume_import_draft_response(
         values = data.model_dump(mode="python", by_alias=False)
         return ResumeImportDraftResponse(
             resume_document_id=draft.resume_document_id,
-            source_run_id=draft.source_agent_run_id,
             parsing_result_version=draft.parsing_result_version,
             draft_version=draft.draft_version,
             status=draft.status,

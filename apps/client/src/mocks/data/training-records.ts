@@ -191,7 +191,7 @@ const partiallyAnsweredPracticeQuestion: TargetedPracticeQuestion = {
     "给出了处理方法，但缺少个人推动过程和最终结果。",
   ),
   review: review("能够识别共同约束并提出折中方案。", "没有说明方案落地后的效果。"),
-  referenceAnswer: { status: "generating", content: null, viewedBeforeSubmission: false },
+  referenceAnswer: { status: "notRequested", content: null, viewedBeforeSubmission: false },
   followUps: [
     {
       id: "history-practice-follow-up-002",
@@ -378,7 +378,7 @@ const interviewQuestionTwo: TrainingRecordQuestion = {
         "应对方向合理，还可以说明升级决策的触发条件。",
       ),
       review: review("能区分可控工作和外部依赖。", "没有明确何时需要调整总体目标。"),
-      referenceAnswer: { status: "generating", content: null },
+      referenceAnswer: { status: "unavailable", content: null, reason: "generationFailed" },
     },
   ],
 }

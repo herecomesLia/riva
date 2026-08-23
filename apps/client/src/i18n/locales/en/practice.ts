@@ -276,14 +276,6 @@ export const practice = {
     stay: "Keep answering",
     leave: "Leave page",
   },
-  evaluating: {
-    title: "Generating your evaluation",
-    description:
-      "This question is complete. Riva is using the full conversation to prepare multidimensional scores and a review.",
-    progress: "Evaluation usually takes only a moment. Keep this page open.",
-    retry: "Retry evaluation",
-    retrying: "Retrying evaluation",
-  },
   scoreDimensions: {
     relevance: "Content relevance",
     structure: "Structural clarity",

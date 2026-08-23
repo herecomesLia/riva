@@ -41,10 +41,6 @@ function attachmentState(status: ResumeProcessingStatus) {
     return "error" as const
   }
 
-  if (status === "parsing") {
-    return "processing" as const
-  }
-
   if (status === "uploaded") {
     return "idle" as const
   }

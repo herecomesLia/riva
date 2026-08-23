@@ -1,8 +1,10 @@
 import {
   createPracticeFollowUpQuestion,
   createPracticeFollowUpReferenceAnswer,
+  createPracticeReviewState,
   getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
+  type PracticeSubmittedMockState,
 } from "@/mocks/data/practice"
 import type {
   EndPracticeFollowUpsInput,
@@ -209,24 +211,24 @@ export async function submitFollowUpAnswer(
   const nextTemplate = plan[nextOrder - 1]
 
   if (!nextTemplate) {
+    const submitted: PracticeSubmittedMockState = {
+      sessionId: session.sessionId,
+      language: session.language,
+      version: session.version + 1,
+      selection: copyPracticeState(session.selection),
+      startedAt: session.startedAt,
+      attemptId: session.attemptId,
+      attemptNumber: session.attemptNumber,
+      attemptRecords: copyPracticeState(session.attemptRecords),
+      question: copyPracticeState(session.question),
+      mainAnswer: copyPracticeState(session.mainAnswer),
+      followUpExchanges,
+      followUpCompletion: { status: "completed", reason: "allAnswered" },
+      submittedAt,
+    }
     return setPracticeMockState({
       ...getPracticeMockState(),
-      session: {
-        status: "evaluating",
-        sessionId: session.sessionId,
-        language: session.language,
-        version: session.version + 1,
-        selection: copyPracticeState(session.selection),
-        startedAt: session.startedAt,
-        attemptId: session.attemptId,
-        attemptNumber: session.attemptNumber,
-        attemptRecords: copyPracticeState(session.attemptRecords),
-        question: copyPracticeState(session.question),
-        mainAnswer: copyPracticeState(session.mainAnswer),
-        followUpExchanges,
-        followUpCompletion: { status: "completed", reason: "allAnswered" },
-        submittedAt,
-      },
+      session: createPracticeReviewState(submitted),
     })
   }
 
@@ -254,27 +256,28 @@ export async function endPracticeFollowUps(
 ): Promise<PracticeMutationResponse> {
   await consumePracticeMockOperation("endPracticeFollowUps")
   const session = requireCurrentFollowUp(input)
+  const submittedAt = nextPracticeMutationTimestamp()
+  const submitted: PracticeSubmittedMockState = {
+    sessionId: session.sessionId,
+    language: session.language,
+    version: session.version + 1,
+    selection: copyPracticeState(session.selection),
+    startedAt: session.startedAt,
+    attemptId: session.attemptId,
+    attemptNumber: session.attemptNumber,
+    attemptRecords: copyPracticeState(session.attemptRecords),
+    question: copyPracticeState(session.question),
+    mainAnswer: copyPracticeState(session.mainAnswer),
+    followUpExchanges: copyPracticeState(session.followUpExchanges),
+    followUpCompletion: {
+      status: "endedEarly",
+      unansweredQuestion: copyPracticeState(session.currentFollowUp.question),
+    },
+    submittedAt,
+  }
 
   return setPracticeMockState({
     ...getPracticeMockState(),
-    session: {
-      status: "evaluating",
-      sessionId: session.sessionId,
-      language: session.language,
-      version: session.version + 1,
-      selection: copyPracticeState(session.selection),
-      startedAt: session.startedAt,
-      attemptId: session.attemptId,
-      attemptNumber: session.attemptNumber,
-      attemptRecords: copyPracticeState(session.attemptRecords),
-      question: copyPracticeState(session.question),
-      mainAnswer: copyPracticeState(session.mainAnswer),
-      followUpExchanges: copyPracticeState(session.followUpExchanges),
-      followUpCompletion: {
-        status: "endedEarly",
-        unansweredQuestion: copyPracticeState(session.currentFollowUp.question),
-      },
-      submittedAt: nextPracticeMutationTimestamp(),
-    },
+    session: createPracticeReviewState(submitted),
   })
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from datetime import datetime
-from typing import Literal, cast
+from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -10,9 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.agents.interview_turn import InterviewTurnAgent
+from riva.integrations import LLMProvider
 from riva.models import (
-    AgentRun,
-    AgentRunStatus,
     InterviewAnswer,
     InterviewFollowUpAnswer,
     InterviewFollowUpQuestion,
@@ -27,15 +26,11 @@ from riva.schemas.interview import (
     InterviewDifficulty,
     InterviewRound,
 )
-from riva.schemas.interview_planning import (
-    InterviewPlanningQuestion,
-    InterviewPlanningRunPayload,
-)
+from riva.schemas.interview_planning import InterviewPlanningQuestion
 from riva.schemas.interview_turn import (
     MAX_INTERVIEW_FOLLOW_UPS_BASIC,
     MAX_INTERVIEW_FOLLOW_UPS_PRESSURE,
     InterviewTurnAnswerSnapshot,
-    InterviewTurnAssessmentOutput,
     InterviewTurnCompleteQuestionAction,
     InterviewTurnFollowUpAction,
     InterviewTurnFollowUpExchange,
@@ -43,11 +38,10 @@ from riva.schemas.interview_turn import (
     InterviewTurnNextAction,
     InterviewTurnOutput,
     InterviewTurnQuestionContext,
-    InterviewTurnRunPayload,
     InterviewTurnSessionSnapshot,
 )
-from riva.services.agent_runs import AgentRunService
 from riva.services.competency_ingestion import CompetencyIngestionService
+from riva.services.interview_planning import InterviewPlanningService
 from riva.utils import utc_now
 
 InterviewTurnStateErrorCode = Literal[
@@ -57,7 +51,6 @@ InterviewTurnStateErrorCode = Literal[
     "interview_turn_question_mismatch",
     "interview_turn_follow_up_mismatch",
     "interview_turn_answer_invalid",
-    "interview_turn_run_invalid",
     "interview_turn_snapshot_invalid",
     "interview_turn_model_not_configured",
 ]
@@ -80,7 +73,6 @@ INTERVIEW_TURN_FOLLOW_UP_MISMATCH: InterviewTurnStateErrorCode = (
 INTERVIEW_TURN_ANSWER_INVALID: InterviewTurnStateErrorCode = (
     "interview_turn_answer_invalid"
 )
-INTERVIEW_TURN_RUN_INVALID: InterviewTurnStateErrorCode = "interview_turn_run_invalid"
 INTERVIEW_TURN_SNAPSHOT_INVALID: InterviewTurnStateErrorCode = (
     "interview_turn_snapshot_invalid"
 )
@@ -105,6 +97,7 @@ class InterviewTurnService:
         self,
         session: AsyncSession,
         *,
+        llm_provider: LLMProvider | None = None,
         llm_model: str | None = None,
         clock: Clock = utc_now,
         competency_ingestion_service_factory: Callable[
@@ -112,7 +105,8 @@ class InterviewTurnService:
         ] = CompetencyIngestionService,
     ) -> None:
         self.session = session
-        self.llm_model = llm_model
+        self.llm_provider = llm_provider
+        self.llm_model = (llm_model or "").strip()
         self.clock = clock
         self.competency_ingestion_service_factory = competency_ingestion_service_factory
 
@@ -131,175 +125,99 @@ class InterviewTurnService:
             await self._lock_user(user_id)
             interview_session = await self._locked_session(user_id, session_id)
             self._require_version(interview_session, version)
+            question = await self._current_question(interview_session, for_update=True)
+            if question is None or question.id != question_id:
+                raise InterviewTurnStateError(INTERVIEW_TURN_QUESTION_MISMATCH)
             normalized_content = _normalized_content(content)
 
-            question = await self._current_question(
-                interview_session,
-                for_update=True,
-            )
-            if question is None:
-                raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-            if question.id != question_id:
-                raise InterviewTurnStateError(INTERVIEW_TURN_QUESTION_MISMATCH)
-
             if target == "question":
-                if follow_up_question_id is not None:
-                    raise InterviewTurnStateError(INTERVIEW_TURN_QUESTION_MISMATCH)
-                if interview_session.status != "question":
+                if (
+                    follow_up_question_id is not None
+                    or interview_session.status != "question"
+                ):
                     raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-                existing_answer = await self.session.scalar(
-                    select(InterviewAnswer)
-                    .where(InterviewAnswer.question_id == question.id)
-                    .with_for_update()
-                )
-                if existing_answer is not None:
+                if await self._main_answer(question.id) is not None:
                     raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
                 now = self._now()
-                answer = InterviewAnswer(
+                main_answer = InterviewAnswer(
                     id=uuid4(),
-                    session_id=interview_session.id,
+                    session_id=session_id,
                     question_id=question.id,
                     content=normalized_content,
                     submitted_at=now,
                 )
-                self.session.add(answer)
+                self.session.add(main_answer)
                 await self.session.flush()
-                turn_input = await self._build_turn_input(
-                    interview_session,
-                    question,
-                    answer,
-                    (),
-                )
+                answered_follow_ups: tuple[
+                    tuple[InterviewFollowUpQuestion, InterviewFollowUpAnswer], ...
+                ] = ()
                 target_type: Literal["main", "followUp"] = "main"
-                submitted_answer_id = answer.id
-                follow_up_answer_id = None
+                main_answer_for_input = main_answer
                 follow_up_id = None
+                follow_up_answer_id = None
             else:
-                if interview_session.status != "followUp":
-                    raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-                if follow_up_question_id is None:
+                if (
+                    interview_session.status != "followUp"
+                    or follow_up_question_id is None
+                ):
                     raise InterviewTurnStateError(INTERVIEW_TURN_FOLLOW_UP_MISMATCH)
                 follow_up = await self.session.scalar(
                     select(InterviewFollowUpQuestion)
                     .where(
                         InterviewFollowUpQuestion.id == follow_up_question_id,
                         InterviewFollowUpQuestion.parent_question_id == question.id,
-                        InterviewFollowUpQuestion.session_id == interview_session.id,
+                        InterviewFollowUpQuestion.session_id == session_id,
                     )
                     .with_for_update()
                 )
                 if follow_up is None:
                     raise InterviewTurnStateError(INTERVIEW_TURN_FOLLOW_UP_MISMATCH)
-                existing_follow_up_answer = await self.session.scalar(
-                    select(InterviewFollowUpAnswer)
-                    .where(
-                        InterviewFollowUpAnswer.follow_up_question_id == follow_up.id
+                if (
+                    await self.session.scalar(
+                        select(InterviewFollowUpAnswer).where(
+                            InterviewFollowUpAnswer.follow_up_question_id
+                            == follow_up.id
+                        )
                     )
-                    .with_for_update()
-                )
-                if existing_follow_up_answer is not None:
+                    is not None
+                ):
                     raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-                main_answer = await self._main_answer(question.id)
-                if main_answer is None:
+                main_answer_for_input = await self._main_answer(question.id)
+                if main_answer_for_input is None:
                     raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
                 now = self._now()
-                answer = InterviewFollowUpAnswer(
+                follow_up_answer = InterviewFollowUpAnswer(
                     id=uuid4(),
-                    session_id=interview_session.id,
+                    session_id=session_id,
                     follow_up_question_id=follow_up.id,
                     content=normalized_content,
                     submitted_at=now,
                 )
-                self.session.add(answer)
+                self.session.add(follow_up_answer)
                 await self.session.flush()
-                answered_follow_ups = await self._answered_follow_ups(
-                    question.id,
-                )
-                turn_input = await self._build_turn_input(
-                    interview_session,
-                    question,
-                    main_answer,
-                    answered_follow_ups,
-                )
+                answered_follow_ups = await self._answered_follow_ups(question.id)
                 target_type = "followUp"
-                submitted_answer_id = answer.id
-                follow_up_answer_id = answer.id
                 follow_up_id = follow_up.id
+                follow_up_answer_id = follow_up_answer.id
 
-            run = await self._enqueue_turn(
+            turn_input = await self._build_turn_input(
+                interview_session,
+                question,
+                main_answer_for_input,
+                answered_follow_ups,
+                user_id=user_id,
+            )
+            output = await self._run(turn_input)
+            await self._persist_output(
                 interview_session=interview_session,
+                question=question,
                 turn_input=turn_input,
                 target_type=target_type,
-                submitted_answer_id=submitted_answer_id,
-                main_answer_id=turn_input.main_answer.id,
                 follow_up_question_id=follow_up_id,
                 follow_up_answer_id=follow_up_answer_id,
-                idempotency_key=(
-                    f"interview-turn:{interview_session.id}:answer:"
-                    f"{submitted_answer_id}"
-                ),
-            )
-            interview_session.turn_run_id = run.id
-            interview_session.status = "generatingTurn"
-            interview_session.version += 1
-            await self.session.commit()
-            return interview_session
-        except InterviewTurnStateError:
-            await self.session.rollback()
-            raise
-        except TypeError, ValueError, ValidationError:
-            await self.session.rollback()
-            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
-        except Exception:
-            await self.session.rollback()
-            raise
-
-    async def retry_turn(
-        self,
-        *,
-        user_id: UUID,
-        session_id: UUID,
-        version: int,
-    ) -> InterviewSession:
-        try:
-            await self._lock_user(user_id)
-            interview_session = await self._locked_session(user_id, session_id)
-            self._require_version(interview_session, version)
-            if (
-                interview_session.status != "generatingTurn"
-                or interview_session.turn_run_id is None
-            ):
-                raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-            failed_run = await self.session.scalar(
-                select(AgentRun)
-                .where(AgentRun.id == interview_session.turn_run_id)
-                .with_for_update()
-            )
-            if failed_run is None:
-                raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-            if _status_value(failed_run.status) != AgentRunStatus.FAILED.value:
-                raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-            payload = self._validate_run_payload(failed_run)
-            if (
-                payload.session_id != interview_session.id
-                or payload.session_state_version != interview_session.version
-            ):
-                raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-            retry_payload = payload.model_copy(
-                update={
-                    "session_state_version": interview_session.version + 1,
-                    "retry_of_run_id": failed_run.id,
-                }
-            )
-            run = await self._enqueue_turn_payload(
+                output=output,
                 user_id=user_id,
-                payload=retry_payload,
-                idempotency_key=(
-                    f"interview-turn-retry:{interview_session.id}:run:{failed_run.id}"
-                ),
             )
-            interview_session.turn_run_id = run.id
-            interview_session.version += 1
             await self.session.commit()
             return interview_session
         except InterviewTurnStateError:
@@ -312,256 +230,115 @@ class InterviewTurnService:
             await self.session.rollback()
             raise
 
-    async def load_turn_input(self, run: AgentRun) -> InterviewTurnInput:
-        payload = self._validate_run_payload(run)
-        return payload.interview_turn_input
+    async def _run(self, turn_input: InterviewTurnInput) -> InterviewTurnOutput:
+        if self.llm_provider is None or not self.llm_model:
+            raise InterviewTurnStateError(INTERVIEW_TURN_MODEL_NOT_CONFIGURED)
+        return (
+            await InterviewTurnAgent(self.llm_provider, self.llm_model).run(turn_input)
+        ).output
 
-    async def persist_success(
-        self,
-        run: AgentRun,
-        output: InterviewTurnOutput,
-    ) -> InterviewTurnOutput:
-        try:
-            payload = self._validate_run_payload(run)
-            validated_output = _validate_output(output)
-            await self._lock_user(run.user_id)
-            persisted_run = await self.session.scalar(
-                select(AgentRun).where(AgentRun.id == run.id).with_for_update()
-            )
-            if persisted_run is None or _status_value(persisted_run.status) != (
-                AgentRunStatus.RUNNING.value
-            ):
-                raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-            self._validate_run_metadata(persisted_run, run.user_id)
-
-            interview_session = await self._locked_session(
-                run.user_id,
-                payload.session_id,
-            )
-            if (
-                interview_session.turn_run_id != run.id
-                or interview_session.status != "generatingTurn"
-                or interview_session.version != payload.session_state_version
-            ):
-                raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-            question = await self.session.scalar(
-                select(InterviewQuestion)
-                .where(
-                    InterviewQuestion.id == payload.question_id,
-                    InterviewQuestion.session_id == interview_session.id,
-                )
-                .with_for_update()
-            )
-            if question is None or question.completed_at is not None:
-                raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-            self._validate_answer_lineage(payload, question)
-            self._validate_question_lineage(payload, question)
-            await self._validate_persisted_answer_lineage(payload, question)
-
-            existing_assessment = await self.session.scalar(
-                select(InterviewTurnAssessment)
-                .where(InterviewTurnAssessment.source_agent_run_id == run.id)
-                .with_for_update()
-            )
-            if existing_assessment is not None:
-                canonical = _output_from_assessment(
-                    existing_assessment,
-                    await self._follow_up_for_assessment(existing_assessment),
-                )
-                await self.competency_ingestion_service_factory(
-                    self.session
-                ).ingest_interview_turn(
-                    user_id=run.user_id,
-                    interview_session=interview_session,
-                    assessment=existing_assessment,
-                )
-                await self.session.commit()
-                return canonical
-
-            plan = await self.session.scalar(
-                select(InterviewPlan).where(
-                    InterviewPlan.id == payload.plan_id,
-                    InterviewPlan.session_id == interview_session.id,
-                    InterviewPlan.revision == payload.plan_revision,
-                )
-            )
-            if plan is None:
-                raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-
-            effective_action: InterviewTurnNextAction = validated_output.next_action
-            follow_up_count = len(
-                list(
-                    (
-                        await self.session.scalars(
-                            select(InterviewFollowUpQuestion)
-                            .where(
-                                InterviewFollowUpQuestion.parent_question_id
-                                == question.id
-                            )
-                            .order_by(InterviewFollowUpQuestion.order.asc())
-                        )
-                    ).all()
-                )
-            )
-            if isinstance(effective_action, InterviewTurnFollowUpAction):
-                max_follow_ups = _max_follow_ups(interview_session.difficulty)
-                if (
-                    payload.remaining_follow_up_slots <= 0
-                    or follow_up_count >= max_follow_ups
-                ):
-                    effective_action = InterviewTurnCompleteQuestionAction(
-                        type="completeQuestion"
-                    )
-
-            assessment = InterviewTurnAssessment(
-                id=uuid4(),
-                session_id=interview_session.id,
-                question_id=question.id,
-                source_agent_run_id=run.id,
-                main_answer_id=(
-                    payload.main_answer_id if payload.target_type == "main" else None
-                ),
-                follow_up_answer_id=(
-                    payload.follow_up_answer_id
-                    if payload.target_type == "followUp"
-                    else None
-                ),
-                score=validated_output.assessment.score,
-                summary=validated_output.assessment.summary,
-                strengths=list(validated_output.assessment.strengths),
-                issues=list(validated_output.assessment.issues),
-                decision=effective_action.type,
-                created_at=self._now(),
-            )
-            self.session.add(assessment)
-            await self.session.flush()
-            await self.competency_ingestion_service_factory(
-                self.session
-            ).ingest_interview_turn(
-                user_id=run.user_id,
-                interview_session=interview_session,
-                assessment=assessment,
-            )
-
-            if isinstance(effective_action, InterviewTurnFollowUpAction):
-                self.session.add(
-                    InterviewFollowUpQuestion(
-                        id=uuid4(),
-                        session_id=interview_session.id,
-                        parent_question_id=question.id,
-                        source_turn_run_id=run.id,
-                        order=follow_up_count + 1,
-                        prompt=effective_action.prompt,
-                        created_at=self._now(),
-                    )
-                )
-                interview_session.status = "followUp"
-            else:
-                question.completed_at = self._now()
-                next_question = await self._next_planned_question(
-                    plan,
-                    question.order,
-                )
-                if next_question is None:
-                    interview_session.status = "candidateQuestions"
-                else:
-                    existing_next = await self.session.scalar(
-                        select(InterviewQuestion).where(
-                            InterviewQuestion.session_id == interview_session.id,
-                            InterviewQuestion.order == next_question.order,
-                        )
-                    )
-                    if existing_next is not None:
-                        raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-                    self.session.add(
-                        InterviewQuestion(
-                            id=uuid4(),
-                            session_id=interview_session.id,
-                            source_plan_id=plan.id,
-                            plan_revision=plan.revision,
-                            order=next_question.order,
-                            prompt=next_question.prompt,
-                            question_type=next_question.question_type.value,
-                            assessed_capabilities=list(
-                                next_question.assessed_capabilities
-                            ),
-                            created_at=self._now(),
-                        )
-                    )
-                    interview_session.status = "question"
-            interview_session.version += 1
-            await self.session.commit()
-            if effective_action is validated_output.next_action:
-                return validated_output
-            return validated_output.model_copy(update={"next_action": effective_action})
-        except InterviewTurnStateError:
-            await self.session.rollback()
-            raise
-        except TypeError, ValueError, ValidationError:
-            await self.session.rollback()
-            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
-        except Exception:
-            await self.session.rollback()
-            raise
-
-    async def _enqueue_turn(
+    async def _persist_output(
         self,
         *,
         interview_session: InterviewSession,
+        question: InterviewQuestion,
         turn_input: InterviewTurnInput,
         target_type: Literal["main", "followUp"],
-        submitted_answer_id: UUID,
-        main_answer_id: UUID,
         follow_up_question_id: UUID | None,
         follow_up_answer_id: UUID | None,
-        idempotency_key: str,
-    ) -> AgentRun:
-        payload = InterviewTurnRunPayload(
-            session_id=interview_session.id,
-            session_version=turn_input.session.version,
-            session_state_version=interview_session.version + 1,
-            plan_id=turn_input.plan_id,
-            plan_revision=turn_input.plan_revision,
-            question_id=turn_input.question_id,
-            target_type=target_type,
-            submitted_answer_id=submitted_answer_id,
-            main_answer_id=main_answer_id,
-            follow_up_question_id=follow_up_question_id,
-            follow_up_answer_id=follow_up_answer_id,
-            interaction_language=turn_input.session.language,
-            remaining_follow_up_slots=turn_input.remaining_follow_up_slots,
-            interview_turn_input=turn_input,
-        )
-        return await self._enqueue_turn_payload(
-            user_id=interview_session.user_id,
-            payload=payload,
-            idempotency_key=idempotency_key,
-        )
-
-    async def _enqueue_turn_payload(
-        self,
-        *,
+        output: InterviewTurnOutput,
         user_id: UUID,
-        payload: InterviewTurnRunPayload,
-        idempotency_key: str,
-    ) -> AgentRun:
-        model = (self.llm_model or "").strip()
-        if not model:
-            raise InterviewTurnStateError(INTERVIEW_TURN_MODEL_NOT_CONFIGURED)
-        return await AgentRunService(self.session).enqueue_in_transaction(
-            user_id=user_id,
-            agent_id=InterviewTurnAgent.agent_id,
-            prompt_id=InterviewTurnAgent.agent_id,
-            prompt_version=InterviewTurnAgent.agent_version,
-            output_schema_id=InterviewTurnAgent.output_schema_id,
-            model=model,
-            payload=cast(
-                dict[str, object],
-                payload.model_dump(mode="json", by_alias=True),
-            ),
-            idempotency_key=idempotency_key,
-            max_attempts=3,
+    ) -> None:
+        validated = _validate_output(output)
+        follow_up_count = len(
+            list(
+                (
+                    await self.session.scalars(
+                        select(InterviewFollowUpQuestion).where(
+                            InterviewFollowUpQuestion.parent_question_id == question.id
+                        )
+                    )
+                ).all()
+            )
         )
+        effective_action: InterviewTurnNextAction = validated.next_action
+        if isinstance(effective_action, InterviewTurnFollowUpAction) and (
+            turn_input.remaining_follow_up_slots <= 0
+            or follow_up_count >= _max_follow_ups(interview_session.difficulty)
+        ):
+            effective_action = InterviewTurnCompleteQuestionAction(
+                type="completeQuestion"
+            )
+
+        assessment = InterviewTurnAssessment(
+            id=uuid4(),
+            session_id=interview_session.id,
+            question_id=question.id,
+            main_answer_id=turn_input.main_answer.id if target_type == "main" else None,
+            follow_up_answer_id=follow_up_answer_id
+            if target_type == "followUp"
+            else None,
+            score=validated.assessment.score,
+            summary=validated.assessment.summary,
+            strengths=list(validated.assessment.strengths),
+            issues=list(validated.assessment.issues),
+            decision=effective_action.type,
+            created_at=self._now(),
+        )
+        self.session.add(assessment)
+        await self.session.flush()
+        await self.competency_ingestion_service_factory(
+            self.session
+        ).ingest_interview_turn(
+            user_id=user_id,
+            interview_session=interview_session,
+            assessment=assessment,
+        )
+        if isinstance(effective_action, InterviewTurnFollowUpAction):
+            self.session.add(
+                InterviewFollowUpQuestion(
+                    id=uuid4(),
+                    session_id=interview_session.id,
+                    parent_question_id=question.id,
+                    order=follow_up_count + 1,
+                    prompt=effective_action.prompt,
+                    created_at=self._now(),
+                )
+            )
+            interview_session.status = "followUp"
+        else:
+            question.completed_at = self._now()
+            plan = await self.session.scalar(
+                select(InterviewPlan).where(
+                    InterviewPlan.id == question.source_plan_id,
+                    InterviewPlan.session_id == interview_session.id,
+                    InterviewPlan.revision == question.plan_revision,
+                )
+            )
+            if plan is None:
+                raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
+            next_planned = _planned_question(
+                plan.questions, question.order + 1, required=False
+            )
+            if next_planned is None:
+                interview_session.status = "candidateQuestions"
+            else:
+                self.session.add(
+                    InterviewQuestion(
+                        id=uuid4(),
+                        session_id=interview_session.id,
+                        source_plan_id=plan.id,
+                        plan_revision=plan.revision,
+                        order=next_planned.order,
+                        prompt=next_planned.prompt,
+                        question_type=next_planned.question_type.value,
+                        assessed_capabilities=list(next_planned.assessed_capabilities),
+                        created_at=self._now(),
+                    )
+                )
+                interview_session.status = "question"
+        interview_session.version += 1
+        interview_session.updated_at = self._now()
 
     async def _build_turn_input(
         self,
@@ -571,6 +348,8 @@ class InterviewTurnService:
         answered_follow_ups: Sequence[
             tuple[InterviewFollowUpQuestion, InterviewFollowUpAnswer]
         ],
+        *,
+        user_id: UUID,
     ) -> InterviewTurnInput:
         plan = await self.session.scalar(
             select(InterviewPlan).where(
@@ -581,93 +360,65 @@ class InterviewTurnService:
         )
         if plan is None:
             raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID)
-        planning_run = await self.session.scalar(
-            select(AgentRun).where(AgentRun.id == plan.source_agent_run_id)
-        )
-        if planning_run is None:
+        planned_question = _planned_question(plan.questions, question.order)
+        if (
+            question.prompt != planned_question.prompt
+            or question.question_type != planned_question.question_type.value
+            or list(question.assessed_capabilities)
+            != list(planned_question.assessed_capabilities)
+        ):
             raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID)
-        try:
-            planning_payload = InterviewPlanningRunPayload.model_validate(
-                planning_run.payload
+        planner_context = await InterviewPlanningService(
+            self.session
+        )._build_planning_input(
+            interview_session,
+            user_id=user_id,
+        )
+        exchanges = [
+            InterviewTurnFollowUpExchange(
+                order=follow_up.order,
+                question_id=follow_up.id,
+                prompt=follow_up.prompt,
+                answer=InterviewTurnAnswerSnapshot(
+                    id=answer.id,
+                    content=answer.content,
+                    submitted_at=answer.submitted_at,
+                ),
             )
-            planning_input = planning_payload.interview_planning_input
-            planned_question = _planned_question(plan.questions, question.order)
-            if (
-                question.prompt != planned_question.prompt
-                or question.question_type != planned_question.question_type.value
-                or list(question.assessed_capabilities)
-                != list(planned_question.assessed_capabilities)
-            ):
-                raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID)
-            turn_question = InterviewTurnQuestionContext(
+            for follow_up, answer in answered_follow_ups
+        ]
+        return InterviewTurnInput(
+            session=InterviewTurnSessionSnapshot(
+                id=interview_session.id,
+                version=interview_session.version,
+                status=interview_session.status,
+                language=interview_session.language,
+                configuration=_session_configuration(interview_session),
+            ),
+            plan_id=plan.id,
+            plan_revision=plan.revision,
+            question_id=question.id,
+            planned_question=InterviewTurnQuestionContext(
                 prompt=planned_question.prompt,
                 question_type=planned_question.question_type,
                 assessed_capabilities=list(planned_question.assessed_capabilities),
                 objective=planned_question.objective,
                 follow_up_directions=list(planned_question.follow_up_directions),
                 scoring_focus=list(planned_question.scoring_focus),
-            )
-            exchanges = tuple(
-                InterviewTurnFollowUpExchange(
-                    order=follow_up.order,
-                    question_id=follow_up.id,
-                    prompt=follow_up.prompt,
-                    answer=InterviewTurnAnswerSnapshot(
-                        id=answer.id,
-                        content=answer.content,
-                        submitted_at=answer.submitted_at,
-                    ),
-                )
-                for follow_up, answer in answered_follow_ups
-            )
-            return InterviewTurnInput(
-                session=InterviewTurnSessionSnapshot(
-                    id=interview_session.id,
-                    version=interview_session.version,
-                    status=interview_session.status,
-                    language=interview_session.language,
-                    configuration=_session_configuration(interview_session),
-                ),
-                plan_id=plan.id,
-                plan_revision=plan.revision,
-                question_id=question.id,
-                planned_question=turn_question,
-                main_answer=InterviewTurnAnswerSnapshot(
-                    id=main_answer.id,
-                    content=main_answer.content,
-                    submitted_at=main_answer.submitted_at,
-                ),
-                answered_follow_ups=list(exchanges),
-                remaining_follow_up_slots=(
-                    _max_follow_ups(interview_session.difficulty) - len(exchanges)
-                ),
-                career_profile=planning_input.career_profile,
-                target_role=planning_input.target_role,
-                job_description_analysis=planning_input.job_description_analysis,
-                matching_analysis=planning_input.matching_analysis,
-            )
-        except TypeError, ValueError, ValidationError, AttributeError:
-            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
-
-    async def _next_planned_question(
-        self,
-        plan: InterviewPlan,
-        current_order: int,
-    ) -> InterviewPlanningQuestion | None:
-        try:
-            return _planned_question(
-                plan.questions,
-                current_order + 1,
-                required=False,
-            )
-        except TypeError, ValueError, ValidationError:
-            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
-
-    async def _main_answer(self, question_id: UUID) -> InterviewAnswer | None:
-        return await self.session.scalar(
-            select(InterviewAnswer)
-            .where(InterviewAnswer.question_id == question_id)
-            .with_for_update()
+            ),
+            main_answer=InterviewTurnAnswerSnapshot(
+                id=main_answer.id,
+                content=main_answer.content,
+                submitted_at=main_answer.submitted_at,
+            ),
+            answered_follow_ups=exchanges,
+            remaining_follow_up_slots=(
+                _max_follow_ups(interview_session.difficulty) - len(exchanges)
+            ),
+            career_profile=planner_context.career_profile,
+            target_role=planner_context.target_role,
+            job_description_analysis=planner_context.job_description_analysis,
+            matching_analysis=planner_context.matching_analysis,
         )
 
     async def _answered_follow_ups(
@@ -684,10 +435,14 @@ class InterviewTurnService:
                 )
                 .where(InterviewFollowUpQuestion.parent_question_id == question_id)
                 .order_by(InterviewFollowUpQuestion.order.asc())
-                .with_for_update()
             )
         ).all()
         return tuple((question, answer) for question, answer in rows)
+
+    async def _main_answer(self, question_id: UUID) -> InterviewAnswer | None:
+        return await self.session.scalar(
+            select(InterviewAnswer).where(InterviewAnswer.question_id == question_id)
+        )
 
     async def _current_question(
         self,
@@ -709,15 +464,12 @@ class InterviewTurnService:
         return await self.session.scalar(statement)
 
     async def _locked_session(
-        self,
-        user_id: UUID,
-        session_id: UUID,
+        self, user_id: UUID, session_id: UUID
     ) -> InterviewSession:
         interview_session = await self.session.scalar(
             select(InterviewSession)
             .where(
-                InterviewSession.id == session_id,
-                InterviewSession.user_id == user_id,
+                InterviewSession.id == session_id, InterviewSession.user_id == user_id
             )
             .with_for_update()
         )
@@ -726,17 +478,16 @@ class InterviewTurnService:
         return interview_session
 
     async def _lock_user(self, user_id: UUID) -> None:
-        exists = await self.session.scalar(
-            select(User.id).where(User.id == user_id).with_for_update()
-        )
-        if exists is None:
+        if (
+            await self.session.scalar(
+                select(User.id).where(User.id == user_id).with_for_update()
+            )
+            is None
+        ):
             raise InterviewTurnStateError(INTERVIEW_TURN_SESSION_NOT_FOUND)
 
-    def _require_version(
-        self,
-        interview_session: InterviewSession,
-        version: int,
-    ) -> None:
+    @staticmethod
+    def _require_version(interview_session: InterviewSession, version: int) -> None:
         if interview_session.version != version:
             raise InterviewTurnStateError(INTERVIEW_TURN_VERSION_CONFLICT)
 
@@ -746,155 +497,12 @@ class InterviewTurnService:
             raise ValueError("clock must return a timezone-aware datetime")
         return value
 
-    @staticmethod
-    def _validate_run_metadata(run: AgentRun, user_id: UUID) -> None:
-        if (
-            run.user_id != user_id
-            or run.agent_id != InterviewTurnAgent.agent_id
-            or run.prompt_id != InterviewTurnAgent.agent_id
-            or run.prompt_version != InterviewTurnAgent.agent_version
-            or run.output_schema_id != InterviewTurnAgent.output_schema_id
-        ):
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-
-    @classmethod
-    def _validate_run_payload(cls, run: AgentRun) -> InterviewTurnRunPayload:
-        cls._validate_run_metadata(run, run.user_id)
-        try:
-            return InterviewTurnRunPayload.model_validate(run.payload)
-        except TypeError, ValueError, ValidationError:
-            raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
-
-    async def _follow_up_for_assessment(
-        self,
-        assessment: InterviewTurnAssessment,
-    ) -> InterviewFollowUpQuestion | None:
-        if assessment.decision != "followUp":
-            return None
-        return await self.session.scalar(
-            select(InterviewFollowUpQuestion).where(
-                InterviewFollowUpQuestion.source_turn_run_id
-                == assessment.source_agent_run_id
-            )
-        )
-
-    async def _validate_persisted_answer_lineage(
-        self,
-        payload: InterviewTurnRunPayload,
-        question: InterviewQuestion,
-    ) -> None:
-        main_answer = await self.session.scalar(
-            select(InterviewAnswer)
-            .where(
-                InterviewAnswer.id == payload.main_answer_id,
-                InterviewAnswer.session_id == payload.session_id,
-                InterviewAnswer.question_id == question.id,
-            )
-            .with_for_update()
-        )
-        if main_answer is None or (
-            main_answer.content != payload.interview_turn_input.main_answer.content
-        ):
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-        if payload.target_type == "main":
-            if payload.submitted_answer_id != main_answer.id:
-                raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-            return
-        if payload.follow_up_question_id is None or payload.follow_up_answer_id is None:
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-        follow_up = await self.session.scalar(
-            select(InterviewFollowUpQuestion).where(
-                InterviewFollowUpQuestion.id == payload.follow_up_question_id,
-                InterviewFollowUpQuestion.session_id == payload.session_id,
-                InterviewFollowUpQuestion.parent_question_id == question.id,
-            )
-        )
-        follow_up_answer = await self.session.scalar(
-            select(InterviewFollowUpAnswer)
-            .where(
-                InterviewFollowUpAnswer.id == payload.follow_up_answer_id,
-                InterviewFollowUpAnswer.session_id == payload.session_id,
-                InterviewFollowUpAnswer.follow_up_question_id
-                == payload.follow_up_question_id,
-            )
-            .with_for_update()
-        )
-        if follow_up is None or follow_up_answer is None:
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-        exchanges = payload.interview_turn_input.answered_follow_ups
-        if not exchanges:
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-        submitted_exchange = exchanges[-1]
-        if (
-            payload.submitted_answer_id != follow_up_answer.id
-            or submitted_exchange.question_id != follow_up.id
-            or submitted_exchange.order != follow_up.order
-            or submitted_exchange.prompt != follow_up.prompt
-            or submitted_exchange.answer.id != follow_up_answer.id
-            or submitted_exchange.answer.content != follow_up_answer.content
-        ):
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-
-    @staticmethod
-    def _validate_question_lineage(
-        payload: InterviewTurnRunPayload,
-        question: InterviewQuestion,
-    ) -> None:
-        planned_question = payload.interview_turn_input.planned_question
-        if (
-            question.prompt != planned_question.prompt
-            or question.question_type != planned_question.question_type.value
-            or list(question.assessed_capabilities)
-            != list(planned_question.assessed_capabilities)
-        ):
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-
-    @staticmethod
-    def _validate_answer_lineage(
-        payload: InterviewTurnRunPayload,
-        question: InterviewQuestion,
-    ) -> None:
-        if (
-            question.order < 1
-            or question.source_plan_id != payload.plan_id
-            or question.plan_revision != payload.plan_revision
-        ):
-            raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID)
-
 
 def _validate_output(output: object) -> InterviewTurnOutput:
     try:
         return InterviewTurnOutput.model_validate(output)
     except TypeError, ValueError, ValidationError:
         raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID) from None
-
-
-def _output_from_assessment(
-    assessment: InterviewTurnAssessment,
-    follow_up: InterviewFollowUpQuestion | None,
-) -> InterviewTurnOutput:
-    try:
-        action: InterviewTurnNextAction
-        if assessment.decision == "followUp":
-            if follow_up is None:
-                raise ValueError
-            action = InterviewTurnFollowUpAction(
-                type="followUp",
-                prompt=follow_up.prompt,
-            )
-        else:
-            action = InterviewTurnCompleteQuestionAction(type="completeQuestion")
-        return InterviewTurnOutput(
-            assessment=InterviewTurnAssessmentOutput(
-                score=assessment.score,
-                summary=assessment.summary,
-                strengths=list(assessment.strengths),
-                issues=list(assessment.issues),
-            ),
-            next_action=action,
-        )
-    except TypeError, ValueError, ValidationError:
-        raise InterviewTurnStateError(INTERVIEW_TURN_RUN_INVALID) from None
 
 
 def _planned_question(
@@ -904,13 +512,13 @@ def _planned_question(
     required: bool = True,
 ) -> InterviewPlanningQuestion | None:
     if not isinstance(questions, list):
-        raise ValueError("plan questions must be a list")
+        raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID)
     for raw in questions:
         question = InterviewPlanningQuestion.model_validate(raw)
         if question.order == order:
             return question
     if required:
-        raise ValueError("planned question does not exist")
+        raise InterviewTurnStateError(INTERVIEW_TURN_SNAPSHOT_INVALID)
     return None
 
 
@@ -921,7 +529,7 @@ def _max_follow_ups(difficulty: str) -> int:
         raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID) from None
     return (
         MAX_INTERVIEW_FOLLOW_UPS_PRESSURE
-        if value.value == "pressure"
+        if value == InterviewDifficulty.PRESSURE
         else MAX_INTERVIEW_FOLLOW_UPS_BASIC
     )
 
@@ -947,16 +555,11 @@ def _session_configuration(session: InterviewSession) -> InterviewConfiguration:
         raise InterviewTurnStateError(INTERVIEW_TURN_STATE_INVALID) from None
 
 
-def _status_value(status_value: object) -> str:
-    return str(getattr(status_value, "value", status_value))
-
-
 __all__ = [
     "INTERVIEW_TURN_ANSWER_INVALID",
     "INTERVIEW_TURN_FOLLOW_UP_MISMATCH",
     "INTERVIEW_TURN_MODEL_NOT_CONFIGURED",
     "INTERVIEW_TURN_QUESTION_MISMATCH",
-    "INTERVIEW_TURN_RUN_INVALID",
     "INTERVIEW_TURN_SESSION_NOT_FOUND",
     "INTERVIEW_TURN_SNAPSHOT_INVALID",
     "INTERVIEW_TURN_STATE_INVALID",

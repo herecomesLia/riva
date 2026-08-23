@@ -4,11 +4,11 @@ import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
   DeleteTargetRoleInput,
-  GenerateOrRegenerateMatchingAnalysisInput,
+  StartMatchingAnalysisInput,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
-  StartOrRetryJobDescriptionParsingInput,
+  StartJobDescriptionParsingInput,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
@@ -101,7 +101,7 @@ export function saveJobDescription(
 }
 
 export function startJobDescriptionParsing(
-  input: StartOrRetryJobDescriptionParsingInput,
+  input: StartJobDescriptionParsingInput,
 ): Promise<RolesPageResponse> {
   if (env.mock) return rolesMockService.startJobDescriptionParsing(input)
   const { roleId, ...request } = input
@@ -112,7 +112,7 @@ export function startJobDescriptionParsing(
 }
 
 export function generateMatchingAnalysis(
-  input: GenerateOrRegenerateMatchingAnalysisInput,
+  input: StartMatchingAnalysisInput,
 ): Promise<RolesPageResponse> {
   if (env.mock) return rolesMockService.generateMatchingAnalysis(input)
   return requestRolesPage(`/roles/${encodeURIComponent(input.roleId)}/matching-analysis`, {

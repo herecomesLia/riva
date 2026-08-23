@@ -36,21 +36,19 @@ docs      文档
 
 JavaScript/TypeScript 包使用 `pnpm` 管理，Python 服务使用 `uv` 管理。
 
-### 本地 API 与 Worker
+### 本地 API
 
-先启动 PostgreSQL 并初始化数据库表，再在两个独立终端中运行 API 和 Worker：
+先启动 PostgreSQL 并初始化数据库表，再运行 API：
 
 ```bash
 podman compose -f infra/local/docker-compose.yml up -d postgres
 uv run --directory apps/server riva db setup --env-file "$PWD/.env"
 uv run --directory apps/server riva start --env-file "$PWD/.env"
-uv run --directory apps/server riva worker --env-file "$PWD/.env"
 ```
 
-未配置 `RIVA_LLM_PROVIDER` 时，Worker 会使用空 Handler Registry 启动。完整配置
-Qwen（`RIVA_LLM_PROVIDER=qwen`、model、API Key 和 base URL）后，会注册
-`job-description-parser`、`matching-analyzer` 和 `resume-parser`，启动日志中的
-`handler_count` 应为 `3`。API 已暴露 JD parsing lifecycle 和 Matching analysis lifecycle；API 与前端已完成 JD parsing lifecycle 和 Matching analysis lifecycle 的真实接入。前端会在 Agent 任务执行期间轮询状态，并在求职档案或 JD 结构化分析发生变化后将已有匹配结果标记为 stale，支持基于最新数据重新生成。简历解析成功后，API 还提供可审阅的导入 Draft 和显式应用接口：
+API 会同步调用当前 Agent，等待 LLM 完成后保存并返回业务结果。前端只在本次请求
+等待期间显示加载和错误反馈，不依赖队列或轮询。简历解析成功后，API 还提供可审阅的
+导入 Draft 和显式应用接口：
 
 - `GET /api/profile/resumes/{resumeId}/import-draft` 查看当前 Draft；
 - `POST /api/profile/resumes/{resumeId}/import-draft/apply`，提交

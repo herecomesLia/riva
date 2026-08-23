@@ -161,7 +161,7 @@ def reference_answer_response(
     return TrainingRecordReferenceAnswerResponse.model_validate(
         {
             "target": target,
-            "referenceAnswer": {"status": "generating"},
+            "referenceAnswer": {"status": "unavailable"},
         }
     )
 
@@ -206,16 +206,9 @@ class FakeTrainingRecordReferenceAnswerService:
         self.result = result or reference_answer_response()
         self.error = error
         self.request_calls: list[dict[str, object]] = []
-        self.refresh_calls: list[dict[str, object]] = []
 
     async def request_reference_answer(self, **kwargs: object):
         self.request_calls.append(kwargs)
-        if self.error is not None:
-            raise TrainingRecordReferenceAnswerStateError(self.error)  # type: ignore[arg-type]
-        return self.result
-
-    async def refresh_reference_answer(self, **kwargs: object):
-        self.refresh_calls.append(kwargs)
         if self.error is not None:
             raise TrainingRecordReferenceAnswerStateError(self.error)  # type: ignore[arg-type]
         return self.result
@@ -427,14 +420,14 @@ def test_request_training_record_reference_answer_forwards_main_request(app) -> 
             headers={"Origin": TRUSTED_ORIGIN},
         )
 
-    assert response.status_code == 202
+    assert response.status_code == 200
     assert response.json()["target"] == {
         "kind": "targetedPractice",
         "recordId": str(RECORD_ID),
         "questionId": str(ATTEMPT_ID),
         "subject": "mainQuestion",
     }
-    assert response.json()["referenceAnswer"]["status"] == "generating"
+    assert response.json()["referenceAnswer"]["status"] == "unavailable"
     assert len(service.request_calls) == 1
     assert service.request_calls[0]["user_id"] == user.id
     assert service.request_calls[0]["record_id"] == RECORD_ID
@@ -443,36 +436,6 @@ def test_request_training_record_reference_answer_forwards_main_request(app) -> 
         "subject": "mainQuestion",
         "questionId": str(ATTEMPT_ID),
     }
-
-
-def test_refresh_training_record_reference_answer_forwards_follow_up_request(
-    app,
-) -> None:
-    follow_up_id = uuid4()
-    service = FakeTrainingRecordReferenceAnswerService(
-        result=reference_answer_response(
-            subject="followUp",
-            follow_up_id=follow_up_id,
-        )
-    )
-    client, user = reference_answer_client_for(app, service)
-
-    with client:
-        response = client.post(
-            f"/api/training-records/practice/{RECORD_ID}/reference-answer/refresh",
-            json={
-                "subject": "followUp",
-                "questionId": str(ATTEMPT_ID),
-                "followUpId": str(follow_up_id),
-            },
-            headers={"Origin": TRUSTED_ORIGIN},
-        )
-
-    assert response.status_code == 200
-    assert response.json()["target"]["subject"] == "followUp"
-    assert response.json()["target"]["followUpId"] == str(follow_up_id)
-    assert service.refresh_calls[0]["user_id"] == user.id
-    assert service.refresh_calls[0]["record_id"] == RECORD_ID
 
 
 def test_training_record_reference_answer_routes_validate_body(app) -> None:

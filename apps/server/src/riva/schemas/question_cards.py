@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal, Self
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import (
@@ -9,8 +9,6 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
-    field_validator,
-    model_validator,
 )
 
 from riva.core.language import InteractionLanguage
@@ -163,82 +161,6 @@ class QuestionCardResponse(APIModel):
     updated_at: datetime
 
 
-QuestionGenerationLifecycleStatus = Literal[
-    "queued",
-    "running",
-    "succeeded",
-    "failed",
-]
-
-
-class QuestionGenerationStatusResponse(APIModel):
-    model_config = ConfigDict(extra="forbid")
-
-    run_id: UUID
-    status: QuestionGenerationLifecycleStatus
-    question_type: QuestionCardQuestionType
-    difficulty: QuestionCardDifficulty
-    language: InteractionLanguage
-    attempt_count: int = Field(ge=0)
-    max_attempts: int = Field(ge=1)
-    error_code: str | None
-    failure_reason: str | None
-    created_at: datetime
-    started_at: datetime | None
-    finished_at: datetime | None
-    question_card: QuestionCardResponse | None
-
-    @field_validator("created_at", "started_at", "finished_at")
-    @classmethod
-    def validate_aware_datetime(cls, value: datetime | None) -> datetime | None:
-        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
-            raise ValueError("timestamps must be timezone-aware")
-        return value
-
-    @model_validator(mode="after")
-    def validate_state(self) -> Self:
-        if self.status == "queued":
-            self._require(
-                self.question_card is None
-                and self.error_code is None
-                and self.failure_reason is None
-                and self.finished_at is None,
-                "queued state contains terminal data",
-            )
-        elif self.status == "running":
-            self._require(
-                self.question_card is None
-                and self.error_code is None
-                and self.failure_reason is None
-                and self.started_at is not None
-                and self.finished_at is None,
-                "running state contains invalid lifecycle data",
-            )
-        elif self.status == "succeeded":
-            self._require(
-                self.question_card is not None
-                and self.error_code is None
-                and self.failure_reason is None
-                and self.finished_at is not None,
-                "succeeded state is incomplete",
-            )
-        elif self.status == "failed":
-            self._require(
-                self.question_card is None
-                and self.error_code is not None
-                and self.failure_reason is not None
-                and bool(self.failure_reason.strip())
-                and self.finished_at is not None,
-                "failed state is invalid",
-            )
-        return self
-
-    @staticmethod
-    def _require(condition: bool, message: str) -> None:
-        if not condition:
-            raise ValueError(message)
-
-
 __all__ = [
     "MAX_QUESTION_CARD_ANSWER_FRAMEWORK",
     "MAX_QUESTION_CARD_ANSWER_HINTS",
@@ -260,7 +182,5 @@ __all__ = [
     "QuestionCardResponse",
     "QuestionCardTextItem",
     "QuestionCardTextList",
-    "QuestionGenerationLifecycleStatus",
-    "QuestionGenerationStatusResponse",
     "StartQuestionGenerationRequest",
 ]

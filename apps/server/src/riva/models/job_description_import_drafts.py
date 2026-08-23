@@ -12,7 +12,6 @@ from sqlalchemy import (
     Index,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
@@ -21,7 +20,6 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
-    from riva.models.agent_runs import AgentRun
     from riva.models.roles import TargetRole
 
 
@@ -29,7 +27,7 @@ class JobDescriptionImportDraft(Base):
     __tablename__ = "job_description_import_drafts"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('parsing', 'ready', 'failed', 'applied')",
+            "status IN ('ready', 'applied')",
             name="ck_job_description_import_drafts_status",
         ),
         CheckConstraint(
@@ -39,14 +37,6 @@ class JobDescriptionImportDraft(Base):
         CheckConstraint(
             "parsed_title IS NULL OR length(trim(parsed_title)) > 0",
             name="ck_job_description_import_drafts_title_not_blank",
-        ),
-        CheckConstraint(
-            "failure_reason IS NULL OR length(trim(failure_reason)) > 0",
-            name="ck_job_description_import_drafts_failure_not_blank",
-        ),
-        UniqueConstraint(
-            "agent_run_id",
-            name="uq_job_description_import_drafts_agent_run",
         ),
         Index(
             "ix_job_description_import_drafts_user_status_updated_at",
@@ -88,14 +78,8 @@ class JobDescriptionImportDraft(Base):
     status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
-        default="parsing",
+        default="ready",
     )
-    agent_run_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     applied_role_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("target_roles.id", ondelete="SET NULL"),
@@ -113,10 +97,6 @@ class JobDescriptionImportDraft(Base):
         onupdate=utc_now,
     )
 
-    agent_run: Mapped[AgentRun | None] = relationship(
-        "AgentRun",
-        foreign_keys=[agent_run_id],
-    )
     applied_role: Mapped[TargetRole | None] = relationship(
         "TargetRole",
         foreign_keys=[applied_role_id],

@@ -20,9 +20,6 @@ from riva.schemas.practice_sessions import (
     PracticeQuestionReferenceAnswerRequest,
     PracticeSessionResponse,
     PracticeSetupResponse,
-    RefreshPracticeEvaluationRequest,
-    RefreshPracticeFollowUpGenerationRequest,
-    RefreshPracticeQuestionGenerationRequest,
     RetryPracticeQuestionRequest,
     RevealPracticeFollowUpGuidanceRequest,
     RevealPracticeQuestionGuidanceRequest,
@@ -64,7 +61,7 @@ async def get_practice_setup_capabilities(
 @router.post(
     "/sessions",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def start_practice_session(
     payload: StartPracticeSessionRequest,
@@ -84,7 +81,7 @@ async def start_practice_session(
 @router.post(
     "/sessions/{sessionId}/questions/next",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def continue_to_next_practice_question(
     session_id: PracticeSessionId,
@@ -120,7 +117,7 @@ async def retry_current_practice_question(
 @router.post(
     "/sessions/{sessionId}/questions/skip",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def skip_current_practice_question(
     session_id: PracticeSessionId,
@@ -210,7 +207,7 @@ async def reveal_practice_question_framework(
 @router.post(
     "/sessions/{sessionId}/questions/reference-answer",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def request_practice_question_reference_answer(
     session_id: PracticeSessionId,
@@ -226,43 +223,9 @@ async def request_practice_question_reference_answer(
 
 
 @router.post(
-    "/sessions/{sessionId}/questions/reference-answer/refresh",
-    response_model=PracticeActiveSessionResponse,
-)
-async def refresh_practice_question_reference_answer(
-    session_id: PracticeSessionId,
-    payload: PracticeQuestionReferenceAnswerRequest,
-    current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
-) -> PracticeActiveSessionResponse:
-    return await practice_api_service.refresh_question_reference_answer(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
-    "/sessions/{sessionId}/question-generation/refresh",
-    response_model=PracticeActiveSessionResponse,
-)
-async def refresh_practice_question_generation(
-    session_id: PracticeSessionId,
-    payload: RefreshPracticeQuestionGenerationRequest,
-    current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
-) -> PracticeActiveSessionResponse:
-    return await practice_api_service.refresh_question_generation(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
     "/sessions/{sessionId}/answers/main",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def submit_practice_primary_answer(
     session_id: PracticeSessionId,
@@ -280,7 +243,7 @@ async def submit_practice_primary_answer(
 @router.post(
     "/sessions/{sessionId}/answers/follow-up",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def submit_practice_follow_up_answer(
     session_id: PracticeSessionId,
@@ -298,7 +261,7 @@ async def submit_practice_follow_up_answer(
 @router.post(
     "/sessions/{sessionId}/follow-ups/end",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def end_practice_follow_ups(
     session_id: PracticeSessionId,
@@ -307,23 +270,6 @@ async def end_practice_follow_ups(
     practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.end_follow_ups(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
-    "/sessions/{sessionId}/follow-up-generation/refresh",
-    response_model=PracticeActiveSessionResponse,
-)
-async def refresh_practice_follow_up_generation(
-    session_id: PracticeSessionId,
-    payload: RefreshPracticeFollowUpGenerationRequest,
-    current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
-) -> PracticeActiveSessionResponse:
-    return await practice_api_service.refresh_follow_up_generation(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,
@@ -369,7 +315,7 @@ async def reveal_practice_follow_up_framework(
 @router.post(
     "/sessions/{sessionId}/follow-ups/reference-answer",
     response_model=PracticeActiveSessionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def request_practice_follow_up_reference_answer(
     session_id: PracticeSessionId,
@@ -378,40 +324,6 @@ async def request_practice_follow_up_reference_answer(
     practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
 ) -> PracticeActiveSessionResponse:
     return await practice_api_service.request_follow_up_reference_answer(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
-    "/sessions/{sessionId}/follow-ups/reference-answer/refresh",
-    response_model=PracticeActiveSessionResponse,
-)
-async def refresh_practice_follow_up_reference_answer(
-    session_id: PracticeSessionId,
-    payload: PracticeFollowUpReferenceAnswerRequest,
-    current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
-) -> PracticeActiveSessionResponse:
-    return await practice_api_service.refresh_follow_up_reference_answer(
-        user_id=current_user.id,
-        session_id=session_id,
-        payload=payload,
-    )
-
-
-@router.post(
-    "/sessions/{sessionId}/evaluation/refresh",
-    response_model=PracticeActiveSessionResponse,
-)
-async def refresh_practice_evaluation_generation(
-    session_id: PracticeSessionId,
-    payload: RefreshPracticeEvaluationRequest,
-    current_user: User = Depends(require_current_user),
-    practice_api_service: PracticeAPIService = Depends(get_practice_api_service),
-) -> PracticeActiveSessionResponse:
-    return await practice_api_service.refresh_evaluation(
         user_id=current_user.id,
         session_id=session_id,
         payload=payload,

@@ -29,20 +29,12 @@ type Props =
       isPending: boolean
       interactionLocked: boolean
       assistedRetry: boolean
-      pollingError?: boolean
-      pollingTimedOut?: boolean
-      isPollingRetrying?: boolean
-      onRecheck?: () => void
       onRequest: () => Promise<PracticeInteractionResult>
     }
   | {
       mode: "review" | "readonly"
       state: PracticeReferenceAnswerState
       assistedRetry?: boolean
-      pollingError?: boolean
-      pollingTimedOut?: boolean
-      isPollingRetrying?: boolean
-      onRecheck?: () => void
       isPending?: never
       interactionLocked?: never
       onRequest?: never
@@ -114,44 +106,6 @@ export function PracticeReferenceAnswer(props: Props) {
               : t("practice.referenceAnswer.request")}
           </Button>
         )}
-
-        {state.status === "generating" && props.pollingError ? (
-          <Alert data-testid="practice-reference-answer-polling-error" variant="destructive">
-            <AlertTitle>
-              {props.pollingTimedOut
-                ? t("common.agentPolling.timeoutTitle")
-                : t("practice.referenceAnswer.requestErrorTitle")}
-            </AlertTitle>
-            <AlertDescription className="flex flex-col items-start gap-3">
-              <span>
-                {props.pollingTimedOut
-                  ? t("common.agentPolling.timeoutDescription")
-                  : t("practice.referenceAnswer.requestErrorDescription")}
-              </span>
-              {props.onRecheck ? (
-                <Button
-                  disabled={props.isPollingRetrying}
-                  onClick={props.onRecheck}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  {props.isPollingRetrying && (
-                    <Spinner aria-hidden="true" data-icon="inline-start" />
-                  )}
-                  {props.isPollingRetrying
-                    ? t("common.agentPolling.rechecking")
-                    : t("common.agentPolling.recheck")}
-                </Button>
-              ) : null}
-            </AlertDescription>
-          </Alert>
-        ) : state.status === "generating" ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-            <Spinner aria-hidden="true" />
-            {t("practice.referenceAnswer.generating")}
-          </div>
-        ) : null}
 
         {state.status === "unavailable" && (
           <p className="text-sm text-muted-foreground" role="status">

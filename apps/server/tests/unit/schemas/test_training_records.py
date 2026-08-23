@@ -295,14 +295,14 @@ def test_training_record_reference_answer_response_reuses_practice_union() -> No
                 "questionId": str(attempt_id),
                 "subject": "mainQuestion",
             },
-            "referenceAnswer": {"status": "generating"},
+            "referenceAnswer": {"status": "unavailable"},
         }
     )
 
     assert response.target.question_id == attempt_id
-    assert response.reference_answer.status == "generating"
+    assert response.reference_answer.status == "unavailable"
     assert response.model_dump(mode="json", by_alias=True)["referenceAnswer"] == {
-        "status": "generating",
+        "status": "unavailable",
         "content": None,
         "viewedBeforeSubmission": False,
     }

@@ -16,7 +16,6 @@ def draft_payload(**overrides: object) -> dict[str, object]:
     skill_id = uuid4()
     payload: dict[str, object] = {
         "resumeDocumentId": uuid4(),
-        "sourceRunId": uuid4(),
         "parsingResultVersion": 1,
         "draftVersion": 1,
         "status": "ready",

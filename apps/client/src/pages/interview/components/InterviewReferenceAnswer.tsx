@@ -22,11 +22,7 @@ export function InterviewReferenceAnswer({
     return (
       <Alert>
         <BookOpenTextIcon aria-hidden="true" />
-        <AlertTitle>
-          {referenceAnswer.status === "generating"
-            ? t("interview.review.reference.generating")
-            : t("interview.review.reference.unavailable")}
-        </AlertTitle>
+        <AlertTitle>{t("interview.review.reference.unavailable")}</AlertTitle>
       </Alert>
     )
   }

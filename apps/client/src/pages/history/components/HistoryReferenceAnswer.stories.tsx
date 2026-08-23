@@ -16,31 +16,6 @@ const meta = preview.meta({
 export const Ready = meta.story({
   args: { onGenerate: fn(), referenceAnswer: ready },
 })
-export const Generating = meta.story({
-  args: {
-    onGenerate: fn(),
-    referenceAnswer: { status: "generating", content: null },
-  },
-})
-export const PollingAfterSingleFailure = meta.story({
-  args: {
-    onGenerate: fn(),
-    referenceAnswer: { status: "pollingRetrying", content: null },
-  },
-})
-export const PollingEventuallySucceeded = meta.story({
-  args: { onGenerate: fn(), referenceAnswer: ready },
-})
-export const PollingRetryLimitReached = meta.story({
-  args: {
-    onGenerate: fn(),
-    referenceAnswer: {
-      status: "pollingFailed",
-      content: null,
-      reason: "consecutiveFailures",
-    },
-  },
-})
 export const GenerationFailed = meta.story({
   args: {
     onGenerate: fn(),
@@ -80,7 +55,8 @@ const lockedGenerate = fn()
 export const DuplicateClickLocked = meta.story({
   args: {
     onGenerate: lockedGenerate,
-    referenceAnswer: { status: "generating", content: null },
+    isRequesting: true,
+    referenceAnswer: { status: "notRequested", content: null },
   },
   play: async ({ canvas }) => {
     const button = canvas.getByRole("button", { name: /生成参考答案|generate reference answer/i })

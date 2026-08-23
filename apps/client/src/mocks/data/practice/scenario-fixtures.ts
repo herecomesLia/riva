@@ -1,13 +1,15 @@
 import type {
   AnsweredPracticeFollowUpExchange,
   PracticeAttemptRecord,
-  PracticeEvaluatingState,
   PracticeFollowUpQuestion,
   PracticePageResponse,
   PracticeReviewState,
 } from "@/models/practice"
 
-import { createPracticeMockEvaluationResult } from "./evaluation-builders"
+import {
+  createPracticeMockEvaluationResult,
+  type PracticeEvaluationInput,
+} from "./evaluation-builders"
 import { createPracticeFollowUpReferenceAnswer } from "./follow-up-catalog"
 import { createPracticeReferenceAnswer } from "./reference-answer-catalog"
 import { getMockQuestionTemplateId } from "./types"
@@ -44,7 +46,22 @@ import {
   weakQuestion,
 } from "./scenario-content"
 
-function createPracticeReviewState(session: PracticeEvaluatingState): PracticeReviewState {
+export type PracticeSubmittedMockState = PracticeEvaluationInput &
+  Pick<
+    PracticeReviewState,
+    | "sessionId"
+    | "language"
+    | "version"
+    | "startedAt"
+    | "attemptId"
+    | "attemptNumber"
+    | "attemptRecords"
+    | "followUpExchanges"
+  >
+
+export function createPracticeReviewState(
+  session: PracticeSubmittedMockState,
+): PracticeReviewState {
   const result = createPracticeMockEvaluationResult(session)
   const targetRoleTitle =
     targetRoles.find((role) => role.id === session.selection.targetRoleId)?.title ?? "Target role"
@@ -106,7 +123,7 @@ function createPracticeReviewState(session: PracticeEvaluatingState): PracticeRe
 }
 
 function revealFixtureFollowUpReference(
-  session: Pick<PracticeEvaluatingState, "question" | "mainAnswer" | "selection">,
+  session: Pick<PracticeSubmittedMockState, "question" | "mainAnswer" | "selection">,
   followUp: PracticeFollowUpQuestion,
   previousFollowUpExchanges: readonly AnsweredPracticeFollowUpExchange[],
   targetRoleTitle: string,
@@ -156,7 +173,7 @@ export type PracticeMockScenario =
   | "noRoles"
   | "noEligibleSavedQuestions"
   | "noEligibleHistoryQuestions"
-  | "generatingQuestion"
+  | "answeringGeneratedQuestion"
   | "answeringQuestion"
   | "answeringHintRevealed"
   | "answeringFrameworkRevealed"
@@ -165,9 +182,9 @@ export type PracticeMockScenario =
   | "answeringFirstFollowUp"
   | "answeringSingleFollowUp"
   | "answeringFollowUp"
-  | "evaluatingNoFollowUp"
-  | "evaluatingFollowUpEndedEarly"
-  | "evaluatingAnswer"
+  | "reviewNoFollowUp"
+  | "reviewFollowUpEndedEarly"
+  | "reviewAnswer"
   | "reviewRetryRecommended"
   | "reviewNextRecommended"
   | "reviewBalanced"
@@ -179,7 +196,7 @@ export type PracticeMockScenario =
   | "reviewFollowUpEndedEarly"
   | "completedSession"
   | "retryingCurrentQuestion"
-  | "generatingNextQuestion"
+  | "answeringNextQuestion"
   | "completedWithRetries"
   | "completedWithWeakQuestions"
 
@@ -243,23 +260,23 @@ const practiceMockScenarios = {
       selection: { ...defaultSelection, source: "history" },
     },
   },
-  generatingQuestion: {
+  answeringGeneratedQuestion: {
     setupContext,
     session: {
-      status: "generatingQuestion",
+      status: "answering",
       ...activeSession,
-      previousAttempt: null,
+      question,
     },
   },
-  generatingNextQuestion: {
+  answeringNextQuestion: {
     setupContext,
     session: {
-      status: "generatingQuestion",
+      status: "answering",
       ...activeSession,
       attemptId: `${activeSession.sessionId}_attempt_2`,
       attemptNumber: 2,
       attemptRecords: [createPracticeAttemptFixture(archivedProjectAttempt)],
-      previousAttempt: createPracticeAttemptFixture(archivedProjectAttempt),
+      question,
     },
   },
   retryingCurrentQuestion: {
@@ -358,10 +375,9 @@ const practiceMockScenarios = {
       },
     },
   },
-  evaluatingNoFollowUp: {
+  reviewNoFollowUp: {
     setupContext,
-    session: {
-      status: "evaluating",
+    session: createPracticeReviewState({
       ...motivationActiveSession,
       question: motivationQuestion,
       mainAnswer: motivationMainAnswer,
@@ -371,12 +387,11 @@ const practiceMockScenarios = {
         reason: "noFollowUpRequired",
       },
       submittedAt: "2026-07-20T01:35:00.000Z",
-    },
+    }),
   },
-  evaluatingFollowUpEndedEarly: {
+  reviewFollowUpEndedEarly: {
     setupContext,
-    session: {
-      status: "evaluating",
+    session: createPracticeReviewState({
       ...activeSession,
       question,
       mainAnswer,
@@ -386,12 +401,11 @@ const practiceMockScenarios = {
         unansweredQuestion: secondProjectFollowUpQuestion,
       },
       submittedAt: "2026-07-20T01:38:00.000Z",
-    },
+    }),
   },
-  evaluatingAnswer: {
+  reviewAnswer: {
     setupContext,
-    session: {
-      status: "evaluating",
+    session: createPracticeReviewState({
       ...activeSession,
       question,
       mainAnswer,
@@ -401,7 +415,7 @@ const practiceMockScenarios = {
         reason: "allAnswered",
       },
       submittedAt: "2026-07-20T01:39:00.000Z",
-    },
+    }),
   },
   reviewRetryRecommended: {
     setupContext,
@@ -503,7 +517,6 @@ const practiceMockScenarios = {
   reviewMotivation: {
     setupContext,
     session: createPracticeReviewState({
-      status: "evaluating",
       ...motivationActiveSession,
       question: motivationQuestion,
       mainAnswer: motivationMainAnswer,
@@ -515,7 +528,6 @@ const practiceMockScenarios = {
   reviewFollowUpEndedEarly: {
     setupContext,
     session: createPracticeReviewState({
-      status: "evaluating",
       ...activeSession,
       question,
       mainAnswer,

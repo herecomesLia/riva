@@ -10,11 +10,7 @@ import { renderWithProviders } from "@/test/render"
 import { useAuthStore } from "@/stores/auth"
 
 const roleId = "11111111-1111-4111-8111-111111111111"
-function createResponse(
-  status: "saved" | "parsing",
-  version: number,
-  jobDescriptionVersion: number,
-): RolesPageResponseDto {
+function createResponse(version: number, jobDescriptionVersion: number): RolesPageResponseDto {
   const roleBase = {
     company: "Riva",
     createdAt: "2026-07-30T08:00:00Z",
@@ -28,28 +24,15 @@ function createResponse(
     updatedAt: "2026-07-30T09:00:00Z",
     version,
   }
-  const role =
-    status === "saved"
-      ? {
-          ...roleBase,
-          jobDescription: {
-            parsingFailureReason: null,
-            rawText: "Design and build reliable APIs.",
-            status: "saved" as const,
-            version: jobDescriptionVersion,
-          },
-          jobDescriptionAnalysis: null,
-        }
-      : {
-          ...roleBase,
-          jobDescription: {
-            parsingFailureReason: null,
-            rawText: "Design and build reliable APIs.",
-            status: "parsing" as const,
-            version: jobDescriptionVersion,
-          },
-          jobDescriptionAnalysis: null,
-        }
+  const role = {
+    ...roleBase,
+    jobDescription: {
+      rawText: "Design and build reliable APIs.",
+      status: "saved" as const,
+      version: jobDescriptionVersion,
+    },
+    jobDescriptionAnalysis: null,
+  }
 
   return {
     currentRoleId: roleId,
@@ -58,7 +41,7 @@ function createResponse(
   }
 }
 
-const response = createResponse("saved", 2, 1)
+const response = createResponse(2, 1)
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

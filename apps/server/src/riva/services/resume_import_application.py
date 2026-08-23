@@ -44,7 +44,6 @@ from riva.services.resume_imports import (
     RESUME_IMPORT_PROFILE_INVALID,
     RESUME_IMPORT_PROFILE_VERSION_CONFLICT,
     RESUME_PARSING_RESULT_NOT_FOUND,
-    RESUME_PARSING_RESULT_SUPERSEDED,
     ResumeImportStateError,
     _parse_persisted_result,
     _require_aware_datetime,
@@ -89,8 +88,6 @@ class ResumeImportApplicationService:
             document = await self._load_document(user_id, resume_document_id)
             result = await self._load_result(user_id, resume_document_id)
 
-            if document.parsing_run_id != result.source_agent_run_id:
-                raise ResumeImportStateError(RESUME_PARSING_RESULT_SUPERSEDED)
             parsed_output = _parse_persisted_result(result)
 
             profile = await self._load_profile(user_id)
@@ -107,15 +104,9 @@ class ResumeImportApplicationService:
             _validate_draft_status(draft.status)
 
             if draft.status == APPLIED:
-                if (
-                    draft.parsing_result_version != result.result_version
-                    or draft.source_agent_run_id != result.source_agent_run_id
-                ):
+                if draft.parsing_result_version != result.result_version:
                     raise ResumeImportStateError(RESUME_IMPORT_APPLY_CONFLICT)
-            elif (
-                draft.parsing_result_version != result.result_version
-                or draft.source_agent_run_id != result.source_agent_run_id
-            ):
+            elif draft.parsing_result_version != result.result_version:
                 raise ResumeImportStateError(RESUME_IMPORT_DRAFT_INVALID)
 
             draft_data = resume_import_draft_data_from_model(draft)

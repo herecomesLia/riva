@@ -6,13 +6,11 @@ import {
   getPracticeFollowUpPlan,
 } from "@/mocks/data/practice"
 import { reconcilePracticeSetupSelection, resetPracticeMockState } from "@/mocks/services/practice"
-import { copyPracticeState, getPracticeMockState } from "@/mocks/services/practice/state"
+import { copyPracticeState } from "@/mocks/services/practice/state"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   endPracticeFollowUps,
   getPracticePage,
-  getPracticeEvaluationStatus as requestPracticeEvaluationStatus,
-  getQuestionGenerationStatus as requestQuestionGenerationStatus,
   requestAnswerFramework as requestAnswerFrameworkService,
   requestEndPracticeSession,
   requestPracticeHint as requestPracticeHintService,
@@ -20,7 +18,6 @@ import {
   requestPracticeFollowUpFramework as requestPracticeFollowUpFrameworkService,
   requestPracticeFollowUpHint as requestPracticeFollowUpHintService,
   requestPracticeFollowUpReferenceAnswer as requestPracticeFollowUpReferenceAnswerService,
-  retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   endPracticeSession,
@@ -96,12 +93,6 @@ export function requireMockPageResponse(response: PracticeServiceResponse): Prac
   throw new Error("The mock practice service must return a page response.")
 }
 
-async function getPracticeEvaluationStatus(
-  input: Parameters<typeof requestPracticeEvaluationStatus>[0],
-) {
-  return requireMockPageResponse(await requestPracticeEvaluationStatus(input))
-}
-
 async function submitPrimaryAnswer(input: Parameters<typeof requestSubmitPrimaryAnswer>[0]) {
   return requireMockPageResponse(await requestSubmitPrimaryAnswer(input))
 }
@@ -152,40 +143,17 @@ export async function generateQuestion(
   const setup = await settle(getPracticePage())
   const targetRoleId = setup.setupContext.defaultTargetRoleId
   if (!targetRoleId) throw new Error("The default practice setup must include a current role.")
-  const generating = await settle(
+  const session = await settle(
     startPracticeSession({ ...setup.session.selection, targetRoleId, questionType }),
   )
-  if (generating.session.status !== "generatingQuestion") {
-    throw new Error("The practice session must be generating a question.")
+  if (session.status !== "answering") {
+    throw new Error("Starting a practice session must produce an answering session.")
   }
-  const input = {
-    sessionId: generating.session.sessionId,
-    version: generating.session.version,
-  }
-  await settle(getQuestionGenerationStatus(input))
-  const response = await settle(getQuestionGenerationStatus(input))
-  if (response.session.status !== "answering") {
-    throw new Error("Question generation must produce an answering session.")
-  }
-  return response.session
+  return session
 }
 
 async function startPracticeSession(input: Parameters<typeof requestStartPracticeSession>[0]) {
-  const session = await requestStartPracticeSession(input)
-  return {
-    ...copyPracticeState(getPracticeMockState()),
-    session: copyPracticeState(session),
-  }
-}
-
-async function getQuestionGenerationStatus(
-  input: Parameters<typeof requestQuestionGenerationStatus>[0],
-) {
-  const session = await requestQuestionGenerationStatus(input)
-  return {
-    ...copyPracticeState(getPracticeMockState()),
-    session: copyPracticeState(session),
-  }
+  return copyPracticeState(await requestStartPracticeSession(input))
 }
 
 export async function completeQuestionToReview(
@@ -228,22 +196,12 @@ export async function completeQuestionToReview(
     )
   }
 
-  if (response.session.status !== "evaluating") {
-    throw new Error("A completed answer must enter evaluation.")
+  if (response.session.status !== "review") {
+    throw new Error("A completed answer must produce a review.")
   }
-  const submittedAt = response.session.submittedAt
-  const input = {
-    sessionId: response.session.sessionId,
-    version: response.session.version,
-    questionId: response.session.question.id,
-  }
-  await settle(getPracticeEvaluationStatus(input))
-  const completed = await settle(getPracticeEvaluationStatus(input))
+  const completed = response
   if (completed.session.status !== "review") {
     throw new Error("Evaluation must produce a review.")
-  }
-  if (Date.parse(completed.session.evaluation.evaluatedAt) < Date.parse(submittedAt)) {
-    throw new Error("Evaluation must not be timestamped before answer submission.")
   }
   return completed.session
 }
@@ -271,14 +229,8 @@ export async function finishCurrentAttempt(
       }),
     )
   }
-  if (response.session.status !== "evaluating") throw new Error("Expected evaluating session.")
-  const input = {
-    sessionId: response.session.sessionId,
-    version: response.session.version,
-    questionId: response.session.question.id,
-  }
-  await settle(getPracticeEvaluationStatus(input))
-  const reviewed = await settle(getPracticeEvaluationStatus(input))
+  if (response.session.status !== "review") throw new Error("Expected review session.")
+  const reviewed = response
   if (reviewed.session.status !== "review") throw new Error("Expected review session.")
   return reviewed.session
 }
@@ -287,7 +239,7 @@ export async function continueToSecondQuestion(
   questionType: PracticeQuestionType,
 ): Promise<PracticeAnsweringState> {
   const firstReview = await finishCurrentAttempt(await generateQuestion(questionType))
-  const generating = requireMockPageResponse(
+  const next = requireMockPageResponse(
     await settle(
       continueToNextPracticeQuestion({
         sessionId: firstReview.sessionId,
@@ -296,10 +248,6 @@ export async function continueToSecondQuestion(
       }),
     ),
   )
-  if (generating.session.status !== "generatingQuestion") throw new Error("Expected generation.")
-  const input = { sessionId: generating.session.sessionId, version: generating.session.version }
-  await settle(getQuestionGenerationStatus(input))
-  const next = await settle(getQuestionGenerationStatus(input))
   if (next.session.status !== "answering") throw new Error("Expected second question.")
   return next.session
 }
@@ -420,8 +368,6 @@ export {
   resetPracticeMockState,
   resetRolesMockState,
   getPracticePage,
-  getPracticeEvaluationStatus,
-  getQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
@@ -429,7 +375,6 @@ export {
   requestPracticeFollowUpFramework,
   requestPracticeFollowUpHint,
   requestPracticeFollowUpReferenceAnswer,
-  retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   endPracticeSession,

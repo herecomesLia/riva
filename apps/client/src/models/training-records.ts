@@ -81,19 +81,6 @@ export type TrainingRecordReferenceAnswer =
       }
     }
   | {
-      status: "generating"
-      content: null
-    }
-  | {
-      status: "pollingRetrying"
-      content: null
-    }
-  | {
-      status: "pollingFailed"
-      content: null
-      reason: "consecutiveFailures" | "timeout"
-    }
-  | {
       status: "unavailable"
       content: null
       reason: "generationFailed" | "insufficientContext"
@@ -128,7 +115,6 @@ export type TrainingRecordReferenceAnswerGenerationErrorCode =
   | "recordNotFound"
   | "questionNotFound"
   | "followUpNotFound"
-  | "alreadyGenerating"
   | "alreadyReady"
   | "insufficientContext"
 

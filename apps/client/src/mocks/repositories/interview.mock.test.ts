@@ -90,7 +90,10 @@ describe("interview Mock repository", () => {
     const firstRead = getCompletedInterviewSession(session.sessionId)
     if (firstRead === null) throw new Error("Expected persisted session.")
     firstRead.completedQuestions[0]!.answer.content = "读取后修改的答案"
-    firstRead.questionDetails[0]!.referenceAnswer = { status: "generating" }
+    firstRead.questionDetails[0]!.referenceAnswer = {
+      status: "unavailable",
+      reason: "generationFailed",
+    }
 
     expect(getCompletedInterviewSession(session.sessionId)).toEqual(expected)
   })

@@ -30,7 +30,7 @@ router = APIRouter(
 @router.post(
     "",
     response_model=JobDescriptionImportDraftResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def create_job_description_import_draft(
     payload: JobDescriptionImportDraftCreate,

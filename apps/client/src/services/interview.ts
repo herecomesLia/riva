@@ -8,9 +8,6 @@ import type {
   GetInterviewReviewResponse,
   InterviewMutationResponse,
   InterviewPageResponse,
-  RetryInterviewCandidateAnswerInput,
-  RetryInterviewReviewInput,
-  RetryInterviewTurnInput,
   StartInterviewInput,
   SubmitCandidateQuestionInput,
   SubmitInterviewAnswerInput,
@@ -27,10 +24,6 @@ import type { RolesPageResponse } from "@/models/roles"
 import { getRolesPage } from "@/services/roles"
 import { getInterviewReviewResponseSchema, interviewPageResponseSchema } from "@/schemas/interview"
 import { apiRequest } from "@/services/api"
-
-function realApiUnavailable(): never {
-  throw new Error("Real interview API is not implemented.")
-}
 
 async function requestInterviewPage(
   path: string,
@@ -137,18 +130,6 @@ export function submitInterviewAnswer(
   )
 }
 
-export function retryInterviewTurn(
-  input: RetryInterviewTurnInput,
-): Promise<InterviewMutationResponse> {
-  if (env.mock) {
-    throw new Error("Real interview turn retry is not available in the mock service.")
-  }
-  return requestInterviewPage(
-    `/interview/sessions/${encodeURIComponent(input.sessionId)}/turn/retry`,
-    { json: { version: input.version }, method: "POST" },
-  )
-}
-
 export function submitCandidateQuestion(
   input: SubmitCandidateQuestionInput,
 ): Promise<InterviewMutationResponse> {
@@ -159,18 +140,6 @@ export function submitCandidateQuestion(
       json: { version: input.version, content: input.content },
       method: "POST",
     },
-  )
-}
-
-export function retryInterviewCandidateAnswer(
-  input: RetryInterviewCandidateAnswerInput,
-): Promise<InterviewMutationResponse> {
-  if (env.mock) {
-    return realApiUnavailable()
-  }
-  return requestInterviewPage(
-    `/interview/sessions/${encodeURIComponent(input.sessionId)}/candidate-answer/retry`,
-    { json: { version: input.version }, method: "POST" },
   )
 }
 
@@ -188,18 +157,6 @@ export function endInterview(input: EndInterviewInput): Promise<InterviewMutatio
     json: { version: input.version },
     method: "POST",
   })
-}
-
-export function retryInterviewReview(
-  input: RetryInterviewReviewInput,
-): Promise<InterviewMutationResponse> {
-  if (env.mock) {
-    return realApiUnavailable()
-  }
-  return requestInterviewPage(
-    `/interview/sessions/${encodeURIComponent(input.sessionId)}/review/retry`,
-    { json: { version: input.version }, method: "POST" },
-  )
 }
 
 export async function getInterviewReview(

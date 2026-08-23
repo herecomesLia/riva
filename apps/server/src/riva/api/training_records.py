@@ -122,7 +122,7 @@ async def get_training_records_overview(
 @router.post(
     "/practice/{recordId}/reference-answer",
     response_model=TrainingRecordReferenceAnswerResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def request_training_record_reference_answer(
     record_id: TrainingRecordId,
@@ -134,29 +134,6 @@ async def request_training_record_reference_answer(
 ) -> TrainingRecordReferenceAnswerResponse:
     try:
         return await reference_answer_service.request_reference_answer(
-            user_id=current_user.id,
-            record_id=record_id,
-            payload=payload,
-        )
-    except TrainingRecordReferenceAnswerStateError as error:
-        raise training_record_reference_answer_state_api_error(error) from None
-
-
-@router.post(
-    "/practice/{recordId}/reference-answer/refresh",
-    response_model=TrainingRecordReferenceAnswerResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def refresh_training_record_reference_answer(
-    record_id: TrainingRecordId,
-    payload: TargetedPracticeReferenceAnswerRequest,
-    current_user: User = Depends(require_current_user),
-    reference_answer_service: TrainingRecordReferenceAnswerService = Depends(
-        get_training_record_reference_answer_service
-    ),
-) -> TrainingRecordReferenceAnswerResponse:
-    try:
-        return await reference_answer_service.refresh_reference_answer(
             user_id=current_user.id,
             record_id=record_id,
             payload=payload,

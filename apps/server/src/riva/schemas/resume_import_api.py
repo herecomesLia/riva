@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import ConfigDict, Field, ValidationError, model_validator
 
@@ -23,11 +23,8 @@ from riva.schemas.resume_imports import (
     ResumeImportSkipReason,
     ResumeImportSummaryAction,
 )
-from riva.schemas.resume_parsing_lifecycle import (
-    ResumeImportDraftLifecycleStatus,
-)
 
-ResumeImportDraftStatus = ResumeImportDraftLifecycleStatus
+ResumeImportDraftStatus = Literal["ready", "applied", "superseded"]
 
 
 class _ResumeImportAPIModel(APIModel):
@@ -54,7 +51,6 @@ class ResumeImportChangeSummaryResponse(_ResumeImportAPIModel):
 
 class ResumeImportDraftResponse(_ResumeImportAPIModel):
     resume_document_id: StandardUUID
-    source_run_id: StandardUUID
     parsing_result_version: int = Field(ge=1)
     draft_version: int = Field(ge=1)
     status: ResumeImportDraftStatus

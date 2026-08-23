@@ -7,9 +7,7 @@ from riva.schemas.job_description_parsing import Company, RawJobDescription, Rol
 
 
 class JobDescriptionImportDraftStatus(StrEnum):
-    PARSING = "parsing"
     READY = "ready"
-    FAILED = "failed"
     APPLIED = "applied"
 
 
@@ -25,8 +23,6 @@ class JobDescriptionImportDraftResponse(APIModel):
     parsed_location: Company
     parsed_description: RawJobDescription | None
     status: JobDescriptionImportDraftStatus
-    agent_run_id: UUID | None
-    failure_reason: str | None
     applied_role_id: UUID | None
     can_apply: bool
     created_at: datetime

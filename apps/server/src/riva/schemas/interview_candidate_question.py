@@ -139,31 +139,6 @@ class InterviewCandidateQuestionInput(InterviewCandidateQuestionModel):
         return self
 
 
-class InterviewCandidateQuestionRunPayload(InterviewCandidateQuestionModel):
-    session_id: StandardUUID
-    session_version: Annotated[int, Field(strict=True, ge=1)]
-    session_state_version: Annotated[int, Field(strict=True, ge=1)]
-    candidate_question_id: StandardUUID
-    interaction_language: InteractionLanguage
-    interview_candidate_question_input: InterviewCandidateQuestionInput
-    retry_of_run_id: StandardUUID | None = None
-
-    @model_validator(mode="after")
-    def validate_payload_lineage(self) -> Self:
-        if self.session_state_version <= self.session_version:
-            raise ValueError("candidate question state version must advance snapshot")
-        input_snapshot = self.interview_candidate_question_input
-        if input_snapshot.session.id != self.session_id:
-            raise ValueError("candidate question session id mismatch")
-        if input_snapshot.session.version != self.session_version:
-            raise ValueError("candidate question session version mismatch")
-        if input_snapshot.interaction_language != self.interaction_language:
-            raise ValueError("candidate question language mismatch")
-        if input_snapshot.current_candidate_question.id != self.candidate_question_id:
-            raise ValueError("candidate question id mismatch")
-        return self
-
-
 class InterviewCandidateQuestionFeedback(InterviewCandidateQuestionModel):
     summary: CandidateQuestionFeedbackText
     strengths: CandidateQuestionFeedbackList = Field(default_factory=list)
@@ -176,7 +151,7 @@ class InterviewCandidateQuestionOutput(InterviewCandidateQuestionModel):
     feedback: InterviewCandidateQuestionFeedback
 
 
-# A compact alias keeps the worker/service vocabulary aligned with the prompt
+# A compact alias keeps the agent/service vocabulary aligned with the prompt
 # and the persisted exchange name.
 InterviewCandidateQuestionOutputModel = InterviewCandidateQuestionOutput
 
@@ -195,7 +170,6 @@ __all__ = [
     "InterviewCandidateQuestionModel",
     "InterviewCandidateQuestionOutput",
     "InterviewCandidateQuestionOutputModel",
-    "InterviewCandidateQuestionRunPayload",
     "InterviewCandidateQuestionSessionSnapshot",
     "InterviewCandidateQuestionSnapshot",
 ]

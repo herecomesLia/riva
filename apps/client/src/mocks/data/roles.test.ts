@@ -17,13 +17,10 @@ const scenarios: RolesMockScenario[] = [
   "singleRoleWithoutJobDescription",
   "multipleRoles",
   "rolesWithoutCurrent",
-  "roleWithJobDescriptionParsing",
-  "roleWithJobDescriptionFailed",
+  "roleWithSavedJobDescription",
   "roleWithParsedJobDescription",
   "profileMissing",
   "profileIncomplete",
-  "matchingAnalysisGenerating",
-  "matchingAnalysisFailed",
   "matchingAnalysisStale",
   "matchingAnalysisCurrent",
   "archivedRoles",
@@ -36,25 +33,16 @@ function expectConsistentJobDescription(role: TargetRole) {
     case "missing":
       expect(jobDescription.rawText).toBeNull()
       expect(jobDescription.version).toBeNull()
-      expect(jobDescription.parsingFailureReason).toBeNull()
       expect(jobDescriptionAnalysis).toBeNull()
       return
-    case "parsing":
+    case "saved":
       expect(jobDescription.rawText.trim()).not.toBe("")
       expect(jobDescription.version).toBeTypeOf("number")
-      expect(jobDescription.parsingFailureReason).toBeNull()
-      expect(jobDescriptionAnalysis).toBeNull()
-      return
-    case "failed":
-      expect(jobDescription.rawText.trim()).not.toBe("")
-      expect(jobDescription.version).toBeTypeOf("number")
-      expect(jobDescription.parsingFailureReason.trim()).not.toBe("")
       expect(jobDescriptionAnalysis).toBeNull()
       return
     case "ready":
       expect(jobDescription.rawText.trim()).not.toBe("")
       expect(jobDescription.version).toBeTypeOf("number")
-      expect(jobDescription.parsingFailureReason).toBeNull()
       expect(jobDescriptionAnalysis).not.toBeNull()
       expect(jobDescriptionAnalysis?.jobDescriptionVersion).toBe(jobDescription.version)
       expect(jobDescriptionAnalysis?.analysisVersion).toBeGreaterThanOrEqual(1)
@@ -76,16 +64,6 @@ function expectConsistentMatchingAnalysis(response: RolesPageResponse, role: Tar
   if (role.jobDescription.status !== "ready" || !response.profileContext.exists) return
 
   switch (matchingAnalysis.status) {
-    case "generating":
-      expect(matchingAnalysis.generatedAt).toBeNull()
-      expect(matchingAnalysis.failureReason).toBeNull()
-      expect(matchingAnalysis.result).toBeNull()
-      return
-    case "failed":
-      expect(matchingAnalysis.generatedAt).toBeNull()
-      expect(matchingAnalysis.failureReason.trim()).not.toBe("")
-      expect(matchingAnalysis.result).toBeNull()
-      return
     case "current":
       expect(matchingAnalysis.profileVersion).toBe(response.profileContext.version)
       expect(matchingAnalysis.jobDescriptionVersion).toBe(role.jobDescription.version)

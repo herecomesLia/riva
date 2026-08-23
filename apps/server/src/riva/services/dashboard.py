@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

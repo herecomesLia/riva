@@ -118,21 +118,6 @@ export const RequestPending = meta.story({
   },
 })
 
-export const Generating = meta.story({
-  render: () => (
-    <Answering
-      state={{ status: "generating", content: null, viewedBeforeSubmission: false }}
-      isPending={false}
-    />
-  ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText(/正在生成|generating/i)).toBeVisible()
-    await expect(
-      canvas.queryByRole("button", { name: /RIVA 示例回答|RIVA example answer/i }),
-    ).not.toBeInTheDocument()
-  },
-})
-
 export const PersonalizedExample = meta.story({
   render: () => <Answering state={personalized} />,
 })

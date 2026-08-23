@@ -10,7 +10,6 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
-    from riva.models.agent_runs import AgentRun
     from riva.models.auth import AuthSession
     from riva.models.competencies import UserCompetency
     from riva.models.interviews import InterviewSession
@@ -52,11 +51,6 @@ class User(Base):
     sessions: Mapped[list[AuthSession]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
-    )
-    agent_runs: Mapped[list[AgentRun]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
     )
     resume_documents: Mapped[list[ResumeDocument]] = relationship(
         back_populates="user",

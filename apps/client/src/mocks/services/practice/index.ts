@@ -8,7 +8,6 @@ export {
   submitPrimaryAnswer,
 } from "./answering"
 export { endPracticeSession, requestEndPracticeSession } from "./completion"
-export { getPracticeEvaluationStatus, retryPracticeEvaluation } from "./evaluation"
 export {
   endPracticeFollowUps,
   requestPracticeFollowUpFramework,
@@ -16,7 +15,6 @@ export {
   requestPracticeFollowUpReferenceAnswer,
   submitFollowUpAnswer,
 } from "./follow-up"
-export { getQuestionGenerationStatus } from "./generation"
 export { continueToNextPracticeQuestion, retryCurrentPracticeQuestion } from "./review"
 export {
   getPracticePage,

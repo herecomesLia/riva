@@ -12,9 +12,6 @@ import { PracticePage } from "@/pages/practice"
 import {
   endPracticeFollowUps,
   getPracticePage,
-  getPracticeEvaluationStatus,
-  getFollowUpGenerationStatus,
-  getQuestionGenerationStatus,
   requestAnswerFramework,
   requestEndPracticeSession,
   requestPracticeHint,
@@ -22,7 +19,6 @@ import {
   requestPracticeFollowUpFramework,
   requestPracticeFollowUpHint,
   requestPracticeFollowUpReferenceAnswer,
-  retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   endPracticeSession,
@@ -56,9 +52,6 @@ export function renderPracticePage(initialEntry = "/practice") {
 beforeEach(async () => {
   await i18n.changeLanguage(defaultLanguage)
   vi.mocked(getPracticePage).mockReset()
-  vi.mocked(getPracticeEvaluationStatus).mockReset()
-  vi.mocked(getFollowUpGenerationStatus).mockReset()
-  vi.mocked(getQuestionGenerationStatus).mockReset()
   vi.mocked(endPracticeFollowUps).mockReset()
   vi.mocked(requestAnswerFramework).mockReset()
   vi.mocked(requestEndPracticeSession).mockReset()
@@ -67,7 +60,6 @@ beforeEach(async () => {
   vi.mocked(requestPracticeFollowUpFramework).mockReset()
   vi.mocked(requestPracticeFollowUpHint).mockReset()
   vi.mocked(requestPracticeFollowUpReferenceAnswer).mockReset()
-  vi.mocked(retryPracticeEvaluation).mockReset()
   vi.mocked(retryCurrentPracticeQuestion).mockReset()
   vi.mocked(continueToNextPracticeQuestion).mockReset()
   vi.mocked(endPracticeSession).mockReset()
@@ -87,9 +79,6 @@ export {
   getMockQuestionTemplateId,
   getPracticeFollowUpPlan,
   getPracticePage,
-  getPracticeEvaluationStatus,
-  getFollowUpGenerationStatus,
-  getQuestionGenerationStatus,
   endPracticeFollowUps,
   requestAnswerFramework,
   requestEndPracticeSession,
@@ -98,7 +87,6 @@ export {
   requestPracticeFollowUpFramework,
   requestPracticeFollowUpHint,
   requestPracticeFollowUpReferenceAnswer,
-  retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   endPracticeSession,

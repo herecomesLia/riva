@@ -46,19 +46,10 @@ class InterviewDurationMinutes(IntEnum):
 
 class InterviewSessionStatus(StrEnum):
     OPENING = "opening"
-    GENERATING_QUESTION = "generatingQuestion"
     QUESTION = "question"
-    GENERATING_TURN = "generatingTurn"
     FOLLOW_UP = "followUp"
     CANDIDATE_QUESTIONS = "candidateQuestions"
-    GENERATING_CANDIDATE_ANSWER = "generatingCandidateAnswer"
-    GENERATING_REVIEW = "generatingReview"
     COMPLETED = "completed"
-
-
-class InterviewGenerationStatus(StrEnum):
-    GENERATING = "generating"
-    FAILED = "failed"
 
 
 InterviewSetupBlockedReason = Literal[
@@ -199,27 +190,6 @@ class InterviewAwaitingQuestionResponse(InterviewAPIModel):
     answer: None = None
 
 
-class InterviewGeneratingQuestionSessionResponse(InterviewAPIModel):
-    status: Literal["generatingQuestion"]
-    session_id: StandardUUID
-    language: InteractionLanguage
-    version: Annotated[int, Field(strict=True, ge=1)]
-    configuration: InterviewConfiguration
-    started_at: datetime
-    progress: InterviewProgressResponse
-    completed_questions: list[InterviewCompletedQuestionResponse] = Field(
-        default_factory=list
-    )
-    generation_status: InterviewGenerationStatus
-
-    @field_validator("started_at")
-    @classmethod
-    def validate_started_at(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("started_at must be timezone-aware")
-        return value
-
-
 class InterviewOpeningSessionResponse(InterviewAPIModel):
     status: Literal["opening"]
     session_id: StandardUUID
@@ -262,34 +232,12 @@ class InterviewQuestionSessionResponse(InterviewAPIModel):
         return value
 
 
-class InterviewGeneratingTurnQuestionResponse(InterviewAPIModel):
+class InterviewAnsweredQuestionResponse(InterviewAPIModel):
     question: InterviewQuestionResponse
     answer: InterviewAnswerResponse
     answered_follow_ups: list[InterviewAnsweredFollowUpResponse] = Field(
         default_factory=list
     )
-
-
-class InterviewGeneratingTurnSessionResponse(InterviewAPIModel):
-    status: Literal["generatingTurn"]
-    session_id: StandardUUID
-    language: InteractionLanguage
-    version: Annotated[int, Field(strict=True, ge=1)]
-    configuration: InterviewConfiguration
-    started_at: datetime
-    progress: InterviewProgressResponse
-    completed_questions: list[InterviewCompletedQuestionResponse] = Field(
-        default_factory=list
-    )
-    generation_status: InterviewGenerationStatus
-    current_question: InterviewGeneratingTurnQuestionResponse
-
-    @field_validator("started_at")
-    @classmethod
-    def validate_started_at(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("started_at must be timezone-aware")
-        return value
 
 
 class InterviewAwaitingFollowUpResponse(InterviewAPIModel):
@@ -309,7 +257,7 @@ class InterviewFollowUpSessionResponse(InterviewAPIModel):
     completed_questions: list[InterviewCompletedQuestionResponse] = Field(
         default_factory=list
     )
-    current_question: InterviewGeneratingTurnQuestionResponse
+    current_question: InterviewAnsweredQuestionResponse
     current_follow_up: InterviewAwaitingFollowUpResponse
 
     @field_validator("started_at")
@@ -390,31 +338,6 @@ class InterviewCandidateQuestionsSessionResponse(InterviewAPIModel):
         return value
 
 
-class InterviewGeneratingCandidateAnswerSessionResponse(InterviewAPIModel):
-    status: Literal["generatingCandidateAnswer"]
-    session_id: StandardUUID
-    language: InteractionLanguage
-    version: Annotated[int, Field(strict=True, ge=1)]
-    configuration: InterviewConfiguration
-    started_at: datetime
-    progress: InterviewProgressResponse
-    completed_questions: list[InterviewCompletedQuestionResponse] = Field(
-        default_factory=list
-    )
-    generation_status: InterviewGenerationStatus
-    current_candidate_question: InterviewCandidateQuestionResponse
-    exchanges: list[InterviewCandidateQuestionExchangeResponse] = Field(
-        default_factory=list
-    )
-
-    @field_validator("started_at")
-    @classmethod
-    def validate_started_at(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("started_at must be timezone-aware")
-        return value
-
-
 InterviewCompletionReason = Literal["formalQuestionsCompleted", "userEndedEarly"]
 InterviewReviewText = Annotated[
     str,
@@ -474,19 +397,13 @@ class InterviewReadyReferenceAnswerResponse(InterviewAPIModel):
     content: InterviewReferenceAnswerContentResponse
 
 
-class InterviewGeneratingReferenceAnswerResponse(InterviewAPIModel):
-    status: Literal["generating"]
-
-
 class InterviewUnavailableReferenceAnswerResponse(InterviewAPIModel):
     status: Literal["unavailable"]
     reason: Literal["generationFailed"]
 
 
 InterviewReferenceAnswerResponse = Annotated[
-    InterviewReadyReferenceAnswerResponse
-    | InterviewGeneratingReferenceAnswerResponse
-    | InterviewUnavailableReferenceAnswerResponse,
+    InterviewReadyReferenceAnswerResponse | InterviewUnavailableReferenceAnswerResponse,
     Field(discriminator="status"),
 ]
 
@@ -505,7 +422,7 @@ class InterviewFollowUpRecordResponse(InterviewAPIModel):
 
 
 class InterviewReferenceAnswerStateResponse(InterviewAPIModel):
-    status: Literal["ready", "generating", "unavailable"]
+    status: Literal["ready", "unavailable"]
     content: InterviewReferenceAnswerContentResponse | None = None
     reason: Literal["generationFailed"] | None = None
 
@@ -599,31 +516,6 @@ InterviewSessionReviewResponse = Annotated[
 ]
 
 
-class InterviewGeneratingReviewSessionResponse(InterviewAPIModel):
-    status: Literal["generatingReview"]
-    session_id: StandardUUID
-    language: InteractionLanguage
-    version: Annotated[int, Field(strict=True, ge=1)]
-    configuration: InterviewConfiguration
-    started_at: datetime
-    progress: InterviewProgressResponse
-    completed_questions: list[InterviewCompletedQuestionResponse] = Field(
-        default_factory=list
-    )
-    generation_status: InterviewGenerationStatus
-    completion_reason: InterviewCompletionReason
-    candidate_question_exchanges: list[InterviewCandidateQuestionExchangeResponse] = (
-        Field(default_factory=list)
-    )
-
-    @field_validator("started_at")
-    @classmethod
-    def validate_started_at(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("started_at must be timezone-aware")
-        return value
-
-
 class InterviewCompletedSessionResponse(InterviewAPIModel):
     status: Literal["completed"]
     session_id: StandardUUID
@@ -657,13 +549,9 @@ class InterviewPageResponse(InterviewAPIModel):
     setup: InterviewSetupResponse
     session: (
         InterviewOpeningSessionResponse
-        | InterviewGeneratingQuestionSessionResponse
         | InterviewQuestionSessionResponse
-        | InterviewGeneratingTurnSessionResponse
         | InterviewFollowUpSessionResponse
         | InterviewCandidateQuestionsSessionResponse
-        | InterviewGeneratingCandidateAnswerSessionResponse
-        | InterviewGeneratingReviewSessionResponse
         | InterviewCompletedSessionResponse
         | None
     )
@@ -698,10 +586,6 @@ SubmitInterviewAnswerRequest = Annotated[
 ]
 
 
-class RetryInterviewTurnRequest(InterviewAPIModel):
-    version: Annotated[int, Field(strict=True, ge=1)]
-
-
 class SubmitCandidateQuestionRequest(InterviewAPIModel):
     version: Annotated[int, Field(strict=True, ge=1)]
     content: InterviewCandidateQuestionText
@@ -712,14 +596,6 @@ class FinishInterviewRequest(InterviewAPIModel):
 
 
 class EndInterviewRequest(InterviewAPIModel):
-    version: Annotated[int, Field(strict=True, ge=1)]
-
-
-class RetryInterviewCandidateAnswerRequest(InterviewAPIModel):
-    version: Annotated[int, Field(strict=True, ge=1)]
-
-
-class RetryInterviewReviewRequest(InterviewAPIModel):
     version: Annotated[int, Field(strict=True, ge=1)]
 
 
@@ -784,12 +660,7 @@ __all__ = [
     "InterviewDefaultConfiguration",
     "InterviewDifficulty",
     "InterviewDurationMinutes",
-    "InterviewGenerationStatus",
-    "InterviewGeneratingQuestionSessionResponse",
-    "InterviewGeneratingCandidateAnswerSessionResponse",
-    "InterviewGeneratingReviewSessionResponse",
-    "InterviewGeneratingTurnQuestionResponse",
-    "InterviewGeneratingTurnSessionResponse",
+    "InterviewAnsweredQuestionResponse",
     "InterviewFollowUpQuestionResponse",
     "InterviewFollowUpSessionResponse",
     "InterviewOpeningSessionResponse",
@@ -828,9 +699,6 @@ __all__ = [
     "InterviewSetupBlockedResponse",
     "InterviewSetupResponse",
     "InterviewTargetRoleResponse",
-    "RetryInterviewTurnRequest",
-    "RetryInterviewCandidateAnswerRequest",
-    "RetryInterviewReviewRequest",
     "SubmitCandidateQuestionRequest",
     "FinishInterviewRequest",
     "EndInterviewRequest",

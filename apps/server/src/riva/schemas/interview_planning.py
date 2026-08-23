@@ -116,7 +116,6 @@ class InterviewMatchingAnalysisSnapshot(
     MatchingAnalysisOutput,
     InterviewPlanningModel,
 ):
-    source_agent_run_id: StandardUUID
     role_id: StandardUUID
     profile_id: StandardUUID
     profile_version: Annotated[int, Field(strict=True, ge=1)]
@@ -174,51 +173,6 @@ class InterviewPlanningInput(InterviewPlanningModel):
         return self
 
 
-class InterviewPlanningRunPayload(InterviewPlanningModel):
-    session_id: StandardUUID
-    session_version: Annotated[int, Field(strict=True, ge=1)]
-    profile_id: StandardUUID
-    profile_version: Annotated[int, Field(strict=True, ge=1)]
-    target_role_id: StandardUUID
-    target_role_version: Annotated[int, Field(strict=True, ge=1)]
-    job_description_version: Annotated[int, Field(strict=True, ge=1)]
-    job_description_analysis_version: Annotated[
-        int,
-        Field(strict=True, ge=1),
-    ]
-    interaction_language: InteractionLanguage
-    interview_planning_input: InterviewPlanningInput
-
-    @model_validator(mode="after")
-    def validate_payload_lineage(self) -> Self:
-        planning_input = self.interview_planning_input
-        if planning_input.session.id != self.session_id:
-            raise ValueError("payload session id does not match input snapshot")
-        if planning_input.session.version != self.session_version:
-            raise ValueError("payload session version does not match input snapshot")
-        if planning_input.interaction_language != self.interaction_language:
-            raise ValueError("payload language does not match input snapshot")
-        if planning_input.career_profile.profile_id != self.profile_id:
-            raise ValueError("payload profile id does not match input snapshot")
-        if planning_input.career_profile.version != self.profile_version:
-            raise ValueError("payload profile version does not match input snapshot")
-        if planning_input.target_role.id != self.target_role_id:
-            raise ValueError("payload target role id does not match input snapshot")
-        if planning_input.target_role.version != self.target_role_version:
-            raise ValueError(
-                "payload target role version does not match input snapshot"
-            )
-        if planning_input.job_description_analysis.job_description_version != (
-            self.job_description_version
-        ):
-            raise ValueError("payload job description version is stale")
-        if planning_input.job_description_analysis.analysis_version != (
-            self.job_description_analysis_version
-        ):
-            raise ValueError("payload job description analysis version is stale")
-        return self
-
-
 QUESTION_COUNT_RANGES: dict[int, tuple[int, int]] = {
     15: (2, 3),
     30: (3, 5),
@@ -257,7 +211,6 @@ __all__ = [
     "InterviewPlanningModel",
     "InterviewPlanningOutput",
     "InterviewPlanningQuestion",
-    "InterviewPlanningRunPayload",
     "InterviewPlanningSessionSnapshot",
     "InterviewTargetRoleSnapshot",
     "QUESTION_COUNT_RANGES",

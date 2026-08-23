@@ -24,18 +24,14 @@ import type { MatchingAnalysisResult, ProfileContext, TargetRole } from "@/model
 
 export function MatchingAnalysisCard({
   onGenerate,
-  onRetrySynchronization,
   pending,
   profileContext,
   role,
-  synchronizationError,
 }: {
   onGenerate?: () => void
-  onRetrySynchronization?: () => void
   pending?: boolean
   profileContext: ProfileContext
   role: TargetRole
-  synchronizationError: boolean
 }) {
   const { t } = useTranslation()
   const analysis = role.matchingAnalysis
@@ -75,9 +71,7 @@ export function MatchingAnalysisCard({
               </div>
             )}
             {status !== "current" && (
-              <Badge variant={status === "failed" ? "destructive" : "outline"}>
-                {t(`roles.matchingAnalysisStatus.${status}.label`)}
-              </Badge>
+              <Badge variant="outline">{t(`roles.matchingAnalysisStatus.${status}.label`)}</Badge>
             )}
           </div>
         </div>
@@ -118,18 +112,6 @@ export function MatchingAnalysisCard({
           <JobDescriptionPrerequisite status={role.jobDescription.status} />
         ) : analysis === null ? (
           <AnalysisEmpty onGenerate={onGenerate} pending={pending} />
-        ) : analysis.status === "generating" ? (
-          <AnalysisGenerating
-            onRetrySynchronization={onRetrySynchronization}
-            pending={pending}
-            synchronizationError={synchronizationError}
-          />
-        ) : analysis.status === "failed" ? (
-          <AnalysisFailed
-            failureReason={analysis.failureReason}
-            onRetry={onGenerate}
-            pending={pending}
-          />
         ) : (
           <MatchingAnalysisResultView result={analysis.result} />
         )}
@@ -183,74 +165,6 @@ function AnalysisEmpty({ onGenerate, pending }: { onGenerate?: () => void; pendi
           <SparklesIcon data-icon="inline-start" />
           {t("roles.matching.actions.generate")}
         </Button>
-      )}
-    </div>
-  )
-}
-
-function AnalysisGenerating({
-  onRetrySynchronization,
-  pending,
-  synchronizationError,
-}: {
-  onRetrySynchronization?: () => void
-  pending?: boolean
-  synchronizationError: boolean
-}) {
-  const { t } = useTranslation()
-  if (synchronizationError) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>{t("roles.matching.synchronization.title")}</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-3">
-          <span>{t("roles.matching.synchronization.description")}</span>
-          {onRetrySynchronization && (
-            <Button disabled={pending} onClick={onRetrySynchronization} size="sm" variant="outline">
-              <RefreshCwIcon data-icon="inline-start" />
-              {t("roles.matching.actions.resynchronize")}
-            </Button>
-          )}
-        </AlertDescription>
-      </Alert>
-    )
-  }
-  return (
-    <div className="flex items-center gap-3" aria-live="polite">
-      <Spinner />
-      <p className="text-sm text-muted-foreground">
-        {t("roles.matchingAnalysisStatus.generating.description")}
-      </p>
-    </div>
-  )
-}
-
-function AnalysisFailed({
-  failureReason,
-  onRetry,
-  pending,
-}: {
-  failureReason: string
-  onRetry?: () => void
-  pending?: boolean
-}) {
-  const { t } = useTranslation()
-  return (
-    <div className="flex flex-col gap-3">
-      <Alert variant="destructive">
-        <AlertTitle>{t("roles.matching.failed.title")}</AlertTitle>
-        <AlertDescription>{failureReason}</AlertDescription>
-      </Alert>
-      {onRetry && (
-        <div>
-          <Button disabled={pending} onClick={onRetry} size="sm">
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <RefreshCwIcon data-icon="inline-start" />
-            )}
-            {t("roles.matching.actions.retry")}
-          </Button>
-        </div>
       )}
     </div>
   )

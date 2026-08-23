@@ -132,9 +132,9 @@ describe("getDashboardData mock service", () => {
       jobDescriptionAdded: true,
     })
 
-    resetRolesMockState("roleWithJobDescriptionParsing")
-    const parsingJobDescription = await settle(getDashboardData())
-    expect(parsingJobDescription.currentRole).toMatchObject({
+    resetRolesMockState("roleWithSavedJobDescription")
+    const savedJobDescription = await settle(getDashboardData())
+    expect(savedJobDescription.currentRole).toMatchObject({
       profileCompleted: true,
       jobDescriptionAdded: true,
     })
@@ -159,18 +159,16 @@ describe("getDashboardData mock service", () => {
     },
   )
 
-  it.each([
-    "matchingAnalysisGenerating",
-    "matchingAnalysisFailed",
-    "matchingAnalysisStale",
-    "roleWithParsedJobDescription",
-  ] as const)("does not expose %s as a current role-fit score", async (scenario) => {
-    resetRolesMockState(scenario)
+  it.each(["matchingAnalysisStale", "roleWithParsedJobDescription"] as const)(
+    "does not expose %s as a current role-fit score",
+    async (scenario) => {
+      resetRolesMockState(scenario)
 
-    const dashboard = await settle(getDashboardData())
+      const dashboard = await settle(getDashboardData())
 
-    expect(dashboard.metrics.roleFit).toEqual({ currentValue: null, previousValue: null })
-  })
+      expect(dashboard.metrics.roleFit).toEqual({ currentValue: null, previousValue: null })
+    },
+  )
 
   it.each([
     [

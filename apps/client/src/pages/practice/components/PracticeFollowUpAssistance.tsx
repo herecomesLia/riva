@@ -28,10 +28,6 @@ type Props = {
   onRequestHint: () => Promise<PracticeInteractionResult>
   onRequestFramework: () => Promise<PracticeInteractionResult>
   onRequestReferenceAnswer: () => Promise<PracticeInteractionResult>
-  pollingError?: boolean
-  pollingTimedOut?: boolean
-  isPollingRetrying?: boolean
-  onRecheck?: () => void
 }
 
 export function PracticeFollowUpAssistance({
@@ -41,10 +37,6 @@ export function PracticeFollowUpAssistance({
   onRequestHint,
   onRequestFramework,
   onRequestReferenceAnswer,
-  pollingError = false,
-  pollingTimedOut = false,
-  isPollingRetrying = false,
-  onRecheck,
 }: Props) {
   const { t } = useTranslation()
   const [error, setError] = useState<"hint" | "framework" | "referenceAnswer" | null>(null)
@@ -138,41 +130,6 @@ export function PracticeFollowUpAssistance({
                 ? t("practice.followUpAssistance.referenceGenerating")
                 : t("practice.followUpAssistance.viewReference")}
             </Button>
-          ) : null}
-          {question.referenceAnswer.status === "generating" && pollingError ? (
-            <Alert data-testid="practice-follow-up-reference-polling-error" variant="destructive">
-              <AlertTitle>
-                {pollingTimedOut
-                  ? t("common.agentPolling.timeoutTitle")
-                  : t("practice.followUpAssistance.requestErrorTitle")}
-              </AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <span>
-                  {pollingTimedOut
-                    ? t("common.agentPolling.timeoutDescription")
-                    : t("practice.followUpAssistance.requestErrorDescription")}
-                </span>
-                {onRecheck ? (
-                  <Button
-                    disabled={isPollingRetrying}
-                    onClick={onRecheck}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {isPollingRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
-                    {isPollingRetrying
-                      ? t("common.agentPolling.rechecking")
-                      : t("common.agentPolling.recheck")}
-                  </Button>
-                ) : null}
-              </AlertDescription>
-            </Alert>
-          ) : question.referenceAnswer.status === "generating" ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-              <Spinner aria-hidden="true" />
-              {t("practice.followUpAssistance.referenceGenerating")}
-            </div>
           ) : null}
           {question.referenceAnswer.status === "revealed" ? (
             <div className="flex min-w-0 flex-col gap-4 break-words [overflow-wrap:anywhere]">

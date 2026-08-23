@@ -30,18 +30,14 @@ export function JobDescriptionCard({
   onEdit,
   onEditAnalysisModule,
   onStartParsing,
-  onRetrySynchronization,
   pending,
   role,
-  synchronizationError,
 }: {
   onEdit?: () => void
   onEditAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
   onStartParsing?: () => void
-  onRetrySynchronization?: () => void
   pending?: boolean
   role: TargetRole
-  synchronizationError: boolean
 }) {
   const { t } = useTranslation()
   const { jobDescription } = role
@@ -80,26 +76,11 @@ export function JobDescriptionCard({
         {jobDescription.status === "missing" && (
           <JobDescriptionEmpty onEdit={onEdit} pending={pending} />
         )}
-        {jobDescription.status === "parsing" && (
-          <ParsingState
-            onRetrySynchronization={onRetrySynchronization}
-            pending={pending}
-            synchronizationError={synchronizationError}
-          />
-        )}
         {jobDescription.status === "saved" && (
           <SavedState
             onStartParsing={onStartParsing}
             pending={pending}
             rawText={jobDescription.rawText}
-          />
-        )}
-        {jobDescription.status === "failed" && (
-          <FailedState
-            failureReason={jobDescription.parsingFailureReason}
-            onEdit={onEdit}
-            onStartParsing={onStartParsing}
-            pending={pending}
           />
         )}
         {jobDescription.status === "ready" && role.jobDescriptionAnalysis && (
@@ -168,89 +149,6 @@ function JobDescriptionEmpty({ onEdit, pending }: { onEdit?: () => void; pending
           {t("roles.jd.actions.add")}
         </Button>
       )}
-    </div>
-  )
-}
-
-function ParsingState({
-  onRetrySynchronization,
-  pending,
-  synchronizationError,
-}: {
-  onRetrySynchronization?: () => void
-  pending?: boolean
-  synchronizationError: boolean
-}) {
-  const { t } = useTranslation()
-  if (synchronizationError) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>{t("roles.jd.synchronization.title")}</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-3">
-          <span>{t("roles.jd.synchronization.description")}</span>
-          {onRetrySynchronization && (
-            <Button disabled={pending} onClick={onRetrySynchronization} size="sm" variant="outline">
-              <RefreshCwIcon data-icon="inline-start" />
-              {t("roles.jd.actions.resynchronize")}
-            </Button>
-          )}
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-3" aria-live="polite">
-      <Spinner />
-      <p className="text-sm text-muted-foreground">
-        {t("roles.jobDescriptionStatus.parsing.description")}
-      </p>
-    </div>
-  )
-}
-
-function FailedState({
-  failureReason,
-  onEdit,
-  onStartParsing,
-  pending,
-}: {
-  failureReason: string
-  onEdit?: () => void
-  onStartParsing?: () => void
-  pending?: boolean
-}) {
-  const { t } = useTranslation()
-  return (
-    <div className="flex flex-col gap-4">
-      <Alert variant="destructive">
-        <AlertTitle>{t("roles.jd.failed.title")}</AlertTitle>
-        <AlertDescription>{failureReason}</AlertDescription>
-      </Alert>
-      <div className="flex flex-wrap gap-2">
-        {onStartParsing && (
-          <Button disabled={pending} onClick={onStartParsing} size="sm">
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <RefreshCwIcon data-icon="inline-start" />
-            )}
-            {t("roles.jd.actions.retry")}
-          </Button>
-        )}
-        {onEdit && (
-          <Button
-            className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
-            disabled={pending}
-            onClick={onEdit}
-            size="sm"
-            variant="outline"
-          >
-            <FilePenLineIcon className="size-4" data-icon="inline-start" />
-            {t("roles.jd.actions.replace")}
-          </Button>
-        )}
-      </div>
     </div>
   )
 }

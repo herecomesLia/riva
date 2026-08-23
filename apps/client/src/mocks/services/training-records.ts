@@ -40,18 +40,10 @@ export type TrainingRecordReferenceAnswerMockOutcome =
 
 export type TrainingRecordsMockControllerOptions = {
   referenceAnswerOutcome?: TrainingRecordReferenceAnswerMockOutcome
-  referenceAnswerPollsBeforeCompletion?: number
-}
-
-type ReferenceGenerationState = {
-  outcome: TrainingRecordReferenceAnswerMockOutcome
-  pollsRemaining: number
 }
 
 let referenceAnswerOutcome: TrainingRecordReferenceAnswerMockOutcome = "ready"
-let referenceAnswerPollsBeforeCompletion = 1
 let referenceAnswerGenerationSequence = 0
-const referenceGenerations = new Map<string, ReferenceGenerationState>()
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -61,28 +53,9 @@ export function resetTrainingRecordsMockState(
   scenario: TrainingRecordsRepositoryScenario = "default",
   controller: TrainingRecordsMockControllerOptions = {},
 ): void {
-  if (
-    controller.referenceAnswerPollsBeforeCompletion !== undefined &&
-    (!Number.isInteger(controller.referenceAnswerPollsBeforeCompletion) ||
-      controller.referenceAnswerPollsBeforeCompletion < 0)
-  ) {
-    throw new Error("Reference-answer poll count must be a non-negative integer.")
-  }
   resetTrainingRecordsRepository(scenario)
   referenceAnswerOutcome = controller.referenceAnswerOutcome ?? "ready"
-  referenceAnswerPollsBeforeCompletion = controller.referenceAnswerPollsBeforeCompletion ?? 1
   referenceAnswerGenerationSequence = 0
-  referenceGenerations.clear()
-}
-
-function targetKey(target: TrainingRecordReferenceAnswerTarget): string {
-  return [
-    target.kind,
-    target.recordId,
-    target.questionId,
-    target.subject,
-    target.subject === "followUp" ? target.followUpId : "",
-  ].join(":")
 }
 
 function findTarget(target: TrainingRecordReferenceAnswerTarget): {
@@ -236,13 +209,7 @@ export async function requestTrainingRecordReferenceAnswer(
   target: TrainingRecordReferenceAnswerTarget,
 ): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
   await waitForMockDelay()
-  const { referenceAnswer } = findTarget(target)
-  if (referenceAnswer.status === "generating") {
-    throw new TrainingRecordReferenceAnswerGenerationError(
-      "alreadyGenerating",
-      "Reference answer generation is already in progress.",
-    )
-  }
+  const { prompt, referenceAnswer } = findTarget(target)
   if (referenceAnswer.status === "ready" || referenceAnswer.status === "revealed") {
     throw new TrainingRecordReferenceAnswerGenerationError(
       "alreadyReady",
@@ -260,49 +227,14 @@ export async function requestTrainingRecordReferenceAnswer(
     )
   }
 
-  referenceGenerations.set(targetKey(target), {
-    outcome: referenceAnswerOutcome,
-    pollsRemaining: referenceAnswerPollsBeforeCompletion,
-  })
   return updateTargetReferenceAnswer(
     target,
-    target.kind === "targetedPractice"
-      ? { status: "generating", content: null, viewedBeforeSubmission: false }
-      : { status: "generating", content: null },
-  )
-}
-
-export async function getTrainingRecordReferenceAnswerGenerationStatus(
-  target: TrainingRecordReferenceAnswerTarget,
-): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
-  await waitForMockDelay()
-  const located = findTarget(target)
-  if (located.referenceAnswer.status !== "generating") {
-    return generationResponse(target, located.referenceAnswer)
-  }
-
-  const key = targetKey(target)
-  const generation = referenceGenerations.get(key) ?? {
-    outcome: referenceAnswerOutcome,
-    pollsRemaining: referenceAnswerPollsBeforeCompletion,
-  }
-  if (generation.pollsRemaining > 0) {
-    referenceGenerations.set(key, {
-      ...generation,
-      pollsRemaining: generation.pollsRemaining - 1,
-    })
-    return generationResponse(target, copy(located.referenceAnswer))
-  }
-
-  referenceGenerations.delete(key)
-  return updateTargetReferenceAnswer(
-    target,
-    generation.outcome === "ready"
-      ? readyReferenceAnswer(target, located.prompt)
+    referenceAnswerOutcome === "ready"
+      ? readyReferenceAnswer(target, prompt)
       : {
           status: "unavailable",
           content: null,
-          reason: generation.outcome,
+          reason: referenceAnswerOutcome,
         },
   )
 }

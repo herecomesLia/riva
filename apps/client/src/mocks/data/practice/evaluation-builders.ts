@@ -1,12 +1,19 @@
 import type {
   PracticeDimensionScore,
-  PracticeEvaluatingState,
   PracticeEvaluation,
   PracticeQuestionType,
   PracticeRecommendation,
   PracticeReview,
+  PracticeReviewState,
   PracticeScoreDimension,
 } from "@/models/practice"
+
+export type PracticeEvaluationInput = Pick<
+  PracticeReviewState,
+  "question" | "mainAnswer" | "followUpCompletion" | "selection"
+> & {
+  submittedAt: string
+}
 
 const practiceScoreDimensions = [
   "relevance",
@@ -193,7 +200,7 @@ const practiceEvaluationTemplates = {
 } satisfies Record<PracticeQuestionType, PracticeEvaluationTemplate>
 
 function createPracticeRecommendation(
-  session: PracticeEvaluatingState,
+  session: PracticeEvaluationInput,
   template: PracticeEvaluationTemplate,
   review: Omit<PracticeReview, "recommendation">,
 ): PracticeRecommendation {
@@ -219,7 +226,7 @@ function createPracticeRecommendation(
 }
 
 function createPracticeReview(
-  session: PracticeEvaluatingState,
+  session: PracticeEvaluationInput,
   template: PracticeEvaluationTemplate,
 ): PracticeReview {
   const review = structuredClone(template.review)
@@ -238,7 +245,7 @@ function createPracticeReview(
   }
 }
 
-export function createPracticeMockEvaluationResult(session: PracticeEvaluatingState): {
+export function createPracticeMockEvaluationResult(session: PracticeEvaluationInput): {
   evaluation: PracticeEvaluation
   review: PracticeReview
 } {

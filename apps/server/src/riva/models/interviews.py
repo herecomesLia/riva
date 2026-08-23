@@ -24,7 +24,6 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
-    from riva.models.agent_runs import AgentRun
     from riva.models.roles import TargetRole
     from riva.models.user import User
 
@@ -47,11 +46,7 @@ class InterviewSession(Base):
             name="ck_interview_sessions_version",
         ),
         CheckConstraint(
-            "status IN ("
-            "'opening', 'generatingQuestion', 'question', 'generatingTurn', "
-            "'followUp', 'candidateQuestions', 'generatingCandidateAnswer', "
-            "'generatingReview', 'completed'"
-            ")",
+            "status IN ('opening', 'question', 'followUp', 'candidateQuestions', 'completed')",
             name="ck_interview_sessions_status",
         ),
         CheckConstraint(
@@ -136,30 +131,6 @@ class InterviewSession(Base):
         Integer,
         nullable=True,
     )
-    planning_run_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    turn_run_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    candidate_answer_run_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    review_run_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -182,18 +153,6 @@ class InterviewSession(Base):
         foreign_keys=[user_id, target_role_id],
         passive_deletes=True,
         overlaps="user,interview_sessions",
-    )
-    planning_run: Mapped[AgentRun | None] = relationship(
-        foreign_keys=[planning_run_id],
-    )
-    turn_run: Mapped[AgentRun | None] = relationship(
-        foreign_keys=[turn_run_id],
-    )
-    candidate_answer_run: Mapped[AgentRun | None] = relationship(
-        foreign_keys=[candidate_answer_run_id],
-    )
-    review_run: Mapped[AgentRun | None] = relationship(
-        foreign_keys=[review_run_id],
     )
     plans: Mapped[list[InterviewPlan]] = relationship(
         back_populates="session",
@@ -283,12 +242,6 @@ class InterviewPlan(Base):
         index=True,
     )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     total_main_questions: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -305,9 +258,6 @@ class InterviewPlan(Base):
 
     session: Mapped[InterviewSession] = relationship(
         back_populates="plans",
-    )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
     )
     questions_records: Mapped[list[InterviewQuestion]] = relationship(
         back_populates="source_plan",
@@ -472,10 +422,6 @@ class InterviewFollowUpQuestion(Base):
             "order",
             name="uq_interview_follow_up_questions_parent_order",
         ),
-        UniqueConstraint(
-            "source_turn_run_id",
-            name="uq_interview_follow_up_questions_source_run",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -495,11 +441,6 @@ class InterviewFollowUpQuestion(Base):
         nullable=False,
         index=True,
     )
-    source_turn_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
-    )
     order: Mapped[int] = mapped_column("order", Integer, nullable=False)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -513,10 +454,6 @@ class InterviewFollowUpQuestion(Base):
     )
     parent_question: Mapped[InterviewQuestion] = relationship(
         back_populates="follow_up_questions",
-    )
-    source_turn_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_turn_run_id],
-        passive_deletes=True,
     )
     answer: Mapped[InterviewFollowUpAnswer | None] = relationship(
         back_populates="follow_up_question",
@@ -592,10 +529,6 @@ class InterviewTurnAssessment(Base):
             name="ck_interview_turn_assessments_exactly_one_answer",
         ),
         UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_interview_turn_assessments_source_run",
-        ),
-        UniqueConstraint(
             "main_answer_id",
             name="uq_interview_turn_assessments_main_answer",
         ),
@@ -621,11 +554,6 @@ class InterviewTurnAssessment(Base):
         ForeignKey("interview_questions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
-        nullable=False,
     )
     main_answer_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
@@ -659,10 +587,6 @@ class InterviewTurnAssessment(Base):
     )
     question: Mapped[InterviewQuestion] = relationship(
         back_populates="turn_assessments",
-    )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
-        passive_deletes=True,
     )
     main_answer: Mapped[InterviewAnswer | None] = relationship(
         back_populates="assessments",
@@ -742,10 +666,6 @@ class InterviewCandidateQuestionExchange(Base):
             "question_id",
             name="uq_interview_candidate_question_exchanges_question",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_interview_candidate_question_exchanges_source_run",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -762,11 +682,6 @@ class InterviewCandidateQuestionExchange(Base):
     question_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("interview_candidate_questions.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    source_agent_run_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="CASCADE"),
         nullable=False,
     )
     interviewer_answer: Mapped[str] = mapped_column(Text, nullable=False)
@@ -796,10 +711,6 @@ class InterviewCandidateQuestionExchange(Base):
         back_populates="exchange",
         uselist=False,
     )
-    source_agent_run: Mapped[AgentRun] = relationship(
-        foreign_keys=[source_agent_run_id],
-        passive_deletes=True,
-    )
 
 
 class InterviewReview(Base):
@@ -813,10 +724,6 @@ class InterviewReview(Base):
             "session_id",
             name="uq_interview_reviews_session",
         ),
-        UniqueConstraint(
-            "source_agent_run_id",
-            name="uq_interview_reviews_source_run",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -828,12 +735,6 @@ class InterviewReview(Base):
         Uuid(as_uuid=True),
         ForeignKey("interview_sessions.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
-    )
-    source_agent_run_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("agent_runs.id", ondelete="SET NULL"),
-        nullable=True,
         index=True,
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -853,10 +754,6 @@ class InterviewReview(Base):
 
     session: Mapped[InterviewSession] = relationship(
         back_populates="review",
-    )
-    source_agent_run: Mapped[AgentRun | None] = relationship(
-        foreign_keys=[source_agent_run_id],
-        passive_deletes=True,
     )
 
 

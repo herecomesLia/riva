@@ -123,14 +123,6 @@ export const practiceReferenceAnswerNotRequestedSchema = z
   })
   .strict()
 
-export const practiceReferenceAnswerGeneratingSchema = z
-  .object({
-    content: z.null(),
-    status: z.literal("generating"),
-    viewedBeforeSubmission: z.literal(false),
-  })
-  .strict()
-
 export const practiceReferenceAnswerUnavailableSchema = z
   .object({
     content: z.null(),
@@ -157,14 +149,12 @@ export const practiceFollowUpReferenceAnswerRevealedSchema = z
 
 export const practiceMainReferenceAnswerStateSchema = z.discriminatedUnion("status", [
   practiceReferenceAnswerNotRequestedSchema,
-  practiceReferenceAnswerGeneratingSchema,
   practiceMainReferenceAnswerRevealedSchema,
   practiceReferenceAnswerUnavailableSchema,
 ])
 
 export const practiceFollowUpReferenceAnswerStateSchema = z.discriminatedUnion("status", [
   practiceReferenceAnswerNotRequestedSchema,
-  practiceReferenceAnswerGeneratingSchema,
   practiceFollowUpReferenceAnswerRevealedSchema,
   practiceReferenceAnswerUnavailableSchema,
 ])
@@ -427,23 +417,10 @@ const practiceActiveSessionBaseSchema = z
   })
   .strict()
 
-export const practiceGeneratingQuestionSchema = practiceActiveSessionBaseSchema
-  .extend({ status: z.literal("generatingQuestion") })
-  .strict()
-
 export const practiceAnsweringSchema = practiceActiveSessionBaseSchema
   .extend({
     question: practiceQuestionSchema,
     status: z.literal("answering"),
-  })
-  .strict()
-
-export const practiceGeneratingFollowUpSchema = practiceActiveSessionBaseSchema
-  .extend({
-    status: z.literal("generatingFollowUp"),
-    question: practiceQuestionSchema,
-    mainAnswer: practiceAnswerSchema,
-    followUpExchanges: answeredFollowUpExchangesUpToOneSchema,
   })
   .strict()
 
@@ -466,20 +443,6 @@ export const practiceAnsweringFollowUpSchema = practiceActiveSessionBaseSchema
     }
   })
 
-export const practiceEvaluatingSchema = practiceActiveSessionBaseSchema
-  .extend({
-    status: z.literal("evaluating"),
-    question: practiceQuestionSchema,
-    mainAnswer: practiceAnswerSchema,
-    followUpExchanges: answeredFollowUpExchangesUpToTwoSchema,
-    followUpCompletion: practiceFollowUpCompletionSchema,
-    submittedAt: dateTimeSchema,
-  })
-  .strict()
-  .superRefine((session, context) => {
-    validateFollowUpCompletionSnapshot(session, context)
-  })
-
 export const practiceReviewSessionSchema = practiceActiveSessionBaseSchema
   .extend({
     status: z.literal("review"),
@@ -496,11 +459,8 @@ export const practiceReviewSessionSchema = practiceActiveSessionBaseSchema
   })
 
 export const practiceActiveSessionResponseSchema = z.discriminatedUnion("status", [
-  practiceGeneratingQuestionSchema,
   practiceAnsweringSchema,
-  practiceGeneratingFollowUpSchema,
   practiceAnsweringFollowUpSchema,
-  practiceEvaluatingSchema,
   practiceReviewSessionSchema,
 ])
 
@@ -680,11 +640,8 @@ export type PracticeFollowUpCompletionWire = z.infer<typeof practiceFollowUpComp
 export type PracticeEvaluationWire = z.infer<typeof practiceEvaluationSchema>
 export type PracticeRecommendationWire = z.infer<typeof practiceRecommendationSchema>
 export type PracticeReviewWire = z.infer<typeof practiceReviewSchema>
-export type PracticeGeneratingQuestionWire = z.infer<typeof practiceGeneratingQuestionSchema>
 export type PracticeAnsweringWire = z.infer<typeof practiceAnsweringSchema>
-export type PracticeGeneratingFollowUpWire = z.infer<typeof practiceGeneratingFollowUpSchema>
 export type PracticeAnsweringFollowUpWire = z.infer<typeof practiceAnsweringFollowUpSchema>
-export type PracticeEvaluatingWire = z.infer<typeof practiceEvaluatingSchema>
 export type PracticeReviewWireSession = z.infer<typeof practiceReviewSessionSchema>
 export type PracticeActiveSessionWire = z.infer<typeof practiceActiveSessionResponseSchema>
 export type PracticeUnfinishedAttemptWire = z.infer<typeof practiceUnfinishedAttemptSchema>

@@ -1,33 +1,25 @@
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, cast
 from uuid import UUID
 
-from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.agents.job_description_parsing import JobDescriptionParsingAgent
-from riva.models import AgentRun, JobDescriptionAnalysis, TargetRole
+from riva.core.language import InteractionLanguage
+from riva.models import JobDescriptionAnalysis, TargetRole
 from riva.schemas.job_description_parsing import (
     MAX_JOB_DESCRIPTION_SUMMARY_LENGTH,
     JobDescriptionParsingInput,
     JobDescriptionParsingOutput,
-    JobDescriptionParsingRunPayload,
 )
 from riva.utils import utc_now
 
 JobDescriptionParsingStateErrorCode = Literal[
-    "invalid_job_description_parse_run",
     "job_description_target_not_found",
     "job_description_missing",
     "job_description_version_stale",
-    "job_description_parse_superseded",
 ]
-INVALID_PARSE_RUN: JobDescriptionParsingStateErrorCode = (
-    "invalid_job_description_parse_run"
-)
 TARGET_NOT_FOUND: JobDescriptionParsingStateErrorCode = (
     "job_description_target_not_found"
 )
@@ -35,39 +27,36 @@ JOB_DESCRIPTION_MISSING: JobDescriptionParsingStateErrorCode = "job_description_
 JOB_DESCRIPTION_VERSION_STALE: JobDescriptionParsingStateErrorCode = (
     "job_description_version_stale"
 )
-PARSE_SUPERSEDED: JobDescriptionParsingStateErrorCode = (
-    "job_description_parse_superseded"
-)
 RIVA_SUMMARY_FALLBACK = "No specific structured requirements were identified."
+
+
+class JobDescriptionParsingStateError(RuntimeError):
+    safe_message = "The job description parsing state is invalid."
+
+    def __init__(self, code: JobDescriptionParsingStateErrorCode) -> None:
+        self.code = code
+        super().__init__(self.safe_message)
 
 
 def new_job_description_analysis(
     *,
     role: TargetRole,
-    source_agent_run_id: UUID,
     output: JobDescriptionParsingOutput,
     parsed_at: datetime,
 ) -> JobDescriptionAnalysis:
-    """Build a new analysis shared by parser and import workflows."""
-
     values = output.model_dump(mode="json")
     return JobDescriptionAnalysis(
         role_id=role.id,
         user_id=role.user_id,
-        job_description_version=cast(int, role.job_description_version),
+        job_description_version=role.job_description_version,
         analysis_version=1,
-        source_agent_run_id=source_agent_run_id,
         parsed_at=parsed_at,
         riva_summary=output.riva_summary,
         responsibilities=cast(list[str], values["responsibilities"]),
         qualification_requirements=cast(
-            dict[str, list[str]],
-            values["qualification_requirements"],
+            dict[str, list[str]], values["qualification_requirements"]
         ),
-        required_skills=cast(
-            dict[str, list[str]],
-            values["required_skills"],
-        ),
+        required_skills=cast(dict[str, list[str]], values["required_skills"]),
         preferred_qualifications=cast(list[str], values["preferred_qualifications"]),
         soft_skills=cast(list[str], values["soft_skills"]),
         business_domains=cast(list[str], values["business_domains"]),
@@ -83,8 +72,6 @@ def build_riva_summary(
     soft_skills: Sequence[str],
     business_domains: Sequence[str],
 ) -> str:
-    """Build a bounded, deterministic summary from structured JD modules."""
-
     responsibility = _first_item(responsibilities)
     skills: list[str] = []
     for category in (
@@ -99,7 +86,6 @@ def build_riva_summary(
         skills.extend(required_skills.get(category, ()))
     skills = [_clean_summary_item(item) for item in skills[:3]]
     skills = [item for item in skills if item]
-
     qualification = _first_from_categories(
         qualification_requirements,
         (
@@ -115,7 +101,6 @@ def build_riva_summary(
     preferred = _first_item(preferred_qualifications)
     soft_skill = _first_item(soft_skills)
     domain = _first_item(business_domains)
-
     parts = [
         responsibility,
         f"重点要求 {'、'.join(skills)}" if skills else None,
@@ -133,17 +118,14 @@ def build_riva_summary(
 
 def _first_item(items: Sequence[str]) -> str | None:
     for item in items:
-        normalized = _clean_summary_item(item)
+        normalized = _clean_summary_item(item).rstrip("。.")
         if normalized:
-            normalized = normalized.rstrip("。.")
-            if normalized:
-                return normalized
+            return normalized
     return None
 
 
 def _first_from_categories(
-    groups: Mapping[str, Sequence[str]],
-    categories: Sequence[str],
+    groups: Mapping[str, Sequence[str]], categories: Sequence[str]
 ) -> str | None:
     for category in categories:
         item = _first_item(groups.get(category, ()))
@@ -156,20 +138,6 @@ def _clean_summary_item(item: str) -> str:
     return item.strip()
 
 
-class JobDescriptionParsingStateError(RuntimeError):
-    safe_message = "The job description parsing state is invalid."
-
-    def __init__(self, code: JobDescriptionParsingStateErrorCode) -> None:
-        self.code = code
-        super().__init__(self.safe_message)
-
-
-@dataclass(frozen=True)
-class _ParsingContext:
-    payload: JobDescriptionParsingRunPayload
-    role: TargetRole
-
-
 class JobDescriptionAnalysisService:
     def __init__(
         self,
@@ -180,114 +148,72 @@ class JobDescriptionAnalysisService:
         self.session = session
         self.clock = clock
 
-    async def load_parsing_input(
+    async def build_parsing_input(
         self,
-        run: AgentRun,
+        *,
+        user_id: UUID,
+        role_id: UUID,
+        interaction_language: InteractionLanguage,
     ) -> JobDescriptionParsingInput:
-        try:
-            context = await self._validated_context(run, for_update=False)
-            try:
-                parsing_input = JobDescriptionParsingInput(
-                    role_title=context.role.title,
-                    company=context.role.company,
-                    raw_job_description=context.role.raw_job_description,
-                    interaction_language=context.payload.interaction_language,
-                )
-            except ValidationError:
-                raise JobDescriptionParsingStateError(INVALID_PARSE_RUN) from None
-
-            await self.session.commit()
-            return parsing_input
-        except Exception:
-            await self.session.rollback()
-            raise
+        role = await self._role(user_id=user_id, role_id=role_id, for_update=False)
+        return JobDescriptionParsingInput(
+            role_title=role.title,
+            company=role.company,
+            raw_job_description=role.raw_job_description,
+            interaction_language=interaction_language,
+        )
 
     async def persist_success(
         self,
-        run: AgentRun,
+        *,
+        user_id: UUID,
+        role_id: UUID,
         output: JobDescriptionParsingOutput,
     ) -> JobDescriptionAnalysis:
-        try:
-            context = await self._validated_context(run, for_update=True)
-            existing = await self.session.scalar(
-                select(JobDescriptionAnalysis).where(
-                    JobDescriptionAnalysis.role_id == context.role.id
-                )
+        role = await self._role(user_id=user_id, role_id=role_id, for_update=True)
+        existing = await self.session.scalar(
+            select(JobDescriptionAnalysis)
+            .where(JobDescriptionAnalysis.role_id == role.id)
+            .with_for_update()
+        )
+        now = self.clock()
+        _require_aware_datetime(now)
+        if existing is None:
+            analysis = new_job_description_analysis(
+                role=role,
+                output=output,
+                parsed_at=now,
             )
-            if (
-                existing is not None
-                and existing.source_agent_run_id == run.id
-                and existing.job_description_version
-                == context.payload.job_description_version
-            ):
-                await self.session.commit()
-                return existing
+            self.session.add(analysis)
+        else:
+            values = output.model_dump(mode="json")
+            analysis = existing
+            analysis.job_description_version = role.job_description_version
+            analysis.analysis_version += 1
+            analysis.parsed_at = now
+            analysis.riva_summary = output.riva_summary
+            analysis.responsibilities = cast(list[str], values["responsibilities"])
+            analysis.qualification_requirements = cast(
+                dict[str, list[str]], values["qualification_requirements"]
+            )
+            analysis.required_skills = cast(
+                dict[str, list[str]], values["required_skills"]
+            )
+            analysis.preferred_qualifications = cast(
+                list[str], values["preferred_qualifications"]
+            )
+            analysis.soft_skills = cast(list[str], values["soft_skills"])
+            analysis.business_domains = cast(list[str], values["business_domains"])
+        role.version += 1
+        await self.session.flush()
+        return analysis
 
-            now = self.clock()
-            _require_aware_datetime(now)
-            if existing is None:
-                analysis = new_job_description_analysis(
-                    role=context.role,
-                    source_agent_run_id=run.id,
-                    output=output,
-                    parsed_at=now,
-                )
-                self.session.add(analysis)
-            else:
-                values = output.model_dump(mode="json")
-                analysis = existing
-                analysis.job_description_version = (
-                    context.payload.job_description_version
-                )
-                analysis.analysis_version = 1
-                analysis.source_agent_run_id = run.id
-                analysis.parsed_at = now
-                analysis.riva_summary = output.riva_summary
-                analysis.responsibilities = cast(list[str], values["responsibilities"])
-                analysis.qualification_requirements = cast(
-                    dict[str, list[str]],
-                    values["qualification_requirements"],
-                )
-                analysis.required_skills = cast(
-                    dict[str, list[str]], values["required_skills"]
-                )
-                analysis.preferred_qualifications = cast(
-                    list[str], values["preferred_qualifications"]
-                )
-                analysis.soft_skills = cast(list[str], values["soft_skills"])
-                analysis.business_domains = cast(list[str], values["business_domains"])
-
-            context.role.version += 1
-            await self.session.commit()
-            return analysis
-        except Exception:
-            await self.session.rollback()
-            raise
-
-    async def _validated_context(
-        self,
-        run: AgentRun,
-        *,
-        for_update: bool,
-    ) -> _ParsingContext:
-        if (
-            run.agent_id != JobDescriptionParsingAgent.agent_id
-            or run.prompt_id != JobDescriptionParsingAgent.agent_id
-            or run.prompt_version != JobDescriptionParsingAgent.agent_version
-            or run.output_schema_id != JobDescriptionParsingAgent.output_schema_id
-        ):
-            raise JobDescriptionParsingStateError(INVALID_PARSE_RUN)
-
-        try:
-            payload = JobDescriptionParsingRunPayload.model_validate(run.payload)
-        except ValidationError:
-            raise JobDescriptionParsingStateError(INVALID_PARSE_RUN) from None
-        if payload.role_id is None or payload.job_description_version is None:
-            raise JobDescriptionParsingStateError(INVALID_PARSE_RUN)
-
+    async def _role(
+        self, *, user_id: UUID, role_id: UUID, for_update: bool
+    ) -> TargetRole:
         statement = select(TargetRole).where(
-            TargetRole.id == payload.role_id,
-            TargetRole.user_id == run.user_id,
+            TargetRole.id == role_id,
+            TargetRole.user_id == user_id,
         )
         if for_update:
             statement = statement.with_for_update()
@@ -296,16 +222,11 @@ class JobDescriptionAnalysisService:
             raise JobDescriptionParsingStateError(TARGET_NOT_FOUND)
         if (
             role.job_description_status != "saved"
-            or role.raw_job_description is None
+            or not role.raw_job_description
             or role.job_description_version is None
         ):
             raise JobDescriptionParsingStateError(JOB_DESCRIPTION_MISSING)
-        if role.job_description_version != payload.job_description_version:
-            raise JobDescriptionParsingStateError(JOB_DESCRIPTION_VERSION_STALE)
-        if role.job_description_parsing_run_id != run.id:
-            raise JobDescriptionParsingStateError(PARSE_SUPERSEDED)
-
-        return _ParsingContext(payload=payload, role=role)
+        return role
 
 
 def _require_aware_datetime(value: datetime) -> None:
@@ -314,8 +235,11 @@ def _require_aware_datetime(value: datetime) -> None:
 
 
 __all__ = [
+    "JOB_DESCRIPTION_MISSING",
+    "JOB_DESCRIPTION_VERSION_STALE",
     "JobDescriptionAnalysisService",
     "JobDescriptionParsingStateError",
+    "TARGET_NOT_FOUND",
     "build_riva_summary",
     "new_job_description_analysis",
 ]

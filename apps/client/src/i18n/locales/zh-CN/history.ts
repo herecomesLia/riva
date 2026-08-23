@@ -159,16 +159,6 @@ export const history = {
       guidance: "使用建议",
       generatedAt: "生成于 {{date}}",
       notViewedBeforeSubmission: "提交前未查看参考答案",
-      generating: "参考答案生成中",
-      generatingDescription: "正在为当前历史问题生成参考答案，完成后会自动更新。",
-      pollingRetrying: "暂时无法检查生成进度",
-      pollingRetryingDescription: "本次检查失败，正在按有限重试策略重新检查。",
-      pollingFailed: "生成进度检查已停止",
-      pollingFailedDescription: {
-        consecutiveFailures: "连续多次无法检查生成进度。可以重新检查当前生成任务。",
-        timeout: "生成进度检查已超时。可以重新检查当前生成任务。",
-      },
-      recheck: "重新检查",
       unavailable: "参考答案暂不可用",
       unavailableDescription:
         "未能为当前历史问题生成参考答案。生成失败时可以重试；上下文不足时需开始新训练补充信息。",

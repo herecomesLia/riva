@@ -12,12 +12,10 @@ from pydantic import (
     model_validator,
 )
 
-from riva.core.language import InteractionLanguage
 from riva.schemas.evaluation import (
     EvaluationInput,
     PracticeEvaluationOutput,
 )
-from riva.schemas.profile import StandardUUID
 
 MAX_PRACTICE_REVIEW_OVERALL_LENGTH = 4_000
 MAX_PRACTICE_REVIEW_ITEM_LENGTH = 1_500
@@ -49,19 +47,6 @@ ReviewWeakness = Annotated[
         max_length=MAX_PRACTICE_REVIEW_WEAKNESS_LENGTH,
     ),
 ]
-
-
-class ReviewRunPayload(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_by_alias=True,
-        validate_by_name=True,
-        serialize_by_alias=True,
-    )
-
-    attempt_id: StandardUUID = Field(alias="attemptId")
-    evaluation_id: StandardUUID = Field(alias="evaluationId")
-    interaction_language: InteractionLanguage = Field(alias="interactionLanguage")
 
 
 def _alias(snake_case: str, camel_case: str, **kwargs: Any) -> Any:
@@ -180,7 +165,6 @@ __all__ = [
     "MAX_PRACTICE_REVIEW_WEAKNESS_LENGTH",
     "PracticeReviewInput",
     "PracticeReviewOutput",
-    "ReviewRunPayload",
     "ReviewItem",
     "ReviewOverallPerformance",
     "ReviewWeakness",

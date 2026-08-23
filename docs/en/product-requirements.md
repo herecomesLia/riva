@@ -38,8 +38,8 @@ content stored in training records.
    API requests default to the normalized current language in `Accept-Language`.
 2. **Artifact language** is the frozen language of one independent AI result. Resume
    Parsing, JD Parsing, Matching Analysis, and future independent QuestionCard
-   generation capture the current UI language when their AgentRun is created and
-   store it as `interactionLanguage` in invocation metadata.
+   generation capture the current UI language when the Agent is invoked and
+   store it as `interactionLanguage` with the resulting business artifact.
 3. **Session language** is business metadata for continuous training. A
    `PracticeSession` or `InterviewSession` captures and persists the current UI
    language at creation; every QuestionCard, Question Generation, Follow-up,
@@ -62,17 +62,17 @@ facts. Raw user resumes, raw JDs, and user answers are stored as entered and are
 automatically translated by RIVA.
 
 Every new user-visible AI workflow must declare its language source: an independent
-artifact uses `AgentRun.interactionLanguage`, and a Session child operation uses its
-owning Session's `language`. New Prompts must not use “detect the primary language and
+artifact uses the language captured for its Agent invocation, and a Session child
+operation uses its owning Session's `language`. Agent prompts must not use “detect the primary language and
 choose the output language” as their main strategy; a default of `zh-CN` is allowed
 only for historical compatibility data that lacks a language.
 
 ### Current Agents and future capabilities
 
 The current Resume Parsing, JD Parsing, and Matching Analysis one-shot operations
-write the normalized language into the AgentRun payload. Workers restore it from the
-payload into Agent Input and Prompt rendering; they never read `Accept-Language`, a
-global locale, or browser state. Future QuestionCard, follow-up, evaluation, review,
+pass the normalized language directly into the current Agent. The Agent renders its
+own prompt and never reads `Accept-Language`, a global locale, or browser state.
+Future QuestionCard, follow-up, evaluation, review,
 and recommendation Agents must inherit Session language rather than independently
 reading UI language. `PracticeSession.language` and `InterviewSession.language` must
 be immutable for the session lifetime and persisted so a full training round cannot
@@ -168,8 +168,8 @@ A question card should include at least:
 9. Scoring reference.
 
 A question card must not make its language guessable only from its text. An
-independent card uses the `interactionLanguage` captured when its AgentRun is
-created; a card belonging to a `PracticeSession` or `InterviewSession` must equal
+independent card uses the `interactionLanguage` captured when its Agent is invoked;
+a card belonging to a `PracticeSession` or `InterviewSession` must equal
 the owning Session's `language`.
 
 When generating personalized question cards, Riva should refer to:
