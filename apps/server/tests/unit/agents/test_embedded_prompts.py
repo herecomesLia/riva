@@ -15,13 +15,11 @@ from riva.agents.practice.reference_answer import PracticeReferenceAnswerAgent
 from riva.agents.practice.review import PracticeReviewAgent
 from riva.agents.resumes.parser import ResumeParsingAgent
 from riva.agents.training.planning import TrainingPlanningAgent
-from riva.evals.quality_judge import AgentEvalQualityJudge
 
 
 @pytest.mark.parametrize(
     "agent_class",
     [
-        AgentEvalQualityJudge,
         FollowUpAgent,
         InterviewCandidateQuestionAgent,
         InterviewPlanningAgent,

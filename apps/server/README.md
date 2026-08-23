@@ -9,11 +9,8 @@ markers support focused development runs without changing the default suite:
 # Fast, isolated tests
 pytest -m unit
 
-# Functional tests, excluding explicitly long-running lifecycles
-pytest -m "integration and not slow"
-
-# Agent evaluation framework and cases
-pytest -m eval
+# Functional tests
+pytest -m integration
 
 # Complete suite
 pytest

@@ -10,16 +10,9 @@ from tests.helpers.fakes import FakeDatabase
 
 TEST_DATABASE_URL = "postgresql+asyncpg://riva_test:riva_test@localhost:5432/riva_test"
 TESTS_ROOT = Path(__file__).parent.resolve()
-SLOW_TEST_PATHS = frozenset(
-    {
-        "unit/evals/test_runner.py",
-    }
-)
 TEST_CLASSIFICATION_MARKERS = {
     "unit": pytest.mark.unit,
     "integration": pytest.mark.integration,
-    "eval": pytest.mark.eval,
-    "slow": pytest.mark.slow,
 }
 
 
@@ -34,11 +27,6 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
             _add_marker(item, "unit")
         elif parts[0] == "integration":
             _add_marker(item, "integration")
-
-        if parts[:2] == ["unit", "evals"]:
-            _add_marker(item, "eval")
-        if relative_path in SLOW_TEST_PATHS:
-            _add_marker(item, "slow")
 
 
 def _add_marker(item: pytest.Item, marker_name: str) -> None:

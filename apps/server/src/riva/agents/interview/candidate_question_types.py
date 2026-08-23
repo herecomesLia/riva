@@ -6,7 +6,7 @@ from typing import Annotated, Self
 from pydantic import ConfigDict, Field, StringConstraints, model_validator
 
 from riva.agents.base import AgentModel
-from riva.agents.interview_planning_types import (
+from riva.agents.interview.planning_types import (
     InterviewPlanningInput,
 )
 from riva.core.language import InteractionLanguage
@@ -157,8 +157,8 @@ InterviewCandidateQuestionOutputModel = InterviewCandidateQuestionOutput
 
 
 __all__ = [
-    "CandidateQuestionFeedbackList",
     "CandidateAnswerText",
+    "CandidateQuestionFeedbackList",
     "CandidateQuestionFeedbackText",
     "CandidateQuestionText",
     "InterviewCandidateCompletedFollowUpSnapshot",

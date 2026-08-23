@@ -1,7 +1,7 @@
 import tomllib
 from pathlib import Path
 
-REQUIRED_MARKERS = {"unit", "integration", "eval", "slow"}
+REQUIRED_MARKERS = {"unit", "integration"}
 PYPROJECT_PATH = Path(__file__).parents[2] / "pyproject.toml"
 
 

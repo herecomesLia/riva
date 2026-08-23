@@ -11,14 +11,14 @@ from pydantic import (
     model_validator,
 )
 
-from riva.agents.follow_up_types import FollowUpFocus
-from riva.agents.job_description_parsing_types import (
+from riva.agents.jobs.jd_parser_types import (
     AnalysisItemList,
     Company,
     RoleTitle,
     Summary,
 )
-from riva.agents.practice_interaction_types import (
+from riva.agents.practice.follow_up_types import FollowUpFocus
+from riva.agents.practice.interaction_types import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerContent,
 )
@@ -456,10 +456,10 @@ __all__ = [
     "PracticeReferenceMainAnswer",
     "PracticeReferencePreviousFollowUp",
     "PracticeReferenceProjectEvidence",
+    "PracticeReferenceQualificationRequirements",
     "PracticeReferenceQuestionContext",
     "PracticeReferenceRecommendedMaterialIds",
     "PracticeReferenceRequiredSkillGroups",
-    "PracticeReferenceQualificationRequirements",
     "PracticeReferenceRoleContext",
     "PracticeReferenceWorkEvidence",
     "ReferenceAnswer",

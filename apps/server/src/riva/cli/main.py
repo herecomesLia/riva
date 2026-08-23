@@ -2,7 +2,6 @@ import typer
 
 from riva.cli.commands import register_commands
 from riva.cli.db import app as db_app
-from riva.cli.eval import register_eval_command
 
 app = typer.Typer(
     add_completion=False,
@@ -21,7 +20,6 @@ def cli(ctx: typer.Context) -> None:
 
 register_commands(app)
 app.add_typer(db_app, name="db")
-register_eval_command(app)
 
 
 def main() -> None:
