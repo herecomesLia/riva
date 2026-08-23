@@ -3,7 +3,6 @@ name = "riva-server"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-  "alembic>=1.19.1,<1.20",
   "argon2-cffi>=25.1.0",
   "asgi-correlation-id>=5.0.1",
   "asyncpg>=0.31.0",
@@ -26,7 +25,6 @@ testpaths = ["tests"]
 markers = [
   "unit: unit tests",
   "integration: integration tests",
-  "migration: database migration tests",
   "eval: agent evaluation tests",
   "slow: slow running tests",
 ]

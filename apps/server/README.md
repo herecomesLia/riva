@@ -12,9 +12,6 @@ pytest -m unit
 # Functional tests, excluding explicitly long-running lifecycles
 pytest -m "integration and not slow"
 
-# Database migration coverage
-pytest -m migration
-
 # Agent evaluation framework and cases
 pytest -m eval
 

@@ -12,15 +12,12 @@ TEST_DATABASE_URL = "postgresql+asyncpg://riva_test:riva_test@localhost:5432/riv
 TESTS_ROOT = Path(__file__).parent.resolve()
 SLOW_TEST_PATHS = frozenset(
     {
-        "integration/test_competency_migration.py",
-        "integration/test_migrations.py",
         "unit/evals/test_runner.py",
     }
 )
 TEST_CLASSIFICATION_MARKERS = {
     "unit": pytest.mark.unit,
     "integration": pytest.mark.integration,
-    "migration": pytest.mark.migration,
     "eval": pytest.mark.eval,
     "slow": pytest.mark.slow,
 }
@@ -40,8 +37,6 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
         if parts[:2] == ["unit", "evals"]:
             _add_marker(item, "eval")
-        if parts[0] == "integration" and "migration" in item.path.name:
-            _add_marker(item, "migration")
         if relative_path in SLOW_TEST_PATHS:
             _add_marker(item, "slow")
 

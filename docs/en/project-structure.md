@@ -83,8 +83,7 @@ apps/server/
 │       ├── services/
 │       ├── agents/
 │       └── integrations/
-├── tests/
-└── migrations/
+└── tests/
 ```
 
 Layer responsibilities:
@@ -92,7 +91,7 @@ Layer responsibilities:
 - `api/`: FastAPI routes, request validation, and response handling.
 - `cli/`: Typer command definitions and command-specific orchestration.
 - `core/`: configuration, logging, auth dependencies, and lifecycle code.
-- `db/`: database connections, transactions, and migration support.
+- `db/`: database connections, transactions, and model-managed schema operations.
 - `models/`: database models, such as users, resumes, jobs, questions, interview
   sessions, reviews, and business result records.
 - `schemas/`: Pydantic request and response schemas.
