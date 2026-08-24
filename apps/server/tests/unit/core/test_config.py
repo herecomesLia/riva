@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from riva.core.config import SameSitePolicy, Settings
 from riva.core.logging import LogFormat, LogLevel
 
-
 RIVA_ENV_KEYS = [
     "RIVA_HOST",
     "RIVA_PORT",

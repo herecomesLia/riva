@@ -51,7 +51,7 @@ def test_password_hash_does_not_store_plaintext() -> None:
 
 
 def test_password_hash_accepts_documented_visible_symbols() -> None:
-    password = 'Aa1!@#%^&*()_-+=[]{}|\\:;"\'<>?,./~`'
+    password = "Aa1!@#%^&*()_-+=[]{}|\\:;\"'<>?,./~`"
 
     password_hash = hash_password(password)
 

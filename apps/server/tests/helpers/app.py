@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 
 from riva.core.config import Settings
-
 from tests.helpers.fakes import FakeDatabase
 
 
