@@ -97,7 +97,7 @@ class QuestionGenerationEducationContext(_QuestionGenerationModel):
 
 
 class QuestionGenerationWorkExperienceContext(_QuestionGenerationModel):
-    id: StandardUUID
+    label: RequiredText
     company: RequiredText
     title: RequiredText
     responsibilities: QuestionCardTextList
@@ -106,7 +106,7 @@ class QuestionGenerationWorkExperienceContext(_QuestionGenerationModel):
 
 
 class QuestionGenerationProjectExperienceContext(_QuestionGenerationModel):
-    id: StandardUUID
+    label: RequiredText
     name: RequiredText
     role: OptionalText
     responsibilities: QuestionCardTextList = Field(default_factory=list)

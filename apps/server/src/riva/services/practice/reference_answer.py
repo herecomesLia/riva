@@ -363,10 +363,10 @@ class ReferenceAnswerGenerationService:
             assessed_capabilities=card.assessed_capabilities,
             answer_framework=card.answer_framework,
             scoring_focus=card.scoring_focus,
-            recommended_material_ids=[
-                item["id"]
+            recommended_material_labels=[
+                item["label"]
                 for item in card.recommended_materials
-                if isinstance(item, dict) and item.get("id") is not None
+                if isinstance(item, dict) and item.get("label") is not None
             ],
         )
 

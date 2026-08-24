@@ -11,7 +11,7 @@ import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { cn } from "@/lib/utils"
-import type { JobProfile } from "@/models/profile"
+import type { ProfileProjectExperience } from "@/models/profile"
 
 import { ProfileSectionCard } from "./ProfileSectionCard"
 import { ProfileSkillBadge } from "./ProfileSkillBadge"
@@ -19,8 +19,7 @@ import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 
 export type ProjectExperienceCardProps = {
   onEdit: () => void
-  projects: JobProfile["projectExperiences"]
-  skills: JobProfile["skills"]
+  projects: ProfileProjectExperience[]
 }
 
 type ProjectDetail = {
@@ -28,10 +27,8 @@ type ProjectDetail = {
   key: "description" | "achievements" | "technologyStack"
 }
 
-export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExperienceCardProps) {
+export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCardProps) {
   const { t } = useTranslation()
-  const skillsById = new Map(skills.map((skill) => [skill.id, skill.name]))
-
   return (
     <ProfileSectionCard onEdit={onEdit} section="projectExperience">
       {projects.length === 0 ? (
@@ -68,7 +65,7 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
                     },
                   ]
                 : []),
-              ...(project.skillIds.length > 0
+              ...(project.skills.length > 0
                 ? [
                     {
                       content: (
@@ -84,12 +81,8 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
                             className="flex flex-wrap gap-2"
                             data-testid="project-experience-skills"
                           >
-                            {project.skillIds.map((skillId) => (
-                              <ProfileSkillBadge
-                                key={skillId}
-                                name={skillsById.get(skillId) ?? skillId}
-                                showIcon={false}
-                              />
+                            {project.skills.map((skill) => (
+                              <ProfileSkillBadge key={skill} name={skill} showIcon={false} />
                             ))}
                           </div>
                         </div>
@@ -101,7 +94,7 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
             ]
 
             return (
-              <li className="relative pl-7 sm:pl-10" key={project.id}>
+              <li className="relative pl-7 sm:pl-10" key={`${project.name}-${index}`}>
                 {index < projects.length - 1 && (
                   <span
                     aria-hidden="true"
@@ -115,7 +108,7 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
                 />
                 <article
                   className="overflow-hidden rounded-xl border bg-card shadow-sm"
-                  data-testid={`project-experience-item-${project.id}`}
+                  data-testid={`project-experience-item-${index}`}
                 >
                   <header className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
                     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary sm:size-12">
@@ -139,7 +132,7 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
                           <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0" />
                           <DateRange
                             endDate={project.endDate}
-                            isCurrent={project.endDate === null}
+                            isCurrent={project.isCurrent}
                             startDate={project.startDate}
                           />
                         </span>
@@ -165,7 +158,7 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
                         details.length === 3 &&
                           "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(13rem,0.75fr)]",
                       )}
-                      data-testid={`project-experience-details-${project.id}`}
+                      data-testid={`project-experience-details-${index}`}
                     >
                       {details.map((detail, detailIndex) => (
                         <div

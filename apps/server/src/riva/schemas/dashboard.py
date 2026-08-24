@@ -10,9 +10,8 @@ from pydantic import (
     field_validator,
 )
 
-from riva.schemas.base import APIModel
+from riva.schemas.base import APIModel, StandardUUID
 from riva.schemas.interview import InterviewRound
-from riva.schemas.profile import StandardUUID
 
 
 class _DashboardAPIModel(APIModel):

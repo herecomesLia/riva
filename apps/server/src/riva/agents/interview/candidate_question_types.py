@@ -9,13 +9,13 @@ from riva.agents.base import AgentModel
 from riva.agents.interview.planning_types import (
     InterviewPlanningInput,
 )
+from riva.agents.types import RequiredText, StandardUUID
 from riva.core.language import InteractionLanguage
 from riva.schemas.interview import (
     InterviewConfiguration,
     InterviewQuestionType,
     InterviewSessionStatus,
 )
-from riva.schemas.profile import RequiredText, StandardUUID
 
 
 class InterviewCandidateQuestionModel(AgentModel):

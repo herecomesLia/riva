@@ -12,8 +12,7 @@ from pydantic import (
 )
 
 from riva.core.language import InteractionLanguage
-from riva.services.profile.types import StandardUUID
-from riva.services.types import DomainModel
+from riva.services.types import DomainModel, StandardUUID
 
 MAX_QUESTION_CARD_PROMPT_LENGTH = 4_000
 MAX_QUESTION_CARD_LIST_ITEM_LENGTH = 1_000
@@ -52,9 +51,9 @@ def _deduplicate_materials(
     value: list["QuestionCardMaterialReference"],
 ) -> list["QuestionCardMaterialReference"]:
     normalized: list[QuestionCardMaterialReference] = []
-    seen: set[tuple[QuestionCardMaterialType, UUID]] = set()
+    seen: set[tuple[QuestionCardMaterialType, str]] = set()
     for material in value:
-        key = (material.type, material.id)
+        key = (material.type, material.label.casefold())
         if key in seen:
             continue
         seen.add(key)
@@ -107,7 +106,6 @@ class QuestionCardMaterialReference(DomainModel):
     model_config = ConfigDict(extra="forbid")
 
     type: QuestionCardMaterialType
-    id: UUID
     label: Annotated[
         str,
         StringConstraints(

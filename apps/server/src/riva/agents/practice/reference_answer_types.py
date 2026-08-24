@@ -22,8 +22,8 @@ from riva.agents.practice.interaction_types import (
     MAX_PRACTICE_FOLLOW_UPS,
     PracticeAnswerContent,
 )
+from riva.agents.types import OptionalText, RequiredText
 from riva.core.language import InteractionLanguage
-from riva.schemas.profile import OptionalText, RequiredText, StandardUUID
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_RECOMMENDED_MATERIALS,
     QuestionCardDifficulty,
@@ -118,9 +118,9 @@ PracticeReferenceAnswerCommonMistakes = Annotated[
     BeforeValidator(_normalize_text_list),
     Field(min_length=1, max_length=MAX_PRACTICE_REFERENCE_ANSWER_ITEMS),
 ]
-PracticeReferenceRecommendedMaterialIds = Annotated[
-    list[StandardUUID],
-    BeforeValidator(_deduplicate_ids),
+PracticeReferenceRecommendedMaterialLabels = Annotated[
+    list[RequiredText],
+    BeforeValidator(_normalize_text_list),
     Field(max_length=MAX_QUESTION_CARD_RECOMMENDED_MATERIALS),
 ]
 
@@ -217,15 +217,15 @@ class PracticeReferenceQuestionContext(_PracticeReferenceModel):
         "scoring_focus",
         "scoringFocus",
     )
-    recommended_material_ids: PracticeReferenceRecommendedMaterialIds = _alias(
-        "recommended_material_ids",
-        "recommendedMaterialIds",
+    recommended_material_labels: PracticeReferenceRecommendedMaterialLabels = _alias(
+        "recommended_material_labels",
+        "recommendedMaterialLabels",
     )
 
 
 class PracticeReferenceWorkEvidence(_PracticeReferenceModel):
     type: Literal["workExperience"]
-    id: StandardUUID
+    label: RequiredText
     company: RequiredText
     title: RequiredText
     responsibilities: QuestionCardTextList
@@ -235,7 +235,7 @@ class PracticeReferenceWorkEvidence(_PracticeReferenceModel):
 
 class PracticeReferenceProjectEvidence(_PracticeReferenceModel):
     type: Literal["projectExperience"]
-    id: StandardUUID
+    label: RequiredText
     name: RequiredText
     role: OptionalText
     responsibilities: QuestionCardTextList
@@ -299,12 +299,14 @@ class _PracticeReferenceAnswerInput(_PracticeReferenceModel):
 
     @model_validator(mode="after")
     def validate_candidate_evidence(self) -> Self:
-        evidence_ids = [evidence.id for evidence in self.candidate_evidence]
-        if len(evidence_ids) != len(set(evidence_ids)):
-            raise ValueError("candidate_evidence ids must be unique")
-        if not set(evidence_ids).issubset(set(self.question.recommended_material_ids)):
+        evidence_labels = [evidence.label for evidence in self.candidate_evidence]
+        if len(evidence_labels) != len(set(evidence_labels)):
+            raise ValueError("candidate_evidence labels must be unique")
+        if not set(evidence_labels).issubset(
+            set(self.question.recommended_material_labels)
+        ):
             raise ValueError(
-                "candidate_evidence ids must reference recommended materials"
+                "candidate_evidence labels must reference recommended materials"
             )
         return self
 
@@ -458,7 +460,7 @@ __all__ = [
     "PracticeReferenceProjectEvidence",
     "PracticeReferenceQualificationRequirements",
     "PracticeReferenceQuestionContext",
-    "PracticeReferenceRecommendedMaterialIds",
+    "PracticeReferenceRecommendedMaterialLabels",
     "PracticeReferenceRequiredSkillGroups",
     "PracticeReferenceRoleContext",
     "PracticeReferenceWorkEvidence",

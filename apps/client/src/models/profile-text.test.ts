@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import { normalizeSkillName, parseBulletItems, parseSkillNames } from "@/models/profile-text"
+import { parseBulletItems } from "@/lib/text"
+import { normalizeSkillName, parseSkillNames } from "@/models/profile-text"
 
 describe("parseBulletItems", () => {
   it("parses explicit multiline bullet and numbered lists", () => {
@@ -56,6 +57,6 @@ describe("parseSkillNames", () => {
       "Next.js",
       "react",
     ])
-    expect(normalizeSkillName("  Design   Systems ")).toBe("design systems")
+    expect(normalizeSkillName("  Design   Systems ")).toBe("design   systems")
   })
 })

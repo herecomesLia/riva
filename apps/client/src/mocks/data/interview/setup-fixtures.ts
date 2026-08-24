@@ -2,7 +2,7 @@ import type {
   InterviewCandidateQuestionExchangeResponse,
   InterviewSetupResponse,
 } from "@/models/interview"
-import type { JobProfileSnapshot } from "@/models/profile"
+import type { ProfileSnapshot } from "@/models/profile"
 import type { RolesPageResponse } from "@/models/roles"
 
 import { profileResponseMock } from "../profile"
@@ -20,7 +20,7 @@ export const interviewSetupConfigurationMock = {
 
 export function createInterviewSetupResponseMock(
   rolesResponse: RolesPageResponse,
-  profileSnapshot: JobProfileSnapshot,
+  profileSnapshot: ProfileSnapshot,
 ): InterviewSetupResponse {
   const domainRoles = rolesResponse.roles.filter(
     ({ preparationStatus }) => preparationStatus !== "archived",
@@ -49,8 +49,11 @@ export function createInterviewSetupResponseMock(
     ? interviewSetupConfigurationMock.defaultRound
     : (defaultInterviewRole?.supportedRounds[0] ?? interviewSetupConfigurationMock.defaultRound)
   const profileComplete =
-    profileSnapshot.profile?.status === "active" &&
-    profileSnapshot.profile.completeness.percentage === 100
+    profileSnapshot !== null &&
+    profileSnapshot.content.education.length > 0 &&
+    profileSnapshot.content.workExperiences.length > 0 &&
+    profileSnapshot.content.projectExperiences.length > 0 &&
+    profileSnapshot.content.skills.length > 0
   const availability: InterviewSetupResponse["availability"] =
     domainRoles.length === 0
       ? { status: "blocked", reason: "noTargetRoles" }

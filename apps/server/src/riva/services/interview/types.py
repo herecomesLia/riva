@@ -6,8 +6,7 @@ from pydantic import ConfigDict, Field, StringConstraints, field_validator
 
 from riva.agents.jobs.jd_parser_types import Company, RoleTitle
 from riva.core.language import InteractionLanguage
-from riva.services.profile.types import RequiredText, StandardUUID
-from riva.services.types import DomainModel
+from riva.services.types import DomainModel, RequiredText, StandardUUID
 
 
 class InterviewDomainModel(DomainModel):

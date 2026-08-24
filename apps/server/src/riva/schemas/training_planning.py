@@ -4,8 +4,7 @@ from pydantic import Field
 
 from riva.agents.training.planning_types import TrainingPlanningOutput
 from riva.core.language import InteractionLanguage
-from riva.schemas.base import APIModel
-from riva.schemas.profile import StandardUUID
+from riva.schemas.base import APIModel, StandardUUID
 
 
 class StartTrainingPlanningRequest(APIModel):

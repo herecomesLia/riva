@@ -35,13 +35,12 @@ from riva.services.interview.types import (
     InterviewDurationMinutes,
     InterviewRound,
 )
-from riva.services.jobs.matching import _career_profile_loader_options
 from riva.services.practice.question_types import (
     QuestionCardDifficulty,
     QuestionCardQuestionType,
 )
 from riva.services.practice.session import PracticeSessionService
-from riva.services.profile.completion import career_profile_completed
+from riva.services.profile.content import has_required_content, parse_content
 from riva.services.training.memory import TrainingMemoryService
 from riva.services.training.planning_types import (
     EnsureCurrentTrainingPlanningRequest,
@@ -180,11 +179,9 @@ class TrainingPlanningService:
             raise DomainConflictError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
         profile = await self.session.scalar(
-            select(CareerProfile)
-            .options(*_career_profile_loader_options())
-            .where(CareerProfile.user_id == user_id)
+            select(CareerProfile).where(CareerProfile.user_id == user_id)
         )
-        if profile is None or not career_profile_completed(profile):
+        if profile is None or not has_required_content(parse_content(profile.content)):
             raise DomainConflictError(TRAINING_PLANNING_TARGET_UNAVAILABLE)
 
         matching_analysis = _current_matching_analysis(role, profile)
@@ -270,7 +267,6 @@ def _current_matching_analysis(
         or role.job_description_version is None
         or matching.role_id != role.id
         or matching.user_id != role.user_id
-        or matching.profile_id != profile.profile_id
         or matching.profile_version != profile.version
         or matching.job_description_version != role.job_description_version
         or matching.job_description_analysis_version != analysis.analysis_version

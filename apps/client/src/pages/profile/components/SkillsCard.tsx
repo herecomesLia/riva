@@ -1,12 +1,10 @@
-import type { JobProfile } from "@/models/profile"
-
 import { ProfileSectionCard } from "./ProfileSectionCard"
 import { ProfileSkillBadge } from "./ProfileSkillBadge"
 import { EmptySection } from "./profile-section-shared"
 
 export type SkillsCardProps = {
   onEdit: () => void
-  skills: JobProfile["skills"]
+  skills: string[]
 }
 
 export function SkillsCard({ onEdit, skills }: SkillsCardProps) {
@@ -22,7 +20,7 @@ export function SkillsCard({ onEdit, skills }: SkillsCardProps) {
       ) : (
         <div className="flex flex-wrap gap-2">
           {skills.map((skill) => (
-            <ProfileSkillBadge key={skill.id} name={skill.name} />
+            <ProfileSkillBadge key={skill} name={skill} />
           ))}
         </div>
       )}

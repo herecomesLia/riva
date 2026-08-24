@@ -11,8 +11,7 @@ from pydantic import (
 )
 
 from riva.services.interview.types import InterviewRound
-from riva.services.profile.types import StandardUUID
-from riva.services.types import DomainModel
+from riva.services.types import DomainModel, StandardUUID
 
 
 class _DashboardDomainModel(DomainModel):

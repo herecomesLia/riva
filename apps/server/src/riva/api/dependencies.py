@@ -11,7 +11,6 @@ from riva.integrations import (
     LLMProviderConfigurationError,
     build_llm_provider,
 )
-from riva.integrations.storage import ResumeObjectStorage
 from riva.models import User
 from riva.services.dashboard.dashboard import DashboardService
 from riva.services.errors import (
@@ -26,11 +25,7 @@ from riva.services.jobs.jd_import import (
 from riva.services.jobs.roles import TargetRoleService
 from riva.services.practice.cards import QuestionCardService
 from riva.services.practice.workflow import PracticeService
-from riva.services.profile.profile import CareerProfileService
-from riva.services.resumes.documents import ResumeDocumentService
-from riva.services.resumes.extraction import ResumeTextExtractor
-from riva.services.resumes.import_service import ResumeImportService
-from riva.services.resumes.parsing import ResumeParsingService
+from riva.services.profile.service import ProfileService
 from riva.services.training.competencies import CompetencyService
 from riva.services.training.planning import TrainingPlanningService
 from riva.services.training.record_answers import (
@@ -156,52 +151,19 @@ async def require_practice_service(
     )
 
 
-async def require_career_profile_service(
-    session: AsyncSession = Depends(require_db_session),
-) -> CareerProfileService:
-    return CareerProfileService(session)
-
-
-def require_resume_storage(request: Request) -> ResumeObjectStorage:
-    return request.app.state.resume_storage
-
-
-def require_resume_text_extractor(request: Request) -> ResumeTextExtractor:
-    return request.app.state.resume_text_extractor
-
-
-async def require_resume_document_service(
+async def require_profile_service(
     request: Request,
     session: AsyncSession = Depends(require_db_session),
-    storage: ResumeObjectStorage = Depends(require_resume_storage),
-    extractor: ResumeTextExtractor = Depends(require_resume_text_extractor),
-) -> ResumeDocumentService:
+) -> ProfileService:
     settings = request.app.state.settings
-    return ResumeDocumentService(
+    return ProfileService(
         session=session,
-        storage=storage,
-        extractor=extractor,
+        extractor=request.app.state.profile_resume_extractor,
+        llm_provider=_configured_llm_provider(request),
+        llm_model=settings.llm_model,
         max_upload_bytes=settings.resume_max_upload_bytes,
         max_extracted_characters=settings.resume_max_extracted_characters,
     )
-
-
-async def require_resume_parsing_service(
-    request: Request,
-    session: AsyncSession = Depends(require_db_session),
-) -> ResumeParsingService:
-    settings = request.app.state.settings
-    return ResumeParsingService(
-        session=session,
-        llm_provider=_configured_llm_provider(request),
-        llm_model=settings.llm_model,
-    )
-
-
-async def require_resume_import_service(
-    session: AsyncSession = Depends(require_db_session),
-) -> ResumeImportService:
-    return ResumeImportService(session=session)
 
 
 async def require_target_role_service(

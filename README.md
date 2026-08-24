@@ -60,19 +60,12 @@ The API invokes the current Agent synchronously and returns the persisted busine
 result after the LLM call completes. The frontend keeps request-level loading and
 error feedback while a request is in progress; no queue or polling is required.
 
-The API accepts TXT, PDF, DOCX, or pasted resume text through the three
-resume-document endpoints under `/api/profile/resumes`. This step stores the
-source and extracted text in `ResumeDocument`; it does not support legacy DOC,
-encrypted PDF, or OCR. After parsing succeeds, the import lifecycle exposes a
-reviewable draft and an explicit apply action:
-
-- `GET /api/profile/resumes/{resumeId}/import-draft` returns the current draft;
-- `POST /api/profile/resumes/{resumeId}/import-draft/apply` with
-  `{"draftVersion": 1}` applies that exact draft version.
-
-Draft retrieval never changes the profile, and applying an already applied
-draft is idempotent. The existing `CareerProfile` GET endpoint remains the
-source of truth for the resulting profile.
+The API accepts TXT, PDF, DOCX, or pasted resume text through
+`POST /api/profile/import/resume`. Resume data is read temporarily, converted
+to a Profile content preview, and returned directly; no Resume document or
+import draft is persisted. After reviewing the preview, the frontend saves it
+through the ordinary `PUT /api/profile` endpoint with the Profile version from
+the preceding GET request.
 
 Default automated tests use a fake provider and never call Qwen. A real Qwen
 check must be run explicitly by a developer with the required values in a

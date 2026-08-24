@@ -16,15 +16,6 @@ export function formatMonth(value: string | null, language: string, present: str
   )
 }
 
-export function formatFileSize(fileSize: number, language: string) {
-  return new Intl.NumberFormat(language, {
-    maximumFractionDigits: 1,
-    style: "unit",
-    unit: fileSize >= 1_000_000 ? "megabyte" : "kilobyte",
-    unitDisplay: "short",
-  }).format(fileSize >= 1_000_000 ? fileSize / 1_000_000 : fileSize / 1_000)
-}
-
-export function employmentTypeLabel(type: EmploymentType, t: TFunction) {
-  return t(`profile.employmentType.${type}`)
+export function employmentTypeLabel(type: EmploymentType | null, t: TFunction) {
+  return type ? t(`profile.employmentType.${type}`) : "—"
 }

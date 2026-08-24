@@ -40,8 +40,7 @@ from riva.services.practice.types import (
     PracticeMainReferenceAnswerResponse,
     PracticeQuestionSource,
 )
-from riva.services.profile.types import StandardUUID
-from riva.services.types import DomainModel
+from riva.services.types import DomainModel, StandardUUID
 
 
 def _validate_aware_timestamp(value: datetime) -> datetime:

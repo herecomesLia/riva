@@ -14,9 +14,7 @@ if TYPE_CHECKING:
     from riva.models.competencies import UserCompetency
     from riva.models.interviews import InterviewSession
     from riva.models.practice_sessions import PracticeSession
-    from riva.models.profile import CareerProfile
     from riva.models.question_cards import QuestionCard
-    from riva.models.resumes import ResumeDocument
     from riva.models.roles import CurrentTargetRole, TargetRole
 
 
@@ -51,17 +49,6 @@ class User(Base):
     sessions: Mapped[list[AuthSession]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
-    )
-    resume_documents: Mapped[list[ResumeDocument]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-        foreign_keys="ResumeDocument.user_id",
-        passive_deletes=True,
-    )
-    career_profile: Mapped[CareerProfile | None] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-        uselist=False,
     )
     target_roles: Mapped[list[TargetRole]] = relationship(
         back_populates="user",

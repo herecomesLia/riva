@@ -142,7 +142,6 @@ class QuestionCardMaterialReference(AgentModel):
     model_config = ConfigDict(extra="forbid")
 
     type: QuestionCardMaterialType
-    id: UUID
     label: Annotated[
         str,
         StringConstraints(
@@ -165,9 +164,9 @@ def _deduplicate_materials(
     value: list[QuestionCardMaterialReference],
 ) -> list[QuestionCardMaterialReference]:
     normalized: list[QuestionCardMaterialReference] = []
-    seen: set[tuple[QuestionCardMaterialType, UUID]] = set()
+    seen: set[tuple[QuestionCardMaterialType, str]] = set()
     for material in value:
-        key = (material.type, material.id)
+        key = (material.type, material.label.casefold())
         if key in seen:
             continue
         seen.add(key)

@@ -1,7 +1,7 @@
 import { CalendarDaysIcon, GraduationCapIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import type { JobProfile } from "@/models/profile"
+import type { ProfileEducation } from "@/models/profile"
 
 import { ProfileItemCarousel } from "./ProfileItemCarousel"
 import { ProfileSectionCard } from "./ProfileSectionCard"
@@ -9,7 +9,7 @@ import { EmptySection } from "./profile-section-shared"
 import { formatMonth } from "./profile-formatters"
 
 export type EducationCardProps = {
-  education: JobProfile["education"]
+  education: ProfileEducation[]
   onEdit: () => void
 }
 
@@ -27,7 +27,7 @@ export function EducationCard({ education, onEdit }: EducationCardProps) {
         <EmptySection />
       ) : (
         <ProfileItemCarousel
-          getItemKey={(item) => item.id}
+          getItemKey={(item) => item.school}
           itemCardClassName="border-border bg-card py-4"
           items={education}
           renderItem={(item) => {

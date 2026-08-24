@@ -9,7 +9,7 @@ import {
 import { useTranslation } from "react-i18next"
 
 import { cn } from "@/lib/utils"
-import type { JobProfile } from "@/models/profile"
+import type { ProfileWorkExperience } from "@/models/profile"
 
 import { employmentTypeLabel } from "./profile-formatters"
 import { ProfileSectionCard } from "./ProfileSectionCard"
@@ -17,15 +17,12 @@ import { ProfileSkillBadge } from "./ProfileSkillBadge"
 import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 
 export type WorkExperienceCardProps = {
-  experiences: JobProfile["workExperiences"]
+  experiences: ProfileWorkExperience[]
   onEdit: () => void
-  skills: JobProfile["skills"]
 }
 
-export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperienceCardProps) {
+export function WorkExperienceCard({ experiences, onEdit }: WorkExperienceCardProps) {
   const { t } = useTranslation()
-  const skillsById = new Map(skills.map((skill) => [skill.id, skill.name]))
-
   return (
     <ProfileSectionCard onEdit={onEdit} section="workExperience">
       {experiences.length === 0 ? (
@@ -50,19 +47,15 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                   title={t("profile.field.achievements")}
                 />
               ),
-              experience.skillIds.length > 0 && (
+              experience.skills.length > 0 && (
                 <div className="flex flex-col gap-2" key="skills">
                   <h4 className="flex items-center gap-2 text-sm font-medium">
                     <TagsIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
                     {t("profile.field.skills")}
                   </h4>
                   <div className="flex flex-wrap gap-2" data-testid="work-experience-skills">
-                    {experience.skillIds.map((skillId) => (
-                      <ProfileSkillBadge
-                        key={skillId}
-                        name={skillsById.get(skillId) ?? skillId}
-                        showIcon={false}
-                      />
+                    {experience.skills.map((skill) => (
+                      <ProfileSkillBadge key={skill} name={skill} showIcon={false} />
                     ))}
                   </div>
                 </div>
@@ -70,7 +63,7 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
             ].filter(Boolean)
 
             return (
-              <li className="relative pl-7 sm:pl-10" key={experience.id}>
+              <li className="relative pl-7 sm:pl-10" key={`${experience.company}-${index}`}>
                 {index < experiences.length - 1 && (
                   <span
                     aria-hidden="true"
@@ -84,7 +77,7 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                 />
                 <article
                   className="overflow-hidden rounded-xl border bg-card shadow-sm"
-                  data-testid={`work-experience-item-${experience.id}`}
+                  data-testid={`work-experience-item-${index}`}
                 >
                   <header className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
                     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary sm:size-12">

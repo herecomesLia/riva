@@ -18,7 +18,7 @@ from riva.agents.practice.review_types import (
     ReviewWeakness,
 )
 from riva.core.language import InteractionLanguage
-from riva.schemas.base import APIModel
+from riva.schemas.base import APIModel, StandardUUID
 from riva.schemas.interview import (
     InterviewCandidateQuestionExchangeResponse,
     InterviewCompletionReason,
@@ -35,7 +35,6 @@ from riva.schemas.practice_sessions import (
     PracticeMainReferenceAnswerResponse,
     PracticeQuestionSource,
 )
-from riva.schemas.profile import StandardUUID
 from riva.schemas.question_cards import (
     QuestionCardDifficulty,
     QuestionCardPrompt,

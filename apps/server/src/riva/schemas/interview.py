@@ -6,8 +6,7 @@ from pydantic import ConfigDict, Field, StringConstraints, field_validator
 
 from riva.agents.jobs.jd_parser_types import Company, RoleTitle
 from riva.core.language import InteractionLanguage
-from riva.schemas.base import APIModel
-from riva.schemas.profile import RequiredText, StandardUUID
+from riva.schemas.base import APIModel, RequiredText, StandardUUID
 
 
 class InterviewAPIModel(APIModel):

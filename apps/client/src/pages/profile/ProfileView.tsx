@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import type {
-  JobProfileSnapshot,
-  ProfileCapabilities,
+  Profile,
+  ProfileContent,
+  ProfileSection,
+  ProfileSnapshot,
   ResumeUploadInput,
-  SaveProfileSectionInput,
 } from "@/models/profile"
 
 import { ProfileHeader } from "./components/ProfileHeader"
@@ -30,25 +31,18 @@ import {
   ProfileErrorState,
   ProfileLoadingState,
   ProfileProcessingState,
-  ProfileRecognitionFailureState,
 } from "./components/ProfilePageStates"
-import { ProfileResumeDraftReviewState } from "./components/ProfileResumeDraftReviewState"
-import { ProfileResumeDialog, type ResumeDialogMode } from "./components/ProfileResumeDialog"
-import {
-  ProfileSectionEditDialog,
-  type EditableProfileSection,
-} from "./components/ProfileSectionEditDialog"
+import { ProfileResumeImportPreview } from "./components/ProfileResumeImportPreview"
+import { ProfileResumeDialog } from "./components/ProfileResumeDialog"
+import { ProfileSectionEditDialog } from "./components/ProfileSectionEditDialog"
 import { ProfileSections } from "./components/ProfileSections"
 import type { ProfileResumeWorkflowState } from "./profile-resume-workflow"
 
 export type ProfileViewActions = {
-  applyResumeDraft: () => Promise<void>
-  createManualProfile: () => Promise<JobProfileSnapshot>
-  retryResumeWorkflow: () => Promise<void>
+  confirmResumeImport: () => Promise<void>
+  importResume: (input: ResumeUploadInput) => Promise<void>
+  saveProfile: (content: ProfileContent) => Promise<Profile>
   resetResumeWorkflow: () => void
-  saveSection: (input: SaveProfileSectionInput) => Promise<unknown>
-  uploadResumeForInitialImport: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
-  uploadResumeForUpdate: (input: ResumeUploadInput) => Promise<JobProfileSnapshot>
 }
 
 export type ProfileViewProps =
@@ -56,66 +50,42 @@ export type ProfileViewProps =
   | { variant: "default"; content: { status: "loading" } }
   | {
       variant: "default"
-      capabilities?: ProfileCapabilities
       content: {
         status: "ready"
-        data: JobProfileSnapshot
-        hasResumeDocuments?: boolean
-        resumeWorkflow?: ProfileResumeWorkflowState
+        data: ProfileSnapshot
+        resumeWorkflow: ProfileResumeWorkflowState
       }
       actions: ProfileViewActions
     }
 
-const defaultProfileCapabilities: ProfileCapabilities = {
-  credentials: true,
-  resumeImport: true,
-  targetRoles: true,
-}
-
 export function ProfileView(props: ProfileViewProps) {
-  if (props.variant === "error") {
-    return <ProfileErrorState isRetrying={false} onRetry={props.onRetry} />
-  }
-
-  if (!("actions" in props)) {
-    return <ProfileLoadingState />
-  }
-
+  if (props.variant === "error") return <ProfileErrorState onRetry={props.onRetry} />
+  if (!("actions" in props)) return <ProfileLoadingState />
   return (
     <ProfileReadyView
       actions={props.actions}
-      capabilities={props.capabilities ?? defaultProfileCapabilities}
-      hasResume={props.content.hasResumeDocuments ?? Boolean(props.content.data.profile?.resume)}
-      snapshot={props.content.data}
-      resumeWorkflow={props.content.resumeWorkflow ?? { status: "idle" }}
+      profile={props.content.data}
+      workflow={props.content.resumeWorkflow}
     />
   )
 }
 
 function ProfileReadyView({
   actions,
-  capabilities,
-  hasResume,
-  resumeWorkflow,
-  snapshot,
+  profile,
+  workflow,
 }: {
   actions: ProfileViewActions
-  capabilities: ProfileCapabilities
-  hasResume: boolean
-  resumeWorkflow: ProfileResumeWorkflowState
-  snapshot: JobProfileSnapshot
+  profile: ProfileSnapshot
+  workflow: ProfileResumeWorkflowState
 }) {
   const { t } = useTranslation()
-  const [editingSection, setEditingSection] = useState<EditableProfileSection | null>(null)
+  const [editingSection, setEditingSection] = useState<ProfileSection | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
-  const [isImportSubmitting, setIsImportSubmitting] = useState(false)
-  const [initialImportError, setInitialImportError] = useState<string | null>(null)
-  const [resumeDialogMode, setResumeDialogMode] = useState<ResumeDialogMode>("details")
   const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false)
-  const [resumeImportError, setResumeImportError] = useState<string | null>(null)
-  const [lifecycleActionError, setLifecycleActionError] = useState<string | null>(null)
-  const [pendingLifecycleAction, setPendingLifecycleAction] = useState(false)
+  const [isImportSubmitting, setIsImportSubmitting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
   const blocker = useBlocker({
     disabled: !isDirty,
     enableBeforeUnload: isDirty,
@@ -123,18 +93,75 @@ function ProfileReadyView({
     withResolver: true,
   })
 
-  const handleDirtyChange = useCallback((nextIsDirty: boolean) => {
-    setIsDirty(nextIsDirty)
-  }, [])
+  const handleDirtyChange = useCallback((dirty: boolean) => setIsDirty(dirty), [])
+
+  async function importResume(input: ResumeUploadInput) {
+    setIsImportSubmitting(true)
+    setImportError(null)
+    try {
+      await actions.importResume(input)
+      setIsResumeDialogOpen(false)
+    } catch {
+      setImportError(t("profile.import.failed"))
+    } finally {
+      setIsImportSubmitting(false)
+    }
+  }
+
+  if (workflow.status === "importing") {
+    return (
+      <div className="mx-auto w-full max-w-3xl">
+        <ProfileProcessingState />
+      </div>
+    )
+  }
+
+  if (workflow.status === "preview") {
+    return (
+      <div className="mx-auto w-full max-w-5xl">
+        <ProfileResumeImportPreview
+          content={workflow.content}
+          isSaving={workflow.isSaving}
+          onCancel={actions.resetResumeWorkflow}
+          onSave={() => void actions.confirmResumeImport()}
+        />
+      </div>
+    )
+  }
+
+  if (profile === null) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <ProfileEmptyState />
+        <ResumeImportForm
+          isSubmitting={isImportSubmitting}
+          onSubmit={importResume}
+          title={t("profile.import.title")}
+        />
+        {importError && <ImportError message={importError} />}
+        <Button
+          onClick={() => {
+            void actions
+              .saveProfile({
+                education: [],
+                projectExperiences: [],
+                skills: [],
+                summary: null,
+                workExperiences: [],
+              })
+              .catch(() => setImportError(t("profile.editor.saveError")))
+          }}
+          variant="outline"
+        >
+          {t("profile.actions.manualEntry")}
+        </Button>
+      </div>
+    )
+  }
 
   function closeEditor() {
     setEditingSection(null)
     setIsDirty(false)
-  }
-
-  function startEditing(section: EditableProfileSection) {
-    setIsDirty(false)
-    setEditingSection(section)
   }
 
   function requestCloseEditor() {
@@ -142,205 +169,30 @@ function ProfileReadyView({
       setIsDiscardDialogOpen(true)
       return
     }
-
     closeEditor()
-  }
-
-  function handleEditorOpenChange(open: boolean) {
-    if (!open) requestCloseEditor()
-  }
-
-  function discardDraftAndClose() {
-    setIsDiscardDialogOpen(false)
-    closeEditor()
-  }
-
-  async function runImport(
-    input: ResumeUploadInput,
-    upload: (value: ResumeUploadInput) => Promise<JobProfileSnapshot>,
-    setError: (message: string | null) => void,
-    onSuccess?: () => void,
-  ) {
-    setIsImportSubmitting(true)
-    setError(null)
-    try {
-      await upload(input)
-      onSuccess?.()
-    } catch {
-      setError(t("profile.import.failed"))
-    } finally {
-      setIsImportSubmitting(false)
-    }
-  }
-
-  async function runLifecycleAction(action: () => Promise<JobProfileSnapshot>) {
-    if (pendingLifecycleAction) return
-    setPendingLifecycleAction(true)
-    setLifecycleActionError(null)
-    try {
-      await action()
-    } catch {
-      setLifecycleActionError(t("profile.lifecycle.actionFailed"))
-    } finally {
-      setPendingLifecycleAction(false)
-    }
-  }
-
-  if (resumeWorkflow.status !== "idle") {
-    let workflowContent
-    switch (resumeWorkflow.status) {
-      case "uploading":
-        workflowContent = <ProfileProcessingState status="uploadingResume" />
-        break
-      case "parsing":
-        workflowContent = (
-          <ProfileProcessingState
-            isRetrying={resumeWorkflow.isRetrying}
-            onRetry={() => void actions.retryResumeWorkflow()}
-            status="parsingResume"
-            synchronizationError={resumeWorkflow.synchronizationError}
-          />
-        )
-        break
-      case "failed":
-        workflowContent = (
-          <ProfileRecognitionFailureState
-            canRetry={resumeWorkflow.canRetry}
-            failureReason={resumeWorkflow.failureReason}
-            isActionPending={resumeWorkflow.isRetrying}
-            onManualEntry={() => {
-              actions.resetResumeWorkflow()
-              void runLifecycleAction(actions.createManualProfile)
-            }}
-            onReupload={actions.resetResumeWorkflow}
-            onRetry={() => void actions.retryResumeWorkflow()}
-          />
-        )
-        break
-      case "draftReady":
-        workflowContent = (
-          <ProfileResumeDraftReviewState
-            applyConflict={resumeWorkflow.applyConflict}
-            applyError={resumeWorkflow.applyError}
-            draft={resumeWorkflow.draft}
-            isApplying={false}
-            onApply={() => void actions.applyResumeDraft()}
-            onCancel={actions.resetResumeWorkflow}
-          />
-        )
-        break
-      case "applying":
-        workflowContent = (
-          <ProfileResumeDraftReviewState
-            applyConflict={null}
-            applyError={false}
-            draft={resumeWorkflow.draft}
-            isApplying
-            onApply={() => undefined}
-            onCancel={() => undefined}
-          />
-        )
-    }
-
-    if (!snapshot.profile) {
-      return <div className="mx-auto w-full max-w-3xl">{workflowContent}</div>
-    }
-    return (
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <ProfileHeader hasResume={hasResume} profile={snapshot.profile} />
-        {workflowContent}
-      </div>
-    )
-  }
-
-  if (!snapshot.profile) {
-    if (!capabilities.resumeImport) {
-      return (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-          <ProfileEmptyState manualOnly />
-          <div>
-            <Button
-              disabled={pendingLifecycleAction}
-              onClick={() => void runLifecycleAction(actions.createManualProfile)}
-            >
-              {t("profile.actions.manualEntry")}
-            </Button>
-          </div>
-          {lifecycleActionError && <ImportError message={lifecycleActionError} />}
-        </div>
-      )
-    }
-
-    return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <ProfileEmptyState />
-        <ResumeImportForm
-          isSubmitting={isImportSubmitting}
-          onSubmit={(input) =>
-            runImport(input, actions.uploadResumeForInitialImport, setInitialImportError)
-          }
-          title={t("profile.import.title")}
-        />
-        {initialImportError && <ImportError message={initialImportError} />}
-      </div>
-    )
-  }
-
-  const { profile } = snapshot
-
-  function closeResumeDialog() {
-    setIsResumeDialogOpen(false)
-    setResumeDialogMode("details")
-    setResumeImportError(null)
-  }
-
-  function handleResumeDialogOpenChange(open: boolean) {
-    if (!open && isImportSubmitting) return
-
-    if (open) {
-      setResumeDialogMode(profile.resume ? "details" : "import")
-      setResumeImportError(null)
-      setIsResumeDialogOpen(true)
-      return
-    }
-
-    closeResumeDialog()
-  }
-
-  async function submitResumeImport(input: ResumeUploadInput) {
-    await runImport(input, actions.uploadResumeForUpdate, setResumeImportError, closeResumeDialog)
   }
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <ProfileHeader
-        hasResume={hasResume}
-        onOpenResume={
-          capabilities.resumeImport ? () => handleResumeDialogOpenChange(true) : undefined
-        }
-        profile={profile}
+      <ProfileHeader onOpenResume={() => setIsResumeDialogOpen(true)} profile={profile} />
+      <ProfileResumeDialog
+        importError={importError}
+        isSubmitting={isImportSubmitting}
+        onOpenChange={(open) => {
+          setIsResumeDialogOpen(open)
+          if (!open) setImportError(null)
+        }}
+        onSubmit={importResume}
+        open={isResumeDialogOpen}
       />
-      {capabilities.resumeImport && (
-        <ProfileResumeDialog
-          importError={resumeImportError}
-          isSubmitting={isImportSubmitting}
-          mode={resumeDialogMode}
-          onModeChange={(mode) => {
-            setResumeDialogMode(mode)
-            setResumeImportError(null)
-          }}
-          onOpenChange={handleResumeDialogOpenChange}
-          onSubmit={submitResumeImport}
-          open={isResumeDialogOpen}
-          profile={profile}
-        />
-      )}
-      <ProfileSections onStartEditing={startEditing} profile={profile} />
+      <ProfileSections onStartEditing={setEditingSection} profile={profile.content} />
       <ProfileSectionEditDialog
         onDirtyChange={handleDirtyChange}
-        onOpenChange={handleEditorOpenChange}
-        onSave={async (input) => {
-          await actions.saveSection(input)
+        onOpenChange={(open) => {
+          if (!open) requestCloseEditor()
+        }}
+        onSave={async (content) => {
+          await actions.saveProfile(content)
           closeEditor()
           toast.success(t("profile.editor.saveSuccess"), {
             duration: 2500,
@@ -351,26 +203,32 @@ function ProfileReadyView({
         profile={profile}
         section={editingSection}
       />
+      {importError && !isResumeDialogOpen && <ImportError message={importError} />}
 
       <AlertDialog open={isDiscardDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("profile.dialog.discardDraftTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("profile.dialog.discardTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("profile.dialog.discardDraftDescription")}
+              {t("profile.dialog.discardDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setIsDiscardDialogOpen(false)}>
               {t("profile.dialog.stayEditing")}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={discardDraftAndClose} variant="destructive">
+            <AlertDialogAction
+              onClick={() => {
+                setIsDiscardDialogOpen(false)
+                closeEditor()
+              }}
+              variant="destructive"
+            >
               {t("profile.dialog.discardChanges")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <AlertDialog open={blocker.status === "blocked"}>
         <AlertDialogContent>
           <AlertDialogHeader>

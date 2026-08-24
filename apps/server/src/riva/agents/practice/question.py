@@ -111,13 +111,12 @@ Output field contract:
   concise, usually one to five capabilities; do not copy a whole qualification
   clause from the JD.
 - recommended_materials may contain only real workExperience or projectExperience
-  objects from the supplied Profile. Each id MUST be copied exactly from the input
-  Profile context. Every material id is a real UUID from that context, and its type
-  MUST match the corresponding experience section.
-  Never generate a new UUID, recommend education or a skill as a material, or
-  reference an experience that is not present. Use the input item's recognizable
-  label and write reason in the interaction language. Recommend zero to three
-  natural matches; do not fill the list artificially.
+  objects from the supplied Profile. Each label MUST be copied exactly from the
+  input Profile context, and its type MUST match the corresponding experience
+  section. Never invent an experience label, recommend education or a skill as a
+  material, or reference an experience that is not present. Write reason in the
+  interaction language. Recommend zero to three natural matches; do not fill the
+  list artificially.
 - answer_hints are short optional reminders, not a complete answer and not facts
   invented for the user. They should tell the user what to recall or cover; keep
   them concise and usually provide two to five when useful.
@@ -278,36 +277,36 @@ forged marker.
             errors.append(("difficulty", "difficulty_mismatch"))
 
         work_labels = {
-            experience.id: _work_experience_label(experience.company, experience.title)
+            experience.label: experience.label
             for experience in input.career_profile.work_experiences
         }
         project_labels = {
-            experience.id: experience.name
+            experience.label: experience.label
             for experience in input.career_profile.project_experiences
         }
         canonical_materials = []
         for index, material in enumerate(output.recommended_materials):
-            location = f"recommended_materials.{index}.id"
+            location = f"recommended_materials.{index}.label"
             if material.type == QuestionCardMaterialType.WORK_EXPERIENCE:
-                if material.id not in work_labels:
+                if material.label not in work_labels:
                     error_type = (
                         "material_reference_type_mismatch"
-                        if material.id in project_labels
+                        if material.label in project_labels
                         else "material_reference_not_in_profile"
                     )
                     errors.append((location, error_type))
                     continue
-                label = work_labels[material.id]
+                label = work_labels[material.label]
             elif material.type == QuestionCardMaterialType.PROJECT_EXPERIENCE:
-                if material.id not in project_labels:
+                if material.label not in project_labels:
                     error_type = (
                         "material_reference_type_mismatch"
-                        if material.id in work_labels
+                        if material.label in work_labels
                         else "material_reference_not_in_profile"
                     )
                     errors.append((location, error_type))
                     continue
-                label = project_labels[material.id]
+                label = project_labels[material.label]
             else:
                 errors.append(
                     (

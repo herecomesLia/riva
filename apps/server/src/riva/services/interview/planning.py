@@ -37,11 +37,10 @@ from riva.services.interview.types import (
     InterviewRound,
 )
 from riva.services.jobs.matching import (
-    _career_profile_loader_options,
     build_matching_career_profile,
     build_matching_job_context,
 )
-from riva.services.profile.completion import career_profile_completed
+from riva.services.profile.content import has_required_content, parse_content
 from riva.services.training.memory import TrainingMemoryService
 from riva.utils import utc_now
 
@@ -171,13 +170,11 @@ class InterviewPlanningService:
         training_memory: TrainingMemoryContext | None = None,
     ) -> InterviewPlanningInput:
         profile = await self.session.scalar(
-            select(CareerProfile)
-            .options(*_career_profile_loader_options())
-            .where(CareerProfile.user_id == user_id)
+            select(CareerProfile).where(CareerProfile.user_id == user_id)
         )
         if profile is None:
             raise service_error_for_code(INTERVIEW_PLANNING_PROFILE_NOT_FOUND)
-        if not career_profile_completed(profile):
+        if not has_required_content(parse_content(profile.content)):
             raise service_error_for_code(INTERVIEW_PLANNING_PROFILE_INCOMPLETE)
         role = await self.session.scalar(
             select(TargetRole)
@@ -216,7 +213,6 @@ class InterviewPlanningService:
                 configuration=configuration,
                 interaction_language=interview_session.language,
                 career_profile=InterviewCareerProfileSnapshot(
-                    profile_id=profile.profile_id,
                     version=profile.version,
                     **career_profile.model_dump(mode="python"),
                 ),
@@ -277,7 +273,6 @@ def _matching_snapshot(
     if (
         matching.role_id != role.id
         or matching.user_id != role.user_id
-        or matching.profile_id != profile.profile_id
         or matching.profile_version != profile.version
         or matching.job_description_version != role.job_description_version
         or matching.job_description_analysis_version != analysis.analysis_version
@@ -297,7 +292,6 @@ def _matching_snapshot(
         )
         return InterviewMatchingAnalysisSnapshot(
             role_id=matching.role_id,
-            profile_id=matching.profile_id,
             profile_version=matching.profile_version,
             job_description_version=matching.job_description_version,
             job_description_analysis_version=matching.job_description_analysis_version,

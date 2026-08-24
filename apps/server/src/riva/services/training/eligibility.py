@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from riva.models import CareerProfile, CurrentTargetRole, TargetRole
-from riva.services.profile.completion import career_profile_completed
+from riva.services.profile.content import has_required_content, parse_content
 
 TrainingRoleEligibilityBlockedReason = Literal[
     "noTargetRoles",
@@ -62,7 +62,9 @@ class TrainingRoleEligibilityService:
                 CurrentTargetRole.user_id == user_id
             )
         )
-        profile_complete = profile is not None and career_profile_completed(profile)
+        profile_complete = profile is not None and has_required_content(
+            parse_content(profile.content)
+        )
 
         if not roles:
             blocked_reason: TrainingRoleEligibilityBlockedReason | None = (
@@ -84,14 +86,7 @@ class TrainingRoleEligibilityService:
 
     async def _profile(self, user_id: UUID) -> CareerProfile | None:
         return await self.session.scalar(
-            select(CareerProfile)
-            .options(
-                selectinload(CareerProfile.education),
-                selectinload(CareerProfile.work_experiences),
-                selectinload(CareerProfile.project_experiences),
-                selectinload(CareerProfile.skills),
-            )
-            .where(CareerProfile.user_id == user_id)
+            select(CareerProfile).where(CareerProfile.user_id == user_id)
         )
 
     @staticmethod

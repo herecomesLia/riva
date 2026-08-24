@@ -31,8 +31,7 @@ from riva.agents.practice.review_types import (
     ReviewWeakness,
 )
 from riva.core.language import InteractionLanguage
-from riva.schemas.base import APIModel
-from riva.schemas.profile import StandardUUID
+from riva.schemas.base import APIModel, StandardUUID
 from riva.schemas.question_cards import (
     MAX_QUESTION_CARD_LIST_ITEMS,
     QuestionCardDifficulty,

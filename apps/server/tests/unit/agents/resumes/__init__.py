@@ -1,1 +1,0 @@
-"""Resume Agent tests."""

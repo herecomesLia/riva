@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import type { ResumeUploadInput } from "@/models/profile"
 
 export function ResumeImportForm({
   embedded = false,
@@ -23,7 +24,7 @@ export function ResumeImportForm({
 }: {
   embedded?: boolean
   isSubmitting: boolean
-  onSubmit: (input: { file?: File; text?: string }) => Promise<void>
+  onSubmit: (input: ResumeUploadInput) => Promise<void>
   title: string
 }) {
   const { t } = useTranslation()
@@ -40,7 +41,7 @@ export function ResumeImportForm({
           htmlFor="profile-resume-file"
         >
           <Input
-            accept=".pdf,.doc,.docx,.txt"
+            accept=".pdf,.docx,.txt"
             aria-label={t("profile.import.file")}
             className="sr-only"
             id="profile-resume-file"

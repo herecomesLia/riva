@@ -21,7 +21,6 @@ from riva.db.base import Base
 from riva.utils import utc_now
 
 if TYPE_CHECKING:
-    from riva.models.profile import CareerProfile
     from riva.models.roles import TargetRole
     from riva.models.user import User
 
@@ -34,12 +33,6 @@ class QuestionCard(Base):
             ["target_roles.user_id", "target_roles.id"],
             ondelete="CASCADE",
             name="fk_question_cards_target_role_owner",
-        ),
-        ForeignKeyConstraint(
-            ["user_id", "profile_id"],
-            ["career_profiles.user_id", "career_profiles.id"],
-            ondelete="CASCADE",
-            name="fk_question_cards_profile_owner",
         ),
         CheckConstraint(
             "language IN ('zh-CN', 'en')",
@@ -77,11 +70,6 @@ class QuestionCard(Base):
             "user_id",
             "target_role_id",
         ),
-        Index(
-            "ix_question_cards_user_profile",
-            "user_id",
-            "profile_id",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -96,10 +84,6 @@ class QuestionCard(Base):
         index=True,
     )
     target_role_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        nullable=False,
-    )
-    profile_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         nullable=False,
     )
@@ -159,17 +143,11 @@ class QuestionCard(Base):
     user: Mapped[User] = relationship(
         back_populates="question_cards",
         foreign_keys=[user_id],
-        overlaps="target_role,career_profile",
+        overlaps="target_role",
     )
     target_role: Mapped[TargetRole] = relationship(
         back_populates="question_cards",
         foreign_keys=[user_id, target_role_id],
         passive_deletes=True,
-        overlaps="user,career_profile,question_cards",
-    )
-    career_profile: Mapped[CareerProfile] = relationship(
-        back_populates="question_cards",
-        foreign_keys=[user_id, profile_id],
-        passive_deletes=True,
-        overlaps="user,target_role,question_cards",
+        overlaps="user,question_cards",
     )

@@ -1,6 +1,5 @@
 from riva.models.auth import AuthSession
 from riva.models.competencies import CompetencyEvidence, UserCompetency
-from riva.models.import_drafts import ResumeImportDraft
 from riva.models.interviews import (
     InterviewAnswer,
     InterviewCandidateQuestion,
@@ -16,7 +15,6 @@ from riva.models.interviews import (
 from riva.models.jd_import import JobDescriptionImportDraft
 from riva.models.job_analysis import JobDescriptionAnalysis
 from riva.models.matching import MatchingAnalysis
-from riva.models.parsing_results import ResumeParsingResult
 from riva.models.practice_interactions import (
     PracticeAnswer,
     PracticeEvaluation,
@@ -26,21 +24,12 @@ from riva.models.practice_interactions import (
     PracticeReview,
 )
 from riva.models.practice_sessions import PracticeAttempt, PracticeSession
-from riva.models.profile import (
-    CareerProfile,
-    CareerProfileEducation,
-    CareerProfileProjectExperience,
-    CareerProfileProjectSkill,
-    CareerProfileSkill,
-    CareerProfileWorkExperience,
-    CareerProfileWorkSkill,
-)
+from riva.models.profile import CareerProfile
 from riva.models.question_cards import QuestionCard
 from riva.models.reference_answers import (
     PracticeQuestionReferenceContext,
     PracticeReferenceAnswerArtifact,
 )
-from riva.models.resumes import ResumeDocument
 from riva.models.roles import CurrentTargetRole, TargetRole
 from riva.models.user import User
 
@@ -48,12 +37,6 @@ __all__ = [
     "AuthSession",
     "CompetencyEvidence",
     "CareerProfile",
-    "CareerProfileEducation",
-    "CareerProfileProjectExperience",
-    "CareerProfileProjectSkill",
-    "CareerProfileSkill",
-    "CareerProfileWorkExperience",
-    "CareerProfileWorkSkill",
     "CurrentTargetRole",
     "JobDescriptionAnalysis",
     "JobDescriptionImportDraft",
@@ -79,9 +62,6 @@ __all__ = [
     "PracticeReview",
     "PracticeSession",
     "QuestionCard",
-    "ResumeDocument",
-    "ResumeImportDraft",
-    "ResumeParsingResult",
     "TargetRole",
     "UserCompetency",
     "User",

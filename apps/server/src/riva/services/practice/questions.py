@@ -1,13 +1,12 @@
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TypeVar, cast
+from typing import cast
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from riva.agents.practice.question import QuestionGenerationAgent
 from riva.agents.practice.question_types import (
@@ -37,10 +36,6 @@ from riva.core.language import InteractionLanguage
 from riva.integrations.llm import LLMProvider
 from riva.models import (
     CareerProfile,
-    CareerProfileProjectExperience,
-    CareerProfileProjectSkill,
-    CareerProfileWorkExperience,
-    CareerProfileWorkSkill,
     JobDescriptionAnalysis,
     MatchingAnalysis,
     PracticeQuestionReferenceContext,
@@ -55,7 +50,7 @@ from riva.services.practice.question_types import (
     QuestionCardQuestionType,
 )
 from riva.services.practice.weakness import PracticeWeaknessFocus
-from riva.services.profile.completion import career_profile_completed
+from riva.services.profile.content import has_required_content, parse_content
 from riva.services.training.memory import TrainingMemoryService
 from riva.utils import utc_now
 
@@ -78,7 +73,6 @@ QUESTION_GENERATION_MATCHING_ANALYSIS_STALE: str = (
 
 
 QuestionGenerationWeaknessFocusInput = PracticeWeaknessFocus | Iterable[object]
-_Item = TypeVar("_Item")
 
 
 @dataclass(frozen=True)
@@ -104,18 +98,17 @@ def build_question_generation_target_role_context(
 def build_question_generation_profile_context(
     profile: CareerProfile,
 ) -> QuestionGenerationProfileContext:
+    content = parse_content(profile.content)
     return QuestionGenerationProfileContext(
         education=[
             QuestionGenerationEducationContext(
                 school=item.school, degree=item.degree, major=item.major
             )
-            for item in _ordered(
-                profile.education, limit=MAX_QUESTION_GENERATION_EDUCATION_ITEMS
-            )
+            for item in content.education[:MAX_QUESTION_GENERATION_EDUCATION_ITEMS]
         ],
         work_experiences=[
             QuestionGenerationWorkExperienceContext(
-                id=item.id,
+                label=f"{item.company} / {item.title}",
                 company=item.company,
                 title=item.title,
                 responsibilities=_stable_unique_texts(
@@ -125,21 +118,17 @@ def build_question_generation_profile_context(
                     item.achievements, limit=MAX_QUESTION_CARD_LIST_ITEMS
                 ),
                 skills=_stable_unique_texts(
-                    [
-                        link.skill.name
-                        for link in _ordered(item.skill_links, limit=None)
-                    ],
+                    item.skills,
                     limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
                 ),
             )
-            for item in _ordered(
-                profile.work_experiences,
-                limit=MAX_QUESTION_GENERATION_WORK_EXPERIENCE_ITEMS,
-            )
+            for item in content.work_experiences[
+                :MAX_QUESTION_GENERATION_WORK_EXPERIENCE_ITEMS
+            ]
         ],
         project_experiences=[
             QuestionGenerationProjectExperienceContext(
-                id=item.id,
+                label=item.name,
                 name=item.name,
                 role=item.role,
                 responsibilities=_stable_unique_texts(
@@ -149,20 +138,16 @@ def build_question_generation_profile_context(
                     item.achievements, limit=MAX_QUESTION_CARD_LIST_ITEMS
                 ),
                 skills=_stable_unique_texts(
-                    [
-                        link.skill.name
-                        for link in _ordered(item.skill_links, limit=None)
-                    ],
+                    item.skills,
                     limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
                 ),
             )
-            for item in _ordered(
-                profile.project_experiences,
-                limit=MAX_QUESTION_GENERATION_PROJECT_EXPERIENCE_ITEMS,
-            )
+            for item in content.project_experiences[
+                :MAX_QUESTION_GENERATION_PROJECT_EXPERIENCE_ITEMS
+            ]
         ],
         skills=_stable_unique_texts(
-            [item.name for item in _ordered(profile.skills, limit=None)],
+            content.skills,
             limit=MAX_QUESTION_GENERATION_PROFILE_SKILLS,
         ),
     )
@@ -319,7 +304,6 @@ class QuestionGenerationService:
             id=uuid4(),
             user_id=context.role.user_id,
             target_role_id=context.role.id,
-            profile_id=context.profile.profile_id,
             language=input_snapshot.interaction_language,
             question_type=output.question_type.value,
             difficulty=output.difficulty.value,
@@ -365,17 +349,15 @@ class QuestionGenerationService:
             raise service_error_for_code(QUESTION_GENERATION_TARGET_NOT_FOUND)
         if role.preparation_status == "archived":
             raise service_error_for_code(QUESTION_GENERATION_TARGET_ARCHIVED)
-        profile_statement = (
-            select(CareerProfile)
-            .options(*_career_profile_loader_options())
-            .where(CareerProfile.user_id == user_id)
+        profile_statement = select(CareerProfile).where(
+            CareerProfile.user_id == user_id
         )
         if for_update:
             profile_statement = profile_statement.with_for_update()
         profile = await self.session.scalar(profile_statement)
         if profile is None:
             raise service_error_for_code(QUESTION_GENERATION_PROFILE_NOT_FOUND)
-        if not career_profile_completed(profile):
+        if not has_required_content(parse_content(profile.content)):
             raise service_error_for_code(QUESTION_GENERATION_PROFILE_INCOMPLETE)
         if (
             role.job_description_status != "saved"
@@ -403,7 +385,6 @@ class QuestionGenerationService:
         )
         if (
             matching is None
-            or matching.profile_id != profile.profile_id
             or matching.profile_version != profile.version
             or matching.job_description_version != role.job_description_version
             or matching.job_description_analysis_version != analysis.analysis_version
@@ -428,18 +409,21 @@ def build_practice_reference_frozen_context(
         required_skills=context.job_description_analysis.required_skills,
         business_domains=context.job_description_analysis.business_domains,
     )
-    work_by_id = {item.id: item for item in context.profile.work_experiences}
-    project_by_id = {item.id: item for item in context.profile.project_experiences}
+    content = parse_content(context.profile.content)
+    work_by_label = {
+        f"{item.company} / {item.title}": item for item in content.work_experiences
+    }
+    project_by_label = {item.name: item for item in content.project_experiences}
     evidence = []
     for material in output.recommended_materials:
         if material.type is QuestionCardMaterialType.WORK_EXPERIENCE:
-            item = work_by_id.get(material.id)
+            item = work_by_label.get(material.label)
             if item is None:
                 raise service_error_for_code(QUESTION_GENERATION_PROFILE_INCOMPLETE)
             evidence.append(
                 PracticeReferenceWorkEvidence(
                     type="workExperience",
-                    id=item.id,
+                    label=material.label,
                     company=item.company,
                     title=item.title,
                     responsibilities=_stable_unique_texts(
@@ -449,22 +433,19 @@ def build_practice_reference_frozen_context(
                         item.achievements, limit=MAX_QUESTION_CARD_LIST_ITEMS
                     ),
                     skills=_stable_unique_texts(
-                        [
-                            link.skill.name
-                            for link in _ordered(item.skill_links, limit=None)
-                        ],
+                        item.skills,
                         limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
                     ),
                 )
             )
         elif material.type is QuestionCardMaterialType.PROJECT_EXPERIENCE:
-            item = project_by_id.get(material.id)
+            item = project_by_label.get(material.label)
             if item is None:
                 raise service_error_for_code(QUESTION_GENERATION_PROFILE_INCOMPLETE)
             evidence.append(
                 PracticeReferenceProjectEvidence(
                     type="projectExperience",
-                    id=item.id,
+                    label=material.label,
                     name=item.name,
                     role=item.role,
                     responsibilities=_stable_unique_texts(
@@ -474,10 +455,7 @@ def build_practice_reference_frozen_context(
                         item.achievements, limit=MAX_QUESTION_CARD_LIST_ITEMS
                     ),
                     skills=_stable_unique_texts(
-                        [
-                            link.skill.name
-                            for link in _ordered(item.skill_links, limit=None)
-                        ],
+                        item.skills,
                         limit=MAX_QUESTION_GENERATION_EXPERIENCE_SKILLS,
                     ),
                 )
@@ -519,30 +497,6 @@ def _stable_unique_texts(values: Iterable[str], *, limit: int) -> list[str]:
             seen.add(value)
             result.append(value)
     return result[:limit]
-
-
-def _ordered(items: Iterable[_Item], *, limit: int | None) -> list[_Item]:
-    ordered = sorted(
-        items,
-        key=lambda item: (
-            cast(int, getattr(item, "position")),
-            str(getattr(item, "id")),
-        ),
-    )
-    return ordered if limit is None else ordered[:limit]
-
-
-def _career_profile_loader_options() -> tuple[object, ...]:
-    return (
-        selectinload(CareerProfile.education),
-        selectinload(CareerProfile.skills),
-        selectinload(CareerProfile.work_experiences)
-        .selectinload(CareerProfileWorkExperience.skill_links)
-        .selectinload(CareerProfileWorkSkill.skill),
-        selectinload(CareerProfile.project_experiences)
-        .selectinload(CareerProfileProjectExperience.skill_links)
-        .selectinload(CareerProfileProjectSkill.skill),
-    )
 
 
 def _require_aware_datetime(value: datetime) -> None:

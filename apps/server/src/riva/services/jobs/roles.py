@@ -54,7 +54,7 @@ from riva.services.jobs.role_types import (
     UpdatePreparationStatusRequest,
     UpdateTargetRoleRequest,
 )
-from riva.services.profile.completion import career_profile_completed
+from riva.services.profile.content import has_required_content, parse_content
 
 
 def build_matching_analysis_result_response(
@@ -424,7 +424,8 @@ class TargetRoleService:
                 else ExistingProfileContext(
                     exists=True,
                     version=profile.version,
-                    completed=career_profile_completed(profile),
+                    completed=profile is not None
+                    and has_required_content(parse_content(profile.content)),
                 )
             ),
         )
@@ -436,25 +437,12 @@ class TargetRoleService:
 
     async def _profile(self, user_id: UUID) -> CareerProfile | None:
         return await self.session.scalar(
-            select(CareerProfile)
-            .options(
-                selectinload(CareerProfile.education),
-                selectinload(CareerProfile.work_experiences),
-                selectinload(CareerProfile.project_experiences),
-                selectinload(CareerProfile.skills),
-            )
-            .where(CareerProfile.user_id == user_id)
+            select(CareerProfile).where(CareerProfile.user_id == user_id)
         )
 
     async def _locked_profile(self, user_id: UUID) -> CareerProfile | None:
         return await self.session.scalar(
             select(CareerProfile)
-            .options(
-                selectinload(CareerProfile.education),
-                selectinload(CareerProfile.work_experiences),
-                selectinload(CareerProfile.project_experiences),
-                selectinload(CareerProfile.skills),
-            )
             .where(CareerProfile.user_id == user_id)
             .with_for_update()
         )
@@ -656,7 +644,6 @@ class TargetRoleService:
             current = bool(
                 ready
                 and profile is not None
-                and matching.profile_id == profile.profile_id
                 and matching.profile_version == profile.version
                 and matching.job_description_version == role.job_description_version
                 and analysis is not None

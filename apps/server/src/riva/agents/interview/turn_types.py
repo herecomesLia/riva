@@ -142,8 +142,6 @@ class InterviewTurnInput(InterviewTurnModel):
         if matching is not None:
             if matching.role_id != self.target_role.id:
                 raise ValueError("turn matching role does not match target role")
-            if matching.profile_id != self.career_profile.profile_id:
-                raise ValueError("turn matching profile does not match profile")
             if matching.profile_version != self.career_profile.version:
                 raise ValueError("turn matching profile snapshot is stale")
             if matching.job_description_version != (

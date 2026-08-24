@@ -31,12 +31,6 @@ class MatchingAnalysis(Base):
             ondelete="CASCADE",
             name="fk_matching_analyses_role_owner",
         ),
-        ForeignKeyConstraint(
-            ["user_id", "profile_id"],
-            ["career_profiles.user_id", "career_profiles.id"],
-            ondelete="CASCADE",
-            name="fk_matching_analyses_profile_owner",
-        ),
         CheckConstraint(
             "profile_version >= 1",
             name="ck_matching_analyses_profile_version",
@@ -62,11 +56,6 @@ class MatchingAnalysis(Base):
             "user_id",
             "role_id",
         ),
-        Index(
-            "ix_matching_analyses_user_profile",
-            "user_id",
-            "profile_id",
-        ),
     )
 
     role_id: Mapped[UUID] = mapped_column(
@@ -74,10 +63,6 @@ class MatchingAnalysis(Base):
         primary_key=True,
     )
     user_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        nullable=False,
-    )
-    profile_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         nullable=False,
     )

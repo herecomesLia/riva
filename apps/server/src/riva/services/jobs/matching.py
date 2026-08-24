@@ -1,12 +1,11 @@
 from collections.abc import Callable, Iterable
 from datetime import datetime
-from typing import TypeVar, cast
+from typing import cast
 from uuid import UUID
 
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from riva.agents.jobs.jd_parser_types import JobDescriptionParsingOutput
 from riva.agents.jobs.matcher_types import (
@@ -28,16 +27,12 @@ from riva.agents.jobs.matcher_types import (
 from riva.core.language import InteractionLanguage
 from riva.models import (
     CareerProfile,
-    CareerProfileProjectExperience,
-    CareerProfileProjectSkill,
-    CareerProfileWorkExperience,
-    CareerProfileWorkSkill,
     JobDescriptionAnalysis,
     MatchingAnalysis,
     TargetRole,
 )
 from riva.services.errors import service_error_for_code
-from riva.services.profile.completion import career_profile_completed
+from riva.services.profile.content import has_required_content, parse_content
 from riva.utils import utc_now
 
 MATCHING_TARGET_NOT_FOUND: str = "matching_target_not_found"
@@ -47,9 +42,6 @@ MATCHING_JOB_DESCRIPTION_NOT_READY: str = "matching_job_description_not_ready"
 MATCHING_JOB_DESCRIPTION_ANALYSIS_NOT_READY: str = (
     "matching_job_description_analysis_not_ready"
 )
-
-
-_Item = TypeVar("_Item")
 
 
 def stable_unique_texts(
@@ -66,6 +58,7 @@ def stable_unique_texts(
 
 
 def build_matching_career_profile(profile: CareerProfile) -> MatchingCareerProfile:
+    content = parse_content(profile.content)
     education = [
         MatchingProfileEducation(
             school=item.school,
@@ -75,7 +68,7 @@ def build_matching_career_profile(profile: CareerProfile) -> MatchingCareerProfi
             end_date=item.end_date,
             is_current=item.is_current,
         )
-        for item in _ordered(profile.education, limit=MAX_MATCHING_EDUCATION_ITEMS)
+        for item in content.education[:MAX_MATCHING_EDUCATION_ITEMS]
     ]
     work_experiences = [
         MatchingProfileWorkExperience(
@@ -95,13 +88,11 @@ def build_matching_career_profile(profile: CareerProfile) -> MatchingCareerProfi
                 limit=MAX_MATCHING_EXPERIENCE_ACHIEVEMENTS,
             ),
             skills=stable_unique_texts(
-                [link.skill.name for link in _ordered(item.skill_links, limit=None)],
+                item.skills,
                 limit=MAX_MATCHING_EXPERIENCE_SKILLS,
             ),
         )
-        for item in _ordered(
-            profile.work_experiences, limit=MAX_MATCHING_WORK_EXPERIENCE_ITEMS
-        )
+        for item in content.work_experiences[:MAX_MATCHING_WORK_EXPERIENCE_ITEMS]
     ]
     project_experiences = [
         MatchingProfileProjectExperience(
@@ -118,21 +109,19 @@ def build_matching_career_profile(profile: CareerProfile) -> MatchingCareerProfi
                 limit=MAX_MATCHING_EXPERIENCE_ACHIEVEMENTS,
             ),
             skills=stable_unique_texts(
-                [link.skill.name for link in _ordered(item.skill_links, limit=None)],
+                item.skills,
                 limit=MAX_MATCHING_EXPERIENCE_SKILLS,
             ),
         )
-        for item in _ordered(
-            profile.project_experiences, limit=MAX_MATCHING_PROJECT_EXPERIENCE_ITEMS
-        )
+        for item in content.project_experiences[:MAX_MATCHING_PROJECT_EXPERIENCE_ITEMS]
     ]
     return MatchingCareerProfile(
-        summary=profile.summary,
+        summary=content.summary,
         education=education,
         work_experiences=work_experiences,
         project_experiences=project_experiences,
         skills=stable_unique_texts(
-            [item.name for item in _ordered(profile.skills, limit=None)],
+            content.skills,
             limit=MAX_MATCHING_PROFILE_SKILLS,
         ),
     )
@@ -200,7 +189,6 @@ class MatchingAnalysisService:
             analysis = MatchingAnalysis(
                 role_id=context.role.id,
                 user_id=context.role.user_id,
-                profile_id=context.profile.profile_id,
                 profile_version=context.profile.version,
                 job_description_version=context.role.job_description_version,
                 job_description_analysis_version=context.job_description_analysis.analysis_version,
@@ -224,7 +212,6 @@ class MatchingAnalysisService:
             self.session.add(analysis)
         else:
             analysis = context.existing
-            analysis.profile_id = context.profile.profile_id
             analysis.profile_version = context.profile.version
             analysis.job_description_version = context.role.job_description_version
             analysis.job_description_analysis_version = (
@@ -257,7 +244,7 @@ class MatchingAnalysisService:
         role_id: UUID,
         interaction_language: InteractionLanguage,
         for_update: bool,
-    ) -> "_MatchingContext":
+    ) -> _MatchingContext:
         role_statement = select(TargetRole).where(
             TargetRole.id == role_id, TargetRole.user_id == user_id
         )
@@ -275,17 +262,15 @@ class MatchingAnalysisService:
         ):
             raise service_error_for_code(MATCHING_JOB_DESCRIPTION_NOT_READY)
 
-        profile_statement = (
-            select(CareerProfile)
-            .options(*_career_profile_loader_options())
-            .where(CareerProfile.user_id == user_id)
+        profile_statement = select(CareerProfile).where(
+            CareerProfile.user_id == user_id
         )
         if for_update:
             profile_statement = profile_statement.with_for_update()
         profile = await self.session.scalar(profile_statement)
         if profile is None:
             raise service_error_for_code(MATCHING_PROFILE_NOT_FOUND)
-        if not career_profile_completed(profile):
+        if not has_required_content(parse_content(profile.content)):
             raise service_error_for_code(MATCHING_PROFILE_INCOMPLETE)
 
         analysis = await self.session.scalar(
@@ -309,7 +294,7 @@ class MatchingAnalysisService:
         return _MatchingContext(role, profile, analysis, existing, interaction_language)
 
     @staticmethod
-    def _build_input(context: "_MatchingContext") -> MatchingAnalysisInput:
+    def _build_input(context: _MatchingContext) -> MatchingAnalysisInput:
         try:
             return MatchingAnalysisInput(
                 career_profile=build_matching_career_profile(context.profile),
@@ -336,30 +321,6 @@ class _MatchingContext:
         self.job_description_analysis = job_description_analysis
         self.existing = existing
         self.interaction_language = interaction_language
-
-
-def _ordered(items: Iterable[_Item], *, limit: int | None) -> list[_Item]:
-    ordered = sorted(
-        items,
-        key=lambda item: (
-            cast(int, getattr(item, "position")),
-            str(getattr(item, "id")),
-        ),
-    )
-    return ordered if limit is None else ordered[:limit]
-
-
-def _career_profile_loader_options() -> tuple[object, ...]:
-    return (
-        selectinload(CareerProfile.education),
-        selectinload(CareerProfile.skills),
-        selectinload(CareerProfile.work_experiences)
-        .selectinload(CareerProfileWorkExperience.skill_links)
-        .selectinload(CareerProfileWorkSkill.skill),
-        selectinload(CareerProfile.project_experiences)
-        .selectinload(CareerProfileProjectExperience.skill_links)
-        .selectinload(CareerProfileProjectSkill.skill),
-    )
 
 
 def _copy_list(value: object) -> list[str]:

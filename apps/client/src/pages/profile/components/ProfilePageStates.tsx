@@ -1,8 +1,6 @@
 import { AlertCircleIcon, CalendarClockIcon, FileUpIcon } from "lucide-react"
-import { Spinner } from "@/components/ui/spinner"
 import { useTranslation } from "react-i18next"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -15,6 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 
 import { ProfileHeaderIntro } from "./ProfileHeaderIntro"
 
@@ -85,7 +84,7 @@ function ProfileSkeletonCard({
   )
 }
 
-export function ProfileEmptyState({ manualOnly = false }: { manualOnly?: boolean }) {
+export function ProfileEmptyState() {
   const { t } = useTranslation()
 
   return (
@@ -95,52 +94,25 @@ export function ProfileEmptyState({ manualOnly = false }: { manualOnly?: boolean
           <FileUpIcon />
         </EmptyMedia>
         <EmptyTitle>{t("profile.empty.title")}</EmptyTitle>
-        <EmptyDescription>
-          {t(manualOnly ? "profile.empty.manualDescription" : "profile.empty.description")}
-        </EmptyDescription>
+        <EmptyDescription>{t("profile.empty.description")}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   )
 }
 
-export function ProfileProcessingState({
-  isRetrying = false,
-  onRetry,
-  status,
-  synchronizationError = null,
-}: {
-  isRetrying?: boolean
-  onRetry?: () => void
-  status: "uploadingResume" | "parsingResume"
-  synchronizationError?: boolean | "initialRecognition" | "resumeUpdate" | null
-}) {
+export function ProfileProcessingState() {
   const { t } = useTranslation()
-  const stateKey = status === "uploadingResume" ? "uploading" : "parsing"
 
   return (
     <Card data-testid="profile-processing-state">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Spinner className="size-5" />
-          {t(`profile.lifecycle.${stateKey}.title`)}
+          {t("profile.lifecycle.parsing.title")}
         </CardTitle>
-        <CardDescription>{t(`profile.lifecycle.${stateKey}.description`)}</CardDescription>
+        <CardDescription>{t("profile.lifecycle.parsing.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {synchronizationError && (
-          <Alert data-testid="profile-synchronization-error" variant="destructive">
-            <AlertCircleIcon />
-            <AlertTitle>{t("profile.lifecycle.syncFailed.title")}</AlertTitle>
-            <AlertDescription>{t("profile.lifecycle.syncFailed.description")}</AlertDescription>
-            {onRetry && (
-              <Button disabled={isRetrying} onClick={onRetry} size="sm" variant="outline">
-                {isRetrying
-                  ? t("profile.lifecycle.syncFailed.retrying")
-                  : t("profile.lifecycle.syncFailed.retry")}
-              </Button>
-            )}
-          </Alert>
-        )}
         <Skeleton className="h-5 w-full max-w-md" />
         <Skeleton className="h-5 w-4/5 max-w-sm" />
       </CardContent>
@@ -148,54 +120,7 @@ export function ProfileProcessingState({
   )
 }
 
-export function ProfileRecognitionFailureState({
-  canRetry = true,
-  failureReason,
-  isActionPending = false,
-  onManualEntry,
-  onReupload,
-  onRetry,
-}: {
-  canRetry?: boolean
-  failureReason: string | null
-  isActionPending?: boolean
-  onManualEntry: () => void
-  onReupload: () => void
-  onRetry: () => void
-}) {
-  const { t } = useTranslation()
-
-  return (
-    <Alert className="items-start" data-testid="profile-recognition-failure" variant="destructive">
-      <AlertCircleIcon className="mt-0.5 shrink-0" />
-      <div className="min-w-0">
-        <AlertTitle>{t("profile.lifecycle.failed.title")}</AlertTitle>
-        <AlertDescription className="mt-1">
-          {failureReason ?? t("profile.lifecycle.failed.description")}
-        </AlertDescription>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button disabled={isActionPending || !canRetry} onClick={onRetry} size="sm">
-            {t("profile.actions.retryRecognition")}
-          </Button>
-          <Button disabled={isActionPending} onClick={onReupload} size="sm" variant="outline">
-            {t("profile.actions.updateResume")}
-          </Button>
-          <Button disabled={isActionPending} onClick={onManualEntry} size="sm" variant="outline">
-            {t("profile.actions.manualEntry")}
-          </Button>
-        </div>
-      </div>
-    </Alert>
-  )
-}
-
-export function ProfileErrorState({
-  isRetrying,
-  onRetry,
-}: {
-  isRetrying: boolean
-  onRetry: () => void
-}) {
+export function ProfileErrorState({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation()
 
   return (
@@ -208,9 +133,7 @@ export function ProfileErrorState({
         <CardDescription>{t("common.pageState.error.description")}</CardDescription>
       </CardHeader>
       <CardFooter>
-        <Button disabled={isRetrying} onClick={onRetry}>
-          {isRetrying ? t("common.pageState.error.retrying") : t("common.pageState.error.retry")}
-        </Button>
+        <Button onClick={onRetry}>{t("common.pageState.error.retry")}</Button>
       </CardFooter>
     </Card>
   )

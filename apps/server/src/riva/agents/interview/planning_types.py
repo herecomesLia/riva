@@ -92,7 +92,6 @@ class InterviewCareerProfileSnapshot(
     MatchingCareerProfile,
     InterviewPlanningModel,
 ):
-    profile_id: StandardUUID
     version: Annotated[int, Field(strict=True, ge=1)]
 
 
@@ -119,7 +118,6 @@ class InterviewMatchingAnalysisSnapshot(
     InterviewPlanningModel,
 ):
     role_id: StandardUUID
-    profile_id: StandardUUID
     profile_version: Annotated[int, Field(strict=True, ge=1)]
     job_description_version: Annotated[int, Field(strict=True, ge=1)]
     job_description_analysis_version: Annotated[
@@ -158,10 +156,6 @@ class InterviewPlanningInput(InterviewPlanningModel):
         if matching is not None:
             if matching.role_id != self.target_role.id:
                 raise ValueError("matching analysis role does not match target role")
-            if matching.profile_id != self.career_profile.profile_id:
-                raise ValueError(
-                    "matching analysis profile does not match career profile"
-                )
             if matching.profile_version != self.career_profile.version:
                 raise ValueError("matching analysis profile version is stale")
             if matching.job_description_version != (

@@ -7,25 +7,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { JobProfile, ProfileSection, SaveProfileSectionInput } from "@/models/profile"
+import type { Profile, ProfileContent, ProfileSection } from "@/models/profile"
 
-import { ProfileAdditionalSectionEditor } from "./ProfileAdditionalSectionEditor"
 import { ProfileSectionEditor } from "./ProfileSectionEditor"
-
-export type EditableProfileSection = Exclude<ProfileSection, "targetRoles">
-export type EditableExperienceSection = Extract<
-  EditableProfileSection,
-  "education" | "workExperience" | "projectExperience"
->
-export type EditableAdditionalSection = Extract<EditableProfileSection, "skills" | "credentials">
+import { ProfileSkillsEditor } from "./ProfileSkillsEditor"
 
 type ProfileSectionEditDialogProps = {
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
-  onSave: (input: SaveProfileSectionInput) => Promise<void>
+  onSave: (content: ProfileContent) => Promise<void>
   open: boolean
-  profile: JobProfile
-  section: EditableProfileSection | null
+  profile: Profile
+  section: ProfileSection | null
 }
 
 export function ProfileSectionEditDialog({
@@ -45,26 +38,19 @@ export function ProfileSectionEditDialog({
           <>
             <DialogHeader className="border-b px-6 py-5 pr-14">
               <DialogTitle className="text-xl font-semibold leading-tight">
-                {t("profile.editor.dialogTitle", {
-                  section: t(`profile.sections.${section}`),
-                })}
+                {t("profile.editor.dialogTitle", { section: t(`profile.sections.${section}`) })}
               </DialogTitle>
               <DialogDescription>{t("profile.editor.dialogDescription")}</DialogDescription>
             </DialogHeader>
-
-            {section === "education" ||
-            section === "workExperience" ||
-            section === "projectExperience" ? (
-              <ProfileSectionEditor
-                key={section}
+            {section === "skills" ? (
+              <ProfileSkillsEditor
                 onCancel={() => onOpenChange(false)}
                 onDirtyChange={onDirtyChange}
                 onSave={onSave}
                 profile={profile}
-                section={section}
               />
             ) : (
-              <ProfileAdditionalSectionEditor
+              <ProfileSectionEditor
                 key={section}
                 onCancel={() => onOpenChange(false)}
                 onDirtyChange={onDirtyChange}

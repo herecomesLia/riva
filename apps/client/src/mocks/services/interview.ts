@@ -339,8 +339,11 @@ export async function startInterview(
     throw new Error("Interview target role job description is not ready.")
   }
   const profileComplete =
-    profileSnapshot.profile?.status === "active" &&
-    profileSnapshot.profile.completeness.percentage === 100
+    profileSnapshot !== null &&
+    profileSnapshot.content.education.length > 0 &&
+    profileSnapshot.content.workExperiences.length > 0 &&
+    profileSnapshot.content.projectExperiences.length > 0 &&
+    profileSnapshot.content.skills.length > 0
   if (!profileComplete) {
     throw new Error("Interview prerequisite is not met: profileIncomplete.")
   }

@@ -1,6 +1,5 @@
 import os
 from enum import StrEnum
-from pathlib import Path
 from typing import Annotated
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -32,7 +31,6 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_timeout_seconds: float = Field(default=60, gt=0)
     llm_enable_thinking: bool = False
-    resume_storage_dir: Path = Path(".riva/resumes")
     resume_max_upload_bytes: int = Field(
         default=10 * 1024 * 1024,
         gt=0,
@@ -95,7 +93,6 @@ class Settings(BaseSettings):
         _write_optional_environ("RIVA_LLM_BASE_URL", self.llm_base_url)
         os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.llm_timeout_seconds)
         os.environ["RIVA_LLM_ENABLE_THINKING"] = str(self.llm_enable_thinking).lower()
-        os.environ["RIVA_RESUME_STORAGE_DIR"] = str(self.resume_storage_dir)
         os.environ["RIVA_RESUME_MAX_UPLOAD_BYTES"] = str(self.resume_max_upload_bytes)
         os.environ["RIVA_RESUME_MAX_EXTRACTED_CHARACTERS"] = str(
             self.resume_max_extracted_characters

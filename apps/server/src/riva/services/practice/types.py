@@ -40,8 +40,7 @@ from riva.services.practice.question_types import (
     QuestionCardTextItem,
     QuestionCardTextList,
 )
-from riva.services.profile.types import StandardUUID
-from riva.services.types import DomainModel
+from riva.services.types import DomainModel, StandardUUID
 
 
 class PracticeQuestionSource(StrEnum):
