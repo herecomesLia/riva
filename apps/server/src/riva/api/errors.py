@@ -4,10 +4,6 @@ from fastapi.responses import JSONResponse
 from riva.api.cookies import delete_session_cookie
 
 
-class DatabaseUnavailableError(RuntimeError):
-    pass
-
-
 class APIError(RuntimeError):
     def __init__(
         self,

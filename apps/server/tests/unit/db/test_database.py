@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from riva.api.errors import DatabaseUnavailableError
 from riva.db.database import Database
+from riva.db.errors import DatabaseUnavailableError
 from tests.helpers.fakes import FakeEngine, FakeSession, FakeSessionMaker
 
 

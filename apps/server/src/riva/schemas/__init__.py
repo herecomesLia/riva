@@ -1,4 +1,5 @@
 from riva.schemas.auth import LoginCredentials, RegisterCredentials
+from riva.schemas.errors import ErrorBody, ErrorIssue, ErrorResponse
 from riva.schemas.health import (
     DependencyHealthStatus,
     HealthResponse,
@@ -8,6 +9,9 @@ from riva.schemas.users import UserProfileUpdate, UserResponse
 
 __all__ = [
     "DependencyHealthStatus",
+    "ErrorBody",
+    "ErrorIssue",
+    "ErrorResponse",
     "HealthResponse",
     "LoginCredentials",
     "RegisterCredentials",

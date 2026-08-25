@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from riva.api.errors import DatabaseUnavailableError
 from riva.db.base import Base
+from riva.db.errors import DatabaseUnavailableError
 
 
 def load_models() -> None:
