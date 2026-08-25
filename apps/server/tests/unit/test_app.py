@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from riva.core.errors import DatabaseUnavailableError
+from riva.api.errors import DatabaseUnavailableError
 from tests.helpers.app import create_test_app
 from tests.helpers.fakes import FakeDatabase
 

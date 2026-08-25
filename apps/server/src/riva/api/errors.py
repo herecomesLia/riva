@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from riva.core.cookies import delete_session_cookie
+from riva.api.cookies import delete_session_cookie
 
 
 class DatabaseUnavailableError(RuntimeError):

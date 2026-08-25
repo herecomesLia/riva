@@ -90,9 +90,9 @@ apps/server/
 
 Layer responsibilities:
 
-- `api/`: FastAPI routes, request validation, and response handling.
+- `api/`: FastAPI routes, request validation, API dependencies, and response handling.
 - `cli/`: Typer command definitions and command-specific orchestration.
-- `core/`: configuration, logging, auth dependencies, and lifecycle code.
+- `core/`: configuration, logging, security primitives, and lifecycle code.
 - `db/`: database connections, transactions, and migration support.
 - `models/`: database models, such as users, resumes, jobs, questions, interview
   sessions, reviews, and agent run records.

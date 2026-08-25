@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from riva.core.auth import require_current_user
-from riva.core.csrf import csrf_protect
-from riva.core.users import get_user_service
+from riva.api.csrf import csrf_protect
+from riva.api.deps import require_current_user, require_user_service
 from riva.models import User
 from riva.schemas.users import UserProfileUpdate, UserResponse
 from riva.services.users import UserService
@@ -23,7 +22,7 @@ async def get_current_user(current_user: User = Depends(require_current_user)) -
 async def update_current_user_profile(
     payload: UserProfileUpdate,
     current_user: User = Depends(require_current_user),
-    user_service: UserService = Depends(get_user_service),
+    user_service: UserService = Depends(require_user_service),
 ) -> User:
     changes = payload.model_dump(
         mode="json",

@@ -8,8 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from riva.api.errors import APIError
 from riva.core.config import Settings
-from riva.core.errors import APIError
 from riva.core.security import (
     digest_session_token,
     generate_session_token,

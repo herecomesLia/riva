@@ -3,9 +3,9 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from riva.core.errors import APIError
+from riva.api.deps import require_user_service
+from riva.api.errors import APIError
 from riva.core.security import normalize_username
-from riva.core.users import get_user_service
 from riva.models import User
 from riva.services.users import AuthenticationResult, CurrentSession
 
@@ -92,7 +92,7 @@ class FakeUserService:
 
 def create_auth_client(app) -> tuple[TestClient, FakeUserService]:
     user_service = FakeUserService()
-    app.dependency_overrides[get_user_service] = lambda: user_service
+    app.dependency_overrides[require_user_service] = lambda: user_service
     return TestClient(app), user_service
 
 

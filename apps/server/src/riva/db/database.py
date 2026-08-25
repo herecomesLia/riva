@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from riva.core.errors import DatabaseUnavailableError
+from riva.api.errors import DatabaseUnavailableError
 from riva.db.base import Base
 
 

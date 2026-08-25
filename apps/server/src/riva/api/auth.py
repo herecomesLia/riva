@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from riva.core.cookies import delete_session_cookie, set_session_cookie
-from riva.core.csrf import csrf_protect
-from riva.core.users import get_user_service
+from riva.api.cookies import delete_session_cookie, set_session_cookie
+from riva.api.csrf import csrf_protect
+from riva.api.deps import require_user_service
 from riva.models import User
 from riva.schemas.auth import AuthCredentials
 from riva.schemas.users import UserResponse
@@ -24,7 +24,7 @@ async def register(
     payload: AuthCredentials,
     request: Request,
     response: Response,
-    user_service: UserService = Depends(get_user_service),
+    user_service: UserService = Depends(require_user_service),
 ) -> User:
     result = await user_service.register(payload.username, payload.password)
     set_session_cookie(response, request.app.state.settings, result.token)
@@ -36,7 +36,7 @@ async def login(
     payload: AuthCredentials,
     request: Request,
     response: Response,
-    user_service: UserService = Depends(get_user_service),
+    user_service: UserService = Depends(require_user_service),
 ) -> User:
     settings = request.app.state.settings
     result = await user_service.login(
@@ -52,7 +52,7 @@ async def login(
 async def logout(
     request: Request,
     response: Response,
-    user_service: UserService = Depends(get_user_service),
+    user_service: UserService = Depends(require_user_service),
 ) -> None:
     settings = request.app.state.settings
     await user_service.logout(request.cookies.get(settings.session_cookie_name))

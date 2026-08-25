@@ -2,8 +2,8 @@ from urllib.parse import urlsplit
 
 from fastapi import Request, status
 
+from riva.api.errors import APIError
 from riva.core.config import Settings
-from riva.core.errors import APIError
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
