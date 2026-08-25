@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from riva.api.deps import require_current_user, require_user_service
+from riva.api.deps import get_user_service, require_current_user
 from riva.models import User
 
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -38,12 +38,12 @@ def create_users_client(app) -> tuple[TestClient, FakeUserService, User]:
     user_service = FakeUserService()
     user = create_user()
     app.dependency_overrides[require_current_user] = lambda: user
-    app.dependency_overrides[require_user_service] = lambda: user_service
+    app.dependency_overrides[get_user_service] = lambda: user_service
     return TestClient(app), user_service, user
 
 
 def test_get_current_user_profile_requires_authentication(app) -> None:
-    app.dependency_overrides[require_user_service] = lambda: object()
+    app.dependency_overrides[get_user_service] = lambda: object()
 
     with TestClient(app) as client:
         response = client.get("/api/users/me")
