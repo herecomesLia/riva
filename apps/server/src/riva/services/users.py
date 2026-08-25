@@ -1,7 +1,12 @@
+import hashlib
+import hmac
+import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -10,15 +15,9 @@ from sqlalchemy.orm import selectinload
 
 from riva.api.errors import APIError
 from riva.core.config import Settings
-from riva.core.security import (
-    digest_session_token,
-    generate_session_token,
-    hash_password,
-    normalize_username,
-    validate_password,
-    verify_password,
-)
 from riva.models import AuthSession, User
+
+_password_hasher = PasswordHasher()
 
 
 @dataclass(frozen=True)
@@ -40,13 +39,12 @@ class UserService:
         self.settings = settings
 
     async def register(self, username: str, password: str) -> AuthenticationResult:
-        normalized_username = _normalize_registration_username(username)
-        _validate_registration_password(password)
+        normalized_username = _normalize_username(username)
         now = _utc_now()
         user = User(
             username=username,
             normalized_username=normalized_username,
-            password_hash=hash_password(password),
+            password_hash=_hash_password(password),
             display_name=username,
             created_at=now,
             updated_at=now,
@@ -70,10 +68,7 @@ class UserService:
         *,
         current_token: str | None = None,
     ) -> AuthenticationResult:
-        try:
-            normalized_username = normalize_username(username)
-        except ValueError as exc:
-            raise _invalid_credentials() from exc
+        normalized_username = _normalize_username(username)
 
         result = await self.session.execute(
             select(User).where(User.normalized_username == normalized_username)
@@ -81,7 +76,7 @@ class UserService:
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
             raise _invalid_credentials()
-        if not verify_password(user.password_hash, password):
+        if not _verify_password(user.password_hash, password):
             raise _invalid_credentials()
 
         now = _utc_now()
@@ -171,17 +166,17 @@ class UserService:
         return user
 
     def _new_session(self, user: User, now: datetime) -> tuple[str, AuthSession]:
-        token = generate_session_token()
+        token = _generate_session_token()
         return token, AuthSession(
             user=user,
-            token_digest=digest_session_token(token, self.settings.session_digest_key),
+            token_digest=_digest_session_token(token, self.settings.session_digest_key),
             created_at=now,
             last_seen_at=now,
             expires_at=self._expires_at(now),
         )
 
     async def _session_by_token(self, token: str) -> AuthSession | None:
-        token_digest = digest_session_token(token, self.settings.session_digest_key)
+        token_digest = _digest_session_token(token, self.settings.session_digest_key)
         result = await self.session.execute(
             select(AuthSession)
             .options(selectinload(AuthSession.user))
@@ -209,26 +204,35 @@ class UserService:
         return now + timedelta(seconds=self.settings.session_idle_timeout_seconds)
 
 
-def _normalize_registration_username(username: str) -> str:
-    try:
-        return normalize_username(username)
-    except ValueError as exc:
-        raise APIError(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_username"
-        ) from exc
-
-
-def _validate_registration_password(password: str) -> None:
-    try:
-        validate_password(password)
-    except ValueError as exc:
-        raise APIError(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_password"
-        ) from exc
-
-
 def _invalid_credentials() -> APIError:
     return APIError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
+
+
+def _normalize_username(username: str) -> str:
+    return username.lower()
+
+
+def _hash_password(password: str) -> str:
+    return _password_hasher.hash(password)
+
+
+def _verify_password(password_hash: str, password: str) -> bool:
+    try:
+        return _password_hasher.verify(password_hash, password)
+    except InvalidHashError, VerificationError, VerifyMismatchError:
+        return False
+
+
+def _generate_session_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _digest_session_token(token: str, digest_key: str) -> str:
+    return hmac.new(
+        digest_key.encode("utf-8"),
+        token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def _utc_now() -> datetime:

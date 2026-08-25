@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 
 from riva.api.deps import get_user_service
 from riva.api.errors import APIError
-from riva.core.security import normalize_username
 from riva.models import User
 from riva.services.users import AuthenticationResult, CurrentSession
 
@@ -23,10 +22,7 @@ class FakeUserService:
     counter: int = 0
 
     async def register(self, username: str, password: str) -> AuthenticationResult:
-        try:
-            normalized_username = normalize_username(username)
-        except ValueError as exc:
-            raise APIError(422, "invalid_username") from exc
+        normalized_username = username.lower()
         if normalized_username in self.users:
             raise APIError(409, "username_taken")
 
@@ -50,10 +46,7 @@ class FakeUserService:
         *,
         current_token: str | None = None,
     ) -> AuthenticationResult:
-        try:
-            normalized_username = normalize_username(username)
-        except ValueError as exc:
-            raise APIError(401, "invalid_credentials") from exc
+        normalized_username = username.lower()
         if normalized_username not in self.users or password != "correct-password":
             raise APIError(401, "invalid_credentials")
         if current_token in self.tokens:

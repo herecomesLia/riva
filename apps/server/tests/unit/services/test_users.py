@@ -2,7 +2,13 @@ import asyncio
 from uuid import uuid4
 
 from riva.models import User
-from riva.services.users import UserService
+from riva.services.users import (
+    UserService,
+    _digest_session_token,
+    _generate_session_token,
+    _hash_password,
+    _verify_password,
+)
 
 
 class FakeSession:
@@ -26,6 +32,35 @@ def create_user() -> User:
         display_name="Lia",
         avatar_url="https://example.com/old.png",
     )
+
+
+def test_password_hash_verifies_without_storing_plaintext() -> None:
+    password = "Aa1!Bb2@"
+    password_hash = _hash_password(password)
+
+    assert password_hash != password
+    assert _verify_password(password_hash, password) is True
+    assert _verify_password(password_hash, "wrong password") is False
+
+
+def test_password_hash_does_not_apply_registration_rules() -> None:
+    password_hash = _hash_password("short")
+
+    assert _verify_password(password_hash, "short") is True
+
+
+def test_password_verification_rejects_invalid_hash() -> None:
+    assert _verify_password("not-a-password-hash", "password") is False
+
+
+def test_session_token_digest_is_stable_and_not_plaintext() -> None:
+    token = _generate_session_token()
+    digest = _digest_session_token(token, "test-session-digest-key")
+
+    assert len(token) >= 32
+    assert len(digest) == 64
+    assert digest != token
+    assert digest == _digest_session_token(token, "test-session-digest-key")
 
 
 def test_update_profile_persists_only_supplied_fields(test_settings) -> None:
