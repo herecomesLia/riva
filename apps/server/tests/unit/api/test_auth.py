@@ -69,7 +69,6 @@ class FakeUserService:
 
         return CurrentSession(
             user=self.tokens[token],
-            token=token,
             refreshed=token in self.refresh_tokens,
         )
 

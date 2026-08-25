@@ -3,7 +3,7 @@ import hmac
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from riva.api.errors import APIError
 from riva.core.config import Settings
 from riva.models import AuthSession, User
+from riva.utils import utc_now
 
 _password_hasher = PasswordHasher()
 
@@ -29,7 +30,6 @@ class AuthenticationResult:
 @dataclass(frozen=True)
 class CurrentSession:
     user: User
-    token: str
     refreshed: bool = False
 
 
@@ -40,7 +40,7 @@ class UserService:
 
     async def register(self, username: str, password: str) -> AuthenticationResult:
         normalized_username = _normalize_username(username)
-        now = _utc_now()
+        now = utc_now()
         user = User(
             username=username,
             normalized_username=normalized_username,
@@ -79,9 +79,9 @@ class UserService:
         if not _verify_password(user.password_hash, password):
             raise _invalid_credentials()
 
-        now = _utc_now()
+        now = utc_now()
         if current_token:
-            await self._revoke_token(current_token, now, commit=False)
+            await self._revoke_token(current_token, now)
 
         token, auth_session = self._new_session(user, now)
         self.session.add(auth_session)
@@ -89,7 +89,7 @@ class UserService:
         return AuthenticationResult(user=user, token=token)
 
     async def get_current_session(self, token: str) -> CurrentSession:
-        now = _utc_now()
+        now = utc_now()
         auth_session = await self._session_by_token(token)
         if auth_session is None or auth_session.revoked_at is not None:
             raise APIError(
@@ -98,26 +98,8 @@ class UserService:
                 clear_session_cookie=True,
             )
 
-        if auth_session.expires_at <= now:
-            auth_session.revoked_at = now
-            await self.session.commit()
-            raise APIError(
-                status.HTTP_401_UNAUTHORIZED,
-                "session_expired",
-                clear_session_cookie=True,
-            )
-
         user = auth_session.user
-        if not user.is_active:
-            auth_session.revoked_at = now
-            await self.session.commit()
-            raise APIError(
-                status.HTTP_403_FORBIDDEN,
-                "account_disabled",
-                clear_session_cookie=True,
-            )
-
-        if (
+        if auth_session.expires_at <= now or (
             user.password_changed_at is not None
             and auth_session.created_at < user.password_changed_at
         ):
@@ -126,6 +108,15 @@ class UserService:
             raise APIError(
                 status.HTTP_401_UNAUTHORIZED,
                 "session_expired",
+                clear_session_cookie=True,
+            )
+
+        if not user.is_active:
+            auth_session.revoked_at = now
+            await self.session.commit()
+            raise APIError(
+                status.HTTP_403_FORBIDDEN,
+                "account_disabled",
                 clear_session_cookie=True,
             )
 
@@ -139,30 +130,28 @@ class UserService:
             refreshed = True
             await self.session.commit()
 
-        return CurrentSession(user=user, token=token, refreshed=refreshed)
+        return CurrentSession(user=user, refreshed=refreshed)
 
     async def logout(self, token: str | None) -> None:
         if token is None:
             return
 
-        now = _utc_now()
-        revoked = await self._revoke_token(token, now, commit=True)
-        if not revoked:
-            await self.session.rollback()
+        if await self._revoke_token(token, utc_now()):
+            await self.session.commit()
 
     async def update_profile(
         self,
         user: User,
         changes: Mapping[str, str | None],
     ) -> User:
+        if not changes:
+            return user
+
         for field in ("display_name", "avatar_url"):
             if field in changes:
                 setattr(user, field, changes[field])
 
-        if changes:
-            await self.session.commit()
-            await self.session.refresh(user)
-
+        await self.session.commit()
         return user
 
     def _new_session(self, user: User, now: datetime) -> tuple[str, AuthSession]:
@@ -188,16 +177,12 @@ class UserService:
         self,
         token: str,
         now: datetime,
-        *,
-        commit: bool,
     ) -> bool:
         auth_session = await self._session_by_token(token)
         if auth_session is None:
             return False
         if auth_session.revoked_at is None:
             auth_session.revoked_at = now
-        if commit:
-            await self.session.commit()
         return True
 
     def _expires_at(self, now: datetime) -> datetime:
@@ -233,7 +218,3 @@ def _digest_session_token(token: str, digest_key: str) -> str:
         token.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)

@@ -45,7 +45,7 @@ async def require_current_user(
 
     session_state = await user_service.get_current_session(token)
     if session_state.refreshed:
-        set_session_cookie(response, settings, session_state.token)
+        set_session_cookie(response, settings, token)
     return session_state.user
 
 

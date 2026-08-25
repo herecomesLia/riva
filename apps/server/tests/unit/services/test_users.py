@@ -14,13 +14,9 @@ from riva.services.users import (
 class FakeSession:
     def __init__(self) -> None:
         self.commit_count = 0
-        self.refreshed: list[User] = []
 
     async def commit(self) -> None:
         self.commit_count += 1
-
-    async def refresh(self, user: User) -> None:
-        self.refreshed.append(user)
 
 
 def create_user() -> User:
@@ -74,7 +70,6 @@ def test_update_profile_persists_only_supplied_fields(test_settings) -> None:
     assert user.display_name == "Lia Chen"
     assert user.avatar_url == "https://example.com/old.png"
     assert session.commit_count == 1
-    assert session.refreshed == [user]
 
 
 def test_update_profile_can_clear_avatar(test_settings) -> None:
@@ -95,4 +90,3 @@ def test_empty_update_does_not_write(test_settings) -> None:
     asyncio.run(service.update_profile(user, {}))
 
     assert session.commit_count == 0
-    assert session.refreshed == []
