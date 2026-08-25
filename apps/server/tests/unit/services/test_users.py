@@ -2,7 +2,7 @@ import asyncio
 from uuid import uuid4
 
 from riva.models import User
-from riva.services.users import UsersService
+from riva.services.users import UserService
 
 
 class FakeSession:
@@ -28,9 +28,9 @@ def create_user() -> User:
     )
 
 
-def test_update_profile_persists_only_supplied_fields() -> None:
+def test_update_profile_persists_only_supplied_fields(test_settings) -> None:
     session = FakeSession()
-    service = UsersService(session)  # type: ignore[arg-type]
+    service = UserService(session, test_settings)  # type: ignore[arg-type]
     user = create_user()
 
     result = asyncio.run(service.update_profile(user, {"display_name": "Lia Chen"}))
@@ -42,9 +42,9 @@ def test_update_profile_persists_only_supplied_fields() -> None:
     assert session.refreshed == [user]
 
 
-def test_update_profile_can_clear_avatar() -> None:
+def test_update_profile_can_clear_avatar(test_settings) -> None:
     session = FakeSession()
-    service = UsersService(session)  # type: ignore[arg-type]
+    service = UserService(session, test_settings)  # type: ignore[arg-type]
     user = create_user()
 
     asyncio.run(service.update_profile(user, {"avatar_url": None}))
@@ -52,9 +52,9 @@ def test_update_profile_can_clear_avatar() -> None:
     assert user.avatar_url is None
 
 
-def test_empty_update_does_not_write() -> None:
+def test_empty_update_does_not_write(test_settings) -> None:
     session = FakeSession()
-    service = UsersService(session)  # type: ignore[arg-type]
+    service = UserService(session, test_settings)  # type: ignore[arg-type]
     user = create_user()
 
     asyncio.run(service.update_profile(user, {}))

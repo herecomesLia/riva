@@ -3,18 +3,18 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from riva.core.auth import get_auth_service
 from riva.core.errors import APIError
 from riva.core.security import normalize_username
+from riva.core.users import get_user_service
 from riva.models import User
-from riva.services.auth import AuthResult, CurrentSession
+from riva.services.users import AuthenticationResult, CurrentSession
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 SAME_ORIGIN = "http://testserver"
 
 
 @dataclass
-class FakeAuthService:
+class FakeUserService:
     users: dict[str, User] = field(default_factory=dict)
     tokens: dict[str, User] = field(default_factory=dict)
     revoked_tokens: set[str] = field(default_factory=set)
@@ -22,7 +22,7 @@ class FakeAuthService:
     logout_tokens: list[str | None] = field(default_factory=list)
     counter: int = 0
 
-    async def register(self, username: str, password: str) -> AuthResult:
+    async def register(self, username: str, password: str) -> AuthenticationResult:
         try:
             normalized_username = normalize_username(username)
         except ValueError as exc:
@@ -35,11 +35,13 @@ class FakeAuthService:
             username=username,
             normalized_username=normalized_username,
             password_hash="hashed-password",
+            display_name=username,
+            avatar_url=None,
         )
         self.users[normalized_username] = user
         token = self._new_token("register")
         self.tokens[token] = user
-        return AuthResult(user=user, token=token)
+        return AuthenticationResult(user=user, token=token)
 
     async def login(
         self,
@@ -47,7 +49,7 @@ class FakeAuthService:
         password: str,
         *,
         current_token: str | None = None,
-    ) -> AuthResult:
+    ) -> AuthenticationResult:
         try:
             normalized_username = normalize_username(username)
         except ValueError as exc:
@@ -59,9 +61,12 @@ class FakeAuthService:
 
         token = self._new_token("login")
         self.tokens[token] = self.users[normalized_username]
-        return AuthResult(user=self.users[normalized_username], token=token)
+        return AuthenticationResult(
+            user=self.users[normalized_username],
+            token=token,
+        )
 
-    async def current_session(self, token: str) -> CurrentSession:
+    async def get_current_session(self, token: str) -> CurrentSession:
         if token == "expired-token":
             raise APIError(401, "session_expired", clear_session_cookie=True)
         if token == "disabled-token":
@@ -85,14 +90,14 @@ class FakeAuthService:
         return f"{prefix}-token-{self.counter}"
 
 
-def create_auth_client(app) -> tuple[TestClient, FakeAuthService]:
-    auth_service = FakeAuthService()
-    app.dependency_overrides[get_auth_service] = lambda: auth_service
-    return TestClient(app), auth_service
+def create_auth_client(app) -> tuple[TestClient, FakeUserService]:
+    user_service = FakeUserService()
+    app.dependency_overrides[get_user_service] = lambda: user_service
+    return TestClient(app), user_service
 
 
 def test_register_sets_cookie_and_me_returns_current_user(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         register_response = client.post(
@@ -100,10 +105,18 @@ def test_register_sets_cookie_and_me_returns_current_user(app) -> None:
             json={"username": "New_User-1", "password": "correct-password"},
             headers={"Origin": TRUSTED_ORIGIN},
         )
-        me_response = client.get("/api/auth/me")
+        me_response = client.get("/api/users/me")
 
     assert register_response.status_code == 201
+    assert set(register_response.json()) == {
+        "id",
+        "username",
+        "displayName",
+        "avatarUrl",
+    }
     assert register_response.json()["username"] == "New_User-1"
+    assert register_response.json()["displayName"] == "New_User-1"
+    assert register_response.json()["avatarUrl"] is None
     assert "riva_session=" in register_response.headers["set-cookie"]
     assert "HttpOnly" in register_response.headers["set-cookie"]
     assert "Max-Age=604800" in register_response.headers["set-cookie"]
@@ -113,7 +126,7 @@ def test_register_sets_cookie_and_me_returns_current_user(app) -> None:
 
 
 def test_register_rejects_duplicate_username(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         first_response = client.post(
@@ -133,7 +146,7 @@ def test_register_rejects_duplicate_username(app) -> None:
 
 
 def test_register_rejects_usernames_shorter_than_four_chars(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         response = client.post(
@@ -147,7 +160,7 @@ def test_register_rejects_usernames_shorter_than_four_chars(app) -> None:
 
 
 def test_login_sets_cookie_and_revokes_current_browser_session(app) -> None:
-    client, auth_service = create_auth_client(app)
+    client, user_service = create_auth_client(app)
 
     with client:
         client.post(
@@ -163,12 +176,20 @@ def test_login_sets_cookie_and_revokes_current_browser_session(app) -> None:
         )
 
     assert login_response.status_code == 200
+    assert set(login_response.json()) == {
+        "id",
+        "username",
+        "displayName",
+        "avatarUrl",
+    }
+    assert login_response.json()["displayName"] == "new-user"
+    assert login_response.json()["avatarUrl"] is None
     assert login_response.cookies["riva_session"] != old_token
-    assert old_token in auth_service.revoked_tokens
+    assert old_token in user_service.revoked_tokens
 
 
 def test_login_invalid_credentials_returns_simple_json_error(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         response = client.post(
@@ -182,21 +203,30 @@ def test_login_invalid_credentials_returns_simple_json_error(app) -> None:
 
 
 def test_me_requires_cookie(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
-        response = client.get("/api/auth/me")
+        response = client.get("/api/users/me")
 
     assert response.status_code == 401
     assert response.json() == {"error": "not_authenticated"}
 
 
-def test_me_clears_invalid_cookie(app) -> None:
-    client, _auth_service = create_auth_client(app)
-    client.cookies.set("riva_session", "missing-token")
+def test_auth_me_endpoint_is_removed(app) -> None:
+    client, _user_service = create_auth_client(app)
 
     with client:
         response = client.get("/api/auth/me")
+
+    assert response.status_code == 404
+
+
+def test_me_clears_invalid_cookie(app) -> None:
+    client, _user_service = create_auth_client(app)
+    client.cookies.set("riva_session", "missing-token")
+
+    with client:
+        response = client.get("/api/users/me")
 
     assert response.status_code == 401
     assert response.json() == {"error": "invalid_session"}
@@ -206,7 +236,7 @@ def test_me_clears_invalid_cookie(app) -> None:
 
 
 def test_logout_without_cookie_returns_204_and_clears_cookie(app) -> None:
-    client, auth_service = create_auth_client(app)
+    client, user_service = create_auth_client(app)
 
     with client:
         response = client.post(
@@ -215,14 +245,14 @@ def test_logout_without_cookie_returns_204_and_clears_cookie(app) -> None:
         )
 
     assert response.status_code == 204
-    assert auth_service.logout_tokens == [None]
+    assert user_service.logout_tokens == [None]
     assert "Max-Age=0" in response.headers["set-cookie"]
     assert "Path=/" in response.headers["set-cookie"]
     assert "SameSite=lax" in response.headers["set-cookie"]
 
 
 def test_logout_revokes_valid_session(app) -> None:
-    client, auth_service = create_auth_client(app)
+    client, user_service = create_auth_client(app)
 
     with client:
         client.post(
@@ -235,22 +265,22 @@ def test_logout_revokes_valid_session(app) -> None:
             "/api/auth/logout",
             headers={"Origin": TRUSTED_ORIGIN},
         )
-        me_response = client.get("/api/auth/me")
+        me_response = client.get("/api/users/me")
 
     assert logout_response.status_code == 204
-    assert token in auth_service.revoked_tokens
+    assert token in user_service.revoked_tokens
     assert me_response.status_code == 401
     assert me_response.json() == {"error": "not_authenticated"}
 
 
 def test_me_clears_expired_and_disabled_sessions(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         client.cookies.set("riva_session", "expired-token")
-        expired_response = client.get("/api/auth/me")
+        expired_response = client.get("/api/users/me")
         client.cookies.set("riva_session", "disabled-token")
-        disabled_response = client.get("/api/auth/me")
+        disabled_response = client.get("/api/users/me")
 
     assert expired_response.status_code == 401
     assert expired_response.json() == {"error": "session_expired"}
@@ -261,7 +291,7 @@ def test_me_clears_expired_and_disabled_sessions(app) -> None:
 
 
 def test_me_refreshes_cookie_when_session_is_refreshed(app) -> None:
-    client, auth_service = create_auth_client(app)
+    client, user_service = create_auth_client(app)
 
     with client:
         client.post(
@@ -270,15 +300,15 @@ def test_me_refreshes_cookie_when_session_is_refreshed(app) -> None:
             headers={"Origin": TRUSTED_ORIGIN},
         )
         token = client.cookies["riva_session"]
-        auth_service.refresh_tokens.add(token)
-        response = client.get("/api/auth/me")
+        user_service.refresh_tokens.add(token)
+        response = client.get("/api/users/me")
 
     assert response.status_code == 200
     assert "Max-Age=604800" in response.headers["set-cookie"]
 
 
 def test_auth_unsafe_methods_require_trusted_origin(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         missing_origin_response = client.post(
@@ -298,7 +328,7 @@ def test_auth_unsafe_methods_require_trusted_origin(app) -> None:
 
 
 def test_auth_csrf_allows_same_origin_and_trusted_referer(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         same_origin_response = client.post(
@@ -317,7 +347,7 @@ def test_auth_csrf_allows_same_origin_and_trusted_referer(app) -> None:
 
 
 def test_auth_csrf_rejects_untrusted_referer(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         response = client.post(
@@ -331,7 +361,7 @@ def test_auth_csrf_rejects_untrusted_referer(app) -> None:
 
 
 def test_options_preflight_is_not_blocked_by_csrf(app) -> None:
-    client, _auth_service = create_auth_client(app)
+    client, _user_service = create_auth_client(app)
 
     with client:
         response = client.options(

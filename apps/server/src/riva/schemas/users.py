@@ -11,7 +11,7 @@ DisplayName = Annotated[
 ]
 
 
-class UserProfileResponse(APIModel):
+class UserResponse(APIModel):
     id: UUID
     username: str
     display_name: str

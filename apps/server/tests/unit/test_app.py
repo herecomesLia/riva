@@ -40,3 +40,16 @@ def test_lifespan_fails_when_database_is_unavailable(
 
     assert database.ping_count == 1
     assert database.dispose_count == 1
+
+
+def test_openapi_exposes_only_the_consolidated_current_user_path(app) -> None:
+    paths = app.openapi()["paths"]
+
+    assert set(paths) == {
+        "/api/auth/register",
+        "/api/auth/login",
+        "/api/auth/logout",
+        "/api/users/me",
+        "/api/health",
+    }
+    assert set(paths["/api/users/me"]) == {"get", "patch"}

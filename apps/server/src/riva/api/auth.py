@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from riva.core.auth import get_auth_service, require_current_user
 from riva.core.cookies import delete_session_cookie, set_session_cookie
 from riva.core.csrf import csrf_protect
+from riva.core.users import get_user_service
 from riva.models import User
-from riva.schemas.auth import AuthCredentials, UserResponse
-from riva.services.auth import AuthService
+from riva.schemas.auth import AuthCredentials
+from riva.schemas.users import UserResponse
+from riva.services.users import UserService
 
 router = APIRouter(
     prefix="/auth",
@@ -23,9 +24,9 @@ async def register(
     payload: AuthCredentials,
     request: Request,
     response: Response,
-    auth_service: AuthService = Depends(get_auth_service),
+    user_service: UserService = Depends(get_user_service),
 ) -> User:
-    result = await auth_service.register(payload.username, payload.password)
+    result = await user_service.register(payload.username, payload.password)
     set_session_cookie(response, request.app.state.settings, result.token)
     return result.user
 
@@ -35,10 +36,10 @@ async def login(
     payload: AuthCredentials,
     request: Request,
     response: Response,
-    auth_service: AuthService = Depends(get_auth_service),
+    user_service: UserService = Depends(get_user_service),
 ) -> User:
     settings = request.app.state.settings
-    result = await auth_service.login(
+    result = await user_service.login(
         payload.username,
         payload.password,
         current_token=request.cookies.get(settings.session_cookie_name),
@@ -47,17 +48,12 @@ async def login(
     return result.user
 
 
-@router.get("/me", response_model=UserResponse)
-async def me(current_user: User = Depends(require_current_user)) -> User:
-    return current_user
-
-
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     request: Request,
     response: Response,
-    auth_service: AuthService = Depends(get_auth_service),
+    user_service: UserService = Depends(get_user_service),
 ) -> None:
     settings = request.app.state.settings
-    await auth_service.logout(request.cookies.get(settings.session_cookie_name))
+    await user_service.logout(request.cookies.get(settings.session_cookie_name))
     delete_session_cookie(response, settings)

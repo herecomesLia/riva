@@ -1,17 +1,16 @@
-from riva.schemas.auth import AuthCredentials, UserResponse
+from riva.schemas.auth import AuthCredentials
 from riva.schemas.health import (
     DependencyHealthStatus,
     HealthResponse,
     ServiceHealthStatus,
 )
-from riva.schemas.users import UserProfileResponse, UserProfileUpdate
+from riva.schemas.users import UserProfileUpdate, UserResponse
 
 __all__ = [
     "AuthCredentials",
     "DependencyHealthStatus",
     "HealthResponse",
     "ServiceHealthStatus",
-    "UserProfileResponse",
     "UserProfileUpdate",
     "UserResponse",
 ]
