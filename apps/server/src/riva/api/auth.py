@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, Response, status
 from riva.api.cookies import delete_session_cookie, set_session_cookie
 from riva.api.deps import UserServiceDep, csrf_guard
 from riva.models import User
-from riva.schemas.auth import AuthCredentials
+from riva.schemas.auth import LoginCredentials, RegisterCredentials
 from riva.schemas.users import UserResponse
 
 router = APIRouter(
@@ -19,7 +19,7 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
 )
 async def register(
-    payload: AuthCredentials,
+    payload: RegisterCredentials,
     request: Request,
     response: Response,
     user_service: UserServiceDep,
@@ -31,7 +31,7 @@ async def register(
 
 @router.post("/login", response_model=UserResponse)
 async def login(
-    payload: AuthCredentials,
+    payload: LoginCredentials,
     request: Request,
     response: Response,
     user_service: UserServiceDep,

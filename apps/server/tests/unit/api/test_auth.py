@@ -156,7 +156,21 @@ def test_register_rejects_usernames_shorter_than_four_chars(app) -> None:
         )
 
     assert response.status_code == 422
-    assert response.json() == {"error": "invalid_username"}
+    assert response.json()["detail"][0]["loc"] == ["body", "username"]
+
+
+def test_login_keeps_invalid_username_as_invalid_credentials(app) -> None:
+    client, _user_service = create_auth_client(app)
+
+    with client:
+        response = client.post(
+            "/api/auth/login",
+            json={"username": "abc", "password": "short"},
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"error": "invalid_credentials"}
 
 
 def test_login_sets_cookie_and_revokes_current_browser_session(app) -> None:
