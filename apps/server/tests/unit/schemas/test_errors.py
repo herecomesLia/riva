@@ -31,7 +31,6 @@ def test_error_response_serializes_nested_issues() -> None:
             issues=[
                 ErrorIssue(
                     location=["body", "displayName"],
-                    code="required",
                     message="Field is required.",
                 )
             ],
@@ -46,7 +45,6 @@ def test_error_response_serializes_nested_issues() -> None:
             "issues": [
                 {
                     "location": ["body", "displayName"],
-                    "code": "required",
                     "message": "Field is required.",
                 }
             ],

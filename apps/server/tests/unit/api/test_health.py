@@ -30,4 +30,5 @@ def test_health_returns_503_when_database_is_unavailable(
         "status": "unhealthy",
         "database": "unavailable",
     }
+    assert "error" not in response.json()
     assert database.ping_count == 2

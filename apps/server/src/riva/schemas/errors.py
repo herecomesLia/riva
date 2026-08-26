@@ -3,7 +3,6 @@ from riva.schemas.base import APIModel
 
 class ErrorIssue(APIModel):
     location: list[str | int]
-    code: str
     message: str
 
 

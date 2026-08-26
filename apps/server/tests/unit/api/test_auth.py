@@ -159,7 +159,17 @@ def test_register_rejects_usernames_shorter_than_four_chars(app) -> None:
         )
 
     assert response.status_code == 422
-    assert response.json()["detail"][0]["loc"] == ["body", "username"]
+    assert response.json()["error"] == {
+        "code": "request.validation_failed",
+        "message": "Request validation failed.",
+        "issues": [
+            {
+                "location": ["body", "username"],
+                "message": "String should have at least 4 characters",
+            }
+        ],
+    }
+    assert set(response.json()) == {"error", "requestId"}
 
 
 def test_login_keeps_invalid_username_as_invalid_credentials(app) -> None:
@@ -247,7 +257,12 @@ def test_auth_me_endpoint_is_removed(app) -> None:
     with client:
         response = client.get("/api/auth/me")
 
-    assert response.status_code == 404
+    assert_error_response(
+        response,
+        status_code=404,
+        code="request.not_found",
+        message="The requested endpoint was not found.",
+    )
 
 
 def test_me_clears_invalid_cookie(app) -> None:
