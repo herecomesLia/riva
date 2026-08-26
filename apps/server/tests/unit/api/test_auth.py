@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from riva.api.deps import get_user_service
+from riva.core.app import wrap_cors
 from riva.models import User
 from riva.services.errors import (
     AccountDisabledError,
@@ -92,7 +93,7 @@ class FakeUserService:
 def create_auth_client(app) -> tuple[TestClient, FakeUserService]:
     user_service = FakeUserService()
     app.dependency_overrides[get_user_service] = lambda: user_service
-    return TestClient(app), user_service
+    return TestClient(wrap_cors(app, app.state.settings)), user_service
 
 
 def test_register_sets_cookie_and_me_returns_current_user(app) -> None:

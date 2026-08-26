@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from riva.core.app import wrap_cors
 from riva.core.config import Settings
 from riva.core.logging import LogFormat, LogLevel
 from tests.helpers.app import create_test_app
@@ -23,7 +24,7 @@ def create_cors_client(
         session_cookie_secure=False,
     )
     app = create_test_app(monkeypatch, settings, FakeDatabase())
-    return TestClient(app)
+    return TestClient(wrap_cors(app, settings))
 
 
 def test_cors_default_does_not_allow_cross_origin(monkeypatch) -> None:

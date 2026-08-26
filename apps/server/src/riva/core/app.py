@@ -7,6 +7,7 @@ import structlog
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp
 
 from riva.api import router
 from riva.api.errors import register_exception_handlers
@@ -80,7 +81,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
 
 
-def register_middlewares(app: FastAPI, settings: Settings) -> None:
+def register_middlewares(app: FastAPI) -> None:
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(
         CorrelationIdMiddleware,
@@ -88,13 +89,21 @@ def register_middlewares(app: FastAPI, settings: Settings) -> None:
         update_request_header=True,
         generator=lambda: str(uuid4()),
     )
-    app.add_middleware(
-        CORSMiddleware,
+
+
+def wrap_cors(app: ASGIApp, settings: Settings) -> ASGIApp:
+    return CORSMiddleware(
+        app,
         allow_origins=settings.cors_allowed_origins,
         allow_credentials=settings.cors_allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+def create_asgi_app(settings: Settings | None = None) -> ASGIApp:
+    settings = settings or Settings()
+    return wrap_cors(create_app(settings), settings)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -105,6 +114,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.database = database
     register_exception_handlers(app)
-    register_middlewares(app, settings)
+    register_middlewares(app)
     app.include_router(router, prefix="/api")
     return app

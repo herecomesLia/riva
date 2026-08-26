@@ -3,8 +3,12 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from riva.api.deps import get_user_service
+from riva.core.app import wrap_cors
 from riva.db.errors import DatabaseUnavailableError
 from tests.helpers.assertions import assert_error_response
+
+TRUSTED_ORIGIN = "http://localhost:5173"
+UNTRUSTED_ORIGIN = "http://localhost:3000"
 
 
 def test_missing_route_returns_not_found_error_response(client) -> None:
@@ -111,8 +115,14 @@ def test_unknown_exception_returns_internal_error_response(app) -> None:
 
     app.add_api_route("/test-errors/unknown", unknown_error)
 
-    with TestClient(app, raise_server_exceptions=False) as client:
-        response = client.get("/test-errors/unknown")
+    with TestClient(
+        wrap_cors(app, app.state.settings),
+        raise_server_exceptions=False,
+    ) as client:
+        response = client.get(
+            "/test-errors/unknown",
+            headers={"Origin": TRUSTED_ORIGIN},
+        )
 
     assert_error_response(
         response,
@@ -120,6 +130,34 @@ def test_unknown_exception_returns_internal_error_response(app) -> None:
         code="server.internal_error",
         message="An internal server error occurred.",
     )
+    assert "sensitive internal detail" not in response.text
+    assert response.headers["access-control-allow-origin"] == TRUSTED_ORIGIN
+    assert response.headers["access-control-allow-credentials"] == "true"
+    assert response.headers["vary"] == "Origin"
+
+
+def test_unknown_exception_omits_cors_for_untrusted_origin(app) -> None:
+    async def unknown_error() -> None:
+        raise RuntimeError("sensitive internal detail")
+
+    app.add_api_route("/test-errors/unknown-untrusted", unknown_error)
+
+    with TestClient(
+        wrap_cors(app, app.state.settings),
+        raise_server_exceptions=False,
+    ) as client:
+        response = client.get(
+            "/test-errors/unknown-untrusted",
+            headers={"Origin": UNTRUSTED_ORIGIN},
+        )
+
+    assert_error_response(
+        response,
+        status_code=500,
+        code="server.internal_error",
+        message="An internal server error occurred.",
+    )
+    assert "access-control-allow-origin" not in response.headers
     assert "sensitive internal detail" not in response.text
 
 
