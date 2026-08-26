@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Response, status
 
 from riva.api.cookies import delete_session_cookie, set_session_cookie
 from riva.api.deps import UserServiceDep, csrf_guard
-from riva.api.errors import error_responses
+from riva.api.errors.openapi import error_responses
 from riva.models import User
 from riva.schemas.auth import LoginCredentials, RegisterCredentials
 from riva.schemas.users import UserResponse

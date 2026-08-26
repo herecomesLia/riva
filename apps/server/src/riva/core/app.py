@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp
 
-from riva.api import router
-from riva.api.errors import register_exception_handlers
+from riva.api.errors.handlers import register_exception_handlers
+from riva.api.routes import router
 from riva.core.config import Settings
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database

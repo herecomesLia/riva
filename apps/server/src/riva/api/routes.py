@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 
 from riva.api.auth import router as auth_router
-from riva.api.errors import error_responses
+from riva.api.errors.openapi import error_responses
 from riva.api.health import router as health_router
 from riva.api.users import router as users_router
 

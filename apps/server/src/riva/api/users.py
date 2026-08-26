@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 
 from riva.api.deps import CurrentUserDep, UserServiceDep, csrf_guard
-from riva.api.errors import error_responses
+from riva.api.errors.openapi import error_responses
 from riva.models import User
 from riva.schemas.users import UserProfileUpdate, UserResponse
 
