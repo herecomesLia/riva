@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from testcontainers.community.postgres import PostgresContainer
 
 from riva.core.app import create_app, wrap_cors
+from riva.core.config import Settings
 from riva.db import Database
+from riva.services.users import UserService
+from tests.support.clock import Clock
 from tests.support.settings import TEST_ORIGIN, make_test_settings
 
 POSTGRES_IMAGE = "postgres:18-alpine"
@@ -42,11 +45,24 @@ async def db_session(database: Database) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-async def app(
-    test_database_url: str,
-    database: Database,
-) -> FastAPI:
-    settings = make_test_settings(database_url=test_database_url)
+def settings(test_database_url: str) -> Settings:
+    return make_test_settings(database_url=test_database_url)
+
+
+@pytest.fixture
+def user_service(db_session: AsyncSession, settings: Settings) -> UserService:
+    return UserService(db_session, settings)
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
+    test_clock = Clock()
+    monkeypatch.setattr("riva.services.users.utc_now", test_clock)
+    return test_clock
+
+
+@pytest.fixture
+async def app(settings: Settings, database: Database) -> FastAPI:
     application = create_app(settings)
 
     # Replace create_app's database before lifespan starts so every request uses

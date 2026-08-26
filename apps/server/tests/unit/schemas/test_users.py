@@ -10,7 +10,7 @@ from riva.schemas.users import UserProfileUpdate, UserResponse
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (" Eleno ", "Eleno"),
+        (" Test User ", "Test User"),
         ("a" * 64, "a" * 64),
     ],
 )
@@ -48,7 +48,7 @@ def test_profile_update_rejects_invalid_avatar_url() -> None:
     ("payload", "expected"),
     [
         ({}, {}),
-        ({"displayName": "Eleno"}, {"display_name": "Eleno"}),
+        ({"displayName": "Test User"}, {"display_name": "Test User"}),
         ({"avatarUrl": None}, {"avatar_url": None}),
     ],
 )
@@ -77,8 +77,8 @@ def test_user_response_validates_attributes_and_serializes_aliases() -> None:
     user_id = uuid4()
     user = SimpleNamespace(
         id=user_id,
-        username="eleno",
-        display_name="Eleno",
+        username="test_user",
+        display_name="Test User",
         avatar_url=None,
     )
 
@@ -86,7 +86,7 @@ def test_user_response_validates_attributes_and_serializes_aliases() -> None:
 
     assert response.model_dump(mode="json") == {
         "id": str(user_id),
-        "username": "eleno",
-        "displayName": "Eleno",
+        "username": "test_user",
+        "displayName": "Test User",
         "avatarUrl": None,
     }
