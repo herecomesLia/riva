@@ -1,8 +1,8 @@
 from urllib.parse import urlsplit
 
-from fastapi import Request, status
+from fastapi import Request
 
-from riva.api.errors import APIError
+from riva.api.errors import CsrfFailedError
 from riva.core.config import Settings
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -17,13 +17,13 @@ async def csrf_protect(request: Request) -> None:
     if origin is not None:
         if _is_allowed_source(origin, request, settings):
             return
-        raise APIError(status.HTTP_403_FORBIDDEN, "csrf_failed")
+        raise CsrfFailedError()
 
     referer = request.headers.get("referer")
     if referer is not None and _is_allowed_source(referer, request, settings):
         return
 
-    raise APIError(status.HTTP_403_FORBIDDEN, "csrf_failed")
+    raise CsrfFailedError()
 
 
 def _is_allowed_source(source: str, request: Request, settings: Settings) -> bool:

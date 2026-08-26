@@ -1,12 +1,12 @@
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import Depends, Request, Response, status
+from fastapi import Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.api.cookies import set_session_cookie
 from riva.api.csrf import csrf_protect
-from riva.api.errors import APIError
+from riva.api.errors import AuthRequiredError
 from riva.db import Database
 from riva.models import User
 from riva.services.users import UserService
@@ -41,7 +41,7 @@ async def require_current_user(
     settings = request.app.state.settings
     token = request.cookies.get(settings.session_cookie_name)
     if token is None:
-        raise APIError(status.HTTP_401_UNAUTHORIZED, "not_authenticated")
+        raise AuthRequiredError()
 
     session_state = await user_service.get_current_session(token)
     if session_state.refreshed:

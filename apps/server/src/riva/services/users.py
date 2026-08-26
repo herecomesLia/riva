@@ -7,15 +7,20 @@ from datetime import datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from riva.api.errors import APIError
 from riva.core.config import Settings
 from riva.models import AuthSession, User
+from riva.services.errors import (
+    AccountDisabledError,
+    InvalidCredentialsError,
+    InvalidSessionError,
+    SessionExpiredError,
+    UsernameTakenError,
+)
 from riva.utils import utc_now
 
 _password_hasher = PasswordHasher()
@@ -57,7 +62,7 @@ class UserService:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise APIError(status.HTTP_409_CONFLICT, "username_taken") from exc
+            raise UsernameTakenError() from exc
 
         return AuthenticationResult(user=user, token=token)
 
@@ -75,9 +80,9 @@ class UserService:
         )
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
-            raise _invalid_credentials()
+            raise InvalidCredentialsError()
         if not _verify_password(user.password_hash, password):
-            raise _invalid_credentials()
+            raise InvalidCredentialsError()
 
         now = utc_now()
         if current_token:
@@ -92,11 +97,7 @@ class UserService:
         now = utc_now()
         auth_session = await self._session_by_token(token)
         if auth_session is None or auth_session.revoked_at is not None:
-            raise APIError(
-                status.HTTP_401_UNAUTHORIZED,
-                "invalid_session",
-                clear_session_cookie=True,
-            )
+            raise InvalidSessionError()
 
         user = auth_session.user
         if auth_session.expires_at <= now or (
@@ -105,20 +106,12 @@ class UserService:
         ):
             auth_session.revoked_at = now
             await self.session.commit()
-            raise APIError(
-                status.HTTP_401_UNAUTHORIZED,
-                "session_expired",
-                clear_session_cookie=True,
-            )
+            raise SessionExpiredError()
 
         if not user.is_active:
             auth_session.revoked_at = now
             await self.session.commit()
-            raise APIError(
-                status.HTTP_403_FORBIDDEN,
-                "account_disabled",
-                clear_session_cookie=True,
-            )
+            raise AccountDisabledError()
 
         refreshed = False
         refresh_after = timedelta(
@@ -187,10 +180,6 @@ class UserService:
 
     def _expires_at(self, now: datetime) -> datetime:
         return now + timedelta(seconds=self.settings.session_idle_timeout_seconds)
-
-
-def _invalid_credentials() -> APIError:
-    return APIError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
 
 
 def _normalize_username(username: str) -> str:

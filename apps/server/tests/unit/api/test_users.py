@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from riva.api.deps import get_user_service, require_current_user
 from riva.models import User
+from tests.helpers.assertions import assert_error_response
 
 TRUSTED_ORIGIN = "http://localhost:5173"
 
@@ -48,8 +49,12 @@ def test_get_current_user_profile_requires_authentication(app) -> None:
     with TestClient(app) as client:
         response = client.get("/api/users/me")
 
-    assert response.status_code == 401
-    assert response.json() == {"error": "not_authenticated"}
+    assert_error_response(
+        response,
+        status_code=401,
+        code="auth.not_authenticated",
+        message="Authentication is required.",
+    )
 
 
 def test_get_current_user_profile(app) -> None:
@@ -121,6 +126,10 @@ def test_patch_current_user_profile_requires_trusted_origin(app) -> None:
             json={"displayName": "Lia Chen"},
         )
 
-    assert response.status_code == 403
-    assert response.json() == {"error": "csrf_failed"}
+    assert_error_response(
+        response,
+        status_code=403,
+        code="request.csrf_failed",
+        message="CSRF validation failed.",
+    )
     assert user_service.changes == []
