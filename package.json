@@ -16,6 +16,7 @@
     "format:prettier:check": "prettier --check --ignore-unknown .",
     "server:format": "uv run --locked --directory apps/server ruff check --select I --fix && uv run --locked --directory apps/server ruff format",
     "server:format:check": "uv run --locked --directory apps/server ruff check --select I && uv run --locked --directory apps/server ruff format --check",
+    "server:test": "uv run --locked --directory apps/server pytest",
     "format": "pnpm run format:prettier && pnpm run server:format",
     "format:check": "pnpm run format:prettier:check && pnpm run server:format:check",
     "prepare": "husky"
