@@ -1,5 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
+from http import HTTPStatus
+from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
@@ -19,6 +21,16 @@ from riva.services.errors import (
     SessionExpiredError,
     UsernameTakenError,
 )
+
+
+def error_responses(*status_codes: int) -> dict[int, dict[str, Any]]:
+    return {
+        status_code: {
+            "model": ErrorResponse,
+            "description": HTTPStatus(status_code).phrase,
+        }
+        for status_code in status_codes
+    }
 
 
 class APIRequestError(Exception):

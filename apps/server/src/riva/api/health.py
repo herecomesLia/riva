@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
@@ -7,7 +9,16 @@ from riva.schemas import DependencyHealthStatus, HealthResponse, ServiceHealthSt
 router = APIRouter()
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    responses={
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "model": HealthResponse,
+            "description": HTTPStatus(status.HTTP_503_SERVICE_UNAVAILABLE).phrase,
+        }
+    },
+)
 async def health(request: Request) -> HealthResponse | JSONResponse:
     try:
         await request.app.state.database.ping()
