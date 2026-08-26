@@ -17,12 +17,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "asgi-lifespan>=2.1.0",
-    "httpx>=0.28.1",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
-    "ruff>=0.11.0",
-    "testcontainers[postgres]>=4.15.0",
+  "asgi-lifespan>=2.1.0",
+  "httpx>=0.28.1",
+  "pytest>=9.1.1",
+  "pytest-asyncio>=1.4.0",
+  "pytest-cov>=7.0.0",
+  "ruff>=0.11.0",
+  "testcontainers[postgres]>=4.15.0",
 ]
 
 [project.scripts]
@@ -30,6 +31,14 @@ riva = "riva.cli:main"
 
 [tool.uv.build-backend]
 module-name = "riva"
+
+[tool.coverage.run]
+branch = true
+source = ["riva"]
+
+[tool.coverage.report]
+skip_empty = true
+skip_covered = true
 
 [build-system]
 requires = ["uv_build>=0.11.24,<0.12.0"]
