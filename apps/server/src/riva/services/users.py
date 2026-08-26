@@ -27,7 +27,7 @@ _password_hasher = PasswordHasher()
 
 
 @dataclass(frozen=True)
-class AuthenticationResult:
+class AuthResult:
     user: User
     token: str
 
@@ -43,7 +43,7 @@ class UserService:
         self.session = session
         self.settings = settings
 
-    async def register(self, username: str, password: str) -> AuthenticationResult:
+    async def register(self, username: str, password: str) -> AuthResult:
         normalized_username = _normalize_username(username)
         now = utc_now()
         user = User(
@@ -64,7 +64,7 @@ class UserService:
             await self.session.rollback()
             raise UsernameTakenError() from exc
 
-        return AuthenticationResult(user=user, token=token)
+        return AuthResult(user=user, token=token)
 
     async def login(
         self,
@@ -72,7 +72,7 @@ class UserService:
         password: str,
         *,
         current_token: str | None = None,
-    ) -> AuthenticationResult:
+    ) -> AuthResult:
         normalized_username = _normalize_username(username)
 
         result = await self.session.execute(
@@ -91,7 +91,7 @@ class UserService:
         token, auth_session = self._new_session(user, now)
         self.session.add(auth_session)
         await self.session.commit()
-        return AuthenticationResult(user=user, token=token)
+        return AuthResult(user=user, token=token)
 
     async def get_current_session(self, token: str) -> CurrentSession:
         now = utc_now()

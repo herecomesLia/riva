@@ -12,7 +12,7 @@ from riva.services.errors import (
     SessionExpiredError,
     UsernameTakenError,
 )
-from riva.services.users import AuthenticationResult, CurrentSession
+from riva.services.users import AuthResult, CurrentSession
 from tests.helpers.assertions import assert_error_response
 
 TRUSTED_ORIGIN = "http://localhost:5173"
@@ -28,7 +28,7 @@ class FakeUserService:
     logout_tokens: list[str | None] = field(default_factory=list)
     counter: int = 0
 
-    async def register(self, username: str, password: str) -> AuthenticationResult:
+    async def register(self, username: str, password: str) -> AuthResult:
         normalized_username = username.lower()
         if normalized_username in self.users:
             raise UsernameTakenError()
@@ -44,7 +44,7 @@ class FakeUserService:
         self.users[normalized_username] = user
         token = self._new_token("register")
         self.tokens[token] = user
-        return AuthenticationResult(user=user, token=token)
+        return AuthResult(user=user, token=token)
 
     async def login(
         self,
@@ -52,7 +52,7 @@ class FakeUserService:
         password: str,
         *,
         current_token: str | None = None,
-    ) -> AuthenticationResult:
+    ) -> AuthResult:
         normalized_username = username.lower()
         if normalized_username not in self.users or password != "correct-password":
             raise InvalidCredentialsError()
@@ -61,7 +61,7 @@ class FakeUserService:
 
         token = self._new_token("login")
         self.tokens[token] = self.users[normalized_username]
-        return AuthenticationResult(
+        return AuthResult(
             user=self.users[normalized_username],
             token=token,
         )
