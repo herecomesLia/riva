@@ -31,17 +31,75 @@ Riva focuses on five product areas:
 
 ## Development
 
-Use `main` as the stable integration branch. Client, server, and documentation
-work can use dedicated long-lived branches:
+Riva is a pnpm and uv monorepo. Run the following commands from the repository
+root unless noted otherwise.
 
-```text
-main      stable integration
-client    frontend development
-server    backend development
-docs      documentation
+### Prerequisites
+
+- pnpm 11
+- uv and Python 3.14 or newer
+- Podman or Docker when running the server or server integration tests
+
+Install the workspace dependencies:
+
+```bash
+pnpm install
+uv sync --locked --directory apps/server
 ```
 
-Daily changes should happen on task branches and merge back through the normal
-review path.
+### Client development
 
-Use `pnpm` for JavaScript and TypeScript packages, and `uv` for Python services.
+The client currently uses its mock services for day-to-day UI development:
+
+```bash
+pnpm client:dev:mock
+```
+
+Vite serves the client at `http://localhost:5173`. Use `pnpm client:dev` when
+working against implemented server APIs.
+
+### Server development
+
+Create a local environment file and apply the local-development cookie and CORS
+values documented in it:
+
+```bash
+cp .env.example .env
+```
+
+Start PostgreSQL:
+
+```bash
+podman compose -f infra/local/docker-compose.yml up -d
+```
+
+Docker users can replace `podman compose` with `docker compose`.
+
+Create the database tables, then start the FastAPI server with source reload:
+
+```bash
+uv run --locked --directory apps/server riva db setup --env-file ../../.env -y
+uv run --locked --directory apps/server riva start --env-file ../../.env --reload
+```
+
+The API listens on `http://127.0.0.1:7482` by default. Stop the local database
+when it is no longer needed:
+
+```bash
+podman compose -f infra/local/docker-compose.yml down
+```
+
+### Tests and checks
+
+Run the relevant checks before submitting a change:
+
+```bash
+pnpm client:lint
+pnpm client:test:all
+pnpm server:test
+pnpm format:check
+```
+
+Server tests use Testcontainers to create and remove a temporary PostgreSQL
+instance automatically. A Docker-compatible container runtime must be available,
+but the local development database does not need to be running.
