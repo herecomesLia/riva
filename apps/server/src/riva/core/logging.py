@@ -134,7 +134,7 @@ class RequestLoggingMiddleware:
         try:
             # Resolve full route template with router prefixes.
             return str(request.app.url_path_for(route_name, **path_params))
-        except Exception:
+        except Exception:  # noqa: BLE001 - logging metadata must not affect request handling
             # Avoid unreliable fallback values.
             return None
 

@@ -1,6 +1,6 @@
 import os
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Self
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def validate_cors_credentials(self) -> "Settings":
+    def validate_cors_credentials(self) -> Self:
         if self.cors_allow_credentials and "*" in self.cors_allowed_origins:
             raise ValueError(
                 "RIVA_CORS_ALLOWED_ORIGINS cannot contain '*' when "

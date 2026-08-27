@@ -1,3 +1,5 @@
+from typing import Self
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -28,7 +30,7 @@ class Database:
     async def dispose(self) -> None:
         await self.engine.dispose()
 
-    async def __aenter__(self) -> "Database":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *args: object) -> None:
