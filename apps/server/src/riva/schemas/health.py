@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from riva.schemas.base import APIModel
+from riva.schemas.base import ResponseModel
 
 
 class ServiceHealthStatus(StrEnum):
@@ -15,6 +15,6 @@ class DependencyHealthStatus(StrEnum):
     unknown = "unknown"
 
 
-class HealthResponse(APIModel):
+class HealthResponse(ResponseModel):
     status: ServiceHealthStatus
     database: DependencyHealthStatus

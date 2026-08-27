@@ -1,9 +1,9 @@
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, HttpUrl, StringConstraints, field_validator
+from pydantic import Field, HttpUrl, StringConstraints, field_validator
 
-from riva.schemas.base import APIModel
+from riva.schemas.base import RequestModel, ResponseModel
 
 DisplayName = Annotated[
     str,
@@ -11,16 +11,14 @@ DisplayName = Annotated[
 ]
 
 
-class UserResponse(APIModel):
+class UserResponse(ResponseModel):
     id: UUID
     username: str
     display_name: str
     avatar_url: str | None
 
 
-class UserProfileUpdate(APIModel):
-    model_config = ConfigDict(extra="forbid")
-
+class UserProfileUpdate(RequestModel):
     display_name: DisplayName | None = None
     avatar_url: Annotated[HttpUrl, Field(max_length=2083)] | None = None
 

@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import StringConstraints
 
-from riva.schemas.base import APIModel
+from riva.schemas.base import RequestModel
 
 RegistrationUsername = Annotated[
     str,
@@ -23,11 +23,11 @@ RegistrationPassword = Annotated[
 ]
 
 
-class RegisterCredentials(APIModel):
+class RegisterCredentials(RequestModel):
     username: RegistrationUsername
     password: RegistrationPassword
 
 
-class LoginCredentials(APIModel):
+class LoginCredentials(RequestModel):
     username: str
     password: str

@@ -68,11 +68,6 @@ def test_profile_update_preserves_partial_update_semantics(
     )
 
 
-def test_profile_update_forbids_extra_fields() -> None:
-    with pytest.raises(ValidationError):
-        UserProfileUpdate.model_validate({"unknown": "value"})
-
-
 def test_user_response_validates_attributes_and_serializes_aliases() -> None:
     user_id = uuid4()
     user = SimpleNamespace(

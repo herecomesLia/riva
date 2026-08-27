@@ -26,6 +26,31 @@ async def test_request_validation_returns_structured_issues(
     assert ("body", "password") in locations
 
 
+async def test_extra_request_field_returns_validation_error(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/api/auth/register",
+        headers=ORIGIN_HEADERS,
+        json={
+            "username": "testuser",
+            "password": "Abcd1234",
+            "unexpected": "value",
+        },
+    )
+
+    body = assert_error_response(
+        response,
+        status_code=422,
+        code="request.validation_failed",
+        message="Request validation failed.",
+    )
+
+    assert any(
+        issue["location"] == ["body", "unexpected"] for issue in body["error"]["issues"]
+    )
+
+
 async def test_not_found_returns_standard_error_response(
     client: AsyncClient,
 ) -> None:
