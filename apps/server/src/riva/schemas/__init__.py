@@ -5,7 +5,7 @@ from riva.schemas.health import (
     HealthResponse,
     ServiceHealthStatus,
 )
-from riva.schemas.users import UserProfileUpdate, UserResponse
+from riva.schemas.users import UpdateCurrentUserRequest, UserResponse
 
 __all__ = [
     "DependencyHealthStatus",
@@ -16,6 +16,6 @@ __all__ = [
     "LoginCredentials",
     "RegisterCredentials",
     "ServiceHealthStatus",
-    "UserProfileUpdate",
+    "UpdateCurrentUserRequest",
     "UserResponse",
 ]

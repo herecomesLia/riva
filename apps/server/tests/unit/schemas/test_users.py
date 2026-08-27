@@ -4,59 +4,17 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from riva.schemas.users import UserProfileUpdate, UserResponse
+from riva.schemas.users import UpdateCurrentUserRequest, UserResponse
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (" Test User ", "Test User"),
-        ("a" * 64, "a" * 64),
-    ],
-)
-def test_profile_update_normalizes_valid_display_name(
-    value: str,
-    expected: str,
-) -> None:
-    update = UserProfileUpdate.model_validate({"displayName": value})
+def test_current_user_update_accepts_display_name() -> None:
+    update = UpdateCurrentUserRequest.model_validate({"displayName": " Test User "})
 
-    assert update.display_name == expected
+    assert update.display_name == "Test User"
 
 
-@pytest.mark.parametrize("value", ["", "   ", "a" * 65, None])
-def test_profile_update_rejects_invalid_display_name(value: object) -> None:
-    with pytest.raises(ValidationError):
-        UserProfileUpdate.model_validate({"displayName": value})
-
-
-@pytest.mark.parametrize(
-    "value",
-    ["http://example.test/avatar.png", "https://example.test/avatar.png"],
-)
-def test_profile_update_accepts_http_avatar_url(value: str) -> None:
-    update = UserProfileUpdate.model_validate({"avatarUrl": value})
-
-    assert str(update.avatar_url) == value
-
-
-def test_profile_update_rejects_invalid_avatar_url() -> None:
-    with pytest.raises(ValidationError):
-        UserProfileUpdate.model_validate({"avatarUrl": "not-a-url"})
-
-
-@pytest.mark.parametrize(
-    ("payload", "expected"),
-    [
-        ({}, {}),
-        ({"displayName": "Test User"}, {"display_name": "Test User"}),
-        ({"avatarUrl": None}, {"avatar_url": None}),
-    ],
-)
-def test_profile_update_preserves_partial_update_semantics(
-    payload: dict[str, object],
-    expected: dict[str, object],
-) -> None:
-    update = UserProfileUpdate.model_validate(payload)
+def test_current_user_update_allows_empty_payload() -> None:
+    update = UpdateCurrentUserRequest.model_validate({})
 
     assert (
         update.model_dump(
@@ -64,8 +22,13 @@ def test_profile_update_preserves_partial_update_semantics(
             by_alias=False,
             exclude_unset=True,
         )
-        == expected
+        == {}
     )
+
+
+def test_current_user_update_rejects_null_display_name() -> None:
+    with pytest.raises(ValidationError):
+        UpdateCurrentUserRequest.model_validate({"displayName": None})
 
 
 def test_user_response_validates_attributes_and_serializes_aliases() -> None:

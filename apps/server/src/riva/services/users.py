@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import secrets
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -132,18 +131,16 @@ class UserService:
         if await self._revoke_token(token, utc_now()):
             await self.session.commit()
 
-    async def update_profile(
+    async def update(
         self,
         user: User,
-        changes: Mapping[str, str | None],
+        *,
+        display_name: str | None = None,
     ) -> User:
-        if not changes:
+        if display_name is None or display_name == user.display_name:
             return user
 
-        for field in ("display_name", "avatar_url"):
-            if field in changes:
-                setattr(user, field, changes[field])
-
+        user.display_name = display_name
         await self.session.commit()
         return user
 

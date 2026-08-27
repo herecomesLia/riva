@@ -277,55 +277,45 @@ class TestLogout:
             await user_service.get_current_session(registered.token)
 
 
-class TestUpdateProfile:
-    async def test_partial_update_preserves_omitted_fields(
+class TestUpdateUser:
+    async def test_update_persists_changed_display_name(
         self,
         user_service: UserService,
         db_session: AsyncSession,
     ) -> None:
         registered = await user_service.register(USERNAME, PASSWORD)
-        registered.user.avatar_url = "https://example.test/avatar.png"
-        await db_session.commit()
 
-        await user_service.update_profile(
+        await user_service.update(
             registered.user,
-            {"display_name": "New Name"},
+            display_name="New Name",
         )
 
         await db_session.refresh(registered.user)
         assert registered.user.display_name == "New Name"
-        assert registered.user.avatar_url == "https://example.test/avatar.png"
 
-    async def test_avatar_can_be_cleared(
-        self,
-        user_service: UserService,
-        db_session: AsyncSession,
-    ) -> None:
-        registered = await user_service.register(USERNAME, PASSWORD)
-        registered.user.avatar_url = "https://example.test/avatar.png"
-        await db_session.commit()
-
-        await user_service.update_profile(registered.user, {"avatar_url": None})
-
-        await db_session.refresh(registered.user)
-        assert registered.user.avatar_url is None
-
-    async def test_empty_changes_leave_user_unchanged(
+    async def test_update_with_same_display_name_is_noop(
         self,
         user_service: UserService,
     ) -> None:
         registered = await user_service.register(USERNAME, PASSWORD)
-        original = (
-            registered.user.display_name,
-            registered.user.avatar_url,
-            registered.user.updated_at,
+        original = (registered.user.display_name, registered.user.updated_at)
+
+        updated = await user_service.update(
+            registered.user,
+            display_name=registered.user.display_name,
         )
 
-        updated = await user_service.update_profile(registered.user, {})
+        assert updated is registered.user
+        assert (updated.display_name, updated.updated_at) == original
+
+    async def test_update_without_display_name_is_noop(
+        self,
+        user_service: UserService,
+    ) -> None:
+        registered = await user_service.register(USERNAME, PASSWORD)
+        original = (registered.user.display_name, registered.user.updated_at)
+
+        updated = await user_service.update(registered.user)
 
         assert updated is registered.user
-        assert (
-            updated.display_name,
-            updated.avatar_url,
-            updated.updated_at,
-        ) == original
+        assert (updated.display_name, updated.updated_at) == original

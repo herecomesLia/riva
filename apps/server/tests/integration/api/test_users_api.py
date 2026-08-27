@@ -1,5 +1,6 @@
 """HTTP integration coverage for the current-user API."""
 
+import pytest
 from httpx import AsyncClient
 
 from tests.support.assertions import assert_error_response
@@ -31,7 +32,9 @@ async def test_get_current_user_returns_authenticated_user(
     assert response.json() == registered.json()
 
 
-async def test_patch_profile_persists_partial_update(client: AsyncClient) -> None:
+async def test_patch_current_user_persists_display_name(
+    client: AsyncClient,
+) -> None:
     await register_user(client)
 
     update_response = await client.patch(
@@ -48,26 +51,77 @@ async def test_patch_profile_persists_partial_update(client: AsyncClient) -> Non
     assert persisted_response.json() == update_response.json()
 
 
-async def test_patch_profile_distinguishes_null_from_omitted(
+async def test_patch_current_user_allows_empty_payload(client: AsyncClient) -> None:
+    registered = await register_user(client)
+
+    response = await client.patch(
+        "/api/users/me",
+        headers=ORIGIN_HEADERS,
+        json={},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == registered.json()
+
+
+async def test_patch_current_user_rejects_null_display_name(
     client: AsyncClient,
 ) -> None:
     await register_user(client)
-    await client.patch(
+
+    response = await client.patch(
+        "/api/users/me",
+        headers=ORIGIN_HEADERS,
+        json={"displayName": None},
+    )
+
+    assert_error_response(
+        response,
+        status_code=422,
+        code="request.validation_failed",
+        message="Request validation failed.",
+    )
+
+
+async def test_patch_current_user_rejects_avatar_url(client: AsyncClient) -> None:
+    await register_user(client)
+
+    response = await client.patch(
         "/api/users/me",
         headers=ORIGIN_HEADERS,
         json={"avatarUrl": "https://example.test/avatar.png"},
     )
 
-    clear_response = await client.patch(
-        "/api/users/me",
-        headers=ORIGIN_HEADERS,
-        json={"avatarUrl": None},
+    assert_error_response(
+        response,
+        status_code=422,
+        code="request.validation_failed",
+        message="Request validation failed.",
     )
-    persisted_response = await client.get("/api/users/me")
 
-    assert clear_response.status_code == 200
-    assert clear_response.json()["avatarUrl"] is None
-    assert persisted_response.json()["avatarUrl"] is None
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("PUT", "/api/users/me/avatar"),
+        ("DELETE", "/api/users/me/avatar"),
+    ],
+)
+async def test_avatar_endpoints_are_not_implemented(
+    client: AsyncClient,
+    method: str,
+    path: str,
+) -> None:
+    await register_user(client)
+
+    response = await client.request(method, path, headers=ORIGIN_HEADERS)
+
+    assert_error_response(
+        response,
+        status_code=501,
+        code="request.not_implemented",
+        message="This operation is not implemented.",
+    )
 
 
 async def test_invalid_session_is_rejected_and_cookie_is_deleted(

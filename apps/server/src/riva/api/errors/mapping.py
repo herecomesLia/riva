@@ -26,6 +26,10 @@ class CsrfFailedError(APIRequestError):
     pass
 
 
+class APINotImplementedError(APIRequestError):
+    pass
+
+
 @dataclass(frozen=True)
 class ErrorSpec:
     status_code: int
@@ -86,6 +90,13 @@ def resolve_error(exc: Exception) -> ErrorSpec:
                 status_code=status.HTTP_403_FORBIDDEN,
                 code="request.csrf_failed",
                 message="CSRF validation failed.",
+            )
+
+        case APINotImplementedError():
+            return ErrorSpec(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                code="request.not_implemented",
+                message="This operation is not implemented.",
             )
 
         case DatabaseUnavailableError():

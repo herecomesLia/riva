@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field, HttpUrl, StringConstraints, field_validator
+from pydantic import StringConstraints, field_validator
 
 from riva.schemas.base import RequestModel, ResponseModel
 
@@ -18,9 +18,8 @@ class UserResponse(ResponseModel):
     avatar_url: str | None
 
 
-class UserProfileUpdate(RequestModel):
+class UpdateCurrentUserRequest(RequestModel):
     display_name: DisplayName | None = None
-    avatar_url: Annotated[HttpUrl, Field(max_length=2083)] | None = None
 
     @field_validator("display_name", mode="before")
     @classmethod
