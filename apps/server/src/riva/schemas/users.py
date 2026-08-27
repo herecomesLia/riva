@@ -1,13 +1,19 @@
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import StringConstraints, field_validator
+from pydantic import Field, StringConstraints, field_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from riva.schemas.base import RequestModel, ResponseModel
 
 DisplayName = Annotated[
     str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[^\x00-\x1F\x7F-\x9F]+$",
+    ),
 ]
 
 
@@ -19,7 +25,9 @@ class UserResponse(ResponseModel):
 
 
 class UpdateCurrentUserRequest(RequestModel):
-    display_name: DisplayName | None = None
+    display_name: DisplayName | SkipJsonSchema[None] = Field(
+        default_factory=lambda: None,
+    )
 
     @field_validator("display_name", mode="before")
     @classmethod

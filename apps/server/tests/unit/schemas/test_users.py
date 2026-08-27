@@ -31,6 +31,11 @@ def test_current_user_update_rejects_null_display_name() -> None:
         UpdateCurrentUserRequest.model_validate({"displayName": None})
 
 
+def test_current_user_update_rejects_control_characters() -> None:
+    with pytest.raises(ValidationError):
+        UpdateCurrentUserRequest.model_validate({"displayName": "Eleno\nChen"})
+
+
 def test_user_response_validates_attributes_and_serializes_aliases() -> None:
     user_id = uuid4()
     user = SimpleNamespace(
