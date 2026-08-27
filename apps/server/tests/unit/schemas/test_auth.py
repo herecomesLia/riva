@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from riva.schemas.auth import LoginCredentials, RegisterCredentials
+from riva.schemas.auth import RegisterCredentials
 
 VALID_PASSWORD = "Abcd1234"
 

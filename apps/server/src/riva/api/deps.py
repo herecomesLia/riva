@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from typing import Annotated
 
+import structlog
 from fastapi import Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,9 +45,11 @@ async def require_current_user(
         raise AuthRequiredError()
 
     session_state = await user_service.get_current_session(token)
+    user = session_state.user
+    structlog.contextvars.bind_contextvars(user_id=str(user.id))
     if session_state.refreshed:
         set_session_cookie(response, settings, token)
-    return session_state.user
+    return user
 
 
 CurrentUserDep = Annotated[User, Depends(require_current_user)]

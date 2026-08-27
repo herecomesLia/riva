@@ -3,6 +3,7 @@ import hmac
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from uuid import UUID
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -123,12 +124,16 @@ class UserService:
 
         return CurrentSession(user=user, refreshed=refreshed)
 
-    async def logout(self, token: str | None) -> None:
+    async def logout(self, token: str | None) -> UUID | None:
         if token is None:
-            return
+            return None
 
-        if await self._revoke_token(token, utc_now()):
-            await self.session.commit()
+        user_id = await self._revoke_token(token, utc_now())
+        if user_id is None:
+            return None
+
+        await self.session.commit()
+        return user_id
 
     async def update(
         self,
@@ -166,13 +171,13 @@ class UserService:
         self,
         token: str,
         now: datetime,
-    ) -> bool:
+    ) -> UUID | None:
         auth_session = await self._session_by_token(token)
-        if auth_session is None:
-            return False
-        if auth_session.revoked_at is None:
-            auth_session.revoked_at = now
-        return True
+        if auth_session is None or auth_session.revoked_at is not None:
+            return None
+
+        auth_session.revoked_at = now
+        return auth_session.user_id
 
     def _expires_at(self, now: datetime) -> datetime:
         return now + timedelta(seconds=self.settings.session_idle_timeout_seconds)

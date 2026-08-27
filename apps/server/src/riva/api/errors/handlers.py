@@ -26,6 +26,7 @@ def _build_error_response(
     issues: list[ErrorIssue] | None = None,
     headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
+    structlog.contextvars.bind_contextvars(error_code=spec.code)
     request_id = _get_request_id(request)
 
     response = JSONResponse(

@@ -68,6 +68,10 @@ async def test_request_logging_records_route_and_cleans_context() -> None:
 
     @app.get("/items/{item_id}", name="get_item", status_code=204)
     async def get_item(item_id: str) -> Response:
+        structlog.contextvars.bind_contextvars(
+            user_id="user-1",
+            error_code="auth.invalid_credentials",
+        )
         return Response(status_code=204)
 
     request_id = "00000000-0000-4000-8000-000000000001"
@@ -75,7 +79,9 @@ async def test_request_logging_records_route_and_cleans_context() -> None:
     structlog.contextvars.clear_contextvars()
 
     try:
-        with capture_logs() as events:
+        with capture_logs(
+            processors=[structlog.contextvars.merge_contextvars]
+        ) as events:
             transport = ASGITransport(app=RequestLoggingMiddleware(app))
             async with AsyncClient(
                 transport=transport,
@@ -99,6 +105,8 @@ async def test_request_logging_records_route_and_cleans_context() -> None:
     assert event["client_ip"] == "127.0.0.1"
     assert event["user_agent"] == "test-client"
     assert event["request_id"] == request_id
+    assert event["user_id"] == "user-1"
+    assert event["error_code"] == "auth.invalid_credentials"
 
 
 async def test_request_logging_records_and_propagates_exception() -> None:

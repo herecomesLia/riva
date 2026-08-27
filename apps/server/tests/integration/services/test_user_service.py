@@ -266,12 +266,12 @@ class TestCurrentSession:
 
 class TestLogout:
     async def test_logout_is_idempotent(self, user_service: UserService) -> None:
-        await user_service.logout(None)
-        await user_service.logout("unknown-token")
+        assert await user_service.logout(None) is None
+        assert await user_service.logout("unknown-token") is None
 
         registered = await user_service.register(USERNAME, PASSWORD)
-        await user_service.logout(registered.token)
-        await user_service.logout(registered.token)
+        assert await user_service.logout(registered.token) == registered.user.id
+        assert await user_service.logout(registered.token) is None
 
         with pytest.raises(InvalidSessionError):
             await user_service.get_current_session(registered.token)

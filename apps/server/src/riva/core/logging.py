@@ -63,12 +63,11 @@ class RequestLoggingMiddleware:
         started_at = perf_counter()
         request_id = correlation_id.get()
 
+        previous_context = structlog.contextvars.get_contextvars()
+
         # Bind request id to structlog context.
-        context_tokens = (
+        if request_id is not None:
             structlog.contextvars.bind_contextvars(request_id=request_id)
-            if request_id is not None
-            else {}
-        )
 
         status_code = 500
         exc_info: ExcInfo | None = None
@@ -117,7 +116,9 @@ class RequestLoggingMiddleware:
                     logger.error("http.request", **log_fields)
 
             finally:
-                structlog.contextvars.reset_contextvars(**context_tokens)
+                structlog.contextvars.clear_contextvars()
+                if previous_context:
+                    structlog.contextvars.bind_contextvars(**previous_context)
 
     def _resolve_route_template(self, request: Request) -> str | None:
         route = request.scope.get("route")
