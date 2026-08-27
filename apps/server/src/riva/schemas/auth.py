@@ -29,5 +29,5 @@ class RegisterCredentials(RequestModel):
 
 
 class LoginCredentials(RequestModel):
-    username: str
-    password: str
+    username: Annotated[str, StringConstraints(max_length=32)]
+    password: Annotated[str, StringConstraints(max_length=128)]
