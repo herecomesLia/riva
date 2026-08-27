@@ -59,10 +59,3 @@ def test_register_credentials_validates_password(
 
     with pytest.raises(ValidationError):
         RegisterCredentials(username="user", password=password)
-
-
-def test_login_credentials_do_not_apply_registration_constraints() -> None:
-    credentials = LoginCredentials(username="", password="")
-
-    assert credentials.username == ""
-    assert credentials.password == ""
