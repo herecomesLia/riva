@@ -33,11 +33,13 @@ function useStoryLifecycle({
   enabled,
   advanceDelay,
   snapshot,
+  setShowInitialImportFeedback,
   setSnapshot,
 }: {
   advanceDelay: number
   enabled: boolean
   snapshot: JobProfileSnapshot
+  setShowInitialImportFeedback: (show: boolean) => void
   setSnapshot: (next: JobProfileSnapshot) => void
 }) {
   const profileStatus = snapshot.profile?.status
@@ -51,13 +53,19 @@ function useStoryLifecycle({
       profileStatus === "uploadingResume"
         ? createProfileMockSnapshot("initialResumeRecognizing")
         : createProfileMockSnapshot("initialResumeRecognitionSucceeded")
-    if (advanceDelay === 0) {
+    const advance = () => {
       setSnapshot(next)
+      if (next.recognition?.processingStatus === "succeeded") {
+        setShowInitialImportFeedback(true)
+      }
+    }
+    if (advanceDelay === 0) {
+      advance()
       return
     }
-    const timeout = window.setTimeout(() => setSnapshot(next), advanceDelay)
+    const timeout = window.setTimeout(advance, advanceDelay)
     return () => window.clearTimeout(timeout)
-  }, [advanceDelay, enabled, profileStatus, setSnapshot])
+  }, [advanceDelay, enabled, profileStatus, setShowInitialImportFeedback, setSnapshot])
 
   useEffect(() => {
     if (!enabled) return
@@ -82,21 +90,33 @@ export function ProfileStoryHarness({
   scenario,
 }: ProfileStoryHarnessProps) {
   const [snapshot, setSnapshot] = useState(() => createProfileMockSnapshot(scenario))
-  useStoryLifecycle({ advanceDelay, enabled: autoAdvance, snapshot, setSnapshot })
+  const [showInitialImportFeedback, setShowInitialImportFeedback] = useState(
+    scenario === "initialResumeRecognitionSucceeded",
+  )
+  useStoryLifecycle({
+    advanceDelay,
+    enabled: autoAdvance,
+    snapshot,
+    setShowInitialImportFeedback,
+    setSnapshot,
+  })
 
   const actions: ProfileViewActions = {
     createManualProfile: fn(async () => {
       const next = createProfileMockSnapshot("emptyManualProfile")
+      setShowInitialImportFeedback(false)
       setSnapshot(next)
       return next
     }),
     resetInitialResumeImport: fn(async () => {
       const next = createProfileMockSnapshot("noProfile")
+      setShowInitialImportFeedback(false)
       setSnapshot(next)
       return next
     }),
     retryRecognition: fn(async () => {
       const next = createProfileMockSnapshot("initialResumeRecognizing")
+      setShowInitialImportFeedback(false)
       setSnapshot(next)
       return next
     }),
@@ -108,11 +128,13 @@ export function ProfileStoryHarness({
     }),
     uploadInitialResume: fn(async () => {
       const next = createProfileMockSnapshot("initialResumeUploading")
+      setShowInitialImportFeedback(false)
       setSnapshot(next)
       return next
     }),
     uploadUpdatedResume: fn(async () => {
       const next = createProfileMockSnapshot("resumeUpdateUploading")
+      setShowInitialImportFeedback(false)
       setSnapshot(next)
       return next
     }),
@@ -121,7 +143,7 @@ export function ProfileStoryHarness({
   return (
     <ProfileView
       actions={actions}
-      content={{ status: "ready", data: snapshot }}
+      content={{ status: "ready", data: snapshot, showInitialImportFeedback }}
       variant="default"
     />
   )

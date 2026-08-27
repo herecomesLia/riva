@@ -55,6 +55,7 @@ export type ProfileViewProps =
       content: {
         status: "ready"
         data: JobProfileSnapshot
+        showInitialImportFeedback?: boolean
         synchronizationError?: "initialRecognition" | "resumeUpdate" | null
       }
       actions: ProfileViewActions
@@ -72,6 +73,7 @@ export function ProfileView(props: ProfileViewProps) {
   return (
     <ProfileReadyView
       actions={props.actions}
+      showInitialImportFeedback={props.content.showInitialImportFeedback ?? false}
       snapshot={props.content.data}
       synchronizationError={props.content.synchronizationError ?? null}
     />
@@ -80,10 +82,12 @@ export function ProfileView(props: ProfileViewProps) {
 
 function ProfileReadyView({
   actions,
+  showInitialImportFeedback,
   snapshot,
   synchronizationError,
 }: {
   actions: ProfileViewActions
+  showInitialImportFeedback: boolean
   snapshot: JobProfileSnapshot
   synchronizationError: "initialRecognition" | "resumeUpdate" | null
 }) {
@@ -229,10 +233,6 @@ function ProfileReadyView({
   }
 
   const summary = snapshot.resumeUpdate?.changeSummary
-  const showsInitialImportFeedback =
-    snapshot.recognition?.processingStatus === "succeeded" &&
-    snapshot.matchingAnalysis === null &&
-    snapshot.resumeUpdate === null
   const showsResumeUpdateFeedback = snapshot.resumeUpdate?.status === "succeeded"
 
   return (
@@ -253,7 +253,7 @@ function ProfileReadyView({
         resumeUpdate={snapshot.resumeUpdate}
       />
 
-      {showsInitialImportFeedback && (
+      {showInitialImportFeedback && (
         <Alert data-testid="profile-import-success">
           <AlertTitle>{t("profile.import.success")}</AlertTitle>
           <AlertDescription>{t("profile.import.successDescription")}</AlertDescription>

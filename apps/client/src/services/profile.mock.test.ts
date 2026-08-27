@@ -7,7 +7,6 @@ import {
   getJobProfile,
   getResumeRecognitionStatus,
   getResumeUpdateStatus,
-  regenerateMatchingAnalysis,
   resetInitialResumeImport,
   saveProfileSection,
   startInitialResumeRecognition,
@@ -70,7 +69,6 @@ describe("profile mock service", () => {
     expect(profile.education[0]!.school).toBe("Updated University")
     expect(profile.education[0]!.source).toBe("userEdited")
     expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
-    expect(profile.matchingAnalysisStale).toBe(true)
     expect(profileResponseMock.profile!.education[0]!.school).toBe("Fudan University")
 
     const current = await settle(getJobProfile())
@@ -147,7 +145,6 @@ describe("profile mock service", () => {
     expect(profile.workExperiences[0]!.skillIds).toEqual(["skill_react", skill.id])
     expect(profile.workExperiences[0]!.source).toBe("userEdited")
     expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
-    expect(profile.matchingAnalysisStale).toBe(true)
   })
 
   it("reuses matching skills and creates duplicate draft names only once", async () => {
@@ -200,7 +197,6 @@ describe("profile mock service", () => {
     expect(profile.projectExperiences[0]!.skillIds).toEqual(["skill_react", skill.id])
     expect(profile.projectExperiences[0]!.source).toBe("userEdited")
     expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
-    expect(profile.matchingAnalysisStale).toBe(true)
   })
 
   it("does not partially save a new skill or project experience for a stale version", async () => {
@@ -306,7 +302,6 @@ describe("profile mock service", () => {
     expect(recognized.profile).toMatchObject({ status: "active" })
     expect(recognized.profile!.resume).toMatchObject({ processingStatus: "succeeded" })
     expect(recognized.profile!.education[0]!.source).toBe("resumeExtracted")
-    expect(recognized.matchingAnalysis).toBeNull()
 
     const repeatedStart = await settle(
       startInitialResumeRecognition(recognized.profile!.profileId, recognized.profile!.resume!.id),
@@ -489,8 +484,6 @@ describe("profile mock service", () => {
     expect(updated.profile!.skills).toContainEqual(
       expect.objectContaining({ id: "skill_added", source: "userAdded" }),
     )
-    expect(updated.matchingAnalysis).toBeNull()
-    expect(updated.profile!.matchingAnalysisStale).toBe(false)
   })
 
   it("keeps a manual profile without a resume after a failed resume update", async () => {
@@ -539,53 +532,9 @@ describe("profile mock service", () => {
       changeSummary: { changedItems: 2, missingItems: 1, newItems: 1 },
       status: "succeeded",
     })
-    expect(updated.profile!.matchingAnalysisStale).toBe(true)
-    expect(updated.matchingAnalysis).toMatchObject({
-      status: "stale",
-      profileVersion: updated.profile!.version - 1,
-    })
   })
 
-  it("preserves the generated analysis version across consecutive saves", async () => {
-    const firstSave = await settle(
-      saveProfileSection({
-        profileId: profileResponseMock.profile!.profileId,
-        version: profileResponseMock.profile!.version,
-        section: "skills",
-        values: structuredClone(profileResponseMock.profile!.skills),
-      }),
-    )
-    expect(firstSave.profile).toMatchObject({ matchingAnalysisStale: true, version: 8 })
-    expect(firstSave.matchingAnalysis).toMatchObject({
-      status: "stale",
-      profileVersion: 7,
-    })
-
-    const secondSave = await settle(
-      saveProfileSection({
-        profileId: firstSave.profile!.profileId,
-        version: firstSave.profile!.version,
-        section: "skills",
-        values: structuredClone(firstSave.profile!.skills),
-      }),
-    )
-    expect(secondSave.profile).toMatchObject({ matchingAnalysisStale: true, version: 9 })
-    expect(secondSave.matchingAnalysis).toMatchObject({
-      status: "stale",
-      profileVersion: 7,
-    })
-
-    const current = await settle(regenerateMatchingAnalysis(secondSave.profile!.profileId))
-    const snapshot = await settle(getJobProfile())
-    expect(current.profileVersion).toBe(secondSave.profile!.version)
-    expect(snapshot.profile!.matchingAnalysisStale).toBe(false)
-    expect(snapshot.matchingAnalysis).toMatchObject({
-      status: "current",
-      profileVersion: secondSave.profile!.version,
-    })
-  })
-
-  it("does not create an analysis when saving a manual profile without one", async () => {
+  it("increments the version when saving a manual profile", async () => {
     const manual = await settle(createManualJobProfile())
     const saved = await settle(
       saveProfileSection({
@@ -596,8 +545,7 @@ describe("profile mock service", () => {
       }),
     )
 
-    expect(saved.profile).toMatchObject({ matchingAnalysisStale: false, version: 2 })
-    expect(saved.matchingAnalysis).toBeNull()
+    expect(saved.profile).toMatchObject({ version: 2 })
   })
 
   it("rejects an upload without a file or pasted text", async () => {

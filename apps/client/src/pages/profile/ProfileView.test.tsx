@@ -383,15 +383,6 @@ describe("ProfileView", () => {
     expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
   })
 
-  it("does not render matching-analysis regeneration controls", async () => {
-    const snapshot = createProfileMockSnapshot("matchingAnalysisStale")
-    renderReady(snapshot)
-
-    expect(await screen.findByTestId("profile-section-education")).toBeInTheDocument()
-    expect(screen.queryByTestId("profile-matching-analysis-stale")).not.toBeInTheDocument()
-    expect(screen.queryByText(/重新生成匹配分析/)).not.toBeInTheDocument()
-  })
-
   it("renders a safe page error and invokes retry", async () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()

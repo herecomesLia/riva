@@ -2,7 +2,6 @@ import { env } from "@/app/env"
 import * as profileMockService from "@/mocks/services/profile"
 import type {
   JobProfileSnapshot,
-  MatchingAnalysis,
   ResumeRecognition,
   ResumeUpdate,
   ResumeUploadInput,
@@ -76,8 +75,4 @@ export function getResumeUpdateStatus(
   return env.mock
     ? profileMockService.getResumeUpdateStatus(profileId, resumeUpdateId)
     : realApiUnavailable()
-}
-
-export function regenerateMatchingAnalysis(profileId: string): Promise<MatchingAnalysis> {
-  return env.mock ? profileMockService.regenerateMatchingAnalysis(profileId) : realApiUnavailable()
 }

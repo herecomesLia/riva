@@ -22,7 +22,6 @@ const scenarios: ProfileMockScenario[] = [
   "resumeUpdateRecognizing",
   "resumeUpdateSucceeded",
   "resumeUpdateFailed",
-  "matchingAnalysisStale",
 ]
 
 const processingStatusByProfileStatus: Partial<Record<ProfileStatus, ResumeProcessingStatus>> = {
@@ -32,12 +31,11 @@ const processingStatusByProfileStatus: Partial<Record<ProfileStatus, ResumeProce
 }
 
 function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
-  const { matchingAnalysis, profile, recognition, resumeUpdate } = snapshot
+  const { profile, recognition, resumeUpdate } = snapshot
 
   if (!profile) {
     expect(recognition).toBeNull()
     expect(resumeUpdate).toBeNull()
-    expect(matchingAnalysis).toBeNull()
     return
   }
 
@@ -93,18 +91,6 @@ function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
     expect(new Date(resumeUpdate.resume.parsedAt!).getTime()).toBeGreaterThanOrEqual(
       new Date(resumeUpdate.resume.uploadedAt).getTime(),
     )
-  }
-
-  if (matchingAnalysis) {
-    expect(matchingAnalysis.status === "stale").toBe(profile.matchingAnalysisStale)
-    if (matchingAnalysis.status === "current") {
-      expect(matchingAnalysis.profileVersion).toBe(profile.version)
-    }
-    if (matchingAnalysis.status === "stale") {
-      expect(matchingAnalysis.profileVersion).toBeLessThan(profile.version)
-    }
-  } else {
-    expect(profile.matchingAnalysisStale).toBe(false)
   }
 }
 

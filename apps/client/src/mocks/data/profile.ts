@@ -39,7 +39,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
     },
     updatedAt: "2026-07-10T09:15:00.000Z",
     version: 7,
-    matchingAnalysisStale: false,
     resume: createResume(),
     education: [
       {
@@ -186,12 +185,6 @@ function createCompleteSnapshot(): JobProfileSnapshot {
     profile,
     recognition: createRecognition(profile.resume!),
     resumeUpdate: null,
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
   }
 }
 
@@ -202,12 +195,6 @@ function createProfileWithoutResumeSnapshot(): JobProfileSnapshot {
     profile,
     recognition: null,
     resumeUpdate: null,
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
   }
 }
 
@@ -226,7 +213,6 @@ function createEmptyManualProfileSnapshot(): JobProfileSnapshot {
     },
     credentials: [],
     education: [],
-    matchingAnalysisStale: false,
     profileId: "profile_manual_empty",
     projectExperiences: [],
     resume: null,
@@ -238,7 +224,7 @@ function createEmptyManualProfileSnapshot(): JobProfileSnapshot {
     workExperiences: [],
   })
 
-  return { profile, recognition: null, resumeUpdate: null, matchingAnalysis: null }
+  return { profile, recognition: null, resumeUpdate: null }
 }
 
 function createInitialResumeSnapshot(
@@ -269,7 +255,6 @@ function createInitialResumeSnapshot(
     },
     credentials: [],
     education: [],
-    matchingAnalysisStale: false,
     projectExperiences: [],
     resume,
     skills: [],
@@ -284,7 +269,6 @@ function createInitialResumeSnapshot(
     profile,
     recognition: createRecognition(resume),
     resumeUpdate: null,
-    matchingAnalysis: null,
   }
 }
 
@@ -304,7 +288,6 @@ function createInitialResumeRecognitionSucceededSnapshot(): JobProfileSnapshot {
     profile,
     recognition: createRecognition(resume),
     resumeUpdate: null,
-    matchingAnalysis: null,
   }
 }
 
@@ -329,12 +312,6 @@ function createPartialProfileSnapshot(): JobProfileSnapshot {
     profile,
     recognition: createRecognition(profile.resume!),
     resumeUpdate: null,
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
   }
 }
 
@@ -346,7 +323,6 @@ function createResumeUpdateSucceededSnapshot(): JobProfileSnapshot {
     uploadedAt: "2026-07-13T08:00:00.000Z",
   })
   const profile = createCompleteProfile({
-    matchingAnalysisStale: true,
     resume,
     updatedAt: "2026-07-13T08:04:00.000Z",
     version: 8,
@@ -363,12 +339,6 @@ function createResumeUpdateSucceededSnapshot(): JobProfileSnapshot {
       changeSummary: { changedItems: 2, missingItems: 1, newItems: 1 },
       failureReason: null,
       preservesManualChanges: true,
-    },
-    matchingAnalysis: {
-      status: "stale",
-      profileVersion: 7,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
     },
   }
 }
@@ -392,12 +362,6 @@ function createResumeUpdateProcessingSnapshot(status: "uploading" | "parsing"): 
       changeSummary: null,
       failureReason: null,
       preservesManualChanges: true,
-    },
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
     },
   }
 }
@@ -425,28 +389,6 @@ function createResumeUpdateFailedSnapshot(): JobProfileSnapshot {
       failureReason,
       preservesManualChanges: true,
     },
-    matchingAnalysis: {
-      status: "current",
-      profileVersion: profile.version,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
-  }
-}
-
-function createMatchingAnalysisStaleSnapshot(): JobProfileSnapshot {
-  const profile = createCompleteProfile({ matchingAnalysisStale: true, version: 8 })
-
-  return {
-    profile,
-    recognition: createRecognition(profile.resume!),
-    resumeUpdate: null,
-    matchingAnalysis: {
-      status: "stale",
-      profileVersion: 7,
-      generatedAt: "2026-07-10T09:16:00.000Z",
-      failureReason: null,
-    },
   }
 }
 
@@ -465,11 +407,10 @@ export type ProfileMockScenario =
   | "resumeUpdateRecognizing"
   | "resumeUpdateSucceeded"
   | "resumeUpdateFailed"
-  | "matchingAnalysisStale"
 
 const profileMockScenarios = {
   complete: createCompleteSnapshot(),
-  noProfile: { profile: null, recognition: null, resumeUpdate: null, matchingAnalysis: null },
+  noProfile: { profile: null, recognition: null, resumeUpdate: null },
   emptyManualProfile: createEmptyManualProfileSnapshot(),
   profileWithoutResume: createProfileWithoutResumeSnapshot(),
   initialResumeUploading: createInitialResumeSnapshot("uploadingResume"),
@@ -485,7 +426,6 @@ const profileMockScenarios = {
   resumeUpdateRecognizing: createResumeUpdateProcessingSnapshot("parsing"),
   resumeUpdateSucceeded: createResumeUpdateSucceededSnapshot(),
   resumeUpdateFailed: createResumeUpdateFailedSnapshot(),
-  matchingAnalysisStale: createMatchingAnalysisStaleSnapshot(),
 } satisfies Record<ProfileMockScenario, JobProfileSnapshot>
 
 export const profileResponseMock = profileMockScenarios.complete

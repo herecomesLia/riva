@@ -358,7 +358,6 @@ describe("ProfilePage orchestration", () => {
       profile: null,
       recognition: null,
       resumeUpdate: null,
-      matchingAnalysis: null,
     })
     vi.mocked(profileService.uploadInitialResume).mockRejectedValue(new Error("raw upload error"))
     renderPage()
@@ -437,11 +436,9 @@ describe("ProfilePage orchestration", () => {
     const snapshot = structuredClone(profileResponseMock)
     const saved = structuredClone(snapshot.profile!)
     saved.education[0]!.school = "Updated University"
-    saved.matchingAnalysisStale = true
     saved.version += 1
     const savedSnapshot = {
       ...snapshot,
-      matchingAnalysis: { ...snapshot.matchingAnalysis!, status: "stale" as const },
       profile: saved,
     }
     vi.mocked(profileService.getJobProfile)
@@ -460,8 +457,7 @@ describe("ProfilePage orchestration", () => {
     expect(await screen.findByText("Updated University")).toBeInTheDocument()
     expect(screen.queryByTestId("profile-save-success")).not.toBeInTheDocument()
     expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-      matchingAnalysis: { profileVersion: 7, status: "stale" },
-      profile: { matchingAnalysisStale: true, version: 8 },
+      profile: { version: 8 },
     })
   })
 
@@ -470,11 +466,9 @@ describe("ProfilePage orchestration", () => {
     const snapshot = structuredClone(profileResponseMock)
     const saved = structuredClone(snapshot.profile!)
     saved.education[0]!.school = "Saved Despite Refresh Failure"
-    saved.matchingAnalysisStale = true
     saved.version += 1
     const savedSnapshot = {
       ...snapshot,
-      matchingAnalysis: { ...snapshot.matchingAnalysis!, status: "stale" as const },
       profile: saved,
     }
     vi.mocked(profileService.getJobProfile)
@@ -494,8 +488,7 @@ describe("ProfilePage orchestration", () => {
     expect(await screen.findByText("Saved Despite Refresh Failure")).toBeInTheDocument()
     expect(screen.queryByText(i18n.t("profile.editor.saveError"))).not.toBeInTheDocument()
     expect(result.queryClient.getQueryData(["profile"])).toMatchObject({
-      matchingAnalysis: { profileVersion: 7, status: "stale" },
-      profile: { matchingAnalysisStale: true, version: 8 },
+      profile: { version: 8 },
     })
   })
 
@@ -520,11 +513,9 @@ describe("ProfilePage orchestration", () => {
     const removedTitle = snapshot.profile!.workExperiences[0].title
     const saved = structuredClone(snapshot.profile!)
     saved.workExperiences = saved.workExperiences.slice(1)
-    saved.matchingAnalysisStale = true
     saved.version += 1
     const savedSnapshot = {
       ...snapshot,
-      matchingAnalysis: { ...snapshot.matchingAnalysis!, status: "stale" as const },
       profile: saved,
     }
     vi.mocked(profileService.getJobProfile)

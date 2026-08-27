@@ -25,6 +25,7 @@ export function ProfilePage() {
   const queryClient = useQueryClient()
   const [synchronizationError, setSynchronizationError] =
     useState<ProfileSynchronizationError | null>(null)
+  const [showInitialImportFeedback, setShowInitialImportFeedback] = useState(false)
   const profileQuery = useQuery({
     queryFn: getJobProfile,
     queryKey: profileQueryKey,
@@ -57,6 +58,17 @@ export function ProfilePage() {
     return result.snapshot
   }
 
+  function finishInitialImport(snapshot: JobProfileSnapshot) {
+    if (
+      snapshot.profile?.status === "active" &&
+      snapshot.recognition?.processingStatus === "succeeded" &&
+      snapshot.resumeUpdate === null
+    ) {
+      setShowInitialImportFeedback(true)
+    }
+    return snapshot
+  }
+
   async function advanceInitialRecognition(
     profileId: string,
     resumeId: string,
@@ -67,9 +79,9 @@ export function ProfilePage() {
       latest = setSnapshot(await startInitialResumeRecognition(profileId, resumeId))
       await getResumeRecognitionStatus(profileId, resumeId)
     } catch {
-      return synchronizeRecognition(latest, "initialRecognition")
+      return finishInitialImport(await synchronizeRecognition(latest, "initialRecognition"))
     }
-    return synchronizeRecognition(latest, "initialRecognition")
+    return finishInitialImport(await synchronizeRecognition(latest, "initialRecognition"))
   }
 
   async function advanceUpdatedResumeRecognition(
@@ -100,12 +112,14 @@ export function ProfilePage() {
       const fallback = queryClient.getQueryData<JobProfileSnapshot>(profileQueryKey)
       if (!fallback) throw new Error("Job profile is not available.")
       setSynchronizationError(null)
+      setShowInitialImportFeedback(false)
       return advanceInitialRecognition(profileId, resumeId, fallback)
     },
   })
   const uploadInitialMutation = useMutation({
     mutationFn: async (input: ResumeUploadInput) => {
       setSynchronizationError(null)
+      setShowInitialImportFeedback(false)
       const snapshot = setSnapshot(await uploadInitialResume(input))
       const profile = snapshot.profile
       if (!profile?.resume) throw new Error("Resume upload returned no profile.")
@@ -115,6 +129,7 @@ export function ProfilePage() {
   const uploadUpdatedMutation = useMutation({
     mutationFn: async (input: ResumeUploadInput) => {
       setSynchronizationError(null)
+      setShowInitialImportFeedback(false)
       const snapshot = setSnapshot(await uploadUpdatedResume(input))
       const profile = snapshot.profile
       const resumeUpdate = snapshot.resumeUpdate
@@ -124,13 +139,19 @@ export function ProfilePage() {
   })
   const manualProfileMutation = useMutation({
     mutationFn: createManualJobProfile,
-    onMutate: () => setSynchronizationError(null),
+    onMutate: () => {
+      setSynchronizationError(null)
+      setShowInitialImportFeedback(false)
+    },
     onSuccess: setSnapshot,
   })
   const resetInitialImportMutation = useMutation({
     mutationFn: ({ profileId, resumeId }: { profileId: string; resumeId: string }) =>
       resetInitialResumeImport(profileId, resumeId),
-    onMutate: () => setSynchronizationError(null),
+    onMutate: () => {
+      setSynchronizationError(null)
+      setShowInitialImportFeedback(false)
+    },
     onSuccess: setSnapshot,
   })
 
@@ -168,7 +189,12 @@ export function ProfilePage() {
     return (
       <ProfileView
         actions={actions}
-        content={{ status: "ready", data: profileQuery.data, synchronizationError }}
+        content={{
+          status: "ready",
+          data: profileQuery.data,
+          showInitialImportFeedback,
+          synchronizationError,
+        }}
         variant="default"
       />
     )

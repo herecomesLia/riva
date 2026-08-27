@@ -98,7 +98,6 @@ export type JobProfile = {
   completeness: ProfileCompleteness
   updatedAt: string
   version: number
-  matchingAnalysisStale: boolean
   resume: ResumeFile | null
   education: EducationExperience[]
   workExperiences: WorkExperience[]
@@ -121,14 +120,6 @@ export type ResumeImportChangeSummary = {
   newItems: number
 }
 
-export type MatchingAnalysis = {
-  failureReason: string | null
-  generatedAt: string | null
-  /** Profile version used when this analysis was generated; stale analyses intentionally lag behind. */
-  profileVersion: number
-  status: "current" | "stale" | "regenerating" | "failed"
-}
-
 export type ResumeUpdate = {
   id: string
   resume: ResumeFile
@@ -143,7 +134,6 @@ export type JobProfileSnapshot = {
   profile: JobProfile | null
   recognition: ResumeRecognition | null
   resumeUpdate: ResumeUpdate | null
-  matchingAnalysis: MatchingAnalysis | null
 }
 
 export type ProfileSectionValueMap = {

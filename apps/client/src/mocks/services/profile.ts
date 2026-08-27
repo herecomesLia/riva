@@ -8,7 +8,6 @@ import { normalizeSkillIds, normalizeSkillName } from "@/models/profile-text"
 import type {
   JobProfile,
   JobProfileSnapshot,
-  MatchingAnalysis,
   NewProfileSkillInput,
   ProfileSource,
   ResumeFile,
@@ -85,7 +84,6 @@ function createEmptyProfile(resume: ResumeFile | null, status: JobProfile["statu
     },
     credentials: [],
     education: [],
-    matchingAnalysisStale: false,
     profileId: "profile_resume_import",
     projectExperiences: [],
     resume,
@@ -267,17 +265,6 @@ function mergeRecognizedProfile(profile: JobProfile): JobProfile {
   }
 }
 
-function staleMatchingAnalysis(
-  matchingAnalysis: MatchingAnalysis | null,
-  profile: JobProfile,
-): MatchingAnalysis | null {
-  if (!matchingAnalysis) return null
-  if (matchingAnalysis.profileVersion >= profile.version) {
-    throw new Error("A stale matching analysis must be older than the profile.")
-  }
-  return { ...matchingAnalysis, status: "stale" }
-}
-
 function recognitionFailureReason(resume: ResumeFile) {
   const fileName = resume.fileName.toLowerCase()
   if (fileName.includes("unreadable")) {
@@ -318,7 +305,6 @@ function completeInitialRecognition(profile: JobProfile, recognition: ResumeReco
     version: profile.version + 1,
   })
   return setMockSnapshot({
-    matchingAnalysis: null,
     profile: completedProfile,
     recognition: { ...recognition, processingStatus: "succeeded", completedAt: parsedAt },
     resumeUpdate: null,
@@ -345,18 +331,14 @@ function completeUpdatedRecognition(profile: JobProfile, resumeUpdate: ResumeUpd
   const resume = { ...resumeUpdate.resume, parsedAt, processingStatus: "succeeded" as const }
   const mergedProfile = mergeRecognizedProfile({
     ...profile,
-    matchingAnalysisStale: false,
     resume,
     status: "active",
     updatedAt: parsedAt,
     version: profile.version + 1,
   })
-  const matchingAnalysis = staleMatchingAnalysis(mockSnapshot.matchingAnalysis, mergedProfile)
-  const completedProfile = { ...mergedProfile, matchingAnalysisStale: matchingAnalysis !== null }
   return setMockSnapshot({
     ...mockSnapshot,
-    matchingAnalysis,
-    profile: completedProfile,
+    profile: mergedProfile,
     resumeUpdate: {
       ...resumeUpdate,
       changeSummary: { newItems: 1, changedItems: 2, missingItems: 1 },
@@ -385,9 +367,7 @@ export async function saveProfileSection(
   }
   profile.updatedAt = "2026-07-13T08:05:00.000Z"
   profile.version += 1
-  const matchingAnalysis = staleMatchingAnalysis(mockSnapshot.matchingAnalysis, profile)
-  profile.matchingAnalysisStale = matchingAnalysis !== null
-  return setMockSnapshot({ ...mockSnapshot, matchingAnalysis, profile })
+  return setMockSnapshot({ ...mockSnapshot, profile })
 }
 
 export async function uploadInitialResume(input: ResumeUploadInput): Promise<JobProfileSnapshot> {
@@ -398,7 +378,6 @@ export async function uploadInitialResume(input: ResumeUploadInput): Promise<Job
   }
   const profile = createEmptyProfile(resume, "uploadingResume")
   return setMockSnapshot({
-    matchingAnalysis: null,
     profile,
     recognition: {
       resumeId: resume.id,
@@ -469,7 +448,6 @@ export async function resetInitialResumeImport(
     profile: null,
     recognition: null,
     resumeUpdate: null,
-    matchingAnalysis: null,
   })
 }
 
@@ -479,7 +457,6 @@ export async function createManualJobProfile(): Promise<JobProfileSnapshot> {
     profile: createEmptyProfile(null, "active"),
     recognition: null,
     resumeUpdate: null,
-    matchingAnalysis: null,
   })
 }
 
@@ -533,18 +510,4 @@ export async function getResumeUpdateStatus(
   // Polling advances this mock job to simulate an asynchronous backend.
   if (resumeUpdate.status === "parsing") completeUpdatedRecognition(profile, resumeUpdate)
   return copy(mockSnapshot.resumeUpdate!)
-}
-
-export async function regenerateMatchingAnalysis(profileId: string): Promise<MatchingAnalysis> {
-  await waitForMockDelay()
-  const profile = copy(requireProfile(profileId))
-  profile.matchingAnalysisStale = false
-  const matchingAnalysis: MatchingAnalysis = {
-    status: "current",
-    profileVersion: profile.version,
-    generatedAt: "2026-07-13T08:20:00.000Z",
-    failureReason: null,
-  }
-  setMockSnapshot({ ...mockSnapshot, matchingAnalysis, profile })
-  return copy(matchingAnalysis)
 }

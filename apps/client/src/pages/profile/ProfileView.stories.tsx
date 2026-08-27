@@ -97,7 +97,6 @@ export const RecognitionFailed = meta.story({
 })
 export const AfterInitialImport = pageStory("initialResumeRecognitionSucceeded")
 export const AfterResumeUpdate = pageStory("resumeUpdateSucceeded")
-export const MatchingAnalysisStale = pageStory("matchingAnalysisStale")
 
 export const EditableProfile = meta.story({
   render: () => <ProfileStoryHarness autoAdvance scenario="complete" />,
