@@ -76,7 +76,6 @@ export const profile = {
     projectExperience: "项目经历",
     skills: "技能",
     credentials: "证书与奖项",
-    targetRoles: "当前目标岗位",
   },
   carousel: {
     next: "下一项{{section}}",

@@ -61,8 +61,7 @@ function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
     profile.workExperiences.length === 0 &&
     profile.projectExperiences.length === 0 &&
     profile.skills.length === 0 &&
-    profile.credentials.length === 0 &&
-    profile.targetRoles.length === 0
+    profile.credentials.length === 0
   ) {
     expect(profile.completeness).toEqual({
       percentage: 0,
@@ -72,7 +71,6 @@ function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
         "projectExperience",
         "skills",
         "credentials",
-        "targetRoles",
       ],
     })
   }

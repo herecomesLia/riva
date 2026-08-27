@@ -102,20 +102,6 @@ describe("profile mock service", () => {
     ).toBe(true)
   })
 
-  it("retains the target-role section contract for the future Roles module", async () => {
-    const values = structuredClone(profileResponseMock.profile!.targetRoles)
-    values[0]!.title = "Principal Frontend Engineer"
-    const profile = await saveProfile({
-      profileId: profileResponseMock.profile!.profileId,
-      version: profileResponseMock.profile!.version,
-      section: "targetRoles",
-      values,
-    })
-
-    expect(profile.targetRoles[0]!.title).toBe("Principal Frontend Engineer")
-    expect(profileResponseMock.profile!.targetRoles[0]!.title).toBe("Frontend Technical Lead")
-  })
-
   it("rejects a stale save version with a clear service error", async () => {
     const promise = saveProfileSection({
       profileId: profileResponseMock.profile!.profileId,

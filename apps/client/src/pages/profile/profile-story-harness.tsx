@@ -24,8 +24,6 @@ function replaceSection(profile: JobProfile, input: SaveProfileSectionInput): Jo
       return { ...profile, skills: input.values }
     case "credentials":
       return { ...profile, credentials: input.values }
-    case "targetRoles":
-      return { ...profile, targetRoles: input.values }
   }
 }
 

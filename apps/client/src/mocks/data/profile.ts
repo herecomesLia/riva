@@ -165,15 +165,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         source: "userAdded",
       },
     ],
-    targetRoles: [
-      {
-        id: "target_role_frontend_lead",
-        title: "Frontend Technical Lead",
-        company: null,
-        location: "Shanghai",
-        source: "userAdded",
-      },
-    ],
     ...overrides,
   }
 }
@@ -208,7 +199,6 @@ function createEmptyManualProfileSnapshot(): JobProfileSnapshot {
         "projectExperience",
         "skills",
         "credentials",
-        "targetRoles",
       ],
     },
     credentials: [],
@@ -218,7 +208,6 @@ function createEmptyManualProfileSnapshot(): JobProfileSnapshot {
     resume: null,
     skills: [],
     status: "active",
-    targetRoles: [],
     updatedAt: "2026-07-11T09:00:00.000Z",
     version: 1,
     workExperiences: [],
@@ -250,7 +239,6 @@ function createInitialResumeSnapshot(
         "projectExperience",
         "skills",
         "credentials",
-        "targetRoles",
       ],
     },
     credentials: [],
@@ -259,7 +247,6 @@ function createInitialResumeSnapshot(
     resume,
     skills: [],
     status,
-    targetRoles: [],
     updatedAt: "2026-07-13T08:00:00.000Z",
     version: 1,
     workExperiences: [],

@@ -85,7 +85,6 @@ export const profile = {
     projectExperience: "Project experience",
     skills: "Skills",
     credentials: "Certificates and awards",
-    targetRoles: "Current target roles",
   },
   carousel: {
     next: "Next {{section}}",

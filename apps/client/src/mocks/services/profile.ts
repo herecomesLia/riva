@@ -79,7 +79,6 @@ function createEmptyProfile(resume: ResumeFile | null, status: JobProfile["statu
         "projectExperience",
         "skills",
         "credentials",
-        "targetRoles",
       ],
     },
     credentials: [],
@@ -89,7 +88,6 @@ function createEmptyProfile(resume: ResumeFile | null, status: JobProfile["statu
     resume,
     skills: [],
     status,
-    targetRoles: [],
     updatedAt: resume?.uploadedAt ?? "2026-07-13T08:00:00.000Z",
     version: 1,
     workExperiences: [],
@@ -130,9 +128,6 @@ function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) 
       break
     case "credentials":
       profile.credentials = applySources(profile.credentials, input.values)
-      break
-    case "targetRoles":
-      profile.targetRoles = applySources(profile.targetRoles, input.values)
   }
 }
 

@@ -12,7 +12,7 @@ import type { JobProfile, ProfileSection, SaveProfileSectionInput } from "@/mode
 import { ProfileAdditionalSectionEditor } from "./ProfileAdditionalSectionEditor"
 import { ProfileSectionEditor } from "./ProfileSectionEditor"
 
-export type EditableProfileSection = Exclude<ProfileSection, "targetRoles">
+export type EditableProfileSection = ProfileSection
 export type EditableExperienceSection = Extract<
   EditableProfileSection,
   "education" | "workExperience" | "projectExperience"

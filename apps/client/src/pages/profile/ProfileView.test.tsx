@@ -159,8 +159,6 @@ describe("ProfileView", () => {
     expect(screen.queryByText("档案已生效")).not.toBeInTheDocument()
     expect(screen.queryByText("匹配分析已同步")).not.toBeInTheDocument()
     expect(screen.queryByText("lin-chen-resume.pdf")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("profile-section-targetRoles")).not.toBeInTheDocument()
-    expect(screen.queryByText("Frontend Technical Lead")).not.toBeInTheDocument()
     expect(screen.queryByText(/待确认/)).not.toBeInTheDocument()
     expect(screen.queryByText(/已确认/)).not.toBeInTheDocument()
   })
