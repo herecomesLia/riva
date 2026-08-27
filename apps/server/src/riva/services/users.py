@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from riva.core.config import Settings
-from riva.models import AuthSession, User
+from riva.models import AuthSession
+from riva.models.user import User, normalize_username
 from riva.services.errors import (
     AccountDisabledError,
     InvalidCredentialsError,
@@ -43,11 +44,9 @@ class UserService:
         self.settings = settings
 
     async def register(self, username: str, password: str) -> AuthResult:
-        normalized_username = _normalize_username(username)
         now = utc_now()
         user = User(
             username=username,
-            normalized_username=normalized_username,
             password_hash=_hash_password(password),
             display_name=username,
             created_at=now,
@@ -72,7 +71,7 @@ class UserService:
         *,
         current_token: str | None = None,
     ) -> AuthResult:
-        normalized_username = _normalize_username(username)
+        normalized_username = normalize_username(username)
 
         result = await self.session.execute(
             select(User).where(User.normalized_username == normalized_username)
@@ -177,10 +176,6 @@ class UserService:
 
     def _expires_at(self, now: datetime) -> datetime:
         return now + timedelta(seconds=self.settings.session_idle_timeout_seconds)
-
-
-def _normalize_username(username: str) -> str:
-    return username.lower()
 
 
 def _hash_password(password: str) -> str:

@@ -7,7 +7,6 @@ from riva.models import User
 def _user(username: str) -> User:
     return User(
         username=username,
-        normalized_username=username.lower(),
         password_hash="test-password-hash",
         display_name=username,
     )
