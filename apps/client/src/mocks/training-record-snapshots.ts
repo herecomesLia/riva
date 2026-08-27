@@ -1,10 +1,10 @@
 import type {
   InterviewCandidateQuestionExchangeResponse,
-  InterviewCompletedSessionResponse,
-  InterviewPageResponse,
   InterviewQuestionLearningDetailResponse,
   InterviewReferenceAnswerResponse,
+  InterviewSetupResponse,
 } from "@/models/interview"
+import type { MockInterviewCompletedSession } from "@/mocks/data/interview"
 import type {
   PracticeAttemptRecord,
   PracticeCompletedState,
@@ -26,8 +26,9 @@ import type {
 } from "@/models/training-records"
 
 type CompletedPracticePage = PracticePageResponse & { session: PracticeCompletedState }
-type CompletedInterviewPage = InterviewPageResponse & {
-  session: InterviewCompletedSessionResponse
+type CompletedInterviewPage = {
+  setup: InterviewSetupResponse
+  session: MockInterviewCompletedSession
 }
 
 function durationSeconds(startedAt: string, endedAt: string): number {
@@ -353,7 +354,7 @@ function interviewQuestion(
 }
 
 function interviewOverallReview(
-  session: InterviewCompletedSessionResponse,
+  session: MockInterviewCompletedSession,
 ): MockInterviewOverallReviewState {
   if (session.review.status === "unavailable") {
     return { status: "unavailable", content: null, reason: "insufficientAnswers" }
@@ -374,7 +375,7 @@ function interviewOverallReview(
 }
 
 function interviewRecommendation(
-  session: InterviewCompletedSessionResponse,
+  session: MockInterviewCompletedSession,
 ): TrainingRecordRecommendation {
   if (session.review.status === "complete") {
     return structuredClone(session.review.review.nextTraining)

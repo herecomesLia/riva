@@ -2,14 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 
-import { trainingRecordQueryKeys } from "@/app/training-record-query"
-import { dashboardQueryKeys } from "@/app/dashboard-query"
 import type {
   ActiveInterviewSessionResponse,
+  InterviewCompletionResponse,
   InterviewConversationRecordViewData,
   InterviewMutationResponse,
   InterviewPageResponse,
-  InterviewSessionResponse,
   SubmitInterviewAnswerInput,
 } from "@/models/interview"
 import {
@@ -60,14 +58,12 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
   }
 
   async function commitAndOpenReview(
-    response: InterviewMutationResponse,
+    response: InterviewCompletionResponse,
     completedSessionId: string,
   ) {
-    commit(response)
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all }),
-      queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all }),
-    ])
+    queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, (current) =>
+      current === undefined ? current : { ...current, session: response.session },
+    )
     await navigate({
       to: "/interview/review/$sessionId",
       params: { sessionId: completedSessionId },
@@ -322,7 +318,7 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
 }
 
 function toSummary(
-  session: InterviewSessionResponse,
+  session: ActiveInterviewSessionResponse,
   targetRole: string,
   company: string | null,
 ): InterviewSessionSummary {

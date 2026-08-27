@@ -9,11 +9,14 @@ import {
   createCandidateQuestionExchange,
   createInterviewAgentPlanMock,
   createInterviewCompletedSessionMock,
+  createInterviewCompletedSessionResponseMock,
   createInterviewMockResponse,
   defaultInterviewConfigurationMock,
 } from "@/mocks/data/interview"
 import type {
+  ActiveInterviewSessionResponse,
   InterviewCandidateQuestionsSessionResponse,
+  InterviewCompletionResponse,
   InterviewFollowUpSessionResponse,
   InterviewPageResponse,
   InterviewQuestionSessionResponse,
@@ -62,21 +65,21 @@ function responseWithSession(session: InterviewPageResponse["session"]): Intervi
 }
 
 function completedResponse(
-  activeSession: Exclude<InterviewPageResponse["session"], null>,
-): InterviewPageResponse {
+  activeSession: ActiveInterviewSessionResponse,
+): InterviewCompletionResponse {
   const completed = createInterviewCompletedSessionMock({
     completionReason:
       activeSession.status === "candidateQuestions" ? "formalQuestionsCompleted" : "userEndedEarly",
     completedMainQuestions: activeSession.progress.completedMainQuestions,
   })
-  return responseWithSession({
-    ...completed,
-    sessionId: activeSession.sessionId,
-    version: activeSession.version + 1,
-    configuration: activeSession.configuration,
-    startedAt: activeSession.startedAt,
-    progress: activeSession.progress,
-  })
+  return {
+    session: {
+      ...createInterviewCompletedSessionResponseMock(completed),
+      sessionId: activeSession.sessionId,
+      version: activeSession.version + 1,
+      reviewStatus: completed.review.status === "unavailable" ? "unavailable" : "generating",
+    },
+  }
 }
 
 function openingResponse(): InterviewPageResponse {
@@ -182,17 +185,16 @@ function candidateSession(
   version: number,
   exchanges: InterviewCandidateQuestionsSessionResponse["exchanges"] = [],
 ): InterviewCandidateQuestionsSessionResponse {
-  const completed = createInterviewMockResponse("completed").session
-  if (completed?.status !== "completed") throw new Error("Expected completed fixture.")
+  const completedArtifact = createInterviewCompletedSessionMock()
 
   return {
     status: "candidateQuestions",
     sessionId,
     version,
-    configuration: completed.configuration,
-    startedAt: completed.startedAt,
-    progress: completed.progress,
-    completedQuestions: completed.completedQuestions,
+    configuration: completedArtifact.configuration,
+    startedAt: completedArtifact.startedAt,
+    progress: completedArtifact.progress,
+    completedQuestions: completedArtifact.completedQuestions,
     prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
     exchanges,
   }
@@ -332,7 +334,7 @@ describe("InterviewSessionContainer", () => {
     )
   })
 
-  it("ends an unanswered main question once, caches the snapshot, and opens its review", async () => {
+  it("ends an unanswered main question once, caches its summary, and opens its review", async () => {
     const user = userEvent.setup()
     const active = questionSession(1, 2)
     const completed = completedResponse(active)
@@ -358,11 +360,13 @@ describe("InterviewSessionContainer", () => {
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
     expect(result.router?.state.location.pathname).not.toBe("/interview")
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(
+      responseWithSession(completed.session),
+    )
     expect(
       result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
-    ).toBe(true)
-    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(true)
+    ).toBe(false)
+    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(false)
   })
 
   it("ends from the current follow-up version and opens the same review route", async () => {
@@ -386,14 +390,16 @@ describe("InterviewSessionContainer", () => {
     await waitFor(() =>
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(
+      responseWithSession(completed.session),
+    )
   })
 
   it("locks repeated early-end confirmation while the request is pending", async () => {
     const user = userEvent.setup()
     const active = questionSession(1, 2)
     const completed = completedResponse(active)
-    const request = createDeferred<InterviewPageResponse>()
+    const request = createDeferred<InterviewCompletionResponse>()
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
     vi.mocked(endInterview).mockReturnValue(request.promise)
     const result = renderSession()
@@ -447,9 +453,9 @@ describe("InterviewSessionContainer", () => {
     const user = userEvent.setup()
     const activeResponse = openingResponse()
     const active = activeResponse.session
-    if (active === null) throw new Error("Expected opening session.")
+    if (active?.status !== "opening") throw new Error("Expected opening session.")
     const completed = completedResponse(active)
-    const request = createDeferred<InterviewPageResponse>()
+    const request = createDeferred<InterviewCompletionResponse>()
     vi.mocked(getInterviewPage).mockResolvedValue(activeResponse)
     vi.mocked(endInterview).mockReturnValue(request.promise)
     const result = renderSession()
@@ -478,7 +484,9 @@ describe("InterviewSessionContainer", () => {
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
     expect(endInterview).toHaveBeenCalledOnce()
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(
+      responseWithSession(completed.session),
+    )
   })
 
   it("submits candidate questions, shows feedback, and finishes only once", async () => {
@@ -488,9 +496,7 @@ describe("InterviewSessionContainer", () => {
     const exchange = createCandidateQuestionExchange(question, 1)
     const withExchange = candidateSession(7, [exchange])
     const completed = completedResponse(withExchange)
-    if (completed.session?.status !== "completed") throw new Error("Expected completed session.")
-    completed.session.candidateQuestionExchanges = [exchange]
-    const finishRequest = createDeferred<InterviewPageResponse>()
+    const finishRequest = createDeferred<InterviewCompletionResponse>()
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(candidate))
     vi.mocked(submitCandidateQuestion).mockResolvedValue(responseWithSession(withExchange))
     vi.mocked(finishInterview).mockReturnValue(finishRequest.promise)
@@ -534,8 +540,9 @@ describe("InterviewSessionContainer", () => {
     await waitFor(() =>
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(completed)
-    expect(completed.session.candidateQuestionExchanges).toEqual([exchange])
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(
+      responseWithSession(completed.session),
+    )
     expect(finishInterview).toHaveBeenCalledOnce()
   })
 

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   createInterviewAgentPlanMock,
   createInterviewCompletedSessionMock,
-  createInterviewReviewResponseMock,
   defaultInterviewConfigurationMock,
   type InterviewAgentMockScenario,
 } from "@/mocks/data/interview"
@@ -31,12 +30,15 @@ import {
 } from "@/mocks/services/roles"
 import { getProfileMockSnapshot, resetProfileMockState } from "@/mocks/services/profile"
 import type {
+  GetInterviewReviewResponse,
   InterviewCandidateQuestionsSessionResponse,
   InterviewFollowUpSessionResponse,
   InterviewOpeningSessionResponse,
   InterviewQuestionSessionResponse,
   InterviewScoreDimension,
 } from "@/models/interview"
+
+type TerminalInterviewReviewResponse = Exclude<GetInterviewReviewResponse, { status: "generating" }>
 
 function resetScenario(
   agentScenario: InterviewAgentMockScenario = "singleFollowUp",
@@ -142,6 +144,16 @@ async function finishCandidateQuestions(session: InterviewCandidateQuestionsSess
   })
   if (response.session?.status !== "completed") throw new Error("Expected completed interview.")
   return response.session
+}
+
+async function getTerminalInterviewReview(
+  sessionId: string,
+): Promise<TerminalInterviewReviewResponse> {
+  const first = await getInterviewReview({ sessionId })
+  if (first.status !== "generating") return first
+  const terminal = await getInterviewReview({ sessionId })
+  if (terminal.status === "generating") throw new Error("Expected terminal interview review.")
+  return terminal
 }
 
 describe("interview Agent mock scenarios", () => {
@@ -315,10 +327,11 @@ describe("interview Agent mock scenarios", () => {
       throw new Error("Expected candidate questions.")
     }
     const completed = await finishCandidateQuestions(candidateResponse.session)
-    expect(completed.progress).toMatchObject({
-      completedMainQuestions: plan.questions.length,
-      totalMainQuestions: null,
-    })
+    expect(completed.reviewStatus).toBe("generating")
+    expect("progress" in completed).toBe(false)
+    const review = await getTerminalInterviewReview(completed.sessionId)
+    if (review.status !== "complete") throw new Error("Expected complete review.")
+    expect(review.questionDetails).toHaveLength(plan.questions.length)
   })
 
   it("adjustedPlan updates total and revision without changing the completed count", async () => {
@@ -480,6 +493,60 @@ describe("interview mock state-machine protection", () => {
 })
 
 describe("interview completion and review availability", () => {
+  it("keeps I07/I08 lightweight while I09 owns the generating-to-terminal transition", async () => {
+    const first = await startToFirstQuestion("noFollowUps")
+    const secondResponse = await answerQuestion(first, "已完成的第一题回答")
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const completion = await endInterview({
+      sessionId: secondResponse.session.sessionId,
+      version: secondResponse.session.version,
+    })
+
+    expect(completion.session).toMatchObject({
+      status: "completed",
+      reviewStatus: "generating",
+    })
+    expect("review" in completion.session).toBe(false)
+    expect("questionDetails" in completion.session).toBe(false)
+
+    const generating = await getInterviewReview({ sessionId: completion.session.sessionId })
+    expect(generating).toEqual({
+      status: "generating",
+      sessionId: completion.session.sessionId,
+      completionReason: "userEndedEarly",
+    })
+    expect((await getInterviewPage()).session).toMatchObject({ reviewStatus: "generating" })
+
+    const terminal = await getInterviewReview({ sessionId: completion.session.sessionId })
+    expect(terminal.status).toBe("partial")
+    expect((await getInterviewPage()).session).toMatchObject({ reviewStatus: "partial" })
+  })
+
+  it("publishes an explicit failed I09 terminal state when review generation fails", async () => {
+    resetScenario("noFollowUps", { reviewGenerationFailure: true })
+    const first = await beginQuestions(await startCurrentOpening())
+    const secondResponse = await answerQuestion(first)
+    if (secondResponse.session?.status !== "question") throw new Error("Expected second question.")
+    const completion = await endInterview({
+      sessionId: secondResponse.session.sessionId,
+      version: secondResponse.session.version,
+    })
+
+    expect((await getInterviewReview({ sessionId: completion.session.sessionId })).status).toBe(
+      "generating",
+    )
+    expect(await getInterviewReview({ sessionId: completion.session.sessionId })).toEqual({
+      status: "failed",
+      sessionId: completion.session.sessionId,
+      completionReason: "userEndedEarly",
+      reason: "generationFailed",
+    })
+    expect(await getInterviewReview({ sessionId: completion.session.sessionId })).toMatchObject({
+      status: "failed",
+    })
+    expect((await getInterviewPage()).session).toMatchObject({ reviewStatus: "failed" })
+  })
+
   it("ends during opening without generating scores or fixed evaluation data", async () => {
     const opening = await startOpening()
     const response = await endInterview({
@@ -488,14 +555,14 @@ describe("interview completion and review availability", () => {
     })
     if (response.session?.status !== "completed") throw new Error("Expected completion.")
 
-    expect(response.session.completedQuestions).toEqual([])
-    expect(response.session.progress.completedMainQuestions).toBe(0)
-    expect(response.session.completionReason).toBe("userEndedEarly")
-    expect(response.session.review).toEqual({
-      status: "unavailable",
-      reason: "insufficientAnswers",
+    expect(response.session).toMatchObject({
+      status: "completed",
+      completionReason: "userEndedEarly",
+      reviewStatus: "unavailable",
     })
-    const review = await getInterviewReview({ sessionId: response.session.sessionId })
+    expect("review" in response.session).toBe(false)
+    expect("questionDetails" in response.session).toBe(false)
+    const review = await getTerminalInterviewReview(response.session.sessionId)
     expect(review).toEqual({
       status: "unavailable",
       reason: "insufficientAnswers",
@@ -516,14 +583,12 @@ describe("interview completion and review availability", () => {
     })
     expect(endedImmediately.session).toMatchObject({
       status: "completed",
-      completedQuestions: [],
-      progress: { completedMainQuestions: 0 },
       completionReason: "userEndedEarly",
-      review: { status: "unavailable", reason: "insufficientAnswers" },
+      reviewStatus: "unavailable",
     })
     if (endedImmediately.session?.status !== "completed") throw new Error("Expected completion.")
-    const review = await getInterviewReview({ sessionId: endedImmediately.session.sessionId })
-    expect(review.status).toBe("unavailable")
+    const review = await getTerminalInterviewReview(endedImmediately.session.sessionId)
+    if (review.status !== "unavailable") throw new Error("Expected unavailable review.")
     expect(review.questionDetails).toHaveLength(1)
     expect(review.questionDetails[0]).toMatchObject({
       record: { status: "unanswered", answer: null },
@@ -543,13 +608,11 @@ describe("interview completion and review availability", () => {
     })
     expect(endedOnSecond.session).toMatchObject({
       status: "completed",
-      completedQuestions: [{ answer: { content: "已完成的第一题回答" } }],
-      progress: { completedMainQuestions: 1 },
       completionReason: "userEndedEarly",
-      review: { status: "partial" },
+      reviewStatus: "generating",
     })
     if (endedOnSecond.session?.status !== "completed") throw new Error("Expected completion.")
-    const review = await getInterviewReview({ sessionId: endedOnSecond.session.sessionId })
+    const review = await getTerminalInterviewReview(endedOnSecond.session.sessionId)
     if (review.status !== "partial") throw new Error("Expected partial review.")
     expect(review.questionDetails).toHaveLength(2)
     expect(review.review.questionReviews).toHaveLength(1)
@@ -586,19 +649,11 @@ describe("interview completion and review availability", () => {
     })
     expect(ended.session).toMatchObject({
       status: "completed",
-      completedQuestions: [
-        {},
-        {
-          answer: { content: "已回答的主问题" },
-          followUps: [],
-        },
-      ],
-      progress: { completedMainQuestions: 2 },
       completionReason: "userEndedEarly",
-      review: { status: "partial" },
+      reviewStatus: "generating",
     })
     if (ended.session?.status !== "completed") throw new Error("Expected completion.")
-    const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    const review = await getTerminalInterviewReview(ended.session.sessionId)
     if (review.status !== "partial") throw new Error("Expected partial review.")
     expect(review.questionDetails).toHaveLength(2)
     expect(review.questionDetails[1]?.followUps).toHaveLength(1)
@@ -620,7 +675,7 @@ describe("interview completion and review availability", () => {
     const followUpReference = review.questionDetails[1]?.followUps[0]?.referenceAnswer
     expect(mainReference).not.toEqual(followUpReference)
     expect(review.review.questionReviews.map(({ questionId }) => questionId)).toEqual(
-      ended.session.completedQuestions.map(({ question }) => question.id),
+      review.questionDetails.map(({ record }) => record.question.id),
     )
   })
 
@@ -646,15 +701,9 @@ describe("interview completion and review availability", () => {
       version: secondFollowUpResponse.session.version,
     })
     if (ended.session?.status !== "completed") throw new Error("Expected completion.")
-    expect(ended.session.completedQuestions[1]?.followUps).toMatchObject([
-      {
-        question: { id: plan.questions[1]!.followUps[0]!.id },
-        answer: { content: "已完成的第一轮追问" },
-      },
-    ])
-    expect(ended.session.completedQuestions[1]?.followUps).toHaveLength(1)
+    expect(ended.session.reviewStatus).toBe("generating")
 
-    const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    const review = await getTerminalInterviewReview(ended.session.sessionId)
     if (review.status !== "partial") throw new Error("Expected partial review.")
     expect(review.questionDetails[1]?.followUps.map(({ record }) => record.question.id)).toEqual([
       plan.questions[1]!.followUps[0]!.id,
@@ -675,9 +724,11 @@ describe("interview completion and review availability", () => {
     const candidate = await reachNoFollowUpsCandidateQuestions()
     const completed = await finishCandidateQuestions(candidate)
     expect(completed.completionReason).toBe("formalQuestionsCompleted")
-    expect(completed.review.status).toBe("complete")
+    expect(completed.reviewStatus).toBe("generating")
+    expect("review" in completed).toBe(false)
+    expect("questionDetails" in completed).toBe(false)
 
-    const review = await getInterviewReview({ sessionId: completed.sessionId })
+    const review = await getTerminalInterviewReview(completed.sessionId)
     if (review.status !== "complete") throw new Error("Expected complete review.")
     const expectedDimensions: InterviewScoreDimension[] = [
       "relevance",
@@ -701,7 +752,7 @@ describe("interview completion and review availability", () => {
       expect(explanation.trim()).not.toBe("")
     })
     expect(review.review.nextTraining.focusAreas.length).toBeGreaterThan(0)
-    expect(review.questionDetails).toHaveLength(completed.completedQuestions.length)
+    expect(review.questionDetails).toHaveLength(createPlan("noFollowUps").questions.length)
     for (const detail of review.questionDetails) {
       expect(detail.record.status).toBe("answered")
       expect(detail.performance).not.toBeNull()
@@ -727,7 +778,7 @@ describe("interview completion and review availability", () => {
       throw new Error("Expected candidate questions.")
     }
     const completed = await finishCandidateQuestions(candidateResponse.session)
-    const review = await getInterviewReview({ sessionId: completed.sessionId })
+    const review = await getTerminalInterviewReview(completed.sessionId)
     if (review.status !== "complete") throw new Error("Expected complete review.")
 
     const main = review.questionDetails[1]
@@ -757,15 +808,13 @@ describe("interview completion and review availability", () => {
       version: withExchangeResponse.session.version,
     })
     if (ended.session?.status !== "completed") throw new Error("Expected completion.")
-    expect(ended.session.completedQuestions).toHaveLength(2)
-    expect(ended.session.candidateQuestionExchanges).toHaveLength(1)
     expect(ended.session.completionReason).toBe("formalQuestionsCompleted")
-    expect(ended.session.review.status).toBe("complete")
+    expect(ended.session.reviewStatus).toBe("generating")
+    expect("candidateQuestionExchanges" in ended.session).toBe(false)
 
-    const review = await getInterviewReview({ sessionId: ended.session.sessionId })
+    const review = await getTerminalInterviewReview(ended.session.sessionId)
     if (review.status !== "complete") throw new Error("Expected complete review.")
     expect(review.questionDetails).toHaveLength(2)
-    expect(review).toEqual(createInterviewReviewResponseMock(ended.session))
   })
 
   it("returns an immutable persisted learning snapshot for repeated review reads", async () => {
@@ -776,14 +825,16 @@ describe("interview completion and review availability", () => {
     })
     if (endedResponse.session?.status !== "completed") throw new Error("Expected completion.")
 
-    const firstRead = await getInterviewReview({ sessionId: endedResponse.session.sessionId })
+    const firstRead = await getTerminalInterviewReview(endedResponse.session.sessionId)
+    if (firstRead.status !== "unavailable") throw new Error("Expected unavailable review.")
     const original = structuredClone(firstRead)
     const firstReference = firstRead.questionDetails[0]?.referenceAnswer
     if (firstReference?.status !== "ready") throw new Error("Expected ready reference answer.")
     firstReference.content.exampleAnswer = "调用方修改后的内容"
     await startCurrentOpening()
 
-    const secondRead = await getInterviewReview({ sessionId: endedResponse.session.sessionId })
+    const secondRead = await getTerminalInterviewReview(endedResponse.session.sessionId)
+    if (secondRead.status !== "unavailable") throw new Error("Expected unavailable review.")
     expect(secondRead).toEqual(original)
     expect(secondRead.questionDetails[0]?.referenceAnswer).not.toEqual(firstReference)
   })
@@ -795,17 +846,17 @@ describe("interview completion and review availability", () => {
       version: first.version,
     })
     if (ended.session?.status !== "completed") throw new Error("Expected completion.")
-    const expected = await getInterviewReview({ sessionId: ended.session.sessionId })
+    const expected = await getTerminalInterviewReview(ended.session.sessionId)
 
     resetInterviewMockState("setupReady", {
       clearPersistedSessions: false,
       defaultDelayMs: 0,
     })
 
-    expect(await getInterviewReview({ sessionId: ended.session.sessionId })).toEqual(expected)
+    expect(await getTerminalInterviewReview(ended.session.sessionId)).toEqual(expected)
     const next = await startCurrentOpening()
     expect(next.sessionId).toBe("mock-interview-session-2")
-    expect(await getInterviewReview({ sessionId: ended.session.sessionId })).toEqual(expected)
+    expect(await getTerminalInterviewReview(ended.session.sessionId)).toEqual(expected)
   })
 
   it("keeps a completed review in memory when repository storage writes fail", async () => {
@@ -830,14 +881,14 @@ describe("interview completion and review availability", () => {
         version: first.version,
       })
       if (ended.session?.status !== "completed") throw new Error("Expected completion.")
-      const expected = await getInterviewReview({ sessionId: ended.session.sessionId })
+      const expected = await getTerminalInterviewReview(ended.session.sessionId)
 
       resetInterviewMockState("setupReady", {
         clearPersistedSessions: false,
         defaultDelayMs: 0,
       })
 
-      expect(await getInterviewReview({ sessionId: ended.session.sessionId })).toEqual(expected)
+      expect(await getTerminalInterviewReview(ended.session.sessionId)).toEqual(expected)
     } finally {
       vi.unstubAllGlobals()
     }
@@ -1456,15 +1507,17 @@ describe("configuration-driven interview catalogs", () => {
     })
     if (completed.session?.status !== "completed") throw new Error("Expected completion.")
 
+    const review = await getTerminalInterviewReview(completed.session.sessionId)
+    if (review.status !== "partial") throw new Error("Expected partial review.")
     expect(
-      completed.session.completedQuestions.every(
-        ({ question }) => !question.prompt.includes("前端"),
-      ),
+      review.questionDetails
+        .filter(({ record }) => record.status === "answered")
+        .every(({ record }) => !record.question.prompt.includes("前端")),
     ).toBe(true)
-    expect(completed.session.questionDetails[0]?.performance).not.toBeNull()
-    expect(completed.session.questionDetails[0]?.referenceAnswer.status).toBe("ready")
-    expect(completed.session.questionDetails[1]?.followUps[0]?.performance).not.toBeNull()
-    expect(completed.session.questionDetails[1]?.followUps[0]?.referenceAnswer.status).toBe("ready")
+    expect(review.questionDetails[0]?.performance).not.toBeNull()
+    expect(review.questionDetails[0]?.referenceAnswer.status).toBe("ready")
+    expect(review.questionDetails[1]?.followUps[0]?.performance).not.toBeNull()
+    expect(review.questionDetails[1]?.followUps[0]?.referenceAnswer.status).toBe("ready")
   })
 
   it("keeps duration as input without converting it into a fixed question count", () => {

@@ -157,8 +157,14 @@ export const interview = {
     description: "从整场表现、关键问题和能力风险中，找到正式面试前最值得强化的方向。",
     loadingTitle: "正在生成面试复盘",
     loadingDescription: "Riva 正在整理本次实际保存的问答记录和可用复盘结果。",
-    errorTitle: "复盘生成失败",
-    errorDescription: "面试记录已经保留，你可以安全重试。",
+    errorTitle: "暂时无法获取面试复盘",
+    errorDescription: "面试记录已经保留，请检查网络后重试获取。",
+    failed: {
+      generationFailed: {
+        title: "面试复盘生成失败",
+        description: "面试问答记录已经保留，但本次复盘任务未能完成。请返回面试配置页。",
+      },
+    },
     unavailable: {
       insufficientAnswers: {
         title: "回答数据不足，暂时无法生成复盘",

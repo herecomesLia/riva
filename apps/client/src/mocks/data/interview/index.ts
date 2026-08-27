@@ -6,9 +6,11 @@ export {
 export { createInterviewQuestionDetails, createInterviewSessionReview } from "./review-builders"
 export {
   createInterviewCompletedSessionMock,
+  createInterviewCompletedSessionResponseMock,
   createInterviewMockResponse,
   createInterviewReviewResponseMock,
   defaultInterviewConfigurationMock,
+  type MockInterviewCompletedSession,
   type InterviewMockScenario,
 } from "./session-builders"
 export {

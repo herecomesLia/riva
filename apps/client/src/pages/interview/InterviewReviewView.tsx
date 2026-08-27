@@ -46,11 +46,17 @@ import { InterviewReviewListCard } from "./components/InterviewReviewListCard"
 
 type PartialReviewData = Extract<GetInterviewReviewResponse, { status: "partial" }>
 type CompleteReviewData = Extract<GetInterviewReviewResponse, { status: "complete" }>
+type FailedReviewData = Extract<GetInterviewReviewResponse, { status: "failed" }>
+type GeneratingReviewData = Extract<GetInterviewReviewResponse, { status: "generating" }>
 type UnavailableReviewData = Extract<GetInterviewReviewResponse, { status: "unavailable" }>
 type AvailableReviewData = PartialReviewData | CompleteReviewData
 
 export type InterviewReviewViewProps =
   | { status: "loading" }
+  | {
+      status: "generating"
+      data: GeneratingReviewData
+    }
   | {
       status: "partial"
       data: PartialReviewData
@@ -65,6 +71,11 @@ export type InterviewReviewViewProps =
   | {
       status: "unavailable"
       data: UnavailableReviewData
+      onBack: () => void
+    }
+  | {
+      status: "failed"
+      data: FailedReviewData
       onBack: () => void
     }
   | {
@@ -106,7 +117,7 @@ export function InterviewReviewView(props: InterviewReviewViewProps) {
         </p>
       </header>
 
-      {props.status === "loading" ? (
+      {props.status === "loading" || props.status === "generating" ? (
         <ReviewLoading />
       ) : props.status === "partial" || props.status === "complete" ? (
         <ReviewContent
@@ -116,10 +127,31 @@ export function InterviewReviewView(props: InterviewReviewViewProps) {
         />
       ) : props.status === "unavailable" ? (
         <ReviewUnavailable data={props.data} onBack={props.onBack} />
+      ) : props.status === "failed" ? (
+        <ReviewGenerationFailed data={props.data} onBack={props.onBack} />
       ) : (
         <ReviewError isRetrying={props.isRetrying} onBack={props.onBack} onRetry={props.onRetry} />
       )}
     </div>
+  )
+}
+
+function ReviewGenerationFailed({ data, onBack }: { data: FailedReviewData; onBack: () => void }) {
+  const { t } = useTranslation()
+
+  return (
+    <Card role="alert">
+      <CardHeader>
+        <CardTitle>{t(`interview.review.failed.${data.reason}.title`)}</CardTitle>
+        <CardDescription>{t(`interview.review.failed.${data.reason}.description`)}</CardDescription>
+      </CardHeader>
+      <CardFooter>
+        <Button onClick={onBack} variant="outline">
+          <ArrowLeftIcon aria-hidden="true" data-icon="inline-start" />
+          {t("interview.review.actions.backToSetup")}
+        </Button>
+      </CardFooter>
+    </Card>
   )
 }
 

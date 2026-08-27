@@ -2,6 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { dashboardQueryKeys } from "@/app/dashboard-query"
+import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import { i18n } from "@/i18n/i18n"
 import {
   createInterviewCompletedSessionMock,
@@ -75,6 +77,50 @@ describe("InterviewReviewContainer", () => {
     ).toBeVisible()
     expect(screen.getByTestId("interview-review-loading")).toHaveAttribute("aria-busy", "true")
     expect(screen.getByText(i18n.t("interview.review.sections.questions"))).toBeVisible()
+  })
+
+  it("polls a generating review and invalidates dependent data only at the terminal state", async () => {
+    const terminal = completedReview()
+    vi.mocked(getInterviewReview)
+      .mockResolvedValueOnce({
+        status: "generating",
+        sessionId,
+        completionReason: terminal.completionReason,
+      })
+      .mockResolvedValueOnce(terminal)
+    const result = renderReview()
+    result.queryClient.setQueryData(trainingRecordQueryKeys.overview(), { stale: true })
+    result.queryClient.setQueryData(dashboardQueryKeys.all, { stale: true })
+
+    expect(await screen.findByTestId("interview-review-loading")).toBeVisible()
+    expect(
+      result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
+    ).toBe(false)
+    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(false)
+
+    await waitFor(() => expect(getInterviewReview).toHaveBeenCalledTimes(2), { timeout: 2_500 })
+    expect(await screen.findByText(String(terminal.review.overallScore))).toBeVisible()
+    expect(
+      result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
+    ).toBe(true)
+    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(true)
+  })
+
+  it("renders an explicit terminal generation failure without offering a GET retry", async () => {
+    vi.mocked(getInterviewReview).mockResolvedValue({
+      status: "failed",
+      sessionId,
+      completionReason: "userEndedEarly",
+      reason: "generationFailed",
+    })
+    renderReview()
+
+    expect(
+      await screen.findByText(i18n.t("interview.review.failed.generationFailed.title")),
+    ).toBeVisible()
+    expect(
+      screen.queryByRole("button", { name: i18n.t("interview.review.actions.retry") }),
+    ).not.toBeInTheDocument()
   })
 
   it("renders the saved answer, feedback, and a separately collapsed reference answer", async () => {

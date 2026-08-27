@@ -2,6 +2,8 @@ import {
   candidateQuestionsPromptMock,
   createCandidateQuestionExchange,
   createInterviewAgentPlanMock,
+  createInterviewCompletedSessionMock,
+  createInterviewCompletedSessionResponseMock,
   createInterviewMockResponse,
   createInterviewQuestionDetails,
   createInterviewReviewResponseMock,
@@ -12,6 +14,7 @@ import {
   interviewSetupConfigurationMock,
   type InterviewAgentMockScenario,
   type InterviewMockScenario,
+  type MockInterviewCompletedSession,
   type MockInterviewAgentPlan,
 } from "@/mocks/data/interview"
 import {
@@ -35,14 +38,15 @@ import type {
   GetInterviewReviewInput,
   GetInterviewReviewResponse,
   InterviewCandidateQuestionsSessionResponse,
+  InterviewCompletionResponse,
   InterviewCompletionReason,
-  InterviewCompletedSessionResponse,
   InterviewFollowUpSessionResponse,
   InterviewMutationResponse,
   InterviewPageResponse,
   InterviewProgressResponse,
   InterviewQuestionSessionResponse,
   InterviewQuestionRecordResponse,
+  InterviewReviewGenerationStatus,
   InterviewSessionMutationInput,
   StartInterviewInput,
   SubmitCandidateQuestionInput,
@@ -72,6 +76,7 @@ export type InterviewMockControllerOptions = {
   defaultDelayMs?: number
   delayNext?: Partial<Record<InterviewMockOperation, number>>
   failNext?: readonly InterviewMockOperation[]
+  reviewGenerationFailure?: boolean
 }
 
 type PlanCursor = {
@@ -90,8 +95,11 @@ let planCursor: PlanCursor | null = null
 let sessionSequence = getPersistedSessionSequence()
 let mutationSequence = 0
 let configuredDefaultDelayMs: number | undefined
+let selectedReviewGenerationFailure = false
 const delayedOperations = new Map<InterviewMockOperation, number>()
 const failingOperations = new Set<InterviewMockOperation>()
+const pendingReviewPolls = new Map<string, number>()
+const failedReviewSessionIds = new Set<string>()
 
 function copy<T>(value: T): T {
   return structuredClone(value)
@@ -121,16 +129,44 @@ function getSnapshot(): InterviewPageResponse {
 
 function commit(nextSession: InterviewPageResponse["session"]): InterviewMutationResponse {
   session = copy(nextSession)
-  if (nextSession?.status === "completed") {
-    saveCompletedInterviewSession(nextSession)
+  return getSnapshot()
+}
+
+function saveInterviewTrainingRecord(completedSession: MockInterviewCompletedSession) {
+  saveTrainingRecordSnapshot(
+    createMockInterviewRecordSnapshot({
+      setup: getSnapshot().setup,
+      session: completedSession,
+    }),
+  )
+}
+
+function updateCurrentReviewStatus(
+  sessionId: string,
+  reviewStatus: InterviewReviewGenerationStatus,
+) {
+  if (session?.status !== "completed" || session.sessionId !== sessionId) return
+  session = { ...session, reviewStatus }
+}
+
+function commitCompletion(
+  completedSession: MockInterviewCompletedSession,
+): InterviewCompletionResponse {
+  saveCompletedInterviewSession(completedSession)
+  const isImmediatelyUnavailable = completedSession.review.status === "unavailable"
+  const completedSummary = {
+    ...createInterviewCompletedSessionResponseMock(completedSession),
+    reviewStatus: isImmediatelyUnavailable ? ("unavailable" as const) : ("generating" as const),
   }
-  const snapshot = getSnapshot()
-  if (snapshot.session?.status === "completed") {
-    saveTrainingRecordSnapshot(
-      createMockInterviewRecordSnapshot({ ...snapshot, session: snapshot.session }),
-    )
+  session = copy(completedSummary)
+  failedReviewSessionIds.delete(completedSession.sessionId)
+  if (isImmediatelyUnavailable) {
+    pendingReviewPolls.delete(completedSession.sessionId)
+    saveInterviewTrainingRecord(completedSession)
+  } else {
+    pendingReviewPolls.set(completedSession.sessionId, 1)
   }
-  return snapshot
+  return copy({ session: completedSummary })
 }
 
 function nextTimestamp() {
@@ -269,16 +305,16 @@ export function resetInterviewMockState(
   sessionSequence = getPersistedSessionSequence()
   mutationSequence = 0
   configuredDefaultDelayMs = controller.defaultDelayMs
+  selectedReviewGenerationFailure = controller.reviewGenerationFailure ?? false
   delayedOperations.clear()
   failingOperations.clear()
-  if (session?.status === "completed") {
-    saveCompletedInterviewSession(session)
-    const snapshot = getSnapshot()
-    if (snapshot.session?.status === "completed") {
-      saveTrainingRecordSnapshot(
-        createMockInterviewRecordSnapshot({ ...snapshot, session: snapshot.session }),
-      )
-    }
+  pendingReviewPolls.clear()
+  failedReviewSessionIds.clear()
+  if (scenario === "completed") {
+    const completedSession = createInterviewCompletedSessionMock()
+    session = createInterviewCompletedSessionResponseMock(completedSession)
+    saveCompletedInterviewSession(completedSession)
+    saveInterviewTrainingRecord(completedSession)
   }
 
   for (const operation of controller.failNext ?? []) failingOperations.add(operation)
@@ -507,13 +543,13 @@ export async function submitCandidateQuestion(
 
 export async function finishInterview(
   input: FinishInterviewInput,
-): Promise<InterviewMutationResponse> {
+): Promise<InterviewCompletionResponse> {
   await consumeOperation("finishInterview")
   const session = requireActiveSession(input)
   if (session.status !== "candidateQuestions") {
     throw new Error("Interview can only finish after entering candidate questions.")
   }
-  return commit(
+  return commitCompletion(
     toCompletedSession(
       session,
       session.completedQuestions,
@@ -536,7 +572,7 @@ function toCompletedSession(
       followUps,
     }),
   ),
-): InterviewCompletedSessionResponse {
+): MockInterviewCompletedSession {
   const review = createInterviewSessionReview(completedQuestions, completionReason)
   return {
     status: "completed",
@@ -554,7 +590,7 @@ function toCompletedSession(
   }
 }
 
-export async function endInterview(input: EndInterviewInput): Promise<InterviewMutationResponse> {
+export async function endInterview(input: EndInterviewInput): Promise<InterviewCompletionResponse> {
   await consumeOperation("endInterview")
   const session = requireActiveSession(input)
   let completedQuestions = session.completedQuestions
@@ -608,7 +644,7 @@ export async function endInterview(input: EndInterviewInput): Promise<InterviewM
   const completionReason =
     session.status === "candidateQuestions" ? "formalQuestionsCompleted" : "userEndedEarly"
   planCursor = null
-  return commit(
+  return commitCompletion(
     toCompletedSession(session, completedQuestions, exchanges, completionReason, questionRecords),
   )
 }
@@ -621,5 +657,37 @@ export async function getInterviewReview(
   if (session === null) {
     throw new Error("Interview review is not available.")
   }
+  if (failedReviewSessionIds.has(session.sessionId)) {
+    return {
+      status: "failed",
+      sessionId: session.sessionId,
+      completionReason: session.completionReason,
+      reason: "generationFailed",
+    }
+  }
+  const remainingPolls = pendingReviewPolls.get(session.sessionId)
+  if (remainingPolls !== undefined && remainingPolls > 0) {
+    pendingReviewPolls.set(session.sessionId, remainingPolls - 1)
+    return {
+      status: "generating",
+      sessionId: session.sessionId,
+      completionReason: session.completionReason,
+    }
+  }
+  if (remainingPolls !== undefined) {
+    pendingReviewPolls.delete(session.sessionId)
+    if (selectedReviewGenerationFailure) {
+      failedReviewSessionIds.add(session.sessionId)
+      updateCurrentReviewStatus(session.sessionId, "failed")
+      return {
+        status: "failed",
+        sessionId: session.sessionId,
+        completionReason: session.completionReason,
+        reason: "generationFailed",
+      }
+    }
+  }
+  updateCurrentReviewStatus(session.sessionId, session.review.status)
+  saveInterviewTrainingRecord(session)
   return copy(createInterviewReviewResponseMock(session))
 }

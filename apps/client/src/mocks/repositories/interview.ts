@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import type { InterviewCompletedSessionResponse } from "@/models/interview"
+import type { MockInterviewCompletedSession } from "@/mocks/data/interview"
 
 export const INTERVIEW_MOCK_REPOSITORY_STORAGE_KEY = "riva:mock:interview:completed-sessions"
 
@@ -233,7 +233,7 @@ const repositorySchema = z.object({
 
 type RepositoryState = {
   version: typeof repositoryVersion
-  sessions: InterviewCompletedSessionResponse[]
+  sessions: MockInterviewCompletedSession[]
 }
 
 let volatileState: RepositoryState = { version: repositoryVersion, sessions: [] }
@@ -306,7 +306,7 @@ function writeState(state: RepositoryState) {
   }
 }
 
-export function saveCompletedInterviewSession(session: InterviewCompletedSessionResponse) {
+export function saveCompletedInterviewSession(session: MockInterviewCompletedSession) {
   const snapshot = copy(session)
   const parsed = completedSessionSchema.safeParse(snapshot)
   if (!parsed.success) {
@@ -319,12 +319,12 @@ export function saveCompletedInterviewSession(session: InterviewCompletedSession
 
 export function getCompletedInterviewSession(
   sessionId: string,
-): InterviewCompletedSessionResponse | null {
+): MockInterviewCompletedSession | null {
   const session = readState().sessions.find((candidate) => candidate.sessionId === sessionId)
   return session === undefined ? null : copy(session)
 }
 
-export function listCompletedInterviewSessions(): InterviewCompletedSessionResponse[] {
+export function listCompletedInterviewSessions(): MockInterviewCompletedSession[] {
   return copy(readState().sessions)
 }
 

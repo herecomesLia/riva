@@ -40,6 +40,30 @@ export const Loading = meta.story({
   },
 })
 
+export const Generating = meta.story({
+  args: {
+    status: "generating",
+    data: {
+      status: "generating",
+      sessionId: "mock-interview-session-generating",
+      completionReason: "formalQuestionsCompleted",
+    },
+  },
+})
+
+export const GenerationFailed = meta.story({
+  args: {
+    status: "failed",
+    data: {
+      status: "failed",
+      sessionId: "mock-interview-session-failed",
+      completionReason: "userEndedEarly",
+      reason: "generationFailed",
+    },
+    onBack: fn(),
+  },
+})
+
 export const Complete = meta.story({
   args: {
     status: "complete",

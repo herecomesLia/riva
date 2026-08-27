@@ -1,11 +1,15 @@
 import type {
   CompletedInterviewQuestionResponse,
   GetInterviewReviewResponse,
+  InterviewCandidateQuestionExchangeResponse,
   InterviewCompletionReason,
   InterviewCompletedSessionResponse,
   InterviewConfiguration,
   InterviewPageResponse,
+  InterviewProgressResponse,
+  InterviewQuestionLearningDetailResponse,
   InterviewQuestionRecordResponse,
+  InterviewSessionReviewResponse,
 } from "@/models/interview"
 
 import { createProfileMockSnapshot, profileResponseMock } from "../profile"
@@ -27,6 +31,22 @@ export const defaultInterviewConfigurationMock: InterviewConfiguration = {
   round: "technical",
   difficulty: "pressure",
   durationMinutes: 30,
+}
+
+/** Full persisted Mock artifact. It deliberately stays outside the server response models. */
+export type MockInterviewCompletedSession = {
+  status: "completed"
+  sessionId: string
+  version: number
+  configuration: InterviewConfiguration
+  startedAt: string
+  progress: InterviewProgressResponse
+  completedQuestions: CompletedInterviewQuestionResponse[]
+  completionReason: InterviewCompletionReason
+  completedAt: string
+  candidateQuestionExchanges: InterviewCandidateQuestionExchangeResponse[]
+  review: InterviewSessionReviewResponse
+  questionDetails: InterviewQuestionLearningDetailResponse[]
 }
 
 function createCompletedQuestionRecords(
@@ -61,7 +81,7 @@ export function createInterviewCompletedSessionMock(
     completedMainQuestions?: number
     configuration?: InterviewConfiguration
   } = {},
-): InterviewCompletedSessionResponse {
+): MockInterviewCompletedSession {
   const agentScenario = options.agentScenario ?? "singleFollowUp"
   const completionReason = options.completionReason ?? "formalQuestionsCompleted"
   const configuration = options.configuration ?? defaultInterviewConfigurationMock
@@ -102,8 +122,21 @@ export function createInterviewCompletedSessionMock(
   }
 }
 
+export function createInterviewCompletedSessionResponseMock(
+  session: MockInterviewCompletedSession = createInterviewCompletedSessionMock(),
+): InterviewCompletedSessionResponse {
+  return {
+    status: "completed",
+    sessionId: session.sessionId,
+    version: session.version,
+    completionReason: session.completionReason,
+    completedAt: session.completedAt,
+    reviewStatus: session.review.status,
+  }
+}
+
 export function createInterviewReviewResponseMock(
-  session: InterviewCompletedSessionResponse = createInterviewCompletedSessionMock(),
+  session: MockInterviewCompletedSession = createInterviewCompletedSessionMock(),
 ): GetInterviewReviewResponse {
   const base = {
     sessionId: session.sessionId,
@@ -141,9 +174,10 @@ export function createInterviewMockResponse(
   }
 
   if (scenario === "completed") {
+    const completedSession = createInterviewCompletedSessionMock()
     return {
       setup: structuredClone(interviewSetupResponseMock),
-      session: createInterviewCompletedSessionMock(),
+      session: createInterviewCompletedSessionResponseMock(completedSession),
     }
   }
 

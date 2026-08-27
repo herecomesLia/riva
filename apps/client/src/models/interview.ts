@@ -306,14 +306,20 @@ export type InterviewSessionReviewResponse =
       review: InterviewReviewResponse
     }
 
-export type InterviewCompletedSessionResponse = InterviewActiveSessionResponseBase & {
+export type InterviewReviewGenerationStatus =
+  "generating" | "complete" | "partial" | "unavailable" | "failed"
+
+/**
+ * Lightweight completion state returned by I07/I08 and exposed by I01.
+ * Review artifacts are available only through I09.
+ */
+export type InterviewCompletedSessionResponse = {
   status: "completed"
+  sessionId: string
+  version: number
   completionReason: InterviewCompletionReason
   completedAt: string
-  candidateQuestionExchanges: InterviewCandidateQuestionExchangeResponse[]
-  review: InterviewSessionReviewResponse
-  /** Persisted learning snapshot for every question actually shown to the user. */
-  questionDetails: InterviewQuestionLearningDetailResponse[]
+  reviewStatus: InterviewReviewGenerationStatus
 }
 
 export type ActiveInterviewSessionResponse =
@@ -411,9 +417,14 @@ export type InterviewCandidateQuestionFormState = {
 /**
  * Service inputs.
  *
- * Successful mutations return a complete authoritative page snapshot.
+ * Active-session mutations return a complete authoritative page snapshot.
+ * Completion mutations return only the completed session summary.
  */
 export type InterviewMutationResponse = InterviewPageResponse
+
+export type InterviewCompletionResponse = {
+  session: InterviewCompletedSessionResponse
+}
 
 export type StartInterviewInput = InterviewConfiguration
 
@@ -452,21 +463,30 @@ export type GetInterviewReviewInput = {
 type GetInterviewReviewResponseBase = {
   sessionId: string
   completionReason: InterviewCompletionReason
-  questionDetails: InterviewQuestionLearningDetailResponse[]
 }
 
 export type GetInterviewReviewResponse = GetInterviewReviewResponseBase &
   (
     | {
+        status: "generating"
+      }
+    | {
+        status: "failed"
+        reason: "generationFailed"
+      }
+    | {
         status: "unavailable"
         reason: "insufficientAnswers"
+        questionDetails: InterviewQuestionLearningDetailResponse[]
       }
     | {
         status: "partial"
         review: InterviewPartialReviewResponse
+        questionDetails: InterviewQuestionLearningDetailResponse[]
       }
     | {
         status: "complete"
         review: InterviewReviewResponse
+        questionDetails: InterviewQuestionLearningDetailResponse[]
       }
   )

@@ -10,6 +10,7 @@ import {
   endInterview,
   finishInterview,
   getInterviewPage,
+  getInterviewReview,
   startInterview,
   submitInterviewAnswer,
 } from "@/services/interview"
@@ -70,6 +71,13 @@ async function startInterviewAtFirstQuestion() {
   })
   if (response.session?.status !== "question") throw new Error("Expected interview question.")
   return response.session
+}
+
+async function publishInterviewReview(sessionId: string) {
+  const first = await getInterviewReview({ sessionId })
+  const result = first.status === "generating" ? await getInterviewReview({ sessionId }) : first
+  if (result.status === "generating") throw new Error("Expected terminal interview review.")
+  return result
 }
 
 describe("training completion to history mock integration", () => {
@@ -135,6 +143,7 @@ describe("training completion to history mock integration", () => {
       version: question.version,
     })
     if (completed.session?.status !== "completed") throw new Error("Expected completion.")
+    await publishInterviewReview(completed.session.sessionId)
 
     const detail = await settle(
       getMockInterviewRecord(`mock-interview-record-${completed.session.sessionId}`),
@@ -172,10 +181,14 @@ describe("training completion to history mock integration", () => {
       version: next.session.version,
     })
     if (completed.session?.status !== "completed") throw new Error("Expected completion.")
-
-    const detail = await settle(
-      getMockInterviewRecord(`mock-interview-record-${completed.session.sessionId}`),
+    const recordId = `mock-interview-record-${completed.session.sessionId}`
+    const beforeReview = await settle(
+      listTrainingRecords({ kinds: ["mockInterview"], page: 1, pageSize: 20 }),
     )
+    expect(beforeReview.items.some(({ id }) => id === recordId)).toBe(false)
+    await publishInterviewReview(completed.session.sessionId)
+
+    const detail = await settle(getMockInterviewRecord(recordId))
     expect(detail).toMatchObject({
       status: "partiallyCompleted",
       answeredQuestionCount: 1,
@@ -214,6 +227,7 @@ describe("training completion to history mock integration", () => {
       version: candidateQuestions.session.version,
     })
     if (completed.session?.status !== "completed") throw new Error("Expected completion.")
+    await publishInterviewReview(completed.session.sessionId)
 
     const detail = await settle(
       getMockInterviewRecord(`mock-interview-record-${completed.session.sessionId}`),

@@ -172,8 +172,15 @@ export const interview = {
     loadingTitle: "Generating your interview review",
     loadingDescription:
       "Riva is organizing the answers actually saved in this session and the review data available.",
-    errorTitle: "Unable to generate the review",
-    errorDescription: "Your interview record is safe, so you can retry.",
+    errorTitle: "Unable to load the interview review",
+    errorDescription: "Your interview record is safe. Check your connection and try again.",
+    failed: {
+      generationFailed: {
+        title: "Interview review generation failed",
+        description:
+          "Your interview answers are safe, but this review task could not be completed. Return to interview setup to continue.",
+      },
+    },
     unavailable: {
       insufficientAnswers: {
         title: "Not enough answer data for a review",

@@ -18,6 +18,13 @@ import type {
 
 import type { InterviewSessionSummary } from "../InterviewSessionView"
 
+type CompleteInterviewReviewResponse = Extract<GetInterviewReviewResponse, { status: "complete" }>
+type PartialInterviewReviewResponse = Extract<GetInterviewReviewResponse, { status: "partial" }>
+type UnavailableInterviewReviewResponse = Extract<
+  GetInterviewReviewResponse,
+  { status: "unavailable" }
+>
+
 export function createInterviewSetupStoryFixture(
   scenario:
     | "setupReady"
@@ -42,10 +49,7 @@ export function createInterviewSetupStoryFixture(
 
 export function createInterviewSessionStoryFixture() {
   const response = createInterviewMockResponse("completed")
-  const session = response.session
-  if (session?.status !== "completed") {
-    throw new Error("Completed interview fixture required.")
-  }
+  const session = createInterviewCompletedSessionMock()
   const targetRole = response.setup.targetRoles.find(
     ({ id }) => id === session.configuration.targetRoleId,
   )
@@ -95,7 +99,7 @@ export function createInterviewSessionStoryFixture() {
   }
 }
 
-export function createSparseInterviewReviewStoryFixture(): GetInterviewReviewResponse {
+export function createSparseInterviewReviewStoryFixture(): CompleteInterviewReviewResponse {
   const response = createInterviewReviewResponseMock()
   if (response.status !== "complete") {
     throw new Error("Complete interview review fixture required.")
@@ -139,7 +143,7 @@ export function createPartialInterviewReviewStoryFixture() {
   )
 }
 
-export function createUnavailableReviewWithLearningStoryFixture(): GetInterviewReviewResponse {
+export function createUnavailableReviewWithLearningStoryFixture(): UnavailableInterviewReviewResponse {
   const complete = createInterviewReviewResponseMock(
     createInterviewCompletedSessionMock({ agentScenario: "noFollowUps" }),
   )
@@ -162,7 +166,7 @@ export function createUnavailableReviewWithLearningStoryFixture(): GetInterviewR
   }
 }
 
-export function createPartialWithUnansweredQuestionStoryFixture(): GetInterviewReviewResponse {
+export function createPartialWithUnansweredQuestionStoryFixture(): PartialInterviewReviewResponse {
   const partial = createPartialInterviewReviewStoryFixture()
   const complete = createInterviewReviewResponseMock(
     createInterviewCompletedSessionMock({ agentScenario: "noFollowUps" }),
@@ -185,7 +189,7 @@ export function createPartialWithUnansweredQuestionStoryFixture(): GetInterviewR
   }
 }
 
-export function createPartialWithUnansweredFollowUpStoryFixture(): GetInterviewReviewResponse {
+export function createPartialWithUnansweredFollowUpStoryFixture(): PartialInterviewReviewResponse {
   const response = createInterviewReviewResponseMock(
     createInterviewCompletedSessionMock({
       agentScenario: "singleFollowUp",
@@ -206,13 +210,15 @@ export function createPartialWithUnansweredFollowUpStoryFixture(): GetInterviewR
   return copy
 }
 
-export function createMultipleFollowUpsReviewStoryFixture(): GetInterviewReviewResponse {
-  return createInterviewReviewResponseMock(
+export function createMultipleFollowUpsReviewStoryFixture(): CompleteInterviewReviewResponse {
+  const response = createInterviewReviewResponseMock(
     createInterviewCompletedSessionMock({ agentScenario: "multipleFollowUps" }),
   )
+  if (response.status !== "complete") throw new Error("Complete review fixture required.")
+  return response
 }
 
-export function createGeneratingReferenceReviewStoryFixture(): GetInterviewReviewResponse {
+export function createGeneratingReferenceReviewStoryFixture(): CompleteInterviewReviewResponse {
   const response = createInterviewReviewResponseMock()
   if (response.status !== "complete") throw new Error("Complete review fixture required.")
   const copy = structuredClone(response)

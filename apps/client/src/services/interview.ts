@@ -6,6 +6,7 @@ import type {
   FinishInterviewInput,
   GetInterviewReviewInput,
   GetInterviewReviewResponse,
+  InterviewCompletionResponse,
   InterviewMutationResponse,
   InterviewPageResponse,
   StartInterviewInput,
@@ -53,11 +54,11 @@ export function submitCandidateQuestion(
   return env.mock ? interviewMockService.submitCandidateQuestion(input) : realApiUnavailable()
 }
 
-export function finishInterview(input: FinishInterviewInput): Promise<InterviewMutationResponse> {
+export function finishInterview(input: FinishInterviewInput): Promise<InterviewCompletionResponse> {
   return env.mock ? interviewMockService.finishInterview(input) : realApiUnavailable()
 }
 
-export function endInterview(input: EndInterviewInput): Promise<InterviewMutationResponse> {
+export function endInterview(input: EndInterviewInput): Promise<InterviewCompletionResponse> {
   return env.mock ? interviewMockService.endInterview(input) : realApiUnavailable()
 }
 
