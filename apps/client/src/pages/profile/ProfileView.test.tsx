@@ -17,7 +17,6 @@ import { defaultLanguage } from "@/i18n/resources"
 import { createProfileMockSnapshot, profileResponseMock } from "@/mocks/data/profile"
 import type { JobProfileSnapshot } from "@/models/profile"
 import { ProfileView, type ProfileViewActions } from "@/pages/profile/ProfileView"
-import { ProfileSectionEditDialog } from "@/pages/profile/components/ProfileSectionEditDialog"
 import { formatDate } from "@/pages/profile/components/profile-formatters"
 import { renderWithProviders } from "@/test/render"
 
@@ -268,9 +267,6 @@ describe("ProfileView", () => {
 
     expect(within(summarySections).getByTestId("profile-section-education")).toBeInTheDocument()
     expect(within(summarySections).getByTestId("profile-section-skills")).toBeInTheDocument()
-    expect(
-      within(summarySections).queryByTestId("profile-section-credentials"),
-    ).not.toBeInTheDocument()
     expect(screen.getByTestId("profile-section-workExperience")).toBeInTheDocument()
     expect(screen.getByTestId("profile-section-projectExperience")).toBeInTheDocument()
   })
@@ -529,30 +525,6 @@ describe("ProfileView", () => {
     expect(snapshot).toEqual(profileResponseMock)
   })
 
-  it("keeps the credentials editor available independently", async () => {
-    renderWithProviders(
-      <ProfileSectionEditDialog
-        onDirtyChange={vi.fn()}
-        onOpenChange={vi.fn()}
-        onSave={vi.fn(async () => undefined)}
-        open
-        profile={structuredClone(profileResponseMock.profile!)}
-        section="credentials"
-      />,
-      { router: false },
-    )
-
-    const dialog = await screen.findByRole("dialog")
-    expect(within(dialog).getByTestId("profile-editor-credentials")).toBeInTheDocument()
-    expect(within(dialog).getByDisplayValue("AWS Certified Cloud Practitioner")).toBeInTheDocument()
-    expect(
-      within(dialog).getAllByLabelText(i18n.t("profile.formField.awardedAt"))[0],
-    ).toHaveTextContent(formatMonthForLocale("2023-08"))
-    expect(
-      within(dialog).getAllByLabelText(i18n.t("profile.formField.expiresAt"))[0],
-    ).toHaveTextContent(i18n.t("profile.monthPicker.placeholder"))
-  })
-
   it("renders only the supported education fields in the editor", async () => {
     const user = userEvent.setup()
     renderReady()
@@ -563,7 +535,6 @@ describe("ProfileView", () => {
     for (const field of ["school", "degree", "major", "startDate", "endDate"] as const) {
       expect(within(dialog).getAllByLabelText(i18n.t(`profile.formField.${field}`))).toHaveLength(2)
     }
-    expect(within(dialog).queryByLabelText(i18n.t("profile.formField.description"))).toBeNull()
   })
 
   it("manages an education end date with the present option", async () => {

@@ -139,32 +139,6 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         source: "resumeExtracted",
       },
     ],
-    credentials: [
-      {
-        id: "certificate_aws_2023",
-        type: "certificate",
-        name: "AWS Certified Cloud Practitioner",
-        issuer: "Amazon Web Services",
-        awardedAt: "2023-08",
-        expiresAt: null,
-        credentialId: "AWS-CCP-2023-0174",
-        credentialUrl: "https://www.credly.com/",
-        description: null,
-        source: "resumeExtracted",
-      },
-      {
-        id: "award_design_2024",
-        type: "award",
-        name: "Product Excellence Award",
-        issuer: "Northstar Commerce",
-        awardedAt: "2024-12",
-        expiresAt: null,
-        credentialId: null,
-        credentialUrl: null,
-        description: "Recognized for cross-functional delivery of the merchant operations console.",
-        source: "userAdded",
-      },
-    ],
     ...overrides,
   }
 }
@@ -193,15 +167,8 @@ function createEmptyManualProfileSnapshot(): JobProfileSnapshot {
   const profile = createCompleteProfile({
     completeness: {
       percentage: 0,
-      missingSections: [
-        "education",
-        "workExperience",
-        "projectExperience",
-        "skills",
-        "credentials",
-      ],
+      missingSections: ["education", "workExperience", "projectExperience", "skills"],
     },
-    credentials: [],
     education: [],
     profileId: "profile_manual_empty",
     projectExperiences: [],
@@ -233,15 +200,8 @@ function createInitialResumeSnapshot(
   const profile = createCompleteProfile({
     completeness: {
       percentage: 0,
-      missingSections: [
-        "education",
-        "workExperience",
-        "projectExperience",
-        "skills",
-        "credentials",
-      ],
+      missingSections: ["education", "workExperience", "projectExperience", "skills"],
     },
-    credentials: [],
     education: [],
     projectExperiences: [],
     resume,
@@ -283,9 +243,8 @@ function createPartialProfileSnapshot(): JobProfileSnapshot {
   const profile = createCompleteProfile({
     completeness: {
       percentage: 75,
-      missingSections: ["projectExperience", "credentials"],
+      missingSections: ["projectExperience"],
     },
-    credentials: [],
     education: completeProfile.education.map((education, index) =>
       index === 0 ? { ...education, degree: null } : education,
     ),

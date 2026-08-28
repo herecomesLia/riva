@@ -5,8 +5,7 @@ export type ProfileSource = "resumeExtracted" | "userEdited" | "userAdded"
 
 export type ResumeProcessingStatus = "uploaded" | "parsing" | "succeeded" | "failed"
 
-export type ProfileSection =
-  "education" | "workExperience" | "projectExperience" | "skills" | "credentials"
+export type ProfileSection = "education" | "workExperience" | "projectExperience" | "skills"
 
 export type ProfileCompleteness = {
   percentage: number
@@ -71,19 +70,6 @@ export type ProfileSkill = {
   source: ProfileSource
 }
 
-export type Credential = {
-  id: string
-  type: "certificate" | "award"
-  name: string
-  issuer: string | null
-  awardedAt: string | null
-  expiresAt: string | null
-  credentialId: string | null
-  credentialUrl: string | null
-  description: string | null
-  source: ProfileSource
-}
-
 export type JobProfile = {
   profileId: string
   status: ProfileStatus
@@ -95,7 +81,6 @@ export type JobProfile = {
   workExperiences: WorkExperience[]
   projectExperiences: ProjectExperience[]
   skills: ProfileSkill[]
-  credentials: Credential[]
 }
 
 export type ResumeRecognition = {
@@ -132,7 +117,6 @@ export type ProfileSectionValueMap = {
   workExperience: WorkExperience[]
   projectExperience: ProjectExperience[]
   skills: ProfileSkill[]
-  credentials: Credential[]
 }
 
 type SaveStandardProfileSectionInput = {

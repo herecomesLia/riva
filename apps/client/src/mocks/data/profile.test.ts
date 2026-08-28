@@ -60,18 +60,11 @@ function expectConsistentSnapshot(snapshot: JobProfileSnapshot) {
     profile.education.length === 0 &&
     profile.workExperiences.length === 0 &&
     profile.projectExperiences.length === 0 &&
-    profile.skills.length === 0 &&
-    profile.credentials.length === 0
+    profile.skills.length === 0
   ) {
     expect(profile.completeness).toEqual({
       percentage: 0,
-      missingSections: [
-        "education",
-        "workExperience",
-        "projectExperience",
-        "skills",
-        "credentials",
-      ],
+      missingSections: ["education", "workExperience", "projectExperience", "skills"],
     })
   }
 

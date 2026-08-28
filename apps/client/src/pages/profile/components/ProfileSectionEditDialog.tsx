@@ -17,7 +17,6 @@ export type EditableExperienceSection = Extract<
   EditableProfileSection,
   "education" | "workExperience" | "projectExperience"
 >
-export type EditableAdditionalSection = Extract<EditableProfileSection, "skills" | "credentials">
 
 type ProfileSectionEditDialogProps = {
   onDirtyChange: (isDirty: boolean) => void

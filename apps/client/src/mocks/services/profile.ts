@@ -73,15 +73,8 @@ function createEmptyProfile(resume: ResumeFile | null, status: JobProfile["statu
     ...profile,
     completeness: {
       percentage: 0,
-      missingSections: [
-        "education",
-        "workExperience",
-        "projectExperience",
-        "skills",
-        "credentials",
-      ],
+      missingSections: ["education", "workExperience", "projectExperience", "skills"],
     },
-    credentials: [],
     education: [],
     profileId: "profile_resume_import",
     projectExperiences: [],
@@ -126,8 +119,6 @@ function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) 
     case "skills":
       profile.skills = applySources(profile.skills, input.values)
       break
-    case "credentials":
-      profile.credentials = applySources(profile.credentials, input.values)
   }
 }
 
@@ -206,10 +197,6 @@ function recognizedProfile(): JobProfile {
   const profile = standardProfile()
   return {
     ...profile,
-    credentials: profile.credentials.map((item) => ({
-      ...item,
-      source: "resumeExtracted" as const,
-    })),
     education: profile.education.map((item) => ({ ...item, source: "resumeExtracted" as const })),
     projectExperiences: profile.projectExperiences.map((item) => ({
       ...item,
@@ -249,7 +236,6 @@ function mergeRecognizedProfile(profile: JobProfile): JobProfile {
   const recognized = recognizedProfile()
   return {
     ...profile,
-    credentials: mergeRecognizedItems(profile.credentials, recognized.credentials),
     education: mergeRecognizedItems(profile.education, recognized.education),
     projectExperiences: mergeRecognizedItems(
       profile.projectExperiences,

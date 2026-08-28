@@ -9,33 +9,19 @@ import { Button } from "@/components/ui/button"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { LocalizedMonthPicker } from "@/components/ui/month-picker"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { credentialsSchema, skillSchema } from "@/schemas/profile"
+import { skillSchema } from "@/schemas/profile"
 import type { JobProfile, SaveProfileSectionInput } from "@/models/profile"
-import type { EditableAdditionalSection } from "./ProfileSectionEditDialog"
 
 type ProfileAdditionalSectionEditorProps = {
   onCancel: () => void
   onDirtyChange: (isDirty: boolean) => void
   onSave: (input: SaveProfileSectionInput) => Promise<void>
   profile: JobProfile
-  section: EditableAdditionalSection
+  section: "skills"
 }
 
 function createTemporaryId() {
   return `draft_${crypto.randomUUID()}`
-}
-
-function toNullable(value: string) {
-  return value.trim() || null
 }
 
 function translateValidationError(t: ReturnType<typeof useTranslation>["t"], error: unknown) {
@@ -49,10 +35,6 @@ function translateValidationError(t: ReturnType<typeof useTranslation>["t"], err
       return t("profile.editor.validation.required")
     case "duplicateSkill":
       return t("profile.editor.validation.duplicateSkill")
-    case "dateRange":
-      return t("profile.editor.validation.dateRange")
-    case "url":
-      return t("profile.editor.validation.url")
     default:
       return String(error)
   }
@@ -76,16 +58,12 @@ function TextField({
   form,
   index,
   label,
-  month = false,
   name,
-  textarea = false,
 }: {
   form: any
   index?: number
   label: string
-  month?: boolean
   name: string
-  textarea?: boolean
 }) {
   const { t } = useTranslation()
   const fieldName = index === undefined ? name : `items.${index}.${name}`
@@ -99,29 +77,12 @@ function TextField({
           <Field invalid={invalid}>
             <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
             <FieldControl>
-              {month ? (
-                <LocalizedMonthPicker
-                  id={field.name}
-                  invalid={invalid}
-                  onBlur={field.handleBlur}
-                  onChange={field.handleChange}
-                  value={field.state.value ?? ""}
-                />
-              ) : textarea ? (
-                <Textarea
-                  id={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  value={field.state.value ?? ""}
-                />
-              ) : (
-                <Input
-                  id={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  value={field.state.value ?? ""}
-                />
-              )}
+              <Input
+                id={field.name}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+                value={field.state.value ?? ""}
+              />
             </FieldControl>
             <FieldError
               errors={field.state.meta.errors.map((error: unknown) => ({
@@ -131,32 +92,6 @@ function TextField({
           </Field>
         )
       }}
-    </form.Field>
-  )
-}
-
-function CredentialTypeField({ form, index }: { form: any; index: number }) {
-  const { t } = useTranslation()
-  const fieldName = `items.${index}.type`
-
-  return (
-    <form.Field name={fieldName}>
-      {(field: any) => (
-        <Field>
-          <FieldLabel htmlFor={field.name}>{t("profile.formField.credentialType")}</FieldLabel>
-          <Select onValueChange={field.handleChange} value={field.state.value}>
-            <FieldControl>
-              <SelectTrigger id={field.name} onBlur={field.handleBlur}>
-                <SelectValue />
-              </SelectTrigger>
-            </FieldControl>
-            <SelectContent>
-              <SelectItem value="certificate">{t("profile.credentialType.certificate")}</SelectItem>
-              <SelectItem value="award">{t("profile.credentialType.award")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
     </form.Field>
   )
 }
@@ -172,13 +107,15 @@ export function ProfileAdditionalSectionEditor({
   const [saveError, setSaveError] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
   const form = useForm({
-    defaultValues: createDraft(profile, section) as any,
-    validators: { onSubmit: createSectionSchema(section) as any },
+    defaultValues: {
+      items: structuredClone(profile.skills).map(({ source: _source, ...item }) => item),
+    },
+    validators: { onSubmit: z.object({ items: z.array(skillSchema) }) },
     onSubmit: async ({ value }: { value: any }) => {
       setSaveError(false)
       setValidationError(null)
 
-      if (section === "skills" && hasDuplicateSkillName(value.items)) {
+      if (hasDuplicateSkillName(value.items)) {
         setValidationError("duplicateSkill")
         return
       }
@@ -187,9 +124,12 @@ export function ProfileAdditionalSectionEditor({
         await onSave({
           profileId: profile.profileId,
           section,
-          values: normalizeSectionValues(section, value),
+          values: value.items.map(({ source: _source, ...item }: any) => ({
+            ...item,
+            name: item.name.trim(),
+          })),
           version: profile.version,
-        } as SaveProfileSectionInput)
+        })
       } catch {
         setSaveError(true)
       }
@@ -198,7 +138,7 @@ export function ProfileAdditionalSectionEditor({
 
   function addItem() {
     const items = form.state.values.items ?? []
-    form.setFieldValue("items" as never, [...items, createNewItem(section)] as never)
+    form.setFieldValue("items" as never, [...items, { id: createTemporaryId(), name: "" }] as never)
   }
 
   return (
@@ -217,11 +157,7 @@ export function ProfileAdditionalSectionEditor({
         </form.Subscribe>
 
         <FieldGroup>
-          {section === "skills" ? (
-            <SkillFields form={form} onAdd={addItem} />
-          ) : (
-            <CredentialFields form={form} onAdd={addItem} />
-          )}
+          <SkillFields form={form} onAdd={addItem} />
         </FieldGroup>
 
         {validationError && (
@@ -287,99 +223,6 @@ function SkillFields({ form, onAdd }: { form: any; onAdd: () => void }) {
   )
 }
 
-function CredentialFields({ form, onAdd }: { form: any; onAdd: () => void }) {
-  const { t } = useTranslation()
-
-  return (
-    <>
-      <form.Subscribe selector={(state: any) => state.values.items}>
-        {(items: any[]) => (
-          <div className="flex flex-col gap-6">
-            {items.map((item, index) => (
-              <div
-                className="flex flex-col gap-5 rounded-xl border p-4"
-                data-testid={`profile-editor-item-${item.id}`}
-                key={item.id}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="font-medium">
-                    {t("profile.editor.credential", { count: index + 1 })}
-                  </p>
-                  <Button
-                    onClick={() => {
-                      form.setFieldValue(
-                        "items" as never,
-                        items.filter((candidate) => candidate.id !== item.id) as never,
-                      )
-                    }}
-                    type="button"
-                    variant="destructive"
-                  >
-                    <Trash2Icon data-icon="inline-start" />
-                    {t("profile.editor.delete")}
-                  </Button>
-                </div>
-                <div className="grid gap-5 md:grid-cols-2">
-                  <CredentialTypeField form={form} index={index} />
-                  <TextField
-                    form={form}
-                    index={index}
-                    label={t("profile.field.name")}
-                    name="name"
-                  />
-                  <TextField
-                    form={form}
-                    index={index}
-                    label={t("profile.field.issuer")}
-                    name="issuer"
-                  />
-                  <TextField
-                    form={form}
-                    index={index}
-                    label={t("profile.formField.awardedAt")}
-                    month
-                    name="awardedAt"
-                  />
-                  <TextField
-                    form={form}
-                    index={index}
-                    label={t("profile.formField.expiresAt")}
-                    month
-                    name="expiresAt"
-                  />
-                  <TextField
-                    form={form}
-                    index={index}
-                    label={t("profile.formField.credentialId")}
-                    name="credentialId"
-                  />
-                  <TextField
-                    form={form}
-                    index={index}
-                    label={t("profile.formField.credentialUrl")}
-                    name="credentialUrl"
-                  />
-                  <TextField
-                    form={form}
-                    index={index}
-                    label={t("profile.formField.description")}
-                    name="description"
-                    textarea
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </form.Subscribe>
-      <Button onClick={onAdd} type="button" variant="outline">
-        <PlusIcon data-icon="inline-start" />
-        {t("profile.editor.addCredential")}
-      </Button>
-    </>
-  )
-}
-
 function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
   const { t } = useTranslation()
 
@@ -399,34 +242,6 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
   )
 }
 
-function createDraft(profile: JobProfile, section: EditableAdditionalSection) {
-  if (section === "skills") {
-    return {
-      items: structuredClone(profile.skills).map(({ source: _source, ...item }) => item),
-    }
-  }
-
-  return {
-    items: structuredClone(profile.credentials).map(({ source: _source, ...item }) => ({
-      ...item,
-      awardedAt: item.awardedAt ?? "",
-      credentialId: item.credentialId ?? "",
-      credentialUrl: item.credentialUrl ?? "",
-      description: item.description ?? "",
-      expiresAt: item.expiresAt ?? "",
-      issuer: item.issuer ?? "",
-    })),
-  }
-}
-
-function createSectionSchema(section: EditableAdditionalSection) {
-  if (section === "skills") {
-    return z.object({ items: z.array(skillSchema) })
-  }
-
-  return credentialsSchema
-}
-
 function hasDuplicateSkillName(items: { name: string }[]) {
   const names = new Set<string>()
 
@@ -440,46 +255,4 @@ function hasDuplicateSkillName(items: { name: string }[]) {
     names.add(name)
     return false
   })
-}
-
-function normalizeSectionValues(section: EditableAdditionalSection, value: any) {
-  if (section === "skills") {
-    return value.items.map(({ source: _source, ...item }: any) => ({
-      ...item,
-      name: item.name.trim(),
-    }))
-  }
-
-  return value.items.map(({ source: _source, ...item }: any) => ({
-    ...item,
-    awardedAt: toNullable(item.awardedAt),
-    credentialId: toNullable(item.credentialId),
-    credentialUrl: toNullable(item.credentialUrl),
-    description: toNullable(item.description),
-    expiresAt: toNullable(item.expiresAt),
-    issuer: toNullable(item.issuer),
-    name: item.name.trim(),
-  }))
-}
-
-function createNewItem(section: "skills" | "credentials") {
-  const base = {
-    id: createTemporaryId(),
-  }
-
-  if (section === "skills") {
-    return { ...base, name: "" }
-  }
-
-  return {
-    ...base,
-    awardedAt: "",
-    credentialId: "",
-    credentialUrl: "",
-    description: "",
-    expiresAt: "",
-    issuer: "",
-    name: "",
-    type: "certificate",
-  }
 }

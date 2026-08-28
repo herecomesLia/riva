@@ -71,27 +71,3 @@ export const skillSchema = z.object({
   id: requiredText,
   name: requiredText,
 })
-
-export const credentialsSchema = z.object({
-  items: z
-    .array(
-      z
-        .object({
-          awardedAt: optionalText,
-          credentialId: optionalText,
-          credentialUrl: optionalText.refine((value) => !value || URL.canParse(value), "url"),
-          description: optionalText,
-          expiresAt: optionalText,
-          id: requiredText,
-          issuer: optionalText,
-          name: requiredText,
-          type: z.enum(["certificate", "award"]),
-        })
-        .superRefine((value, context) => {
-          if (value.awardedAt && value.expiresAt && value.expiresAt < value.awardedAt) {
-            context.addIssue({ code: "custom", message: "dateRange", path: ["expiresAt"] })
-          }
-        }),
-    )
-    .default([]),
-})
