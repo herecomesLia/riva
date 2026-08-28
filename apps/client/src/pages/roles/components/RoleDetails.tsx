@@ -50,10 +50,7 @@ export function RoleDetails({
   const isCurrent = role.id === currentRoleId
 
   return (
-    <Card
-      className="min-w-0 border border-border/80 bg-card shadow-sm"
-      data-testid="role-details-card"
-    >
+    <Card className="min-w-0 bg-card shadow-sm" data-testid="role-details-card">
       <CardHeader className="border-b border-border/70 pb-(--card-spacing)">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-col gap-1">
