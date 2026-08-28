@@ -83,7 +83,7 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                   data-testid="work-experience-timeline-node"
                 />
                 <article
-                  className="overflow-hidden rounded-xl border bg-card shadow-sm"
+                  className="overflow-hidden rounded-xl border bg-card"
                   data-testid={`work-experience-item-${experience.id}`}
                 >
                   <header className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
