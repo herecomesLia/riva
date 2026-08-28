@@ -10,6 +10,7 @@ from riva.api.csrf import csrf_protect
 from riva.api.errors import AuthRequiredError
 from riva.db import Database
 from riva.models import User
+from riva.services.career_profiles import CareerProfileService
 from riva.services.users import UserService
 
 csrf_guard = Depends(csrf_protect)
@@ -53,3 +54,15 @@ async def require_current_user(
 
 
 CurrentUserDep = Annotated[User, Depends(require_current_user)]
+
+
+async def get_career_profile_service(
+    session: DbSessionDep,
+) -> CareerProfileService:
+    return CareerProfileService(session)
+
+
+CareerProfileServiceDep = Annotated[
+    CareerProfileService,
+    Depends(get_career_profile_service),
+]

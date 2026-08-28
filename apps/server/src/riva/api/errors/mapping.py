@@ -6,6 +6,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from riva.db.errors import DatabaseUnavailableError
 from riva.services.errors import (
+    CareerProfileAlreadyExistsError,
+    CareerProfileNotFoundError,
+    CareerProfileSkillMismatchError,
     InvalidCredentialsError,
     InvalidSessionError,
     SessionExpiredError,
@@ -123,6 +126,30 @@ def resolve_error(exc: Exception) -> ErrorSpec:
                 status_code=status_code,
                 code="request.http_error",
                 message="Request failed.",
+            )
+
+        case CareerProfileNotFoundError():
+            return ErrorSpec(
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="career_profile.not_found",
+                message="Career profile was not found.",
+            )
+
+        case CareerProfileAlreadyExistsError():
+            return ErrorSpec(
+                status_code=status.HTTP_409_CONFLICT,
+                code="career_profile.already_exists",
+                message="Career profile already exists.",
+            )
+
+        case CareerProfileSkillMismatchError():
+            return ErrorSpec(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                code="career_profile.skill_mismatch",
+                message=(
+                    "Work experience skills must exist in the career profile "
+                    "skills list."
+                ),
             )
 
         case _:

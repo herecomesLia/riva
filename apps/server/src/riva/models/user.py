@@ -12,6 +12,7 @@ from riva.utils import utc_now
 
 if TYPE_CHECKING:
     from riva.models.auth import AuthSession
+    from riva.models.career_profile import CareerProfile
 
 
 def normalize_username(username: str) -> str:
@@ -65,4 +66,11 @@ class User(Base):
     sessions: Mapped[list[AuthSession]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+
+    career_profile: Mapped[CareerProfile | None] = relationship(
+        "CareerProfile",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )

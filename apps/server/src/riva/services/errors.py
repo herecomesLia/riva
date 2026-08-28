@@ -24,3 +24,15 @@ class SessionExpiredError(AuthenticationError):
 
 class UsernameTakenError(ConflictError):
     pass
+
+
+class CareerProfileNotFoundError(ApplicationError):
+    pass
+
+
+class CareerProfileAlreadyExistsError(ConflictError):
+    pass
+
+
+class CareerProfileSkillMismatchError(ApplicationError):
+    pass

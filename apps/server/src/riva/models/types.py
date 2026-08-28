@@ -1,0 +1,35 @@
+from typing import Annotated, Self
+
+from pydantic import BaseModel, StringConstraints, model_validator
+
+NonBlankStr = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+    ),
+]
+
+YearMonth = Annotated[
+    str,
+    StringConstraints(
+        strict=True,
+        pattern=r"^[0-9]{4}-(?:0[1-9]|1[0-2])$",
+    ),
+]
+
+
+class YearMonthRangeModel(BaseModel):
+    start_date: YearMonth | None = None
+    end_date: YearMonth | None = None
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> Self:
+        if (
+            self.start_date is not None
+            and self.end_date is not None
+            and self.end_date < self.start_date
+        ):
+            raise ValueError("end_date must not be earlier than start_date")
+
+        return self
