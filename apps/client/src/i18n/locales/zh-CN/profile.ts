@@ -120,7 +120,6 @@ export const profile = {
     dialogTitle: "编辑{{section}}",
     dialogDescription: "修改此档案分区，完成后保存更改。",
     delete: "删除此条目",
-    deleteDescription: "删除仅会修改当前草稿；保存修改后才会应用到档案。",
     experience: "经历 {{count}}",
     credential: "证书或奖项 {{count}}",
     save: "保存修改",

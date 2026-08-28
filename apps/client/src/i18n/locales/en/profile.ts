@@ -129,8 +129,6 @@ export const profile = {
     dialogTitle: "Edit {{section}}",
     dialogDescription: "Update this profile section and save your changes.",
     delete: "Delete this entry",
-    deleteDescription:
-      "Deletion only changes this draft. It is applied to your profile when you save.",
     experience: "Experience {{count}}",
     credential: "Certificate or award {{count}}",
     save: "Save changes",

@@ -376,9 +376,6 @@ export function ProfileSectionEditor({
             <PlusIcon data-icon="inline-start" />
             {t("profile.editor.addExperience")}
           </Button>
-          <Alert>
-            <AlertDescription>{t("profile.editor.deleteDescription")}</AlertDescription>
-          </Alert>
         </FieldGroup>
 
         {saveError && (

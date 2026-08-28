@@ -283,9 +283,6 @@ function SkillFields({ form, onAdd }: { form: any; onAdd: () => void }) {
         <PlusIcon data-icon="inline-start" />
         {t("profile.editor.addSkill")}
       </Button>
-      <Alert>
-        <AlertDescription>{t("profile.editor.deleteDescription")}</AlertDescription>
-      </Alert>
     </>
   )
 }
@@ -379,9 +376,6 @@ function CredentialFields({ form, onAdd }: { form: any; onAdd: () => void }) {
         <PlusIcon data-icon="inline-start" />
         {t("profile.editor.addCredential")}
       </Button>
-      <Alert>
-        <AlertDescription>{t("profile.editor.deleteDescription")}</AlertDescription>
-      </Alert>
     </>
   )
 }
