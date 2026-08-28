@@ -73,4 +73,27 @@ describe("TechnologyStackInput", () => {
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByText("React")).toBeInTheDocument()
   })
+
+  it("shows a field error without changing the stack when the input is duplicated", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    renderWithProviders(<StatefulTechnologyStackInput onChange={onChange} />, { router: false })
+
+    const input = screen.getByRole("textbox", {
+      name: i18n.t("profile.editor.technologyInputPlaceholder"),
+    })
+    await user.type(input, " react ")
+    await user.keyboard("{Enter}")
+
+    const error = screen.getByRole("alert")
+    expect(error).toHaveTextContent(i18n.t("profile.editor.validation.duplicateTechnology"))
+    expect(screen.getByText("Technology stack")).toHaveClass("text-foreground")
+    expect(input).toHaveAttribute("aria-invalid", "true")
+    expect(input).toHaveAttribute("aria-describedby", error.id)
+    expect(onChange).not.toHaveBeenCalled()
+
+    await user.clear(input)
+    expect(error).toHaveAttribute("aria-hidden", "true")
+    expect(input).not.toHaveAttribute("aria-invalid", "true")
+  })
 })

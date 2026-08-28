@@ -160,6 +160,7 @@ export const profile = {
       employmentType: "Choose a valid employment type.",
       url: "Enter a valid URL.",
       duplicateSkill: "Skill names must be unique.",
+      duplicateTechnology: "Technology names must be unique.",
     },
   },
   dialog: {

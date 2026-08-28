@@ -12,7 +12,13 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldControl,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field"
 import { normalizeSkillName, parseSkillNames } from "@/models/profile-text"
 import type { ProfileSkill } from "@/models/profile"
 
@@ -40,6 +46,7 @@ export function SkillTagInput({
   selectedSkillIds,
 }: SkillTagInputProps) {
   const { t } = useTranslation()
+  const [hasDuplicate, setHasDuplicate] = useState(false)
   const [inputValue, setInputValue] = useState("")
   const allSkills = [...availableSkills, ...draftSkills]
   const selectedSkills = selectedSkillIds
@@ -47,27 +54,44 @@ export function SkillTagInput({
     .filter((skill): skill is ProfileSkill => Boolean(skill))
   const candidates = allSkills.filter((skill) => !selectedSkillIds.includes(skill.id))
 
-  function addSkillByName(name: string) {
-    const normalizedName = normalizeSkillName(name)
-    if (!normalizedName) return
-
-    const existing = allSkills.find((skill) => normalizeSkillName(skill.name) === normalizedName)
-    const skill = existing ?? createDraftSkill(name.trim().replace(/\s+/g, " "))
-
-    if (!existing) onDraftSkillsChange([...draftSkills, skill])
-    if (!selectedSkillIds.includes(skill.id)) {
-      onSelectedSkillIdsChange([...selectedSkillIds, skill.id])
+  function addSkillsByName(names: string[]) {
+    const selectedNames = new Set(selectedSkills.map((skill) => normalizeSkillName(skill.name)))
+    if (names.some((name) => selectedNames.has(normalizeSkillName(name)))) {
+      setHasDuplicate(true)
+      return false
     }
+
+    const nextDraftSkills = [...draftSkills]
+    const nextSelectedSkillIds = [...selectedSkillIds]
+
+    names.forEach((name) => {
+      const normalizedName = normalizeSkillName(name)
+      if (!normalizedName) return
+
+      const existing = [...availableSkills, ...nextDraftSkills].find(
+        (skill) => normalizeSkillName(skill.name) === normalizedName,
+      )
+      const skill = existing ?? createDraftSkill(name.trim().replace(/\s+/g, " "))
+
+      if (!existing) nextDraftSkills.push(skill)
+      if (!nextSelectedSkillIds.includes(skill.id)) nextSelectedSkillIds.push(skill.id)
+    })
+
+    if (nextDraftSkills.length !== draftSkills.length) onDraftSkillsChange(nextDraftSkills)
+    if (nextSelectedSkillIds.length !== selectedSkillIds.length) {
+      onSelectedSkillIdsChange(nextSelectedSkillIds)
+    }
+    setHasDuplicate(false)
+    return true
   }
 
   function addInputSkills() {
-    parseSkillNames(inputValue).forEach(addSkillByName)
-    setInputValue("")
+    if (addSkillsByName(parseSkillNames(inputValue))) setInputValue("")
   }
 
   return (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
+    <Field invalid={hasDuplicate}>
+      <FieldLabel className="text-foreground">{label}</FieldLabel>
       <FieldDescription>{description}</FieldDescription>
       <div className="flex flex-wrap gap-2">
         {selectedSkills.map((skill) => (
@@ -76,9 +100,10 @@ export function SkillTagInput({
             <Button
               aria-label={t("profile.editor.removeSkill", { name: skill.name })}
               className="-mr-1 size-4 rounded-full p-0"
-              onClick={() =>
+              onClick={() => {
+                setHasDuplicate(false)
                 onSelectedSkillIdsChange(selectedSkillIds.filter((id) => id !== skill.id))
-              }
+              }}
               size="icon-xs"
               type="button"
               variant="ghost"
@@ -93,26 +118,26 @@ export function SkillTagInput({
         itemToStringLabel={(skill) => skill.name}
         onInputValueChange={setInputValue}
         onValueChange={(skill: ProfileSkill | null) => {
-          if (skill) {
-            addSkillByName(skill.name)
-            setInputValue("")
-          }
+          if (skill && addSkillsByName([skill.name])) setInputValue("")
         }}
         value={null}
       >
-        <ComboboxInput
-          aria-label={t("profile.editor.skillInputPlaceholder")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && inputValue.trim()) {
-              event.preventDefault()
-              addInputSkills()
-            }
-          }}
-          placeholder={t("profile.editor.skillInputPlaceholder")}
-          showClear={false}
-          showTrigger={false}
-          value={inputValue}
-        />
+        <FieldControl>
+          <ComboboxInput
+            aria-label={t("profile.editor.skillInputPlaceholder")}
+            onChange={() => setHasDuplicate(false)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && inputValue.trim()) {
+                event.preventDefault()
+                addInputSkills()
+              }
+            }}
+            placeholder={t("profile.editor.skillInputPlaceholder")}
+            showClear={false}
+            showTrigger={false}
+            value={inputValue}
+          />
+        </FieldControl>
         <ComboboxContent>
           <ComboboxList>
             <ComboboxEmpty>{t("profile.editor.skillNotFound")}</ComboboxEmpty>
@@ -125,6 +150,7 @@ export function SkillTagInput({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
+      <FieldError>{t("profile.editor.validation.duplicateSkill")}</FieldError>
     </Field>
   )
 }

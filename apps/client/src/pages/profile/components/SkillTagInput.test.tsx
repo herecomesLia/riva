@@ -101,4 +101,38 @@ describe("SkillTagInput", () => {
     expect(onSelectedSkillIdsChange).toHaveBeenCalledOnce()
     expect(screen.getByText("Accessibility")).toBeInTheDocument()
   })
+
+  it("shows a field error without changing selected skills when the input is duplicated", async () => {
+    const user = userEvent.setup()
+    const onSelectedSkillIdsChange = vi.fn()
+    renderWithProviders(
+      <SkillTagInput
+        availableSkills={profileResponseMock.profile!.skills}
+        description="Select from existing skills, or enter a new skill."
+        draftSkills={[]}
+        label="Related skills"
+        onDraftSkillsChange={vi.fn()}
+        onSelectedSkillIdsChange={onSelectedSkillIdsChange}
+        selectedSkillIds={["skill_react"]}
+      />,
+      { router: false },
+    )
+
+    const input = screen.getByRole("combobox", {
+      name: i18n.t("profile.editor.skillInputPlaceholder"),
+    })
+    await user.type(input, " react ")
+    await user.keyboard("{Enter}")
+
+    const error = screen.getByRole("alert")
+    expect(error).toHaveTextContent(i18n.t("profile.editor.validation.duplicateSkill"))
+    expect(screen.getByText("Related skills")).toHaveClass("text-foreground")
+    expect(input).toHaveAttribute("aria-invalid", "true")
+    expect(input).toHaveAttribute("aria-describedby", error.id)
+    expect(onSelectedSkillIdsChange).not.toHaveBeenCalled()
+
+    await user.type(input, "TypeScript")
+    expect(error).toHaveAttribute("aria-hidden", "true")
+    expect(input).not.toHaveAttribute("aria-invalid", "true")
+  })
 })

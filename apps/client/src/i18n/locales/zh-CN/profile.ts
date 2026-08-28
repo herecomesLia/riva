@@ -149,6 +149,7 @@ export const profile = {
       employmentType: "请选择有效的工作类型。",
       url: "请输入有效的网址。",
       duplicateSkill: "技能名称不能重复。",
+      duplicateTechnology: "技术名称不能重复。",
     },
   },
   dialog: {
