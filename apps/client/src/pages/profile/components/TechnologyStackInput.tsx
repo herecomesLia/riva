@@ -55,9 +55,6 @@ export function TechnologyStackInput({
           aria-label={t("profile.editor.technologyInputPlaceholder")}
           onChange={(event) => setInputValue(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Backspace" && !inputValue && technologies.length) {
-              onChange(technologies.slice(0, -1))
-            }
             if (event.key === "Enter" && inputValue.trim()) {
               event.preventDefault()
               addInputTechnologies()

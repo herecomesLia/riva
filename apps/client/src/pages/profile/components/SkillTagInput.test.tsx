@@ -71,7 +71,7 @@ describe("SkillTagInput", () => {
     expect(screen.queryByText("skill_react")).not.toBeInTheDocument()
   })
 
-  it("creates one reusable temporary skill and removes the last tag with Backspace", async () => {
+  it("creates one reusable temporary skill without removing it on Backspace", async () => {
     const user = userEvent.setup()
     const onDraftSkillsChange = vi.fn()
     const onSelectedSkillIdsChange = vi.fn()
@@ -98,6 +98,7 @@ describe("SkillTagInput", () => {
     expect(onSelectedSkillIdsChange).toHaveBeenCalledWith([expect.stringMatching(/^draft_skill_/)])
 
     await user.keyboard("{Backspace}")
-    expect(onSelectedSkillIdsChange).toHaveBeenLastCalledWith([])
+    expect(onSelectedSkillIdsChange).toHaveBeenCalledOnce()
+    expect(screen.getByText("Accessibility")).toBeInTheDocument()
   })
 })

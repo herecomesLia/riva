@@ -58,7 +58,7 @@ describe("TechnologyStackInput", () => {
     expect(removeButton).toHaveClass("-mr-1", "size-4", "rounded-full", "p-0")
   })
 
-  it("removes the last technology with Backspace when the input is empty", async () => {
+  it("does not remove the last technology with Backspace when the input is empty", async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     renderWithProviders(<StatefulTechnologyStackInput onChange={onChange} />, { router: false })
@@ -70,7 +70,7 @@ describe("TechnologyStackInput", () => {
     )
     await user.keyboard("{Backspace}")
 
-    expect(onChange).toHaveBeenLastCalledWith([])
-    expect(screen.queryByText("React")).not.toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByText("React")).toBeInTheDocument()
   })
 })

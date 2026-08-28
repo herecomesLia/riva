@@ -103,9 +103,6 @@ export function SkillTagInput({
         <ComboboxInput
           aria-label={t("profile.editor.skillInputPlaceholder")}
           onKeyDown={(event) => {
-            if (event.key === "Backspace" && !inputValue && selectedSkillIds.length) {
-              onSelectedSkillIdsChange(selectedSkillIds.slice(0, -1))
-            }
             if (event.key === "Enter" && inputValue.trim()) {
               event.preventDefault()
               addInputSkills()
