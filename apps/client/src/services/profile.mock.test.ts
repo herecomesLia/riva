@@ -102,6 +102,35 @@ describe("profile mock service", () => {
     ).toBe(true)
   })
 
+  it("atomically removes deleted skill references from every work experience", async () => {
+    const values = structuredClone(profileResponseMock.profile!.skills).filter(
+      (skill) => skill.id !== "skill_react",
+    )
+
+    const profile = await saveProfile({
+      profileId: profileResponseMock.profile!.profileId,
+      version: profileResponseMock.profile!.version,
+      section: "skills",
+      values,
+    })
+
+    expect(profile.skills.some((skill) => skill.id === "skill_react")).toBe(false)
+    expect(profile.workExperiences[0]!.skillIds).toEqual([
+      "skill_typescript",
+      "skill_design_systems",
+    ])
+    expect(profile.workExperiences[1]!.skillIds).toEqual(["skill_javascript"])
+    expect(profile.workExperiences.every((experience) => experience.source === "userEdited")).toBe(
+      true,
+    )
+    expect(profile.projectExperiences[0]!.technologyStack).toEqual([
+      "React",
+      "TypeScript",
+      "TanStack Query",
+    ])
+    expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
+  })
+
   it("rejects a stale save version with a clear service error", async () => {
     const promise = saveProfileSection({
       profileId: profileResponseMock.profile!.profileId,
@@ -112,6 +141,10 @@ describe("profile mock service", () => {
     const assertion = expect(promise).rejects.toThrow("version is out of date")
     await vi.runAllTimersAsync()
     await assertion
+
+    const current = await settle(getJobProfile())
+    expect(current.profile!.skills).toEqual(profileResponseMock.profile!.skills)
+    expect(current.profile!.workExperiences).toEqual(profileResponseMock.profile!.workExperiences)
   })
 
   it("atomically creates a new skill and replaces its temporary work-experience id", async () => {
@@ -166,33 +199,51 @@ describe("profile mock service", () => {
     ])
   })
 
-  it("atomically creates a new skill and replaces its temporary project technology id", async () => {
+  it("rejects a work experience that references an unknown skill", async () => {
+    const values = [structuredClone(profileResponseMock.profile!.workExperiences[0]!)]
+    values[0]!.skillIds = ["skill_unknown"]
+
+    const promise = saveProfileSection({
+      profileId: profileResponseMock.profile!.profileId,
+      section: "workExperience",
+      skillsToCreate: [],
+      values,
+      version: profileResponseMock.profile!.version,
+    })
+    const assertion = expect(promise).rejects.toThrow(
+      "Work experience references an unknown skill: skill_unknown",
+    )
+    await vi.runAllTimersAsync()
+    await assertion
+
+    const current = await settle(getJobProfile())
+    expect(current.profile).toEqual(profileResponseMock.profile)
+  })
+
+  it("saves a project's technology stack without changing profile skills", async () => {
     const values = [structuredClone(profileResponseMock.profile!.projectExperiences[0]!)]
-    values[0]!.skillIds = ["skill_react", "draft_skill_tanstack_router"]
+    values[0]!.technologyStack = ["React", "TanStack Router"]
 
     const profile = await saveProfile({
       profileId: profileResponseMock.profile!.profileId,
       section: "projectExperience",
-      skillsToCreate: [{ clientId: "draft_skill_tanstack_router", name: "TanStack Router" }],
       values,
       version: profileResponseMock.profile!.version,
     })
 
-    const skill = profile.skills.find((candidate) => candidate.name === "TanStack Router")!
-    expect(skill).toMatchObject({ source: "userAdded" })
-    expect(profile.projectExperiences[0]!.skillIds).toEqual(["skill_react", skill.id])
+    expect(profile.skills).toEqual(profileResponseMock.profile!.skills)
+    expect(profile.projectExperiences[0]!.technologyStack).toEqual(["React", "TanStack Router"])
     expect(profile.projectExperiences[0]!.source).toBe("userEdited")
     expect(profile.version).toBe(profileResponseMock.profile!.version + 1)
   })
 
-  it("does not partially save a new skill or project experience for a stale version", async () => {
+  it("does not partially save a project experience for a stale version", async () => {
     const promise = saveProfileSection({
       profileId: profileResponseMock.profile!.profileId,
       section: "projectExperience",
-      skillsToCreate: [{ clientId: "draft_skill_tanstack_router", name: "TanStack Router" }],
       values: structuredClone(profileResponseMock.profile!.projectExperiences).map((project) => ({
         ...project,
-        skillIds: ["draft_skill_tanstack_router"],
+        technologyStack: ["TanStack Router"],
       })),
       version: -1,
     })
@@ -201,7 +252,6 @@ describe("profile mock service", () => {
     await assertion
 
     const current = await settle(getJobProfile())
-    expect(current.profile!.skills.some((skill) => skill.name === "TanStack Router")).toBe(false)
     expect(current.profile!.projectExperiences).toEqual(
       profileResponseMock.profile!.projectExperiences,
     )

@@ -20,7 +20,6 @@ import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 export type ProjectExperienceCardProps = {
   onEdit: () => void
   projects: JobProfile["projectExperiences"]
-  skills: JobProfile["skills"]
 }
 
 type ProjectDetail = {
@@ -28,9 +27,8 @@ type ProjectDetail = {
   key: "description" | "achievements" | "technologyStack"
 }
 
-export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExperienceCardProps) {
+export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCardProps) {
   const { t } = useTranslation()
-  const skillsById = new Map(skills.map((skill) => [skill.id, skill.name]))
 
   return (
     <ProfileSectionCard onEdit={onEdit} section="projectExperience">
@@ -68,7 +66,7 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
                     },
                   ]
                 : []),
-              ...(project.skillIds.length > 0
+              ...(project.technologyStack.length > 0
                 ? [
                     {
                       content: (
@@ -82,12 +80,12 @@ export function ProjectExperienceCard({ onEdit, projects, skills }: ProjectExper
                           </h4>
                           <div
                             className="flex flex-wrap gap-2"
-                            data-testid="project-experience-skills"
+                            data-testid="project-experience-technologies"
                           >
-                            {project.skillIds.map((skillId) => (
+                            {project.technologyStack.map((technology) => (
                               <ProfileSkillBadge
-                                key={skillId}
-                                name={skillsById.get(skillId) ?? skillId}
+                                key={technology}
+                                name={technology}
                                 showIcon={false}
                               />
                             ))}

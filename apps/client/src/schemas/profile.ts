@@ -1,6 +1,10 @@
 import { z } from "zod"
 
-import { normalizeBulletItems, normalizeSkillIds } from "@/models/profile-text"
+import {
+  normalizeBulletItems,
+  normalizeSkillIds,
+  normalizeTechnologyStack,
+} from "@/models/profile-text"
 
 export const profileEmploymentTypes = [
   "fullTime",
@@ -22,6 +26,11 @@ const skillIdsSchema = z
   .array(z.string())
   .default([])
   .transform(normalizeSkillIds)
+  .pipe(z.array(requiredText))
+const technologyStackSchema = z
+  .array(z.string())
+  .default([])
+  .transform(normalizeTechnologyStack)
   .pipe(z.array(requiredText))
 
 const dateRangeSchema = z
@@ -64,7 +73,7 @@ export const projectItemSchema = dateRangeSchema.extend({
   projectUrl: optionalText.refine((value) => !value || URL.canParse(value), "url"),
   responsibilities: bulletItemsSchema,
   role: optionalText,
-  skillIds: skillIdsSchema,
+  technologyStack: technologyStackSchema,
 })
 
 export const skillSchema = z.object({

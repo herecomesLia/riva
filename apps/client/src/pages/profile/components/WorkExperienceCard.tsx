@@ -22,6 +22,12 @@ export type WorkExperienceCardProps = {
   skills: JobProfile["skills"]
 }
 
+function requireSkillName(skillsById: Map<string, string>, skillId: string) {
+  const name = skillsById.get(skillId)
+  if (!name) throw new Error(`Work experience references an unknown skill: ${skillId}`)
+  return name
+}
+
 export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperienceCardProps) {
   const { t } = useTranslation()
   const skillsById = new Map(skills.map((skill) => [skill.id, skill.name]))
@@ -60,7 +66,7 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                     {experience.skillIds.map((skillId) => (
                       <ProfileSkillBadge
                         key={skillId}
-                        name={skillsById.get(skillId) ?? skillId}
+                        name={requireSkillName(skillsById, skillId)}
                         showIcon={false}
                       />
                     ))}

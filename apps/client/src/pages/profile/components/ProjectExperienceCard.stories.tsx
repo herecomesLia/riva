@@ -7,17 +7,11 @@ import type { JobProfile } from "@/models/profile"
 import { ProjectExperienceCard } from "./ProjectExperienceCard"
 
 type Project = JobProfile["projectExperiences"][number]
-type Skill = JobProfile["skills"][number]
 
 function createProject(overrides: Partial<Project> = {}): Project {
   return { ...structuredClone(profileResponseMock.profile!.projectExperiences[0]!), ...overrides }
 }
 
-function createSkill(overrides: Partial<Skill> = {}): Skill {
-  return { ...structuredClone(profileResponseMock.profile!.skills[0]!), ...overrides }
-}
-
-const defaultSkills = structuredClone(profileResponseMock.profile!.skills)
 const meta = preview.meta({
   component: ProjectExperienceCard,
   parameters: { layout: "padded" },
@@ -29,7 +23,6 @@ export const Default = meta.story({
   args: {
     onEdit: defaultOnEdit,
     projects: [createProject()],
-    skills: structuredClone(defaultSkills),
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /编辑|edit/i }))
@@ -37,7 +30,7 @@ export const Default = meta.story({
   },
 })
 
-export const Empty = meta.story({ args: { onEdit: fn(), projects: [], skills: [] } })
+export const Empty = meta.story({ args: { onEdit: fn(), projects: [] } })
 
 export const Multiple = meta.story({
   args: {
@@ -51,11 +44,10 @@ export const Multiple = meta.story({
         name: "Support Operations Workspace",
         responsibilities: ["Owned frontend architecture and delivery."],
         role: "Frontend engineer",
-        skillIds: ["skill_react", "skill_javascript"],
+        technologyStack: ["React", "JavaScript"],
         startDate: "2022-05",
       }),
     ],
-    skills: structuredClone(defaultSkills),
   },
 })
 
@@ -71,7 +63,7 @@ export const ThreeProjects = meta.story({
         name: "Support Operations Workspace",
         responsibilities: ["Owned frontend architecture and delivery."],
         role: "Frontend engineer",
-        skillIds: ["skill_react", "skill_javascript"],
+        technologyStack: ["React", "JavaScript"],
         startDate: "2022-05",
       }),
       createProject({
@@ -84,11 +76,10 @@ export const ThreeProjects = meta.story({
           "Documented the team workflow and component conventions.",
         ],
         role: "Frontend engineer",
-        skillIds: ["skill_typescript"],
+        technologyStack: ["TypeScript"],
         startDate: "2021-09",
       }),
     ],
-    skills: structuredClone(defaultSkills),
   },
 })
 
@@ -96,7 +87,6 @@ export const Ongoing = meta.story({
   args: {
     onEdit: fn(),
     projects: [createProject({ endDate: null })],
-    skills: structuredClone(defaultSkills),
   },
 })
 
@@ -104,7 +94,6 @@ export const MissingRole = meta.story({
   args: {
     onEdit: fn(),
     projects: [createProject({ role: null })],
-    skills: structuredClone(defaultSkills),
   },
 })
 
@@ -127,21 +116,8 @@ export const LongContent = meta.story({
           "Reviewed implementation quality and mentored engineers across teams.",
         ],
         role: "Principal frontend engineer for cross-functional platform delivery",
-        skillIds: [
-          "skill_react",
-          "skill_typescript",
-          "skill_tanstack_query",
-          "skill_storybook",
-          "skill_testing_library",
-        ],
+        technologyStack: ["React", "TypeScript", "TanStack Query", "Storybook", "Testing Library"],
       }),
-    ],
-    skills: [
-      createSkill(),
-      createSkill({ id: "skill_typescript", name: "TypeScript" }),
-      createSkill({ id: "skill_tanstack_query", name: "TanStack Query" }),
-      createSkill({ id: "skill_storybook", name: "Storybook" }),
-      createSkill({ id: "skill_testing_library", name: "Testing Library" }),
     ],
   },
 })
@@ -155,9 +131,8 @@ export const MissingOptionalFields = meta.story({
         projectUrl: null,
         responsibilities: [],
         role: null,
-        skillIds: [],
+        technologyStack: [],
       }),
     ],
-    skills: [],
   },
 })

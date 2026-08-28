@@ -148,10 +148,12 @@ export const profile = {
     projectDescriptionHint: "Each item will be shown as a separate project description point.",
     projectAchievementsHint: "Each item will be shown as a separate project outcome.",
     technologyStackDescription:
-      "Select from existing skills, or enter a new technology and press Enter.",
+      "Enter a technology and press Enter. The technology stack belongs only to this project.",
+    technologyInputPlaceholder: "Enter a technology…",
     skillInputPlaceholder: "Search or enter a skill…",
     skillNotFound: "No matching skill. Press Enter to create it.",
     removeSkill: "Remove {{name}}",
+    removeTechnology: "Remove {{name}}",
     validation: {
       required: "This field is required.",
       dateRange: "The end date cannot be before the start date.",

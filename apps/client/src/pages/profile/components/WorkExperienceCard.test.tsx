@@ -78,10 +78,10 @@ describe("WorkExperienceCard", () => {
     ).toHaveLength(0)
   })
 
-  it("falls back to an unknown skill id", () => {
-    renderCard([createExperience({ skillIds: ["skill_unavailable"] })], [])
-
-    expect(screen.getByText("skill_unavailable")).toBeInTheDocument()
+  it("fails explicitly when a work experience references an unknown skill", () => {
+    expect(() => renderCard([createExperience({ skillIds: ["skill_unavailable"] })], [])).toThrow(
+      "Work experience references an unknown skill: skill_unavailable",
+    )
   })
 
   it("renders the present label for current work", () => {

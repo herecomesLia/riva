@@ -20,8 +20,19 @@ function replaceSection(profile: JobProfile, input: SaveProfileSectionInput): Jo
       return { ...profile, workExperiences: input.values }
     case "projectExperience":
       return { ...profile, projectExperiences: input.values }
-    case "skills":
-      return { ...profile, skills: input.values }
+    case "skills": {
+      const skillIds = new Set(input.values.map((skill) => skill.id))
+      return {
+        ...profile,
+        skills: input.values,
+        workExperiences: profile.workExperiences.map((experience) => {
+          const remainingSkillIds = experience.skillIds.filter((skillId) => skillIds.has(skillId))
+          return remainingSkillIds.length === experience.skillIds.length
+            ? experience
+            : { ...experience, skillIds: remainingSkillIds, source: "userEdited" }
+        }),
+      }
+    }
   }
 }
 

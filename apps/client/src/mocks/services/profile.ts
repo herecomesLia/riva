@@ -116,9 +116,20 @@ function applySavedSection(profile: JobProfile, input: SaveProfileSectionInput) 
     case "education":
       profile.education = applySources(profile.education, input.values)
       break
-    case "skills":
-      profile.skills = applySources(profile.skills, input.values)
+    case "projectExperience":
+      profile.projectExperiences = applySources(profile.projectExperiences, input.values)
       break
+    case "skills": {
+      profile.skills = applySources(profile.skills, input.values)
+      const remainingSkillIds = new Set(profile.skills.map((skill) => skill.id))
+      profile.workExperiences = profile.workExperiences.map((experience) => {
+        const skillIds = experience.skillIds.filter((skillId) => remainingSkillIds.has(skillId))
+        return skillIds.length === experience.skillIds.length
+          ? experience
+          : { ...experience, skillIds, source: "userEdited" }
+      })
+      break
+    }
   }
 }
 
@@ -169,28 +180,24 @@ function replaceDraftSkillIds(skillIds: string[], persistedIds: Map<string, stri
   )
 }
 
-function applySkillLinkedSectionSave(
+function applyWorkExperienceSectionSave(
   profile: JobProfile,
-  input: Extract<SaveProfileSectionInput, { section: "workExperience" | "projectExperience" }>,
+  input: Extract<SaveProfileSectionInput, { section: "workExperience" }>,
 ) {
   const persistedIds = persistDraftSkills(profile, input.skillsToCreate)
-  if (input.section === "workExperience") {
-    profile.workExperiences = applySources(
-      profile.workExperiences,
-      input.values.map((item) => ({
-        ...item,
-        skillIds: replaceDraftSkillIds(item.skillIds, persistedIds),
-      })),
-    )
-    return
-  }
-  profile.projectExperiences = applySources(
-    profile.projectExperiences,
-    input.values.map((item) => ({
+  const skillIds = new Set(profile.skills.map((skill) => skill.id))
+  const values = input.values.map((item) => {
+    const persistedSkillIds = replaceDraftSkillIds(item.skillIds, persistedIds)
+    const missingSkillId = persistedSkillIds.find((skillId) => !skillIds.has(skillId))
+    if (missingSkillId) {
+      throw new Error(`Work experience references an unknown skill: ${missingSkillId}`)
+    }
+    return {
       ...item,
-      skillIds: replaceDraftSkillIds(item.skillIds, persistedIds),
-    })),
-  )
+      skillIds: persistedSkillIds,
+    }
+  })
+  profile.workExperiences = applySources(profile.workExperiences, values)
 }
 
 function recognizedProfile(): JobProfile {
@@ -341,8 +348,8 @@ export async function saveProfileSection(
   await waitForMockDelay()
   const profile = copy(requireProfile(input.profileId))
   if (profile.version !== input.version) throw new Error("Job profile version is out of date.")
-  if (input.section === "workExperience" || input.section === "projectExperience") {
-    applySkillLinkedSectionSave(profile, input)
+  if (input.section === "workExperience") {
+    applyWorkExperienceSectionSave(profile, input)
   } else {
     applySavedSection(profile, input)
   }

@@ -126,18 +126,18 @@ describe("ProfileSectionEditor project experience", () => {
       expect(input.values[0]!.achievements).toEqual(
         profileResponseMock.profile!.projectExperiences[0]!.achievements,
       )
-      expect(input.values[0]!.skillIds).toEqual(
-        profileResponseMock.profile!.projectExperiences[0]!.skillIds,
+      expect(input.values[0]!.technologyStack).toEqual(
+        profileResponseMock.profile!.projectExperiences[0]!.technologyStack,
       )
-      expect(input.skillsToCreate).toEqual([])
+      expect("skillsToCreate" in input).toBe(false)
     }
   })
 
   it("includes a new technology in the same project save", async () => {
     const user = userEvent.setup()
     const { onSave } = renderEditor("projectExperience")
-    const input = screen.getByRole("combobox", {
-      name: i18n.t("profile.editor.skillInputPlaceholder"),
+    const input = screen.getByRole("textbox", {
+      name: i18n.t("profile.editor.technologyInputPlaceholder"),
     })
 
     await user.type(input, "Accessibility")
@@ -147,13 +147,8 @@ describe("ProfileSectionEditor project experience", () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     const saveInput = onSave.mock.calls[0]![0]
     if (saveInput.section === "projectExperience") {
-      expect(saveInput.skillsToCreate).toEqual([
-        expect.objectContaining({
-          clientId: expect.stringMatching(/^draft_skill_/),
-          name: "Accessibility",
-        }),
-      ])
-      expect(saveInput.values[0]!.skillIds).toContain(saveInput.skillsToCreate[0]!.clientId)
+      expect(saveInput.values[0]!.technologyStack).toContain("Accessibility")
+      expect("skillsToCreate" in saveInput).toBe(false)
     }
   })
 })

@@ -72,3 +72,18 @@ export function normalizeBulletItems(items: string[]) {
 export function normalizeSkillIds(ids: string[]) {
   return uniqueItems(ids.map(normalizeWhitespace))
 }
+
+export function normalizeTechnologyStack(technologies: string[]) {
+  const seen = new Set<string>()
+
+  return technologies.map(normalizeWhitespace).filter((technology) => {
+    const normalized = normalizeSkillName(technology)
+    if (!normalized || seen.has(normalized)) return false
+    seen.add(normalized)
+    return true
+  })
+}
+
+export function parseTechnologyNames(input: string) {
+  return normalizeTechnologyStack(input.split(/[,，;；\r\n]+/))
+}

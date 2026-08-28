@@ -18,7 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { normalizeBulletItems, normalizeSkillIds } from "@/models/profile-text"
+import {
+  normalizeBulletItems,
+  normalizeSkillIds,
+  normalizeTechnologyStack,
+} from "@/models/profile-text"
 import {
   educationItemSchema,
   profileEmploymentTypes as employmentTypes,
@@ -29,13 +33,13 @@ import type {
   EmploymentType,
   JobProfile,
   ProfileSkill,
-  ProjectExperience,
   SaveProfileSectionInput,
   WorkExperience,
 } from "@/models/profile"
 import { BulletListEditor } from "./BulletListEditor"
 import type { EditableExperienceSection } from "./ProfileSectionEditDialog"
 import { SkillTagInput } from "./SkillTagInput"
+import { TechnologyStackInput } from "./TechnologyStackInput"
 
 type ProfileSectionEditorProps = {
   onCancel: () => void
@@ -296,16 +300,16 @@ export function ProfileSectionEditor({
 
       try {
         const values = normalizeSectionValues(section, value)
-        const isSkillLinkedSection = section === "workExperience" || section === "projectExperience"
-        const skillLinkedValues = values as Array<WorkExperience | ProjectExperience>
-        const skillsToCreate = isSkillLinkedSection
+        const isWorkExperienceSection = section === "workExperience"
+        const workExperiences = values as WorkExperience[]
+        const skillsToCreate = isWorkExperienceSection
           ? draftSkills
-              .filter((skill) => skillLinkedValues.some((item) => item.skillIds.includes(skill.id)))
+              .filter((skill) => workExperiences.some((item) => item.skillIds.includes(skill.id)))
               .map(({ id, name }) => ({ clientId: id, name }))
           : []
 
         await onSave(
-          isSkillLinkedSection
+          isWorkExperienceSection
             ? {
                 profileId: profile.profileId,
                 section,
@@ -521,16 +525,13 @@ function ExperienceFields({
                 />
               )}
             </form.Field>
-            <form.Field name={`items.${index}.skillIds`}>
+            <form.Field name={`items.${index}.technologyStack`}>
               {(field: any) => (
-                <SkillTagInput
-                  availableSkills={profile.skills}
+                <TechnologyStackInput
                   description={t("profile.editor.technologyStackDescription")}
-                  draftSkills={draftSkills}
                   label={t("profile.field.technologyStack")}
-                  onDraftSkillsChange={onDraftSkillsChange}
-                  onSelectedSkillIdsChange={field.handleChange}
-                  selectedSkillIds={field.state.value ?? []}
+                  onChange={field.handleChange}
+                  technologies={field.state.value ?? []}
                 />
               )}
             </form.Field>
@@ -600,7 +601,7 @@ function createDraft(profile: JobProfile, section: EditableExperienceSection) {
           responsibilities: structuredClone(item.responsibilities),
           role: item.role ?? "",
           isCurrent: item.endDate === null,
-          skillIds: structuredClone(item.skillIds),
+          technologyStack: structuredClone(item.technologyStack),
           startDate: item.startDate ?? "",
         })),
       }
@@ -648,7 +649,7 @@ function normalizeSectionValues(section: EditableExperienceSection, value: any) 
     projectUrl: toNullable(item.projectUrl),
     responsibilities: normalizeBulletItems(item.responsibilities),
     role: toNullable(item.role),
-    skillIds: normalizeSkillIds(item.skillIds),
+    technologyStack: normalizeTechnologyStack(item.technologyStack),
     startDate: toNullable(item.startDate),
   }))
 }
@@ -685,6 +686,6 @@ function createNewItem(section: EditableExperienceSection) {
     projectUrl: "",
     responsibilities: [],
     role: "",
-    skillIds: [],
+    technologyStack: [],
   }
 }

@@ -107,7 +107,7 @@ function createCompleteProfile(overrides: Partial<JobProfile> = {}): JobProfile 
         endDate: null,
         responsibilities: ["Defined frontend architecture and delivery milestones."],
         achievements: ["Cut average case handling time by 23% after rollout."],
-        skillIds: ["skill_react", "skill_typescript", "skill_tanstack_query"],
+        technologyStack: ["React", "TypeScript", "TanStack Query"],
         projectUrl: null,
         source: "userEdited",
       },

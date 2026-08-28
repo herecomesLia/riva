@@ -15,19 +15,12 @@ function createProject(overrides: Partial<Project> = {}): Project {
   return { ...structuredClone(profileResponseMock.profile!.projectExperiences[0]!), ...overrides }
 }
 
-function renderCard(
-  projects: JobProfile["projectExperiences"],
-  skills = structuredClone(profileResponseMock.profile!.skills),
-  onEdit = vi.fn(),
-) {
+function renderCard(projects: JobProfile["projectExperiences"], onEdit = vi.fn()) {
   return {
     onEdit,
-    ...renderWithProviders(
-      <ProjectExperienceCard onEdit={onEdit} projects={projects} skills={skills} />,
-      {
-        router: false,
-      },
-    ),
+    ...renderWithProviders(<ProjectExperienceCard onEdit={onEdit} projects={projects} />, {
+      router: false,
+    }),
   }
 }
 
@@ -62,16 +55,18 @@ describe("ProjectExperienceCard", () => {
     expect(screen.getByText(i18n.t("profile.field.projectAchievements"))).toBeInTheDocument()
   })
 
-  it("maps skill ids to ProfileSkillBadge names and falls back to unknown ids", () => {
-    renderCard([createProject({ skillIds: ["skill_react", "skill_unavailable"] })])
+  it("renders the project's independent technology stack", () => {
+    renderCard([createProject({ technologyStack: ["React", "Rust"] })])
 
     expect(screen.getByText("React")).toBeInTheDocument()
-    expect(screen.getByText("skill_unavailable")).toBeInTheDocument()
+    expect(screen.getByText("Rust")).toBeInTheDocument()
     expect(
-      screen.getByTestId("project-experience-skills").querySelectorAll('[data-slot="badge"]'),
+      screen.getByTestId("project-experience-technologies").querySelectorAll('[data-slot="badge"]'),
     ).toHaveLength(2)
     expect(
-      screen.getByTestId("project-experience-skills").querySelectorAll('[data-slot="badge"] svg'),
+      screen
+        .getByTestId("project-experience-technologies")
+        .querySelectorAll('[data-slot="badge"] svg'),
     ).toHaveLength(0)
   })
 
@@ -95,7 +90,7 @@ describe("ProjectExperienceCard", () => {
         projectUrl: null,
         responsibilities: [],
         role: null,
-        skillIds: [],
+        technologyStack: [],
       }),
     ])
 
@@ -105,7 +100,7 @@ describe("ProjectExperienceCard", () => {
     expect(
       screen.queryByTestId("project-experience-details-project_merchant_console"),
     ).not.toBeInTheDocument()
-    expect(screen.queryByTestId("project-experience-skills")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("project-experience-technologies")).not.toBeInTheDocument()
     expect(screen.queryByText("关键贡献")).not.toBeInTheDocument()
     expect(screen.queryByText("关联工作经历")).not.toBeInTheDocument()
   })

@@ -47,7 +47,7 @@ export const ExistingTechnology = meta.story({
   args: createProfileEditDialogArgs("projectExperience", structuredProjectProfile),
   play: async ({ userEvent }) => {
     await userEvent.type(
-      screen.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
+      screen.getByRole("textbox", { name: /输入技术|enter a technology/i }),
       "React",
     )
     await userEvent.keyboard("{Enter}")
@@ -58,7 +58,7 @@ export const NewTechnology = meta.story({
   args: createProfileEditDialogArgs("projectExperience", structuredProjectProfile),
   play: async ({ userEvent }) => {
     await userEvent.type(
-      screen.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
+      screen.getByRole("textbox", { name: /输入技术|enter a technology/i }),
       "Accessibility",
     )
     await userEvent.keyboard("{Enter}")
@@ -69,7 +69,7 @@ export const BatchTechnology = meta.story({
   args: createProfileEditDialogArgs("projectExperience", structuredProjectProfile),
   play: async ({ userEvent }) => {
     await userEvent.type(
-      screen.getByRole("combobox", { name: /搜索或输入技能|search or enter a skill/i }),
+      screen.getByRole("textbox", { name: /输入技术|enter a technology/i }),
       "React, TypeScript；TanStack Query",
     )
     await userEvent.keyboard("{Enter}")

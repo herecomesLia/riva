@@ -29,7 +29,6 @@ export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProp
       <ProjectExperienceCard
         onEdit={() => onStartEditing("projectExperience")}
         projects={profile.projectExperiences}
-        skills={profile.skills}
       />
     </div>
   )

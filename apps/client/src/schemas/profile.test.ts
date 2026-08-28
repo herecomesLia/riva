@@ -43,7 +43,7 @@ const schemas: Array<[string, any, Record<string, unknown>]> = [
       projectUrl: "",
       responsibilities: [],
       role: "",
-      skillIds: [],
+      technologyStack: [],
     },
   ],
 ]
@@ -153,7 +153,7 @@ describe("work experience schema", () => {
 })
 
 describe("project experience schema", () => {
-  it("keeps structured project content and technology skill ids", () => {
+  it("keeps structured project content and normalizes its independent technology stack", () => {
     const result = projectItemSchema.safeParse({
       achievements: ["  Improved project adoption  ", "Improved project adoption"],
       endDate: "",
@@ -163,7 +163,7 @@ describe("project experience schema", () => {
       projectUrl: "https://riva.example.com",
       responsibilities: ["  Built the project workspace  ", "Built the project workspace", "  "],
       role: "",
-      skillIds: ["skill_react", "skill_react"],
+      technologyStack: [" React ", "react", "TypeScript"],
       startDate: "2024-01",
     })
 
@@ -172,7 +172,7 @@ describe("project experience schema", () => {
         data: expect.objectContaining({
           achievements: ["Improved project adoption"],
           responsibilities: ["Built the project workspace"],
-          skillIds: ["skill_react"],
+          technologyStack: ["React", "TypeScript"],
         }),
         success: true,
       }),

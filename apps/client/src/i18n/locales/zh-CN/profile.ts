@@ -137,10 +137,12 @@ export const profile = {
     skillInputDescription: "输入技能名称后按 Enter 添加。",
     projectDescriptionHint: "每项将作为一个独立的项目描述要点显示。",
     projectAchievementsHint: "每项将作为一个独立的项目成果显示。",
-    technologyStackDescription: "从现有技能中选择，或输入新的技术后按 Enter 添加。",
+    technologyStackDescription: "输入技术名称后按 Enter 添加。技术栈仅属于当前项目。",
+    technologyInputPlaceholder: "输入技术…",
     skillInputPlaceholder: "搜索或输入技能…",
     skillNotFound: "未找到该技能，按 Enter 创建。",
     removeSkill: "移除 {{name}}",
+    removeTechnology: "移除 {{name}}",
     validation: {
       required: "请填写此字段。",
       dateRange: "结束时间不能早于开始时间。",
