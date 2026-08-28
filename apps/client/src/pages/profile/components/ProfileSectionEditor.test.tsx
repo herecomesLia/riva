@@ -30,6 +30,34 @@ function renderEditor(
   }
 }
 
+describe("ProfileSectionEditor field group structure", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage(defaultLanguage)
+  })
+
+  it.each([
+    ["education", 5],
+    ["workExperience", 9],
+    ["projectExperience", 8],
+  ] as const)("renders each %s item as a field group with direct fields", (section, fieldCount) => {
+    renderEditor(section)
+
+    const items = screen.getAllByTestId(/^profile-editor-item-/)
+    expect(items.length).toBeGreaterThan(0)
+
+    items.forEach((item) => {
+      const directFields = Array.from(item.children).filter(
+        (child) => child.getAttribute("data-slot") === "field",
+      )
+
+      expect(item).toHaveAttribute("data-slot", "field-group")
+      expect(item).toHaveAttribute("role", "group")
+      expect(directFields).toHaveLength(fieldCount)
+      expect(item.querySelectorAll('[data-slot="field"]')).toHaveLength(fieldCount)
+    })
+  })
+})
+
 describe("ProfileSectionEditor work experience", () => {
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)

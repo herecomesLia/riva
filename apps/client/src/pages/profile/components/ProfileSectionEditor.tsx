@@ -350,12 +350,12 @@ export function ProfileSectionEditor({
         <form.Subscribe selector={(state: any) => state.isDirty}>
           {(isDirty: boolean) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
         </form.Subscribe>
-        <FieldGroup>
+        <div className="flex flex-col gap-7">
           <form.Subscribe selector={(state: any) => state.values.items}>
             {(items: EditorItem[]) => (
               <div className="flex flex-col gap-6">
                 {items.map((item, index) => (
-                  <ExperienceFields
+                  <ExperienceFieldGroup
                     form={form}
                     index={index}
                     itemId={item.id}
@@ -380,7 +380,7 @@ export function ProfileSectionEditor({
             <PlusIcon data-icon="inline-start" />
             {t("profile.editor.addExperience")}
           </Button>
-        </FieldGroup>
+        </div>
 
         {saveError && (
           <Alert className="mt-6" variant="destructive">
@@ -393,7 +393,7 @@ export function ProfileSectionEditor({
   )
 }
 
-function ExperienceFields({
+function ExperienceFieldGroup({
   form,
   hasSubmitted,
   index,
@@ -416,6 +416,7 @@ function ExperienceFields({
 }) {
   const { t } = useTranslation()
   const fieldLabel = (name: string) => t(`profile.formField.${name}`)
+  const titleId = `profile-editor-item-${itemId}-title`
   const dateFields = (
     <>
       <TextField form={form} index={index} label={fieldLabel("startDate")} month name="startDate" />
@@ -424,127 +425,124 @@ function ExperienceFields({
   )
 
   return (
-    <div
-      className="flex flex-col gap-5 rounded-xl border p-4"
+    <FieldGroup
+      aria-labelledby={titleId}
+      className="grid gap-5 rounded-xl border px-4 pt-4 pb-5 md:grid-cols-2"
       data-testid={`profile-editor-item-${itemId}`}
+      role="group"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-medium">{t("profile.editor.experience", { count: index + 1 })}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
+        <p className="font-medium" id={titleId}>
+          {t("profile.editor.experience", { count: index + 1 })}
+        </p>
         <Button onClick={onDelete} type="button" variant="destructive">
           <Trash2Icon data-icon="inline-start" />
           {t("profile.editor.delete")}
         </Button>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        {section === "education" ? (
-          <>
-            <TextField form={form} index={index} label={fieldLabel("school")} name="school" />
-            <TextField form={form} index={index} label={fieldLabel("degree")} name="degree" />
-            <TextField form={form} index={index} label={fieldLabel("major")} name="major" />
-            {dateFields}
-          </>
-        ) : section === "workExperience" ? (
-          <>
-            <TextField form={form} index={index} label={fieldLabel("company")} name="company" />
-            <TextField form={form} index={index} label={fieldLabel("title")} name="title" />
-            <EmploymentTypeField form={form} index={index} />
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.field.location")}
-              name="location"
-            />
-            {dateFields}
-            <form.Field name={`items.${index}.responsibilities`}>
-              {(field: any) => (
-                <BulletListEditor
-                  description={t("profile.editor.bulletListDescription")}
-                  items={field.state.value ?? []}
-                  label={t("profile.field.responsibilities")}
-                  onChange={field.handleChange}
-                />
-              )}
-            </form.Field>
-            <form.Field name={`items.${index}.achievements`}>
-              {(field: any) => (
-                <BulletListEditor
-                  description={t("profile.editor.bulletListDescription")}
-                  items={field.state.value ?? []}
-                  label={t("profile.field.achievements")}
-                  onChange={field.handleChange}
-                />
-              )}
-            </form.Field>
-            <form.Field name={`items.${index}.skillIds`}>
-              {(field: any) => (
-                <SkillTagInput
-                  availableSkills={profile.skills}
-                  description={t("profile.editor.skillInputDescription")}
-                  draftSkills={draftSkills}
-                  label={t("profile.field.skills")}
-                  onDraftSkillsChange={onDraftSkillsChange}
-                  onSelectedSkillIdsChange={field.handleChange}
-                  selectedSkillIds={field.state.value ?? []}
-                />
-              )}
-            </form.Field>
-          </>
-        ) : (
-          <>
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.formField.projectName")}
-              name="name"
-            />
-            <TextField
-              form={form}
-              index={index}
-              label={t("profile.formField.projectRole")}
-              name="role"
-            />
-            {dateFields}
-            <form.Field name={`items.${index}.responsibilities`}>
-              {(field: any) => (
-                <BulletListEditor
-                  description={t("profile.editor.projectDescriptionHint")}
-                  items={field.state.value ?? []}
-                  label={t("profile.field.projectDescription")}
-                  onChange={field.handleChange}
-                />
-              )}
-            </form.Field>
-            <form.Field name={`items.${index}.achievements`}>
-              {(field: any) => (
-                <BulletListEditor
-                  description={t("profile.editor.projectAchievementsHint")}
-                  items={field.state.value ?? []}
-                  label={t("profile.field.projectAchievements")}
-                  onChange={field.handleChange}
-                />
-              )}
-            </form.Field>
-            <form.Field name={`items.${index}.technologyStack`}>
-              {(field: any) => (
-                <TechnologyStackInput
-                  description={t("profile.editor.technologyStackDescription")}
-                  label={t("profile.field.technologyStack")}
-                  onChange={field.handleChange}
-                  technologies={field.state.value ?? []}
-                />
-              )}
-            </form.Field>
-            <TextField
-              form={form}
-              index={index}
-              label={fieldLabel("projectUrl")}
-              name="projectUrl"
-            />
-          </>
-        )}
-      </div>
-    </div>
+      {section === "education" ? (
+        <>
+          <TextField form={form} index={index} label={fieldLabel("school")} name="school" />
+          <TextField form={form} index={index} label={fieldLabel("degree")} name="degree" />
+          <TextField form={form} index={index} label={fieldLabel("major")} name="major" />
+          {dateFields}
+        </>
+      ) : section === "workExperience" ? (
+        <>
+          <TextField form={form} index={index} label={fieldLabel("company")} name="company" />
+          <TextField form={form} index={index} label={fieldLabel("title")} name="title" />
+          <EmploymentTypeField form={form} index={index} />
+          <TextField
+            form={form}
+            index={index}
+            label={t("profile.field.location")}
+            name="location"
+          />
+          {dateFields}
+          <form.Field name={`items.${index}.responsibilities`}>
+            {(field: any) => (
+              <BulletListEditor
+                description={t("profile.editor.bulletListDescription")}
+                items={field.state.value ?? []}
+                label={t("profile.field.responsibilities")}
+                onChange={field.handleChange}
+              />
+            )}
+          </form.Field>
+          <form.Field name={`items.${index}.achievements`}>
+            {(field: any) => (
+              <BulletListEditor
+                description={t("profile.editor.bulletListDescription")}
+                items={field.state.value ?? []}
+                label={t("profile.field.achievements")}
+                onChange={field.handleChange}
+              />
+            )}
+          </form.Field>
+          <form.Field name={`items.${index}.skillIds`}>
+            {(field: any) => (
+              <SkillTagInput
+                availableSkills={profile.skills}
+                description={t("profile.editor.skillInputDescription")}
+                draftSkills={draftSkills}
+                label={t("profile.field.skills")}
+                onDraftSkillsChange={onDraftSkillsChange}
+                onSelectedSkillIdsChange={field.handleChange}
+                selectedSkillIds={field.state.value ?? []}
+              />
+            )}
+          </form.Field>
+        </>
+      ) : (
+        <>
+          <TextField
+            form={form}
+            index={index}
+            label={t("profile.formField.projectName")}
+            name="name"
+          />
+          <TextField
+            form={form}
+            index={index}
+            label={t("profile.formField.projectRole")}
+            name="role"
+          />
+          {dateFields}
+          <form.Field name={`items.${index}.responsibilities`}>
+            {(field: any) => (
+              <BulletListEditor
+                description={t("profile.editor.projectDescriptionHint")}
+                items={field.state.value ?? []}
+                label={t("profile.field.projectDescription")}
+                onChange={field.handleChange}
+              />
+            )}
+          </form.Field>
+          <form.Field name={`items.${index}.achievements`}>
+            {(field: any) => (
+              <BulletListEditor
+                description={t("profile.editor.projectAchievementsHint")}
+                items={field.state.value ?? []}
+                label={t("profile.field.projectAchievements")}
+                onChange={field.handleChange}
+              />
+            )}
+          </form.Field>
+          <form.Field name={`items.${index}.technologyStack`}>
+            {(field: any) => (
+              <TechnologyStackInput
+                description={t("profile.editor.technologyStackDescription")}
+                label={t("profile.field.technologyStack")}
+                onChange={field.handleChange}
+                technologies={field.state.value ?? []}
+              />
+            )}
+          </form.Field>
+          <TextField form={form} index={index} label={fieldLabel("projectUrl")} name="projectUrl" />
+        </>
+      )}
+    </FieldGroup>
   )
 }
 
