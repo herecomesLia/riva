@@ -16,6 +16,7 @@ EXPECTED_ERROR_RESPONSES = {
     ("/api/auth/register", "post"): {"403", "409", "422", "500"},
     ("/api/users/me", "get"): {"401", "403", "500"},
     ("/api/health", "get"): {"500", "503"},
+    ("/api/career-profile", "post"): {"401", "403", "409", "422", "500"},
 }
 
 ERROR_RESPONSE_EXCEPTIONS = {
