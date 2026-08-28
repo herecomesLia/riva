@@ -6,7 +6,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from riva.db.errors import DatabaseUnavailableError
 from riva.services.errors import (
-    AccountDisabledError,
     InvalidCredentialsError,
     InvalidSessionError,
     SessionExpiredError,
@@ -67,14 +66,6 @@ def resolve_error(exc: Exception) -> ErrorSpec:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 code="auth.session_expired",
                 message="Session has expired.",
-                clear_session_cookie=True,
-            )
-
-        case AccountDisabledError():
-            return ErrorSpec(
-                status_code=status.HTTP_403_FORBIDDEN,
-                code="auth.account_disabled",
-                message="Account is disabled.",
                 clear_session_cookie=True,
             )
 

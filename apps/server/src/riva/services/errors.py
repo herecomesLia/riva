@@ -6,10 +6,6 @@ class AuthenticationError(ApplicationError):
     pass
 
 
-class AuthorizationError(ApplicationError):
-    pass
-
-
 class ConflictError(ApplicationError):
     pass
 
@@ -23,10 +19,6 @@ class InvalidSessionError(AuthenticationError):
 
 
 class SessionExpiredError(AuthenticationError):
-    pass
-
-
-class AccountDisabledError(AuthorizationError):
     pass
 
 

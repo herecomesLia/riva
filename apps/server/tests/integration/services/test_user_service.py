@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.core.config import Settings
 from riva.models import AuthSession, User
 from riva.services.errors import (
-    AccountDisabledError,
     InvalidCredentialsError,
     InvalidSessionError,
     SessionExpiredError,
@@ -109,25 +108,19 @@ class TestLogin:
         assert login_session.user_id == registered.user.id
 
     @pytest.mark.parametrize(
-        ("username", "password", "disable_user"),
+        ("username", "password"),
         [
-            ("MissingUser", PASSWORD, False),
-            (USERNAME, "WrongPass123!", False),
-            (USERNAME, PASSWORD, True),
+            ("MissingUser", PASSWORD),
+            (USERNAME, "WrongPass123!"),
         ],
     )
     async def test_login_hides_invalid_credential_reason(
         self,
         user_service: UserService,
-        db_session: AsyncSession,
         username: str,
         password: str,
-        disable_user: bool,
     ) -> None:
-        registered = await user_service.register(USERNAME, PASSWORD)
-        if disable_user:
-            registered.user.is_active = False
-            await db_session.commit()
+        await user_service.register(USERNAME, PASSWORD)
 
         with pytest.raises(InvalidCredentialsError):
             await user_service.login(username, password)
@@ -218,23 +211,6 @@ class TestCurrentSession:
         await db_session.commit()
 
         with pytest.raises(SessionExpiredError):
-            await user_service.get_current_session(registered.token)
-
-        auth_session = await _auth_session(db_session, registered.token, settings)
-        assert auth_session.revoked_at == clock.now
-
-    async def test_disabled_account_revokes_session(
-        self,
-        user_service: UserService,
-        db_session: AsyncSession,
-        settings: Settings,
-        clock: Clock,
-    ) -> None:
-        registered = await user_service.register(USERNAME, PASSWORD)
-        registered.user.is_active = False
-        await db_session.commit()
-
-        with pytest.raises(AccountDisabledError):
             await user_service.get_current_session(registered.token)
 
         auth_session = await _auth_session(db_session, registered.token, settings)

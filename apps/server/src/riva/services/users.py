@@ -16,7 +16,6 @@ from riva.core.config import Settings
 from riva.models import AuthSession
 from riva.models.user import User, normalize_username
 from riva.services.errors import (
-    AccountDisabledError,
     InvalidCredentialsError,
     InvalidSessionError,
     SessionExpiredError,
@@ -78,7 +77,7 @@ class UserService:
             select(User).where(User.normalized_username == normalized_username)
         )
         user = result.scalar_one_or_none()
-        if user is None or not user.is_active:
+        if user is None:
             raise InvalidCredentialsError()
         if not _verify_password(user.password_hash, password):
             raise InvalidCredentialsError()
@@ -106,11 +105,6 @@ class UserService:
             auth_session.revoked_at = now
             await self.session.commit()
             raise SessionExpiredError()
-
-        if not user.is_active:
-            auth_session.revoked_at = now
-            await self.session.commit()
-            raise AccountDisabledError()
 
         refreshed = False
         refresh_after = timedelta(

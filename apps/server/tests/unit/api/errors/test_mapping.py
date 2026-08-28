@@ -10,7 +10,6 @@ from riva.api.errors.mapping import (
 )
 from riva.db.errors import DatabaseUnavailableError
 from riva.services.errors import (
-    AccountDisabledError,
     InvalidCredentialsError,
     InvalidSessionError,
     SessionExpiredError,
@@ -44,15 +43,6 @@ from riva.services.errors import (
                 401,
                 "auth.session_expired",
                 "Session has expired.",
-                clear_session_cookie=True,
-            ),
-        ),
-        (
-            AccountDisabledError(),
-            ErrorSpec(
-                403,
-                "auth.account_disabled",
-                "Account is disabled.",
                 clear_session_cookie=True,
             ),
         ),
