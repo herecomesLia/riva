@@ -6,11 +6,12 @@ from fastapi.responses import JSONResponse
 from riva.db.errors import DatabaseUnavailableError
 from riva.schemas import DependencyHealthStatus, HealthResponse, ServiceHealthStatus
 
-router = APIRouter()
+router = APIRouter(tags=["health"])
 
 
 @router.get(
     "/health",
+    operation_id="check-health",
     response_model=HealthResponse,
     responses={
         status.HTTP_503_SERVICE_UNAVAILABLE: {

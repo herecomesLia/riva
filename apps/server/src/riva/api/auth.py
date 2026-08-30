@@ -20,6 +20,7 @@ router = APIRouter(
 
 @router.post(
     "/register",
+    operation_id="register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(
@@ -43,6 +44,7 @@ async def register(
 
 @router.post(
     "/login",
+    operation_id="login",
     response_model=UserResponse,
     responses=error_responses(
         status.HTTP_401_UNAUTHORIZED,
@@ -68,7 +70,11 @@ async def login(
     return result.user
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    operation_id="logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def logout(
     request: Request,
     response: Response,

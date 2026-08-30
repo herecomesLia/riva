@@ -11,7 +11,7 @@ from riva.schemas.career_profile import (
 
 router = APIRouter(
     prefix="/career-profile",
-    tags=["career-profile"],
+    tags=["career_profile"],
     dependencies=[csrf_guard],
     responses=error_responses(
         status.HTTP_401_UNAUTHORIZED,
@@ -22,6 +22,7 @@ router = APIRouter(
 
 @router.get(
     "",
+    operation_id="get-career-profile",
     response_model=CareerProfileResponse,
     responses=error_responses(status.HTTP_404_NOT_FOUND),
 )
@@ -34,6 +35,7 @@ async def get_career_profile(
 
 @router.post(
     "",
+    operation_id="create-career-profile",
     response_model=CareerProfileResponse,
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(
@@ -57,6 +59,7 @@ async def create_career_profile(
 
 @router.patch(
     "",
+    operation_id="update-career-profile",
     response_model=CareerProfileResponse,
     responses=error_responses(
         status.HTTP_404_NOT_FOUND,

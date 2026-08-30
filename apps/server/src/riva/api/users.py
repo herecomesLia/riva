@@ -17,13 +17,18 @@ router = APIRouter(
 )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    operation_id="get-current-user",
+    response_model=UserResponse,
+)
 async def get_current_user(current_user: CurrentUserDep) -> User:
     return current_user
 
 
 @router.patch(
     "/me",
+    operation_id="update-current-user",
     response_model=UserResponse,
     responses=error_responses(status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
@@ -42,15 +47,17 @@ async def update_current_user(
 
 @router.put(
     "/me/avatar",
+    operation_id="set-user-avatar",
     status_code=status.HTTP_501_NOT_IMPLEMENTED,
     responses=error_responses(status.HTTP_501_NOT_IMPLEMENTED),
 )
-async def update_current_user_avatar(current_user: CurrentUserDep) -> None:
+async def set_current_user_avatar(current_user: CurrentUserDep) -> None:
     raise APINotImplementedError()
 
 
 @router.delete(
     "/me/avatar",
+    operation_id="delete-user-avatar",
     status_code=status.HTTP_501_NOT_IMPLEMENTED,
     responses=error_responses(status.HTTP_501_NOT_IMPLEMENTED),
 )
