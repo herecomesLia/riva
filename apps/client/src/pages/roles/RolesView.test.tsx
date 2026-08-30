@@ -52,6 +52,7 @@ function createActions(
         },
       }),
     ),
+    restoreTargetRole: vi.fn(async () => data),
     saveJobDescription: vi.fn(async () => data),
     setCurrentTargetRole: vi.fn(async () => data),
     updateJobDescriptionAnalysisModule: vi.fn(async () => data),
@@ -253,6 +254,23 @@ describe("RolesView", () => {
     expect(archivedButton).toHaveAttribute("aria-pressed", "true")
     expect(within(details).getByRole("heading", { name: archivedRole.title })).toBeInTheDocument()
     expect(within(details).getByText(i18n.t("roles.status.archived"))).toBeInTheDocument()
+  })
+
+  it("restores an archived role with its current version", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("archivedRoles")
+    const archivedRole = data.roles.find((role) => role.status === "archived")!
+    const restoreTargetRole = vi.fn(async () => data)
+    const actions = createActions(data, { restoreTargetRole })
+    renderReadyView(data, { actions, initialSelectedRoleId: archivedRole.id })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.restore") }))
+
+    expect(restoreTargetRole).toHaveBeenCalledWith({
+      roleId: archivedRole.id,
+      version: archivedRole.version,
+    })
+    expect(actions.setCurrentTargetRole).not.toHaveBeenCalled()
   })
 
   it("changes only local selection when a role is clicked", async () => {

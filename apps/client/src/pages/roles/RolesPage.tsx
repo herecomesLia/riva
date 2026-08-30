@@ -10,6 +10,7 @@ import {
   getRolesPage,
   saveJobDescription,
   recognizeTargetRole,
+  restoreTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
@@ -57,6 +58,10 @@ export function RolesPage() {
   })
   const archiveMutation = useMutation({
     mutationFn: archiveTargetRole,
+    onSuccess: setRolesResponse,
+  })
+  const restoreMutation = useMutation({
+    mutationFn: restoreTargetRole,
     onSuccess: setRolesResponse,
   })
   const deleteMutation = useMutation({ mutationFn: deleteTargetRole, onSuccess: setRolesResponse })
@@ -112,6 +117,7 @@ export function RolesPage() {
       return response
     },
     recognizeTargetRole: (input) => recognitionMutation.mutateAsync(input),
+    restoreTargetRole: (input) => runMutation(restoreMutation.mutateAsync, input),
     saveJobDescription: async (input) => {
       const response = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
       setRolesResponse(response)

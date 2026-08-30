@@ -10,6 +10,7 @@ import type {
   GetMatchingAnalysisStatusInput,
   RolesPageResponse,
   RecognizeTargetRoleInput,
+  RestoreTargetRoleInput,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
@@ -53,6 +54,10 @@ export function setCurrentTargetRole(input: SetCurrentTargetRoleInput): Promise<
 
 export function archiveTargetRole(input: ArchiveTargetRoleInput): Promise<RolesPageResponse> {
   return env.mock ? rolesMockService.archiveTargetRole(input) : realApiUnavailable()
+}
+
+export function restoreTargetRole(input: RestoreTargetRoleInput): Promise<RolesPageResponse> {
+  return env.mock ? rolesMockService.restoreTargetRole(input) : realApiUnavailable()
 }
 
 export function deleteTargetRole(input: DeleteTargetRoleInput): Promise<RolesPageResponse> {

@@ -15,6 +15,7 @@ export type RoleDetailsActions = {
   archive: () => void
   delete: () => void
   edit: () => void
+  restore: () => void
   setCurrent: () => void
   editJobDescription: () => void
   editJobDescriptionAnalysisModule: (field: JobDescriptionAnalysisModuleField) => void

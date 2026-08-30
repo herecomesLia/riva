@@ -12,6 +12,7 @@ import {
   getRolesPage,
   saveJobDescription,
   recognizeTargetRole,
+  restoreTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
@@ -233,6 +234,35 @@ describe("roles stateful mock service", () => {
 
     const after = await settle(getRolesPage())
     expect(after).toEqual(before)
+  })
+
+  it("restores an archived role without changing the current role", async () => {
+    resetRolesMockState("archivedRoles")
+    const before = await settle(getRolesPage())
+    const archivedRole = before.roles.find((role) => role.status === "archived")!
+
+    const restored = await settle(
+      restoreTargetRole({ roleId: archivedRole.id, version: archivedRole.version }),
+    )
+    const restoredRole = restored.roles.find((role) => role.id === archivedRole.id)!
+
+    expect(restored.currentRoleId).toBe(before.currentRoleId)
+    expect(restoredRole).toMatchObject({
+      status: "active",
+      version: archivedRole.version + 1,
+    })
+    expect(restoredRole.updatedAt).not.toBe(archivedRole.updatedAt)
+  })
+
+  it("rejects restoring an active role without partial writes", async () => {
+    const before = await settle(getRolesPage())
+    const activeRole = before.roles.find((role) => role.status === "active")!
+    const promise = restoreTargetRole({ roleId: activeRole.id, version: activeRole.version })
+    const assertion = expect(promise).rejects.toThrow("Only an archived target role")
+    await vi.runAllTimersAsync()
+    await assertion
+
+    expect(await settle(getRolesPage())).toEqual(before)
   })
 
   it("deletes the current role and promotes an active fallback", async () => {

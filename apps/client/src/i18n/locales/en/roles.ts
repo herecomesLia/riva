@@ -7,6 +7,7 @@ export const roles = {
     delete: "Delete role",
     edit: "Edit details",
     retry: "Reload",
+    restore: "Restore role",
     setCurrent: "Set as current role",
   },
   creation: {

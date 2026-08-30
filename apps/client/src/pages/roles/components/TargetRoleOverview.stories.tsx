@@ -15,6 +15,7 @@ function createActions(overrides: Partial<RoleDetailsActions> = {}): RoleDetails
     retryJobDescriptionParsing: fn(),
     retryJobDescriptionSynchronization: fn(),
     retryMatchingAnalysisSynchronization: fn(),
+    restore: fn(),
     setCurrent: fn(),
     editJobDescriptionAnalysisModule: fn(),
     ...overrides,
@@ -44,6 +45,15 @@ export const Active = meta.story({
 
 export const Archived = meta.story({
   args: { actions: createActions(), isCurrent: false, role: archivedRole },
+})
+
+const restore = fn()
+export const RestoreArchived = meta.story({
+  args: { actions: createActions({ restore }), isCurrent: false, role: archivedRole },
+  play: async ({ userEvent }) => {
+    await userEvent.click(screen.getByRole("button", { name: /恢复岗位|restore role/i }))
+    await expect(restore).toHaveBeenCalledTimes(1)
+  },
 })
 
 const setCurrent = fn()

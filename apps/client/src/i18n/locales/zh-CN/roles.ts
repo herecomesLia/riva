@@ -7,6 +7,7 @@ export const roles = {
     delete: "删除岗位",
     edit: "编辑信息",
     retry: "重新加载",
+    restore: "恢复岗位",
     setCurrent: "设为当前岗位",
   },
   creation: {

@@ -268,6 +268,11 @@ export type ArchiveTargetRoleInput = {
   version: number
 }
 
+export type RestoreTargetRoleInput = {
+  roleId: string
+  version: number
+}
+
 export type DeleteTargetRoleInput = {
   roleId: string
   version: number

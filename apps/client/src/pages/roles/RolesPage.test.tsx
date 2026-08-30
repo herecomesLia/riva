@@ -19,6 +19,7 @@ import {
   getRolesPage,
   saveJobDescription,
   recognizeTargetRole,
+  restoreTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
@@ -38,6 +39,7 @@ vi.mock("@/services/roles", async (importOriginal) => ({
   getMatchingAnalysisStatus: vi.fn(),
   saveJobDescription: vi.fn(),
   recognizeTargetRole: vi.fn(),
+  restoreTargetRole: vi.fn(),
   setCurrentTargetRole: vi.fn(),
   startJobDescriptionParsing: vi.fn(),
   updateJobDescriptionAnalysisModule: vi.fn(),
@@ -64,6 +66,7 @@ const mutationMocks = [
   createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
+  restoreTargetRole,
   saveJobDescription,
   setCurrentTargetRole,
   startJobDescriptionParsing,
@@ -197,6 +200,40 @@ describe("RolesPage", () => {
     const cached = queryClient.getQueryData<ReturnType<typeof createRolesMockResponse>>(["roles"])!
     expect(cached.currentRoleId).toBe(nextCurrent.id)
     expect(cached.roles.every((role) => !("isCurrent" in role))).toBe(true)
+  })
+
+  it("restores an archived role, keeps the current role, and returns to the active category", async () => {
+    const user = userEvent.setup()
+    const initial = createRolesMockResponse("archivedRoles")
+    const archivedRole = initial.roles.find((role) => role.status === "archived")!
+    const restored = structuredClone(initial)
+    const restoredRole = restored.roles.find((role) => role.id === archivedRole.id)!
+    restoredRole.status = "active"
+    restoredRole.version += 1
+    vi.mocked(getRolesPage).mockResolvedValue(initial)
+    vi.mocked(restoreTargetRole).mockResolvedValue(restored)
+    const { queryClient } = renderRolesPage()
+
+    const navigation = await screen.findByTestId("roles-desktop-navigation")
+    await user.click(
+      within(navigation).getByRole("tab", {
+        name: i18n.t("roles.list.categories.archived", { count: 1 }),
+      }),
+    )
+    await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.restore") }))
+
+    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(restored))
+    expect(vi.mocked(restoreTargetRole).mock.calls[0]?.[0]).toEqual({
+      roleId: archivedRole.id,
+      version: archivedRole.version,
+    })
+    expect(restored.currentRoleId).toBe(initial.currentRoleId)
+    expect(
+      within(navigation).getByRole("tab", {
+        name: i18n.t("roles.list.categories.active", { count: 2 }),
+      }),
+    ).toHaveAttribute("aria-selected", "true")
+    expect(screen.getByRole("heading", { name: archivedRole.title })).toBeInTheDocument()
   })
 
   it("uses the service fallback after deleting the current role", async () => {

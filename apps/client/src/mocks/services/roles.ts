@@ -16,6 +16,7 @@ import type {
   MatchingAnalysis,
   ReadyTargetRole,
   RecognizeTargetRoleInput,
+  RestoreTargetRoleInput,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
@@ -417,6 +418,22 @@ export async function archiveTargetRole(input: ArchiveTargetRoleInput): Promise<
     : mockResponse.currentRoleId
 
   return setMockResponse({ ...mockResponse, currentRoleId, roles: rolesAfterArchive })
+}
+
+export async function restoreTargetRole(input: RestoreTargetRoleInput): Promise<RolesPageResponse> {
+  await waitForMockDelay()
+  const role = requireRole(input.roleId)
+  requireCurrentVersion(role, input.version)
+  if (role.status !== "archived") {
+    throw new Error("Only an archived target role can be restored.")
+  }
+
+  const restoredRole: TargetRole = {
+    ...role,
+    ...nextRoleVersion(role),
+    status: "active",
+  }
+  return setMockResponse(replaceRole(restoredRole))
 }
 
 export async function deleteTargetRole(input: DeleteTargetRoleInput): Promise<RolesPageResponse> {

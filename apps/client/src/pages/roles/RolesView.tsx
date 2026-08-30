@@ -25,6 +25,7 @@ import type {
   JobDescriptionAnalysisModuleField,
   RolesPageResponse,
   RecognizeTargetRoleInput,
+  RestoreTargetRoleInput,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
@@ -72,6 +73,7 @@ export type RolesViewActions = {
     input: GetMatchingAnalysisStatusInput,
   ) => Promise<RolesPageResponse>
   recognizeTargetRole: (input: RecognizeTargetRoleInput) => Promise<TargetRoleRecognitionResult>
+  restoreTargetRole: (input: RestoreTargetRoleInput) => Promise<RolesPageResponse>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
   updateJobDescriptionAnalysisModule: (
@@ -330,6 +332,19 @@ function RolesReadyView({
                                 version: selectedRole.version,
                               }),
                             )
+                          },
+                          restore: () => {
+                            const restoredRoleId = selectedRole.id
+                            void runAction(() =>
+                              actions.restoreTargetRole({
+                                roleId: restoredRoleId,
+                                version: selectedRole.version,
+                              }),
+                            ).then((succeeded) => {
+                              if (!succeeded) return
+                              setRoleCategory("active")
+                              setSelectedRoleId(restoredRoleId)
+                            })
                           },
                           setCurrent: () =>
                             void runAction(() =>

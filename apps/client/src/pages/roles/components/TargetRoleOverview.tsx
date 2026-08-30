@@ -1,5 +1,6 @@
 import {
   ArchiveIcon,
+  ArchiveRestoreIcon,
   BriefcaseBusinessIcon,
   Building2Icon,
   MapPinIcon,
@@ -64,6 +65,12 @@ export function TargetRoleOverview({
               <Button disabled={pending} onClick={actions.archive} size="sm" variant="outline">
                 <ArchiveIcon data-icon="inline-start" />
                 {t("roles.actions.archive")}
+              </Button>
+            )}
+            {role.status === "archived" && (
+              <Button disabled={pending} onClick={actions.restore} size="sm" variant="outline">
+                <ArchiveRestoreIcon data-icon="inline-start" />
+                {t("roles.actions.restore")}
               </Button>
             )}
             <Button disabled={pending} onClick={actions.delete} size="sm" variant="destructive">
