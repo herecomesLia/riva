@@ -490,7 +490,6 @@ function RecognitionReview({
       location: recognition.suggestedRole.location ?? "",
       minYears: recognition.suggestedRole.experienceRange?.minYears?.toString() ?? "",
       maxYears: recognition.suggestedRole.experienceRange?.maxYears?.toString() ?? "",
-      preparationStatus: "preparing",
     }),
     [recognition],
   )

@@ -28,7 +28,7 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTa
 function ArchivedDetailsHarness() {
   const [activeTab, setActiveTab] = useState<TargetRoleTab>("overview")
   const response = createRoleStoryResponse("archivedRoles")
-  const archivedRole = response.roles.find((role) => role.preparationStatus === "archived")!
+  const archivedRole = response.roles.find((role) => role.status === "archived")!
   return (
     <RoleDetails
       activeTab={activeTab}

@@ -3,9 +3,7 @@ import {
   BriefcaseBusinessIcon,
   Building2Icon,
   MapPinIcon,
-  PauseIcon,
   PencilIcon,
-  PlayIcon,
   StarIcon,
   TimerIcon,
   Trash2Icon,
@@ -56,32 +54,13 @@ export function TargetRoleOverview({
               <PencilIcon className="size-4" data-icon="inline-start" />
               {t("roles.actions.edit")}
             </Button>
-            {!isCurrent && role.preparationStatus !== "archived" && (
+            {!isCurrent && role.status !== "archived" && (
               <Button disabled={pending} onClick={actions.setCurrent} size="sm" variant="outline">
                 <StarIcon data-icon="inline-start" />
                 {t("roles.actions.setCurrent")}
               </Button>
             )}
-            {role.preparationStatus !== "archived" && (
-              <Button
-                disabled={pending}
-                onClick={actions.togglePreparationStatus}
-                size="sm"
-                variant="outline"
-              >
-                {role.preparationStatus === "preparing" ? (
-                  <PauseIcon data-icon="inline-start" />
-                ) : (
-                  <PlayIcon data-icon="inline-start" />
-                )}
-                {t(
-                  role.preparationStatus === "preparing"
-                    ? "roles.actions.pause"
-                    : "roles.actions.resume",
-                )}
-              </Button>
-            )}
-            {role.preparationStatus !== "archived" && (
+            {role.status !== "archived" && (
               <Button disabled={pending} onClick={actions.archive} size="sm" variant="outline">
                 <ArchiveIcon data-icon="inline-start" />
                 {t("roles.actions.archive")}

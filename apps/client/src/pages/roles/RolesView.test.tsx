@@ -54,7 +54,6 @@ function createActions(
     ),
     saveJobDescription: vi.fn(async () => data),
     setCurrentTargetRole: vi.fn(async () => data),
-    updateRolePreparationStatus: vi.fn(async () => data),
     updateJobDescriptionAnalysisModule: vi.fn(async () => data),
     updateTargetRole: vi.fn(async () => data),
     ...overrides,
@@ -114,7 +113,7 @@ describe("RolesView", () => {
     expect(screen.queryByTestId("roles-list-card")).not.toBeInTheDocument()
   })
 
-  it("renders multiple saved roles and their preparation states", async () => {
+  it("renders multiple active roles", async () => {
     const data = createRolesMockResponse("multipleRoles")
     renderReadyView(data)
 
@@ -122,17 +121,14 @@ describe("RolesView", () => {
     expect(within(roleList).getAllByRole("listitem")).toHaveLength(2)
     expect(within(roleList).getByText(data.roles[0]!.title)).toBeInTheDocument()
     expect(within(roleList).getByText(data.roles[1]!.title)).toBeInTheDocument()
-    expect(
-      within(roleList).getByText(i18n.t("roles.preparationStatus.preparing")),
-    ).toBeInTheDocument()
-    expect(within(roleList).getByText(i18n.t("roles.preparationStatus.paused"))).toBeInTheDocument()
+    expect(within(roleList).getAllByText(i18n.t("roles.status.active"))).toHaveLength(2)
   })
 
-  it("shows My roles with saved and archived categories, filtering the visible list locally", async () => {
+  it("shows My roles with active and archived categories, filtering the visible list locally", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("archivedRoles")
-    const savedRole = data.roles.find((role) => role.preparationStatus !== "archived")!
-    const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
+    const activeRole = data.roles.find((role) => role.status === "active")!
+    const archivedRole = data.roles.find((role) => role.status === "archived")!
     renderReadyView(data)
 
     const desktopNavigation = await screen.findByTestId("roles-desktop-navigation")
@@ -142,14 +138,14 @@ describe("RolesView", () => {
     expect(desktopNavigation).not.toHaveTextContent(i18n.t("roles.list.description"))
     expect(
       within(desktopNavigation).getByRole("tab", {
-        name: i18n.t("roles.list.categories.saved", { count: 1 }),
+        name: i18n.t("roles.list.categories.active", { count: 1 }),
       }),
     ).toHaveAttribute("aria-selected", "true")
-    const savedList = within(desktopNavigation).getByRole("list", {
+    const activeList = within(desktopNavigation).getByRole("list", {
       name: i18n.t("roles.list.title"),
     })
-    expect(within(savedList).getByText(savedRole.title)).toBeInTheDocument()
-    expect(within(savedList).queryByText(archivedRole.title)).not.toBeInTheDocument()
+    expect(within(activeList).getByText(activeRole.title)).toBeInTheDocument()
+    expect(within(activeList).queryByText(archivedRole.title)).not.toBeInTheDocument()
 
     await user.click(
       within(desktopNavigation).getByRole("tab", {
@@ -161,14 +157,14 @@ describe("RolesView", () => {
       name: i18n.t("roles.list.title"),
     })
     expect(within(archivedList).getByText(archivedRole.title)).toBeInTheDocument()
-    expect(within(archivedList).queryByText(savedRole.title)).not.toBeInTheDocument()
+    expect(within(archivedList).queryByText(activeRole.title)).not.toBeInTheDocument()
     expect(screen.getByTestId("role-details-card")).toHaveTextContent(archivedRole.title)
   })
 
   it("shows match-score rings only for current or stale analyses and greys archived score indicators", async () => {
     const data = createRolesMockResponse("archivedRoles")
     const currentRole = data.roles.find((role) => role.id === data.currentRoleId)!
-    const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
+    const archivedRole = data.roles.find((role) => role.status === "archived")!
     archivedRole.matchingAnalysis = structuredClone(currentRole.matchingAnalysis)
     renderReadyView(data, { initialSelectedRoleId: archivedRole.id })
 
@@ -180,9 +176,10 @@ describe("RolesView", () => {
 
     expect(scoreRing).toHaveTextContent("78%")
     expect(scoreRing).toHaveAttribute("data-role-status", "archived")
-    expect(
-      within(statusBadges).getByText(i18n.t("roles.preparationStatus.archived")),
-    ).toHaveAttribute("data-role-status", "archived")
+    expect(within(statusBadges).getByText(i18n.t("roles.status.archived"))).toHaveAttribute(
+      "data-role-status",
+      "archived",
+    )
   })
 
   it("keeps the navigation available when the chosen category is empty", async () => {
@@ -205,7 +202,7 @@ describe("RolesView", () => {
 
     await user.click(
       within(desktopNavigation).getByRole("tab", {
-        name: i18n.t("roles.list.categories.saved", { count: 2 }),
+        name: i18n.t("roles.list.categories.active", { count: 2 }),
       }),
     )
     expect(screen.getByTestId("role-details-card")).toBeInTheDocument()
@@ -245,7 +242,7 @@ describe("RolesView", () => {
 
   it("renders an archived role when it is locally selected", async () => {
     const data = createRolesMockResponse("archivedRoles")
-    const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
+    const archivedRole = data.roles.find((role) => role.status === "archived")!
     renderReadyView(data, { initialSelectedRoleId: archivedRole.id })
 
     const archivedButton = await screen.findByRole("button", {
@@ -255,9 +252,7 @@ describe("RolesView", () => {
 
     expect(archivedButton).toHaveAttribute("aria-pressed", "true")
     expect(within(details).getByRole("heading", { name: archivedRole.title })).toBeInTheDocument()
-    expect(
-      within(details).getByText(i18n.t("roles.preparationStatus.archived")),
-    ).toBeInTheDocument()
+    expect(within(details).getByText(i18n.t("roles.status.archived"))).toBeInTheDocument()
   })
 
   it("changes only local selection when a role is clicked", async () => {
@@ -386,10 +381,10 @@ describe("RolesView", () => {
     ).toBeInTheDocument()
   })
 
-  it("keeps saved and archived categories available in the mobile selector", async () => {
+  it("keeps active and archived categories available in the mobile selector", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("archivedRoles")
-    const archivedRole = data.roles.find((role) => role.preparationStatus === "archived")!
+    const archivedRole = data.roles.find((role) => role.status === "archived")!
     const setCurrentTargetRole = vi.fn(async () => data)
     renderReadyView(data, { actions: createActions(data, { setCurrentTargetRole }) })
 
@@ -698,7 +693,7 @@ describe("RolesView", () => {
     expect(actions.recognizeTargetRole).toHaveBeenCalledWith({ sourceType: "url", url })
   })
 
-  it("chooses independent current and preparation actions with the selected role version", async () => {
+  it("sets the selected active role as current with its version", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("multipleRoles")
     const selectedRole = data.roles.find((role) => role.id !== data.currentRoleId)!
@@ -711,13 +706,6 @@ describe("RolesView", () => {
     expect(actions.setCurrentTargetRole).toHaveBeenCalledWith({
       roleId: selectedRole.id,
       version: selectedRole.version,
-    })
-
-    await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.resume") }))
-    expect(actions.updateRolePreparationStatus).toHaveBeenCalledWith({
-      roleId: selectedRole.id,
-      version: selectedRole.version,
-      preparationStatus: "preparing",
     })
   })
 

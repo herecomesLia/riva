@@ -42,7 +42,7 @@ async function getCurrentSetupContext(
 ): Promise<PracticeSetupContext> {
   const currentRoles = rolesResponse ?? (await getRolesPage())
   const targetRoles = currentRoles.roles
-    .filter((role) => role.preparationStatus !== "archived")
+    .filter((role) => role.status !== "archived")
     .map(toPracticeRoleOption)
   const defaultTargetRoleId = targetRoles.some((role) => role.id === currentRoles.currentRoleId)
     ? currentRoles.currentRoleId

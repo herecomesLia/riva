@@ -104,8 +104,8 @@ describe("training entry search application", () => {
 
   it("distinguishes deleted, archived, and prerequisite-unavailable roles", () => {
     const roles = [
-      { id: "active", preparationStatus: "preparing" as const },
-      { id: "archived", preparationStatus: "archived" as const },
+      { id: "active", status: "active" as const },
+      { id: "archived", status: "archived" as const },
     ]
 
     expect(resolveTrainingEntryRoleAvailability(roles, ["active"], "missing")).toEqual({

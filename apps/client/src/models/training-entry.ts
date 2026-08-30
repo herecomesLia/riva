@@ -12,7 +12,7 @@ import type {
   PracticeSetupSelection,
 } from "./practice"
 import type { TrainingRecordQuestionType } from "./training-records"
-import type { TargetRolePreparationStatus } from "./roles"
+import type { TargetRoleStatus } from "./roles"
 
 export type TrainingEntryOrigin = "history"
 
@@ -106,14 +106,14 @@ export function toPracticeQuestionType(
 }
 
 export function resolveTrainingEntryRoleAvailability(
-  roles: Array<{ id: string; preparationStatus: TargetRolePreparationStatus }>,
+  roles: Array<{ id: string; status: TargetRoleStatus }>,
   trainableRoleIds: readonly string[],
   requestedRoleId: string | undefined,
   prerequisitesAvailable = true,
 ): TrainingEntryRoleAvailability {
   const role = roles.find(({ id }) => id === requestedRoleId)
   if (!role) return { status: "unavailable", reason: "targetRoleDeleted" }
-  if (role.preparationStatus === "archived") {
+  if (role.status === "archived") {
     return { status: "unavailable", reason: "targetRoleArchived" }
   }
   if (!prerequisitesAvailable || !trainableRoleIds.includes(role.id)) {

@@ -1062,7 +1062,6 @@ describe("interview mock reset boundaries", () => {
         recruitmentType: "experienced",
         location: "Shanghai",
         experienceRange: { minYears: 3, maxYears: null },
-        preparationStatus: "preparing",
       })
       await vi.runAllTimersAsync()
       const created = await createPromise
@@ -1085,9 +1084,7 @@ describe("interview mock reset boundaries", () => {
 
   it("rejects an archived target role even when submitted directly", async () => {
     resetRolesMockState("archivedRoles")
-    const archivedRole = getRolesMockSnapshot().roles.find(
-      ({ preparationStatus }) => preparationStatus === "archived",
-    )!
+    const archivedRole = getRolesMockSnapshot().roles.find(({ status }) => status === "archived")!
 
     await expect(
       startInterview({

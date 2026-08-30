@@ -20,7 +20,7 @@ import {
 
 export const rolesFixture = createRolesMockResponse("multipleRoles")
 export const targetRoles = rolesFixture.roles
-  .filter((role) => role.preparationStatus !== "archived")
+  .filter((role) => role.status !== "archived")
   .map((role) => ({
     id: role.id,
     title: role.title,

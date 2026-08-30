@@ -16,7 +16,6 @@ export type RoleDetailsActions = {
   delete: () => void
   edit: () => void
   setCurrent: () => void
-  togglePreparationStatus: () => void
   editJobDescription: () => void
   editJobDescriptionAnalysisModule: (field: JobDescriptionAnalysisModuleField) => void
   retryJobDescriptionParsing: () => void

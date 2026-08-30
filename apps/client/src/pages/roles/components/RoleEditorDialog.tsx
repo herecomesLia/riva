@@ -27,7 +27,6 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import type {
-  ActiveTargetRolePreparationStatus,
   CreateTargetRoleInput,
   TargetRole,
   TargetRoleRecruitmentType,
@@ -43,7 +42,6 @@ export type RoleDraft = {
   location: string
   minYears: string
   maxYears: string
-  preparationStatus: ActiveTargetRolePreparationStatus
 }
 
 type RoleEditorDialogProps = {
@@ -69,7 +67,6 @@ const roleDraftSchema = z
     location: z.string(),
     minYears: optionalNonNegativeInteger,
     maxYears: optionalNonNegativeInteger,
-    preparationStatus: z.enum(["preparing", "paused"]),
   })
   .superRefine((value, context) => {
     if (
@@ -178,17 +175,6 @@ export function RoleEditorForm({
           <TextField form={form} label={t("roles.editor.fields.minYears")} name="minYears" number />
           <TextField form={form} label={t("roles.editor.fields.maxYears")} name="maxYears" number />
         </div>
-        {mode === "create" && (
-          <SelectField
-            form={form}
-            label={t("roles.editor.fields.preparationStatus")}
-            name="preparationStatus"
-            options={[
-              ["preparing", t("roles.preparationStatus.preparing")],
-              ["paused", t("roles.preparationStatus.paused")],
-            ]}
-          />
-        )}
       </FieldGroup>
       {saveError && (
         <Alert variant="destructive">
@@ -306,7 +292,6 @@ function createRoleDraft(role: TargetRole | null): RoleDraft {
     location: role?.location ?? "",
     minYears: role?.experienceRange?.minYears?.toString() ?? "",
     maxYears: role?.experienceRange?.maxYears?.toString() ?? "",
-    preparationStatus: role?.preparationStatus === "paused" ? "paused" : "preparing",
   }
 }
 
@@ -323,5 +308,5 @@ function toBasicInput(value: RoleDraft) {
 }
 
 function toCreateInput(value: RoleDraft): CreateTargetRoleInput {
-  return { ...toBasicInput(value), preparationStatus: value.preparationStatus }
+  return toBasicInput(value)
 }

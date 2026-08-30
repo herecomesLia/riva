@@ -17,7 +17,6 @@ import type {
   TargetRoleRecognitionResult,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
-  UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
 
 function realApiUnavailable(): never {
@@ -50,12 +49,6 @@ export function updateTargetRole(input: UpdateTargetRoleInput): Promise<RolesPag
 
 export function setCurrentTargetRole(input: SetCurrentTargetRoleInput): Promise<RolesPageResponse> {
   return env.mock ? rolesMockService.setCurrentTargetRole(input) : realApiUnavailable()
-}
-
-export function updateRolePreparationStatus(
-  input: UpdateTargetRolePreparationStatusInput,
-): Promise<RolesPageResponse> {
-  return env.mock ? rolesMockService.updateRolePreparationStatus(input) : realApiUnavailable()
 }
 
 export function archiveTargetRole(input: ArchiveTargetRoleInput): Promise<RolesPageResponse> {

@@ -16,7 +16,6 @@ function createActions(overrides: Partial<RoleDetailsActions> = {}): RoleDetails
     retryJobDescriptionSynchronization: fn(),
     retryMatchingAnalysisSynchronization: fn(),
     setCurrent: fn(),
-    togglePreparationStatus: fn(),
     editJobDescriptionAnalysisModule: fn(),
     ...overrides,
   }
@@ -28,19 +27,19 @@ const meta = preview.meta({
 })
 
 const readyRole = createRoleStoryResponse("matchingAnalysisCurrent").roles[0]!
-const pausedRole = createRoleStoryResponse("multipleRoles").roles.find(
-  (role) => role.preparationStatus === "paused",
+const activeRole = createRoleStoryResponse("multipleRoles").roles.find(
+  (role) => role.id !== createRoleStoryResponse("multipleRoles").currentRoleId,
 )!
 const archivedRole = createRoleStoryResponse("archivedRoles").roles.find(
-  (role) => role.preparationStatus === "archived",
+  (role) => role.status === "archived",
 )!
 
 export const CompleteRole = meta.story({
   args: { actions: createActions(), isCurrent: true, role: readyRole },
 })
 
-export const Paused = meta.story({
-  args: { actions: createActions(), isCurrent: false, role: pausedRole },
+export const Active = meta.story({
+  args: { actions: createActions(), isCurrent: false, role: activeRole },
 })
 
 export const Archived = meta.story({
@@ -48,19 +47,15 @@ export const Archived = meta.story({
 })
 
 const setCurrent = fn()
-const togglePreparationStatus = fn()
-
 export const NonCurrentActions = meta.story({
   args: {
-    actions: createActions({ setCurrent, togglePreparationStatus }),
+    actions: createActions({ setCurrent }),
     isCurrent: false,
-    role: pausedRole,
+    role: activeRole,
   },
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByRole("button", { name: /设为当前岗位|set as current role/i }))
     await expect(setCurrent).toHaveBeenCalledTimes(1)
-    await userEvent.click(screen.getByRole("button", { name: /继续准备|resume preparation/i }))
-    await expect(togglePreparationStatus).toHaveBeenCalledTimes(1)
   },
 })
 

@@ -13,7 +13,6 @@ import {
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
-  updateRolePreparationStatus,
   updateTargetRole,
 } from "@/services/roles"
 
@@ -54,10 +53,6 @@ export function RolesPage() {
   const updateMutation = useMutation({ mutationFn: updateTargetRole, onSuccess: setRolesResponse })
   const setCurrentMutation = useMutation({
     mutationFn: setCurrentTargetRole,
-    onSuccess: setRolesResponse,
-  })
-  const preparationMutation = useMutation({
-    mutationFn: updateRolePreparationStatus,
     onSuccess: setRolesResponse,
   })
   const archiveMutation = useMutation({
@@ -133,7 +128,6 @@ export function RolesPage() {
       clearMatchingAnalysisSynchronizationError(input.roleId)
       return response
     },
-    updateRolePreparationStatus: (input) => runMutation(preparationMutation.mutateAsync, input),
     updateTargetRole: (input) => runMutation(updateMutation.mutateAsync, input),
   }
 

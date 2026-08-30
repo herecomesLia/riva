@@ -16,21 +16,15 @@ export function RoleStatusBadges({ isCurrent, role }: { isCurrent: boolean; role
       )}
       <Badge
         className={cn(
-          role.preparationStatus === "archived"
+          role.status === "archived"
             ? "border-border bg-muted text-muted-foreground"
             : "border-primary/20 bg-primary/10 text-primary",
         )}
-        data-role-status={role.preparationStatus}
-        variant={preparationStatusVariant[role.preparationStatus]}
+        data-role-status={role.status}
+        variant="outline"
       >
-        {t(`roles.preparationStatus.${role.preparationStatus}`)}
+        {t(`roles.status.${role.status}`)}
       </Badge>
     </div>
   )
 }
-
-const preparationStatusVariant = {
-  preparing: "outline",
-  paused: "outline",
-  archived: "outline",
-} as const

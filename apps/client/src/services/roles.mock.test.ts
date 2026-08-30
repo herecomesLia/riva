@@ -14,7 +14,6 @@ import {
   recognizeTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
-  updateRolePreparationStatus,
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
@@ -26,7 +25,6 @@ const newRole = {
   recruitmentType: "experienced" as const,
   location: "Remote",
   experienceRange: { minYears: 4, maxYears: null },
-  preparationStatus: "preparing" as const,
 }
 
 beforeEach(() => {
@@ -101,7 +99,7 @@ describe("roles stateful mock service", () => {
 
     expect(response.currentRoleId).toBe("role_created_1")
     expect(response.roles).toHaveLength(1)
-    expect(response.roles[0]).toMatchObject({ version: 1 })
+    expect(response.roles[0]).toMatchObject({ status: "active", version: 1 })
     expect(response.roles[0]).not.toHaveProperty("isCurrent")
   })
 
@@ -171,41 +169,6 @@ describe("roles stateful mock service", () => {
     expect(response.roles.every((role) => !("isCurrent" in role))).toBe(true)
   })
 
-  it("pauses and resumes preparation without changing the current role", async () => {
-    const initial = await getCurrentRole()
-
-    const paused = await settle(
-      updateRolePreparationStatus({
-        roleId: initial.id,
-        version: initial.version,
-        preparationStatus: "paused",
-      }),
-    )
-    const pausedRole = paused.roles.find((role) => role.id === initial.id)!
-
-    expect(paused).toMatchObject({ currentRoleId: initial.id })
-    expect(paused.profileContext).toBeDefined()
-    expect(pausedRole).toMatchObject({
-      preparationStatus: "paused",
-      version: initial.version + 1,
-    })
-
-    const resumed = await settle(
-      updateRolePreparationStatus({
-        roleId: pausedRole.id,
-        version: pausedRole.version,
-        preparationStatus: "preparing",
-      }),
-    )
-    const resumedRole = resumed.roles.find((role) => role.id === initial.id)!
-
-    expect(resumed.currentRoleId).toBe(initial.id)
-    expect(resumedRole).toMatchObject({
-      preparationStatus: "preparing",
-      version: pausedRole.version + 1,
-    })
-  })
-
   it("atomically switches the current role", async () => {
     resetRolesMockState("noRoles")
     const first = await settle(createTargetRole(newRole))
@@ -225,7 +188,7 @@ describe("roles stateful mock service", () => {
     )
   })
 
-  it("archives the current role and promotes a preparing fallback", async () => {
+  it("archives the current role and promotes an active fallback", async () => {
     resetRolesMockState("noRoles")
     const first = await settle(createTargetRole(newRole))
     const firstRole = first.roles[0]!
@@ -238,29 +201,28 @@ describe("roles stateful mock service", () => {
 
     expect(archived.currentRoleId).toBe(secondRole.id)
     expect(archived.roles.find((role) => role.id === firstRole.id)).toMatchObject({
-      preparationStatus: "archived",
+      status: "archived",
     })
   })
 
-  it("leaves no current role when archiving the current role with only paused roles left", async () => {
+  it("promotes another active role when archiving the current role", async () => {
     resetRolesMockState("multipleRoles")
     const currentRole = await getCurrentRole()
 
     const archived = await settle(
       archiveTargetRole({ roleId: currentRole.id, version: currentRole.version }),
     )
-    const remainingRoles = archived.roles.filter((role) => role.preparationStatus !== "archived")
+    const remainingRoles = archived.roles.filter((role) => role.status === "active")
 
     expect(remainingRoles.length).toBeGreaterThan(0)
-    expect(remainingRoles.every((role) => role.preparationStatus === "paused")).toBe(true)
-    expect(archived.currentRoleId).toBeNull()
+    expect(archived.currentRoleId).toBe(remainingRoles[0]!.id)
     expect(archived.roles.every((role) => !("isCurrent" in role))).toBe(true)
   })
 
   it("rejects setting an archived role as current without partial writes", async () => {
     resetRolesMockState("archivedRoles")
     const before = await settle(getRolesPage())
-    const archivedRole = before.roles.find((role) => role.preparationStatus === "archived")!
+    const archivedRole = before.roles.find((role) => role.status === "archived")!
     const promise = setCurrentTargetRole({
       roleId: archivedRole.id,
       version: archivedRole.version,
@@ -273,7 +235,7 @@ describe("roles stateful mock service", () => {
     expect(after).toEqual(before)
   })
 
-  it("deletes the current role and promotes a preparing fallback", async () => {
+  it("deletes the current role and promotes an active fallback", async () => {
     resetRolesMockState("noRoles")
     const first = await settle(createTargetRole(newRole))
     const firstRole = first.roles[0]!
@@ -288,7 +250,7 @@ describe("roles stateful mock service", () => {
     expect(deleted.roles.map((role) => role.id)).not.toContain(firstRole.id)
   })
 
-  it("leaves no current role when deleting the current role with only paused roles left", async () => {
+  it("promotes another active role when deleting the current role", async () => {
     resetRolesMockState("multipleRoles")
     const currentRole = await getCurrentRole()
 
@@ -297,8 +259,8 @@ describe("roles stateful mock service", () => {
     )
 
     expect(deleted.roles.length).toBeGreaterThan(0)
-    expect(deleted.roles.every((role) => role.preparationStatus === "paused")).toBe(true)
-    expect(deleted.currentRoleId).toBeNull()
+    expect(deleted.roles.every((role) => role.status === "active")).toBe(true)
+    expect(deleted.currentRoleId).toBe(deleted.roles[0]!.id)
     expect(deleted.roles.every((role) => !("isCurrent" in role))).toBe(true)
   })
 

@@ -26,9 +26,9 @@ export function RolesList({
   onSelectRole: (roleId: string) => void
 }) {
   const { t } = useTranslation()
-  const savedRoles = getRolesForCategory(roles, "saved")
+  const activeRoles = getRolesForCategory(roles, "active")
   const archivedRoles = getRolesForCategory(roles, "archived")
-  const visibleRoles = category === "saved" ? savedRoles : archivedRoles
+  const visibleRoles = category === "active" ? activeRoles : archivedRoles
 
   return (
     <Card
@@ -46,14 +46,14 @@ export function RolesList({
           role="tablist"
         >
           <Button
-            aria-selected={category === "saved"}
+            aria-selected={category === "active"}
             className="h-6 rounded-md px-2 text-[11px] font-medium text-muted-foreground hover:bg-primary/[0.08] hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
-            data-active={category === "saved"}
-            onClick={() => onCategoryChange("saved")}
+            data-active={category === "active"}
+            onClick={() => onCategoryChange("active")}
             role="tab"
             variant="ghost"
           >
-            {t("roles.list.categories.saved", { count: savedRoles.length })}
+            {t("roles.list.categories.active", { count: activeRoles.length })}
           </Button>
           <Button
             aria-selected={category === "archived"}
@@ -105,7 +105,7 @@ function RoleListItem({
   selected: boolean
 }) {
   const { t } = useTranslation()
-  const isArchived = role.preparationStatus === "archived"
+  const isArchived = role.status === "archived"
   const score = getRoleMatchScore(role)
 
   return (

@@ -98,7 +98,7 @@ export function JobDescriptionCard({
         {jobDescription.status === "ready" && role.jobDescriptionAnalysis && (
           <ReadyState
             analysis={role.jobDescriptionAnalysis}
-            canEditAnalysis={role.preparationStatus !== "archived"}
+            canEditAnalysis={role.status !== "archived"}
             onEditAnalysisModule={onEditAnalysisModule}
           />
         )}

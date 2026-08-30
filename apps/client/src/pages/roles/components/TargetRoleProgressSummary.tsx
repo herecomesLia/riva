@@ -32,10 +32,8 @@ export function TargetRoleProgressSummary({
             label={t("roles.summary.roleStatus")}
             value={
               isCurrent
-                ? `${t("roles.badges.current")} · ${t(
-                    `roles.preparationStatus.${role.preparationStatus}`,
-                  )}`
-                : t(`roles.preparationStatus.${role.preparationStatus}`)
+                ? `${t("roles.badges.current")} · ${t(`roles.status.${role.status}`)}`
+                : t(`roles.status.${role.status}`)
             }
           />
           <SummaryRow

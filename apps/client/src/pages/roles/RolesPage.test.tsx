@@ -21,7 +21,6 @@ import {
   recognizeTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
-  updateRolePreparationStatus,
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
@@ -41,7 +40,6 @@ vi.mock("@/services/roles", async (importOriginal) => ({
   recognizeTargetRole: vi.fn(),
   setCurrentTargetRole: vi.fn(),
   startJobDescriptionParsing: vi.fn(),
-  updateRolePreparationStatus: vi.fn(),
   updateJobDescriptionAnalysisModule: vi.fn(),
   updateTargetRole: vi.fn(),
 }))
@@ -69,7 +67,6 @@ const mutationMocks = [
   saveJobDescription,
   setCurrentTargetRole,
   startJobDescriptionParsing,
-  updateRolePreparationStatus,
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 ] as const
@@ -207,7 +204,7 @@ describe("RolesPage", () => {
     const initial = createRolesMockResponse("multipleRoles")
     const current = initial.roles.find((role) => role.id === initial.currentRoleId)!
     const fallback = initial.roles.find((role) => role.id !== initial.currentRoleId)!
-    fallback.preparationStatus = "preparing"
+    fallback.status = "active"
     const response = structuredClone(initial)
     response.roles = response.roles.filter((role) => role.id !== current.id)
     response.currentRoleId = fallback.id

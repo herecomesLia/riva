@@ -20,7 +20,7 @@ const selectedRole = multipleRolesResponse.roles.find(
 
 export const SavedRoles = meta.story({
   args: {
-    category: "saved",
+    category: "active",
     currentRoleId: singleRoleResponse.currentRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
@@ -31,7 +31,7 @@ export const SavedRoles = meta.story({
 
 export const MixedRoles = meta.story({
   args: {
-    category: "saved",
+    category: "active",
     currentRoleId: multipleRolesResponse.currentRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
@@ -44,7 +44,7 @@ const onSelectRole = fn()
 
 export const SelectedRoleDifferentFromCurrent = meta.story({
   args: {
-    category: "saved",
+    category: "active",
     currentRoleId: multipleRolesResponse.currentRoleId,
     onCategoryChange: fn(),
     onSelectRole,
@@ -66,9 +66,7 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
 })
 
 const archivedRolesResponse = createRoleStoryResponse("archivedRoles")
-const archivedRole = archivedRolesResponse.roles.find(
-  (role) => role.preparationStatus === "archived",
-)!
+const archivedRole = archivedRolesResponse.roles.find((role) => role.status === "archived")!
 
 export const ArchivedRoles = meta.story({
   args: {
@@ -83,7 +81,7 @@ export const ArchivedRoles = meta.story({
 
 export const ScrollableRolesList = meta.story({
   args: {
-    category: "saved",
+    category: "active",
     currentRoleId: multipleRolesResponse.currentRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
@@ -99,7 +97,7 @@ roleWithoutScore.title = "Platform Product Manager"
 
 export const RolesWithAndWithoutMatchScore = meta.story({
   args: {
-    category: "saved",
+    category: "active",
     currentRoleId: scoreResponse.currentRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),

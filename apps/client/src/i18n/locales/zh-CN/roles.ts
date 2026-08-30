@@ -1,13 +1,11 @@
 export const roles = {
   title: "目标岗位",
-  description: "集中管理正在准备和已归档的岗位，并查看 JD 与匹配分析状态。",
+  description: "集中管理使用中和已归档的岗位，并查看 JD 与匹配分析状态。",
   actions: {
     add: "添加目标岗位",
     archive: "归档岗位",
     delete: "删除岗位",
     edit: "编辑信息",
-    pause: "暂停准备",
-    resume: "继续准备",
     retry: "重新加载",
     setCurrent: "设为当前岗位",
   },
@@ -88,7 +86,6 @@ export const roles = {
       location: "地点",
       minYears: "最低经验年限",
       maxYears: "最高经验年限",
-      preparationStatus: "准备状态",
     },
     options: { unspecified: "未填写" },
     validation: {
@@ -261,12 +258,12 @@ export const roles = {
     description: "选择岗位可查看详情，不会改变当前默认岗位。",
     categoryLabel: "岗位分类",
     categories: {
-      saved: "已保存 ({{count}})",
-      archived: "归档 ({{count}})",
+      active: "使用中 ({{count}})",
+      archived: "已归档 ({{count}})",
     },
     empty: {
-      saved: "暂时没有已保存的岗位。",
-      archived: "暂时没有归档岗位。",
+      active: "暂时没有使用中的岗位。",
+      archived: "暂时没有已归档的岗位。",
     },
     matchScore: "匹配度 {{score}}%",
   },
@@ -311,9 +308,8 @@ export const roles = {
     current: "当前岗位",
     selected: "正在查看",
   },
-  preparationStatus: {
-    preparing: "准备中",
-    paused: "已暂停",
+  status: {
+    active: "使用中",
     archived: "已归档",
   },
   recruitmentType: {

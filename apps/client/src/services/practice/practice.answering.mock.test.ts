@@ -252,7 +252,6 @@ describe("practice stateful mock service: answering", () => {
         recruitmentType: "experienced",
         location: null,
         experienceRange: null,
-        preparationStatus: "preparing",
       }),
     )
     const createdRole = roles.roles.find((role) => role.title === "Backend Engineer")
@@ -297,7 +296,6 @@ describe("practice stateful mock service: answering", () => {
         recruitmentType: null,
         location: null,
         experienceRange: null,
-        preparationStatus: "preparing",
       }),
     )
     const createdRole = roles.roles.find((role) => role.title === "HR Business Partner")

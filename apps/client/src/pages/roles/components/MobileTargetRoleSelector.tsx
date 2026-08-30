@@ -30,7 +30,7 @@ export function MobileTargetRoleSelector({
   selectedRole: TargetRole | null
 }) {
   const { t } = useTranslation()
-  const savedCount = getRolesForCategory(roles, "saved").length
+  const activeCount = getRolesForCategory(roles, "active").length
   const archivedCount = getRolesForCategory(roles, "archived").length
   const visibleRoles = getRolesForCategory(roles, category)
 
@@ -43,14 +43,14 @@ export function MobileTargetRoleSelector({
         role="tablist"
       >
         <Button
-          aria-selected={category === "saved"}
+          aria-selected={category === "active"}
           className="h-6 rounded-md px-2 text-[11px] font-medium text-muted-foreground hover:bg-primary/[0.08] hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
-          data-active={category === "saved"}
-          onClick={() => onCategoryChange("saved")}
+          data-active={category === "active"}
+          onClick={() => onCategoryChange("active")}
           role="tab"
           variant="ghost"
         >
-          {t("roles.list.categories.saved", { count: savedCount })}
+          {t("roles.list.categories.active", { count: activeCount })}
         </Button>
         <Button
           aria-selected={category === "archived"}

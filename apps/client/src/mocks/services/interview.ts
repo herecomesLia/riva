@@ -358,7 +358,7 @@ export async function startInterview(
   const setup = createInterviewSetupResponseMock(rolesSnapshot, profileSnapshot)
   const targetRole = rolesSnapshot.roles.find(({ id }) => id === input.targetRoleId)
   if (targetRole === undefined) throw new Error("Interview target role does not exist.")
-  if (targetRole.preparationStatus === "archived") {
+  if (targetRole.status === "archived") {
     throw new Error("Interview target role is archived.")
   }
   const supportedRounds =

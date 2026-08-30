@@ -22,9 +22,7 @@ export function createInterviewSetupResponseMock(
   rolesResponse: RolesPageResponse,
   profileSnapshot: JobProfileSnapshot,
 ): InterviewSetupResponse {
-  const domainRoles = rolesResponse.roles.filter(
-    ({ preparationStatus }) => preparationStatus !== "archived",
-  )
+  const domainRoles = rolesResponse.roles.filter(({ status }) => status !== "archived")
   const trainableRoles = domainRoles.filter(
     ({ id, jobDescription }) =>
       id in interviewSetupConfigurationMock.supportedRoundsByTargetRoleId &&

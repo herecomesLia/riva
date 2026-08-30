@@ -1,8 +1,6 @@
 export type TargetRoleRecruitmentType = "campus" | "experienced"
 
-export type TargetRolePreparationStatus = "preparing" | "paused" | "archived"
-
-export type ActiveTargetRolePreparationStatus = Exclude<TargetRolePreparationStatus, "archived">
+export type TargetRoleStatus = "active" | "archived"
 
 export type TargetRoleExperienceRange = {
   minYears: number | null
@@ -149,8 +147,8 @@ type TargetRoleBase = {
   recruitmentType: TargetRoleRecruitmentType | null
   location: string | null
   experienceRange: TargetRoleExperienceRange | null
-  /** Whether the user is actively preparing for this saved role. */
-  preparationStatus: TargetRolePreparationStatus
+  /** Whether the saved role is available for active use or retained as an archive. */
+  status: TargetRoleStatus
   createdAt: string
   updatedAt: string
   /** Increments for every persisted target-role mutation. */
@@ -207,8 +205,7 @@ export type RolesPageResponse = {
   roles: TargetRole[]
   /**
    * The default role used by Dashboard and training, or `null` when no default exists.
-   * A non-null ID must identify an unarchived role in `roles`. The current role may be
-   * either preparing or paused.
+   * A non-null ID must identify an active role in `roles`.
    */
   currentRoleId: string | null
   profileContext: ProfileContext
@@ -220,7 +217,6 @@ export type CreateTargetRoleInput = {
   recruitmentType: TargetRoleRecruitmentType | null
   location: string | null
   experienceRange: TargetRoleExperienceRange | null
-  preparationStatus: ActiveTargetRolePreparationStatus
 }
 
 export type TargetRoleImportSourceType = "text" | "image" | "url"
@@ -244,7 +240,7 @@ export type TargetRoleRecognitionResult = {
   sourceType: TargetRoleImportSourceType
   sourceLabel: string
   rawText: string
-  suggestedRole: Omit<CreateTargetRoleInput, "preparationStatus">
+  suggestedRole: CreateTargetRoleInput
 }
 
 export type CreateTargetRoleFromRecognitionInput = CreateTargetRoleInput & {
@@ -265,12 +261,6 @@ export type UpdateTargetRoleInput = {
 export type SetCurrentTargetRoleInput = {
   roleId: string
   version: number
-}
-
-export type UpdateTargetRolePreparationStatusInput = {
-  roleId: string
-  version: number
-  preparationStatus: ActiveTargetRolePreparationStatus
 }
 
 export type ArchiveTargetRoleInput = {

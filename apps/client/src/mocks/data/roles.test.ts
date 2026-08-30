@@ -124,7 +124,7 @@ function expectConsistentRolesResponse(response: RolesPageResponse) {
   if (response.currentRoleId !== null) {
     const currentRole = response.roles.find((role) => role.id === response.currentRoleId)
     expect(currentRole).toBeDefined()
-    expect(currentRole?.preparationStatus).not.toBe("archived")
+    expect(currentRole?.status).toBe("active")
   }
 
   for (const role of response.roles) {
@@ -241,12 +241,12 @@ describe("roles mock scenarios", () => {
     expect(response.roles[0]?.matchingAnalysis).toBeNull()
   })
 
-  it("keeps paused roles without an automatically promoted current role", () => {
+  it("keeps active roles without inventing a current role", () => {
     const response = createRolesMockResponse("rolesWithoutCurrent")
-    const activeRoles = response.roles.filter((role) => role.preparationStatus !== "archived")
+    const activeRoles = response.roles.filter((role) => role.status === "active")
 
     expect(activeRoles.length).toBeGreaterThan(0)
-    expect(activeRoles.every((role) => role.preparationStatus === "paused")).toBe(true)
+    expect(activeRoles.every((role) => role.status === "active")).toBe(true)
     expect(response.currentRoleId).toBeNull()
   })
 

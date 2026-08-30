@@ -30,7 +30,6 @@ import type {
   StartOrRetryJobDescriptionParsingInput,
   TargetRoleRecognitionResult,
   UpdateTargetRoleInput,
-  UpdateTargetRolePreparationStatusInput,
   UpdateJobDescriptionAnalysisModuleInput,
 } from "@/models/roles"
 import type { Loadable } from "@/types"
@@ -75,9 +74,6 @@ export type RolesViewActions = {
   recognizeTargetRole: (input: RecognizeTargetRoleInput) => Promise<TargetRoleRecognitionResult>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
-  updateRolePreparationStatus: (
-    input: UpdateTargetRolePreparationStatusInput,
-  ) => Promise<RolesPageResponse>
   updateJobDescriptionAnalysisModule: (
     input: UpdateJobDescriptionAnalysisModuleInput,
   ) => Promise<RolesPageResponse>
@@ -151,7 +147,7 @@ function RolesReadyView({
   const initiallySelectedRole = data.roles.find((role) => role.id === defaultSelectedRoleId)
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(defaultSelectedRoleId)
   const [roleCategory, setRoleCategory] = useState<TargetRoleListCategory>(
-    initiallySelectedRole?.preparationStatus === "archived" ? "archived" : "saved",
+    initiallySelectedRole?.status === "archived" ? "archived" : "active",
   )
   const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
   const [editorMode, setEditorMode] = useState<"edit" | null>(null)
@@ -340,17 +336,6 @@ function RolesReadyView({
                               actions.setCurrentTargetRole({
                                 roleId: selectedRole.id,
                                 version: selectedRole.version,
-                              }),
-                            ),
-                          togglePreparationStatus: () =>
-                            void runAction(() =>
-                              actions.updateRolePreparationStatus({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                                preparationStatus:
-                                  selectedRole.preparationStatus === "preparing"
-                                    ? "paused"
-                                    : "preparing",
                               }),
                             ),
                         }

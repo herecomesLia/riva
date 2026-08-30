@@ -24,7 +24,6 @@ import type {
   TargetRoleRecognitionResult,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
-  UpdateTargetRolePreparationStatusInput,
 } from "@/models/roles"
 
 function copy<T>(value: T): T {
@@ -145,10 +144,7 @@ function isReadyTargetRole(role: TargetRole): role is ReadyTargetRole {
 }
 
 function resolveFallbackCurrentRoleId(roles: TargetRole[], excludedRoleId?: string) {
-  return (
-    roles.find((role) => role.id !== excludedRoleId && role.preparationStatus === "preparing")
-      ?.id ?? null
-  )
+  return roles.find((role) => role.id !== excludedRoleId && role.status === "active")?.id ?? null
 }
 
 function completeJobDescriptionParsing(role: TargetRole): TargetRole {
@@ -238,7 +234,7 @@ function createRole(
     recruitmentType: input.recruitmentType,
     location: input.location,
     experienceRange: input.experienceRange,
-    preparationStatus: input.preparationStatus,
+    status: "active" as const,
     createdAt,
     updatedAt: createdAt,
     version: 1,
@@ -392,7 +388,7 @@ export async function setCurrentTargetRole(
   await waitForMockDelay()
   const role = requireRole(input.roleId)
   requireCurrentVersion(role, input.version)
-  if (role.preparationStatus === "archived") {
+  if (role.status === "archived") {
     throw new Error("An archived target role cannot be current.")
   }
 
@@ -400,20 +396,6 @@ export async function setCurrentTargetRole(
     ...mockResponse,
     currentRoleId: role.id,
   })
-}
-
-export async function updateRolePreparationStatus(
-  input: UpdateTargetRolePreparationStatusInput,
-): Promise<RolesPageResponse> {
-  await waitForMockDelay()
-  const role = requireRole(input.roleId)
-  requireCurrentVersion(role, input.version)
-  const updatedRole: TargetRole = {
-    ...role,
-    ...nextRoleVersion(role),
-    preparationStatus: input.preparationStatus,
-  }
-  return setMockResponse(replaceRole(updatedRole))
 }
 
 export async function archiveTargetRole(input: ArchiveTargetRoleInput): Promise<RolesPageResponse> {
@@ -424,7 +406,7 @@ export async function archiveTargetRole(input: ArchiveTargetRoleInput): Promise<
   const archivedRole: TargetRole = {
     ...role,
     ...nextRoleVersion(role),
-    preparationStatus: "archived",
+    status: "archived",
   }
   const rolesAfterArchive = mockResponse.roles.map((candidate) =>
     candidate.id === role.id ? archivedRole : candidate,

@@ -1,14 +1,11 @@
 export const roles = {
   title: "Target roles",
-  description:
-    "Manage roles you are preparing for or have archived, and review JD and match-analysis status.",
+  description: "Manage active and archived roles, and review JD and match-analysis status.",
   actions: {
     add: "Add target role",
     archive: "Archive role",
     delete: "Delete role",
     edit: "Edit details",
-    pause: "Pause preparation",
-    resume: "Resume preparation",
     retry: "Reload",
     setCurrent: "Set as current role",
   },
@@ -94,7 +91,6 @@ export const roles = {
       location: "Location",
       minYears: "Minimum years of experience",
       maxYears: "Maximum years of experience",
-      preparationStatus: "Preparation status",
     },
     options: { unspecified: "Not specified" },
     validation: {
@@ -277,11 +273,11 @@ export const roles = {
     description: "Selecting a role shows its details without changing the current default role.",
     categoryLabel: "Role category",
     categories: {
-      saved: "Saved ({{count}})",
+      active: "Active ({{count}})",
       archived: "Archived ({{count}})",
     },
     empty: {
-      saved: "No saved roles yet.",
+      active: "No active roles yet.",
       archived: "No archived roles yet.",
     },
     matchScore: "Match score {{score}}%",
@@ -327,9 +323,8 @@ export const roles = {
     current: "Current role",
     selected: "Viewing",
   },
-  preparationStatus: {
-    preparing: "Preparing",
-    paused: "Paused",
+  status: {
+    active: "Active",
     archived: "Archived",
   },
   recruitmentType: {

@@ -63,7 +63,7 @@ export const NoCurrentRole = meta.story({
 })
 
 const archivedRoles = createRoleStoryResponse("archivedRoles")
-const archivedRole = archivedRoles.roles.find((role) => role.preparationStatus === "archived")!
+const archivedRole = archivedRoles.roles.find((role) => role.status === "archived")!
 
 export const ArchivedRoleSelected = meta.story({
   args: {

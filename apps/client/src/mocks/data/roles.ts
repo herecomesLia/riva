@@ -31,7 +31,7 @@ function createRoleBase(
     recruitmentType: "experienced",
     location: "Shanghai",
     experienceRange: { minYears: 5, maxYears: null },
-    preparationStatus: "preparing",
+    status: "active",
     createdAt: "2026-07-01T09:00:00.000Z",
     updatedAt: "2026-07-14T09:00:00.000Z",
     version: 4,
@@ -207,7 +207,7 @@ const rolesMockScenarios = {
       createMissingJobDescriptionRole("role_product_manager_meituan", "Product Manager", {
         company: "Meituan",
         location: "Beijing",
-        preparationStatus: "paused",
+        status: "active",
       }),
     ],
     currentRoleId: "role_frontend_bytedance",
@@ -224,7 +224,7 @@ const rolesMockScenarios = {
       createReadyJobDescriptionRole("role_product_manager_meituan", "Product Manager", 2, null, {
         company: "Meituan",
         location: "Beijing",
-        preparationStatus: "paused",
+        status: "active",
       }),
     ],
     currentRoleId: "role_frontend_bytedance",
@@ -236,7 +236,7 @@ const rolesMockScenarios = {
       createReadyJobDescriptionRole("role_product_manager_meituan", "Product Manager", 2, null, {
         company: "Meituan",
         location: "Beijing",
-        preparationStatus: "paused",
+        status: "active",
       }),
     ],
     currentRoleId: "role_frontend_bytedance",
@@ -248,7 +248,7 @@ const rolesMockScenarios = {
       createMissingJobDescriptionRole("role_product_manager_meituan", "Product Manager", {
         company: "Meituan",
         location: "Beijing",
-        preparationStatus: "paused",
+        status: "active",
       }),
     ],
     currentRoleId: "role_frontend_bytedance",
@@ -261,12 +261,12 @@ const rolesMockScenarios = {
         "Senior Frontend Engineer",
         4,
         null,
-        { preparationStatus: "paused" },
+        { status: "active" },
       ),
       createMissingJobDescriptionRole("role_product_manager_meituan", "Product Manager", {
         company: "Meituan",
         location: "Beijing",
-        preparationStatus: "paused",
+        status: "active",
       }),
     ],
     currentRoleId: null,
@@ -374,7 +374,7 @@ const rolesMockScenarios = {
       ),
       createReadyJobDescriptionRole("role_frontend_meituan", "Frontend Engineer", 2, null, {
         company: "Meituan",
-        preparationStatus: "archived",
+        status: "archived",
         updatedAt: "2026-06-20T11:00:00.000Z",
       }),
     ],
