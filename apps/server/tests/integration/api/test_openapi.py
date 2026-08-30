@@ -5,11 +5,16 @@ Do not test FastAPI/Pydantic defaults, generated metadata, or full OpenAPI snaps
 Prefer invariant-based checks over endpoint-by-endpoint duplication.
 """
 
+import re
+from collections.abc import Iterator
+from typing import Any
+
 from riva.core.app import create_app
 from tests.support.settings import make_test_settings
 
 ERROR_RESPONSE_REF = "#/components/schemas/ErrorResponse"
 HTTP_METHODS = {"delete", "get", "head", "options", "patch", "post", "put", "trace"}
+OPERATION_ID_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 # Representative composition cases, not an exhaustive endpoint inventory.
 EXPECTED_ERROR_RESPONSES = {
@@ -22,6 +27,28 @@ EXPECTED_ERROR_RESPONSES = {
 ERROR_RESPONSE_EXCEPTIONS = {
     ("/api/health", "get", "503"): "#/components/schemas/HealthResponse",
 }
+
+
+def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    for path_item in schema["paths"].values():
+        for method, operation in path_item.items():
+            if method in HTTP_METHODS:
+                yield operation
+
+
+def test_operation_ids_are_codegen_safe() -> None:
+    schema = create_app().openapi()
+    operation_ids = [
+        operation.get("operationId") for operation in _iter_operations(schema)
+    ]
+
+    assert all(operation_ids)
+    assert len(operation_ids) == len(set(operation_ids))
+    assert all(
+        OPERATION_ID_PATTERN.fullmatch(operation_id)
+        for operation_id in operation_ids
+        if operation_id is not None
+    )
 
 
 def test_router_response_composition_preserves_declared_errors() -> None:
