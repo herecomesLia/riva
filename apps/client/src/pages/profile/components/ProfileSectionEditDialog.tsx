@@ -43,7 +43,7 @@ export function ProfileSectionEditDialog({
         {section && (
           <>
             <DialogHeader className="border-b px-6 py-5 pr-14">
-              <DialogTitle className="text-xl font-semibold leading-tight">
+              <DialogTitle className="text-xl font-medium leading-tight">
                 {t("profile.editor.dialogTitle", {
                   section: t(`profile.sections.${section}`),
                 })}

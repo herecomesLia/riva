@@ -95,11 +95,7 @@ function expectFixedJobDescriptionEditorLayout(dialog: HTMLElement, scrollAreaTe
     "py-5",
     "pr-14",
   )
-  expect(within(dialog).getByRole("heading")).toHaveClass(
-    "text-xl",
-    "font-semibold",
-    "leading-tight",
-  )
+  expect(within(dialog).getByRole("heading")).toHaveClass("text-xl", "font-medium", "leading-tight")
   expect(within(dialog).getByTestId(scrollAreaTestId)).toHaveClass(
     "min-h-0",
     "overflow-y-auto",

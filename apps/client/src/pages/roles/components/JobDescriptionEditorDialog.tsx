@@ -43,7 +43,7 @@ export function JobDescriptionEditorDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="border-b px-6 py-5 pr-14">
-          <DialogTitle className="text-xl font-semibold leading-tight">
+          <DialogTitle className="text-xl font-medium leading-tight">
             {t(
               role?.jobDescription.status === "missing"
                 ? "roles.jd.editor.addTitle"

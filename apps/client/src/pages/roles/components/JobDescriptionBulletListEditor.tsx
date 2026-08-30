@@ -107,7 +107,7 @@ export function JobDescriptionBulletListEditor({
       <Dialog onOpenChange={(open) => !open && closePasteDialog()} open={isPasteDialogOpen}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
           <DialogHeader className="border-b px-6 py-5 pr-14">
-            <DialogTitle className="text-xl font-semibold leading-tight">
+            <DialogTitle className="text-xl font-medium leading-tight">
               {isPreviewing
                 ? t("roles.jd.analysisEditor.organizedResult")
                 : t("roles.jd.analysisEditor.pasteContent")}

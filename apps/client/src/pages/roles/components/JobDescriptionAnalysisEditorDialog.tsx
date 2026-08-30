@@ -149,7 +149,7 @@ function JobDescriptionAnalysisEditorForm({
   return (
     <>
       <DialogHeader className="border-b px-6 py-5 pr-14">
-        <DialogTitle className="text-xl font-semibold leading-tight">
+        <DialogTitle className="text-xl font-medium leading-tight">
           {t("roles.jd.actions.editModuleLabel", { module: title })}
         </DialogTitle>
         <DialogDescription>{t(getDescriptionKey(field))}</DialogDescription>

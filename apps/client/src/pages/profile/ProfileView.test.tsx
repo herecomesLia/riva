@@ -397,12 +397,12 @@ describe("ProfileView", () => {
 
     expect(within(section).getByText("Fudan University")).toBeInTheDocument()
     expect(
-      within(dialog).getByText(
-        i18n.t("profile.editor.dialogTitle", {
+      within(dialog).getByRole("heading", {
+        name: i18n.t("profile.editor.dialogTitle", {
           section: i18n.t("profile.sections.education"),
         }),
-      ),
-    ).toBeInTheDocument()
+      }),
+    ).toHaveClass("text-xl", "font-medium", "leading-tight")
     expect(within(dialog).getByTestId("profile-editor-education")).toBeInTheDocument()
     expect(snapshot).toEqual(profileResponseMock)
   })
