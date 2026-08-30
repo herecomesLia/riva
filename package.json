@@ -10,6 +10,7 @@
     "client:preview": "pnpm --filter @riva/client --fail-if-no-match preview",
     "client:test": "pnpm --filter @riva/client --fail-if-no-match test",
     "client:test:all": "pnpm --filter @riva/client --fail-if-no-match test:all",
+    "client:api:generate": "pnpm --filter @riva/client --fail-if-no-match api:generate",
     "client:storybook": "pnpm --filter @riva/client --fail-if-no-match storybook",
     "client:storybook:build": "pnpm --filter @riva/client --fail-if-no-match build-storybook",
     "format:prettier": "prettier --write --ignore-unknown .",
@@ -20,13 +21,6 @@
     "format": "pnpm run format:prettier && pnpm run server:format",
     "format:check": "pnpm run format:prettier:check && pnpm run server:format:check",
     "prepare": "husky"
-  },
-  "lint-staged": {
-    "*": "prettier --write --ignore-unknown",
-    "apps/server/**/*.py": [
-      "uv run --locked --directory apps/server ruff check --select I --fix",
-      "uv run --locked --directory apps/server ruff format"
-    ]
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

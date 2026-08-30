@@ -1,0 +1,4 @@
+export { getAuthMock } from "./auth/auth.msw"
+export { getCareerProfileMock } from "./career-profile/career-profile.msw"
+export { getHealthMock } from "./health/health.msw"
+export { getUsersMock } from "./users/users.msw"

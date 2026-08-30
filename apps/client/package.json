@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:mock": "cross-env MOCK=true vite",
+    "api:generate": "orval --config ./orval.config.ts --fail-on-warnings",
     "build": "tsc -b && vite build",
     "build:mock": "cross-env MOCK=true pnpm build",
     "lint": "oxlint .",
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.2.1",
+    "@faker-js/faker": "^10.6.0",
     "@storybook/addon-a11y": "^10.5.0",
     "@storybook/addon-docs": "^10.5.0",
     "@storybook/addon-vitest": "^10.5.0",
@@ -64,6 +66,8 @@
     "@vitest/coverage-v8": "^4.1.10",
     "cross-env": "^10.1.0",
     "jsdom": "^29.1.1",
+    "msw": "^2.15.0",
+    "orval": "^8.26.0",
     "oxlint": "^1.73.0",
     "resize-observer-polyfill": "^1.5.1",
     "storybook": "^10.5.0",
