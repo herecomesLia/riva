@@ -187,7 +187,7 @@ export function TargetRoleCreationDialog({
             {creationMethods.map(({ value, icon: Icon }) => (
               <Button
                 aria-label={t(`roles.creation.methods.${value}`)}
-                className="h-auto min-h-20 items-center justify-start gap-4 border-primary/20 bg-primary/10 px-6 py-6 text-left whitespace-normal hover:bg-primary/15"
+                className="h-auto min-h-20 items-center justify-start gap-4 border-primary/20 bg-primary/10 py-6 pr-6 has-data-[icon=inline-start]:pl-4 text-left whitespace-normal hover:bg-primary/15"
                 key={value}
                 onClick={() => setMethod(value)}
                 type="button"
@@ -330,7 +330,12 @@ export function TargetRoleCreationDialog({
 function ReturnToMethodsButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation()
   return (
-    <Button className="self-start" onClick={onClick} type="button" variant="ghost">
+    <Button
+      className="self-start text-muted-foreground hover:bg-transparent hover:text-primary focus-visible:bg-transparent focus-visible:text-primary active:bg-transparent active:text-primary dark:hover:bg-transparent"
+      onClick={onClick}
+      type="button"
+      variant="ghost"
+    >
       <ArrowLeftIcon data-icon="inline-start" />
       {t("roles.creation.backToMethods")}
     </Button>

@@ -527,7 +527,7 @@ describe("RolesView", () => {
       const methodButton = within(dialog).getByRole("button", {
         name: i18n.t(`roles.creation.methods.${method}`),
       })
-      expect(methodButton).toHaveClass("border-primary/20", "bg-primary/10")
+      expect(methodButton).toHaveClass("border-primary/20", "bg-primary/10", "pl-8")
       expect(
         within(dialog).queryByText(i18n.t(`roles.creation.methodDescriptions.${method}`)),
       ).not.toBeInTheDocument()
@@ -539,6 +539,13 @@ describe("RolesView", () => {
         name: i18n.t("roles.creation.backToMethods"),
       })
       expect(returnButton.closest('[data-slot="dialog-footer"]')).toBeInTheDocument()
+      expect(returnButton).toHaveClass(
+        "text-muted-foreground",
+        "hover:bg-transparent",
+        "hover:text-primary",
+        "active:bg-transparent",
+        "active:text-primary",
+      )
       await user.click(returnButton)
       dialog = await screen.findByRole("dialog", { name: i18n.t("roles.creation.title") })
     }
