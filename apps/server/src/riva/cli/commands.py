@@ -1,9 +1,12 @@
+import json
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich import print_json
 
+from riva.core.app import create_app
 from riva.core.config import Settings
 from riva.core.logging import LogFormat, LogLevel, configure_logging
 
@@ -103,5 +106,21 @@ def _source_root_dir() -> Path:
     return package_dir.parent
 
 
+def openapi(
+    pretty: Annotated[
+        bool,
+        typer.Option("--pretty", help="Pretty-print the OpenAPI document."),
+    ] = False,
+) -> None:
+    """Print the OpenAPI document as JSON."""
+    document = create_app().openapi()
+    if pretty:
+        print_json(data=document, ensure_ascii=False)
+        return
+
+    typer.echo(json.dumps(document, ensure_ascii=False))
+
+
 def register_commands(app: typer.Typer) -> None:
     app.command()(start)
+    app.command()(openapi)
