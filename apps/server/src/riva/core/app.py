@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
@@ -18,9 +18,17 @@ from riva.utils import seconds_to_ms
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings: Settings = app.state.settings
-    database: Database = app.state.database
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    settings: Settings | None = app.state.settings
+    if settings is None:
+        settings = Settings()
+        app.state.settings = settings
+
+    database: Database | None = app.state.database
+    if database is None:
+        database = Database(settings.database_url)
+        app.state.database = database
+
     logger = structlog.get_logger("riva.app")
     lifecycle_fields = {
         "log_level": settings.log_level.value,
@@ -107,8 +115,7 @@ def create_asgi_app(settings: Settings | None = None) -> ASGIApp:
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    settings = settings or Settings()
-    database = Database(settings.database_url)
+    database = Database(settings.database_url) if settings is not None else None
 
     app = FastAPI(title="Riva API", lifespan=lifespan)
     app.state.settings = settings
