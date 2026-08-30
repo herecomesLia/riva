@@ -11,12 +11,14 @@ import { MATCHING_ANALYSIS_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useMatch
 import {
   archiveTargetRole,
   createTargetRole,
+  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   getJobDescriptionParsingStatus,
   getMatchingAnalysisStatus,
   getRolesPage,
   saveJobDescription,
+  recognizeTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateRolePreparationStatus,
@@ -30,11 +32,13 @@ vi.mock("@/services/roles", async (importOriginal) => ({
   getRolesPage: vi.fn(),
   archiveTargetRole: vi.fn(),
   createTargetRole: vi.fn(),
+  createTargetRoleFromRecognition: vi.fn(),
   deleteTargetRole: vi.fn(),
   generateMatchingAnalysis: vi.fn(),
   getJobDescriptionParsingStatus: vi.fn(),
   getMatchingAnalysisStatus: vi.fn(),
   saveJobDescription: vi.fn(),
+  recognizeTargetRole: vi.fn(),
   setCurrentTargetRole: vi.fn(),
   startJobDescriptionParsing: vi.fn(),
   updateRolePreparationStatus: vi.fn(),
@@ -59,6 +63,7 @@ function renderRolesPage() {
 const mutationMocks = [
   archiveTargetRole,
   createTargetRole,
+  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   saveJobDescription,
@@ -75,6 +80,7 @@ describe("RolesPage", () => {
     vi.mocked(getRolesPage).mockReset()
     vi.mocked(getJobDescriptionParsingStatus).mockReset()
     vi.mocked(getMatchingAnalysisStatus).mockReset()
+    vi.mocked(recognizeTargetRole).mockReset()
     mutationMocks.forEach((mutation) => vi.mocked(mutation).mockReset())
   })
 
@@ -152,7 +158,17 @@ describe("RolesPage", () => {
 
     await screen.findByTestId("roles-empty-state")
     await user.click(screen.getByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", {
+        name: i18n.t("roles.creation.methods.manual"),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.manual"),
+    })
     await user.type(
       within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")),
       created.roles[0]!.title,

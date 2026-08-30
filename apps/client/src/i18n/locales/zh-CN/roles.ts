@@ -11,6 +11,67 @@ export const roles = {
     retry: "重新加载",
     setCurrent: "设为当前岗位",
   },
+  creation: {
+    title: "添加目标岗位",
+    description: "选择一种录入方式。通过文字、图片或链接录入时，Riva 会先识别岗位信息供你确认。",
+    methodsLabel: "目标岗位录入方式",
+    methods: {
+      manual: "手动填写",
+      text: "粘贴文字",
+      image: "上传图片",
+      url: "岗位链接",
+    },
+    methodDescriptions: {
+      manual: "填写岗位名称、公司、地点和经验要求，JD 可在创建后补充。",
+      text: "粘贴完整招聘信息，由 Riva 识别岗位基础信息和 JD。",
+      image: "上传一张或多张岗位截图，由视觉 Agent 直接理解原图。",
+      url: "提供公开岗位网页，由 Riva 获取并识别页面信息。",
+    },
+    methodTitles: {
+      manual: "手动填写目标岗位",
+      text: "粘贴岗位文字",
+      image: "上传岗位图片",
+      url: "添加岗位链接",
+    },
+    methodDialogDescription: "完成录入后保存目标岗位；通过 Riva 识别的信息会先供你检查和修改。",
+    backToMethods: "返回选择方式",
+    changeMethod: {
+      title: "更换录入方式？",
+      description: "返回后，当前方式中尚未保存的内容将被清除。",
+      stay: "继续录入",
+      confirm: "清除并返回",
+    },
+    recognize: "让 Riva 识别",
+    recognizing: "Riva 正在识别",
+    recognitionFailed: "Riva 暂时无法识别这份岗位信息。输入内容均已保留，请检查后重试。",
+    text: {
+      label: "岗位信息原文",
+      description: "粘贴完整的岗位介绍、职责和任职要求，Riva 将识别岗位基础信息和 JD。",
+      placeholder: "在这里粘贴完整的岗位招聘信息……",
+      required: "请粘贴岗位信息。",
+    },
+    image: {
+      label: "岗位图片",
+      description:
+        "上传岗位页面截图。Riva 会将原图直接交给视觉 Agent 理解，不使用 OCR；长页面可以按顺序上传多张截图。",
+      required: "请至少上传一张岗位图片。",
+      selectedImages: "已选择的岗位图片",
+      order: "第 {{count}} 张",
+      remove: "移除 {{name}}",
+    },
+    url: {
+      label: "岗位网页链接",
+      description: "粘贴可公开访问的岗位页面，Riva 将从页面获取并识别岗位信息。",
+      placeholder: "https://example.com/jobs/role",
+      invalid: "请输入有效的 HTTP 或 HTTPS 岗位链接。",
+    },
+    review: {
+      source: "Riva 已完成识别，来源：{{source}}。请检查并修正后再保存。",
+      rawText: "识别出的 JD 原文",
+      description: "这份原文将在创建岗位后进入现有的 JD 结构化解析流程。",
+      back: "返回重新录入",
+    },
+  },
   editor: {
     create: {
       title: "添加目标岗位",

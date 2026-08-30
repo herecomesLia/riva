@@ -12,6 +12,72 @@ export const roles = {
     retry: "Reload",
     setCurrent: "Set as current role",
   },
+  creation: {
+    title: "Add target role",
+    description:
+      "Choose an entry method. For text, images, or a link, Riva recognizes the role details for your review first.",
+    methodsLabel: "Target role entry method",
+    methods: {
+      manual: "Enter manually",
+      text: "Paste text",
+      image: "Upload images",
+      url: "Job link",
+    },
+    methodDescriptions: {
+      manual: "Enter the role, company, location, and experience. You can add the JD later.",
+      text: "Paste the full posting so Riva can recognize the role basics and JD.",
+      image: "Upload one or more screenshots for the vision agent to understand directly.",
+      url: "Provide a public job page for Riva to retrieve and recognize.",
+    },
+    methodTitles: {
+      manual: "Enter target role manually",
+      text: "Paste job posting text",
+      image: "Upload job posting images",
+      url: "Add a job posting link",
+    },
+    methodDialogDescription:
+      "Save the target role when ready. Information recognized by Riva is available for review and correction first.",
+    backToMethods: "Back to entry methods",
+    changeMethod: {
+      title: "Change entry method?",
+      description: "Going back clears the unsaved content in the current method.",
+      stay: "Keep entering",
+      confirm: "Clear and go back",
+    },
+    recognize: "Recognize with Riva",
+    recognizing: "Riva is recognizing",
+    recognitionFailed:
+      "Riva could not recognize this job posting. Your input is preserved; review it and try again.",
+    text: {
+      label: "Job posting text",
+      description:
+        "Paste the full role overview, responsibilities, and requirements. Riva recognizes the role basics and JD.",
+      placeholder: "Paste the complete job posting here…",
+      required: "Paste the job posting text.",
+    },
+    image: {
+      label: "Job posting images",
+      description:
+        "Upload screenshots of the job posting. Riva sends the original images directly to a vision agent without OCR; add multiple screenshots in page order for long postings.",
+      required: "Upload at least one job posting image.",
+      selectedImages: "Selected job posting images",
+      order: "Image {{count}}",
+      remove: "Remove {{name}}",
+    },
+    url: {
+      label: "Job posting URL",
+      description:
+        "Paste a publicly accessible job page and Riva will retrieve and recognize its role details.",
+      placeholder: "https://example.com/jobs/role",
+      invalid: "Enter a valid HTTP or HTTPS job posting URL.",
+    },
+    review: {
+      source: "Riva finished recognizing {{source}}. Review and correct the result before saving.",
+      rawText: "Recognized JD text",
+      description: "After creation, this text enters the existing structured JD parsing flow.",
+      back: "Back to entry",
+    },
+  },
   editor: {
     create: {
       title: "Add target role",

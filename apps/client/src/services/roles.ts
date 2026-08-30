@@ -3,15 +3,18 @@ import * as rolesMockService from "@/mocks/services/roles"
 import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
+  CreateTargetRoleFromRecognitionInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
   GetJobDescriptionParsingStatusInput,
   GetMatchingAnalysisStatusInput,
   RolesPageResponse,
+  RecognizeTargetRoleInput,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
   TargetRole,
+  TargetRoleRecognitionResult,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
@@ -27,6 +30,18 @@ export function getRolesPage(): Promise<RolesPageResponse> {
 
 export function createTargetRole(input: CreateTargetRoleInput): Promise<RolesPageResponse> {
   return env.mock ? rolesMockService.createTargetRole(input) : realApiUnavailable()
+}
+
+export function recognizeTargetRole(
+  input: RecognizeTargetRoleInput,
+): Promise<TargetRoleRecognitionResult> {
+  return env.mock ? rolesMockService.recognizeTargetRole(input) : realApiUnavailable()
+}
+
+export function createTargetRoleFromRecognition(
+  input: CreateTargetRoleFromRecognitionInput,
+): Promise<RolesPageResponse> {
+  return env.mock ? rolesMockService.createTargetRoleFromRecognition(input) : realApiUnavailable()
 }
 
 export function updateTargetRole(input: UpdateTargetRoleInput): Promise<RolesPageResponse> {

@@ -17,15 +17,18 @@ import {
 import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
+  CreateTargetRoleFromRecognitionInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
   GetJobDescriptionParsingStatusInput,
   GetMatchingAnalysisStatusInput,
   JobDescriptionAnalysisModuleField,
   RolesPageResponse,
+  RecognizeTargetRoleInput,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
+  TargetRoleRecognitionResult,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
   UpdateJobDescriptionAnalysisModuleInput,
@@ -35,6 +38,7 @@ import type { Loadable } from "@/types"
 import { MobileTargetRoleSelector } from "./components/MobileTargetRoleSelector"
 import { RoleDetails, type TargetRoleTab } from "./components/RoleDetails"
 import { RoleEditorDialog } from "./components/RoleEditorDialog"
+import { TargetRoleCreationDialog } from "./components/TargetRoleCreationDialog"
 import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDialog"
 import { JobDescriptionAnalysisEditorDialog } from "./components/JobDescriptionAnalysisEditorDialog"
 import { RolesHeader } from "./components/RolesHeader"
@@ -52,6 +56,9 @@ import { getRolesActionErrorCode, type RolesActionErrorCode } from "./roles-erro
 export type RolesViewActions = {
   archiveTargetRole: (input: ArchiveTargetRoleInput) => Promise<RolesPageResponse>
   createTargetRole: (input: CreateTargetRoleInput) => Promise<RolesPageResponse>
+  createTargetRoleFromRecognition: (
+    input: CreateTargetRoleFromRecognitionInput,
+  ) => Promise<RolesPageResponse>
   deleteTargetRole: (input: DeleteTargetRoleInput) => Promise<RolesPageResponse>
   generateMatchingAnalysis: (
     input: GenerateOrRegenerateMatchingAnalysisInput,
@@ -65,6 +72,7 @@ export type RolesViewActions = {
   retryMatchingAnalysisSynchronization: (
     input: GetMatchingAnalysisStatusInput,
   ) => Promise<RolesPageResponse>
+  recognizeTargetRole: (input: RecognizeTargetRoleInput) => Promise<TargetRoleRecognitionResult>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
   updateRolePreparationStatus: (
@@ -146,7 +154,8 @@ function RolesReadyView({
     initiallySelectedRole?.preparationStatus === "archived" ? "archived" : "saved",
   )
   const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
-  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null)
+  const [editorMode, setEditorMode] = useState<"edit" | null>(null)
+  const [isCreationDialogOpen, setIsCreationDialogOpen] = useState(false)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
   const [jobDescriptionAnalysisEditorField, setJobDescriptionAnalysisEditorField] =
     useState<JobDescriptionAnalysisModuleField | null>(null)
@@ -166,6 +175,7 @@ function RolesReadyView({
 
   function closeEditor() {
     setEditorMode(null)
+    setIsCreationDialogOpen(false)
     setIsJobDescriptionEditorOpen(false)
     setJobDescriptionAnalysisEditorField(null)
     setIsDirty(false)
@@ -208,7 +218,7 @@ function RolesReadyView({
     <div className="flex flex-col gap-4">
       <RolesHeader
         disabled={pendingAction}
-        onAdd={actions ? () => setEditorMode("create") : undefined}
+        onAdd={actions ? () => setIsCreationDialogOpen(true) : undefined}
       />
       {data.roles.length === 0 ? (
         <RolesEmptyState />
@@ -368,8 +378,21 @@ function RolesReadyView({
 
       {actions && (
         <>
+          <TargetRoleCreationDialog
+            onCreateFromRecognition={async (input) => {
+              await actions.createTargetRoleFromRecognition(input)
+            }}
+            onDirtyChange={handleDirtyChange}
+            onManualCreate={async (input) => {
+              await actions.createTargetRole(input)
+            }}
+            onOpenChange={(open) => !open && requestCloseEditor()}
+            onRecognize={actions.recognizeTargetRole}
+            onSaved={closeEditor}
+            open={isCreationDialogOpen}
+          />
           <RoleEditorDialog
-            mode={editorMode ?? "create"}
+            mode="edit"
             onCreate={async (input) => {
               await actions.createTargetRole(input)
             }}
@@ -379,8 +402,8 @@ function RolesReadyView({
             onUpdate={async (input) => {
               await actions.updateTargetRole(input)
             }}
-            open={editorMode !== null}
-            role={editorMode === "edit" ? selectedRole : null}
+            open={editorMode === "edit"}
+            role={selectedRole}
           />
           <JobDescriptionEditorDialog
             onDirtyChange={handleDirtyChange}

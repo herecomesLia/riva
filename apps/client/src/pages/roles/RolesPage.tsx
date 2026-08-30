@@ -4,10 +4,12 @@ import type { RolesPageResponse } from "@/models/roles"
 import {
   archiveTargetRole,
   createTargetRole,
+  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   getRolesPage,
   saveJobDescription,
+  recognizeTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
@@ -44,6 +46,11 @@ export function RolesPage() {
   }
 
   const createMutation = useMutation({ mutationFn: createTargetRole, onSuccess: setRolesResponse })
+  const recognitionMutation = useMutation({ mutationFn: recognizeTargetRole })
+  const createFromRecognitionMutation = useMutation({
+    mutationFn: createTargetRoleFromRecognition,
+    onSuccess: setRolesResponse,
+  })
   const updateMutation = useMutation({ mutationFn: updateTargetRole, onSuccess: setRolesResponse })
   const setCurrentMutation = useMutation({
     mutationFn: setCurrentTargetRole,
@@ -84,6 +91,8 @@ export function RolesPage() {
   const actions: RolesViewActions = {
     archiveTargetRole: (input) => runMutation(archiveMutation.mutateAsync, input),
     createTargetRole: (input) => runMutation(createMutation.mutateAsync, input),
+    createTargetRoleFromRecognition: (input) =>
+      runMutation(createFromRecognitionMutation.mutateAsync, input),
     deleteTargetRole: (input) => runMutation(deleteMutation.mutateAsync, input),
     generateMatchingAnalysis: async (input) => {
       const response = await runMutation(generateMatchingAnalysisMutation.mutateAsync, input)
@@ -107,6 +116,7 @@ export function RolesPage() {
       if (!response) throw new RolesActionError("requestFailed")
       return response
     },
+    recognizeTargetRole: (input) => recognitionMutation.mutateAsync(input),
     saveJobDescription: async (input) => {
       const response = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
       setRolesResponse(response)

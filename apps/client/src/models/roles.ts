@@ -223,6 +223,35 @@ export type CreateTargetRoleInput = {
   preparationStatus: ActiveTargetRolePreparationStatus
 }
 
+export type TargetRoleImportSourceType = "text" | "image" | "url"
+
+export type RecognizeTargetRoleInput =
+  | {
+      sourceType: "text"
+      text: string
+    }
+  | {
+      sourceType: "image"
+      images: File[]
+    }
+  | {
+      sourceType: "url"
+      url: string
+    }
+
+export type TargetRoleRecognitionResult = {
+  recognitionId: string
+  sourceType: TargetRoleImportSourceType
+  sourceLabel: string
+  rawText: string
+  suggestedRole: Omit<CreateTargetRoleInput, "preparationStatus">
+}
+
+export type CreateTargetRoleFromRecognitionInput = CreateTargetRoleInput & {
+  recognitionId: string
+  rawText: string
+}
+
 export type UpdateTargetRoleInput = {
   roleId: string
   version: number

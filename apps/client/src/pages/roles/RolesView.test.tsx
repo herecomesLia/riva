@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { createRolesMockResponse } from "@/mocks/data/roles"
-import type { RolesPageResponse } from "@/models/roles"
+import type {
+  RecognizeTargetRoleInput,
+  RolesPageResponse,
+  TargetRoleRecognitionResult,
+} from "@/models/roles"
 import { renderWithProviders } from "@/test/render"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
@@ -19,11 +23,35 @@ function createActions(
   return {
     archiveTargetRole: vi.fn(async () => data),
     createTargetRole: vi.fn(async () => data),
+    createTargetRoleFromRecognition: vi.fn(async () => data),
     deleteTargetRole: vi.fn(async () => data),
     generateMatchingAnalysis: vi.fn(async () => data),
     retryJobDescriptionParsing: vi.fn(async () => data),
     retryJobDescriptionSynchronization: vi.fn(async () => data),
     retryMatchingAnalysisSynchronization: vi.fn(async () => data),
+    recognizeTargetRole: vi.fn(
+      async (input: RecognizeTargetRoleInput): Promise<TargetRoleRecognitionResult> => ({
+        recognitionId: `recognition_${input.sourceType}`,
+        sourceType: input.sourceType,
+        sourceLabel:
+          input.sourceType === "text"
+            ? "pasted job posting"
+            : input.sourceType === "image"
+              ? input.images.map((image) => image.name).join(", ")
+              : input.url,
+        rawText:
+          input.sourceType === "text"
+            ? input.text
+            : "Frontend Engineer\nCompany: Riva\nLocation: Shanghai\n3-5 years of experience",
+        suggestedRole: {
+          title: "Frontend Engineer",
+          company: "Riva",
+          recruitmentType: "experienced",
+          location: "Shanghai",
+          experienceRange: { minYears: 3, maxYears: 5 },
+        },
+      }),
+    ),
     saveJobDescription: vi.fn(async () => data),
     setCurrentTargetRole: vi.fn(async () => data),
     updateRolePreparationStatus: vi.fn(async () => data),
@@ -453,7 +481,17 @@ describe("RolesView", () => {
     renderReadyView(data, { actions })
 
     await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", {
+        name: i18n.t("roles.creation.methods.manual"),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.manual"),
+    })
     const minimumExperience = within(dialog).getByLabelText(i18n.t("roles.editor.fields.minYears"))
     fireEvent.change(minimumExperience, { target: { value: "-1" } })
     await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
@@ -474,6 +512,183 @@ describe("RolesView", () => {
     ).toBeInTheDocument()
 
     expect(actions.createTargetRole).not.toHaveBeenCalled()
+  })
+
+  it("offers all four target-role creation methods with or without existing roles", async () => {
+    const user = userEvent.setup()
+    renderReadyView(createRolesMockResponse("multipleRoles"))
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    let dialog = await screen.findByRole("dialog", { name: i18n.t("roles.creation.title") })
+
+    expect(within(dialog).queryByRole("tab")).not.toBeInTheDocument()
+
+    for (const method of ["manual", "text", "image", "url"] as const) {
+      const methodButton = within(dialog).getByRole("button", {
+        name: i18n.t(`roles.creation.methods.${method}`),
+      })
+      expect(methodButton).toHaveClass("border-primary/20", "bg-primary/10")
+      expect(
+        within(dialog).queryByText(i18n.t(`roles.creation.methodDescriptions.${method}`)),
+      ).not.toBeInTheDocument()
+      await user.click(methodButton)
+      const entryDialog = await screen.findByRole("dialog", {
+        name: i18n.t(`roles.creation.methodTitles.${method}`),
+      })
+      const returnButton = within(entryDialog).getByRole("button", {
+        name: i18n.t("roles.creation.backToMethods"),
+      })
+      expect(returnButton.closest('[data-slot="dialog-footer"]')).toBeInTheDocument()
+      await user.click(returnButton)
+      dialog = await screen.findByRole("dialog", { name: i18n.t("roles.creation.title") })
+    }
+  })
+
+  it("confirms before clearing a draft when returning to the entry methods", async () => {
+    const user = userEvent.setup()
+    renderReadyView(createRolesMockResponse("noRoles"))
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", {
+        name: i18n.t("roles.creation.methods.manual"),
+      }),
+    )
+    const entryDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.manual"),
+    })
+    await user.type(
+      within(entryDialog).getByLabelText(i18n.t("roles.editor.fields.title")),
+      "Draft role",
+    )
+    await user.click(
+      within(entryDialog).getByRole("button", { name: i18n.t("roles.creation.backToMethods") }),
+    )
+
+    const confirmation = await screen.findByRole("alertdialog", {
+      name: i18n.t("roles.creation.changeMethod.title"),
+    })
+    await user.click(
+      within(confirmation).getByRole("button", {
+        name: i18n.t("roles.creation.changeMethod.stay"),
+      }),
+    )
+    expect(within(entryDialog).getByDisplayValue("Draft role")).toBeInTheDocument()
+
+    await user.click(
+      within(entryDialog).getByRole("button", { name: i18n.t("roles.creation.backToMethods") }),
+    )
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: i18n.t("roles.creation.changeMethod.confirm"),
+      }),
+    )
+    expect(
+      await screen.findByRole("dialog", { name: i18n.t("roles.creation.title") }),
+    ).toBeInTheDocument()
+  })
+
+  it("recognizes pasted text and creates the reviewed role with its JD", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("noRoles")
+    const actions = createActions(data)
+    renderReadyView(data, { actions })
+    const rawText = [
+      "岗位名称：前端工程师",
+      "公司：Riva",
+      "工作地点：上海",
+      "负责构建可访问的 React 产品界面。",
+    ].join("\n")
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", { name: i18n.t("roles.creation.methods.text") }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.text"),
+    })
+    await user.type(within(dialog).getByLabelText(i18n.t("roles.creation.text.label")), rawText)
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.creation.recognize") }),
+    )
+
+    const review = await within(dialog).findByTestId("target-role-recognition-review")
+    expect(actions.recognizeTargetRole).toHaveBeenCalledWith({ sourceType: "text", text: rawText })
+    expect(within(review).getByLabelText(i18n.t("roles.editor.fields.title"))).toHaveValue(
+      "Frontend Engineer",
+    )
+
+    await user.click(within(review).getByRole("button", { name: i18n.t("roles.editor.save") }))
+    expect(actions.createTargetRoleFromRecognition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawText,
+        recognitionId: "recognition_text",
+        title: "Frontend Engineer",
+      }),
+    )
+  })
+
+  it("sends uploaded screenshots directly through the image Agent entry path", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("noRoles")
+    const actions = createActions(data)
+    renderReadyView(data, { actions })
+    const image = new File(["job screenshot"], "job-posting.png", { type: "image/png" })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", { name: i18n.t("roles.creation.methods.image") }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.image"),
+    })
+    expect(within(dialog).getByText(/视觉 Agent/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/不使用 OCR/)).toBeInTheDocument()
+    await user.upload(within(dialog).getByLabelText(i18n.t("roles.creation.image.label")), image)
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.creation.recognize") }),
+    )
+
+    await within(dialog).findByTestId("target-role-recognition-review")
+    expect(actions.recognizeTargetRole).toHaveBeenCalledWith({
+      sourceType: "image",
+      images: [image],
+    })
+  })
+
+  it("recognizes a public job link before creating a role", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("multipleRoles")
+    const actions = createActions(data)
+    renderReadyView(data, { actions })
+    const url = "https://jobs.example.com/frontend-engineer"
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", { name: i18n.t("roles.creation.methods.url") }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.url"),
+    })
+    await user.type(within(dialog).getByLabelText(i18n.t("roles.creation.url.label")), url)
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.creation.recognize") }),
+    )
+
+    await within(dialog).findByTestId("target-role-recognition-review")
+    expect(actions.recognizeTargetRole).toHaveBeenCalledWith({ sourceType: "url", url })
   })
 
   it("chooses independent current and preparation actions with the selected role version", async () => {
@@ -510,7 +725,17 @@ describe("RolesView", () => {
     renderReadyView(data, { actions: createActions(data, { createTargetRole }) })
 
     await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", {
+        name: i18n.t("roles.creation.methods.manual"),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.manual"),
+    })
     await user.type(
       within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")),
       "Data Engineer",
@@ -591,7 +816,17 @@ describe("RolesView", () => {
     renderReadyView(data)
 
     await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", {
+        name: i18n.t("roles.creation.methods.manual"),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.manual"),
+    })
     await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "Draft")
     await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.cancel") }))
 
@@ -609,7 +844,17 @@ describe("RolesView", () => {
     const { router } = renderReadyView(data)
 
     await user.click(await screen.findByRole("button", { name: i18n.t("roles.actions.add") }))
-    const dialog = await screen.findByRole("dialog")
+    const methodDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.title"),
+    })
+    await user.click(
+      within(methodDialog).getByRole("button", {
+        name: i18n.t("roles.creation.methods.manual"),
+      }),
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.creation.methodTitles.manual"),
+    })
     await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "Draft")
 
     act(() => {

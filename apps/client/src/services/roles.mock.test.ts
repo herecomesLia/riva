@@ -4,12 +4,14 @@ import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   archiveTargetRole,
   createTargetRole,
+  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   getJobDescriptionParsingStatus,
   getMatchingAnalysisStatus,
   getRolesPage,
   saveJobDescription,
+  recognizeTargetRole,
   setCurrentTargetRole,
   startJobDescriptionParsing,
   updateRolePreparationStatus,
@@ -101,6 +103,52 @@ describe("roles stateful mock service", () => {
     expect(response.roles).toHaveLength(1)
     expect(response.roles[0]).toMatchObject({ version: 1 })
     expect(response.roles[0]).not.toHaveProperty("isCurrent")
+  })
+
+  it("recognizes pasted job text into a reviewable role draft", async () => {
+    const rawText = ["岗位名称：前端平台工程师", "公司：Riva", "工作地点：上海", "3-5 年经验"].join(
+      "\n",
+    )
+
+    const result = await settle(recognizeTargetRole({ sourceType: "text", text: rawText }))
+
+    expect(result).toMatchObject({
+      recognitionId: "recognition_text_1",
+      sourceType: "text",
+      rawText,
+      suggestedRole: {
+        title: "前端平台工程师",
+        company: "Riva",
+        location: "上海",
+        experienceRange: { minYears: 3, maxYears: 5 },
+      },
+    })
+  })
+
+  it("creates a recognized role and its parsing JD in one response", async () => {
+    resetRolesMockState("noRoles")
+    const rawText = "Frontend Engineer\nBuild accessible React interfaces."
+
+    const response = await settle(
+      createTargetRoleFromRecognition({
+        ...newRole,
+        recognitionId: "recognition_text_1",
+        rawText,
+      }),
+    )
+
+    expect(response.currentRoleId).toBe("role_created_1")
+    expect(response.roles).toHaveLength(1)
+    expect(response.roles[0]).toMatchObject({
+      title: newRole.title,
+      version: 1,
+      jobDescription: {
+        status: "parsing",
+        rawText,
+        version: 1,
+      },
+      jobDescriptionAnalysis: null,
+    })
   })
 
   it("keeps the existing current role when creating additional roles", async () => {

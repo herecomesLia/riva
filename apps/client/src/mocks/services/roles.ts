@@ -7,6 +7,7 @@ import { waitForMockDelay } from "@/mocks/utils"
 import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
+  CreateTargetRoleFromRecognitionInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
   GetJobDescriptionParsingStatusInput,
@@ -14,11 +15,13 @@ import type {
   JobDescriptionAnalysis,
   MatchingAnalysis,
   ReadyTargetRole,
+  RecognizeTargetRoleInput,
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
   StartOrRetryJobDescriptionParsingInput,
   TargetRole,
+  TargetRoleRecognitionResult,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
   UpdateTargetRolePreparationStatusInput,
@@ -218,10 +221,17 @@ export async function getRolesPage(): Promise<RolesPageResponse> {
 
 export async function createTargetRole(input: CreateTargetRoleInput): Promise<RolesPageResponse> {
   await waitForMockDelay()
+  return createRole(input)
+}
+
+function createRole(
+  input: CreateTargetRoleInput,
+  recognizedJobDescription?: string,
+): RolesPageResponse {
   const createdAt = nextTimestamp()
   createdRoleCount += 1
   const becomesCurrent = mockResponse.roles.length === 0
-  const role: TargetRole = {
+  const roleBase = {
     id: `role_created_${createdRoleCount}`,
     title: input.title,
     company: input.company,
@@ -232,20 +242,132 @@ export async function createTargetRole(input: CreateTargetRoleInput): Promise<Ro
     createdAt,
     updatedAt: createdAt,
     version: 1,
-    jobDescription: {
-      status: "missing",
-      rawText: null,
-      version: null,
-      parsingFailureReason: null,
-    },
-    jobDescriptionAnalysis: null,
     matchingAnalysis: null,
   }
+  const role: TargetRole = recognizedJobDescription
+    ? {
+        ...roleBase,
+        jobDescription: {
+          status: "parsing",
+          rawText: recognizedJobDescription,
+          version: 1,
+          parsingFailureReason: null,
+        },
+        jobDescriptionAnalysis: null,
+      }
+    : {
+        ...roleBase,
+        jobDescription: {
+          status: "missing",
+          rawText: null,
+          version: null,
+          parsingFailureReason: null,
+        },
+        jobDescriptionAnalysis: null,
+      }
   return setMockResponse({
     ...mockResponse,
     roles: [...mockResponse.roles, role],
     currentRoleId: becomesCurrent ? role.id : mockResponse.currentRoleId,
   })
+}
+
+export async function recognizeTargetRole(
+  input: RecognizeTargetRoleInput,
+): Promise<TargetRoleRecognitionResult> {
+  await waitForMockDelay()
+  return createRecognitionResult(input)
+}
+
+export async function createTargetRoleFromRecognition(
+  input: CreateTargetRoleFromRecognitionInput,
+): Promise<RolesPageResponse> {
+  await waitForMockDelay()
+  if (!input.recognitionId.trim()) throw new Error("Target role recognition is required.")
+  const rawText = input.rawText.trim()
+  if (!rawText) throw new Error("Recognized job description text is required.")
+  return createRole(input, rawText)
+}
+
+function createRecognitionResult(input: RecognizeTargetRoleInput): TargetRoleRecognitionResult {
+  if (input.sourceType === "text") {
+    const rawText = input.text.trim()
+    if (!rawText) throw new Error("Job posting text is required.")
+    return {
+      recognitionId: "recognition_text_1",
+      sourceType: "text",
+      sourceLabel: rawText.split(/\r?\n/, 1)[0] ?? "pasted-job-posting",
+      rawText,
+      suggestedRole: inferRoleBasics(rawText),
+    }
+  }
+
+  if (input.sourceType === "image") {
+    if (input.images.length === 0) throw new Error("At least one job posting image is required.")
+    // UI-only fixture: the production adapter sends the original File[] to the vision Agent.
+    const sourceLabel = input.images.map((image) => image.name).join(", ")
+    const rawText = [
+      "Frontend Engineer",
+      "Company: Riva Technology",
+      "Location: Shanghai",
+      "3-5 years of experience",
+      "Build accessible React interfaces and collaborate with product and design teams.",
+      "Strong TypeScript, React, and frontend architecture skills are required.",
+    ].join("\n")
+    return {
+      recognitionId: "recognition_image_1",
+      sourceType: "image",
+      sourceLabel,
+      rawText,
+      suggestedRole: inferRoleBasics(rawText),
+    }
+  }
+
+  const url = input.url.trim()
+  if (!url) throw new Error("A job posting URL is required.")
+  const parsedUrl = new URL(url)
+  const rawText = [
+    "Product Manager",
+    `Company: ${parsedUrl.hostname.replace(/^www\./, "")}`,
+    "Location: Beijing",
+    "Own product discovery, roadmap planning, delivery, and outcome measurement.",
+    "Work closely with engineering, design, operations, and commercial teams.",
+  ].join("\n")
+  return {
+    recognitionId: "recognition_url_1",
+    sourceType: "url",
+    sourceLabel: url,
+    rawText,
+    suggestedRole: inferRoleBasics(rawText),
+  }
+}
+
+function inferRoleBasics(rawText: string): TargetRoleRecognitionResult["suggestedRole"] {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const field = (labels: string[]) => {
+    const pattern = new RegExp(`^(?:${labels.join("|")})\\s*[:：]\\s*(.+)$`, "i")
+    return lines.map((line) => line.match(pattern)?.[1]?.trim()).find(Boolean) ?? null
+  }
+  const range = rawText.match(/(\d+)\s*[-–—至]\s*(\d+)\s*(?:years?|年)/i)
+  const minimum = rawText.match(/(\d+)\s*(?:\+|年以上|years?\s+or\s+more)/i)
+  return {
+    title: field(["岗位名称", "职位", "job title", "role"]) ?? lines[0] ?? "",
+    company: field(["公司名称", "公司", "company"]),
+    recruitmentType: /校招|campus|graduate/i.test(rawText)
+      ? "campus"
+      : /社招|experienced|years? of experience/i.test(rawText)
+        ? "experienced"
+        : null,
+    location: field(["工作地点", "地点", "location"]),
+    experienceRange: range
+      ? { minYears: Number(range[1]), maxYears: Number(range[2]) }
+      : minimum
+        ? { minYears: Number(minimum[1]), maxYears: null }
+        : null,
+  }
 }
 
 export async function updateTargetRole(input: UpdateTargetRoleInput): Promise<RolesPageResponse> {

@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form"
+import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
 import type {
   ActiveTargetRolePreparationStatus,
   CreateTargetRoleInput,
@@ -34,7 +36,7 @@ import type {
 
 import { getRolesActionErrorCode } from "../roles-errors"
 
-type RoleDraft = {
+export type RoleDraft = {
   title: string
   company: string
   recruitmentType: TargetRoleRecruitmentType | "unspecified"
@@ -113,7 +115,9 @@ export function RoleEditorDialog({
   )
 }
 
-function RoleEditorForm({
+export function RoleEditorForm({
+  footerStart,
+  initialDraft,
   mode,
   onCreate,
   onDirtyChange,
@@ -121,11 +125,11 @@ function RoleEditorForm({
   onSaved,
   onUpdate,
   role,
-}: Omit<RoleEditorDialogProps, "open">) {
+}: Omit<RoleEditorDialogProps, "open"> & { footerStart?: ReactNode; initialDraft?: RoleDraft }) {
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState<"requestFailed" | "versionConflict" | null>(null)
   const form = useForm({
-    defaultValues: createRoleDraft(role),
+    defaultValues: initialDraft ?? createRoleDraft(role),
     validators: { onSubmit: roleDraftSchema },
     onSubmit: async ({ value }) => {
       setSaveError(null)
@@ -191,18 +195,21 @@ function RoleEditorForm({
           <AlertDescription>{t(`roles.errors.${saveError}`)}</AlertDescription>
         </Alert>
       )}
-      <DialogFooter>
-        <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
-          {t("roles.editor.cancel")}
-        </Button>
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(isSubmitting) => (
-            <Button disabled={isSubmitting} type="submit">
-              {isSubmitting && <Spinner data-icon="inline-start" />}
-              {isSubmitting ? t("roles.editor.saving") : t("roles.editor.save")}
-            </Button>
-          )}
-        </form.Subscribe>
+      <DialogFooter className={cn(footerStart && "sm:justify-between")}>
+        {footerStart}
+        <div className={cn("contents", footerStart && "flex flex-col-reverse gap-2 sm:flex-row")}>
+          <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
+            {t("roles.editor.cancel")}
+          </Button>
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
+              <Button disabled={isSubmitting} type="submit">
+                {isSubmitting && <Spinner data-icon="inline-start" />}
+                {isSubmitting ? t("roles.editor.saving") : t("roles.editor.save")}
+              </Button>
+            )}
+          </form.Subscribe>
+        </div>
       </DialogFooter>
     </form>
   )
