@@ -105,9 +105,9 @@ export function JobDescriptionBulletListEditor({
       </div>
 
       <Dialog onOpenChange={(open) => !open && closePasteDialog()} open={isPasteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b px-6 py-5 pr-14">
+            <DialogTitle className="text-xl font-semibold leading-tight">
               {isPreviewing
                 ? t("roles.jd.analysisEditor.organizedResult")
                 : t("roles.jd.analysisEditor.pasteContent")}
@@ -118,28 +118,33 @@ export function JobDescriptionBulletListEditor({
                 : t("roles.jd.analysisEditor.pasteContentDescription")}
             </DialogDescription>
           </DialogHeader>
-          {isPreviewing ? (
-            <div className="flex flex-col gap-2">
-              {parsedItems.map((item, index) => (
-                <p key={`${index}-${item}`}>
-                  {index + 1}. {item}
-                </p>
-              ))}
-              {parsedItems.length <= 1 && (
-                <p className="text-sm text-muted-foreground">
-                  {t("roles.jd.analysisEditor.ambiguousBulletPaste")}
-                </p>
-              )}
-            </div>
-          ) : (
-            <Textarea
-              aria-label={t("roles.jd.analysisEditor.pasteContent")}
-              className="min-h-40 resize-y"
-              onChange={(event) => setPasteValue(event.target.value)}
-              value={pasteValue}
-            />
-          )}
-          <DialogFooter>
+          <div
+            className="min-h-0 overflow-y-auto px-6 py-5"
+            data-testid="job-description-bullet-editor-scroll"
+          >
+            {isPreviewing ? (
+              <div className="flex flex-col gap-2">
+                {parsedItems.map((item, index) => (
+                  <p key={`${index}-${item}`}>
+                    {index + 1}. {item}
+                  </p>
+                ))}
+                {parsedItems.length <= 1 && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("roles.jd.analysisEditor.ambiguousBulletPaste")}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <Textarea
+                aria-label={t("roles.jd.analysisEditor.pasteContent")}
+                className="min-h-40 resize-y"
+                onChange={(event) => setPasteValue(event.target.value)}
+                value={pasteValue}
+              />
+            )}
+          </div>
+          <DialogFooter className="border-t bg-popover px-6 py-4">
             {isPreviewing ? (
               <>
                 <Button onClick={() => setIsPreviewing(false)} type="button" variant="outline">

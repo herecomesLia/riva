@@ -87,6 +87,33 @@ function renderReadyView(
   )
 }
 
+function expectFixedJobDescriptionEditorLayout(dialog: HTMLElement, scrollAreaTestId: string) {
+  expect(dialog).toHaveClass("gap-0", "overflow-hidden", "p-0")
+  expect(dialog.querySelector('[data-slot="dialog-header"]')).toHaveClass(
+    "border-b",
+    "px-6",
+    "py-5",
+    "pr-14",
+  )
+  expect(within(dialog).getByRole("heading")).toHaveClass(
+    "text-xl",
+    "font-semibold",
+    "leading-tight",
+  )
+  expect(within(dialog).getByTestId(scrollAreaTestId)).toHaveClass(
+    "min-h-0",
+    "overflow-y-auto",
+    "px-6",
+    "py-5",
+  )
+  expect(dialog.querySelector('[data-slot="dialog-footer"]')).toHaveClass(
+    "border-t",
+    "bg-popover",
+    "px-6",
+    "py-4",
+  )
+}
+
 describe("RolesView", () => {
   beforeEach(async () => {
     await i18n.changeLanguage(defaultLanguage)
@@ -886,6 +913,7 @@ describe("RolesView", () => {
 
     await user.click(await screen.findByRole("button", { name: i18n.t("roles.jd.actions.add") }))
     const dialog = await screen.findByRole("dialog")
+    expectFixedJobDescriptionEditorLayout(dialog, "job-description-editor-scroll")
     expect(within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel"))).toHaveValue("")
     await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.jd.editor.save") }))
     expect(await within(dialog).findByText(i18n.t("roles.jd.editor.required"))).toBeInTheDocument()
@@ -1026,6 +1054,7 @@ describe("RolesView", () => {
       }),
     )
     const dialog = await screen.findByRole("dialog")
+    expectFixedJobDescriptionEditorLayout(dialog, "job-description-analysis-editor-scroll")
     const textarea = within(dialog).getByLabelText(`${summaryTitle} 1`)
     expect(textarea).toHaveValue(data.roles[0]!.jobDescriptionAnalysis!.preferredQualifications[0])
     expect(
@@ -1043,6 +1072,32 @@ describe("RolesView", () => {
         value: ["Corrected structured qualification.", "熟悉无障碍设计"],
       }),
     )
+  })
+
+  it("keeps the bullet-paste editor header and footer fixed around its scrolling content", async () => {
+    const user = userEvent.setup()
+    const data = createRolesMockResponse("roleWithParsedJobDescription")
+    renderReadyView(data, { initialActiveTab: "job-description" })
+
+    const moduleTitle = i18n.t("roles.jd.analysis.preferredQualifications")
+    await user.click(
+      await screen.findByRole("button", {
+        name: i18n.t("roles.jd.actions.editModuleLabel", { module: moduleTitle }),
+      }),
+    )
+    const moduleDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.jd.actions.editModuleLabel", { module: moduleTitle }),
+    })
+    await user.click(
+      within(moduleDialog).getByRole("button", {
+        name: i18n.t("roles.jd.analysisEditor.pasteAndOrganize"),
+      }),
+    )
+
+    const pasteDialog = await screen.findByRole("dialog", {
+      name: i18n.t("roles.jd.analysisEditor.pasteContent"),
+    })
+    expectFixedJobDescriptionEditorLayout(pasteDialog, "job-description-bullet-editor-scroll")
   })
 
   it("renders only non-empty qualification and skill categories, while keeping preferred items semantic lists", async () => {

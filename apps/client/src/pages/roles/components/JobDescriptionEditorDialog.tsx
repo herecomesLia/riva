@@ -41,9 +41,9 @@ export function JobDescriptionEditorDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogHeader className="border-b px-6 py-5 pr-14">
+          <DialogTitle className="text-xl font-semibold leading-tight">
             {t(
               role?.jobDescription.status === "missing"
                 ? "roles.jd.editor.addTitle"
@@ -98,51 +98,56 @@ function JobDescriptionEditorForm({
 
   return (
     <form
-      className="flex flex-col gap-6"
+      className="grid max-h-[calc(100dvh-8.25rem)] min-h-0 grid-rows-[minmax(0,1fr)_auto]"
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()
       }}
     >
-      <form.Subscribe selector={(state) => state.isDirty}>
-        {(isDirty) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
-      </form.Subscribe>
-      <FieldGroup>
-        <form.Field name="rawText">
-          {(field) => {
-            const invalid = field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field invalid={invalid}>
-                <FieldLabel htmlFor={field.name}>{t("roles.jd.editor.fieldLabel")}</FieldLabel>
-                <FieldControl>
-                  <Textarea
-                    aria-invalid={invalid || undefined}
-                    aria-required="true"
-                    className="min-h-72 resize-y"
-                    id={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    placeholder={t("roles.jd.editor.placeholder")}
-                    value={field.state.value}
+      <div
+        className="flex min-h-0 flex-col gap-6 overflow-y-auto px-6 py-5"
+        data-testid="job-description-editor-scroll"
+      >
+        <form.Subscribe selector={(state) => state.isDirty}>
+          {(isDirty) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
+        </form.Subscribe>
+        <FieldGroup>
+          <form.Field name="rawText">
+            {(field) => {
+              const invalid = field.state.meta.isTouched && !field.state.meta.isValid
+              return (
+                <Field invalid={invalid}>
+                  <FieldLabel htmlFor={field.name}>{t("roles.jd.editor.fieldLabel")}</FieldLabel>
+                  <FieldControl>
+                    <Textarea
+                      aria-invalid={invalid || undefined}
+                      aria-required="true"
+                      className="min-h-72 resize-y"
+                      id={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      placeholder={t("roles.jd.editor.placeholder")}
+                      value={field.state.value}
+                    />
+                  </FieldControl>
+                  <FieldError
+                    errors={field.state.meta.errors.map(() => ({
+                      message: t("roles.jd.editor.required"),
+                    }))}
                   />
-                </FieldControl>
-                <FieldError
-                  errors={field.state.meta.errors.map(() => ({
-                    message: t("roles.jd.editor.required"),
-                  }))}
-                />
-              </Field>
-            )
-          }}
-        </form.Field>
-      </FieldGroup>
-      {saveError && (
-        <Alert variant="destructive">
-          <AlertDescription>{t(`roles.errors.${saveError}`)}</AlertDescription>
-        </Alert>
-      )}
-      <DialogFooter>
+                </Field>
+              )
+            }}
+          </form.Field>
+        </FieldGroup>
+        {saveError && (
+          <Alert variant="destructive">
+            <AlertDescription>{t(`roles.errors.${saveError}`)}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+      <DialogFooter className="border-t bg-popover px-6 py-4">
         <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
           {t("roles.editor.cancel")}
         </Button>

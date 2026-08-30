@@ -75,7 +75,7 @@ export function JobDescriptionAnalysisEditorDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={isOpen}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-xl">
         {role && analysis && field && (
           <JobDescriptionAnalysisEditorForm
             key={`${role.id}:${analysis.analysisVersion}:${field}`}
@@ -148,43 +148,48 @@ function JobDescriptionAnalysisEditorForm({
   const fields = getFields(field, t)
   return (
     <>
-      <DialogHeader>
-        <DialogTitle className="text-xl">
+      <DialogHeader className="border-b px-6 py-5 pr-14">
+        <DialogTitle className="text-xl font-semibold leading-tight">
           {t("roles.jd.actions.editModuleLabel", { module: title })}
         </DialogTitle>
         <DialogDescription>{t(getDescriptionKey(field))}</DialogDescription>
       </DialogHeader>
       <form
-        className="mt-6 flex flex-col gap-6"
+        className="grid max-h-[calc(100dvh-8.25rem)] min-h-0 grid-rows-[minmax(0,1fr)_auto]"
         noValidate
         onSubmit={(event) => {
           event.preventDefault()
           void form.handleSubmit()
         }}
       >
-        <form.Subscribe selector={(state) => state.isDirty}>
-          {(isDirty) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
-        </form.Subscribe>
-        <FieldGroup>
-          {fields.map(({ key, label }) => (
-            <form.Field key={key} name={key}>
-              {(input) => (
-                <JobDescriptionBulletListEditor
-                  description={t("roles.jd.analysisEditor.bulletListDescription")}
-                  items={input.state.value}
-                  label={label}
-                  onChange={input.handleChange}
-                />
-              )}
-            </form.Field>
-          ))}
-        </FieldGroup>
-        {saveError && (
-          <Alert variant="destructive">
-            <AlertDescription>{t(`roles.errors.${saveError}`)}</AlertDescription>
-          </Alert>
-        )}
-        <DialogFooter>
+        <div
+          className="flex min-h-0 flex-col gap-6 overflow-y-auto px-6 py-5"
+          data-testid="job-description-analysis-editor-scroll"
+        >
+          <form.Subscribe selector={(state) => state.isDirty}>
+            {(isDirty) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
+          </form.Subscribe>
+          <FieldGroup>
+            {fields.map(({ key, label }) => (
+              <form.Field key={key} name={key}>
+                {(input) => (
+                  <JobDescriptionBulletListEditor
+                    description={t("roles.jd.analysisEditor.bulletListDescription")}
+                    items={input.state.value}
+                    label={label}
+                    onChange={input.handleChange}
+                  />
+                )}
+              </form.Field>
+            ))}
+          </FieldGroup>
+          {saveError && (
+            <Alert variant="destructive">
+              <AlertDescription>{t(`roles.errors.${saveError}`)}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+        <DialogFooter className="border-t bg-popover px-6 py-4">
           <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
             {t("roles.editor.cancel")}
           </Button>
