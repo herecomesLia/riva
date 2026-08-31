@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
@@ -13,6 +13,7 @@ from riva.utils import utc_now
 if TYPE_CHECKING:
     from riva.models.auth import AuthSession
     from riva.models.career_profile import CareerProfile
+    from riva.models.target_role import TargetRole
 
 
 def normalize_username(username: str) -> str:
@@ -34,6 +35,16 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(2083), nullable=True)
     password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
+    )
+    active_target_role_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey(
+            "target_roles.id",
+            name="fk_users_active_target_role_id_target_roles",
+            ondelete="SET NULL",
+            use_alter=True,
+        ),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -73,4 +84,18 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
         lazy="selectin",
+    )
+
+    target_roles: Mapped[list[TargetRole]] = relationship(
+        "TargetRole",
+        cascade="all, delete-orphan",
+        foreign_keys="TargetRole.user_id",
+        lazy="selectin",
+    )
+
+    active_target_role: Mapped[TargetRole | None] = relationship(
+        "TargetRole",
+        foreign_keys=[active_target_role_id],
+        lazy="selectin",
+        post_update=True,
     )
