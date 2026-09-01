@@ -1,68 +1,38 @@
-import type { LoginCredentials, RegisterCredentials, UserResponse } from "@/api/generated/models"
-import { authCredentialsFixture, authUserFixture } from "@/mocks/fixtures/auth"
+import { ApiError } from "@/api/error"
+import type {
+  ErrorResponse,
+  LoginCredentials,
+  RegisterCredentials,
+  UserResponse,
+} from "@/api/generated/models"
+import { authUserFixture } from "@/mocks/fixtures/auth"
 
-type Account = {
-  credentials: LoginCredentials
-  user: UserResponse
-}
+const requestId = "mock-auth-request-id"
 
-type RegisterResult = { ok: true; user: UserResponse } | { ok: false; reason: "usernameTaken" }
-
-function createInitialAccounts(): Account[] {
-  return [
-    {
-      credentials: { ...authCredentialsFixture },
-      user: { ...authUserFixture },
-    },
-  ]
-}
-
-export function createAuthFaker() {
-  let accounts = createInitialAccounts()
-  let currentUser: UserResponse | null = null
-
-  function findAccount(username: string): Account | undefined {
-    const normalizedUsername = username.toLowerCase()
-    return accounts.find(
-      (account) => account.credentials.username.toLowerCase() === normalizedUsername,
-    )
+function authError(status: number, code: string, message: string): ApiError {
+  const response: ErrorResponse = {
+    error: { code, message },
+    requestId,
   }
-
-  return {
-    getCurrentUser(): UserResponse | null {
-      return currentUser ? { ...currentUser } : null
-    },
-    login(credentials: LoginCredentials): UserResponse | null {
-      const account = findAccount(credentials.username)
-      if (!account || account.credentials.password !== credentials.password) return null
-
-      currentUser = { ...account.user }
-      return { ...currentUser }
-    },
-    logout(): void {
-      currentUser = null
-    },
-    register(credentials: RegisterCredentials): RegisterResult {
-      if (findAccount(credentials.username)) return { ok: false, reason: "usernameTaken" }
-
-      const user: UserResponse = {
-        avatarUrl: null,
-        displayName: credentials.username,
-        id: `00000000-0000-4000-8000-${String(accounts.length).padStart(12, "0")}`,
-        username: credentials.username,
-      }
-      accounts.push({
-        credentials: { ...credentials },
-        user,
-      })
-      currentUser = { ...user }
-      return { ok: true, user: { ...user } }
-    },
-    reset(): void {
-      accounts = createInitialAccounts()
-      currentUser = null
-    },
-  }
+  return new ApiError(status, response, message)
 }
 
-export const authFaker = createAuthFaker()
+export async function login(credentials: LoginCredentials): Promise<UserResponse> {
+  if (credentials.username === "invalid-user") {
+    throw authError(401, "auth.invalid_credentials", "Invalid username or password.")
+  }
+  return { ...authUserFixture }
+}
+
+export async function register(credentials: RegisterCredentials): Promise<UserResponse> {
+  if (credentials.username === "taken-user") {
+    throw authError(409, "auth.username_taken", "Username is already registered.")
+  }
+  return { ...authUserFixture }
+}
+
+export async function logout(): Promise<void> {}
+
+export async function getCurrentUser(): Promise<UserResponse> {
+  throw authError(401, "auth.not_authenticated", "Authentication is required.")
+}

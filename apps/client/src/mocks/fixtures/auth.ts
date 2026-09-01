@@ -1,9 +1,4 @@
-import type { LoginCredentials, UserResponse } from "@/api/generated/models"
-
-export const authCredentialsFixture = {
-  password: "riva-demo",
-  username: "rivauser",
-} as const satisfies LoginCredentials
+import type { UserResponse } from "@/api/generated/models"
 
 export const authUserFixture = {
   avatarUrl: null,

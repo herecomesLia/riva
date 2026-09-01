@@ -140,7 +140,10 @@ export function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
                       handleUsernameBlur()
                       field.handleBlur()
                     }}
-                    onChange={(event) => field.handleChange(event.target.value)}
+                    onChange={(event) => {
+                      setSubmitErrorCode(null)
+                      field.handleChange(event.target.value)
+                    }}
                     onFocus={handleUsernameFocus}
                     placeholder={t("login.usernamePlaceholder")}
                     value={field.state.value}

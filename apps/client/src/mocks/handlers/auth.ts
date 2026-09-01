@@ -1,56 +1,41 @@
 import { HttpResponse, http } from "msw"
 
+import { ApiError } from "@/api/error"
 import type { ErrorResponse, LoginCredentials, RegisterCredentials } from "@/api/generated/models"
-import { authFaker } from "@/mocks/fakers/auth"
+import { getCurrentUser, login, logout, register } from "@/mocks/fakers/auth"
 
-const requestId = "mock-auth-request-id"
+async function handle<T>(operation: () => Promise<T>, respond: (result: T) => Response) {
+  try {
+    return respond(await operation())
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error
 
-function errorResponse(code: string, message: string): ErrorResponse {
-  return {
-    error: { code, message },
-    requestId,
+    const response: ErrorResponse = {
+      error: {
+        code: error.code ?? "request.http_error",
+        message: error.message,
+        ...(error.issues ? { issues: error.issues } : {}),
+      },
+      requestId: error.requestId ?? "mock-auth-request-id",
+    }
+    return HttpResponse.json(response, { status: error.status })
   }
 }
 
 export const authHandlers = [
   http.post("*/api/auth/register", async ({ request }) => {
-    const result = authFaker.register((await request.json()) as RegisterCredentials)
-
-    if (!result.ok) {
-      return HttpResponse.json(
-        errorResponse("auth.username_taken", "Username is already registered."),
-        { status: 409 },
-      )
-    }
-
-    return HttpResponse.json(result.user, { status: 201 })
+    const credentials = (await request.json()) as RegisterCredentials
+    return handle(
+      () => register(credentials),
+      (user) => HttpResponse.json(user, { status: 201 }),
+    )
   }),
   http.post("*/api/auth/login", async ({ request }) => {
-    const user = authFaker.login((await request.json()) as LoginCredentials)
-
-    if (!user) {
-      return HttpResponse.json(
-        errorResponse("auth.invalid_credentials", "Invalid username or password."),
-        { status: 401 },
-      )
-    }
-
-    return HttpResponse.json(user)
+    const credentials = (await request.json()) as LoginCredentials
+    return handle(() => login(credentials), HttpResponse.json)
   }),
-  http.post("*/api/auth/logout", () => {
-    authFaker.logout()
-    return new HttpResponse(null, { status: 204 })
-  }),
-  http.get("*/api/users/me", () => {
-    const user = authFaker.getCurrentUser()
-
-    if (!user) {
-      return HttpResponse.json(
-        errorResponse("auth.not_authenticated", "Authentication is required."),
-        { status: 401 },
-      )
-    }
-
-    return HttpResponse.json(user)
-  }),
+  http.post("*/api/auth/logout", () =>
+    handle(logout, () => new HttpResponse(null, { status: 204 })),
+  ),
+  http.get("*/api/users/me", () => handle(getCurrentUser, HttpResponse.json)),
 ]

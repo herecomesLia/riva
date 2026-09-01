@@ -146,6 +146,22 @@ describe("RegisterForm", () => {
     expect(alert).not.toHaveTextContent("Sensitive duplicate-account detail")
   })
 
+  it("clears a previous registration error when the username changes", async () => {
+    registerMock.mockRejectedValue(
+      apiError(409, "auth.username_taken", "Username is already registered."),
+    )
+    renderRegisterForm()
+    fillRegisterForm()
+    submit()
+    expect(await screen.findByRole("alert")).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(t("login.username")), {
+      target: { value: "AnotherUser" },
+    })
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
   it.each([
     apiError(503, "dependency.database_unavailable", "Database unavailable"),
     new TransportError("network", "Network unavailable"),
