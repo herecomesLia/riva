@@ -19,6 +19,13 @@ export function useAuth() {
     clearCurrentUser()
   }
 
+  async function register(input: authService.RegisterCredentials) {
+    const user = await authService.register(input)
+
+    setCurrentUser(user)
+    return user
+  }
+
   async function restoreCurrentUser() {
     const user = await authService.restoreCurrentUser()
 
@@ -36,6 +43,7 @@ export function useAuth() {
     isAuthenticated,
     login,
     logout,
+    register,
     restoreCurrentUser,
   }
 }

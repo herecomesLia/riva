@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ApiError, TransportError } from "@/api/error"
-import { login as loginRequest, logout as logoutRequest } from "@/api/generated/endpoints/auth/auth"
+import {
+  login as loginRequest,
+  logout as logoutRequest,
+  register as registerRequest,
+} from "@/api/generated/endpoints/auth/auth"
 import { getCurrentUser } from "@/api/generated/endpoints/users/users"
 import { authCredentialsFixture, authUserFixture } from "@/mocks/fixtures/auth"
-import { login, logout, restoreCurrentUser } from "@/services/auth"
+import { login, logout, register, restoreCurrentUser } from "@/services/auth"
 
 vi.mock("@/api/generated/endpoints/auth/auth", () => ({
   login: vi.fn(),
   logout: vi.fn(),
+  register: vi.fn(),
 }))
 vi.mock("@/api/generated/endpoints/users/users", () => ({
   getCurrentUser: vi.fn(),
@@ -18,7 +23,25 @@ describe("auth service", () => {
   beforeEach(() => {
     vi.mocked(loginRequest).mockResolvedValue(authUserFixture)
     vi.mocked(logoutRequest).mockResolvedValue()
+    vi.mocked(registerRequest).mockResolvedValue(authUserFixture)
     vi.mocked(getCurrentUser).mockResolvedValue(authUserFixture)
+  })
+
+  it("registers through the generated operation and maps its response", async () => {
+    const credentials = { username: "NewUser", password: "ValidPass123!" }
+    const response = {
+      ...authUserFixture,
+      displayName: credentials.username,
+      username: credentials.username,
+    }
+    vi.mocked(registerRequest).mockResolvedValue(response)
+
+    await expect(register(credentials)).resolves.toEqual({
+      ...response,
+      avatarFallback: "N",
+      avatarUrl: undefined,
+    })
+    expect(registerRequest).toHaveBeenCalledWith(credentials)
   })
 
   it("uses generated operations and maps server users to the UI model", async () => {

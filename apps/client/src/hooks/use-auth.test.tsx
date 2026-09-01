@@ -7,6 +7,7 @@ import { resetStores } from "@/test/stores"
 
 vi.mock("@/services/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/auth")>()),
+  register: vi.fn(),
   restoreCurrentUser: vi.fn(),
 }))
 
@@ -26,5 +27,25 @@ describe("useAuth", () => {
 
     expect(useAuthStore.getState().currentUser).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
+  })
+
+  it("stores the authenticated user returned by registration", async () => {
+    const { register } = await import("@/services/auth")
+    const user = {
+      avatarFallback: "N",
+      displayName: "NewUser",
+      id: "00000000-0000-4000-8000-000000000001",
+      username: "NewUser",
+    }
+    vi.mocked(register).mockResolvedValue(user)
+    const { result } = renderHook(() => useAuth())
+
+    await act(async () => {
+      await expect(
+        result.current.register({ username: "NewUser", password: "ValidPass123!" }),
+      ).resolves.toEqual(user)
+    })
+
+    expect(useAuthStore.getState().currentUser).toEqual(user)
   })
 })

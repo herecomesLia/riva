@@ -4,22 +4,50 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
+import { ApiError, TransportError } from "@/api/error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { useAuth } from "@/hooks/use-auth"
 import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
+
+type RegisterErrorCode = "usernameTaken" | "serviceUnavailable" | "unknown"
+
+type RegisterFormProps = {
+  onRegisterSuccess: () => void
+}
+
+const registrationUsernamePattern = /^[A-Za-z0-9_-]+$/
+const registrationPasswordPattern = /^[A-Za-z0-9!@#$%^&*()_\-+=[\]{}|\\:;"'<>?,./~\x60]+$/
 
 function createRegisterSchema(t: TFunction) {
   return z
     .object({
       confirmPassword: z.string().min(1, t("login.confirmPasswordRequired")),
-      password: z.string().min(1, t("login.passwordRequired")),
-      username: z
-        .string()
-        .min(1, t("login.usernameRequired"))
-        .refine((value) => value === value.trim(), t("login.usernameNoOuterSpaces")),
+      password: z.string().superRefine((value, context) => {
+        if (value.length === 0) {
+          context.addIssue({ code: "custom", message: t("login.passwordRequired") })
+        } else if (value.length < 8) {
+          context.addIssue({ code: "custom", message: t("login.registerPasswordTooShort") })
+        } else if (value.length > 128) {
+          context.addIssue({ code: "custom", message: t("login.registerPasswordTooLong") })
+        } else if (!registrationPasswordPattern.test(value)) {
+          context.addIssue({ code: "custom", message: t("login.registerPasswordInvalid") })
+        }
+      }),
+      username: z.string().superRefine((value, context) => {
+        if (value.length === 0) {
+          context.addIssue({ code: "custom", message: t("login.usernameRequired") })
+        } else if (value.length < 4) {
+          context.addIssue({ code: "custom", message: t("login.registerUsernameTooShort") })
+        } else if (value.length > 32) {
+          context.addIssue({ code: "custom", message: t("login.registerUsernameTooLong") })
+        } else if (!registrationUsernamePattern.test(value)) {
+          context.addIssue({ code: "custom", message: t("login.registerUsernameInvalid") })
+        }
+      }),
     })
     .refine((value) => value.password === value.confirmPassword, {
       message: t("login.confirmPasswordMismatch"),
@@ -27,10 +55,19 @@ function createRegisterSchema(t: TFunction) {
     })
 }
 
-export function RegisterForm() {
+export function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
+  const { register } = useAuth()
   const { t } = useTranslation()
   const [, setHerosState] = useLoginHeroesContext()
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitErrorCode, setSubmitErrorCode] = useState<RegisterErrorCode | null>(null)
+  const submitErrorMessageKey =
+    submitErrorCode === "usernameTaken"
+      ? "login.registerErrorUsernameTaken"
+      : submitErrorCode === "serviceUnavailable"
+        ? "login.registerErrorServiceUnavailable"
+        : submitErrorCode === "unknown"
+          ? "login.registerErrorUnknown"
+          : null
   const form = useForm({
     defaultValues: {
       confirmPassword: "",
@@ -40,10 +77,28 @@ export function RegisterForm() {
     validators: {
       onSubmit: createRegisterSchema(t),
     },
-    onSubmit: () => {
-      setSubmitError(t("login.registerUnavailableDescription"))
+    onSubmit: async ({ value }) => {
+      try {
+        await register({
+          password: value.password,
+          username: value.username,
+        })
+        onRegisterSuccess()
+      } catch (error) {
+        setSubmitErrorCode(resolveRegisterErrorCode(error))
+      }
     },
   })
+
+  function resolveRegisterErrorCode(error: unknown): RegisterErrorCode {
+    if (error instanceof ApiError && error.status === 409 && error.code === "auth.username_taken") {
+      return "usernameTaken"
+    }
+    if ((error instanceof ApiError && error.status === 503) || error instanceof TransportError) {
+      return "serviceUnavailable"
+    }
+    return "unknown"
+  }
 
   function handleUsernameFocus() {
     setHerosState((state) => ({ ...state, isUsernameFocused: true }))
@@ -64,7 +119,7 @@ export function RegisterForm() {
       onSubmit={(event) => {
         event.preventDefault()
         event.stopPropagation()
-        setSubmitError(null)
+        setSubmitErrorCode(null)
         void form.handleSubmit()
       }}
     >
@@ -159,10 +214,10 @@ export function RegisterForm() {
         </form.Field>
       </FieldGroup>
 
-      {submitError && (
+      {submitErrorMessageKey && (
         <Alert variant="destructive">
-          <AlertTitle>{t("login.registerUnavailableTitle")}</AlertTitle>
-          <AlertDescription>{submitError}</AlertDescription>
+          <AlertTitle>{t("login.registerErrorTitle")}</AlertTitle>
+          <AlertDescription>{t(submitErrorMessageKey)}</AlertDescription>
         </Alert>
       )}
 

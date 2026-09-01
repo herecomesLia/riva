@@ -85,6 +85,7 @@ describe("LoginForm", () => {
       isAuthenticated: false,
       login: loginMock,
       logout: vi.fn(),
+      register: vi.fn(),
       restoreCurrentUser: vi.fn(),
     })
   })

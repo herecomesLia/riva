@@ -1,7 +1,7 @@
 import { setupServer } from "msw/node"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 
-import { login, logout } from "@/api/generated/endpoints/auth/auth"
+import { login, logout, register } from "@/api/generated/endpoints/auth/auth"
 import { getCurrentUser } from "@/api/generated/endpoints/users/users"
 import { authFaker } from "@/mocks/fakers/auth"
 import { authCredentialsFixture, authUserFixture } from "@/mocks/fixtures/auth"
@@ -32,6 +32,31 @@ describe("auth handlers", () => {
     await expect(getCurrentUser()).rejects.toMatchObject({
       code: "auth.not_authenticated",
       status: 401,
+    })
+  })
+
+  it("registers and authenticates a new user", async () => {
+    const credentials = { username: "NewUser", password: "ValidPass123!" }
+    const user = await register(credentials)
+
+    expect(user).toMatchObject({
+      avatarUrl: null,
+      displayName: credentials.username,
+      username: credentials.username,
+    })
+    await expect(getCurrentUser()).resolves.toEqual(user)
+  })
+
+  it("returns the formal username-taken response for a case-insensitive duplicate", async () => {
+    const request = register({
+      username: authCredentialsFixture.username.toUpperCase(),
+      password: "ValidPass123!",
+    })
+
+    await expect(request).rejects.toMatchObject({
+      code: "auth.username_taken",
+      requestId: "mock-auth-request-id",
+      status: 409,
     })
   })
 })
