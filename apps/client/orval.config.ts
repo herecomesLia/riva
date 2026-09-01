@@ -37,6 +37,9 @@ export default defineConfig({
           {
             type: "msw",
           },
+          {
+            type: "faker",
+          },
         ],
       },
     },

@@ -4,38 +4,14 @@
  * Riva API
  * OpenAPI spec version: 0.1.0
  */
-import { faker } from "@faker-js/faker"
-
 import { HttpResponse, http } from "msw"
 import type { RequestHandlerOptions } from "msw"
 
 import type { UserResponse } from "../../models"
 
-export const getGetCurrentUserResponseMock = (
-  overrideResponse: Partial<Extract<UserResponse, object>> = {},
-): UserResponse => ({
-  id: faker.string.uuid(),
-  username: faker.string.alpha({ length: { min: 10, max: 20 } }),
-  displayName: faker.string.alpha({ length: { min: 10, max: 20 } }),
-  avatarUrl: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
-    null,
-  ]),
-  ...overrideResponse,
-})
+import { getGetCurrentUserResponseMock, getUpdateCurrentUserResponseMock } from "./users.faker"
 
-export const getUpdateCurrentUserResponseMock = (
-  overrideResponse: Partial<Extract<UserResponse, object>> = {},
-): UserResponse => ({
-  id: faker.string.uuid(),
-  username: faker.string.alpha({ length: { min: 10, max: 20 } }),
-  displayName: faker.string.alpha({ length: { min: 10, max: 20 } }),
-  avatarUrl: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
-    null,
-  ]),
-  ...overrideResponse,
-})
+export { getGetCurrentUserResponseMock, getUpdateCurrentUserResponseMock } from "./users.faker"
 
 export const getGetCurrentUserMockHandler = (
   overrideResponse?:
