@@ -1,10 +1,10 @@
+import { storybookTest } from "@storybook/addon-vitest/vitest-plugin"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
+import { playwright } from "@vitest/browser-playwright"
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { storybookTest } from "@storybook/addon-vitest/vitest-plugin"
-import { playwright } from "@vitest/browser-playwright"
 import type { Plugin } from "vite"
 import { defineConfig } from "vitest/config"
 
@@ -50,6 +50,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), mock && mswWorkerPlugin()],
   resolve: {
     tsconfigPaths: true,
+  },
+  server: {
+    proxy: {
+      "/api": {
+        target: process.env.RIVA_API_PROXY_TARGET ?? "http://localhost:7482",
+        changeOrigin: true,
+      },
+    },
   },
   test: {
     environment: "jsdom",

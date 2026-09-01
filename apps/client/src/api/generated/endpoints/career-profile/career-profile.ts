@@ -4,485 +4,58 @@
  * Riva API
  * OpenAPI spec version: 0.1.0
  */
-import { useMutation, useQuery } from "@tanstack/react-query"
-import type {
-  DataTag,
-  DefinedInitialDataOptions,
-  DefinedUseQueryResult,
-  MutationFunction,
-  QueryClient,
-  QueryFunction,
-  QueryKey,
-  UndefinedInitialDataOptions,
-  UseMutationOptions,
-  UseMutationResult,
-  UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query"
-
 import type {
   CareerProfileResponse,
   CreateCareerProfileRequest,
-  ErrorResponse,
   UpdateCareerProfileRequest,
 } from "../../models"
 
-const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
-  const result = { queryKey } as T & { queryKey: K }
-  for (const key of Object.keys(query)) {
-    // The explicit queryKey always wins, matching the previous
-    // `{ ...query, queryKey }` spread where it was set last.
-    if (key === "queryKey") continue
-    Object.defineProperty(result, key, {
-      enumerable: true,
-      configurable: true,
-      get: () => (query as Record<string, unknown>)[key],
-    })
-  }
-  return result
-}
+import { request } from "../../../http"
 
-export type getCareerProfileResponse200 = {
-  data: CareerProfileResponse
-  status: 200
-}
-
-export type getCareerProfileResponse401 = {
-  data: ErrorResponse
-  status: 401
-}
-
-export type getCareerProfileResponse403 = {
-  data: ErrorResponse
-  status: 403
-}
-
-export type getCareerProfileResponse404 = {
-  data: ErrorResponse
-  status: 404
-}
-
-export type getCareerProfileResponse500 = {
-  data: ErrorResponse
-  status: 500
-}
-
-export type getCareerProfileResponseSuccess = getCareerProfileResponse200 & {
-  headers: Headers
-}
-export type getCareerProfileResponseError = (
-  | getCareerProfileResponse401
-  | getCareerProfileResponse403
-  | getCareerProfileResponse404
-  | getCareerProfileResponse500
-) & {
-  headers: Headers
-}
-
-export type getCareerProfileResponse =
-  getCareerProfileResponseSuccess | getCareerProfileResponseError
-
-export const getGetCareerProfileUrl = () => {
-  return `/api/career-profile`
-}
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 /**
  * @summary Get Career Profile
  */
-export const getCareerProfile = async (
-  options?: RequestInit,
-): Promise<getCareerProfileResponse> => {
-  const res = await fetch(getGetCareerProfileUrl(), {
-    ...options,
-    method: "GET",
-  })
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
-  const data: getCareerProfileResponse["data"] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getCareerProfileResponse
+export const getCareerProfile = (
+  options?: SecondParameter<typeof request<CareerProfileResponse>>,
+) => {
+  return request<CareerProfileResponse>({ url: `/api/career-profile`, method: "GET" }, options)
 }
-
-export const getGetCareerProfileQueryKey = () => {
-  return [`/api/career-profile`] as const
-}
-
-export const getGetCareerProfileQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCareerProfile>>,
-  TError = ErrorResponse,
->(options?: {
-  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getCareerProfile>>, TError, TData>>
-  fetch?: RequestInit
-}) => {
-  const { query: queryOptions, fetch: fetchOptions } = options ?? {}
-
-  const queryKey = queryOptions?.queryKey ?? getGetCareerProfileQueryKey()
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCareerProfile>>> = ({ signal }) =>
-    getCareerProfile({ signal, ...fetchOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCareerProfile>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetCareerProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getCareerProfile>>>
-export type GetCareerProfileQueryError = ErrorResponse
-
-export function useGetCareerProfile<
-  TData = Awaited<ReturnType<typeof getCareerProfile>>,
-  TError = ErrorResponse,
->(
-  options: {
-    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof getCareerProfile>>, TError, TData>> &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCareerProfile>>,
-          TError,
-          Awaited<ReturnType<typeof getCareerProfile>>
-        >,
-        "initialData"
-      >
-    fetch?: RequestInit
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCareerProfile<
-  TData = Awaited<ReturnType<typeof getCareerProfile>>,
-  TError = ErrorResponse,
->(
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getCareerProfile>>, TError, TData>> &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCareerProfile>>,
-          TError,
-          Awaited<ReturnType<typeof getCareerProfile>>
-        >,
-        "initialData"
-      >
-    fetch?: RequestInit
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCareerProfile<
-  TData = Awaited<ReturnType<typeof getCareerProfile>>,
-  TError = ErrorResponse,
->(
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getCareerProfile>>, TError, TData>>
-    fetch?: RequestInit
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get Career Profile
- */
-
-export function useGetCareerProfile<
-  TData = Awaited<ReturnType<typeof getCareerProfile>>,
-  TError = ErrorResponse,
->(
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getCareerProfile>>, TError, TData>>
-    fetch?: RequestInit
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetCareerProfileQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  return withQueryKey(query, queryOptions.queryKey)
-}
-
-export type createCareerProfileResponse201 = {
-  data: CareerProfileResponse
-  status: 201
-}
-
-export type createCareerProfileResponse401 = {
-  data: ErrorResponse
-  status: 401
-}
-
-export type createCareerProfileResponse403 = {
-  data: ErrorResponse
-  status: 403
-}
-
-export type createCareerProfileResponse409 = {
-  data: ErrorResponse
-  status: 409
-}
-
-export type createCareerProfileResponse422 = {
-  data: ErrorResponse
-  status: 422
-}
-
-export type createCareerProfileResponse500 = {
-  data: ErrorResponse
-  status: 500
-}
-
-export type createCareerProfileResponseSuccess = createCareerProfileResponse201 & {
-  headers: Headers
-}
-export type createCareerProfileResponseError = (
-  | createCareerProfileResponse401
-  | createCareerProfileResponse403
-  | createCareerProfileResponse409
-  | createCareerProfileResponse422
-  | createCareerProfileResponse500
-) & {
-  headers: Headers
-}
-
-export type createCareerProfileResponse =
-  createCareerProfileResponseSuccess | createCareerProfileResponseError
-
-export const getCreateCareerProfileUrl = () => {
-  return `/api/career-profile`
-}
-
 /**
  * @summary Create Career Profile
  */
-export const createCareerProfile = async (
+export const createCareerProfile = (
   createCareerProfileRequest: CreateCareerProfileRequest,
-  options?: RequestInit,
-): Promise<createCareerProfileResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
-  }
-  const res = await fetch(getCreateCareerProfileUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(createCareerProfileRequest),
-  })
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
-  const data: createCareerProfileResponse["data"] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as createCareerProfileResponse
+  options?: SecondParameter<typeof request<CareerProfileResponse>>,
+) => {
+  return request<CareerProfileResponse>(
+    {
+      url: `/api/career-profile`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: createCareerProfileRequest,
+    },
+    options,
+  )
 }
-
-export const getCreateCareerProfileMutationOptions = <
-  TError = ErrorResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createCareerProfile>>,
-    TError,
-    CreateCareerProfileMutationVariables,
-    TContext
-  >
-  fetch?: RequestInit
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createCareerProfile>>,
-  TError,
-  CreateCareerProfileMutationVariables,
-  TContext
-> => {
-  const mutationKey = ["createCareerProfile"]
-  const { mutation: mutationOptions, fetch: fetchOptions } = options
-    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, fetch: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createCareerProfile>>,
-    CreateCareerProfileMutationVariables
-  > = (props) => {
-    const { data } = props ?? {}
-
-    return createCareerProfile(data, fetchOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type CreateCareerProfileMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createCareerProfile>>
->
-export type CreateCareerProfileMutationBody = CreateCareerProfileRequest
-export type CreateCareerProfileMutationError = ErrorResponse
-export type CreateCareerProfileMutationVariables = { data: CreateCareerProfileRequest }
-
-/**
- * @summary Create Career Profile
- */
-export const useCreateCareerProfile = <TError = ErrorResponse, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createCareerProfile>>,
-      TError,
-      CreateCareerProfileMutationVariables,
-      TContext
-    >
-    fetch?: RequestInit
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createCareerProfile>>,
-  TError,
-  CreateCareerProfileMutationVariables,
-  TContext
-> => {
-  return useMutation(getCreateCareerProfileMutationOptions(options), queryClient)
-}
-export type updateCareerProfileResponse200 = {
-  data: CareerProfileResponse
-  status: 200
-}
-
-export type updateCareerProfileResponse401 = {
-  data: ErrorResponse
-  status: 401
-}
-
-export type updateCareerProfileResponse403 = {
-  data: ErrorResponse
-  status: 403
-}
-
-export type updateCareerProfileResponse404 = {
-  data: ErrorResponse
-  status: 404
-}
-
-export type updateCareerProfileResponse422 = {
-  data: ErrorResponse
-  status: 422
-}
-
-export type updateCareerProfileResponse500 = {
-  data: ErrorResponse
-  status: 500
-}
-
-export type updateCareerProfileResponseSuccess = updateCareerProfileResponse200 & {
-  headers: Headers
-}
-export type updateCareerProfileResponseError = (
-  | updateCareerProfileResponse401
-  | updateCareerProfileResponse403
-  | updateCareerProfileResponse404
-  | updateCareerProfileResponse422
-  | updateCareerProfileResponse500
-) & {
-  headers: Headers
-}
-
-export type updateCareerProfileResponse =
-  updateCareerProfileResponseSuccess | updateCareerProfileResponseError
-
-export const getUpdateCareerProfileUrl = () => {
-  return `/api/career-profile`
-}
-
 /**
  * @summary Update Career Profile
  */
-export const updateCareerProfile = async (
+export const updateCareerProfile = (
   updateCareerProfileRequest: UpdateCareerProfileRequest,
-  options?: RequestInit,
-): Promise<updateCareerProfileResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Array.isArray(h)) return Object.fromEntries(h)
-    return h
-  }
-  const res = await fetch(getUpdateCareerProfileUrl(), {
-    ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(updateCareerProfileRequest),
-  })
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
-  const data: updateCareerProfileResponse["data"] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as updateCareerProfileResponse
+  options?: SecondParameter<typeof request<CareerProfileResponse>>,
+) => {
+  return request<CareerProfileResponse>(
+    {
+      url: `/api/career-profile`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: updateCareerProfileRequest,
+    },
+    options,
+  )
 }
-
-export const getUpdateCareerProfileMutationOptions = <
-  TError = ErrorResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateCareerProfile>>,
-    TError,
-    UpdateCareerProfileMutationVariables,
-    TContext
-  >
-  fetch?: RequestInit
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateCareerProfile>>,
-  TError,
-  UpdateCareerProfileMutationVariables,
-  TContext
-> => {
-  const mutationKey = ["updateCareerProfile"]
-  const { mutation: mutationOptions, fetch: fetchOptions } = options
-    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, fetch: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateCareerProfile>>,
-    UpdateCareerProfileMutationVariables
-  > = (props) => {
-    const { data } = props ?? {}
-
-    return updateCareerProfile(data, fetchOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type UpdateCareerProfileMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateCareerProfile>>
->
-export type UpdateCareerProfileMutationBody = UpdateCareerProfileRequest
-export type UpdateCareerProfileMutationError = ErrorResponse
-export type UpdateCareerProfileMutationVariables = { data: UpdateCareerProfileRequest }
-
-/**
- * @summary Update Career Profile
- */
-export const useUpdateCareerProfile = <TError = ErrorResponse, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateCareerProfile>>,
-      TError,
-      UpdateCareerProfileMutationVariables,
-      TContext
-    >
-    fetch?: RequestInit
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateCareerProfile>>,
-  TError,
-  UpdateCareerProfileMutationVariables,
-  TContext
-> => {
-  return useMutation(getUpdateCareerProfileMutationOptions(options), queryClient)
-}
+export type GetCareerProfileResult = NonNullable<Awaited<ReturnType<typeof getCareerProfile>>>
+export type CreateCareerProfileResult = NonNullable<Awaited<ReturnType<typeof createCareerProfile>>>
+export type UpdateCareerProfileResult = NonNullable<Awaited<ReturnType<typeof updateCareerProfile>>>

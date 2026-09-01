@@ -18,14 +18,19 @@ export default defineConfig({
     },
     output: {
       mode: "tags-split",
-      client: "react-query",
-      httpClient: "fetch",
+      client: "axios-functions",
       target: fileURLToPath(new URL("./src/api/generated/endpoints", import.meta.url)),
       schemas: fileURLToPath(new URL("./src/api/generated/models", import.meta.url)),
       clean: true,
       indexFiles: true,
       tagsSplitDeduplication: true,
       formatter: "prettier",
+      override: {
+        mutator: {
+          path: fileURLToPath(new URL("./src/api/http.ts", import.meta.url)),
+          name: "request",
+        },
+      },
       mock: {
         indexMockFiles: true,
         generators: [
