@@ -3,6 +3,7 @@ import axios, { type AxiosRequestConfig } from "axios"
 import { normalizeRequestError } from "./error"
 
 const apiClient = axios.create({
+  baseURL: import.meta.env.BASE_URL,
   withCredentials: true,
 })
 
