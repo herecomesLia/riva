@@ -563,7 +563,11 @@ describe("RolesView", () => {
       const methodButton = within(dialog).getByRole("button", {
         name: i18n.t(`roles.creation.methods.${method}`),
       })
-      expect(methodButton).toHaveClass("border-primary/20", "bg-primary/10", "pl-8")
+      expect(methodButton).toHaveClass(
+        "border-primary/20",
+        "bg-primary/10",
+        "has-data-[icon=inline-start]:pl-4",
+      )
       expect(
         within(dialog).queryByText(i18n.t(`roles.creation.methodDescriptions.${method}`)),
       ).not.toBeInTheDocument()
