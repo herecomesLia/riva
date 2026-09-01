@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest"
 
-import { userMock } from "@/mocks/data/auth"
+import { authUserFixture } from "@/mocks/fixtures/auth"
+import type { User } from "@/models/auth"
 import { useAuthStore } from "@/stores/auth"
 import { resetStores } from "@/test/stores"
+
+const userMock = {
+  ...authUserFixture,
+  avatarFallback: "R",
+  avatarUrl: undefined,
+} satisfies User
 
 describe("auth store", () => {
   beforeEach(() => {

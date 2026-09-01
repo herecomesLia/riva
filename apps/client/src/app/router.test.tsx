@@ -8,10 +8,17 @@ import { AppRouter } from "@/app/router"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { userMock } from "@/mocks/data/auth"
+import { authUserFixture } from "@/mocks/fixtures/auth"
+import type { User } from "@/models/auth"
 import { useAuthStore } from "@/stores/auth"
 import { createTestQueryClient } from "@/test/query-client"
 import { resetStores } from "@/test/stores"
+
+const userMock = {
+  ...authUserFixture,
+  avatarFallback: "R",
+  avatarUrl: undefined,
+} satisfies User
 
 vi.mock("@/services/training-records", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/services/training-records")>()

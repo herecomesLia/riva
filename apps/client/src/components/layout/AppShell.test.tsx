@@ -5,10 +5,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppShell } from "@/components/layout/AppShell"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { userMock } from "@/mocks/data/auth"
+import { authUserFixture } from "@/mocks/fixtures/auth"
+import type { User } from "@/models/auth"
 import { useAuthStore } from "@/stores/auth"
 import { renderWithProviders } from "@/test/render"
 import { resetStores } from "@/test/stores"
+
+const userMock = {
+  ...authUserFixture,
+  avatarFallback: "R",
+  avatarUrl: undefined,
+} satisfies User
 
 vi.mock("@/services/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/auth")>()),

@@ -2,9 +2,9 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { ApiError, TransportError } from "@/api/error"
 import { useAuth } from "@/hooks/use-auth"
 import { i18n } from "@/i18n/i18n"
-import { LoginError } from "@/models/auth"
 import { LoginForm } from "@/pages/login/LoginForm"
 import { LoginHeroesProvider, useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
 import { renderWithProviders } from "@/test/render"
@@ -14,6 +14,21 @@ vi.mock("@/hooks/use-auth", () => ({
 }))
 
 const loginMock = vi.fn()
+
+function apiError(status: number, code: string, message: string) {
+  return new ApiError(
+    status,
+    {
+      error: { code, message },
+      requestId: "request-1",
+    },
+    "Request failed",
+  )
+}
+
+function invalidCredentialsError() {
+  return apiError(401, "auth.invalid_credentials", "Invalid username or password.")
+}
 
 function t(key: string) {
   return i18n.t(key)
@@ -157,7 +172,7 @@ describe("LoginForm", () => {
 
   it("handles invalid credentials without field-level server errors", async () => {
     const user = userEvent.setup()
-    loginMock.mockRejectedValue(new LoginError("invalidCredentials"))
+    loginMock.mockRejectedValue(invalidCredentialsError())
     const { onLoginSuccess } = renderLoginForm()
 
     await fillLoginForm(user)
@@ -174,7 +189,9 @@ describe("LoginForm", () => {
 
   it("keeps credentials for a service unavailable error", async () => {
     const user = userEvent.setup()
-    loginMock.mockRejectedValue(new LoginError("serviceUnavailable"))
+    loginMock.mockRejectedValue(
+      apiError(503, "dependency.database_unavailable", "Database is temporarily unavailable."),
+    )
     const { onLoginSuccess } = renderLoginForm()
 
     await fillLoginForm(user)
@@ -186,6 +203,19 @@ describe("LoginForm", () => {
     expect(getPasswordInput()).toHaveValue("secret")
     expect(onLoginSuccess).not.toHaveBeenCalled()
     expect(getSubmitButton()).toBeEnabled()
+  })
+
+  it("treats transport failures as service unavailable", async () => {
+    const user = userEvent.setup()
+    loginMock.mockRejectedValue(new TransportError("network", "Network unavailable"))
+    renderLoginForm()
+
+    await fillLoginForm(user)
+    await user.click(getSubmitButton())
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(t("login.errorServiceUnavailable"))
+    expect(screen.getByLabelText(t("login.username"))).toHaveValue("eleno")
+    expect(getPasswordInput()).toHaveValue("secret")
   })
 
   it("shows a safe fallback for unknown errors", async () => {
@@ -207,7 +237,7 @@ describe("LoginForm", () => {
 
   it("clears the form-level error when the username changes", async () => {
     const user = userEvent.setup()
-    loginMock.mockRejectedValue(new LoginError("serviceUnavailable"))
+    loginMock.mockRejectedValue(new TransportError("network", "Network unavailable"))
     renderLoginForm()
 
     await fillLoginForm(user)
@@ -220,7 +250,7 @@ describe("LoginForm", () => {
   })
 
   it("automatically hides the login error popup after a short duration", async () => {
-    loginMock.mockRejectedValue(new LoginError("invalidCredentials"))
+    loginMock.mockRejectedValue(invalidCredentialsError())
     renderWithProviders(
       <LoginHeroesProvider>
         <LoginForm loginErrorVisibleMs={1} onLoginSuccess={vi.fn()} />
@@ -241,7 +271,7 @@ describe("LoginForm", () => {
 
   it("clears the form-level error when the password changes", async () => {
     const user = userEvent.setup()
-    loginMock.mockRejectedValue(new LoginError("serviceUnavailable"))
+    loginMock.mockRejectedValue(new TransportError("network", "Network unavailable"))
     renderLoginForm()
 
     await fillLoginForm(user)
@@ -255,9 +285,7 @@ describe("LoginForm", () => {
 
   it("can submit again after a failed login and only reports success once", async () => {
     const user = userEvent.setup()
-    loginMock
-      .mockRejectedValueOnce(new LoginError("invalidCredentials"))
-      .mockResolvedValueOnce(undefined)
+    loginMock.mockRejectedValueOnce(invalidCredentialsError()).mockResolvedValueOnce(undefined)
     const { onLoginSuccess } = renderLoginForm()
 
     await fillLoginForm(user)
@@ -279,7 +307,7 @@ describe("LoginForm", () => {
 
   it("resets the login heroes password state after invalid credentials clear the password", async () => {
     const user = userEvent.setup()
-    loginMock.mockRejectedValue(new LoginError("invalidCredentials"))
+    loginMock.mockRejectedValue(invalidCredentialsError())
     renderLoginForm(vi.fn(), true)
 
     await fillLoginForm(user)

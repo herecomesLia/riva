@@ -1,48 +1,36 @@
-import { env } from "@/app/env"
-import { mockLoginCredentials, userMock } from "@/mocks/data/auth"
-import { waitForMockDelay } from "@/mocks/utils"
-import { LoginError, type LoginCredentials, type User } from "@/models/auth"
+import { ApiError } from "@/api/error"
+import { login as loginRequest, logout as logoutRequest } from "@/api/generated/endpoints/auth/auth"
+import { getCurrentUser } from "@/api/generated/endpoints/users/users"
+import type { LoginCredentials, UserResponse } from "@/api/generated/models"
+import type { User } from "@/models/auth"
 
-export type { LoginCredentials, LoginErrorCode } from "@/models/auth"
-export { LoginError, isLoginError } from "@/models/auth"
+export type { LoginCredentials } from "@/api/generated/models"
 
-const authDelayMs = 500
+function mapUser(user: UserResponse): User {
+  const fallbackSource = user.displayName.trim() || user.username
 
-function createUserMockCopy(): User {
-  return { ...userMock }
+  return {
+    avatarFallback: fallbackSource.charAt(0).toUpperCase(),
+    avatarUrl: user.avatarUrl ?? undefined,
+    displayName: user.displayName,
+    id: user.id,
+    username: user.username,
+  }
 }
 
 export async function login(credentials: LoginCredentials): Promise<User> {
-  if (env.mock) {
-    await waitForMockDelay(authDelayMs)
-
-    if (
-      credentials.username !== mockLoginCredentials.username ||
-      credentials.password !== mockLoginCredentials.password
-    ) {
-      throw new LoginError("invalidCredentials")
-    }
-
-    return createUserMockCopy()
-  }
-
-  throw new Error("Real auth API is not implemented.")
+  return mapUser(await loginRequest(credentials))
 }
 
 export async function logout(): Promise<void> {
-  if (env.mock) {
-    await waitForMockDelay(authDelayMs)
-    return
-  }
-
-  throw new Error("Real auth API is not implemented.")
+  await logoutRequest()
 }
 
 export async function restoreCurrentUser(): Promise<User | null> {
-  if (env.mock) {
-    await waitForMockDelay(authDelayMs)
-    return null
+  try {
+    return mapUser(await getCurrentUser())
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return null
+    throw error
   }
-
-  throw new Error("Real auth API is not implemented.")
 }

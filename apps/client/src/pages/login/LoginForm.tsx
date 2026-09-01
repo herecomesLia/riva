@@ -5,14 +5,16 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
+import { ApiError, TransportError } from "@/api/error"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
-import { isLoginError, type LoginErrorCode } from "@/models/auth"
 import { useLoginHeroesContext } from "@/pages/login/LoginHeroesContext"
+
+type LoginErrorCode = "invalidCredentials" | "serviceUnavailable" | "unknown"
 
 type LoginFormProps = {
   loginErrorVisibleMs?: number
@@ -81,7 +83,17 @@ export function LoginForm({
   }
 
   function resolveLoginErrorCode(error: unknown): LoginErrorCode {
-    return isLoginError(error) ? error.code : "unknown"
+    if (
+      error instanceof ApiError &&
+      error.status === 401 &&
+      error.code === "auth.invalid_credentials"
+    ) {
+      return "invalidCredentials"
+    }
+    if ((error instanceof ApiError && error.status === 503) || error instanceof TransportError) {
+      return "serviceUnavailable"
+    }
+    return "unknown"
   }
 
   const form = useForm({
