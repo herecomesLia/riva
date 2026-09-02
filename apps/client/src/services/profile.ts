@@ -12,7 +12,7 @@ export async function getProfile(): Promise<CareerProfileResponse | null> {
   try {
     return await getCareerProfile()
   } catch (error) {
-    if (error instanceof ApiError && error.code === "career_profile.not_found") {
+    if (error instanceof ApiError && error.code === "resource.not_found") {
       return null
     }
     throw error

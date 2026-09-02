@@ -10,9 +10,9 @@ from riva.models.career_profile import (
 from riva.models.types import NonBlankStr
 from riva.models.user import User
 from riva.services.errors import (
-    CareerProfileAlreadyExistsError,
-    CareerProfileNotFoundError,
-    CareerProfileSkillMismatchError,
+    ConflictError,
+    DomainValidationError,
+    NotFoundError,
 )
 from riva.services.types import UNSET
 
@@ -24,7 +24,7 @@ class CareerProfileService:
     async def get(self, user: User) -> CareerProfile:
         profile = user.career_profile
         if profile is None:
-            raise CareerProfileNotFoundError()
+            raise NotFoundError("Career profile was not found.")
         return profile
 
     async def create(
@@ -37,7 +37,7 @@ class CareerProfileService:
         skills: list[NonBlankStr] | None = None,
     ) -> CareerProfile:
         if user.career_profile is not None:
-            raise CareerProfileAlreadyExistsError()
+            raise ConflictError("Career profile already exists.")
 
         education = [] if education is None else education
         work_experiences = [] if work_experiences is None else work_experiences
@@ -48,7 +48,9 @@ class CareerProfileService:
             for work_experience in work_experiences
             for skill in work_experience.skills
         ):
-            raise CareerProfileSkillMismatchError()
+            raise DomainValidationError(
+                "Work experience skills must exist in the career profile skills list."
+            )
 
         profile = CareerProfile(
             education=education,
@@ -63,7 +65,7 @@ class CareerProfileService:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise CareerProfileAlreadyExistsError() from exc
+            raise ConflictError("Career profile already exists.") from exc
 
         return profile
 
@@ -94,7 +96,9 @@ class CareerProfileService:
             for work_experience in next_work_experiences
             for skill in work_experience.skills
         ):
-            raise CareerProfileSkillMismatchError()
+            raise DomainValidationError(
+                "Work experience skills must exist in the career profile skills list."
+            )
 
         if education is not UNSET:
             profile.education = education

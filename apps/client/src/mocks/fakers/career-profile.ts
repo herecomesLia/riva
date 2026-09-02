@@ -26,7 +26,7 @@ function validateSkills(profile: CareerProfileResponse) {
 
   if (hasMismatch) {
     throw careerProfileError(
-      "career_profile.skill_mismatch",
+      "domain.validation_failed",
       "Work experience skills must exist in the career profile skills list.",
     )
   }
@@ -38,7 +38,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
   return {
     async get(): Promise<CareerProfileResponse> {
       if (!profile) {
-        throw careerProfileError("career_profile.not_found", "Career profile was not found.")
+        throw careerProfileError("resource.not_found", "Career profile was not found.")
       }
 
       return structuredClone(profile)
@@ -46,7 +46,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
 
     async create(input: CreateCareerProfileRequest): Promise<CareerProfileResponse> {
       if (profile) {
-        throw careerProfileError("career_profile.already_exists", "Career profile already exists.")
+        throw careerProfileError("resource.conflict", "Career profile already exists.")
       }
 
       const nextProfile: CareerProfileResponse = {
@@ -65,7 +65,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
 
     async update(input: UpdateCareerProfileRequest): Promise<CareerProfileResponse> {
       if (!profile) {
-        throw careerProfileError("career_profile.not_found", "Career profile was not found.")
+        throw careerProfileError("resource.not_found", "Career profile was not found.")
       }
 
       const nextProfile: CareerProfileResponse = {

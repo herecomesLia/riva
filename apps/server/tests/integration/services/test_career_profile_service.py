@@ -16,9 +16,9 @@ from riva.models.career_profile import (
 )
 from riva.services.career_profiles import CareerProfileService
 from riva.services.errors import (
-    CareerProfileAlreadyExistsError,
-    CareerProfileNotFoundError,
-    CareerProfileSkillMismatchError,
+    ConflictError,
+    DomainValidationError,
+    NotFoundError,
 )
 from riva.services.users import UserService
 
@@ -128,7 +128,7 @@ async def test_get_raises_when_profile_does_not_exist(
 ) -> None:
     user = await _new_user(user_service)
 
-    with pytest.raises(CareerProfileNotFoundError):
+    with pytest.raises(NotFoundError):
         await career_profile_service.get(user)
 
 
@@ -138,7 +138,7 @@ async def test_update_raises_when_profile_does_not_exist(
 ) -> None:
     user = await _new_user(user_service)
 
-    with pytest.raises(CareerProfileNotFoundError):
+    with pytest.raises(NotFoundError):
         await career_profile_service.update(user)
 
 
@@ -149,7 +149,7 @@ async def test_create_rejects_duplicate_profile(
     user = await _new_user(user_service)
     await career_profile_service.create(user)
 
-    with pytest.raises(CareerProfileAlreadyExistsError):
+    with pytest.raises(ConflictError):
         await career_profile_service.create(user)
 
 
@@ -206,7 +206,7 @@ async def test_update_rejects_skill_mismatch_without_partial_changes(
         skills=["Python"],
     )
 
-    with pytest.raises(CareerProfileSkillMismatchError):
+    with pytest.raises(DomainValidationError):
         await career_profile_service.update(user, **changes)
 
     profile = await _reload_profile(database, user.id)
@@ -249,7 +249,7 @@ async def test_create_rejects_skill_mismatch_without_creating_profile(
 ) -> None:
     user = await _new_user(user_service)
 
-    with pytest.raises(CareerProfileSkillMismatchError):
+    with pytest.raises(DomainValidationError):
         await career_profile_service.create(
             user,
             work_experiences=[_work_experience("Python")],

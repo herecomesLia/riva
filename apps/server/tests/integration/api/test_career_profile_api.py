@@ -95,7 +95,7 @@ async def test_get_returns_not_found_for_missing_profile(client: AsyncClient) ->
     assert_error_response(
         response,
         status_code=404,
-        code="career_profile.not_found",
+        code="resource.not_found",
         message="Career profile was not found.",
     )
 
@@ -120,7 +120,7 @@ async def test_post_returns_conflict_for_existing_profile(client: AsyncClient) -
     assert_error_response(
         second_response,
         status_code=409,
-        code="career_profile.already_exists",
+        code="resource.conflict",
         message="Career profile already exists.",
     )
 
@@ -211,7 +211,7 @@ async def test_patch_rejects_skill_mismatch_using_persisted_work_experiences(
     assert_error_response(
         response,
         status_code=422,
-        code="career_profile.skill_mismatch",
+        code="domain.validation_failed",
         message=(
             "Work experience skills must exist in the career profile skills list."
         ),

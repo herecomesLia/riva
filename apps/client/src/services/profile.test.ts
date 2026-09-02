@@ -28,10 +28,10 @@ describe("profile service", () => {
     vi.mocked(careerProfileFaker.importResume).mockReset()
   })
 
-  it("maps only career_profile.not_found to null", async () => {
+  it("maps only resource.not_found to null", async () => {
     vi.mocked(getCareerProfile).mockRejectedValueOnce(
       new ApiError({
-        error: { code: "career_profile.not_found", message: "Career profile was not found." },
+        error: { code: "resource.not_found", message: "Career profile was not found." },
       }),
     )
     await expect(getProfile()).resolves.toBeNull()

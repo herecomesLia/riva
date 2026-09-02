@@ -8,13 +8,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from riva.db.errors import DatabaseUnavailableError
 from riva.errors import ErrorCode
 from riva.services.errors import (
-    CareerProfileAlreadyExistsError,
-    CareerProfileNotFoundError,
-    CareerProfileSkillMismatchError,
-    InvalidCredentialsError,
+    AuthenticationError,
+    ConflictError,
+    DomainValidationError,
     InvalidSessionError,
+    NotFoundError,
     SessionExpiredError,
-    UsernameTakenError,
 )
 
 
@@ -54,7 +53,6 @@ class ErrorDetails:
 
 
 HTTP_ERROR_POLICIES: dict[type[Exception], HttpErrorPolicy] = {
-    InvalidCredentialsError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
     InvalidSessionError: HttpErrorPolicy(
         status.HTTP_401_UNAUTHORIZED,
         clear_session_cookie=True,
@@ -63,12 +61,10 @@ HTTP_ERROR_POLICIES: dict[type[Exception], HttpErrorPolicy] = {
         status.HTTP_401_UNAUTHORIZED,
         clear_session_cookie=True,
     ),
-    UsernameTakenError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
-    CareerProfileNotFoundError: HttpErrorPolicy(status.HTTP_404_NOT_FOUND),
-    CareerProfileAlreadyExistsError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
-    CareerProfileSkillMismatchError: HttpErrorPolicy(
-        status.HTTP_422_UNPROCESSABLE_CONTENT
-    ),
+    AuthenticationError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
+    NotFoundError: HttpErrorPolicy(status.HTTP_404_NOT_FOUND),
+    ConflictError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
+    DomainValidationError: HttpErrorPolicy(status.HTTP_422_UNPROCESSABLE_CONTENT),
     AuthRequiredError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
     CsrfFailedError: HttpErrorPolicy(status.HTTP_403_FORBIDDEN),
     APINotImplementedError: HttpErrorPolicy(status.HTTP_501_NOT_IMPLEMENTED),
@@ -99,7 +95,14 @@ def resolve_http_policy(error: Exception | type[Exception]) -> HttpErrorPolicy:
         return HttpErrorPolicy(error.status_code)
 
     error_type = error if isinstance(error, type) else type(error)
-    return HTTP_ERROR_POLICIES.get(error_type, HTTP_ERROR_POLICIES[Exception])
+    return next(
+        (
+            HTTP_ERROR_POLICIES[parent]
+            for parent in error_type.__mro__
+            if parent in HTTP_ERROR_POLICIES
+        ),
+        HTTP_ERROR_POLICIES[Exception],
+    )
 
 
 def resolve_error_details(error: Exception | type[Exception]) -> ErrorDetails:

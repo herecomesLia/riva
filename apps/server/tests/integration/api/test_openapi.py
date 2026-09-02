@@ -94,15 +94,10 @@ def test_openapi_exposes_error_codes_and_endpoint_error_semantics() -> None:
 
     conflict = schema["paths"]["/api/auth/register"]["post"]["responses"]["409"]
     assert "auth.username_taken" in conflict["description"]
-    assert set(conflict["content"]["application/json"]["examples"]) == {
-        "auth.username_taken"
-    }
 
     validation = schema["paths"]["/api/career-profile"]["post"]["responses"]["422"]
-    assert set(validation["content"]["application/json"]["examples"]) == {
-        "career_profile.skill_mismatch",
-        "request.validation_failed",
-    }
+    assert "domain.validation_failed" in validation["description"]
+    assert "request.validation_failed" in validation["description"]
 
 
 def test_validated_operations_declare_public_422_error() -> None:

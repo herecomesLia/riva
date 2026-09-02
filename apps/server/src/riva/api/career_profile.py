@@ -11,10 +11,10 @@ from riva.schemas.career_profile import (
     UpdateCareerProfileRequest,
 )
 from riva.services.errors import (
-    CareerProfileAlreadyExistsError,
-    CareerProfileNotFoundError,
-    CareerProfileSkillMismatchError,
+    ConflictError,
+    DomainValidationError,
     InvalidSessionError,
+    NotFoundError,
     SessionExpiredError,
 )
 
@@ -35,7 +35,7 @@ router = APIRouter(
     "",
     operation_id="get-career-profile",
     response_model=CareerProfileResponse,
-    responses=error_responses(CareerProfileNotFoundError),
+    responses=error_responses(NotFoundError),
 )
 async def get_career_profile(
     current_user: CurrentUserDep,
@@ -50,8 +50,8 @@ async def get_career_profile(
     response_model=CareerProfileResponse,
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(
-        CareerProfileAlreadyExistsError,
-        CareerProfileSkillMismatchError,
+        ConflictError,
+        DomainValidationError,
         RequestValidationError,
     ),
 )
@@ -74,8 +74,8 @@ async def create_career_profile(
     operation_id="update-career-profile",
     response_model=CareerProfileResponse,
     responses=error_responses(
-        CareerProfileNotFoundError,
-        CareerProfileSkillMismatchError,
+        NotFoundError,
+        DomainValidationError,
         RequestValidationError,
     ),
 )

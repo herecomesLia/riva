@@ -8,9 +8,9 @@ import { careerProfileFaker as rawCareerProfileFaker } from "@/mocks/fakers/care
 import { asMswFaker } from "@/mocks/handlers/adapter"
 
 const careerProfileFaker = asMswFaker(rawCareerProfileFaker, {
-  "career_profile.not_found": 404,
-  "career_profile.already_exists": 409,
-  "career_profile.skill_mismatch": 422,
+  "resource.not_found": 404,
+  "resource.conflict": 409,
+  "domain.validation_failed": 422,
 })
 
 export const careerProfileHandlers = [

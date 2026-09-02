@@ -11,7 +11,7 @@ describe("careerProfileFaker", () => {
     const faker = createCareerProfileFaker(careerProfileFixture)
 
     await expect(faker.update({ skills: ["Python"] })).rejects.toMatchObject({
-      code: "career_profile.skill_mismatch",
+      code: "domain.validation_failed",
     })
     await expect(faker.get()).resolves.toEqual(careerProfileFixture)
   })
