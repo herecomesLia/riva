@@ -6,7 +6,7 @@ import {
 } from "@/api/generated/endpoints/career-profile/career-profile"
 import type { CareerProfileResponse, UpdateCareerProfileRequest } from "@/api/generated/models"
 import { careerProfileFaker } from "@/mocks/fakers/career-profile"
-import type { ResumeImportInput } from "@/models/profile"
+import type { ResumeImportInput } from "@/models/resume"
 
 export async function getProfile(): Promise<CareerProfileResponse | null> {
   try {

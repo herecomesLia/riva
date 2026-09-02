@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import type { ResumeImportInput } from "@/models/profile"
+import type { ResumeImportInput } from "@/models/resume"
 
 export function ResumeImportForm({
   embedded = false,

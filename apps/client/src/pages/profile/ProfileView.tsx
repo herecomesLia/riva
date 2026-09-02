@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import type { ResumeImportInput } from "@/models/profile"
+import type { ResumeImportInput } from "@/models/resume"
 
 import { ProfileHeader } from "./components/ProfileHeader"
 import { ResumeImportForm } from "./components/ProfileImportPanels"

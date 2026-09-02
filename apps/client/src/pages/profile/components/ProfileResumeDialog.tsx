@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { ResumeImportInput } from "@/models/profile"
+import type { ResumeImportInput } from "@/models/resume"
 
 import { ResumeImportForm } from "./ProfileImportPanels"
 
