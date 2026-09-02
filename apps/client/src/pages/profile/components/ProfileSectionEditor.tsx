@@ -61,6 +61,10 @@ function toNullable(value: string) {
   return value.trim() || null
 }
 
+function experienceFieldName(index: number, name: string) {
+  return `items[${index}].${name}`
+}
+
 function translateValidationError(t: ReturnType<typeof useTranslation>["t"], error: unknown) {
   const message =
     typeof error === "object" && error !== null && "message" in error
@@ -109,7 +113,7 @@ function TextField({
   name: string
 }) {
   const { t } = useTranslation()
-  const fieldName = index === undefined ? name : `items.${index}.${name}`
+  const fieldName = index === undefined ? name : experienceFieldName(index, name)
 
   return (
     <form.Field name={fieldName}>
@@ -159,8 +163,8 @@ function EndDateField({
   index: number
 }) {
   const { t } = useTranslation()
-  const endDateName = `items.${index}.endDate`
-  const isCurrentName = `items.${index}.isCurrent`
+  const endDateName = experienceFieldName(index, "endDate")
+  const isCurrentName = experienceFieldName(index, "isCurrent")
 
   return (
     <form.Field name={endDateName}>
@@ -240,7 +244,7 @@ function EndDateField({
 
 function EmploymentTypeField({ form, index }: { form: any; index: number }) {
   const { t } = useTranslation()
-  const fieldName = `items.${index}.employmentType`
+  const fieldName = experienceFieldName(index, "employmentType")
 
   return (
     <form.Field name={fieldName}>
@@ -444,7 +448,7 @@ function ExperienceFieldGroup({
             name="location"
           />
           {dateFields}
-          <form.Field name={`items.${index}.responsibilities`}>
+          <form.Field name={experienceFieldName(index, "responsibilities")}>
             {(field: any) => (
               <BulletListEditor
                 description={t("profile.editor.bulletListDescription")}
@@ -454,7 +458,7 @@ function ExperienceFieldGroup({
               />
             )}
           </form.Field>
-          <form.Field name={`items.${index}.achievements`}>
+          <form.Field name={experienceFieldName(index, "achievements")}>
             {(field: any) => (
               <BulletListEditor
                 description={t("profile.editor.bulletListDescription")}
@@ -464,7 +468,7 @@ function ExperienceFieldGroup({
               />
             )}
           </form.Field>
-          <form.Field name={`items.${index}.skills`}>
+          <form.Field name={experienceFieldName(index, "skills")}>
             {(field: any) => (
               <SkillTagInput
                 availableSkills={profile.skills}
@@ -491,7 +495,7 @@ function ExperienceFieldGroup({
             name="role"
           />
           {dateFields}
-          <form.Field name={`items.${index}.description`}>
+          <form.Field name={experienceFieldName(index, "description")}>
             {(field: any) => (
               <BulletListEditor
                 description={t("profile.editor.projectDescriptionHint")}
@@ -501,7 +505,7 @@ function ExperienceFieldGroup({
               />
             )}
           </form.Field>
-          <form.Field name={`items.${index}.achievements`}>
+          <form.Field name={experienceFieldName(index, "achievements")}>
             {(field: any) => (
               <BulletListEditor
                 description={t("profile.editor.projectAchievementsHint")}
@@ -511,7 +515,7 @@ function ExperienceFieldGroup({
               />
             )}
           </form.Field>
-          <form.Field name={`items.${index}.techStack`}>
+          <form.Field name={experienceFieldName(index, "techStack")}>
             {(field: any) => (
               <TechnologyStackInput
                 description={t("profile.editor.techStackDescription")}

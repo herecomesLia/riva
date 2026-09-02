@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -97,6 +97,27 @@ describe("ProfileSectionEditor", () => {
 
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     expect(onSave).toHaveBeenCalledWith({ projects: careerProfileFixture.projects })
+  })
+
+  it.each([
+    ["workExperience", 4],
+    ["projectExperience", 3],
+  ] as const)("shows every missing required field for a new %s", async (section, errorCount) => {
+    const user = userEvent.setup()
+    const { onSave } = renderEditor(section)
+
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.addExperience") }))
+    const newItem = screen.getAllByTestId(/^profile-editor-item-/).at(-1)
+    expect(newItem).toBeDefined()
+
+    await user.click(screen.getByRole("button", { name: i18n.t("profile.editor.save") }))
+
+    await waitFor(() => {
+      expect(
+        within(newItem!).getAllByText(i18n.t("profile.editor.validation.required")),
+      ).toHaveLength(errorCount)
+    })
+    expect(onSave).not.toHaveBeenCalled()
   })
 
   it("keeps a failed save draft visible and hides the raw failure", async () => {
