@@ -15,7 +15,7 @@ async function enableMocking() {
     serviceWorker: {
       url: "/mockServiceWorker.js",
     },
-    onUnhandledRequest: "bypass",
+    onUnhandledRequest: "error",
   })
 }
 
