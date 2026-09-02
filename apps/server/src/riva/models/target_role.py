@@ -46,7 +46,6 @@ class JobDescription(Base):
         ForeignKey("target_roles.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    raw_text: Mapped[str] = mapped_column(Text)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     responsibilities: Mapped[list[NonBlankStr]] = mapped_column(
         PydanticJSONB(list[NonBlankStr]),
